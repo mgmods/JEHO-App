@@ -40,6 +40,7 @@ import com.Dramizo.Series.presentation.profile.VisitorsActivity;
 import com.Dramizo.Series.presentation.notifications.OfficialNewsActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AppLoadingOverlay;
+import com.Dramizo.Series.util.RemoteNavIcons;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -180,14 +181,15 @@ public class MessagesFragment extends Fragment {
             binding.tvRequestBadge.setOnClickListener(openHub);
         }
 
-        // Social shortcuts open existing app destinations; no placeholder screens.
-        binding.btnQuickFriends.setOnClickListener(v -> openFriendsTab(FriendsActivity.TAB_FRIENDS));
+        // Shared inbox channels: Official News, Admin Messages, Notifications.
+        binding.btnQuickFriends.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), OfficialNewsActivity.class)));
+        binding.btnQuickRequests.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(),
+                        com.Dramizo.Series.presentation.notifications.AdminMessagesActivity.class)));
         binding.btnQuickNotifications.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), NotificationsActivity.class)));
-        binding.btnQuickRequests.setOnClickListener(v ->
-                openFriendsTab(FriendsActivity.TAB_REQ_FOLLOW));
-        binding.btnQuickVisitors.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), VisitorsActivity.class)));
+        loadChannelBranding();
 
         if (binding.officialNewsCardMsg != null) {
             binding.officialNewsCardMsg.getRoot().setOnClickListener(v ->
@@ -221,6 +223,28 @@ public class MessagesFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.load();
+    }
+
+    private void loadChannelBranding() {
+        AppContainer c = ContainerProvider.from(requireActivity());
+        RemoteNavIcons.hydrateFromCache(c);
+        bindChannelBranding();
+        c.getIoExecutor().execute(() -> {
+            RemoteNavIcons.refreshBlocking(c);
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(this::bindChannelBranding);
+        });
+    }
+
+    private void bindChannelBranding() {
+        if (binding == null) return;
+        RemoteNavIcons.bindChannelIcon(binding.imgQuickOfficialNews, "officialNews", R.drawable.jeho_logo);
+        RemoteNavIcons.bindChannelIcon(binding.imgQuickAdminMessages, "adminMessages", R.drawable.jeho_logo);
+        RemoteNavIcons.bindChannelIcon(binding.imgQuickNotifications, "notifications", R.drawable.ic_notification);
+        binding.imgQuickOfficialNewsVerified.setVisibility(
+                RemoteNavIcons.isChannelVerified("officialNews") ? View.VISIBLE : View.GONE);
+        binding.imgQuickAdminMessagesVerified.setVisibility(
+                RemoteNavIcons.isChannelVerified("adminMessages") ? View.VISIBLE : View.GONE);
     }
 
     private void runGlobalSearch(String query, int sequence) {
