@@ -648,6 +648,9 @@ export class ContestsService implements OnModuleInit {
     rules?: Record<string, unknown> | null;
     isInteractive?: boolean;
   }) {
+    if (dto.challengeType === 'room_vs_room') {
+      throw new BadRequestException('تحديات PK تُنشأ وتُدار من داخل الروم؛ الداشبورد مخصص لتفعيل الميزة أو إيقافها');
+    }
     const now = new Date();
     const hoursRaw = dto.hours != null ? Number(dto.hours) : NaN;
     const useHours = Number.isFinite(hoursRaw) && hoursRaw > 0;
@@ -741,6 +744,9 @@ export class ContestsService implements OnModuleInit {
   ) {
     const contest = await this.contestsRepo.findOne({ where: { id } });
     if (!contest) throw new NotFoundException('المسابقة غير موجودة');
+    if (contest.challengeType === 'room_vs_room' || dto.challengeType === 'room_vs_room') {
+      throw new BadRequestException('تحديات PK تُدار من داخل الروم فقط؛ استخدم الداشبورد لتفعيل الميزة أو إيقافها');
+    }
     if (dto.title != null) contest.title = String(dto.title).trim();
     if (dto.description !== undefined) contest.description = dto.description?.trim() || null;
     if (dto.category != null) contest.category = dto.category;
