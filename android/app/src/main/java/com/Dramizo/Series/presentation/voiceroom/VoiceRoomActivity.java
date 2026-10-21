@@ -2759,7 +2759,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             menu.getMenu().add(0, i++, 0,
                     (seatRef.isMuted || seatRef.isModeratorMuted) ? "فك كتم المايك" : "كتم المايك");
         }
-        if ((canManageSeats || canKickUsers) && canTarget && seatRef != null) {
+        boolean canRemoveFromMic = canManageSeats || canKickUsers || (myUserId != null && roomModeratorIds.contains(myUserId)) || isPlatformManager() || isPlatformSuper();
+        if (canRemoveFromMic && canTarget && seatRef != null) {
             menu.getMenu().add(0, i++, 0, "إزالة من المايك");
         }
         if ((canKickUsers || canBanUsers) && canTarget) {
@@ -8022,7 +8023,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         TextView actForceLeaveSeat = sheet.findViewById(R.id.actForceLeaveSeat);
         if (actForceLeaveSeat != null) {
-            boolean showForceLeave = (canManageSeats || canKickUsers) && canTarget && targetSeat != null;
+            boolean canRemoveFromMic = canManageSeats || canKickUsers || (myUserId != null && roomModeratorIds.contains(myUserId)) || isPlatformManager() || isPlatformSuper();
+            boolean showForceLeave = canRemoveFromMic && canTarget && targetSeat != null;
             actForceLeaveSeat.setVisibility(showForceLeave ? View.VISIBLE : View.GONE);
             if (showForceLeave) {
                 actForceLeaveSeat.setText("إزالة من المايك");
