@@ -59,8 +59,6 @@
           <div class="position-control">
             <label class="form-label">حجم صورة المستخدم: {{ currentStyle.avatarSizeDp }} dp</label>
             <input v-model.number="currentStyle.avatarSizeDp" class="form-range" type="range" min="20" max="76" step="2" />
-            <label class="form-label">المسافة بين سطري الكتابة: {{ currentStyle.bodyOffsetY }}%</label>
-            <input v-model.number="currentStyle.bodyOffsetY" class="form-range" type="range" min="-5" max="45" step="1" />
           </div>
           <div class="position-control small text-secondary">
             اسحب كل عنصر داخل الصورة لتحديد مكانه. تغييرات المواضع محفوظة كنسب مئوية وتظهر في المعاينة.
@@ -149,8 +147,8 @@ const tabs = [
 ]
 const activeTab = ref('giftSend')
 const form = reactive({
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, bodyOffsetY: 17 },
-  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, bodyOffsetY: 17 },
+  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
   luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, bodyOffsetY: 17 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
   version: 1,
@@ -217,7 +215,6 @@ async function load() {
       widthDp: Math.max(220, Math.min(360, Number(incoming.widthDp) || 340)),
       heightDp: Math.max(60, Math.min(180, Number(incoming.heightDp) || 100)),
       avatarSizeDp: Math.max(20, Math.min(76, Number(incoming.avatarSizeDp) || 44)),
-      bodyOffsetY: Math.max(-5, Math.min(45, Number(incoming.bodyOffsetY) || 17)),
     })
   }
   Object.assign(form.luckyButton, {
