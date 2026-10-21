@@ -491,7 +491,9 @@ export class TasksService {
     const yesterdayDate = new Date(Date.now() - 86400000);
     const yesterday = `${yesterdayDate.getUTCFullYear()}-${String(yesterdayDate.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getUTCDate()).padStart(2, '0')}`;
     const alreadyClaimed = state.lastClaimDate === today;
-    const nextDay = alreadyClaimed ? Math.min(7, Math.max(1, state.streak)) : state.lastClaimDate === yesterday ? (state.streak >= 7 ? 1 : state.streak + 1) : 1;
+    const streakIsCurrent = alreadyClaimed || state.lastClaimDate === yesterday;
+    const activeStreak = streakIsCurrent ? state.streak : 0;
+    const nextDay = alreadyClaimed ? Math.min(7, Math.max(1, activeStreak)) : state.lastClaimDate === yesterday ? (activeStreak >= 7 ? 1 : activeStreak + 1) : 1;
     const day = config.days.find((d: any) => d.day === nextDay) || config.days[0];
     const cosmetic = day?.type === 'cosmetic' && day.cosmeticCode
       ? await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: day.cosmeticCode } })
@@ -506,14 +508,14 @@ export class TasksService {
         previewUrl: item?.previewUrl || null,
         animationUrl: item?.animationUrl || null,
         cosmeticType: item?.type || null,
-        claimed: alreadyClaimed && d.day <= state.streak,
+        claimed: activeStreak > 0 && d.day <= activeStreak,
       };
     }));
     return {
       enabled: config.enabled,
       shouldShow: config.enabled && !alreadyClaimed,
       alreadyClaimed,
-      streak: state.streak,
+      streak: activeStreak,
       currentDay: nextDay,
       today,
       reward: day ? { ...day, previewUrl: cosmetic?.previewUrl || null, animationUrl: cosmetic?.animationUrl || null, cosmeticType: cosmetic?.type || null, name: cosmetic?.name || day.label } : null,
