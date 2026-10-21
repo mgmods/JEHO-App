@@ -217,9 +217,16 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         addText(body, "أدوات الإدارة", 18f, true, TEXT)
         addText(body, "اختر الإجراء المطلوب — الأقسام مرتبة لتسهيل الوصول السريع.", 12f, false, MUTED)
+        // Keep privileged account-granting and global configuration tools out of
+        // Admin/Manager navigation. Backend authorization remains authoritative.
+        val superOnlyModules = listOf(
+            "notifications", "toastManager", "mysteriousMan", "luckyCannon",
+            "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
+            "vip", "logs", "staffIdentity", "operators"
+        )
         val visibleModules = when (currentRole) {
             StaffRoleHelper.MANAGER -> modules.filter { it.key == "rooms" || it.key == "streams" }
-            StaffRoleHelper.ADMIN -> modules.filter { it.key !in listOf("operators", "staffIdentity") }
+            StaffRoleHelper.ADMIN -> modules.filter { it.key !in superOnlyModules }
             else -> modules
         }
         val rows = visibleModules.chunked(2)
@@ -266,8 +273,13 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun openModule(key: String) {
+        val superOnlyModules = listOf(
+            "notifications", "toastManager", "mysteriousMan", "luckyCannon",
+            "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
+            "vip", "logs", "staffIdentity", "operators"
+        )
         if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams")) ||
-            (currentRole == StaffRoleHelper.ADMIN && key in listOf("operators", "staffIdentity"))) {
+            (currentRole == StaffRoleHelper.ADMIN && key in superOnlyModules)) {
             toast(if (currentRole == StaffRoleHelper.MANAGER) "صلاحية المانجر تقتصر على الرومات والبث المباشر" else "هذا القسم مخصص للسوبر أدمن")
             return
         }
