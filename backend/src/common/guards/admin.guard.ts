@@ -59,7 +59,12 @@ export class AdminGuard implements CanActivate {
         /\/admin\/economy\/renormalize-gifts(?:\/|$)/.test(path) ||
         /\/admin\/gifts\/(?:import-[^/]+|activate-all|rebuild-still-catalog)(?:\/|$)/.test(path) ||
         /\/admin\/rooms\/platform(?:\/|$)/.test(path) ||
-        /\/admin\/rooms\/[^/]+\/platform-moderators(?:\/|$)/.test(path);
+        /\/admin\/rooms\/[^/]+\/platform-moderators(?:\/|$)/.test(path) ||
+        // Granting account-bound benefits is Super Admin only; staff may
+        // review catalogs but cannot mint VIP, cosmetics, or vanity IDs.
+        /\\/admin\\/vip\\/assign(?:\\/|$)/.test(path) ||
+        /\\/admin\\/cosmetics\\/grant(?:\\/|$)/.test(path) ||
+        /\\/vanity-ids\\/admin\\/assign(?:\\/|$)/.test(path);
       if (role === 'admin' && superOnlyPath) {
         throw new ForbiddenException('This action is reserved for Super Admin');
       }
