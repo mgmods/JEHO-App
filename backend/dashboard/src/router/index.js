@@ -40,6 +40,12 @@ const routes = [
         meta: { titleKey: 'routes.conversations' },
       },
       {
+        path: 'staff-admins',
+        name: 'staff-admins',
+        component: () => import('@/views/StaffAdminsView.vue'),
+        meta: { title: 'إدارة أدمن لوحة التحكم', superOnly: true },
+      },
+      {
         path: 'users',
         name: 'users',
         component: () => import('@/views/UsersView.vue'),
@@ -308,6 +314,9 @@ router.beforeEach((to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.guest && auth.isAuthenticated) {
+    return { name: 'dashboard' }
+  }
+  if (to.meta.superOnly && !auth.isSuperAdmin) {
     return { name: 'dashboard' }
   }
   if (to.meta.requiresAuth && auth.isAuthenticated && to.name) {
