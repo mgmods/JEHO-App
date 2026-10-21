@@ -14840,7 +14840,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Mikoo grid: 5 columns, no scroll, compact scale for 15/20 mics. */
     private void applyMikooSeatGrid(int guestCount) {
         if (binding == null || binding.recyclerSeats == null || seatAdapter == null) return;
-        int scale = guestCount <= 10
+        int columns = roomPkSeatSplitApplied ? 2 : MIKOO_SEAT_COLUMNS;
+        int scale = roomPkSeatSplitApplied ? SeatAdapter.SCALE_COMPACT
+                : guestCount <= 10
                 ? SeatAdapter.SCALE_NORMAL
                 : guestCount <= 15
                 ? SeatAdapter.SCALE_MEDIUM
@@ -14848,11 +14850,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         seatAdapter.setScaleMode(scale);
 
         RecyclerView.LayoutManager lm = binding.recyclerSeats.getLayoutManager();
-        if (lm instanceof GridLayoutManager grid && grid.getSpanCount() != MIKOO_SEAT_COLUMNS) {
-            grid.setSpanCount(MIKOO_SEAT_COLUMNS);
+        if (lm instanceof GridLayoutManager grid && grid.getSpanCount() != columns) {
+            grid.setSpanCount(columns);
         }
 
-        int rows = guestCount <= 0 ? 1 : (guestCount + MIKOO_SEAT_COLUMNS - 1) / MIKOO_SEAT_COLUMNS;
+        int rows = guestCount <= 0 ? 1 : (guestCount + columns - 1) / columns;
         int rowHeightDp = scale == SeatAdapter.SCALE_COMPACT ? 70
                 : scale == SeatAdapter.SCALE_MEDIUM ? 76 : 86;
         int totalHeightPx = dp(rows * rowHeightDp + 8);
