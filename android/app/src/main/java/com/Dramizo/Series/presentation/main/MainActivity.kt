@@ -554,11 +554,21 @@ class MainActivity : ThemedActivity() {
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
             })
-            tile.addView(TextView(this).apply {
-                text = if (day.type == "coins") "🪙" else "🎁"
-                textSize = 24f
-                setPadding(0, pad / 5, 0, pad / 5)
-            })
+            if (day.type == "cosmetic" && !day.previewUrl.isNullOrBlank()) {
+                val dayImage = ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams((30 * resources.displayMetrics.density).toInt(), (30 * resources.displayMetrics.density).toInt())
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    contentDescription = day.name ?: "مكافأة اليوم"
+                }
+                Glide.with(this).load(day.previewUrl).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(dayImage)
+                tile.addView(dayImage)
+            } else {
+                tile.addView(TextView(this).apply {
+                    text = if (day.type == "coins") "🪙" else "🎁"
+                    textSize = 24f
+                    setPadding(0, pad / 5, 0, pad / 5)
+                })
+            }
             tile.addView(TextView(this).apply {
                 text = if (day.claimed) "تم" else if (day.type == "coins") "${day.amount}" else "هدية"
                 textSize = 10f
