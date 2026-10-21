@@ -133,10 +133,10 @@ public final class GlobalCelebrationToast {
         View sheen = active.findViewById(R.id.viewCelebrationSheen);
         if (sheen != null && shine) {
             sheen.setVisibility(View.VISIBLE);
-            GradientDrawable shine = new GradientDrawable(
+            GradientDrawable shineDrawable = new GradientDrawable(
                     GradientDrawable.Orientation.LEFT_RIGHT,
                     new int[] { 0x00FFFFFF, 0x66FFFFFF, 0x00FFFFFF });
-            sheen.setBackground(shine);
+            sheen.setBackground(shineDrawable);
             sheen.setRotation(12f);
             sheen.setAlpha(0.78f);
             active.post(() -> {
