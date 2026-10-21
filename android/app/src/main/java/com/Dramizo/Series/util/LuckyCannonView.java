@@ -14,8 +14,8 @@ import android.view.animation.DecelerateInterpolator;
 import androidx.annotation.Nullable;
 
 /**
- * Lightweight, locally rendered golden cannon control for the voice room.
- * No textures, network calls, or per-frame server updates are used.
+ * Lightweight locally drawn 3D lucky-gem button. No textures, network calls,
+ * or per-frame server updates; the room Activity owns drag and send behavior.
  */
 public final class LuckyCannonView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -28,11 +28,13 @@ public final class LuckyCannonView extends View {
     public LuckyCannonView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) { super(context, attrs, defStyleAttr); init(); }
 
     private void init() {
-        setContentDescription("مدفع هدايا المحظوظ");
+        setContentDescription("زر هدايا المحظوظ");
         setClickable(true);
         setFocusable(true);
+        setLayerType(View.LAYER_TYPE_SOFTWARE, null);
     }
 
+    /** Short tactile-looking pulse used when the existing send flow launches. */
     public void fire() {
         if (fireAnimator != null) fireAnimator.cancel();
         fireAnimator = ValueAnimator.ofFloat(0f, 1f);
@@ -40,7 +42,7 @@ public final class LuckyCannonView extends View {
         fireAnimator.setInterpolator(new DecelerateInterpolator());
         fireAnimator.addUpdateListener(a -> {
             fireProgress = (float) a.getAnimatedValue();
-            recoil = (float) Math.sin(fireProgress * Math.PI) * (1f - fireProgress) * 0.13f;
+            recoil = (float) Math.sin(fireProgress * Math.PI) * (1f - fireProgress) * 0.07f;
             invalidate();
         });
         fireAnimator.start();
@@ -52,69 +54,99 @@ public final class LuckyCannonView extends View {
         if (w <= 0 || h <= 0) return;
         canvas.save();
         canvas.scale(w / 100f, h / 100f);
-        // Soft gold halo, painted only during the short firing animation.
+        canvas.translate(0, recoil * 100f);
+
+        // Soft outer glow, limited to the short launch animation.
         if (fireProgress > 0f && fireProgress < 0.7f) {
-            paint.setShader(new LinearGradient(18, 18, 82, 82,
-                    new int[]{0x00FFD76A, 0x44FFC83D, 0x00FFD76A},
+            paint.setStyle(Paint.Style.FILL);
+            paint.setShader(new LinearGradient(12, 10, 88, 92,
+                    new int[]{0x00FF3D72, 0x66FFB62E, 0x003EDBFF},
                     null, Shader.TileMode.CLAMP));
-            canvas.drawCircle(50, 48, 44, paint);
+            canvas.drawCircle(50, 49, 49, paint);
             paint.setShader(null);
         }
-        // Compact dark-gold base.
+
+        // Deep dimensional shadow and polished gold outer bezel.
         paint.setStyle(Paint.Style.FILL);
-        paint.setShader(new LinearGradient(22, 69, 78, 89,
-                new int[]{0xFF6D4A12, 0xFFE8B84A, 0xFF5D3C0D}, null, Shader.TileMode.CLAMP));
-        Path base = new Path();
-        base.moveTo(18, 70); base.lineTo(80, 70); base.lineTo(72, 84);
-        base.quadTo(50, 91, 28, 84); base.close();
-        canvas.drawPath(base, paint);
+        paint.setColor(0x66000000);
+        canvas.drawCircle(50, 52, 47, paint);
+        paint.setShader(new LinearGradient(16, 8, 82, 94,
+                new int[]{0xFFFFF0A8, 0xFFB87916, 0xFFFFD86B, 0xFF70400D},
+                null, Shader.TileMode.CLAMP));
+        canvas.drawCircle(50, 48, 46, paint);
         paint.setShader(null);
-        // Barrel with metallic highlight and a short recoil shift.
-        canvas.save();
-        canvas.translate(-recoil * 100f, 0);
-        paint.setShader(new LinearGradient(18, 35, 77, 60,
-                new int[]{0xFF5A5A5A, 0xFFD8D8D8, 0xFF6A6A6A, 0xFFB98725},
-                new float[]{0f, .38f, .72f, 1f}, Shader.TileMode.CLAMP));
-        Path barrel = new Path();
-        barrel.moveTo(24, 40); barrel.lineTo(73, 29); barrel.lineTo(82, 35);
-        barrel.lineTo(80, 48); barrel.lineTo(29, 56); barrel.close();
-        canvas.drawPath(barrel, paint);
-        paint.setShader(null);
+
+        // Inner metallic highlight ring.
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(2.4f);
-        paint.setColor(0xFFFFD56A);
-        canvas.drawLine(31, 42, 74, 33, paint);
+        paint.setColor(0xFFFFF0B3);
+        canvas.drawCircle(50, 47, 41.5f, paint);
         paint.setStyle(Paint.Style.FILL);
-        paint.setShader(new LinearGradient(72, 30, 85, 47,
-                new int[]{0xFFFFE7A1, 0xFFB77A16, 0xFF51300A}, null, Shader.TileMode.CLAMP));
-        canvas.drawOval(74, 31, 86, 47, paint);
+
+        // Ruby / crimson enamel face.
+        paint.setShader(new LinearGradient(23, 13, 76, 83,
+                new int[]{0xFFFF6C83, 0xFFCE123D, 0xFF760B2B, 0xFF36051D},
+                null, Shader.TileMode.CLAMP));
+        canvas.drawCircle(50, 47, 39.5f, paint);
         paint.setShader(null);
-        canvas.restore();
-        // Two dark wheels with polished gold rims.
-        for (float x : new float[]{36f, 63f}) {
-            paint.setColor(0xFF252525); canvas.drawCircle(x, 67, 12, paint);
-            paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(3f);
-            paint.setColor(0xFFFFD36B); canvas.drawCircle(x, 67, 9.5f, paint);
-            paint.setStrokeWidth(1.4f); paint.setColor(0xFF9B6A18);
-            canvas.drawLine(x - 6, 67, x + 6, 67, paint);
-            canvas.drawLine(x, 61, x, 73, paint);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(0xFFEAC05C); canvas.drawCircle(x, 67, 2.4f, paint);
-        }
-        // Small golden sparks around the muzzle during firing.
-        if (fireProgress > 0f && fireProgress < 0.48f) {
-            float fade = 1f - fireProgress / 0.48f;
-            paint.setColor(((int) (255 * fade) << 24) | 0x00F6C64D);
-            paint.setStrokeWidth(2f);
-            for (int i = 0; i < 5; i++) {
-                double a = (i * 0.72) - 0.9;
-                float sx = 86f + (float) Math.cos(a) * (5f + fireProgress * 18f);
-                float sy = 39f + (float) Math.sin(a) * (5f + fireProgress * 18f);
-                canvas.drawLine(sx, sy, sx + (float) Math.cos(a) * 4f, sy + (float) Math.sin(a) * 4f, paint);
+
+        // Gloss highlight along the upper edge.
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2f);
+        paint.setColor(0x99FFFFFF);
+        canvas.drawArc(20, 16, 80, 76, 205, 125, false, paint);
+        paint.setStyle(Paint.Style.FILL);
+
+        // Diamond silhouette with icy cyan facets.
+        Path diamond = new Path();
+        diamond.moveTo(50, 21);
+        diamond.lineTo(70, 39);
+        diamond.lineTo(50, 72);
+        diamond.lineTo(30, 39);
+        diamond.close();
+        paint.setShader(new LinearGradient(31, 22, 68, 70,
+                new int[]{0xFFFFFFFF, 0xFF6BF4FF, 0xFF168BE8, 0xFFB7FFFF},
+                null, Shader.TileMode.CLAMP));
+        canvas.drawPath(diamond, paint);
+        paint.setShader(null);
+
+        // Crisp facets give the gem a cut-glass, three-dimensional look.
+        paint.setColor(0xFFDAFFFF);
+        Path leftFacet = new Path();
+        leftFacet.moveTo(30, 39); leftFacet.lineTo(43, 39);
+        leftFacet.lineTo(50, 21); leftFacet.close();
+        canvas.drawPath(leftFacet, paint);
+        paint.setColor(0xFF5DD8FF);
+        Path rightFacet = new Path();
+        rightFacet.moveTo(50, 21); rightFacet.lineTo(57, 39);
+        rightFacet.lineTo(70, 39); rightFacet.close();
+        canvas.drawPath(rightFacet, paint);
+        paint.setColor(0xFF0875D1);
+        Path lowerLeft = new Path();
+        lowerLeft.moveTo(30, 39); lowerLeft.lineTo(50, 72);
+        lowerLeft.lineTo(43, 39); lowerLeft.close();
+        canvas.drawPath(lowerLeft, paint);
+        paint.setColor(0xFF8CFBFF);
+        Path lowerRight = new Path();
+        lowerRight.moveTo(43, 39); lowerRight.lineTo(57, 39);
+        lowerRight.lineTo(50, 72); lowerRight.close();
+        canvas.drawPath(lowerRight, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.2f);
+        paint.setColor(0xCCFFFFFF);
+        canvas.drawPath(diamond, paint);
+        paint.setStyle(Paint.Style.FILL);
+
+        // Tiny gold sparkle accents; only drawn during launch for low overhead.
+        if (fireProgress > 0f && fireProgress < 0.55f) {
+            float alpha = 1f - fireProgress / 0.55f;
+            paint.setColor(((int) (255 * alpha) << 24) | 0x00FFE8A0);
+            for (int i = 0; i < 4; i++) {
+                float x = (i % 2 == 0) ? 20 + i * 3 : 77 - i * 2;
+                float y = (i < 2) ? 30 + i * 8 : 59 - i * 5;
+                canvas.drawCircle(x, y, 1.6f + alpha, paint);
             }
         }
-        // Tiny central gold jewel.
-        paint.setColor(0xFFFFE7A1); canvas.drawCircle(50, 53, 2.3f, paint);
         canvas.restore();
     }
 
