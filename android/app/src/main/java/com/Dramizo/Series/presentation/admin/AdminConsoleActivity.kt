@@ -1019,52 +1019,23 @@ class AdminConsoleActivity : ThemedActivity() {
             }
 
             when (type) {
-                "users" -> if (!id.isNullOrBlank()) {
-                    val banned = status?.contains("banned", true) == true
-                    if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
-                        card.addView(button("حظر مؤقت (حتى 24 ساعة)") {
-                            showTemporaryBanDialog(id)
-                        })
-                        card.addView(button("فك الحظر المؤقت") {
-                            confirm("سيُفك الحظر المؤقت الذي أصدرته أنت، أو أي حظر مؤقت عند السوبر أدمن. لن يُفك الحظر الدائم.") {
-                                load(api.temporaryUnbanUser(id)) {
-                                    toast("تم فك الحظر المؤقت")
-                                    openModule("users")
-                                }
-                            }
-                        })
-                    }
-                    if (currentRole == StaffRoleHelper.SUPER) {
-                        card.addView(button("تعديل الدور والحالة") { showUserAccessDialog(id, role, status) })
-                        card.addView(button(if (banned) "إلغاء الحظر" else "حظر المستخدم") {
-                            confirm(if (banned) "إلغاء حظر المستخدم؟" else "تأكيد حظر المستخدم؟") {
-                                load(if (banned) api.unbanUser(id) else api.banUser(id)) {
-                                    toast(if (banned) "تم إرسال طلب إلغاء الحظر للخادم" else "تم إرسال طلب الحظر للخادم")
-                                    openModule("users")
-                                }
-                            }
-                        })
-                        card.addView(button("حذف الحساب") {
-                            confirm("سيُطلب حذف الحساب. تأكد من الهوية والضرورة قبل المتابعة.") {
-                                load(api.deleteUser(id)) {
-                                    toast("استجاب الخادم لطلب حذف الحساب")
-                                    openModule("users")
-                                }
-                            }
-                        })
-                    } else {
-                        addText(card, "إجراءات تغيير الرتبة والحظر والحذف متاحة للسوبر أدمن فقط.", 11f, false, MUTED)
-                    }
-                }
-                "rooms" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("تعديل إعدادات الروم") {
-                        showEditRoomDialog(id, roomTitle, accessMode, entryFee)
+                "users", "rooms" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("فتح تفاصيل ${if (type == "users") "المستخدم" else "الروم"} والإجراءات  ←") {
+                        showEntityDetailDialog(item, type)
                     })
-                    card.addView(button("إغلاق الروم") {
-                        confirm("سيتم إغلاق الروم على الخادم. هل تريد المتابعة؟") {
-                            load(api.closeRoom(id)) { toast("استجاب الخادم لطلب إغلاق الروم"); openModule("rooms") }
+                    addText(card, if (type == "users") {
+                        when (currentRole) {
+                            StaffRoleHelper.SUPER -> "رتبتك: سوبر أدمن — صلاحيات إدارة الحساب الكاملة."
+                            StaffRoleHelper.ADMIN -> "رتبتك: أدمن — إجراءات الإشراف والحظر المؤقت فقط."
+                            else -> "رتبتك: مانجر — لا تتوفر إدارة حسابات المستخدمين من هذه الصفحة."
                         }
-                    })
+                    } else {
+                        when (currentRole) {
+                            StaffRoleHelper.SUPER -> "رتبتك: سوبر أدمن — إدارة الروم وإجراءاته."
+                            StaffRoleHelper.ADMIN -> "رتبتك: أدمن — إدارة الروم وفق صلاحيات الخادم."
+                            else -> "رتبتك: مانجر — إشراف الروم ضمن الصلاحيات الممنوحة."
+                        }
+                    }, 11f, false, MUTED)
                 }
                 "streams" -> if (!id.isNullOrBlank()) {
                     card.addView(button("إنهاء البث") {
@@ -1325,6 +1296,138 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 dialog.show()
             }
+    }
+
+    /**
+     * Native, grouped detail sheet for users and rooms. Mutations still use the existing
+     * AdminApi and are authorized by AdminGuard on the server.
+     */
+    private fun showEntityDetailDialog(item: Any, type: String) {
+        val id = value(item, "id", "userId", "roomId") ?: return
+        val isUser = type == "users"
+        val name = value(item, "displayName", "name", "title", "username", "email", "roomName")
+            ?: if (isUser) "مستخدم" else "روم"
+        val status = value(item, "status", "state", "isActive", "type") ?: "غير محدد"
+        val role = value(item, "staffRole", "role") ?: "بدون رتبة إدارية"
+        val publicId = value(item, "publicId")
+        val roomTitle = value(item, "title", "name", "roomName") ?: name
+        val accessMode = value(item, "accessMode") ?: "public"
+        val entryFee = value(item, "entryFeeCoins") ?: "0"
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(14), dp(6), dp(14), dp(8))
+        }
+        fun section(title: String, subtitle: String = ""): LinearLayout {
+            val panel = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(dp(12), dp(11), dp(12), dp(11))
+                background = GradientDrawable().apply {
+                    setColor(Color.WHITE)
+                    cornerRadius = dp(15).toFloat()
+                    setStroke(dp(1), 0xFFE8E7F2.toInt())
+                }
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) }
+            }
+            addText(panel, title, 14f, true, TEXT)
+            if (subtitle.isNotBlank()) addText(panel, subtitle, 11f, false, MUTED)
+            content.addView(panel)
+            return panel
+        }
+        val overview = section(if (isUser) "ملف المستخدم" else "ملف الروم", "المعلومات المعروضة من بيانات الخادم")
+        addText(overview, name, 16f, true, TEXT)
+        addText(overview, "معرّف السجل: $id", 12f, false, MUTED)
+        if (isUser && !publicId.isNullOrBlank()) {
+            addText(overview, "ID العام: $publicId", 12f, true, ACCENT)
+            overview.addView(button("نسخ ID العام") { copyToClipboard("ID المستخدم", publicId) })
+        }
+        addText(overview, "الحالة: $status", 12f, true, TEXT)
+        if (isUser) addText(overview, "الرتبة الإدارية: $role", 12f, false, MUTED)
+        val detailKeys = if (isUser) {
+            listOf("username", "email", "coins", "balance", "diamonds", "level", "vipLevel", "vipExpiresAt", "createdAt", "lastSeenAt", "country", "gender")
+        } else {
+            listOf("ownerName", "ownerId", "membersCount", "accessMode", "entryFeeCoins", "createdAt", "description", "isActive", "roomType")
+        }
+        val details = detailKeys.mapNotNull { key ->
+            value(item, key)?.takeIf { it.isNotBlank() }?.let { prettyKey(key) to it }
+        }
+        if (details.isNotEmpty()) {
+            val detailPanel = section("تفاصيل إضافية")
+            details.forEach { (label, value) -> addText(detailPanel, "$label: $value", 12f, false, MUTED) }
+        }
+        val permissions = section("الصلاحيات حسب رتبتك")
+        val permissionText = if (isUser) when (currentRole) {
+            StaffRoleHelper.SUPER -> "سوبر أدمن: تعديل الرتبة والحالة، الحظر الدائم أو إلغاؤه، الحظر المؤقت، والحذف عند الضرورة."
+            StaffRoleHelper.ADMIN -> "أدمن: الحظر المؤقت حتى 24 ساعة وفك الحظر المؤقت الذي أصدرته أنت. لا يملك تغيير الرتب أو الحظر الدائم أو حذف الحساب."
+            else -> "مانجر: لا يملك أدوات تغيير الحسابات؛ يقتصر دوره على الرومات والبث والبلاغات حسب صلاحيات الخادم."
+        } else when (currentRole) {
+            StaffRoleHelper.SUPER -> "سوبر أدمن: إدارة إعدادات الروم وإغلاقه وفق صلاحيات الخادم."
+            StaffRoleHelper.ADMIN -> "أدمن: إجراءات الروم المتاحة له وفق صلاحيات الخادم."
+            else -> "مانجر: إشراف الروم وإجراءاته المحددة من الخادم."
+        }
+        addText(permissions, permissionText, 12f, false, MUTED)
+
+        if (isUser) {
+            val actions = section("إجراءات الحساب", "تظهر الإجراءات وفق رتبتك، ويظل الخادم المرجع النهائي للصلاحيات.")
+            if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                actions.addView(button("حظر مؤقت حتى 24 ساعة") { showTemporaryBanDialog(id) })
+                actions.addView(button("فك الحظر المؤقت") {
+                    confirm("سيُفك الحظر المؤقت الذي أصدرته أنت، أو أي حظر مؤقت عند السوبر أدمن. لن يُفك الحظر الدائم.") {
+                        load(api.temporaryUnbanUser(id)) {
+                            toast("تم إرسال طلب فك الحظر المؤقت")
+                            openModule("users")
+                        }
+                    }
+                })
+            }
+            if (currentRole == StaffRoleHelper.SUPER) {
+                actions.addView(button("تعديل الرتبة والحالة") { showUserAccessDialog(id, role, status) })
+                val banned = status.contains("banned", true)
+                actions.addView(button(if (banned) "إلغاء الحظر الدائم" else "حظر المستخدم") {
+                    confirm(if (banned) "إلغاء حظر المستخدم؟" else "تأكيد حظر المستخدم؟") {
+                        load(if (banned) api.unbanUser(id) else api.banUser(id)) {
+                            toast("استجاب الخادم لطلب تحديث الحظر")
+                            openModule("users")
+                        }
+                    }
+                })
+                actions.addView(button("حذف الحساب") {
+                    confirm("تحذير: حذف الحساب إجراء حساس. تأكد من هوية الحساب وضرورة الحذف. متابعة؟") {
+                        load(api.deleteUser(id)) {
+                            toast("استجاب الخادم لطلب حذف الحساب")
+                            openModule("users")
+                        }
+                    }
+                })
+            } else {
+                addText(actions, "لا توجد إجراءات إضافية متاحة لرتبتك.", 12f, false, MUTED)
+            }
+        } else {
+            val actions = section("إجراءات الروم", "التغييرات تُرسل إلى الخادم ولا تغيّر منطق الصوت أو اتصال ZEGO.")
+            actions.addView(button("تعديل إعدادات الروم") {
+                showEditRoomDialog(id, roomTitle, accessMode, entryFee)
+            })
+            actions.addView(button("إغلاق الروم") {
+                confirm("سيتم إغلاق الروم على الخادم. هل تريد المتابعة؟") {
+                    load(api.closeRoom(id)) {
+                        toast("تم إرسال طلب إغلاق الروم")
+                        openModule("rooms")
+                    }
+                }
+            })
+        }
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(content)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(if (isUser) "تفاصيل المستخدم" else "تفاصيل الروم")
+            .setView(scroll)
+            .setPositiveButton("إغلاق", null)
+            .show()
     }
 
     private fun showEditRoomDialog(id: String, title: String, accessMode: String, entryFee: String) {
