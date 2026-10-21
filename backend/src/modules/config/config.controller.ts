@@ -145,6 +145,36 @@ export class ConfigController {
   }
 
   @Public()
+  @Get('toast-style')
+  @ApiOperation({ summary: 'Public dashboard-managed gift toast appearance' })
+  async toastStyle() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+    const defaults = { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1 };
+    let parsed: any = {};
+    try { parsed = row?.value ? JSON.parse(row.value) : {}; } catch { parsed = {}; }
+    const raw = typeof parsed.backgroundUrl === 'string' ? parsed.backgroundUrl.trim() : '';
+    const apiBase = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || 'https://jeho-own-backend.mgs.blitz.cloud')
+      .trim().replace(/\\/+$/, '').replace(/\\/api\\/v\\d+$/i, '');
+    let backgroundUrl = raw;
+    if (raw.startsWith('/uploads/') && !raw.startsWith('//')) backgroundUrl = apiBase + raw;
+    else if (/^uploads\\//i.test(raw)) backgroundUrl = apiBase + '/' + raw;
+    if (backgroundUrl && /^https?:\\/\\//i.test(backgroundUrl)) {
+      const separator = backgroundUrl.includes('?') ? '&' : '?';
+      backgroundUrl += separator + 'toast_v=' + Math.max(1, Number(parsed.version) || 1);
+    } else if (backgroundUrl && !/^https?:\\/\\//i.test(backgroundUrl)) {
+      backgroundUrl = '';
+    }
+    return {
+      ...defaults,
+      backgroundUrl,
+      shineEnabled: parsed.shineEnabled !== false,
+      frameGlowEnabled: parsed.frameGlowEnabled !== false,
+      durationSeconds: Math.max(2, Math.min(8, Math.round(Number(parsed.durationSeconds) || 3))),
+      version: Math.max(1, Math.round(Number(parsed.version) || 1)),
+    };
+  }
+
+  @Public()
   @Get('features')
   @ApiOperation({ summary: 'App feature flags for clients' })
   async features() {
