@@ -10470,25 +10470,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int vipLevel,
             @Nullable String message
     ) {
-        if (areCelebrationPopupsMuted()) return;
-        // Lucky gift result uses game-style crawl bubble — not ComingMsg (personal join strip).
+        if (areCelebrationPopupsMuted() || binding == null) return;
         String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
         String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
-        RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
-        if (bubbleFx != null) {
-            bubbleFx.showSlotWinBubble(who, null, Math.max(1L, extractCoinsFromBody(msg)), "حظ", null);
-            if (binding != null && binding.giftChatEffects != null) {
-                binding.giftChatEffects.setVisibility(View.VISIBLE);
-                binding.giftChatEffects.bringToFront();
-            }
-        } else if (binding != null && binding.comingMsgView != null) {
-            binding.comingMsgView.setupView(displayName, avatarUrl, userLevel, vipLevel, msg);
+        // Lucky return/multiplier is a compact upper toast, never a large mid-screen bubble.
+        if (binding.comingMsgView != null) {
+            binding.comingMsgView.setupView(who, avatarUrl, userLevel, vipLevel, msg);
             binding.comingMsgView.bringToFront();
-            binding.comingMsgView.play(3600L);
+            binding.comingMsgView.setElevation(luckyCannonDp(90));
+            binding.comingMsgView.play(2600L);
         }
-        if (roomBannerEnabled()) {
-            appendGameCelebrationLine(msg, null);
-        }
+        if (roomBannerEnabled()) appendGameCelebrationLine(msg, null);
     }
 
     /** World celebration while inside a room — Migo bubble (name/avatar/game/win) + chat. */
