@@ -274,6 +274,8 @@ public final class GlobalCelebrationToast {
         boolean showTimes = multiplier >= 1 && (gameOrLucky || multiplier >= 2);
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
+            wrapTimes.setScaleX(0.82f);
+            wrapTimes.setScaleY(0.82f);
             tvTimes.setText(String.format(Locale.US, "×%d", multiplier));
             if (badge != null) badge.setVisibility(View.GONE);
         } else {
@@ -314,6 +316,14 @@ public final class GlobalCelebrationToast {
                 .setDuration(420)
                 .setInterpolator(new android.view.animation.DecelerateInterpolator())
                 .start();
+        if (wrapTimes != null && wrapTimes.getVisibility() == View.VISIBLE) {
+            wrapTimes.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(360)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.1f))
+                    .start();
+        }
         hideRunnable = () -> removeBanner(banner);
         MAIN.postDelayed(hideRunnable, canOpenRoom ? 6200L : 5200L);
     }
