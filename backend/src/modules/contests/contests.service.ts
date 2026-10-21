@@ -336,7 +336,7 @@ export class ContestsService implements OnModuleInit {
     if (!roomA || !roomB) throw new NotFoundException('أحد الرومين لم يعد متاحاً');
     const now = Date.now();
     const hasRoomAccess = ownAccess.some((access) => access.grantType === RoomAccessGrant.PERMANENT || !access.expiresAt || access.expiresAt.getTime() > now);
-    if (roomA.hostId !== userId && roomA.activeHostId !== userId && roomB.hostId !== userId && roomB.activeHostId !== userId && ownSeats.length === 0 && !hasRoomAccess) {
+    if (roomA.hostId !== userId && roomA.activeHostId !== userId && roomB.hostId !== userId && roomB.activeHostId !== userId && ownSeats.length === 0 && !hasRoomAccess && !roomA.isPublic && !roomB.isPublic) {
       throw new BadRequestException('عرض مقاعد التحدّي متاح لأعضاء الرومين فقط');
     }
     const [seatsA, seatsB] = await Promise.all([
