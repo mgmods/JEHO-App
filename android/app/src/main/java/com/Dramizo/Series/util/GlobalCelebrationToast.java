@@ -336,7 +336,7 @@ public final class GlobalCelebrationToast {
             wrapTimes.setVisibility(View.VISIBLE);
             wrapTimes.setScaleX(0.82f);
             wrapTimes.setScaleY(0.82f);
-            tvTimes.setText(String.format(Locale.US, "×%d", multiplier));
+            tvTimes.setText(giftSend ? String.format(Locale.US, "X%d", multiplier) : String.format(Locale.US, "×%d", multiplier));
             if (badge != null) {
                 if (giftSend) {
                     String giftIcon = AssetCatalog.absoluteUrl(badgeUrl);
