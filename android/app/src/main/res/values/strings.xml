@@ -1291,4 +1291,11 @@
 <string name="admin_messages_footer">هذه القناة مخصصة لرسائل السوبر أدمن</string>
     <string name="support_website">Official website</string>
     <string name="home_hot_all">Popular 🔥</string>
+    <string name="chat_hub_friends">Friends</string>
+    <string name="chat_hub_notifications">Notifications</string>
+    <string name="chat_hub_follow_requests">Follow requests</string>
+    <string name="chat_hub_visitors">Visitors</string>
+    <string name="chat_search_hint">Search chats or messages</string>
+    <string name="chat_search_clear">Clear search</string>
+    <string name="chat_search_no_results">No matching chats or messages</string>
 </resources>

@@ -32,6 +32,8 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
     }
 
     private final List<ChatDtos.ConversationDto> items = new ArrayList<>();
+    private final List<ChatDtos.ConversationDto> sourceItems = new ArrayList<>();
+    private String searchQuery = "";
     private final Listener listener;
 
     public ChatPreviewAdapter(Listener listener) {
@@ -39,24 +41,45 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
     }
 
     public void submit(List<ChatDtos.ConversationDto> data) {
-        if (sameList(items, data)) {
-            List<ChatDtos.ConversationDto> next = data != null ? data : Collections.emptyList();
-            for (int i = 0; i < items.size() && i < next.size(); i++) {
-                ChatDtos.ConversationDto a = items.get(i);
-                ChatDtos.ConversationDto b = next.get(i);
-                if (samePreview(a, b) && sameAvatar(a, b)) continue;
-                items.set(i, b);
-                if (!sameAvatar(a, b)) {
-                    notifyItemChanged(i);
-                } else {
-                    notifyItemChanged(i, PAYLOAD_META);
-                }
-            }
-            return;
-        }
+        sourceItems.clear();
+        if (data != null) sourceItems.addAll(data);
+        applySearchFilter();
+    }
+
+    public void setSearchQuery(String query) {
+        String next = query != null ? query.trim() : "";
+        if (next.equalsIgnoreCase(searchQuery)) return;
+        searchQuery = next;
+        applySearchFilter();
+    }
+
+    private void applySearchFilter() {
         items.clear();
-        if (data != null) items.addAll(data);
+        if (searchQuery.isEmpty()) {
+            items.addAll(sourceItems);
+        } else {
+            String needle = searchQuery.toLowerCase(java.util.Locale.ROOT);
+            for (ChatDtos.ConversationDto item : sourceItems) {
+                if (matchesSearch(item, needle)) items.add(item);
+            }
+        }
         notifyDataSetChanged();
+    }
+
+    private static boolean matchesSearch(ChatDtos.ConversationDto item, String needle) {
+        if (item == null) return false;
+        if (contains(item.title, needle)) return true;
+        if (item.peer != null) {
+            if (contains(item.peer.displayName, needle)
+                    || contains(item.peer.username, needle)
+                    || contains(item.peer.id, needle)) return true;
+        }
+        if (item.lastMessage != null && contains(item.lastMessage.content, needle)) return true;
+        return false;
+    }
+
+    private static boolean contains(String value, String needle) {
+        return value != null && value.toLowerCase(java.util.Locale.ROOT).contains(needle);
     }
 
     private static boolean sameList(
