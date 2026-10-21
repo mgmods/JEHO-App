@@ -178,6 +178,10 @@ const sections = computed(() => [
       { name: 'settings', icon: 'bi-gear', label: t('nav.settings'), settingsRoot: true },
       ...(auth.isSuperAdmin
         ? [{
+            name: 'staff-admins',
+            icon: 'bi-person-plus-fill',
+            label: 'إدارة أدمن اللوحة',
+          }, {
             name: 'settings',
             query: { tab: 'admins' },
             icon: 'bi-people-fill',
