@@ -97,8 +97,6 @@
                     android:cursorVisible="false"
                     android:inputType="none"
                     android:singleLine="true"
-                    android:drawableEnd="@drawable/ic_chevron_down"
-                    android:drawablePadding="8dp"
                     android:textColor="@color/text_primary"
                     android:textColorHint="@color/text_hint" />
             </com.google.android.material.textfield.TextInputLayout>
