@@ -54,11 +54,15 @@ public final class GlobalCelebrationToast {
     private static volatile int remoteDurationSeconds = 3;
     private static volatile int remoteLuckyNormalDurationSeconds = 4;
     private static volatile int remoteLuckyHighDurationSeconds = 5;
-    private static volatile float remoteGiftAvatarX = 8f, remoteGiftAvatarY = 50f, remoteGiftTextX = 25f, remoteGiftTextY = 50f;
+    private static volatile float remoteGiftAvatarX = 8f, remoteGiftAvatarY = 50f;
+    private static volatile float remoteGiftNameX = 25f, remoteGiftNameY = 35f, remoteGiftRewardX = 25f, remoteGiftRewardY = 65f;
+    private static volatile float remoteGiftMultiplierX = 88f, remoteGiftMultiplierY = 50f;
     private static volatile float remoteLuckyNormalAvatarX = 8f, remoteLuckyNormalAvatarY = 50f;
-    private static volatile float remoteLuckyNormalTextX = 25f, remoteLuckyNormalTextY = 50f;
+    private static volatile float remoteLuckyNormalNameX = 25f, remoteLuckyNormalNameY = 35f, remoteLuckyNormalRewardX = 25f, remoteLuckyNormalRewardY = 65f;
+    private static volatile float remoteLuckyNormalMultiplierX = 88f, remoteLuckyNormalMultiplierY = 50f;
     private static volatile float remoteLuckyHighAvatarX = 8f, remoteLuckyHighAvatarY = 50f;
-    private static volatile float remoteLuckyHighTextX = 25f, remoteLuckyHighTextY = 50f;
+    private static volatile float remoteLuckyHighNameX = 25f, remoteLuckyHighNameY = 35f, remoteLuckyHighRewardX = 25f, remoteLuckyHighRewardY = 65f;
+    private static volatile float remoteLuckyHighMultiplierX = 88f, remoteLuckyHighMultiplierY = 50f;
     private static long lastStyleFetchAt;
 
     private static final class ToastRequest {
@@ -153,15 +157,21 @@ public final class GlobalCelebrationToast {
             ImageView avatar = active.findViewById(R.id.imgCelebrationAvatar);
             TextView title = active.findViewById(R.id.tvCelebrationTitle);
             TextView body = active.findViewById(R.id.tvCelebrationBody);
+            View multiplier = active.findViewById(R.id.wrapCelebrationTimes);
             final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
             final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
-            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
-            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
+            final float nameX = giftSend ? remoteGiftNameX : luckyHigh ? remoteLuckyHighNameX : remoteLuckyNormalNameX;
+            final float nameY = giftSend ? remoteGiftNameY : luckyHigh ? remoteLuckyHighNameY : remoteLuckyNormalNameY;
+            final float rewardX = giftSend ? remoteGiftRewardX : luckyHigh ? remoteLuckyHighRewardX : remoteLuckyNormalRewardX;
+            final float rewardY = giftSend ? remoteGiftRewardY : luckyHigh ? remoteLuckyHighRewardY : remoteLuckyNormalRewardY;
+            final float multiplierX = giftSend ? remoteGiftMultiplierX : luckyHigh ? remoteLuckyHighMultiplierX : remoteLuckyNormalMultiplierX;
+            final float multiplierY = giftSend ? remoteGiftMultiplierY : luckyHigh ? remoteLuckyHighMultiplierY : remoteLuckyNormalMultiplierY;
             active.post(() -> {
                 if (active.getParent() == null) return;
                 positionViewPercent(avatar, active, avatarX, avatarY, true);
-                positionViewPercent(title, active, textX, textY, false);
-                positionViewPercent(body, active, textX, textY + 17f, false);
+                positionViewPercent(title, active, nameX, nameY, false);
+                positionViewPercent(body, active, rewardX, rewardY, false);
+                positionViewPercent(multiplier, active, multiplierX, multiplierY, true);
             });
         }
         if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
@@ -208,8 +218,12 @@ public final class GlobalCelebrationToast {
                     remoteDurationSeconds = intValue(gift.get("durationSeconds"), intValue(cfg.get("durationSeconds"), 3));
                     remoteGiftAvatarX = floatValue(gift.get("avatarX"), 8f);
                     remoteGiftAvatarY = floatValue(gift.get("avatarY"), 50f);
-                    remoteGiftTextX = floatValue(gift.get("textX"), 25f);
-                    remoteGiftTextY = floatValue(gift.get("textY"), 50f);
+                    remoteGiftNameX = floatValue(gift.get("nameX"), floatValue(gift.get("textX"), 25f));
+                    remoteGiftNameY = floatValue(gift.get("nameY"), 35f);
+                    remoteGiftRewardX = floatValue(gift.get("rewardX"), floatValue(gift.get("textX"), 25f));
+                    remoteGiftRewardY = floatValue(gift.get("rewardY"), 65f);
+                    remoteGiftMultiplierX = floatValue(gift.get("multiplierX"), 88f);
+                    remoteGiftMultiplierY = floatValue(gift.get("multiplierY"), 50f);
                     remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
                     remoteLuckyHighBackgroundUrl = stringValue(high.get("backgroundUrl"), "");
                     remoteLuckyNormalShineEnabled = !Boolean.FALSE.equals(normal.get("shineEnabled"));
@@ -220,12 +234,20 @@ public final class GlobalCelebrationToast {
                     remoteLuckyHighDurationSeconds = intValue(high.get("durationSeconds"), 5);
                     remoteLuckyNormalAvatarX = floatValue(normal.get("avatarX"), 8f);
                     remoteLuckyNormalAvatarY = floatValue(normal.get("avatarY"), 50f);
-                    remoteLuckyNormalTextX = floatValue(normal.get("textX"), 25f);
-                    remoteLuckyNormalTextY = floatValue(normal.get("textY"), 50f);
+                    remoteLuckyNormalNameX = floatValue(normal.get("nameX"), floatValue(normal.get("textX"), 25f));
+                    remoteLuckyNormalNameY = floatValue(normal.get("nameY"), 35f);
+                    remoteLuckyNormalRewardX = floatValue(normal.get("rewardX"), floatValue(normal.get("textX"), 25f));
+                    remoteLuckyNormalRewardY = floatValue(normal.get("rewardY"), 65f);
+                    remoteLuckyNormalMultiplierX = floatValue(normal.get("multiplierX"), 88f);
+                    remoteLuckyNormalMultiplierY = floatValue(normal.get("multiplierY"), 50f);
                     remoteLuckyHighAvatarX = floatValue(high.get("avatarX"), 8f);
                     remoteLuckyHighAvatarY = floatValue(high.get("avatarY"), 50f);
-                    remoteLuckyHighTextX = floatValue(high.get("textX"), 25f);
-                    remoteLuckyHighTextY = floatValue(high.get("textY"), 50f);
+                    remoteLuckyHighNameX = floatValue(high.get("nameX"), floatValue(high.get("textX"), 25f));
+                    remoteLuckyHighNameY = floatValue(high.get("nameY"), 35f);
+                    remoteLuckyHighRewardX = floatValue(high.get("rewardX"), floatValue(high.get("textX"), 25f));
+                    remoteLuckyHighRewardY = floatValue(high.get("rewardY"), 65f);
+                    remoteLuckyHighMultiplierX = floatValue(high.get("multiplierX"), 88f);
+                    remoteLuckyHighMultiplierY = floatValue(high.get("multiplierY"), 50f);
                     MAIN.post(GlobalCelebrationToast::applyRemoteStyleToActiveToast);
                 }
                 @Override public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
@@ -564,13 +586,18 @@ public final class GlobalCelebrationToast {
         if (customToastStyle) {
             final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
             final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
-            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
-            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
+            final float nameX = giftSend ? remoteGiftNameX : luckyHigh ? remoteLuckyHighNameX : remoteLuckyNormalNameX;
+            final float nameY = giftSend ? remoteGiftNameY : luckyHigh ? remoteLuckyHighNameY : remoteLuckyNormalNameY;
+            final float rewardX = giftSend ? remoteGiftRewardX : luckyHigh ? remoteLuckyHighRewardX : remoteLuckyNormalRewardX;
+            final float rewardY = giftSend ? remoteGiftRewardY : luckyHigh ? remoteLuckyHighRewardY : remoteLuckyNormalRewardY;
+            final float multiplierX = giftSend ? remoteGiftMultiplierX : luckyHigh ? remoteLuckyHighMultiplierX : remoteLuckyNormalMultiplierX;
+            final float multiplierY = giftSend ? remoteGiftMultiplierY : luckyHigh ? remoteLuckyHighMultiplierY : remoteLuckyNormalMultiplierY;
             banner.post(() -> {
                 if (banner.getParent() == null) return;
                 positionViewPercent(avatar, banner, avatarX, avatarY, true);
-                positionViewPercent(tvTitle, banner, textX, textY, false);
-                positionViewPercent(tvBody, banner, textX, textY + 17f, false);
+                positionViewPercent(tvTitle, banner, nameX, nameY, false);
+                positionViewPercent(tvBody, banner, rewardX, rewardY, false);
+                positionViewPercent(wrapTimes, banner, multiplierX, multiplierY, true);
             });
         }
         hideRunnable = () -> removeBanner(banner);
