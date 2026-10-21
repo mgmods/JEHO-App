@@ -259,6 +259,8 @@ public final class GlobalCelebrationToast {
         View wrapTimes = banner.findViewById(R.id.wrapCelebrationTimes);
         TextView tvTimes = banner.findViewById(R.id.tvCelebrationTimes);
         TextView btnGo = banner.findViewById(R.id.btnCelebrationGo);
+        ImageView toastBackground = banner.findViewById(R.id.imgToastBackground);
+        View sheen = banner.findViewById(R.id.viewCelebrationSheen);
 
         boolean planet = kind != null && "planet_summon".equalsIgnoreCase(kind);
         boolean gameOrLucky = kind != null && (
@@ -328,13 +330,23 @@ public final class GlobalCelebrationToast {
             banner.setClickable(false);
         }
 
-        boolean showTimes = multiplier >= 1 && (gameOrLucky || multiplier >= 2);
+        boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
+        boolean showTimes = multiplier >= 1 && (gameOrLucky || giftSend || multiplier >= 2);
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
             wrapTimes.setScaleX(0.82f);
             wrapTimes.setScaleY(0.82f);
             tvTimes.setText(String.format(Locale.US, "×%d", multiplier));
-            if (badge != null) badge.setVisibility(View.GONE);
+            if (badge != null) {
+                if (giftSend) {
+                    String giftIcon = AssetCatalog.absoluteUrl(badgeUrl);
+                    if (giftIcon != null && !giftIcon.isEmpty()) {
+                        badge.setVisibility(View.VISIBLE);
+                        try { Glide.with(activity.getApplicationContext()).load(giftIcon).centerCrop().into(badge); }
+                        catch (Exception ignored) { badge.setVisibility(View.GONE); }
+                    } else badge.setVisibility(View.GONE);
+                } else badge.setVisibility(View.GONE);
+            }
         } else {
             if (wrapTimes != null) wrapTimes.setVisibility(View.GONE);
             // Game/luck already put badge on the left icon — hide trailing personal badge.
@@ -356,23 +368,56 @@ public final class GlobalCelebrationToast {
             }
         }
 
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.gravity = Gravity.TOP;
+        int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+        int toastWidth = Math.min(dp(activity, 360), Math.max(dp(activity, 260), screenWidth - dp(activity, 24)));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(toastWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         lp.topMargin = dp(activity, topMarginDp);
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
+        banner.setScaleX(0.985f);
+        banner.setScaleY(0.985f);
         banner.setTranslationX(dp(activity, 140));
+        if (toastBackground != null) {
+            String imageUrl = AssetCatalog.absoluteUrl(remoteBackgroundUrl);
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                toastBackground.setVisibility(View.VISIBLE);
+                try { Glide.with(activity.getApplicationContext()).load(imageUrl).centerCrop().into(toastBackground); }
+                catch (Exception ignored) { toastBackground.setVisibility(View.GONE); }
+            } else toastBackground.setVisibility(View.GONE);
+        }
+        banner.setElevation(dp(activity, remoteFrameGlowEnabled ? 20 : 14));
+        if (sheen != null && remoteShineEnabled) {
+            sheen.setVisibility(View.VISIBLE);
+            GradientDrawable shine = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[] { 0x00FFFFFF, 0x66FFFFFF, 0x00FFFFFF });
+            sheen.setBackground(shine);
+            sheen.setRotation(12f);
+            sheen.setAlpha(0.78f);
+        } else if (sheen != null) sheen.setVisibility(View.GONE);
         root.addView(banner);
         current = new WeakReference<>(banner);
 
         banner.animate()
                 .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
                 .translationX(0f)
                 .setDuration(420)
                 .setInterpolator(new android.view.animation.DecelerateInterpolator())
                 .start();
+        if (sheen != null && sheen.getVisibility() == View.VISIBLE) {
+            banner.post(() -> {
+                if (sheen.getParent() != banner || banner.getParent() == null) return;
+                ObjectAnimator sweep = ObjectAnimator.ofFloat(
+                        sheen, View.TRANSLATION_X, -dp(activity, 52), banner.getWidth() + dp(activity, 52));
+                sweep.setDuration(1250L);
+                sweep.setRepeatCount(1);
+                sweep.setInterpolator(new LinearInterpolator());
+                sweep.start();
+            });
+        }
         if (wrapTimes != null && wrapTimes.getVisibility() == View.VISIBLE) {
             wrapTimes.animate()
                     .scaleX(1f)
@@ -382,7 +427,7 @@ public final class GlobalCelebrationToast {
                     .start();
         }
         hideRunnable = () -> removeBanner(banner);
-        MAIN.postDelayed(hideRunnable, canOpenRoom ? 6200L : 5200L);
+        MAIN.postDelayed(hideRunnable, Math.max(2, Math.min(8, remoteDurationSeconds)) * 1000L);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
