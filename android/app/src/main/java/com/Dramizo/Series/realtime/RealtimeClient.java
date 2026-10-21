@@ -464,6 +464,9 @@ public class RealtimeClient {
 
     private final Emitter.Listener onDisconnect = args -> {
         Log.i(TAG, "Disconnected");
+        // Server-side Socket.IO room membership is lost on disconnect. Clear the
+        // local cache so VoiceRoomActivity can re-join before sending room events.
+        joinedRooms.clear();
         for (RoomListener l : roomListeners) l.onDisconnected();
         for (ChatListener l : chatListeners) l.onDisconnected();
         for (UserListener l : userListeners) l.onDisconnected();
