@@ -140,8 +140,11 @@ public final class GlobalCelebrationToast {
                 active.setBackgroundColor(android.graphics.Color.TRANSPARENT);
                 background.setBackgroundColor(android.graphics.Color.TRANSPARENT);
                 background.setVisibility(View.VISIBLE);
-                try { Glide.with(activity).load(imageUrl).dontTransform().into(background);
-                catch (Exception ignored) { background.setVisibility(View.GONE); }
+                try {
+                    Glide.with(activity).load(imageUrl).dontTransform().into(background);
+                } catch (Exception ignored) {
+                    background.setVisibility(View.GONE);
+                }
             } else background.setVisibility(View.GONE);
         }
         boolean glow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : remoteLuckyNormalGlowEnabled;
