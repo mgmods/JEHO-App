@@ -171,6 +171,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private android.view.View roomPkProgressB;
     @Nullable private android.widget.LinearLayout roomPkOpponentSeatPanel;
     private boolean roomPkSeatSplitApplied;
+    @Nullable private java.util.List<RoomDtos.SeatDto> roomPkLatestGridSeats;
     private final Runnable roomPkRosterPoll = new Runnable() {
         @Override public void run() {
             if (isFinishing() || exiting || roomPkCurrentContestId == null
@@ -13034,55 +13035,90 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         View rowsView = roomPkOpponentSeatPanel.getChildAt(1);
         if (!(rowsView instanceof android.widget.LinearLayout)) return;
         android.widget.LinearLayout rows = (android.widget.LinearLayout) rowsView;
-        java.util.Map<Integer, JsonObject> seatsByIndex = new java.util.HashMap<>();
+        rows.removeAllViews();
+
+        java.util.List<JsonObject> occupied = new java.util.ArrayList<>();
         for (int i = 0; i < roster.size(); i++) {
             if (!roster.get(i).isJsonObject()) continue;
             JsonObject seat = roster.get(i).getAsJsonObject();
-            if (seat.has("seatIndex") && !seat.get("seatIndex").isJsonNull())
-                seatsByIndex.put(seat.get("seatIndex").getAsInt(), seat);
+            if (!seat.has("user") || !seat.get("user").isJsonObject()) continue;
+            JsonObject user = seat.getAsJsonObject("user");
+            String uid = user.has("id") && !user.get("id").isJsonNull() ? user.get("id").getAsString() : "";
+            String displayName = user.has("displayName") && !user.get("displayName").isJsonNull()
+                    ? user.get("displayName").getAsString().trim() : "";
+            String username = user.has("username") && !user.get("username").isJsonNull()
+                    ? user.get("username").getAsString().trim() : "";
+            if (uid.isEmpty() && displayName.isEmpty() && username.isEmpty()) continue;
+            occupied.add(seat);
         }
-        for (int row = 0; row < rows.getChildCount(); row++) {
-            View rowView = rows.getChildAt(row);
-            if (!(rowView instanceof android.widget.LinearLayout)) continue;
-            android.widget.LinearLayout seatRow = (android.widget.LinearLayout) rowView;
-            for (int col = 0; col < seatRow.getChildCount(); col++) {
-                View slotView = seatRow.getChildAt(col);
-                if (!(slotView instanceof android.widget.LinearLayout)) continue;
-                int seatIndex = row * 2 + col;
-                JsonObject seat = seatsByIndex.get(seatIndex);
-                JsonObject user = seat != null && seat.has("user") && seat.get("user").isJsonObject()
-                        ? seat.getAsJsonObject("user") : null;
-                String name = user != null && user.has("displayName") && !user.get("displayName").isJsonNull()
-                        ? user.get("displayName").getAsString() : "فارغ";
-                android.widget.LinearLayout slot = (android.widget.LinearLayout) slotView;
-                if (slot.getChildCount() < 2 || !(slot.getChildAt(0) instanceof FrameLayout)
-                        || !(slot.getChildAt(1) instanceof TextView)) continue;
-                FrameLayout avatar = (FrameLayout) slot.getChildAt(0);
-                avatar.removeAllViews();
-                String avatarUrl = user != null && user.has("avatarUrl") && !user.get("avatarUrl").isJsonNull()
+
+        for (int i = 0; i < occupied.size(); i += 2) {
+            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER);
+            for (int col = 0; col < 2 && i + col < occupied.size(); col++) {
+                JsonObject seat = occupied.get(i + col);
+                JsonObject user = seat.getAsJsonObject("user");
+                String name = user.has("displayName") && !user.get("displayName").isJsonNull()
+                        ? user.get("displayName").getAsString() : "";
+                if (name.trim().isEmpty() && user.has("username") && !user.get("username").isJsonNull())
+                    name = user.get("username").getAsString();
+                if (name.trim().isEmpty()) name = "مستخدم";
+                String avatarUrl = user.has("avatarUrl") && !user.get("avatarUrl").isJsonNull()
                         ? user.get("avatarUrl").getAsString() : "";
+
+                android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+                card.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                card.setGravity(Gravity.CENTER_VERTICAL);
+                card.setPadding(dp(4), dp(4), dp(4), dp(4));
+                card.setBackground(roundRoomPkDrawable(0xCC18385F, 0xCC18385F, 10));
+                android.widget.LinearLayout.LayoutParams cardLp = new android.widget.LinearLayout.LayoutParams(
+                        0, dp(50), 1f);
+                cardLp.setMargins(dp(2), dp(2), dp(2), dp(2));
+
+                FrameLayout avatar = new FrameLayout(this);
+                avatar.setBackground(roundRoomPkDrawable(0xFF244A78, 0xFF65A9FF, 20));
                 if (!avatarUrl.trim().isEmpty()) {
                     ImageView photo = new ImageView(this);
                     photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                    avatar.addView(photo, new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
+                    avatar.addView(photo, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
                     try { com.bumptech.glide.Glide.with(VoiceRoomActivity.this).load(avatarUrl).circleCrop().into(photo); }
                     catch (Exception ignored) { }
                 } else {
                     TextView fallback = new TextView(this);
-                    fallback.setText(user == null ? String.valueOf(seatIndex) : (name.isEmpty() ? "?" : name.substring(0, 1)));
+                    fallback.setText(name.substring(0, 1));
                     fallback.setTextColor(0xFFEAF4FF);
-                    fallback.setTextSize(11f);
+                    fallback.setTextSize(12f);
                     fallback.setGravity(Gravity.CENTER);
-                    avatar.addView(fallback, new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
+                    avatar.addView(fallback, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
                 }
-                TextView label = (TextView) slot.getChildAt(1);
+                card.addView(avatar, new android.widget.LinearLayout.LayoutParams(dp(34), dp(34)));
+                TextView label = new TextView(this);
                 label.setText(name);
-                label.setTextColor(user == null ? 0xFFB8D8FF : Color.WHITE);
+                label.setTextColor(Color.WHITE);
+                label.setTextSize(10f);
+                label.setMaxLines(1);
+                label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                label.setGravity(Gravity.CENTER_VERTICAL);
+                android.widget.LinearLayout.LayoutParams labelLp = new android.widget.LinearLayout.LayoutParams(
+                        0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                labelLp.setMargins(dp(5), 0, 0, 0);
+                card.addView(label, labelLp);
+                row.addView(card, cardLp);
             }
+            if (occupied.size() % 2 == 1 && i + 1 >= occupied.size()) {
+                View spacer = new View(this);
+                row.addView(spacer, new android.widget.LinearLayout.LayoutParams(0, dp(50), 1f));
+            }
+            rows.addView(row, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(54)));
         }
         if (roomPkOpponentSeatPanel.getChildCount() > 2
-                && roomPkOpponentSeatPanel.getChildAt(2) instanceof TextView)
-            ((TextView) roomPkOpponentSeatPanel.getChildAt(2)).setText("مقاعد المنافس المباشرة");
+                && roomPkOpponentSeatPanel.getChildAt(2) instanceof TextView) {
+            TextView note = (TextView) roomPkOpponentSeatPanel.getChildAt(2);
+            note.setText(occupied.isEmpty() ? "لا توجد مقاعد مشغولة حالياً" : occupied.size() + " مقعد مشغول");
+            note.setVisibility(occupied.isEmpty() ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void showRoomPkScoreBanner(String event, @Nullable JsonObject payload) {
@@ -13254,7 +13290,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             panel.setOrientation(android.widget.LinearLayout.VERTICAL);
             panel.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
             panel.setPadding(dp(5), dp(7), dp(5), dp(7));
-            panel.setBackground(roundRoomPkDrawable(0xD8122A4A, 0xFF438EFF, 14));
+            panel.setBackground(roundRoomPkDrawable(0xD8122A4A, 0xD8122A4A, 12));
             panel.setContentDescription("مقاعد الروم المنافس في وضع PK");
             panel.setClipChildren(false);
             panel.setClipToPadding(false);
@@ -13272,49 +13308,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
             android.widget.LinearLayout seats = new android.widget.LinearLayout(this);
             seats.setOrientation(android.widget.LinearLayout.VERTICAL);
-            for (int row = 0; row < 6; row++) {
-                android.widget.LinearLayout seatRow = new android.widget.LinearLayout(this);
-                seatRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-                seatRow.setGravity(Gravity.CENTER);
-                for (int col = 0; col < 2; col++) {
-                    final int seatIndex = row * 2 + col;
-                    android.widget.LinearLayout slot = new android.widget.LinearLayout(this);
-                    slot.setOrientation(android.widget.LinearLayout.VERTICAL);
-                    slot.setGravity(Gravity.CENTER);
-                    slot.setPadding(dp(2), dp(3), dp(2), dp(3));
-                    slot.setBackground(roundRoomPkDrawable(0xAA18385F, 0xFF356BAA, 10));
-                    android.widget.LinearLayout.LayoutParams slotLp = new android.widget.LinearLayout.LayoutParams(
-                            0, dp(62), 1f);
-                    slotLp.setMargins(dp(2), dp(3), dp(2), dp(3));
-                    android.widget.FrameLayout avatar = new android.widget.FrameLayout(this);
-                    avatar.setBackground(roundRoomPkDrawable(0xFF244A78, 0xFF65A9FF, 22));
-                    TextView seatNumber = new TextView(this);
-                    seatNumber.setText(String.valueOf(seatIndex));
-                    seatNumber.setTextColor(0xFFEAF4FF);
-                    seatNumber.setTextSize(11f);
-                    seatNumber.setGravity(Gravity.CENTER);
-                    avatar.addView(seatNumber, new android.widget.FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
-                    slot.addView(avatar, new android.widget.LinearLayout.LayoutParams(dp(30), dp(30)));
-                    TextView waiting = new TextView(this);
-                    waiting.setText("فارغ");
-                    waiting.setTextColor(0xFFB8D8FF);
-                    waiting.setTextSize(9f);
-                    waiting.setGravity(Gravity.CENTER);
-                    waiting.setMaxLines(1);
-                    slot.addView(waiting, new android.widget.LinearLayout.LayoutParams(
-                            android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(16)));
-                    seatRow.addView(slot, slotLp);
-                }
-                seats.addView(seatRow, new android.widget.LinearLayout.LayoutParams(
-                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(68)));
-            }
+            seats.setTag("room_pk_opponent_seat_rows");
             panel.addView(seats, new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                     android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
             TextView note = new TextView(this);
-            note.setText("بانتظار بيانات مقاعد الخصم");
+            note.setText("لا توجد مقاعد مشغولة حالياً");
             note.setTextColor(0xFFB8D8FF);
-            note.setTextSize(9f);
+            note.setTextSize(10f);
             note.setGravity(Gravity.CENTER);
             note.setPadding(0, dp(4), 0, 0);
             panel.addView(note, new android.widget.LinearLayout.LayoutParams(
@@ -13341,6 +13342,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 @Override public boolean canScrollVertically() { return false; }
             });
             roomPkSeatSplitApplied = true;
+            if (seatAdapter != null && roomPkLatestGridSeats != null) {
+                java.util.List<RoomDtos.SeatDto> occupiedLocal = new java.util.ArrayList<>();
+                for (RoomDtos.SeatDto seat : roomPkLatestGridSeats) {
+                    String occupant = seatUserId(seat);
+                    if (occupant != null && !occupant.trim().isEmpty()) occupiedLocal.add(seat);
+                }
+                seatAdapter.setScaleMode(SeatAdapter.SCALE_COMPACT);
+                seatAdapter.submit(occupiedLocal);
+                applyMikooSeatGrid(occupiedLocal.size());
+            }
         }
         View title = roomPkOpponentSeatPanel.findViewWithTag("room_pk_opponent_title");
         if (title instanceof TextView) ((TextView) title).setText("🔵 " + firstNonEmpty(nameB, "الروم المنافس"));
@@ -13370,6 +13381,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override public boolean canScrollVertically() { return false; }
         });
         roomPkSeatSplitApplied = false;
+        if (seatAdapter != null && roomPkLatestGridSeats != null) {
+            seatAdapter.setScaleMode(SeatAdapter.SCALE_NORMAL);
+            seatAdapter.submit(roomPkLatestGridSeats);
+            applyMikooSeatGrid(roomPkLatestGridSeats.size());
+        }
     }
 
     private GradientDrawable roundRoomPkDrawable(int fill, int stroke, int radiusDp) {
@@ -14824,7 +14840,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Mikoo grid: 5 columns, no scroll, compact scale for 15/20 mics. */
     private void applyMikooSeatGrid(int guestCount) {
         if (binding == null || binding.recyclerSeats == null || seatAdapter == null) return;
-        int scale = guestCount <= 10
+        int columns = roomPkSeatSplitApplied ? 2 : MIKOO_SEAT_COLUMNS;
+        int scale = roomPkSeatSplitApplied ? SeatAdapter.SCALE_COMPACT
+                : guestCount <= 10
                 ? SeatAdapter.SCALE_NORMAL
                 : guestCount <= 15
                 ? SeatAdapter.SCALE_MEDIUM
@@ -14832,11 +14850,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         seatAdapter.setScaleMode(scale);
 
         RecyclerView.LayoutManager lm = binding.recyclerSeats.getLayoutManager();
-        if (lm instanceof GridLayoutManager grid && grid.getSpanCount() != MIKOO_SEAT_COLUMNS) {
-            grid.setSpanCount(MIKOO_SEAT_COLUMNS);
+        if (lm instanceof GridLayoutManager grid && grid.getSpanCount() != columns) {
+            grid.setSpanCount(columns);
         }
 
-        int rows = guestCount <= 0 ? 1 : (guestCount + MIKOO_SEAT_COLUMNS - 1) / MIKOO_SEAT_COLUMNS;
+        int rows = guestCount <= 0 ? 1 : (guestCount + columns - 1) / columns;
         int rowHeightDp = scale == SeatAdapter.SCALE_COMPACT ? 70
                 : scale == SeatAdapter.SCALE_MEDIUM ? 76 : 86;
         int totalHeightPx = dp(rows * rowHeightDp + 8);
@@ -15142,8 +15160,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         Runnable bind = () -> {
             if (binding == null || isFinishing()) return;
             try {
-                applyMikooSeatGrid(gridSeats.size());
-                if (seatAdapter != null) seatAdapter.submit(gridSeats);
+                roomPkLatestGridSeats = new java.util.ArrayList<>(gridSeats);
+                java.util.List<RoomDtos.SeatDto> visibleSeats = gridSeats;
+                if (roomPkSeatSplitApplied) {
+                    visibleSeats = new java.util.ArrayList<>();
+                    for (RoomDtos.SeatDto seat : gridSeats) {
+                        String occupant = seatUserId(seat);
+                        if (occupant != null && !occupant.trim().isEmpty()) visibleSeats.add(seat);
+                    }
+                }
+                applyMikooSeatGrid(visibleSeats.size());
+                if (seatAdapter != null) {
+                    seatAdapter.setScaleMode(roomPkSeatSplitApplied
+                            ? SeatAdapter.SCALE_COMPACT : SeatAdapter.SCALE_NORMAL);
+                    seatAdapter.submit(visibleSeats);
+                }
                 refreshRoomRelationshipEffects(gridSeats);
                 RoomDtos.RoomDto latest = viewModel != null ? viewModel.getRoom().getValue() : null;
                 bindHostStage(findHostSeat(allSeats), latest != null ? latest : room);
