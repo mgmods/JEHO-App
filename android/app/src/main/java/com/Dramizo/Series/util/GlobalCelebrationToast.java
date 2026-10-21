@@ -471,6 +471,10 @@ public final class GlobalCelebrationToast {
                             .load(absLeft)
                             .override(128, 128)
                             .centerCrop()
+                            .placeholder(gameOrLucky || planet
+                                    ? R.drawable.ic_screen_chat_lottery : R.drawable.jeho_logo)
+                            .error(gameOrLucky || planet
+                                    ? R.drawable.ic_screen_chat_lottery : R.drawable.jeho_logo)
                             .dontAnimate()
                             .into(avatar);
                 } catch (Exception ignored) {
@@ -562,10 +566,16 @@ public final class GlobalCelebrationToast {
             String selectedBackground = giftSend ? remoteBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : remoteLuckyNormalBackgroundUrl;
             String imageUrl = customToastStyle ? AssetCatalog.absoluteUrl(selectedBackground) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
+                // The uploaded artwork owns its pixels, edges and alpha channel. Do not add
+                // the built-in rounded frame behind a transparent PNG/WebP design.
+                banner.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                toastBackground.setBackgroundColor(android.graphics.Color.TRANSPARENT);
                 toastBackground.setVisibility(View.VISIBLE);
                 try { Glide.with(activity.getApplicationContext()).load(imageUrl).dontTransform().into(toastBackground); }
                 catch (Exception ignored) { toastBackground.setVisibility(View.GONE); }
-            } else toastBackground.setVisibility(View.GONE);
+            } else {
+                toastBackground.setVisibility(View.GONE);
+            }
         }
         banner.setElevation(dp(activity, customToastStyle && remoteGlow ? 20 : 14));
         if (sheen != null && customToastStyle && remoteShine) {
