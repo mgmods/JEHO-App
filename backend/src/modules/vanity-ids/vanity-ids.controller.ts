@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Body,
   Controller,
   Delete,
@@ -551,16 +552,26 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Grant a vanity ID to a user for 7, 15, 30 days or permanently' })
   async adminAssign(
     @Body() body: { userId?: string; publicId?: string; days?: number; permanent?: boolean },
+    @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
   ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    const isSuper = !!actor?.isSuperAdmin || role === 'super';
+    if (!isSuper && role !== 'admin') {
+      throw new ForbiddenException('Only Admin or Super Admin can assign vanity IDs');
+    }
     const userId = String(body?.userId || '').trim();
     const publicId = String(body?.publicId || '').trim();
     const permanent = body?.permanent === true;
-    const days = Number(body?.days || 7);
+    const days = Number(body?.days);
     if (!userId || !/^[0-9]{3,12}$/.test(publicId)) {
       throw new BadRequestException('userId is required and publicId must contain 3–12 digits');
     }
-    if (!permanent && ![7, 15, 30].includes(days)) {
-      throw new BadRequestException('days must be 7, 15 or 30, or permanent=true');
+    if (isSuper) {
+      if (permanent !== true && (!Number.isInteger(days) || ![1, 3, 7, 15, 30].includes(days))) {
+        throw new BadRequestException('Super Admin vanity ID grants must be 1, 3, 7, 15, 30 days or permanent');
+      }
+    } else if (permanent || !Number.isInteger(days) || ![1, 3, 7, 15].includes(days)) {
+      throw new BadRequestException('Admin vanity ID grants must be limited to 1, 3, 7 or 15 days');
     }
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
