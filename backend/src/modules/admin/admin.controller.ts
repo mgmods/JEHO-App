@@ -1943,6 +1943,7 @@ export class AdminController {
     }
     const permanent = body?.permanent === true;
     const days = Number(body?.days);
+    const frameAndEntranceTypes = new Set(['entry_effect', 'profile_card', 'nameplate']);
     if (isSuper) {
       if (permanent !== true && (!Number.isInteger(days) || ![7, 15, 30].includes(days))) {
         throw new BadRequestException('Super Admin cosmetic grants must be 7, 15, 30 days or permanent');
@@ -1951,12 +1952,14 @@ export class AdminController {
       if (permanent || !Number.isInteger(days) || ![1, 3, 7, 15].includes(days)) {
         throw new BadRequestException('Admin cosmetic grants must be limited to 1, 3, 7 or 15 days');
       }
+      if (!frameAndEntranceTypes.has(String((item as any).type || '').toLowerCase())) {
+        throw new ForbiddenException('Admin may grant frames/nameplates and entrance effects only');
+      }
     } else {
-      const managerTypes = new Set(['entry_effect', 'profile_card', 'nameplate']);
       if (permanent || !Number.isInteger(days) || ![1, 3, 7].includes(days)) {
         throw new BadRequestException('Manager cosmetic grants must be limited to 1, 3 or 7 days');
       }
-      if (!managerTypes.has(String((item as any).type || '').toLowerCase())) {
+      if (!frameAndEntranceTypes.has(String((item as any).type || '').toLowerCase())) {
         throw new ForbiddenException('Manager may grant frames/nameplates and entrance effects only');
       }
     }
