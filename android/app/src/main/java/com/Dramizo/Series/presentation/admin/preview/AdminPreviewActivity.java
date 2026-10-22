@@ -3,6 +3,7 @@ package com.Dramizo.Series.presentation.admin.preview;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -48,14 +49,38 @@ public final class AdminPreviewActivity extends ThemedActivity {
     private EditText search;
     private String activeSection = "overview";
     private final List<Module> modules = Arrays.asList(
-            new Module("overview", "نظرة عامة", "⌂", "ملخص لوحة الإدارة"),
+            new Module("overview", "نظرة عامة", "⌂", "الإحصائيات الحية"),
             new Module("users", "المستخدمون", "♙", "بحث وإدارة الحسابات"),
             new Module("rooms", "الغرف الصوتية", "♫", "الغرف والحالة والنشاط"),
-            new Module("roles", "الرتب والصلاحيات", "✦", "الرتب ونطاق الصلاحيات"),
+            new Module("roles", "الرتب والصلاحيات", "✦", "حسابات الإدارة والصلاحيات"),
+            new Module("agencies", "الوكالات", "▦", "إدارة الوكالات"),
+            new Module("agencyApplications", "طلبات الوكالات", "✉", "مراجعة الطلبات"),
+            new Module("rechargeApplications", "طلبات وكلاء الشحن", "▤", "قبول ورفض الطلبات"),
+            new Module("rechargeAgents", "وكلاء الشحن", "◈", "إدارة الوكلاء"),
+            new Module("recharges", "عمليات الشحن", "＄", "سجل الشحن"),
+            new Module("withdrawals", "طلبات السحب", "↗", "مراجعة السحوبات"),
+            new Module("walletTransactions", "حركة المحفظة", "◉", "سجل المعاملات"),
+            new Module("walletAdjust", "تعديل رصيد المحفظة", "＋", "تعديل موثق مع سبب"),
+            new Module("streams", "البث المباشر", "◍", "متابعة البث"),
+            new Module("reports", "البلاغات والمراجعة", "⚑", "مراجعة البلاغات"),
+            new Module("genderVerifications", "طلبات التحقق", "✓", "مراجعة طلبات التحقق"),
+            new Module("operators", "مديرو الإدارة", "♜", "إدارة المدراء المحدودين"),
             new Module("store", "المتجر والعناصر", "◇", "VIP والإطارات والدخوليات"),
-            new Module("gifts", "الهدايا والتوستات", "♢", "معاينة إعدادات العرض"),
+            new Module("cosmetics", "كتالوج العناصر", "▣", "العناصر التجميلية"),
+            new Module("grantCosmetics", "إهداء الإطارات والدخوليات", "✧", "منح العناصر بمدة"),
+            new Module("vanityIds", "الآي دي المميز", "＃", "كتالوج الآيديات"),
+            new Module("vip", "عضويات VIP", "♛", "العضويات والخطط"),
+            new Module("gifts", "كتالوج الهدايا", "♢", "الهدايا المتاحة"),
+            new Module("toastManager", "التوستات والمؤثرات", "✦", "إعدادات التوست الحقيقية"),
+            new Module("mysteriousMan", "الرجل الغامض", "◈", "إعدادات الهوية الموحدة"),
+            new Module("luckyCannon", "مدفع المحظوظ", "💎", "إعدادات زر المحظوظ"),
+            new Module("supportChest", "صندوق الدعم", "🎁", "الأهداف والمكافآت"),
+            new Module("roomPkSettings", "تحديات PK", "⚔", "تفعيل وإعدادات التحديات"),
             new Module("messages", "الرسائل والإشعارات", "✉", "الأخبار والرسائل الإدارية"),
-            new Module("settings", "إعدادات اللوحة", "⚙", "مظهر وتجربة الاستخدام")
+            new Module("notifications", "إرسال الرسائل", "✉", "رسائل عامة وخاصة"),
+            new Module("logs", "سجل العمليات", "≡", "سجل التغييرات الإدارية"),
+            new Module("staffIdentity", "هوية الرتب", "✦", "الشارات والإطارات الإدارية"),
+            new Module("settings", "إعدادات اللوحة", "⚙", "فتح إعدادات الإدارة")
     );
 
     @Override
@@ -148,7 +173,7 @@ public final class AdminPreviewActivity extends ThemedActivity {
         home.setGravity(Gravity.CENTER);
         home.setPadding(dp(18), dp(8), dp(18), dp(8));
         home.setBackground(pill(PURPLE_LIGHT, 18, 0));
-        home.setOnClickListener(v -> selectSection("overview"));
+        home.setOnClickListener(v -> openConnectedSection("overview"));
         TextView preview = label("◉  وضع المعاينة", 12, MUTED, true);
         preview.setGravity(Gravity.CENTER);
         preview.setPadding(dp(18), dp(8), dp(18), dp(8));
@@ -183,10 +208,30 @@ public final class AdminPreviewActivity extends ThemedActivity {
                     activeSection.equals(module.key) ? PURPLE : BORDER));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.setMargins(dp(4), 0, dp(4), 0);
-            chip.setOnClickListener(v -> selectSection(module.key));
+            chip.setOnClickListener(v -> openConnectedSection(module.key));
             row.addView(chip, lp);
         }
         moduleRail.addView(row);
+    }
+
+    /**
+     * Keeps this light native landing screen while routing each management area to the
+     * existing authenticated AdminConsoleActivity implementation. Server AdminGuard
+     * remains the authority; this screen never performs privileged mutations itself.
+     */
+    private void openConnectedSection(String key) {
+        String target;
+        switch (key) {
+            case "overview": target = null; break;
+            case "roles": target = "operators"; break;
+            case "store": target = "cosmetics"; break;
+            case "messages": target = "notifications"; break;
+            case "settings": target = "roomPkSettings"; break;
+            default: target = key; break;
+        }
+        Intent intent = new Intent(this, com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class);
+        if (target != null) intent.putExtra("admin_initial_section", target);
+        startActivity(intent);
     }
 
     private void selectSection(String key) {
@@ -309,7 +354,7 @@ public final class AdminPreviewActivity extends ThemedActivity {
         box.addView(textCol, new LinearLayout.LayoutParams(0, -2, 1f));
         TextView arrow = label("‹", 24, MUTED, false);
         box.addView(arrow);
-        box.setOnClickListener(v -> selectSection(module.key));
+        box.setOnClickListener(v -> openConnectedSection(module.key));
         addCard(box);
     }
 
@@ -334,7 +379,7 @@ public final class AdminPreviewActivity extends ThemedActivity {
         button.setPadding(dp(9), dp(8), dp(9), dp(8));
         button.setBackground(pill(PURPLE_LIGHT, 10, 0));
         box.addView(button);
-        View.OnClickListener open = v -> showInfo(title, detail + "\n\nهذه بطاقة تجريبية فقط. لم يتم تنفيذ أي إجراء على الحساب أو الخادم.");
+        View.OnClickListener open = v -> openConnectedSection(activeSection);
         button.setOnClickListener(open);
         box.setOnClickListener(open);
         addCard(box);
