@@ -1113,7 +1113,13 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun renderItems(data: Any?, type: String) {
-        val items = extractItems(data)
+        val extractedItems = extractItems(data)
+        val grantableTypes = setOf("entry_effect", "profile_card", "nameplate")
+        val items = if (type == "grantCosmetics" && currentRole != StaffRoleHelper.SUPER) {
+            extractedItems.filter { item ->
+                value(item, "type")?.trim()?.lowercase() in grantableTypes
+            }
+        } else extractedItems
         val countPanel = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
