@@ -705,41 +705,12 @@ public class ProfileFragment extends Fragment {
                     return;
                 }
                 startActivity(new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class));
-            });
-        }
-        // Same native JEHO admin hub for every authenticated staff rank.
-        // Each rank sees only the sections allowed by the existing AdminConsoleActivity gate.
-        if (binding.btnAdminPreview != null) {
-            android.widget.TextView previewEntry = binding.btnAdminPreview;
-            previewEntry.setText("◈  مركز الإدارة الموحد");
-            previewEntry.setTextColor(0xFF6542C8);
-            previewEntry.setTextSize(14f);
-            previewEntry.setTypeface(android.graphics.Typeface.create(
-                    "sans-serif-medium", android.graphics.Typeface.BOLD));
-            previewEntry.setGravity(android.view.Gravity.CENTER);
-            previewEntry.setMinHeight(Math.round(48 * getResources().getDisplayMetrics().density));
-            android.graphics.drawable.GradientDrawable previewBackground =
-                    new android.graphics.drawable.GradientDrawable();
-            previewBackground.setColor(0xFFF3EFFF);
-            previewBackground.setCornerRadius(16 * getResources().getDisplayMetrics().density);
-            previewBackground.setStroke(Math.round(getResources().getDisplayMetrics().density), 0xFFD9CEF9);
-            previewEntry.setBackground(new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(0x226542C8),
-                    previewBackground, null));
-            previewEntry.setVisibility(isStaff ? View.VISIBLE : View.GONE);
-            previewEntry.setOnClickListener(v -> {
-                if (!isAdded()) return;
-                com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto current =
-                        ContainerProvider.from(requireActivity()).getSessionManager().getUser();
-                if (!StaffRoleHelper.isStaff(current)) {
-                    Toast.makeText(requireContext(), "لوحة الإدارة مخصصة لحسابات فريق JEHO",
-                            Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                startActivity(new Intent(requireContext(),
                         com.Dramizo.Series.presentation.admin.preview.AdminPreviewActivity.class));
             });
+        }
+        // Use one unified entry point; avoid showing a duplicate admin button on the profile.
+        if (binding.btnAdminPreview != null) {
+            binding.btnAdminPreview.setVisibility(View.GONE);
         }
         if (binding.panelStaffPowers != null) {
             if (isStaff) {
