@@ -295,17 +295,19 @@ public final class AdminPreviewActivity extends ThemedActivity {
     private boolean isModuleAllowed(String key) {
         String target = targetSection(key);
         if ("home".equals(target)) return true;
-        if (StaffRoleHelper.MANAGER.equals(currentRole)) {
-            return Arrays.asList("rooms", "streams", "reports").contains(target);
-        }
+        if (StaffRoleHelper.SUPER.equals(currentRole)) return true;
         if (StaffRoleHelper.ADMIN.equals(currentRole)) {
-            List<String> superOnly = Arrays.asList("notifications", "toastManager", "mysteriousMan",
-                    "luckyCannon", "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
-                    "vip", "logs", "staffIdentity", "operators", "genderVerifications", "recharges",
-                    "withdrawals", "walletTransactions", "walletAdjust", "cosmetics", "gifts");
-            return !superOnly.contains(target);
+            return Arrays.asList(
+                    "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
+                    "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds"
+            ).contains(target);
         }
-        return StaffRoleHelper.SUPER.equals(currentRole);
+        if (StaffRoleHelper.MANAGER.equals(currentRole)) {
+            return Arrays.asList(
+                    "rooms", "streams", "reports", "cosmetics", "gifts", "grantCosmetics"
+            ).contains(target);
+        }
+        return false;
     }
 
     private void addSectionHeader(String title, String subtitle) {
