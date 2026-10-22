@@ -2,6 +2,7 @@
 import { defineAsyncComponent, onErrorCaptured, ref } from 'vue'
 
 const failed = ref('')
+const failedStack = ref('')
 const attempt = ref(0)
 
 function loadGamesView() {
@@ -13,6 +14,8 @@ const GamesView = defineAsyncComponent({
   timeout: 15000,
   onError(error, retry, fail, attempts) {
     failed.value = error?.message || String(error || 'تعذّر تحميل ملف صفحة الألعاب')
+    failedStack.value = error?.stack || ''
+    console.error('[JEHO Games] async page load failed', error)
     if (attempts < 2) retry()
     else fail()
   },
@@ -20,11 +23,14 @@ const GamesView = defineAsyncComponent({
 
 onErrorCaptured((error) => {
   failed.value = error?.message || String(error || 'خطأ غير معروف أثناء عرض صفحة الألعاب')
+  failedStack.value = error?.stack || ''
+  console.error('[JEHO Games] render/runtime error', error)
   return false
 })
 
 function retry() {
   failed.value = ''
+  failedStack.value = ''
   attempt.value += 1
 }
 
@@ -43,7 +49,7 @@ function reloadPage() {
     <section v-if="failed" class="glass p-4" role="alert" aria-live="assertive">
       <h2 class="h5 mb-2">تعذّر فتح إدارة الألعاب</h2>
       <p class="text-muted mb-2">ظهر خطأ أثناء تحميل صفحة الألعاب. تفاصيل الخطأ:</p>
-      <pre class="small text-break text-wrap mb-3">{{ failed }}</pre>
+      <pre class="small text-break text-wrap mb-3">{{ failed }}<template v-if="failedStack">\n\n{{ failedStack }}</template></pre>
       <div class="d-flex flex-wrap gap-2">
         <button class="btn btn-aurora btn-sm" type="button" @click="retry">إعادة محاولة فتح الألعاب</button>
         <button class="btn btn-outline-light btn-sm" type="button" @click="reloadPage">إعادة تحميل لوحة الإدارة</button>
