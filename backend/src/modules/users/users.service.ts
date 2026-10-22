@@ -127,7 +127,7 @@ export class UsersService {
     customDisplayRankImageUrl: string | null;
     customDisplayRankAnimated: boolean;
   }> {
-    const userId = String(flat.id || '');
+    // Resolve the optional decorative rank as public display data, independent of staffRole.\n    const userId = String(flat.id || '');
     const [hostBadgeMeta, ranks] = await Promise.all([
       this.wearMetaForUrl(flat.hostBadgeUrl as string | null | undefined),
       userId ? this.dataSource.query(
