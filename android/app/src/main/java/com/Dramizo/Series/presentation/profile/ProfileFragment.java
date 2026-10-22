@@ -708,11 +708,11 @@ public class ProfileFragment extends Fragment {
                         com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class));
             });
         }
-        // Isolated design preview: visible only to a server-authorized super admin.
-        // It opens local demo data and never calls production admin endpoints.
+        // Same native JEHO admin hub for every authenticated staff rank.
+        // Each rank sees only the sections allowed by the existing AdminConsoleActivity gate.
         if (binding.btnAdminPreview != null) {
             android.widget.TextView previewEntry = binding.btnAdminPreview;
-            previewEntry.setText("◈  معاينة لوحة الإدارة الجديدة");
+            previewEntry.setText("◈  مركز الإدارة الموحد");
             previewEntry.setTextColor(0xFF6542C8);
             previewEntry.setTextSize(14f);
             previewEntry.setTypeface(android.graphics.Typeface.create(
@@ -727,13 +727,13 @@ public class ProfileFragment extends Fragment {
             previewEntry.setBackground(new android.graphics.drawable.RippleDrawable(
                     android.content.res.ColorStateList.valueOf(0x226542C8),
                     previewBackground, null));
-            previewEntry.setVisibility(StaffRoleHelper.SUPER.equals(role) ? View.VISIBLE : View.GONE);
+            previewEntry.setVisibility(isStaff ? View.VISIBLE : View.GONE);
             previewEntry.setOnClickListener(v -> {
                 if (!isAdded()) return;
                 com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto current =
                         ContainerProvider.from(requireActivity()).getSessionManager().getUser();
-                if (!StaffRoleHelper.isSuper(current)) {
-                    Toast.makeText(requireContext(), "معاينة اللوحة متاحة للسوبر أدمن فقط",
+                if (!StaffRoleHelper.isStaff(current)) {
+                    Toast.makeText(requireContext(), "لوحة الإدارة مخصصة لحسابات فريق JEHO",
                             Toast.LENGTH_SHORT).show();
                     return;
                 }
