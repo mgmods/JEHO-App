@@ -623,8 +623,9 @@ public final class GlobalCelebrationToast {
         }
 
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        int requestedWidthDp = giftSend ? remoteGiftWidthDp : luckyHigh ? remoteLuckyHighWidthDp : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
-        int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
+        // Fixed toast dimensions: background artwork never changes size based on old settings.
+        final int requestedWidthDp = 340;
+        final int requestedHeightDp = 100;
         int toastWidth = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
         int toastHeight = customToastStyle ? dp(activity, requestedHeightDp) : ViewGroup.LayoutParams.WRAP_CONTENT;
         // Keep the text elements content-sized like the dashboard's draggable preview.
@@ -855,7 +856,7 @@ public final class GlobalCelebrationToast {
     private static String toastBackgroundUrl(String pathOrUrl) {
         String absolute = AssetCatalog.absoluteUrl(pathOrUrl);
         if (absolute == null || absolute.isEmpty()) return absolute;
-        return absolute.replaceFirst("/api/v\\\\d+(?=/uploads/)", "");
+        return absolute.replaceFirst("/api/v\\d+(?=/uploads/)", "");
     }
 
     private static int dp(Activity activity, int value) {
