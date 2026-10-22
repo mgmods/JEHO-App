@@ -510,19 +510,30 @@ class AdminConsoleActivity : ThemedActivity() {
             "users" -> {
                 val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
                 val search = EditText(this).apply {
-                    hint = "ابحث بالاسم أو المعرّف"
+                    hint = "ID المستخدم أو UUID أو الاسم أو البريد"
                     textSize = 15f
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
                     textDirection = View.TEXT_DIRECTION_RTL
                     gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
                     setSingleLine(true)
+                    imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
                     setTextColor(TEXT)
                     setHintTextColor(MUTED)
                     background = roundRect(Color.WHITE, 12)
                     setPadding(dp(12), dp(10), dp(12), dp(10))
+                    setOnEditorActionListener { _, actionId, _ ->
+                        if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                            loadUsers(text.toString().trim())
+                            true
+                        } else false
+                    }
                 }
                 searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
-                searchRow.addView(button("بحث") { loadUsers(search.text.toString().trim()) })
+                searchRow.addView(button("بحث") {
+                    val query = search.text.toString().trim()
+                    if (query.isBlank()) toast("أدخل ID المستخدم أو الاسم للبحث")
+                    else loadUsers(query)
+                })
                 body.addView(searchRow)
                 module?.let { addSectionIntro(it) }
                 loadUsers("")
