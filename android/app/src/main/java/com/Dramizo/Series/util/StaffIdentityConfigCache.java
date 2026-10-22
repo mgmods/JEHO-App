@@ -43,6 +43,8 @@ public final class StaffIdentityConfigCache {
     private static final List<Runnable> WAITERS = new ArrayList<>();
     private static boolean loaded;
     private static boolean loading;
+    private static long loadedAtMs;
+    private static final long CACHE_TTL_MS = 60_000L;
 
     private StaffIdentityConfigCache() {}
 
@@ -56,10 +58,11 @@ public final class StaffIdentityConfigCache {
 
     public static void load(Context context, @Nullable Runnable onReady) {
         synchronized (LOCK) {
-            if (loaded) {
+            if (loaded && System.currentTimeMillis() - loadedAtMs < CACHE_TTL_MS) {
                 if (onReady != null) onReady.run();
                 return;
             }
+            if (loaded && System.currentTimeMillis() - loadedAtMs >= CACHE_TTL_MS) loaded = false;
             if (onReady != null) WAITERS.add(onReady);
             if (loading) return;
             loading = true;
@@ -88,6 +91,12 @@ public final class StaffIdentityConfigCache {
         }
     }
 
+    /** Force a fresh role-identity read after an administrator saves role assets. */
+    public static void refresh(Context context, @Nullable Runnable onReady) {
+        synchronized (LOCK) { loaded = false; }
+        load(context, onReady);
+    }
+
     private static void finish(Map<String, RoleIdentity> parsed) {
         List<Runnable> callbacks;
         synchronized (LOCK) {
@@ -95,6 +104,7 @@ public final class StaffIdentityConfigCache {
                 CACHE.put(role, parsed.getOrDefault(role, defaults(role)));
             }
             loaded = true;
+            loadedAtMs = System.currentTimeMillis();
             loading = false;
             callbacks = new ArrayList<>(WAITERS);
             WAITERS.clear();
