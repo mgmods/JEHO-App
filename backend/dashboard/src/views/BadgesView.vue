@@ -117,7 +117,7 @@ async function grantBadge() {
       else failed.push(userId + ': لم يؤكد الخادم ظهور الشارة')
     }
     const summary = 'تم التأكيد لـ ' + success.length + ' من ' + ids.length + ' حساب.'
-    if (failed.length) error.value = summary + '\\nالحسابات التي تحتاج مراجعة:\\n' + failed.join('\\n')
+    if (failed.length) error.value = summary + '\nالحسابات التي تحتاج مراجعة:\n' + failed.join('\n')
     else window.alert(summary)
   } catch (e) {
     error.value = e?.message || e?.response?.data?.message || 'تعذر منح الشارة.'
@@ -137,7 +137,7 @@ async function revokeBadge() {
       else success.push(userId)
     }
     const summary = 'تم السحب من ' + success.length + ' من ' + ids.length + ' حساب.'
-    if (failed.length) error.value = summary + '\\nالحسابات التي تحتاج مراجعة:\\n' + failed.join('\\n')
+    if (failed.length) error.value = summary + '\nالحسابات التي تحتاج مراجعة:\n' + failed.join('\n')
     else window.alert(summary)
   } catch (e) {
     error.value = e?.message || e?.response?.data?.message || 'تعذر سحب الشارة.'
