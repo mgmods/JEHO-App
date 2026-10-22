@@ -17,10 +17,10 @@ import {
 } from '../dashboard-permissions';
 
 /**
- * Browser admin dashboard + /admin/* APIs.
- * Dashboard sessions retain their operator ACL. Authenticated app staff use a
- * separate role policy: Super = full, Admin = all non-super-only modules,
- * Manager = room and live-stream operations only.
+ * Browser dashboard operators keep their module ACL. Authenticated app staff use
+ * a separate explicit policy: Super = full; Admin = moderated platform operations
+ * and bounded grants; Manager = room moderation, streams, reports, and bounded
+ * frame/entrance grants. Service-level checks enforce target hierarchy and duration.
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
