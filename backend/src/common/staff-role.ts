@@ -54,7 +54,7 @@ export function hasDashboardAccess(user: {
   isAdmin?: boolean;
 } | null | undefined): boolean {
   const role = normalizeStaffRole(user);
-  return role === 'super' || role === 'admin' || role === 'operator';
+  return role === 'super' || role === 'admin' || role === 'operator' || role === 'manager';
 }
 
 export function staffRank(role: PlatformStaffRole): number {

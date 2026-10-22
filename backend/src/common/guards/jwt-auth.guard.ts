@@ -80,29 +80,39 @@ export class JwtAuthGuard implements CanActivate {
         const admin = await this.dataSource.getRepository(AdminUser).findOne({
           where: { id: payload.sub },
         });
-        if (!admin || !admin.isActive) {
-          if (required) throw new UnauthorizedException('Dashboard account is disabled or unavailable');
-          return false;
+        if (!admin) {
+          // Legacy dashboard tokens may share the same role claims as app staff.
+          // If no admin_users row matches, continue resolving the token as an app user.
+          // Explicit dashboard tokens must never fall through to app-user auth.
+          if (payload.tokenType === 'dashboard') {
+            if (required) throw new UnauthorizedException('Dashboard account is unavailable');
+            return false;
+          }
+        } else {
+          if (!admin.isActive) {
+            if (required) throw new UnauthorizedException('Dashboard account is disabled or unavailable');
+            return false;
+          }
+          const staffRole = String(admin.staffRole || (admin.role === AdminRole.SUPER ? 'super' : 'operator'));
+          const superAdmin = staffRole === 'super' || admin.role === 'super';
+          const permissions = superAdmin
+            ? fullPermissions()
+            : normalizePermissions(admin.dashboardPermissions);
+          request.user = {
+            ...payload,
+            sub: admin.id,
+            username: admin.username,
+            email: admin.email,
+            isAdmin: true,
+            isSuperAdmin: superAdmin,
+            staffRole: superAdmin ? 'super' : 'operator',
+            permissions,
+            role: 'admin',
+            isGuest: false,
+            authSource: 'dashboard',
+          };
+          return true;
         }
-        const staffRole = String(admin.staffRole || (admin.role === AdminRole.SUPER ? 'super' : 'operator'));
-        const superAdmin = staffRole === 'super' || admin.role === 'super';
-        const permissions = superAdmin
-          ? fullPermissions()
-          : normalizePermissions(admin.dashboardPermissions);
-        request.user = {
-          ...payload,
-          sub: admin.id,
-          username: admin.username,
-          email: admin.email,
-          isAdmin: true,
-          isSuperAdmin: superAdmin,
-          staffRole: superAdmin ? 'super' : 'operator',
-          permissions,
-          role: 'admin',
-          isGuest: false,
-          authSource: 'dashboard',
-        };
-        return true;
       }
 
       const user = await this.usersRepo.findOne({ where: { id: payload.sub } });
