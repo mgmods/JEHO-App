@@ -499,7 +499,8 @@ class MainActivity : ThemedActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, pad)
-            background = roundedBackground(Color.rgb(22, 27, 46), 24, Color.rgb(83, 93, 132))
+            minimumWidth = (320 * resources.displayMetrics.density).toInt()
+            background = roundedBackground(Color.rgb(15, 20, 39), 26, Color.rgb(105, 101, 181))
         }
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -507,8 +508,8 @@ class MainActivity : ThemedActivity() {
         }
         val heading = TextView(this).apply {
             text = "مكافآت تسجيل الدخول"
-            textSize = 20f
-            setTextColor(Color.WHITE)
+            textSize = 21f
+            setTextColor(Color.rgb(249, 247, 255))
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         }
@@ -524,9 +525,9 @@ class MainActivity : ThemedActivity() {
         root.addView(top)
 
         val subtitle = TextView(this).apply {
-            text = "سجّل دخولك 7 أيام متتالية لتحصل على مكافآت مميزة"
+            text = "سجّل دخولك يوميًا وافتح مكافأة جديدة كل يوم"
             textSize = 13f
-            setTextColor(Color.rgb(195, 202, 220))
+            setTextColor(Color.rgb(188, 198, 222))
             setPadding(0, pad / 3, 0, pad)
         }
         root.addView(subtitle)
@@ -540,11 +541,19 @@ class MainActivity : ThemedActivity() {
                 gravity = Gravity.CENTER
                 setPadding(pad / 2, pad / 2, pad / 2, pad / 2)
                 background = roundedBackground(
-                    if (day.day == status.currentDay) Color.rgb(71, 60, 31) else Color.rgb(35, 41, 62),
-                    14,
-                    if (day.day == status.currentDay) Color.rgb(226, 187, 76) else Color.rgb(67, 76, 105),
+                    when {
+                        day.claimed -> Color.rgb(25, 59, 54)
+                        day.day == status.currentDay -> Color.rgb(55, 47, 83)
+                        else -> Color.rgb(27, 34, 57)
+                    },
+                    16,
+                    when {
+                        day.claimed -> Color.rgb(72, 190, 151)
+                        day.day == status.currentDay -> Color.rgb(220, 188, 105)
+                        else -> Color.rgb(62, 76, 112)
+                    },
                 )
-                layoutParams = LinearLayout.LayoutParams((72 * resources.displayMetrics.density).toInt(), (88 * resources.displayMetrics.density).toInt()).apply {
+                layoutParams = LinearLayout.LayoutParams((76 * resources.displayMetrics.density).toInt(), (100 * resources.displayMetrics.density).toInt()).apply {
                     marginEnd = pad / 3
                 }
             }
@@ -554,13 +563,14 @@ class MainActivity : ThemedActivity() {
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
             })
-            if (day.type == "cosmetic" && !day.previewUrl.isNullOrBlank()) {
+            val dayPreview = day.previewUrl ?: day.animationUrl
+            if (day.type == "cosmetic" && !dayPreview.isNullOrBlank()) {
                 val dayImage = ImageView(this).apply {
-                    layoutParams = LinearLayout.LayoutParams((30 * resources.displayMetrics.density).toInt(), (30 * resources.displayMetrics.density).toInt())
+                    layoutParams = LinearLayout.LayoutParams((36 * resources.displayMetrics.density).toInt(), (36 * resources.displayMetrics.density).toInt())
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     contentDescription = day.name ?: "مكافأة اليوم"
                 }
-                Glide.with(this).load(day.previewUrl).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(dayImage)
+                Glide.with(this).load(dayPreview).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(dayImage)
                 tile.addView(dayImage)
             } else {
                 tile.addView(TextView(this).apply {
@@ -570,9 +580,10 @@ class MainActivity : ThemedActivity() {
                 })
             }
             tile.addView(TextView(this).apply {
-                text = if (day.claimed) "تم" else if (day.type == "coins") "${day.amount}" else "هدية"
-                textSize = 10f
-                setTextColor(if (day.claimed) Color.rgb(114, 224, 164) else Color.rgb(238, 210, 125))
+                text = if (day.claimed) "✓ تم الاستلام" else if (day.type == "coins") "${day.amount} كوينز" else "جائزة"
+                textSize = 9f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(if (day.claimed) Color.rgb(112, 232, 183) else if (day.day == status.currentDay) Color.rgb(255, 222, 135) else Color.rgb(185, 195, 218))
             })
             daysRow.addView(tile)
         }
@@ -584,11 +595,11 @@ class MainActivity : ThemedActivity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(pad, pad, pad, pad)
-            background = roundedBackground(Color.rgb(30, 36, 58), 18, Color.rgb(72, 82, 115))
+            background = roundedBackground(Color.rgb(26, 32, 56), 22, Color.rgb(112, 104, 179))
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = pad }
         }
         val rewardImage = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams((82 * resources.displayMetrics.density).toInt(), (82 * resources.displayMetrics.density).toInt())
+            layoutParams = LinearLayout.LayoutParams((96 * resources.displayMetrics.density).toInt(), (96 * resources.displayMetrics.density).toInt())
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
         val previewUrl = reward?.previewUrl ?: reward?.animationUrl
@@ -618,9 +629,10 @@ class MainActivity : ThemedActivity() {
             setPadding(0, pad / 3, 0, pad / 5)
         })
         rewardPanel.addView(TextView(this).apply {
-            text = if (reward?.type == "coins") "${reward.amount} كوينز" else "عنصر تجميلي مؤقت · ${reward?.durationDays ?: 7} أيام"
+            text = if (reward?.type == "coins") "${reward.amount} كوينز" else "${reward?.cosmeticType?.let { cosmeticTypeLabel(it) } ?: "عنصر تجميلي"} · ${reward?.durationDays ?: 7} يوم"
             textSize = 13f
-            setTextColor(Color.rgb(231, 195, 97))
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.rgb(244, 207, 111))
             gravity = Gravity.CENTER
         })
         root.addView(rewardPanel)
@@ -641,11 +653,9 @@ class MainActivity : ThemedActivity() {
         }
         val dialog = AlertDialog.Builder(this).setView(scroll).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        close.setOnClickListener {
-            prefs.edit().putString("seen_date", status.today).apply()
-            dialog.dismiss()
-        }
-        dialog.setOnDismissListener { prefs.edit().putString("seen_date", status.today).apply() }
+        // Closing the dialog without claiming must not mark today's reward as seen.
+        // Otherwise the user loses the chance to claim it again during the same day.
+        close.setOnClickListener { dialog.dismiss() }
         claimButton.setOnClickListener {
             claimButton.isEnabled = false
             claimButton.text = "جارٍ الاستلام…"
@@ -667,6 +677,13 @@ class MainActivity : ThemedActivity() {
             }
         }
         dialog.show()
+    }
+
+    private fun cosmeticTypeLabel(type: String): String = when (type.lowercase()) {
+        "frame", "avatar_frame", "profile_frame" -> "إطار"
+        "entry_effect", "entrance", "entrance_effect", "entry" -> "دخولية"
+        "name_card", "namecard", "name_plate", "nameplate", "title_card" -> "كرت اسم"
+        else -> "عنصر تجميلي"
     }
 
     private fun roundedBackground(fill: Int, radiusDp: Int, stroke: Int): GradientDrawable {
