@@ -21,7 +21,7 @@ import androidx.appcompat.app.AlertDialog;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.util.StaffRoleHelper;
-import com.Dramizo.Series.data.local.ContainerProvider;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
 
 import java.util.ArrayList;
 import java.util.Arrays;
