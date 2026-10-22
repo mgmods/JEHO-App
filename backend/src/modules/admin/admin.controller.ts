@@ -1943,7 +1943,7 @@ export class AdminController {
     }
     const permanent = body?.permanent === true;
     const days = Number(body?.days);
-    const frameAndEntranceTypes = new Set(['entry_effect', 'profile_card', 'nameplate']);
+    const frameAndEntranceTypes = new Set(['entry_effect', 'profile_card', 'room_card', 'nameplate']);
     if (isSuper) {
       if (permanent !== true && (!Number.isInteger(days) || ![7, 15, 30].includes(days))) {
         throw new BadRequestException('Super Admin cosmetic grants must be 7, 15, 30 days or permanent');
