@@ -697,10 +697,13 @@ public final class GlobalCelebrationToast {
         int[] containerLocation = new int[2];
         target.getLocationOnScreen(targetLocation);
         container.getLocationOnScreen(containerLocation);
-        float currentX = targetLocation[0] - containerLocation[0] + (centerX ? target.getWidth() / 2f : 0f);
-        float currentY = targetLocation[1] - containerLocation[1] + target.getHeight() / 2f;
-        target.setTranslationX(target.getTranslationX() + desiredX - currentX);
-        target.setTranslationY(target.getTranslationY() + desiredY - currentY);
+        // Coordinates from getLocationOnScreen already include current translations.
+        // Subtract them first, then assign the exact desired translation so applying updated
+        // dashboard settings is deterministic and cannot accumulate drift across refreshes.
+        float baseX = targetLocation[0] - containerLocation[0] - target.getTranslationX();
+        float baseY = targetLocation[1] - containerLocation[1] - target.getTranslationY();
+        target.setTranslationX(desiredX - baseX - (centerX ? target.getWidth() / 2f : 0f));
+        target.setTranslationY(desiredY - baseY - target.getHeight() / 2f);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
