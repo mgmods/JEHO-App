@@ -11262,8 +11262,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int mul = Math.max(1, multiplier);
             line = "ضرب حظه وربح ×" + mul + " · +" + Math.max(0L, wonCoins);
         }
-        // Small join-style toast only — never the big crawling overlay.
-        showLuckyResultToast(who, avatarUrl, 1, 0, line);
+        // Use the same dashboard-controlled top toast as every other lucky-win event.
+        // Do not route this through ComingMsgView: that legacy sliding toast ignored the design controls.
+        GlobalCelebrationToast.show(
+                this, who, line, avatarUrl, null,
+                "lucky-room-hit-" + who + "-" + Math.max(0L, wonCoins) + "-" + multiplier,
+                28, Math.max(0, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
         if (roomBannerEnabled()) {
             appendChatLine(who, line, 0, 1, null, null, avatarUrl, null);
         }
