@@ -159,7 +159,8 @@ public final class RoomVisualEffects {
     public void showSlotWinBubble(@Nullable String displayName, @Nullable String avatarUrl,
                                    long winCoins, @Nullable String gameTitle,
                                    @Nullable String gameIconUrl) {
-        effectsView.showSlotWinBubble(displayName, avatarUrl, winCoins, gameTitle, gameIconUrl);
+        // JEHO uses the configurable top celebration toast for wins. Do not show the
+        // legacy animated card in the middle of the room; it competes with the toast.
     }
 
     public void showSlotLoseBubble(@Nullable String displayName, @Nullable String avatarUrl,
