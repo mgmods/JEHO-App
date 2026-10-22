@@ -3255,7 +3255,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void endBroadcastAsPlatformStaff() {
         if (exiting || roomId == null || roomId.trim().isEmpty()) return;
         Toast.makeText(this, "جارٍ إنهاء البث وإغلاق الروم…", Toast.LENGTH_SHORT).show();
-        ContainerProvider.from(this).getAdminApi().closeRoom(roomId)
+        ContainerProvider.from(this).getAdminApi().endStream(roomId)
                 .enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
                     @Override
                     public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
