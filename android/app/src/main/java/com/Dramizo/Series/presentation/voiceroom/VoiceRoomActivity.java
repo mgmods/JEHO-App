@@ -170,6 +170,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private TextView roomPkTeamBName;
     @Nullable private TextView roomPkTeamBScore;
     @Nullable private TextView roomPkTeamAMembers;
+    private boolean roomPkInRoomChallenge;
+    private boolean roomPkAutoEndRequested;
     @Nullable private TextView roomPkTeamBMembers;
     @Nullable private android.view.View roomPkProgressA;
     @Nullable private android.view.View roomPkProgressB;
@@ -216,7 +218,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     ? String.format(java.util.Locale.US, "%02d:%02d", remaining / 60000L, (remaining / 1000L) % 60L)
                     : (roomPkEndsAtMs > 0L ? "بانتظار تثبيت النتيجة" : "مباشر");
             roomPkScoreBanner.setText(roomPkBannerBaseText + "   •   ⏱ " + clock);
-            if (remaining > 0L) handler.postDelayed(this, 1000L);
+            if (remaining > 0L) {
+                handler.postDelayed(this, 1000L);
+            } else if (roomPkEndsAtMs > 0L && roomPkInRoomChallenge && isOwner
+                    && !roomPkAutoEndRequested && roomPkCurrentContestId != null
+                    && !roomPkCurrentContestId.isEmpty()) {
+                roomPkAutoEndRequested = true;
+                ContainerProvider.from(VoiceRoomActivity.this).getContestsApi()
+                        .endInRoomPk(roomPkCurrentContestId).enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                            retrofit2.Response<ApiResponse<Object>> response) {
+                        if (!response.isSuccessful() || response.body() == null || !response.body().success) {
+                            roomPkAutoEndRequested = false;
+                        }
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                        roomPkAutoEndRequested = false;
+                    }
+                });
+            }
         }
     };
     private final Runnable hideRoomPkScoreBanner = () -> {
@@ -13835,10 +13855,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (payload.has("contestId") && !payload.get("contestId").isJsonNull()) {
                 roomPkCurrentContestId = payload.get("contestId").getAsString();
             }
+            roomPkInRoomChallenge = "person_vs_person".equals(memberStr(payload, "challengeType"))
+                    || "team_vs_team".equals(memberStr(payload, "challengeType"));
+            if ("contest:pk-started".equals(event)) roomPkAutoEndRequested = false;
             ensureRoomPkActionButton();
             showRoomPkScoreBanner("contest:pk-started".equals(event) ? "contest:team-score" : event, payload);
             if ("contest:team-ended".equals(event)) {
                 roomPkCurrentContestId = null;
+                roomPkInRoomChallenge = false;
+                roomPkAutoEndRequested = false;
                 handler.postDelayed(this::ensureRoomPkActionButton, 12000L);
             }
             return;
