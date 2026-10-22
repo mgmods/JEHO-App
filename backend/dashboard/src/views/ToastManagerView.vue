@@ -282,12 +282,23 @@ async function save() {
   saving.value = false
   if (err) { error.value = err.message; toast().danger(err.message); return }
   const cfg = data?.data || data || {}
+  const positionKeys = ['avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY']
+  for (const key of ['giftSend', 'luckyWinNormal', 'luckyWinHigh']) {
+    for (const field of positionKeys) {
+      if (Number(cfg[key]?.[field]) !== Number(payload[key][field])) {
+        error.value = 'لم يؤكد الخادم حفظ مواضع التوست. لم نعرض الحفظ كنجاح؛ أعد المحاولة بعد التحقق من اتصال الخادم.'
+        toast().danger(error.value)
+        await load()
+        return
+      }
+    }
+  }
   Object.assign(form.giftSend, cfg.giftSend || {})
   Object.assign(form.luckyWinNormal, cfg.luckyWinNormal || {})
   Object.assign(form.luckyWinHigh, cfg.luckyWinHigh || {})
   Object.assign(form.luckyButton, cfg.luckyButton || {})
   form.version = Number(cfg.version) || form.version
-  success.value = 'تم حفظ جميع الإعدادات. ستُنفّذ الحركة محلياً على الأجهزة التي تدعم هذه النسخة.'
+  success.value = 'تم التحقق من حفظ الإعدادات والمواضع في الخادم.'
   toast().success(success.value)
 }
 onMounted(load)
