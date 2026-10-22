@@ -260,11 +260,11 @@
     <TextView
         android:id="@+id/btnRoomPkChallenge"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="50dp"
         android:layout_marginTop="12dp"
         android:background="@drawable/bg_room_dialog_item"
-        android:drawableStart="@drawable/icon_room_opera_admin"
-        android:drawablePadding="10dp"
+        android:drawableStart="@drawable/icon_room_opera_pk_open"
+        android:drawablePadding="12dp"
         android:gravity="center_vertical"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
@@ -272,7 +272,7 @@
         android:textColor="@color/aurora_gold"
         android:textSize="14sp"
         android:textStyle="bold"
-        android:visibility="gone" />
+        android:contentDescription="فتح تحدّي PK بين الغرف" />
 
     <TextView
         android:id="@+id/btnDialogClose"
