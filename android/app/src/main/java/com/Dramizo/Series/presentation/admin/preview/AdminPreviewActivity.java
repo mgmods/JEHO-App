@@ -173,12 +173,7 @@ public final class AdminPreviewActivity extends ThemedActivity {
         home.setPadding(dp(18), dp(8), dp(18), dp(8));
         home.setBackground(pill(PURPLE_LIGHT, 18, 0));
         home.setOnClickListener(v -> openConnectedSection("overview"));
-        TextView preview = label("◉  وضع المعاينة", 12, MUTED, true);
-        preview.setGravity(Gravity.CENTER);
-        preview.setPadding(dp(18), dp(8), dp(18), dp(8));
-        preview.setOnClickListener(v -> openConnectedSection("overview"));
         bottom.addView(home, new LinearLayout.LayoutParams(0, -2, 1f));
-        bottom.addView(preview, new LinearLayout.LayoutParams(0, -2, 1f));
         root.addView(bottom);
 
         search.addTextChangedListener(new TextWatcher() {
