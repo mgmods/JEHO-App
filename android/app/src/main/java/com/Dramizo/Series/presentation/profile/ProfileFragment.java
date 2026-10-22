@@ -705,7 +705,7 @@ public class ProfileFragment extends Fragment {
                     return;
                 }
                 startActivity(new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.admin.preview.AdminPreviewActivity.class));
+                        com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class));
             });
         }
         // Use one unified entry point; avoid showing a duplicate admin button on the profile.
