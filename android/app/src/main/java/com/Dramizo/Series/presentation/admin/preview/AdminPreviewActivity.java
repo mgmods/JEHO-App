@@ -10,6 +10,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -118,9 +119,9 @@ public final class AdminPreviewActivity extends ThemedActivity {
         searchLp.setMargins(dp(16), dp(12), dp(16), dp(8));
         root.addView(search, searchLp);
 
-        ScrollView navScroll = new ScrollView(this);
+        HorizontalScrollView navScroll = new HorizontalScrollView(this);
         navScroll.setFillViewport(false);
-        navScroll.setVerticalScrollBarEnabled(false);
+        navScroll.setHorizontalScrollBarEnabled(false);
         moduleRail = new LinearLayout(this);
         moduleRail.setOrientation(LinearLayout.VERTICAL);
         moduleRail.setPadding(dp(12), dp(4), dp(12), dp(4));
