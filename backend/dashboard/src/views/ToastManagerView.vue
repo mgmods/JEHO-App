@@ -167,7 +167,7 @@ const tabs = [
   { key: 'giftSend', label: 'إرسال الهدايا والعداد X' },
   { key: 'luckyWinNormal', label: 'أرباح المحظوظ العادية' },
   { key: 'luckyReturn', label: 'الهدايا المردودة' },
-  { key: 'luckyWinHigh', label: 'الأرباح العالية' }
+  { key: 'luckyWinHigh', label: 'الأرباح العالية' },
   { key: 'luckyButton', label: 'زر هدية المحظوظ' },
 ]
 const activeTab = ref('giftSend')
