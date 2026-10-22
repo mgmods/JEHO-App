@@ -435,7 +435,14 @@ async function loadDailyLogin() {
   const payload = data?.data ?? data ?? {}
   dailyLoginEnabled.value = payload.enabled !== false
   if (Array.isArray(payload.days) && payload.days.length === 7) {
-    dailyLoginDays.value = payload.days.map((day, i) => ({ ...dailyLoginDays.value[i], ...day, day: i + 1 }))
+    dailyLoginDays.value = payload.days.map((day, i) => ({
+      ...dailyLoginDays.value[i],
+      ...day,
+      day: i + 1,
+      amount: Math.max(0, Number(day.amount) || 0),
+      cosmeticCode: String(day.cosmeticCode || ''),
+      durationDays: Math.max(1, Math.min(365, Math.floor(Number(day.durationDays) || 7))),
+    }))
   }
 }
 
