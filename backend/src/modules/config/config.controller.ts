@@ -153,6 +153,7 @@ export class ConfigController {
       backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1,
       giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
       luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+      luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
       luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
       luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
     };
@@ -191,7 +192,7 @@ export class ConfigController {
       bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.bodySizeSp) || 12))),
       countSizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.countSizeSp) || 12))),
     };
-    const win = (key: 'luckyWinNormal' | 'luckyWinHigh') => {
+    const win = (key: 'luckyWinNormal' | 'luckyReturn' | 'luckyWinHigh') => {
       const value = parsed[key] || {};
       const fallback = defaults[key];
       return {
@@ -221,7 +222,7 @@ export class ConfigController {
       durationSeconds: Math.max(1, Math.min(12, Math.round(Number(button.durationSeconds) || 5))),
       pulseEnabled: button.pulseEnabled !== false,
     };
-    return { ...defaults, ...giftSend, giftSend, luckyWinNormal: win('luckyWinNormal'), luckyWinHigh: win('luckyWinHigh'), luckyButton,
+    return { ...defaults, ...giftSend, giftSend, luckyWinNormal: win('luckyWinNormal'), luckyReturn: win('luckyReturn'), luckyWinHigh: win('luckyWinHigh'), luckyButton,
       version: Math.max(1, Math.round(Number(parsed.version) || 1)) };
   }
 
