@@ -77,7 +77,7 @@ import {
   type PlatformStaffRole,
 } from '../../common/staff-role';
 
-const DEFAULT_ROOM_SEAT_COUNT = 11; // host stage + numbered seats 1..10
+const DEFAULT_ROOM_SEAT_COUNT = 30; // 30 total seats including host
 
 /** Visual guild banner tier 1–6 from lifetime agency diamonds (matches users/agencies). */
 function agencyVisualBannerTier(totalDiamonds: number): number {
