@@ -326,10 +326,12 @@ public class ProfileActivity extends ThemedActivity {
                 AgencyUi.applyUserCardSheet(binding.userCardBg, null, vip);
             }
 
-            binding.tvDisplayName.setText(
-                    user.displayName != null && !user.displayName.isEmpty()
-                            ? user.displayName
-                            : "مستخدم");
+            String profileDisplayName = user.displayName != null && !user.displayName.isEmpty()
+                    ? user.displayName : "مستخدم";
+            if (user.customDisplayRankName != null && !user.customDisplayRankName.trim().isEmpty()) {
+                profileDisplayName = profileDisplayName + "  ·  " + user.customDisplayRankName.trim();
+            }
+            binding.tvDisplayName.setText(profileDisplayName);
             GenderVerifiedBadge.bind(binding.tvDisplayName, null, user.genderVerified);
             bindGenderIcon(binding.imgGender, user.gender);
 
