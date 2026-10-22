@@ -105,7 +105,18 @@ class AdminConsoleActivity : ThemedActivity() {
         currentRole = StaffRoleHelper.normalize(user)
         api = ContainerProvider.from(this).adminApi
         buildShell()
-        showHome()
+        val requestedSection = intent.getStringExtra("admin_initial_section")
+        if (requestedSection.isNullOrBlank()) {
+            showHome()
+        } else if (requestedSection == "home") {
+            showHome()
+        } else if (modules.any { it.key == requestedSection }) {
+            // Open a real connected section requested from the light native admin hub.
+            // The normal role gate above still runs before any API-backed section opens.
+            openModule(requestedSection)
+        } else {
+            showHome()
+        }
     }
 
     private fun buildShell() {
