@@ -69,7 +69,7 @@
                   <input :ref="el => setStaffIdentityInput(role.key, asset.key, el)" type="file" class="form-control form-control-sm mb-2" :accept="asset.accept" @change="uploadStaffIdentityAsset(role.key, asset, $event)" />
                   <div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-secondary btn-sm" :disabled="staffIdentityUploading === role.key + ':' + asset.key" @click="chooseStaffIdentityFile(role.key, asset.key)">{{ staffIdentityUploading === role.key + ':' + asset.key ? 'جارٍ الرفع…' : 'رفع ملف' }}</button>
                     <button v-if="staffIdentityForm[role.key][asset.key]" type="button" class="btn btn-link btn-sm text-danger" @click="staffIdentityForm[role.key][asset.key] = ''">إزالة</button></div><div class="form-text mt-2">{{ asset.help }}</div>
-                </div></div></div>
+                </div></div></div></div>
               <div class="alert alert-info small">الإطار، الشارة، بطاقة الاسم، بطاقة الرسائل، والدخولية محفوظة كإعدادات هوية رتبة وليست عناصر متجر.</div>
               <div class="d-flex justify-content-end"><button type="button" class="btn btn-aurora" :disabled="staffIdentitySaving || staffIdentityLoading || !auth.can('settings', 'write')" @click="saveStaffIdentity"><span v-if="staffIdentitySaving" class="spinner-border spinner-border-sm me-1"></span>حفظ هوية الرتب</button></div>
             </div>
