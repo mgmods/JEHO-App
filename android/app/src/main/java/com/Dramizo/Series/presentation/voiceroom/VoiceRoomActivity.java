@@ -10768,6 +10768,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             chat = coins > 0
                     ? ("مبروك " + who + " فاز بـ " + coins + " عملة · حظ")
                     : ("مبروك " + who + " · حظ");
+            // Use the dashboard-controlled top toast for lucky wins; never the legacy
+            // animated card in the center of the room.
+            GlobalCelebrationToast.show(
+                    this, who, chat, avatarUrl, badgeUrl,
+                    dedupeKey != null ? dedupeKey : ("lucky-room-" + System.currentTimeMillis()),
+                    28, 1d, Math.max(0L, coins), who, "lucky_hit", null);
             if (bubbleFx != null && coins > 0) {
                 bubbleFx.showSlotWinBubble(who, null, coins, "حظ", badgeUrl);
                 if (binding != null && binding.giftChatEffects != null) {
