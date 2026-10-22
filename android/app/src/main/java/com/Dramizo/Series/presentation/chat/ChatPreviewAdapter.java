@@ -124,7 +124,10 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         if (oa == null ? ob != null : !oa.equals(ob)) return false;
         boolean va = a.peer != null && a.peer.genderVerified;
         boolean vb = b.peer != null && b.peer.genderVerified;
-        return va == vb;
+        if (va != vb) return false;
+        String ra = a.peer != null ? a.peer.customDisplayRankName : null;
+        String rb = b.peer != null ? b.peer.customDisplayRankName : null;
+        return eq(ra, rb);
     }
 
     private static boolean sameAvatar(
@@ -176,6 +179,10 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
             displayName = item.title != null && !item.title.isEmpty()
                     ? item.title
                     : holder.itemView.getContext().getString(R.string.user_default);
+        }
+        String rankName = item.peer != null ? item.peer.customDisplayRankName : null;
+        if (rankName != null && !rankName.trim().isEmpty()) {
+            displayName = displayName + "  ·  " + rankName.trim();
         }
         holder.b.tvTitle.setText(displayName);
 
