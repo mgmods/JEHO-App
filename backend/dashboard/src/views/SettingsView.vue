@@ -63,7 +63,8 @@
                   <div class="col-md-6"><label class="form-label">لون الهوية</label><div class="d-flex gap-2"><input v-model="staffIdentityForm[role.key].accentColor" type="color" class="form-control form-control-color" /><input v-model="staffIdentityForm[role.key].accentColor" maxlength="7" class="form-control" dir="ltr" /></div></div></div>
                 <div class="row g-3"><div v-for="asset in staffIdentityAssets" :key="role.key + '-' + asset.key" class="col-md-6 col-xl-4"><div class="h-100 rounded-3 border p-3">
                   <label class="form-label fw-semibold">{{ asset.title }}</label><div class="d-flex align-items-center justify-content-center rounded-3 bg-body-tertiary mb-2 overflow-hidden" style="min-height:110px">
-                    <video v-if="staffIdentityForm[role.key][asset.key] && staffIdentityIsVideo(staffIdentityForm[role.key][asset.key])" :src="resolveAsset(staffIdentityForm[role.key][asset.key])" controls muted loop playsinline style="max-width:100%;max-height:140px" />
+                    <SvgaPreview v-if="staffIdentityForm[role.key][asset.key] && staffIdentityIsSvga(staffIdentityForm[role.key][asset.key])" :src="staffIdentityForm[role.key][asset.key]" />
+                    <video v-else-if="staffIdentityForm[role.key][asset.key] && staffIdentityIsVideo(staffIdentityForm[role.key][asset.key])" :src="resolveAsset(staffIdentityForm[role.key][asset.key])" controls muted loop playsinline style="max-width:100%;max-height:140px" />
                     <img v-else-if="staffIdentityForm[role.key][asset.key]" :src="resolveAsset(staffIdentityForm[role.key][asset.key])" :alt="asset.title" style="max-width:100%;max-height:120px;object-fit:contain" /><span v-else class="small text-secondary">لم يتم رفع ملف</span></div>
                   <input :ref="el => setStaffIdentityInput(role.key, asset.key, el)" type="file" class="form-control form-control-sm mb-2" :accept="asset.accept" @change="uploadStaffIdentityAsset(role.key, asset, $event)" />
                   <div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-secondary btn-sm" :disabled="staffIdentityUploading === role.key + ':' + asset.key" @click="chooseStaffIdentityFile(role.key, asset.key)">{{ staffIdentityUploading === role.key + ':' + asset.key ? 'جارٍ الرفع…' : 'رفع ملف' }}</button>
@@ -688,6 +689,7 @@ import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import SvgaPreview from '@/components/SvgaPreview.vue'
 import EconomyPanel from '@/components/settings/EconomyPanel.vue'
 import OperationalSettingsPanel from '@/components/settings/OperationalSettingsPanel.vue'
 import PaymentSettingsPanel from '@/components/settings/PaymentSettingsPanel.vue'
@@ -751,6 +753,7 @@ const staffIdentityForm = reactive({
 })
 function setStaffIdentityInput(role, key, el) { if (el) staffIdentityInputs[role + ':' + key] = el }
 function chooseStaffIdentityFile(role, key) { staffIdentityInputs[role + ':' + key]?.click() }
+function staffIdentityIsSvga(raw) { return /\.svga(\?|$)/i.test(String(raw || '')) }
 function staffIdentityIsVideo(raw) { return /\.(mp4|webm|mov)(\?|$)/i.test(String(raw || '')) }
 async function loadStaffIdentity() {
   staffIdentityLoading.value = true
@@ -1226,6 +1229,9 @@ async function load() {
 
 function reloadActive() {
   if (isCoreTab.value) load()
+  else if (settingsTab.value === 'staff-identity') loadStaffIdentity()
+  else if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
+  else if (settingsTab.value === 'admins') loadOperators()
 }
 
 async function save() {
