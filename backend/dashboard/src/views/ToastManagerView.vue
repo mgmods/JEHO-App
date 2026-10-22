@@ -295,16 +295,35 @@ async function save() {
     luckyWinHigh: { ...form.luckyWinHigh },
     luckyButton: { ...form.luckyButton },
   }
-  const { data, error: err } = await toastManagerApi.save(payload)
+  const { error: saveError } = await toastManagerApi.save(payload)
+  if (saveError) {
+    saving.value = false
+    error.value = saveError.message
+    toast().danger(saveError.message)
+    return
+  }
+
+  // Verify persistence from a fresh GET instead of trusting the PATCH response.
+  // This catches a backend that accepted a save but serves stale/default settings on reload.
+  const { data: readBack, error: readError } = await toastManagerApi.get()
   saving.value = false
-  if (err) { error.value = err.message; toast().danger(err.message); return }
-  const cfg = data?.data || data || {}
-  Object.assign(form.giftSend, cfg.giftSend || {})
-  Object.assign(form.luckyWinNormal, cfg.luckyWinNormal || {})
-  Object.assign(form.luckyWinHigh, cfg.luckyWinHigh || {})
-  Object.assign(form.luckyButton, cfg.luckyButton || {})
+  if (readError) {
+    error.value = 'تم إرسال الحفظ، لكن تعذّر التحقق من الإعدادات بعد الحفظ: ' + readError.message
+    toast().danger(error.value)
+    return
+  }
+  const cfg = readBack?.data || readBack || {}
+  if (!cfg.giftSend || !cfg.luckyWinNormal || !cfg.luckyWinHigh || !cfg.luckyButton) {
+    error.value = 'الخادم لم يُرجع إعدادات التوست المحفوظة كاملة؛ لم نعرض نجاحاً غير مؤكّد.'
+    toast().danger(error.value)
+    return
+  }
+  Object.assign(form.giftSend, cfg.giftSend)
+  Object.assign(form.luckyWinNormal, cfg.luckyWinNormal)
+  Object.assign(form.luckyWinHigh, cfg.luckyWinHigh)
+  Object.assign(form.luckyButton, cfg.luckyButton)
   form.version = Number(cfg.version) || form.version
-  success.value = 'تم حفظ جميع الإعدادات. ستُنفّذ الحركة محلياً على الأجهزة التي تدعم هذه النسخة.'
+  success.value = 'تم الحفظ والتحقق من الإعدادات بقراءة جديدة من الخادم. إذا عادت القيم بعد تحديث الصفحة، فالمشكلة من نسخة الخادم المنشورة أو قاعدة إعداداته وليست من المعاينة.'
   toast().success(success.value)
 }
 onMounted(load)
