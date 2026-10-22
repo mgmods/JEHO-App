@@ -11,6 +11,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.util.TypedValue;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -63,8 +64,11 @@ public final class GlobalCelebrationToast {
     private static volatile float remoteLuckyHighTextX = 25f, remoteLuckyHighTextY = 42f, remoteLuckyHighBodyX = 25f, remoteLuckyHighBodyY = 62f;
     private static volatile float remoteLuckyHighCountX = 88f, remoteLuckyHighCountY = 50f;
     private static volatile int remoteGiftWidthDp = 340, remoteGiftHeightDp = 100, remoteGiftAvatarSizeDp = 44;
+    private static volatile float remoteGiftTitleSizeSp = 12f, remoteGiftBodySizeSp = 12f, remoteGiftCountSizeSp = 12f;
     private static volatile int remoteLuckyNormalWidthDp = 340, remoteLuckyNormalHeightDp = 100, remoteLuckyNormalAvatarSizeDp = 44;
+    private static volatile float remoteLuckyNormalTitleSizeSp = 12f, remoteLuckyNormalBodySizeSp = 12f, remoteLuckyNormalCountSizeSp = 12f;
     private static volatile int remoteLuckyHighWidthDp = 340, remoteLuckyHighHeightDp = 100, remoteLuckyHighAvatarSizeDp = 44;
+    private static volatile float remoteLuckyHighTitleSizeSp = 12f, remoteLuckyHighBodySizeSp = 12f, remoteLuckyHighCountSizeSp = 12f;
     private static long lastStyleFetchAt;
 
     private static final class ToastRequest {
@@ -177,6 +181,10 @@ public final class GlobalCelebrationToast {
             final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : remoteLuckyNormalCountX;
             final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : remoteLuckyNormalCountY;
             final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : remoteLuckyNormalTitleSizeSp;
+            final float bodySize = giftSend ? remoteGiftBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : remoteLuckyNormalBodySizeSp;
+            final float countSize = giftSend ? remoteGiftCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : remoteLuckyNormalCountSizeSp;
+            applyTextSizes(title, body, active.findViewById(R.id.tvCelebrationTimes), titleSize, bodySize, countSize);
             resizeAvatar(activity, avatar, avatarSize);
             active.post(() -> {
                 if (active.getParent() == null) return;
@@ -199,6 +207,10 @@ public final class GlobalCelebrationToast {
     }
     private static String stringValue(Object value, String fallback) {
         return value instanceof String ? ((String) value).trim() : fallback;
+    }
+    private static float fontSizeValue(Object value, float fallback) {
+        try { return Math.max(8f, Math.min(30f, Float.parseFloat(String.valueOf(value)))); }
+        catch (Exception ignored) { return fallback; }
     }
     private static int intValue(Object value, int fallback) {
         try { return Math.max(1, Math.min(12, (int) Math.round(Double.parseDouble(String.valueOf(value))))); }
@@ -239,6 +251,9 @@ public final class GlobalCelebrationToast {
                     remoteGiftWidthDp = dimensionValue(gift.get("widthDp"), 340, 220, 360);
                     remoteGiftHeightDp = dimensionValue(gift.get("heightDp"), 100, 60, 180);
                     remoteGiftAvatarSizeDp = dimensionValue(gift.get("avatarSizeDp"), 44, 20, 76);
+                    remoteGiftTitleSizeSp = fontSizeValue(gift.get("titleSizeSp"), 12f);
+                    remoteGiftBodySizeSp = fontSizeValue(gift.get("bodySizeSp"), 12f);
+                    remoteGiftCountSizeSp = fontSizeValue(gift.get("countSizeSp"), 12f);
                     remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
                     remoteLuckyHighBackgroundUrl = stringValue(high.get("backgroundUrl"), "");
                     remoteLuckyNormalShineEnabled = !Boolean.FALSE.equals(normal.get("shineEnabled"));
@@ -258,6 +273,9 @@ public final class GlobalCelebrationToast {
                     remoteLuckyNormalWidthDp = dimensionValue(normal.get("widthDp"), 340, 220, 360);
                     remoteLuckyNormalHeightDp = dimensionValue(normal.get("heightDp"), 100, 60, 180);
                     remoteLuckyNormalAvatarSizeDp = dimensionValue(normal.get("avatarSizeDp"), 44, 20, 76);
+                    remoteLuckyNormalTitleSizeSp = fontSizeValue(normal.get("titleSizeSp"), 12f);
+                    remoteLuckyNormalBodySizeSp = fontSizeValue(normal.get("bodySizeSp"), 12f);
+                    remoteLuckyNormalCountSizeSp = fontSizeValue(normal.get("countSizeSp"), 12f);
                     remoteLuckyHighAvatarX = floatValue(high.get("avatarX"), 8f);
                     remoteLuckyHighAvatarY = floatValue(high.get("avatarY"), 50f);
                     remoteLuckyHighTextX = floatValue(high.get("textX"), 25f);
@@ -269,6 +287,9 @@ public final class GlobalCelebrationToast {
                     remoteLuckyHighWidthDp = dimensionValue(high.get("widthDp"), 340, 220, 360);
                     remoteLuckyHighHeightDp = dimensionValue(high.get("heightDp"), 100, 60, 180);
                     remoteLuckyHighAvatarSizeDp = dimensionValue(high.get("avatarSizeDp"), 44, 20, 76);
+                    remoteLuckyHighTitleSizeSp = fontSizeValue(high.get("titleSizeSp"), 12f);
+                    remoteLuckyHighBodySizeSp = fontSizeValue(high.get("bodySizeSp"), 12f);
+                    remoteLuckyHighCountSizeSp = fontSizeValue(high.get("countSizeSp"), 12f);
                     MAIN.post(GlobalCelebrationToast::applyRemoteStyleToActiveToast);
                 }
                 @Override public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
@@ -617,6 +638,10 @@ public final class GlobalCelebrationToast {
             final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : remoteLuckyNormalCountX;
             final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : remoteLuckyNormalCountY;
             final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : remoteLuckyNormalTitleSizeSp;
+            final float bodySize = giftSend ? remoteGiftBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : remoteLuckyNormalBodySizeSp;
+            final float countSize = giftSend ? remoteGiftCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : remoteLuckyNormalCountSizeSp;
+            applyTextSizes(tvTitle, tvBody, tvTimes, titleSize, bodySize, countSize);
             resizeAvatar(activity, avatar, avatarSize);
             banner.post(() -> {
                 if (banner.getParent() == null) return;
@@ -635,6 +660,13 @@ public final class GlobalCelebrationToast {
     private static int dimensionValue(Object value, int fallback, int min, int max) {
         try { return Math.max(min, Math.min(max, (int) Math.round(Double.parseDouble(String.valueOf(value))))); }
         catch (Exception ignored) { return fallback; }
+    }
+
+    private static void applyTextSizes(@Nullable TextView title, @Nullable TextView body, @Nullable TextView count,
+                                       float titleSizeSp, float bodySizeSp, float countSizeSp) {
+        if (title != null) title.setTextSize(TypedValue.COMPLEX_UNIT_SP, Math.max(8f, Math.min(30f, titleSizeSp)));
+        if (body != null) body.setTextSize(TypedValue.COMPLEX_UNIT_SP, Math.max(8f, Math.min(30f, bodySizeSp)));
+        if (count != null) count.setTextSize(TypedValue.COMPLEX_UNIT_SP, Math.max(8f, Math.min(30f, countSizeSp)));
     }
 
     private static void resizeAvatar(Activity activity, ImageView avatar, int sizeDp) {
