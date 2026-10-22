@@ -109,13 +109,13 @@ public final class AdminPreviewActivity extends ThemedActivity {
         top.setOrientation(LinearLayout.VERTICAL);
         top.setPadding(dp(20), dp(14), dp(20), dp(14));
         top.setBackgroundColor(SURFACE);
-        TextView eyebrow = label("JEHO · ADMIN STUDIO", 10, PURPLE, true);
+        TextView eyebrow = label("JEHO · ADMIN CENTER", 10, PURPLE, true);
         eyebrow.setLetterSpacing(.08f);
         top.addView(eyebrow);
         LinearLayout titleRow = new LinearLayout(this);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
         titleRow.setOrientation(LinearLayout.HORIZONTAL);
-        TextView title = label("لوحة الإدارة التجريبية", 22, INK, true);
+        TextView title = label("لوحة الإدارة", 22, INK, true);
         title.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
         titleRow.addView(title);
         String roleText = StaffRoleHelper.SUPER.equals(currentRole) ? "سوبر أدمن" : StaffRoleHelper.ADMIN.equals(currentRole) ? "أدمن" : "مانجر";
