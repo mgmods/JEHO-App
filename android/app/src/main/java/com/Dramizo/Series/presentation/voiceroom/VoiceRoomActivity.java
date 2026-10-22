@@ -10773,15 +10773,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     this, who, chat, avatarUrl, badgeUrl,
                     dedupeKey != null ? dedupeKey : ("lucky-room-" + System.currentTimeMillis()),
                     28, 1d, Math.max(0L, coins), who, "lucky_hit", null);
-            if (bubbleFx != null && coins > 0) {
-                bubbleFx.showSlotWinBubble(who, null, coins, "حظ", badgeUrl);
-                if (binding != null && binding.giftChatEffects != null) {
-                    binding.giftChatEffects.setVisibility(View.VISIBLE);
-                    binding.giftChatEffects.bringToFront();
-                }
-            } else if (bubbleFx != null) {
-                bubbleFx.showRoomEventBubble(null, null, who + " · " + toastMsg, badgeUrl);
-            }
+            // The dashboard-controlled top toast is the only lucky-win toast.
+            // Do not add the legacy moving center-screen bubble for lucky wins.
             if (roomBannerEnabled()) {
                 appendGameCelebrationLine(chat, badgeUrl);
             }
