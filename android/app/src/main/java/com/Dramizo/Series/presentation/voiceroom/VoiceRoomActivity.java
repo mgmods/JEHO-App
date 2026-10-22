@@ -7393,10 +7393,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void showLuckyWinOverlay(String openerName, String rewardLabel) {
         String title = (openerName != null && !openerName.isEmpty() ? openerName : "مستخدم")
                 + " · صندوق الحظ";
-        // Premium 3D PNG burst — no Lottie / DotLottie.
-        RewardBurstOverlay.showLuckyWin(this,
-                openerName != null ? openerName : "",
-                rewardLabel != null ? rewardLabel : "جائزة");
+        // Intentionally do not show the legacy full-screen/center reward burst.
+        // Lucky reward details remain in the room chat; the global top toast is the
+        // only toast surface used for gift/lucky-win announcements.
         if (binding != null && binding.luckyWinOverlay != null) {
             try {
                 if (binding.lottieLuckyWin != null) {
