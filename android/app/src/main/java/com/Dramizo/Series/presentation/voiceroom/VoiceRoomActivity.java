@@ -9995,11 +9995,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         TextView btnRoomPk = sheet.findViewById(R.id.btnRoomPkChallenge);
         if (btnRoomPk != null) {
-            boolean canStartPk = isOwner && roomPkFeatureEnabled && roomPkCurrentContestId == null;
-            btnRoomPk.setVisibility(canStartPk ? View.VISIBLE : View.GONE);
+            // Keep the PK entry visible in Room Settings for the room owner.
+            // Availability is validated again on tap and by the backend.
+            btnRoomPk.setVisibility(isOwner ? View.VISIBLE : View.GONE);
+            btnRoomPk.setText(roomPkCurrentContestId != null
+                    && !roomPkCurrentContestId.isEmpty()
+                    && !"pending".equals(roomPkCurrentContestId)
+                    ? "⚔ تحدّي PK — المواجهة جارية"
+                    : "⚔ تحدّي PK بين الغرف");
             btnRoomPk.setOnClickListener(v -> {
-                if (!isOwner || !roomPkFeatureEnabled) {
-                    Toast.makeText(this, "تحدّي PK غير متاح حالياً", Toast.LENGTH_SHORT).show();
+                if (!isOwner) {
+                    Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!roomPkFeatureEnabled) {
+                    Toast.makeText(this, "تحدّي PK معطّل من لوحة التحكم", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (roomPkCurrentContestId != null && !roomPkCurrentContestId.isEmpty()
+                        && !"pending".equals(roomPkCurrentContestId)) {
+                    Toast.makeText(this, "يوجد تحدّي PK جارٍ في هذه الغرفة", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 dialog.dismiss();
