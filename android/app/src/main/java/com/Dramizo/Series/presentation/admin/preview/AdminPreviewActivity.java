@@ -126,7 +126,7 @@ public final class AdminPreviewActivity extends ThemedActivity {
         role.setBackground(pill(PURPLE_LIGHT, 14, 0));
         titleRow.addView(role);
         top.addView(titleRow);
-        TextView subtitle = label("نموذج مستقل · بيانات تجريبية فقط", 12, MUTED, false);
+        TextView subtitle = label("تصميم أصلي · أقسام الإدارة المتصلة", 12, MUTED, false);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
         subLp.topMargin = dp(5);
         top.addView(subtitle, subLp);
@@ -177,7 +177,7 @@ public final class AdminPreviewActivity extends ThemedActivity {
         TextView preview = label("◉  وضع المعاينة", 12, MUTED, true);
         preview.setGravity(Gravity.CENTER);
         preview.setPadding(dp(18), dp(8), dp(18), dp(8));
-        preview.setOnClickListener(v -> showInfo("وضع المعاينة", "كل العناصر والأزرار في هذه النسخة تجريبية محلية. لا يتم حفظ أي تغيير على الخادم."));
+        preview.setOnClickListener(v -> openConnectedSection("overview"));
         bottom.addView(home, new LinearLayout.LayoutParams(0, -2, 1f));
         bottom.addView(preview, new LinearLayout.LayoutParams(0, -2, 1f));
         root.addView(bottom);
@@ -248,12 +248,12 @@ public final class AdminPreviewActivity extends ThemedActivity {
         if (module == null) return;
         addSectionHeader(module.title, module.description);
         if ("overview".equals(key)) {
-            addNotice("نسخة تجريبية معزولة", "هذه الشاشة أصلية من Android. البيانات والعناصر المعروضة أمثلة محلية، ولا تتصل بواجهات الإدارة الحقيقية.");
+            addNotice("مركز إدارة JEHO", "اختر أي قسم لفتح وظائف الإدارة الفعلية داخل Android. تبقى صلاحيات الحساب والتحقق النهائي مفروضة من الخادم.");
             LinearLayout stats = new LinearLayout(this);
             stats.setOrientation(LinearLayout.HORIZONTAL);
-            stats.addView(statCard("المستخدمون", "12,480", "+8.2%", PURPLE), weighted());
-            stats.addView(statCard("الغرف النشطة", "186", "الآن", 0xFF248A73), weighted());
-            stats.addView(statCard("طلبات المراجعة", "24", "للمعاينة", 0xFFE09A31), weighted());
+            stats.addView(statCard("المستخدمون", "—", "فتح الإدارة", PURPLE), weighted());
+            stats.addView(statCard("الغرف النشطة", "—", "فتح الإدارة", 0xFF248A73), weighted());
+            stats.addView(statCard("طلبات المراجعة", "—", "فتح الإدارة", 0xFFE09A31), weighted());
             content.addView(stats);
             addGap(14);
             addCardTitle("الوصول السريع", "كل قسم يفتح شاشة فرعية داخل النموذج");
@@ -262,9 +262,9 @@ public final class AdminPreviewActivity extends ThemedActivity {
                 addModuleRow(item);
             }
             if (!hasModuleMatch(query)) addEmpty(query);
-            addCardTitle("معاينة نشاط حديث", "بيانات وهمية للتصميم");
-            addRecord("✦", "تحديث إطار تجريبي", "منذ دقيقتين · معاينة فقط", "عرض التفاصيل");
-            addRecord("♙", "حساب تجريبي: نور", "المعرّف DEMO-1024 · نشط", "عرض الحساب");
+            addCardTitle("وصول سريع", "افتح القسم المطلوب لإدارة بيانات الخادم");
+            addRecord("✦", "كتالوج العناصر", "الإطارات والدخوليات وVIP", "فتح القسم");
+            addRecord("♙", "إدارة المستخدمين", "بحث وإجراءات حسب الصلاحية", "فتح القسم");
         } else if ("users".equals(key)) {
             addNotice("قائمة مستخدمين تجريبية", "البحث والتفاصيل يعملان محلياً. الحظر وتعديل الرتب غير موصولين بالخادم.");
             addRecord("ن", "نور الشام", "ID: DEMO-1024 · مستوى 32 · VIP", "التفاصيل");
