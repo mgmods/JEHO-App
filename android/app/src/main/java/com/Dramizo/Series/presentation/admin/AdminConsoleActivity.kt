@@ -13,6 +13,8 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ArrayAdapter
@@ -28,6 +30,8 @@ import com.Dramizo.Series.data.remote.dto.ApiResponse
 import com.Dramizo.Series.presentation.common.ContainerProvider
 import com.Dramizo.Series.presentation.common.ThemedActivity
 import com.Dramizo.Series.util.StaffRoleHelper
+import com.Dramizo.Series.util.AssetCatalog
+import com.bumptech.glide.Glide
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -1087,6 +1091,9 @@ class AdminConsoleActivity : ThemedActivity() {
             val vipLevel = value(item, "level") ?: "1"
             val vipPrice = value(item, "coinPriceMonthly", "price") ?: "0"
             addText(card, primary, 15f, true, TEXT)
+            if (type in listOf("cosmetics", "grantCosmetics", "gifts")) {
+                addLiveAssetPreview(card, item, type, primary)
+            }
             if (!id.isNullOrBlank()) addText(card, "معرّف السجل: $id", 11f, false, MUTED)
             if (type == "users" && !publicId.isNullOrBlank() && publicId != id) {
                 val publicIdRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
@@ -1381,6 +1388,60 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             body.addView(card)
         }
+    }
+
+    /**
+     * Shows the actual icon/preview URL returned by the live catalog API.
+     * This is read-only; it never purchases, grants, or sends an item.
+     */
+    private fun addLiveAssetPreview(parent: LinearLayout, item: Map<*, *>, type: String, title: String) {
+        val assetUrl = if (type == "gifts") {
+            value(item, "iconUrl", "previewUrl", "thumbnailUrl")
+        } else {
+            value(item, "previewUrl", "thumbnailUrl", "iconUrl", "imageUrl")
+        }?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        val absolute = AssetCatalog.absoluteUrl(assetUrl) ?: assetUrl
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = GradientDrawable().apply {
+                setColor(0xFFF8F7FC.toInt())
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), 0xFFE9E5F4.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(8)
+                bottomMargin = dp(8)
+            }
+        }
+        val image = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "معاينة $title"
+            background = roundRect(Color.WHITE, 10)
+        }
+        row.addView(image, LinearLayout.LayoutParams(dp(94), dp(94)).apply { marginStart = dp(12) })
+        Glide.with(this).load(absolute).fitCenter().into(image)
+        val textCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
+        addText(textCol, "معاينة مباشرة من الكتالوج", 12f, true, ACCENT)
+        addText(textCol, if (type == "gifts") "أيقونة الهدية الفعلية" else "صورة العنصر الفعلية", 11f, false, MUTED)
+        textCol.addView(button("تكبير المعاينة") {
+            val large = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                setBackgroundColor(Color.WHITE)
+                contentDescription = "المعاينة الكاملة لـ $title"
+            }
+            Glide.with(this).load(absolute).fitCenter().into(large)
+            AlertDialog.Builder(this).setTitle(title)
+                .setView(large.apply { layoutParams = LinearLayout.LayoutParams(-1, dp(300)) })
+                .setPositiveButton("إغلاق", null).show()
+        })
+        row.addView(textCol, LinearLayout.LayoutParams(0, -2, 1f))
+        parent.addView(row)
     }
 
     private fun showAdjustWalletDialog() {
