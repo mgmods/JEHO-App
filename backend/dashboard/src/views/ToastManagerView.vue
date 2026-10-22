@@ -60,6 +60,14 @@
             <label class="form-label">حجم صورة المستخدم: {{ currentStyle.avatarSizeDp }} dp</label>
             <input v-model.number="currentStyle.avatarSizeDp" class="form-range" type="range" min="20" max="76" step="2" />
           </div>
+          <div class="position-control">
+            <label class="form-label">حجم اسم الفائز/المرسل: {{ currentStyle.titleSizeSp }} sp</label>
+            <input v-model.number="currentStyle.titleSizeSp" class="form-range" type="range" min="8" max="30" step="1" />
+            <label class="form-label">حجم نص المردود/الهدية: {{ currentStyle.bodySizeSp }} sp</label>
+            <input v-model.number="currentStyle.bodySizeSp" class="form-range" type="range" min="8" max="30" step="1" />
+            <label class="form-label">حجم عداد X: {{ currentStyle.countSizeSp }} sp</label>
+            <input v-model.number="currentStyle.countSizeSp" class="form-range" type="range" min="8" max="30" step="1" />
+          </div>
           <div class="position-control small text-secondary">
             اسحب كل عنصر داخل الصورة لتحديد مكانه. تغييرات المواضع محفوظة كنسب مئوية وتظهر في المعاينة.
           </div>
@@ -147,7 +155,7 @@ const tabs = [
 ]
 const activeTab = ref('giftSend')
 const form = reactive({
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 12, bodySizeSp: 12, countSizeSp: 12 },
   luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
   luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
@@ -166,9 +174,9 @@ const canvasStyle = computed(() => ({
   boxShadow: currentStyle.value.frameGlowEnabled ? '0 0 0 1px rgba(255,211,111,.9),0 0 18px rgba(255,191,64,.45)' : '0 0 0 1px rgba(255,211,111,.35)',
 }))
 const avatarPreviewStyle = computed(() => ({ left: currentStyle.value.avatarX + '%', top: currentStyle.value.avatarY + '%', width: currentStyle.value.avatarSizeDp + 'px', height: currentStyle.value.avatarSizeDp + 'px' }))
-const titlePreviewStyle = computed(() => ({ left: currentStyle.value.textX + '%', top: currentStyle.value.textY + '%' }))
-const bodyPreviewStyle = computed(() => ({ left: currentStyle.value.bodyX + '%', top: currentStyle.value.bodyY + '%' }))
-const countPreviewStyle = computed(() => ({ left: currentStyle.value.countX + '%', top: currentStyle.value.countY + '%' }))
+const titlePreviewStyle = computed(() => ({ left: currentStyle.value.textX + '%', top: currentStyle.value.textY + '%', fontSize: currentStyle.value.titleSizeSp + 'px' }))
+const bodyPreviewStyle = computed(() => ({ left: currentStyle.value.bodyX + '%', top: currentStyle.value.bodyY + '%', fontSize: currentStyle.value.bodySizeSp + 'px' }))
+const countPreviewStyle = computed(() => ({ left: currentStyle.value.countX + '%', top: currentStyle.value.countY + '%', fontSize: currentStyle.value.countSizeSp + 'px' }))
 const dragTarget = ref('')
 function startDrag(target, event) {
   if (activeTab.value === 'luckyButton') return
@@ -215,6 +223,9 @@ async function load() {
       widthDp: Math.max(220, Math.min(360, Number(incoming.widthDp) || 340)),
       heightDp: Math.max(60, Math.min(180, Number(incoming.heightDp) || 100)),
       avatarSizeDp: Math.max(20, Math.min(76, Number(incoming.avatarSizeDp) || 44)),
+      titleSizeSp: Math.max(8, Math.min(30, Number(incoming.titleSizeSp) || 12)),
+      bodySizeSp: Math.max(8, Math.min(30, Number(incoming.bodySizeSp) || 12)),
+      countSizeSp: Math.max(8, Math.min(30, Number(incoming.countSizeSp) || 12)),
     })
   }
   Object.assign(form.luckyButton, {
@@ -292,8 +303,8 @@ onMounted(load)
 .drag-item{touch-action:none;cursor:grab;user-select:none}
 .drag-item:active{cursor:grabbing}
 .preview-avatar{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;border:2px solid #f9d77e;border-radius:50%;background:rgba(35,15,28,.82);font-size:22px;z-index:2}
-.preview-title,.preview-body{position:absolute;transform:translate(0,-50%);max-width:68%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 4px #160711;z-index:2;color:#fff;font-size:12px;font-weight:800}
-.preview-count{position:absolute;transform:translate(-50%,-50%);padding:5px 7px;border:1px solid #ffe3a0;border-radius:8px;background:linear-gradient(#8f183b,#3a102d);font-weight:800;color:#ffe6a4;z-index:2;font-size:12px}
+.preview-title,.preview-body{position:absolute;transform:translate(0,-50%);max-width:68%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 4px #160711;z-index:2;color:#fff;font-weight:800}
+.preview-count{position:absolute;transform:translate(-50%,-50%);padding:5px 7px;border:1px solid #ffe3a0;border-radius:8px;background:linear-gradient(#8f183b,#3a102d);font-weight:800;color:#ffe6a4;z-index:2}
 .preview-shine{position:absolute;top:-20%;bottom:-20%;left:-30%;width:34px;transform:skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.68),transparent);animation:toast-shine 2.4s linear infinite;pointer-events:none}
 .button-preview-wrap{display:flex;min-height:140px;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;color:#b9b4c6}
 .button-preview{width:82px;height:82px;border-radius:50%;display:grid;place-items:center;border:3px solid #f8d77d;background:radial-gradient(circle at 30% 25%,#ffcf79,#c62c56 48%,#3c0d37);box-shadow:0 0 20px rgba(255,190,65,.45);font-size:34px;overflow:hidden}
