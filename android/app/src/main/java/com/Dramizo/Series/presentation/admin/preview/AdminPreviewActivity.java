@@ -379,7 +379,14 @@ public final class AdminPreviewActivity extends ThemedActivity {
         button.setPadding(dp(9), dp(8), dp(9), dp(8));
         button.setBackground(pill(PURPLE_LIGHT, 10, 0));
         box.addView(button);
-        View.OnClickListener open = v -> openConnectedSection(activeSection);
+        View.OnClickListener open = v -> {
+            String target = activeSection;
+            if ("overview".equals(target)) {
+                if (title.contains("كتالوج")) target = "cosmetics";
+                else if (title.contains("المستخدمين")) target = "users";
+            }
+            openConnectedSection(target);
+        };
         button.setOnClickListener(open);
         box.setOnClickListener(open);
         addCard(box);
