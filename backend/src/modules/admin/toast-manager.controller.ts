@@ -174,13 +174,16 @@ export class ToastManagerController {
     try { stored = JSON.parse(persisted.value); } catch {
       throw new Error('Saved toast settings could not be read back from storage');
     }
-    if (stored?.giftSend?.textX !== next.giftSend.textX
-      || stored?.giftSend?.textY !== next.giftSend.textY
-      || stored?.luckyWinNormal?.textX !== next.luckyWinNormal.textX
-      || stored?.luckyWinNormal?.textY !== next.luckyWinNormal.textY
-      || stored?.luckyWinHigh?.textX !== next.luckyWinHigh.textX
-      || stored?.luckyWinHigh?.textY !== next.luckyWinHigh.textY) {
-      throw new Error('Toast positions did not persist; please retry after checking the database connection');
+    const verifyFields = [
+      'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
+      'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
+    ];
+    for (const key of ['giftSend', 'luckyWinNormal', 'luckyWinHigh']) {
+      for (const field of verifyFields) {
+        if (Number(stored?.[key]?.[field]) !== Number(next[key]?.[field])) {
+          throw new Error(`Toast setting did not persist: ${key}.${field}`);
+        }
+      }
     }
     return this.getConfig();
   }
