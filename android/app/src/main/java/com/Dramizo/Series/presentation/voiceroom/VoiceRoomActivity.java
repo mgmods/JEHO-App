@@ -15175,8 +15175,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         int rows = guestCount <= 0 ? 1 : (guestCount + columns - 1) / columns;
-        int rowHeightDp = scale == SeatAdapter.SCALE_COMPACT ? 64
-                : scale == SeatAdapter.SCALE_MEDIUM ? 74 : 84;
+        // Match measured SeatAdapter cell height (avatar frame + name + vertical padding).
+        // The old 64/74/84dp estimates were too short for the actual 76dp seat frame,
+        // so the last row was clipped/overlapped by the supporter and relationship layers.
+        int rowHeightDp = scale == SeatAdapter.SCALE_COMPACT ? 82
+                : scale == SeatAdapter.SCALE_MEDIUM ? 88 : 98;
         int totalHeightPx = dp(rows * rowHeightDp + 8);
         // Skip requestLayout on mute-only room refreshes — that was blinking seats.
         int layoutKey = (guestCount << 16) ^ (scale << 8) ^ totalHeightPx;
@@ -15489,10 +15492,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         if (occupant != null && !occupant.trim().isEmpty()) visibleSeats.add(seat);
                     }
                 }
+                // Keep the adapter scale selected by applyMikooSeatGrid. Overriding it
+                // to NORMAL here made 15/20-seat cells taller than the measured grid,
+                // clipping the final row and placing relationship effects over seats.
                 applyMikooSeatGrid(visibleSeats.size());
                 if (seatAdapter != null) {
-                    seatAdapter.setScaleMode(roomPkSeatSplitApplied
-                            ? SeatAdapter.SCALE_COMPACT : SeatAdapter.SCALE_NORMAL);
                     seatAdapter.submit(visibleSeats);
                 }
                 refreshRoomRelationshipEffects(gridSeats);
