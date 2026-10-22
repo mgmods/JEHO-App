@@ -854,29 +854,35 @@ public final class GlobalCelebrationToast {
      * before Glide requests it so a saved background works in the Android app.
      */
     private static String toastBackgroundUrl(String pathOrUrl) {
-        String absolute = AssetCatalog.absoluteUrl(pathOrUrl);
-        if (absolute == null || absolute.trim().isEmpty()) return absolute;
+        if (pathOrUrl == null || pathOrUrl.trim().isEmpty()) return "";
+        String raw = pathOrUrl.trim();
+        boolean suppliedAbsoluteUrl = raw.matches("(?i)^https?://.*");
+        String absolute = suppliedAbsoluteUrl ? raw : AssetCatalog.absoluteUrl(raw);
+        if (absolute == null || absolute.trim().isEmpty()) return "";
         try {
             android.net.Uri uri = android.net.Uri.parse(absolute.trim());
             String path = uri.getEncodedPath();
             if (path != null) {
-                // Static dashboard uploads live at /uploads on the backend root,
-                // not beneath /api/v1. Older dashboard builds can save either form
-                // or an absolute URL pointing at a previous upload host.
+                // Normalize legacy API-prefixed upload paths, but do not replace
+                // the host of an absolute URL: uploads may be served from a
+                // separate storage/CDN host and rewriting it to the API host
+                // makes the image silently disappear in the Android toast.
                 path = path.replaceFirst("(?i)^/api/v\\d+(?=/uploads/)", "");
                 if (path.matches("(?i)^/uploads/.+")) {
-                    StringBuilder canonical = new StringBuilder(ApiOrigin.origin()).append(path);
-                    String query = uri.getEncodedQuery();
-                    if (query != null && !query.isEmpty()) canonical.append('?').append(query);
-                    String fragment = uri.getEncodedFragment();
-                    if (fragment != null && !fragment.isEmpty()) canonical.append('#').append(fragment);
-                    return canonical.toString();
+                    android.net.Uri.Builder builder = uri.buildUpon().encodedPath(path);
+                    if (!suppliedAbsoluteUrl) {
+                        return ApiOrigin.origin() + path
+                                + (uri.getEncodedQuery() == null ? "" : "?" + uri.getEncodedQuery())
+                                + (uri.getEncodedFragment() == null ? "" : "#" + uri.getEncodedFragment());
+                    }
+                    return builder.build().toString();
                 }
             }
+            return uri.toString();
         } catch (Exception ignored) {
-            // Keep the original URL if a legacy value cannot be parsed.
+            // Preserve the saved URL if a legacy value cannot be parsed.
+            return absolute;
         }
-        return absolute.replaceFirst("(?i)/api/v\\d+(?=/uploads/)", "");
     }
 
     private static int dp(Activity activity, int value) {
