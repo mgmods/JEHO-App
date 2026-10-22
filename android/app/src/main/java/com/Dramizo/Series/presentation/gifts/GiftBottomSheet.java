@@ -1291,18 +1291,6 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             dismissAllowingStateLoss();
             if (hostAct instanceof VoiceRoomActivity room) {
                 SessionManager session = ContainerProvider.from(hostAct).getSessionManager();
-                Runnable showSmallToast = () -> {
-                    if (hostAct == null || hostAct.isFinishing() || !didWin) return;
-                    String msg = softFinal
-                            ? ("أرسل هدية ×" + sentQty + " · مردود +" + wonCoins)
-                            : ("أرسل هدية ×" + sentQty + " · حظ ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
-                    room.showLuckyResultToast(
-                            session.getDisplayName(),
-                            session.getAvatarUrl(),
-                            Math.max(1, session.getUserLevel()),
-                            Math.max(0, session.getVipLevel()),
-                            msg);
-                };
                 if (didWin) {
                     String who = session.getDisplayName();
                     if (who == null || who.isEmpty()) who = "مستخدم";
@@ -1324,7 +1312,24 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                         }
                     } catch (OutOfMemoryError | Exception ignored) {
                     }
-                    hostAct.getWindow().getDecorView().postDelayed(showSmallToast, 200L);
+                    // Use the same configurable compact top toast as the dashboard design.
+                    // Do not show the legacy mid-screen room result toast.
+                    String luckyToastBody = softFinal
+                            ? ("مردود +" + wonCoins)
+                            : ("حظ ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
+                    com.Dramizo.Series.util.GlobalCelebrationToast.show(
+                            room,
+                            who,
+                            luckyToastBody,
+                            session.getAvatarUrl(),
+                            icon,
+                            "lucky-room:" + System.currentTimeMillis(),
+                            28,
+                            softFinal ? 0 : Math.max(1, mulFinal),
+                            wonCoins,
+                            who,
+                            "lucky_hit",
+                            null);
                 }
                 // Empty roll: silent.
             } else if (didWin) {
