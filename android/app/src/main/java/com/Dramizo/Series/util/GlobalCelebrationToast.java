@@ -855,8 +855,28 @@ public final class GlobalCelebrationToast {
      */
     private static String toastBackgroundUrl(String pathOrUrl) {
         String absolute = AssetCatalog.absoluteUrl(pathOrUrl);
-        if (absolute == null || absolute.isEmpty()) return absolute;
-        return absolute.replaceFirst("/api/v\\d+(?=/uploads/)", "");
+        if (absolute == null || absolute.trim().isEmpty()) return absolute;
+        try {
+            android.net.Uri uri = android.net.Uri.parse(absolute.trim());
+            String path = uri.getEncodedPath();
+            if (path != null) {
+                // Static dashboard uploads live at /uploads on the backend root,
+                // not beneath /api/v1. Older dashboard builds can save either form
+                // or an absolute URL pointing at a previous upload host.
+                path = path.replaceFirst("(?i)^/api/v\\d+(?=/uploads/)", "");
+                if (path.matches("(?i)^/uploads/.+")) {
+                    StringBuilder canonical = new StringBuilder(ApiOrigin.origin()).append(path);
+                    String query = uri.getEncodedQuery();
+                    if (query != null && !query.isEmpty()) canonical.append('?').append(query);
+                    String fragment = uri.getEncodedFragment();
+                    if (fragment != null && !fragment.isEmpty()) canonical.append('#').append(fragment);
+                    return canonical.toString();
+                }
+            }
+        } catch (Exception ignored) {
+            // Keep the original URL if a legacy value cannot be parsed.
+        }
+        return absolute.replaceFirst("(?i)/api/v\\d+(?=/uploads/)", "");
     }
 
     private static int dp(Activity activity, int value) {
