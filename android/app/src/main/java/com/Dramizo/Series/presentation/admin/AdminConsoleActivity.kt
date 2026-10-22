@@ -557,18 +557,22 @@ class AdminConsoleActivity : ThemedActivity() {
             "cosmetics" -> load(api.cosmetics()) { renderItems(it, "cosmetics") }
             "grantCosmetics" -> load(api.cosmetics()) { renderItems(it, "grantCosmetics") }
             "vanityIds" -> {
-                body.addView(button("＋ إضافة آي دي إلى الكتالوج") { showCreateVanityDialog() })
+                if (currentRole == StaffRoleHelper.SUPER) {
+                    body.addView(button("＋ إضافة آي دي إلى الكتالوج") { showCreateVanityDialog() })
+                }
                 load(api.vanityIds()) { renderItems(it, "vanityIds") }
             }
             "gifts" -> load(api.gifts()) { renderItems(it, "gifts") }
             "vip" -> {
                 body.addView(button("＋ منح عضوية VIP") { showAssignVipDialog() })
-                body.addView(button("＋ إنشاء خطة VIP") { showCreateVipPlanDialog() })
+                if (currentRole == StaffRoleHelper.SUPER) {
+                    body.addView(button("＋ إنشاء خطة VIP") { showCreateVipPlanDialog() })
+                }
                 load(api.vipMembers(1, 40)) { renderItems(it, "vip") }
                 val plansButton = button("إدارة خطط VIP") {
                     load(api.vipPlans()) { renderItems(it, "vipPlans") }
                 }
-                body.addView(plansButton)
+                if (currentRole == StaffRoleHelper.SUPER) body.addView(plansButton)
             }
             "toastManager" -> showToastManager()
             "mysteriousMan" -> showMysteriousManSettings()
@@ -1446,7 +1450,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     })
                 }
-                "gifts" -> if (!id.isNullOrBlank()) {
+                "gifts" -> if (!id.isNullOrBlank() && currentRole == StaffRoleHelper.SUPER) {
                     val active = status?.equals("true", true) == true || status?.equals("active", true) == true
                     card.addView(button(if (active) "تعطيل الهدية" else "تفعيل الهدية") {
                         confirm("تغيير حالة الهدية؟") {
@@ -1461,7 +1465,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 "vanityIds" -> if (!id.isNullOrBlank() && !publicId.isNullOrBlank()) {
                     card.addView(button("إهداء الآي دي لمستخدم") { showGrantVanityDialog(publicId) })
-                    when (status?.lowercase()) {
+                    if (currentRole == StaffRoleHelper.SUPER) when (status?.lowercase()) {
                         "owned", "reserved" -> card.addView(button("سحب الآي دي وإعادته للسوق") {
                             confirm("سيُستعاد الآي دي السابق للمالك إن وجد، ثم يعود هذا الآي دي للسوق. متابعة؟") {
                                 load(api.revokeVanityId(id)) { toast("تمت معالجة طلب سحب الآي دي"); openModule("vanityIds") }
@@ -1479,7 +1483,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         })
                     }
                 }
-                "cosmetics" -> if (!id.isNullOrBlank()) {
+                "cosmetics" -> if (!id.isNullOrBlank() && currentRole == StaffRoleHelper.SUPER) {
                     val active = status?.contains("true", true) == true || status?.contains("active", true) == true
                     card.addView(button(if (active) "تعطيل الميزة" else "تفعيل الميزة") {
                         confirm("تغيير حالة الميزة؟") {
