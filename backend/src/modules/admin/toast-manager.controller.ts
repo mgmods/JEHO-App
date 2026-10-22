@@ -153,11 +153,35 @@ export class ToastManagerController {
       version: previous.version + 1,
     };
     const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
-    if (row) { row.value = JSON.stringify(next); await this.settingsRepo.save(row); }
-    else await this.settingsRepo.save(this.settingsRepo.create({
-      key: 'toast_manager_config', value: JSON.stringify(next),
-      description: 'Dashboard-managed gift send, lucky-win toast and lucky button assets/effects',
-    }));
-    return next;
+    const serialized = JSON.stringify(next);
+    if (row) {
+      row.value = serialized;
+      await this.settingsRepo.save(row);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: 'toast_manager_config', value: serialized,
+        description: 'Dashboard-managed gift send, lucky-win toast and lucky button assets/effects',
+      }));
+    }
+
+    // Never report success from the in-memory request alone: read the durable row back
+    // so the dashboard sees exactly what a page refresh will retrieve.
+    const persisted = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+    if (!persisted?.value) {
+      throw new Error('Toast settings were not persisted; reload was not confirmed');
+    }
+    let stored: any;
+    try { stored = JSON.parse(persisted.value); } catch {
+      throw new Error('Saved toast settings could not be read back from storage');
+    }
+    if (stored?.giftSend?.textX !== next.giftSend.textX
+      || stored?.giftSend?.textY !== next.giftSend.textY
+      || stored?.luckyWinNormal?.textX !== next.luckyWinNormal.textX
+      || stored?.luckyWinNormal?.textY !== next.luckyWinNormal.textY
+      || stored?.luckyWinHigh?.textX !== next.luckyWinHigh.textX
+      || stored?.luckyWinHigh?.textY !== next.luckyWinHigh.textY) {
+      throw new Error('Toast positions did not persist; please retry after checking the database connection');
+    }
+    return this.getConfig();
   }
 }
