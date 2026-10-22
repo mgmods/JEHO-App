@@ -732,8 +732,13 @@ async function retryPage() {
   await Promise.all([load(), loadStore(), loadOdds()])
 }
 
-onErrorCaptured((err) => {
-  pageRuntimeError.value = err?.message || String(err || 'خطأ غير معروف')
+onErrorCaptured((err, instance, info) => {
+  pageRuntimeError.value = [
+    err?.message || String(err || 'خطأ غير معروف'),
+    info ? `Vue phase: ${info}` : '',
+    err?.stack || '',
+  ].filter(Boolean).join('\n\n')
+  console.error('[JEHO Games] captured component error', { error: err, info, component: instance?.$options?.name || instance?.$?.type?.__name || 'unknown' })
   return false
 })
 
