@@ -781,6 +781,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val giftDuration = field(giftCard, "مدة الظهور بالثواني (1–12)", value(gift, "durationSeconds", "3"))
             val giftShine = checked(giftCard, "لمعة متحركة", bool(gift, "shineEnabled", true))
             val giftGlow = checked(giftCard, "توهج الإطار", bool(gift, "frameGlowEnabled", true))
+            addToastLivePreview(giftCard, giftUrl, "توست إرسال الهدايا", "اسم المستخدم  ·  الهدية ×7")
             body.addView(giftCard)
 
             val normalCard = card()
@@ -789,6 +790,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val normalDuration = field(normalCard, "مدة الظهور بالثواني (1–12)", value(normal, "durationSeconds", "4"))
             val normalShine = checked(normalCard, "لمعة متحركة", bool(normal, "shineEnabled", true))
             val normalGlow = checked(normalCard, "توهج الإطار", bool(normal, "frameGlowEnabled", true))
+            addToastLivePreview(normalCard, normalUrl, "توست الربح المحظوظ", "الفائز  ·  ×7  ·  +12,500")
             body.addView(normalCard)
 
             val highCard = card()
@@ -797,6 +799,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val highDuration = field(highCard, "مدة الظهور بالثواني (1–12)", value(high, "durationSeconds", "5"))
             val highShine = checked(highCard, "لمعة متحركة", bool(high, "shineEnabled", true))
             val highGlow = checked(highCard, "توهج الإطار", bool(high, "frameGlowEnabled", true))
+            addToastLivePreview(highCard, highUrl, "توست الربح العالي", "الفائز  ·  ×177  ·  +250,000")
             body.addView(highCard)
 
             val buttonCard = card()
@@ -804,6 +807,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val buttonUrl = field(buttonCard, "رابط أيقونة الزر", value(luckyButton, "iconUrl", ""), "https://…")
             val buttonDuration = field(buttonCard, "مدة ظهور الزر بالثواني (1–12)", value(luckyButton, "durationSeconds", "5"))
             val buttonPulse = checked(buttonCard, "نبضة وحركة خفيفة للزر", bool(luckyButton, "pulseEnabled", true))
+            addToastIconPreview(buttonCard, buttonUrl)
             body.addView(buttonCard)
 
             body.addView(button("حفظ وتطبيق الإعدادات") {
@@ -844,6 +848,92 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
             })
         }
+    }
+
+    /**
+     * Live native preview of the exact background URL configured in the dashboard.
+     * FIT_CENTER preserves the uploaded artwork and its transparency; the sample copy
+     * is an overlay only and is not baked into or uploaded with the image.
+     */
+    private fun addToastLivePreview(parent: LinearLayout, urlField: EditText, title: String, sample: String) {
+        addText(parent, "معاينة حية — $title", 12f, true, ACCENT)
+        val frame = FrameLayout(this).apply {
+            background = roundRect(0xFFF0EDF8.toInt(), 16)
+            clipToPadding = true
+            layoutParams = LinearLayout.LayoutParams(-1, dp(174)).apply {
+                topMargin = dp(6)
+                bottomMargin = dp(8)
+            }
+        }
+        val artwork = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "الخلفية الفعلية لـ $title"
+        }
+        frame.addView(artwork, FrameLayout.LayoutParams(-1, -1))
+        val overlay = TextView(this).apply {
+            text = sample
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            background = GradientDrawable().apply {
+                setColor(0x990E1020.toInt())
+                cornerRadius = dp(10).toFloat()
+            }
+        }
+        frame.addView(overlay, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
+            setMargins(dp(12), 0, dp(12), dp(10))
+        })
+        parent.addView(frame)
+        fun refresh() {
+            val raw = urlField.text?.toString()?.trim().orEmpty()
+            if (raw.isBlank()) {
+                Glide.with(this).clear(artwork)
+                artwork.setImageDrawable(null)
+            } else {
+                val resolved = AssetCatalog.absoluteUrl(raw) ?: raw
+                Glide.with(this).load(resolved).fitCenter().into(artwork)
+            }
+        }
+        urlField.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { refresh() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        refresh()
+    }
+
+    private fun addToastIconPreview(parent: LinearLayout, urlField: EditText) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = roundRect(0xFFF8F7FC.toInt(), 12)
+        }
+        val icon = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "أيقونة زر المحظوظ"
+        }
+        row.addView(icon, LinearLayout.LayoutParams(dp(58), dp(58)).apply { marginStart = dp(10) })
+        addText(row, "معاينة حية لأيقونة الزر من الرابط المحدد", 12f, true, MUTED)
+        parent.addView(row)
+        fun refresh() {
+            val raw = urlField.text?.toString()?.trim().orEmpty()
+            if (raw.isBlank()) {
+                Glide.with(this).clear(icon)
+                icon.setImageDrawable(null)
+            } else {
+                val resolved = AssetCatalog.absoluteUrl(raw) ?: raw
+                Glide.with(this).load(resolved).fitCenter().into(icon)
+            }
+        }
+        urlField.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { refresh() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        refresh()
     }
 
     private fun showTemporaryBanDialog(userId: String) {
