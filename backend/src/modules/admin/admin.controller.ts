@@ -1920,7 +1920,7 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('cosmetics/grant')
-  @ApiOperation({ summary: 'Grant an existing cosmetic to a user for 7, 15, 30 days or permanently' })
+  @ApiOperation({ summary: 'Grant an existing cosmetic with role-specific type and duration limits' })
   async grantCosmeticToUser(
     @Body() body: { userId?: string; cosmeticCode?: string; days?: number; permanent?: boolean },
     @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
