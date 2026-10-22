@@ -45,21 +45,28 @@ public final class GlobalCelebrationToast {
     private static boolean showing;
     private static volatile String remoteBackgroundUrl = "";
     private static volatile String remoteLuckyNormalBackgroundUrl = "";
+    private static volatile String remoteLuckyReturnBackgroundUrl = "";
     private static volatile String remoteLuckyHighBackgroundUrl = "";
     private static volatile boolean remoteShineEnabled = true;
     private static volatile boolean remoteFrameGlowEnabled = true;
     private static volatile boolean remoteLuckyNormalShineEnabled = true;
+    private static volatile boolean remoteLuckyReturnShineEnabled = true;
     private static volatile boolean remoteLuckyHighShineEnabled = true;
     private static volatile boolean remoteLuckyNormalGlowEnabled = true;
+    private static volatile boolean remoteLuckyReturnGlowEnabled = true;
     private static volatile boolean remoteLuckyHighGlowEnabled = true;
     private static volatile int remoteDurationSeconds = 3;
     private static volatile int remoteLuckyNormalDurationSeconds = 4;
+    private static volatile int remoteLuckyReturnDurationSeconds = 3;
     private static volatile int remoteLuckyHighDurationSeconds = 5;
     private static volatile float remoteGiftAvatarX = 8f, remoteGiftAvatarY = 50f, remoteGiftTextX = 25f, remoteGiftTextY = 50f;
     private static volatile float remoteGiftBodyX = 25f, remoteGiftBodyY = 67f, remoteGiftCountX = 88f, remoteGiftCountY = 50f;
     private static volatile float remoteLuckyNormalAvatarX = 8f, remoteLuckyNormalAvatarY = 42f;
     private static volatile float remoteLuckyNormalTextX = 25f, remoteLuckyNormalTextY = 42f, remoteLuckyNormalBodyX = 25f, remoteLuckyNormalBodyY = 62f;
     private static volatile float remoteLuckyNormalCountX = 88f, remoteLuckyNormalCountY = 50f;
+    private static volatile float remoteLuckyReturnAvatarX = 8f, remoteLuckyReturnAvatarY = 42f;
+    private static volatile float remoteLuckyReturnTextX = 25f, remoteLuckyReturnTextY = 42f, remoteLuckyReturnBodyX = 25f, remoteLuckyReturnBodyY = 62f;
+    private static volatile float remoteLuckyReturnCountX = 88f, remoteLuckyReturnCountY = 50f;
     private static volatile float remoteLuckyHighAvatarX = 8f, remoteLuckyHighAvatarY = 42f;
     private static volatile float remoteLuckyHighTextX = 25f, remoteLuckyHighTextY = 42f, remoteLuckyHighBodyX = 25f, remoteLuckyHighBodyY = 62f;
     private static volatile float remoteLuckyHighCountX = 88f, remoteLuckyHighCountY = 50f;
@@ -67,6 +74,8 @@ public final class GlobalCelebrationToast {
     private static volatile float remoteGiftTitleSizeSp = 13f, remoteGiftBodySizeSp = 12f, remoteGiftCountSizeSp = 12f;
     private static volatile int remoteLuckyNormalWidthDp = 340, remoteLuckyNormalHeightDp = 100, remoteLuckyNormalAvatarSizeDp = 44;
     private static volatile float remoteLuckyNormalTitleSizeSp = 13f, remoteLuckyNormalBodySizeSp = 12f, remoteLuckyNormalCountSizeSp = 12f;
+    private static volatile int remoteLuckyReturnWidthDp = 340, remoteLuckyReturnHeightDp = 100, remoteLuckyReturnAvatarSizeDp = 44;
+    private static volatile float remoteLuckyReturnTitleSizeSp = 13f, remoteLuckyReturnBodySizeSp = 12f, remoteLuckyReturnCountSizeSp = 12f;
     private static volatile int remoteLuckyHighWidthDp = 340, remoteLuckyHighHeightDp = 100, remoteLuckyHighAvatarSizeDp = 44;
     private static volatile float remoteLuckyHighTitleSizeSp = 13f, remoteLuckyHighBodySizeSp = 12f, remoteLuckyHighCountSizeSp = 12f;
     private static long lastStyleFetchAt;
@@ -122,16 +131,17 @@ public final class GlobalCelebrationToast {
         String activeKind = String.valueOf(active.getTag());
         boolean giftSend = "gift_send".equals(activeKind);
         boolean luckyHigh = "lucky_hit_high".equals(activeKind);
+        boolean luckyReturn = "lucky_hit_return".equals(activeKind);
         boolean luckyNormal = "lucky_hit_normal".equals(activeKind);
-        if (!giftSend && !luckyHigh && !luckyNormal) return;
+        if (!giftSend && !luckyHigh && !luckyNormal && !luckyReturn) return;
         Activity activity = com.Dramizo.Series.AuraLiveApp.getForegroundActivity();
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
         ImageView background = active.findViewById(R.id.imgToastBackground);
         String chosenBackground = giftSend ? remoteBackgroundUrl
-                : luckyHigh ? remoteLuckyHighBackgroundUrl : remoteLuckyNormalBackgroundUrl;
+                : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        int requestedWidthDp = giftSend ? remoteGiftWidthDp : luckyHigh ? remoteLuckyHighWidthDp : remoteLuckyNormalWidthDp;
-        int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : remoteLuckyNormalHeightDp;
+        int requestedWidthDp = giftSend ? remoteGiftWidthDp : luckyHigh ? remoteLuckyHighWidthDp : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
+        int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
         ViewGroup.LayoutParams activeParams = active.getLayoutParams();
         if (activeParams instanceof FrameLayout.LayoutParams) {
             activeParams.width = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
@@ -151,8 +161,8 @@ public final class GlobalCelebrationToast {
                 }
             } else background.setVisibility(View.GONE);
         }
-        boolean glow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : remoteLuckyNormalGlowEnabled;
-        boolean shine = giftSend ? remoteShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : remoteLuckyNormalShineEnabled;
+        boolean glow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : luckyReturn ? remoteLuckyReturnGlowEnabled : remoteLuckyNormalGlowEnabled;
+        boolean shine = giftSend ? remoteShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : luckyReturn ? remoteLuckyReturnShineEnabled : remoteLuckyNormalShineEnabled;
         active.setElevation(dp(activity, glow ? 20 : 14));
         View sheen = active.findViewById(R.id.viewCelebrationSheen);
         if (sheen != null && shine) {
@@ -173,19 +183,19 @@ public final class GlobalCelebrationToast {
                 sweep.start();
             });
         } else if (sheen != null) sheen.setVisibility(View.GONE);
-        if (giftSend || luckyHigh || luckyNormal) {
+        if (giftSend || luckyHigh || luckyNormal || luckyReturn) {
             ImageView avatar = active.findViewById(R.id.imgCelebrationAvatar);
             TextView title = active.findViewById(R.id.tvCelebrationTitle);
             TextView body = active.findViewById(R.id.tvCelebrationBody);
-            final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
-            final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
-            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
-            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
-            final float bodyX = giftSend ? remoteGiftBodyX : luckyHigh ? remoteLuckyHighBodyX : remoteLuckyNormalBodyX;
-            final float bodyY = giftSend ? remoteGiftBodyY : luckyHigh ? remoteLuckyHighBodyY : remoteLuckyNormalBodyY;
-            final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : remoteLuckyNormalCountX;
-            final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : remoteLuckyNormalCountY;
-            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : luckyReturn ? remoteLuckyReturnAvatarX : remoteLuckyNormalAvatarX;
+            final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : luckyReturn ? remoteLuckyReturnAvatarY : remoteLuckyNormalAvatarY;
+            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : luckyReturn ? remoteLuckyReturnTextX : remoteLuckyNormalTextX;
+            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : luckyReturn ? remoteLuckyReturnTextY : remoteLuckyNormalTextY;
+            final float bodyX = giftSend ? remoteGiftBodyX : luckyHigh ? remoteLuckyHighBodyX : luckyReturn ? remoteLuckyReturnBodyX : remoteLuckyNormalBodyX;
+            final float bodyY = giftSend ? remoteGiftBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
+            final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
+            final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
+            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
             resizeAvatar(activity, avatar, avatarSize);
             active.post(() -> {
                 if (active.getParent() == null) return;
@@ -197,7 +207,7 @@ public final class GlobalCelebrationToast {
         }
         if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
         hideRunnable = () -> removeBanner(active);
-        int duration = giftSend ? remoteDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : remoteLuckyNormalDurationSeconds;
+        int duration = giftSend ? remoteDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
         MAIN.postDelayed(hideRunnable, Math.max(1, Math.min(12, duration)) * 1000L);
     }
 
@@ -232,6 +242,7 @@ public final class GlobalCelebrationToast {
                     Map<String, Object> cfg = response.body().data;
                     Map<String, Object> gift = nestedConfig(cfg, "giftSend");
                     Map<String, Object> normal = nestedConfig(cfg, "luckyWinNormal");
+                    Map<String, Object> returned = nestedConfig(cfg, "luckyReturn");
                     Map<String, Object> high = nestedConfig(cfg, "luckyWinHigh");
                     remoteBackgroundUrl = stringValue(gift.get("backgroundUrl"), stringValue(cfg.get("backgroundUrl"), ""));
                     remoteShineEnabled = !Boolean.FALSE.equals(gift.getOrDefault("shineEnabled", cfg.get("shineEnabled")));
@@ -252,12 +263,16 @@ public final class GlobalCelebrationToast {
                     remoteGiftBodySizeSp = dimensionValue(gift.get("bodySizeSp"), 12, 8, 30);
                     remoteGiftCountSizeSp = dimensionValue(gift.get("countSizeSp"), 12, 8, 30);
                     remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
+                    remoteLuckyReturnBackgroundUrl = stringValue(returned.get("backgroundUrl"), "");
                     remoteLuckyHighBackgroundUrl = stringValue(high.get("backgroundUrl"), "");
                     remoteLuckyNormalShineEnabled = !Boolean.FALSE.equals(normal.get("shineEnabled"));
+                    remoteLuckyReturnShineEnabled = !Boolean.FALSE.equals(returned.get("shineEnabled"));
                     remoteLuckyHighShineEnabled = !Boolean.FALSE.equals(high.get("shineEnabled"));
                     remoteLuckyNormalGlowEnabled = !Boolean.FALSE.equals(normal.get("frameGlowEnabled"));
+                    remoteLuckyReturnGlowEnabled = !Boolean.FALSE.equals(returned.get("frameGlowEnabled"));
                     remoteLuckyHighGlowEnabled = !Boolean.FALSE.equals(high.get("frameGlowEnabled"));
                     remoteLuckyNormalDurationSeconds = intValue(normal.get("durationSeconds"), 4);
+                    remoteLuckyReturnDurationSeconds = intValue(returned.get("durationSeconds"), 3);
                     remoteLuckyHighDurationSeconds = intValue(high.get("durationSeconds"), 5);
                     remoteLuckyNormalAvatarX = floatValue(normal.get("avatarX"), 8f);
                     remoteLuckyNormalAvatarY = floatValue(normal.get("avatarY"), 50f);
@@ -273,6 +288,20 @@ public final class GlobalCelebrationToast {
                     remoteLuckyNormalTitleSizeSp = dimensionValue(normal.get("titleSizeSp"), 13, 8, 30);
                     remoteLuckyNormalBodySizeSp = dimensionValue(normal.get("bodySizeSp"), 12, 8, 30);
                     remoteLuckyNormalCountSizeSp = dimensionValue(normal.get("countSizeSp"), 12, 8, 30);
+                    remoteLuckyReturnAvatarX = floatValue(returned.get("avatarX"), 8f);
+                    remoteLuckyReturnAvatarY = floatValue(returned.get("avatarY"), 42f);
+                    remoteLuckyReturnTextX = floatValue(returned.get("textX"), 25f);
+                    remoteLuckyReturnTextY = floatValue(returned.get("textY"), 42f);
+                    remoteLuckyReturnBodyX = floatValue(returned.get("bodyX"), 25f);
+                    remoteLuckyReturnBodyY = floatValue(returned.get("bodyY"), 62f);
+                    remoteLuckyReturnCountX = floatValue(returned.get("countX"), 88f);
+                    remoteLuckyReturnCountY = floatValue(returned.get("countY"), 50f);
+                    remoteLuckyReturnWidthDp = dimensionValue(returned.get("widthDp"), 340, 220, 360);
+                    remoteLuckyReturnHeightDp = dimensionValue(returned.get("heightDp"), 100, 60, 180);
+                    remoteLuckyReturnAvatarSizeDp = dimensionValue(returned.get("avatarSizeDp"), 44, 20, 76);
+                    remoteLuckyReturnTitleSizeSp = dimensionValue(returned.get("titleSizeSp"), 13, 8, 30);
+                    remoteLuckyReturnBodySizeSp = dimensionValue(returned.get("bodySizeSp"), 12, 8, 30);
+                    remoteLuckyReturnCountSizeSp = dimensionValue(returned.get("countSizeSp"), 12, 8, 30);
                     remoteLuckyHighAvatarX = floatValue(high.get("avatarX"), 8f);
                     remoteLuckyHighAvatarY = floatValue(high.get("avatarY"), 50f);
                     remoteLuckyHighTextX = floatValue(high.get("textX"), 25f);
@@ -443,13 +472,14 @@ public final class GlobalCelebrationToast {
                 "game_win".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind));
         boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
         boolean luckyWin = kind != null && "lucky_hit".equalsIgnoreCase(kind);
-        boolean luckyHigh = luckyWin && (multiplier >= 10d || coinsWon >= 1000L);
-        String toastKindTag = giftSend ? "gift_send" : luckyWin ? (luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
+        boolean luckyReturn = luckyWin && body != null && body.contains("مردود جزئي");
+        boolean luckyHigh = luckyWin && !luckyReturn && (multiplier >= 10d || coinsWon >= 1000L);
+        String toastKindTag = giftSend ? "gift_send" : luckyWin ? (luckyReturn ? "lucky_hit_return" : luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
         banner.setTag(toastKindTag);
         boolean customToastStyle = giftSend || luckyWin;
-        boolean remoteShine = giftSend ? remoteShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : remoteLuckyNormalShineEnabled;
-        boolean remoteGlow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : remoteLuckyNormalGlowEnabled;
-        int customDuration = giftSend ? remoteDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : remoteLuckyNormalDurationSeconds;
+        boolean remoteShine = giftSend ? remoteShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : luckyReturn ? remoteLuckyReturnShineEnabled : remoteLuckyNormalShineEnabled;
+        boolean remoteGlow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : luckyReturn ? remoteLuckyReturnGlowEnabled : remoteLuckyNormalGlowEnabled;
+        int customDuration = giftSend ? remoteDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
         if (planet) {
             banner.setBackgroundResource(R.drawable.bg_planet_go_banner);
         }
@@ -475,9 +505,9 @@ public final class GlobalCelebrationToast {
             tvBody.setSelected(true);
         }
         if (customToastStyle) {
-            float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : remoteLuckyNormalTitleSizeSp;
-            float bodySize = giftSend ? remoteGiftBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : remoteLuckyNormalBodySizeSp;
-            float countSize = giftSend ? remoteGiftCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : remoteLuckyNormalCountSizeSp;
+            float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
+            float bodySize = giftSend ? remoteGiftBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
+            float countSize = giftSend ? remoteGiftCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
             if (tvTitle != null) tvTitle.setTextSize(titleSize);
             if (tvBody != null) tvBody.setTextSize(bodySize);
             if (tvTimes != null) tvTimes.setTextSize(countSize);
@@ -585,8 +615,8 @@ public final class GlobalCelebrationToast {
         }
 
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        int requestedWidthDp = giftSend ? remoteGiftWidthDp : luckyHigh ? remoteLuckyHighWidthDp : remoteLuckyNormalWidthDp;
-        int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : remoteLuckyNormalHeightDp;
+        int requestedWidthDp = giftSend ? remoteGiftWidthDp : luckyHigh ? remoteLuckyHighWidthDp : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
+        int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
         int toastWidth = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
         int toastHeight = customToastStyle ? dp(activity, requestedHeightDp) : ViewGroup.LayoutParams.WRAP_CONTENT;
         // Keep the text elements content-sized like the dashboard's draggable preview.
@@ -607,7 +637,7 @@ public final class GlobalCelebrationToast {
         banner.setScaleY(0.985f);
         banner.setTranslationX(dp(activity, 140));
         if (toastBackground != null) {
-            String selectedBackground = giftSend ? remoteBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : remoteLuckyNormalBackgroundUrl;
+            String selectedBackground = giftSend ? remoteBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
             String imageUrl = customToastStyle ? AssetCatalog.absoluteUrl(selectedBackground) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 // The uploaded artwork owns its pixels, edges and alpha channel. Do not add
@@ -662,15 +692,15 @@ public final class GlobalCelebrationToast {
                     .start();
         }
         if (customToastStyle) {
-            final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
-            final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
-            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
-            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
-            final float bodyX = giftSend ? remoteGiftBodyX : luckyHigh ? remoteLuckyHighBodyX : remoteLuckyNormalBodyX;
-            final float bodyY = giftSend ? remoteGiftBodyY : luckyHigh ? remoteLuckyHighBodyY : remoteLuckyNormalBodyY;
-            final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : remoteLuckyNormalCountX;
-            final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : remoteLuckyNormalCountY;
-            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : luckyReturn ? remoteLuckyReturnAvatarX : remoteLuckyNormalAvatarX;
+            final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : luckyReturn ? remoteLuckyReturnAvatarY : remoteLuckyNormalAvatarY;
+            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : luckyReturn ? remoteLuckyReturnTextX : remoteLuckyNormalTextX;
+            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : luckyReturn ? remoteLuckyReturnTextY : remoteLuckyNormalTextY;
+            final float bodyX = giftSend ? remoteGiftBodyX : luckyHigh ? remoteLuckyHighBodyX : luckyReturn ? remoteLuckyReturnBodyX : remoteLuckyNormalBodyX;
+            final float bodyY = giftSend ? remoteGiftBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
+            final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
+            final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
+            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
             resizeAvatar(activity, avatar, avatarSize);
             banner.post(() -> {
                 if (banner.getParent() == null) return;
