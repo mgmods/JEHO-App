@@ -11,6 +11,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.util.TypedValue;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -196,6 +197,10 @@ public final class GlobalCelebrationToast {
             final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
             final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
             final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
+            final float bodySize = giftSend ? remoteGiftBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
+            final float countSize = giftSend ? remoteGiftCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
+            applyTextSizes(title, body, active.findViewById(R.id.tvCelebrationTimes), titleSize, bodySize, countSize);
             resizeAvatar(activity, avatar, avatarSize);
             active.post(() -> {
                 if (active.getParent() == null) return;
@@ -726,6 +731,13 @@ public final class GlobalCelebrationToast {
     private static int dimensionValue(Object value, int fallback, int min, int max) {
         try { return Math.max(min, Math.min(max, (int) Math.round(Double.parseDouble(String.valueOf(value))))); }
         catch (Exception ignored) { return fallback; }
+    }
+
+    private static void applyTextSizes(@Nullable TextView title, @Nullable TextView body, @Nullable TextView count,
+                                       float titleSizeSp, float bodySizeSp, float countSizeSp) {
+        if (title != null) title.setTextSize(TypedValue.COMPLEX_UNIT_SP, Math.max(8f, Math.min(30f, titleSizeSp)));
+        if (body != null) body.setTextSize(TypedValue.COMPLEX_UNIT_SP, Math.max(8f, Math.min(30f, bodySizeSp)));
+        if (count != null) count.setTextSize(TypedValue.COMPLEX_UNIT_SP, Math.max(8f, Math.min(30f, countSizeSp)));
     }
 
     private static void resizeAvatar(Activity activity, ImageView avatar, int sizeDp) {
