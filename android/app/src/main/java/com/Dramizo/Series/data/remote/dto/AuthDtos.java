@@ -104,7 +104,7 @@ public final class AuthDtos {
         @SerializedName("username") public String username;
         /** Stable numeric app ID — not Google / store account name. */
         @SerializedName("publicId") public String publicId;
-        /** Decorative rank configured by admins; never an authorization role. */
+        /** Public cosmetic rank only; deliberately unrelated to authorization. */
         @SerializedName("customDisplayRankName") public String customDisplayRankName;
         @SerializedName("customDisplayRankImageUrl") public String customDisplayRankImageUrl;
         @SerializedName("customDisplayRankAnimated") public boolean customDisplayRankAnimated;
