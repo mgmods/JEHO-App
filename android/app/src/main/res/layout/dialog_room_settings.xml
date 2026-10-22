@@ -147,6 +147,16 @@
             android:text="20"
             android:textColor="@color/text_primary"
             android:textStyle="bold" />
+        <TextView
+            android:id="@+id/btnSeats30"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_room_dialog_item"
+            android:gravity="center"
+            android:text="30"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <TextView
