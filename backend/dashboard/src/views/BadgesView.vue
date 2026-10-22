@@ -9,23 +9,24 @@
         <div class="col-md-5"><label class="form-label">رابط صورة الشارة</label><input v-model.trim="form.imageUrl" class="form-control" maxlength="512" placeholder="https://... أو ارفع صورة" required /><img v-if="form.imageUrl" :src="resolveAsset(form.imageUrl)" alt="معاينة الشارة" style="display:block;width:64px;height:64px;object-fit:contain;margin-top:8px" /></div>
         <div class="col-md-3"><label class="form-label">رفع صورة من الجهاز</label><input class="form-control" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" :disabled="uploadingImage" @change="uploadImage" /><small v-if="uploadingImage" class="text-muted">جارٍ رفع الصورة…</small></div>
         <div class="col-md-6"><label class="form-label">الوصف</label><input v-model.trim="form.description" class="form-control" maxlength="500" /></div>
-        <div class="col-md-2"><label class="form-label">الفئة</label><input v-model.trim="form.category" class="form-control" /></div>
+        <div class="col-md-2"><label class="form-label">الفئة</label><input v-model.trim="form.category" class="form-control" placeholder="general أو display_rank" /></div>
         <div class="col-md-2"><label class="form-label">نوع المنح</label><select v-model="form.awardType" class="form-select"><option value="manual">يدوي</option><option value="achievement">إنجاز تلقائي</option></select></div>
         <template v-if="form.awardType === 'achievement'">
           <div class="col-md-4"><label class="form-label">شرط الإنجاز</label><select v-model="form.achievementKey" class="form-select" required><option :value="null" disabled>اختر الشرط</option><option value="level">المستوى</option><option value="experience">الخبرة</option><option value="followers">عدد المتابعين</option><option value="recharge">إجمالي الشحن التراكمي</option><option value="support">إجمالي الدعم المرسل للآخرين</option><option value="received">إجمالي الهدايا المستلمة</option></select></div>
           <div class="col-md-3"><label class="form-label">الحد المطلوب</label><input v-model.number="form.achievementThreshold" type="number" min="1" step="1" class="form-control" required /></div>
         </template>
         <div class="col-md-2"><label class="form-label">الترتيب</label><input v-model.number="form.sortOrder" type="number" class="form-control" /></div>
-        <div class="col-md-2 d-flex align-items-end gap-3"><label class="form-check"><input v-model="form.isActive" class="form-check-input" type="checkbox" /> مفعلة</label><label class="form-check"><input v-model="form.isAnimated" class="form-check-input" type="checkbox" /> متحركة</label></div>
+        <div class="col-md-2 d-flex align-items-end gap-3"><label class="form-check"><input v-model="form.isActive" class="form-check-input" type="checkbox" /> مفعلة</label><label class="form-check"><input v-model="form.isAnimated" class="form-check-input" type="checkbox" /> متحركة</label></div><div class="col-12"><small class="text-muted">اختر «رتبة شكلية تظهر للجميع» للرتب المخصصة. الصورة واسم الرتبة تجميليان فقط ولا يمنحان أي صلاحية إدارية.</small></div>
         <div class="col-12 d-flex gap-2"><button class="btn btn-aurora" :disabled="saving">{{ saving ? 'جارٍ الحفظ…' : 'حفظ الشارة' }}</button><button v-if="editingId" class="btn btn-outline-secondary" type="button" @click="reset">إلغاء التعديل</button></div>
       </form>
     </div>
     <div class="glass p-3 mb-3">
-      <h5 class="mb-3">منح أو سحب شارة</h5>
+      <h5 class="mb-3">منح أو سحب شارة / رتبة شكلية</h5>
+      <p class="text-muted small mb-3">يمكن تعيين نفس الشارة لعدة حسابات. هذا التعيين تجميلي فقط ولا يمنح صلاحيات إدارية.</p>
       <div class="row g-2 align-items-end">
         <div class="col-md-5"><label class="form-label">الشارة</label><select v-model="grant.badgeId" class="form-select"><option value="">اختر شارة</option><option v-for="b in badges" :key="b.id" :value="b.id">{{ b.name }}</option></select></div>
-        <div class="col-md-5"><label class="form-label">معرّف المستخدم (UUID أو ID العام)</label><input v-model.trim="grant.userId" class="form-control" /></div>
-        <div class="col-md-2 d-grid gap-2"><button class="btn btn-success" :disabled="!grant.badgeId || !grant.userId" @click="grantBadge">منح</button><button class="btn btn-outline-danger" :disabled="!grant.badgeId || !grant.userId" @click="revokeBadge">سحب</button></div>
+        <div class="col-md-5"><label class="form-label">معرّفات المستخدمين (ID عام أو UUID)</label><textarea v-model="grant.userId" class="form-control" rows="2" placeholder="مثال: 123456, 234567 أو كل ID بسطر" /></div>
+        <div class="col-md-2 d-grid gap-2"><button class="btn btn-success" :disabled="!grant.badgeId || !parseUserIds(grant.userId).length || bulkBusy" @click="grantBadge">{{ bulkBusy ? 'جارٍ التنفيذ…' : 'منح للجميع' }}</button><button class="btn btn-outline-danger" :disabled="!grant.badgeId || !parseUserIds(grant.userId).length || bulkBusy" @click="revokeBadge">سحب من الجميع</button></div>
       </div>
     </div>
     <div class="glass p-0 overflow-hidden">
@@ -44,6 +45,7 @@ const badges = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const uploadingImage = ref(false)
+const bulkBusy = ref(false)
 const error = ref('')
 const editingId = ref('')
 const blank = () => ({ name: '', description: '', imageUrl: '', category: 'general', awardType: 'manual', achievementKey: null, achievementThreshold: 0, isActive: true, isAnimated: false, sortOrder: 0 })
@@ -86,52 +88,60 @@ async function save() {
   } catch (e) { error.value = e?.response?.data?.message || 'تعذر حفظ الشارة.' }
   finally { saving.value = false }
 }
+function parseUserIds(value) {
+  return [...new Set(String(value || '').split(/[\\s,;]+/).map((id) => id.trim()).filter(Boolean))]
+}
 async function grantBadge() {
   error.value = ''
-  const userId = grant.userId.trim()
+  const ids = parseUserIds(grant.userId)
+  if (!ids.length) return
+  bulkBusy.value = true
+  const success = []
+  const failed = []
   try {
-    // safeRequest returns { data, error } instead of throwing on HTTP failures.
-    // Check the result explicitly so the dashboard never reports a false success.
-    const result = await badgesApi.grant(grant.badgeId, userId)
-    if (result?.error) {
-      error.value = result.error.message || 'رفض الخادم منح الشارة.'
-      return
+    for (const userId of ids) {
+      const result = await badgesApi.grant(grant.badgeId, userId)
+      if (result?.error) {
+        failed.push(userId + ': ' + (result.error.message || 'رفض الخادم المنح'))
+        continue
+      }
+      // Verify persisted ownership before counting this ID as successful.
+      const verification = await badgesApi.userBadges(userId)
+      if (verification?.error) {
+        failed.push(userId + ': تعذر التحقق من الحفظ')
+        continue
+      }
+      const rows = Array.isArray(verification?.data) ? verification.data
+        : Array.isArray(verification?.data?.data) ? verification.data.data : []
+      if (rows.some((badge) => String(badge?.id) === String(grant.badgeId) && badge?.earned === true)) success.push(userId)
+      else failed.push(userId + ': لم يؤكد الخادم ظهور الشارة')
     }
-
-    // Verify persistence through the same endpoint the app profile uses.
-    const verification = await badgesApi.userBadges(userId)
-    if (verification?.error) {
-      error.value = 'أُرسل طلب المنح، لكن تعذّر التحقق من ظهور الشارة في حساب المستخدم: ' +
-        (verification.error.message || 'خطأ غير معروف')
-      return
-    }
-    const userBadges = Array.isArray(verification?.data)
-      ? verification.data
-      : Array.isArray(verification?.data?.data) ? verification.data.data : []
-    const owned = userBadges.some((badge) =>
-      String(badge?.id) === String(grant.badgeId) && badge?.earned === true
-    )
-    if (!owned) {
-      error.value = 'الخادم لم يؤكد تسجيل الشارة في حساب هذا المستخدم. لم نعرض رسالة نجاح كاذبة؛ تحقق من معرّف المستخدم ونشر الـBackend.'
-      return
-    }
-    window.alert('تم منح الشارة والتأكد من ظهورها في حساب المستخدم وقسم الشارات.')
+    const summary = 'تم التأكيد لـ ' + success.length + ' من ' + ids.length + ' حساب.'
+    if (failed.length) error.value = summary + '\nالحسابات التي تحتاج مراجعة:\n' + failed.join('\n')
+    else window.alert(summary)
   } catch (e) {
     error.value = e?.message || e?.response?.data?.message || 'تعذر منح الشارة.'
-  }
+  } finally { bulkBusy.value = false }
 }
 async function revokeBadge() {
   error.value = ''
+  const ids = parseUserIds(grant.userId)
+  if (!ids.length) return
+  bulkBusy.value = true
+  const success = []
+  const failed = []
   try {
-    const result = await badgesApi.revoke(grant.badgeId, grant.userId.trim())
-    if (result?.error) {
-      error.value = result.error.message || 'رفض الخادم سحب الشارة.'
-      return
+    for (const userId of ids) {
+      const result = await badgesApi.revoke(grant.badgeId, userId)
+      if (result?.error) failed.push(userId + ': ' + (result.error.message || 'تعذر السحب'))
+      else success.push(userId)
     }
-    window.alert('تم سحب الشارة من المستخدم.')
+    const summary = 'تم السحب من ' + success.length + ' من ' + ids.length + ' حساب.'
+    if (failed.length) error.value = summary + '\nالحسابات التي تحتاج مراجعة:\n' + failed.join('\n')
+    else window.alert(summary)
   } catch (e) {
     error.value = e?.message || e?.response?.data?.message || 'تعذر سحب الشارة.'
-  }
+  } finally { bulkBusy.value = false }
 }
 async function remove(b) {
   if (!window.confirm('حذف الشارة "' + b.name + '" وسجلات ملكيتها؟')) return

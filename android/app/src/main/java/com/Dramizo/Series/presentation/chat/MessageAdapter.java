@@ -591,6 +591,13 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                     "صديق");
         }
 
+        String customRankName = mine
+                ? (me != null ? me.customDisplayRankName : null)
+                : (msg.sender != null ? msg.sender.customDisplayRankName : null);
+        if (customRankName != null && !customRankName.trim().isEmpty()) {
+            name = name + "  ·  " + customRankName.trim();
+        }
+
         if (showAvatar) {
             // Central wear binder keeps GIF/WebP animation and uses the native player for
             // SVGA/video frames instead of silently flattening them in an ImageView.

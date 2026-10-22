@@ -123,11 +123,31 @@ export class UsersService {
 
   private async withWearMeta<T extends Record<string, unknown>>(flat: T): Promise<T & {
     hostBadgeMeta: Record<string, unknown> | null;
+    customDisplayRankName: string | null;
+    customDisplayRankImageUrl: string | null;
+    customDisplayRankAnimated: boolean;
   }> {
-    const hostBadgeMeta = await this.wearMetaForUrl(
-      flat.hostBadgeUrl as string | null | undefined,
-    );
-    return { ...flat, hostBadgeMeta };
+    // Resolve optional decorative rank as public display metadata; never use it for permissions.
+    const userId = String(flat.id || '');
+    const [hostBadgeMeta, ranks] = await Promise.all([
+      this.wearMetaForUrl(flat.hostBadgeUrl as string | null | undefined),
+      userId ? this.dataSource.query(
+        `SELECT b.name AS "name", b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated"
+           FROM user_badges ub
+           JOIN badges b ON b.id = ub."badgeId"
+          WHERE ub."userId" = $1 AND b.category = 'display_rank' AND b."isActive" = true
+          ORDER BY ub."grantedAt" DESC, b."sortOrder" ASC
+          LIMIT 1`,
+        [userId],
+      ) : Promise.resolve([]),
+    ]);
+    const rank = ranks?.[0];
+    return {
+      ...flat, hostBadgeMeta,
+      customDisplayRankName: rank?.name ? String(rank.name) : null,
+      customDisplayRankImageUrl: rank?.imageUrl ? String(rank.imageUrl) : null,
+      customDisplayRankAnimated: rank?.isAnimated === true || rank?.isAnimated === 'true',
+    };
   }
 
   /** Return the saved vanity-ID style only to the account that currently owns/equips it. */

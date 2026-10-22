@@ -104,6 +104,10 @@ public final class AuthDtos {
         @SerializedName("username") public String username;
         /** Stable numeric app ID — not Google / store account name. */
         @SerializedName("publicId") public String publicId;
+        /** Public cosmetic rank only; deliberately unrelated to authorization. */
+        @SerializedName("customDisplayRankName") public String customDisplayRankName;
+        @SerializedName("customDisplayRankImageUrl") public String customDisplayRankImageUrl;
+        @SerializedName("customDisplayRankAnimated") public boolean customDisplayRankAnimated;
         @SerializedName("publicIdStyleMode") public String publicIdStyleMode;
         @SerializedName("publicIdStyleVipLevel") public int publicIdStyleVipLevel;
         @SerializedName("publicIdStyleColor1") public String publicIdStyleColor1;
