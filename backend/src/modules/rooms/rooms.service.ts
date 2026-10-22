@@ -3262,7 +3262,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         const appointedModerator = await this.modsRepo.findOne({ where: { roomId, userId: actorId } });
         const staff = await this.platformStaffRole(actorId);
         const privilegedHost = room.hostId === actorId || room.cohostId === actorId || room.activeHostId === actorId;
-        if (!appointedModerator && !privilegedHost && staff !== 'manager' && staff !== 'super') {
+        if (!appointedModerator && !privilegedHost && staff !== 'manager' && staff !== 'admin' && staff !== 'super') {
           throw kickPermissionError;
         }
       }
@@ -4040,11 +4040,19 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     ) {
       return;
     }
-    // Platform staff: super = full room powers; manager = mute/kick/ban/seats/invite.
+    // Platform staff permissions are explicit and independent of room appointment:
+    // Super = full room powers; Admin = room moderation/configuration actions;
+    // Manager = mic mute, mic removal, and room kick only (never room ban/invite/config).
     const staff = await this.platformStaffRole(actorId);
-    if (staff === 'super') return;
-    if (staff === 'manager' && permission !== 'canManageRoom') {
+    if (staff === 'super' || staff === 'admin') return;
+    if (
+      staff === 'manager' &&
+      ['canMute', 'canKick', 'canManageSeats'].includes(permission)
+    ) {
       return;
+    }
+    if (staff === 'manager') {
+      throw new ForbiddenException('صلاحية المانجر تقتصر على كتم المايك وإنزال المستخدم أو إخراجه من الروم');
     }
     await this.assertAgencyRoomActive(room);
     // Active agency owners/managers can moderate rooms belonging to their agency.
