@@ -26,6 +26,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import com.Dramizo.Series.data.remote.api.AdminApi
+import com.Dramizo.Series.data.remote.api.RoomApi
 import com.Dramizo.Series.data.remote.dto.ApiResponse
 import com.Dramizo.Series.presentation.common.ContainerProvider
 import com.Dramizo.Series.presentation.common.ThemedActivity
@@ -43,6 +44,7 @@ import retrofit2.Response
  */
 class AdminConsoleActivity : ThemedActivity() {
     private lateinit var api: AdminApi
+    private lateinit var roomApi: RoomApi
     private lateinit var body: LinearLayout
     private lateinit var progress: ProgressBar
     private lateinit var titleView: TextView
@@ -108,6 +110,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         currentRole = StaffRoleHelper.normalize(user)
         api = ContainerProvider.from(this).adminApi
+        roomApi = ContainerProvider.from(this).roomApi
         buildShell()
         val requestedSection = intent.getStringExtra("admin_initial_section")
         if (requestedSection.isNullOrBlank()) {
@@ -341,15 +344,7 @@ class AdminConsoleActivity : ThemedActivity() {
             }
         }
 
-        val superOnly = setOf("notifications", "toastManager", "mysteriousMan", "luckyCannon",
-            "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics", "vip", "logs",
-            "staffIdentity", "operators", "genderVerifications", "recharges", "withdrawals",
-            "walletTransactions", "walletAdjust", "cosmetics", "gifts")
-        val visibleModules = when (currentRole) {
-            StaffRoleHelper.MANAGER -> modules.filter { it.key in setOf("rooms", "streams", "reports") }
-            StaffRoleHelper.ADMIN -> modules.filter { it.key !in superOnly }
-            else -> modules
-        }
+        val visibleModules = modules.filter { roleCanAccessModule(it.key) }
 
         val search = EditText(this).apply {
             hint = "⌕   ابحث عن مستخدمين، رومات، هدايا..."
@@ -482,16 +477,27 @@ class AdminConsoleActivity : ThemedActivity() {
         })
     }
 
+    private fun roleCanAccessModule(key: String): Boolean {
+        return when (currentRole) {
+            StaffRoleHelper.SUPER -> true
+            StaffRoleHelper.ADMIN -> key in setOf(
+                "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
+                "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds"
+            )
+            StaffRoleHelper.MANAGER -> key in setOf(
+                "rooms", "streams", "reports", "cosmetics", "gifts", "grantCosmetics"
+            )
+            else -> false
+        }
+    }
+
     private fun openModule(key: String) {
-        val superOnlyModules = listOf(
-            "notifications", "toastManager", "mysteriousMan", "luckyCannon",
-            "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
-            "vip", "logs", "staffIdentity", "operators", "genderVerifications",
-            "recharges", "withdrawals", "walletTransactions", "walletAdjust", "cosmetics", "gifts"
-        )
-        if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams", "reports")) ||
-            (currentRole == StaffRoleHelper.ADMIN && key in superOnlyModules)) {
-            toast(if (currentRole == StaffRoleHelper.MANAGER) "صلاحية المانجر تقتصر على الرومات والبث المباشر والبلاغات" else "هذا القسم مخصص للسوبر أدمن")
+        if (!roleCanAccessModule(key)) {
+            toast(when (currentRole) {
+                StaffRoleHelper.MANAGER -> "صلاحية المانجر تقتصر على إشراف الرومات والبث والبلاغات وإهداء الإطارات والدخوليات"
+                StaffRoleHelper.ADMIN -> "هذا القسم غير متاح لرتبة الأدمن"
+                else -> "هذا القسم مخصص لفريق الإدارة"
+            })
             return
         }
         currentSection = key
@@ -1276,13 +1282,15 @@ class AdminConsoleActivity : ThemedActivity() {
                             load(api.endStream(id)) { toast("استجاب الخادم لطلب إنهاء البث"); openModule("streams") }
                         }
                     })
-                    card.addView(button("إنهاء قسري للبث") {
-                        confirm("استخدم الإنهاء القسري فقط إذا فشل الإنهاء العادي. متابعة؟") {
-                            load(api.forceEndStream(id, mapOf("reason" to "super_admin_force_end"))) {
-                                toast("استجاب الخادم لطلب الإنهاء القسري"); openModule("streams")
+                    if (currentRole == StaffRoleHelper.SUPER) {
+                        card.addView(button("إنهاء قسري للبث") {
+                            confirm("استخدم الإنهاء القسري فقط إذا فشل الإنهاء العادي. متابعة؟") {
+                                load(api.forceEndStream(id, mapOf("reason" to "super_admin_force_end"))) {
+                                    toast("استجاب الخادم لطلب الإنهاء القسري"); openModule("streams")
+                                }
                             }
-                        }
-                    })
+                        })
+                    }
                 }
                 "agencies" -> if (!id.isNullOrBlank()) {
                     val suspended = status?.contains("suspended", true) == true
@@ -1715,7 +1723,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     showEditRoomDialog(id, roomTitle, accessMode, entryFee)
                 })
             }
-            if (currentRole == StaffRoleHelper.SUPER) {
+            if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
                 actions.addView(button("إغلاق الروم") {
                     confirm("سيتم إغلاق الروم على الخادم. هذا الإجراء قد يؤثر على الموجودين فيه. هل تريد المتابعة؟") {
                         load(api.closeRoom(id)) {
@@ -1725,8 +1733,56 @@ class AdminConsoleActivity : ThemedActivity() {
                     }
                 })
             }
-            if (currentRole == StaffRoleHelper.MANAGER) {
-                addText(actions, "وضع إشرافي: لا تتوفر هنا إجراءات تعديل أو إغلاق الروم لهذه الرتبة.", 12f, false, MUTED)
+            if (currentRole == StaffRoleHelper.ADMIN || currentRole == StaffRoleHelper.MANAGER) {
+                addText(actions, "إشراف على هذا الروم فقط: لا يتغير حظر الحساب العام ولا إعدادات الصوت أو ZEGO.", 11f, false, MUTED)
+                val targetInput = EditText(this).apply {
+                    hint = "UUID المستخدم المراد الإشراف عليه"
+                    textSize = 13f
+                    setSingleLine(true)
+                    setTextColor(TEXT)
+                    setHintTextColor(MUTED)
+                    layoutDirection = View.LAYOUT_DIRECTION_LTR
+                    textDirection = View.TEXT_DIRECTION_LTR
+                    background = roundRect(0xFFF7F6FC.toInt(), 10)
+                    setPadding(dp(12), dp(10), dp(12), dp(10))
+                }
+                actions.addView(targetInput, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
+                fun targetId(): String? {
+                    val target = targetInput.text.toString().trim()
+                    if (target.isBlank()) {
+                        targetInput.error = "معرّف المستخدم مطلوب"
+                        return null
+                    }
+                    return target
+                }
+                actions.addView(button("كتم مايك المستخدم داخل الروم") {
+                    val target = targetId() ?: return@button
+                    load(roomApi.setMic(id, mapOf("userId" to target, "muted" to true))) {
+                        toast("تم إرسال طلب كتم المايك لهذا الروم")
+                    }
+                })
+                actions.addView(button("فك كتم المايك داخل الروم") {
+                    val target = targetId() ?: return@button
+                    load(roomApi.setMic(id, mapOf("userId" to target, "muted" to false))) {
+                        toast("تم إرسال طلب فك كتم المايك لهذا الروم")
+                    }
+                })
+                actions.addView(button("إنزال المستخدم من المايك فقط") {
+                    val target = targetId() ?: return@button
+                    confirm("سيبقى المستخدم داخل الروم وسيُزال من المايك فقط. متابعة؟") {
+                        load(roomApi.forceLeaveSeat(id, mapOf("userId" to target, "reason" to "إجراء إشرافي من لوحة JEHO"))) {
+                            toast("تم إرسال طلب إنزال المستخدم من المايك")
+                        }
+                    }
+                })
+                actions.addView(button("إخراج المستخدم من الروم") {
+                    val target = targetId() ?: return@button
+                    confirm("سيتم إخراج المستخدم من هذا الروم فقط. متابعة؟") {
+                        load(roomApi.kick(id, mapOf("userId" to target, "reason" to "إجراء إشرافي من لوحة JEHO"))) {
+                            toast("تم إرسال طلب إخراج المستخدم من الروم")
+                        }
+                    }
+                })
             }
         }
 
@@ -2003,7 +2059,14 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showGrantCosmeticDialog(code: String) {
-        val form = formFields(listOf("معرّف المستخدم", "المدة: 7 أو 15 أو 30 أو permanent"))
+        val allowedDays = when (currentRole) {
+            StaffRoleHelper.MANAGER -> listOf(1, 3, 7)
+            StaffRoleHelper.ADMIN -> listOf(1, 3, 7, 15)
+            else -> listOf(7, 15, 30)
+        }
+        val allowPermanent = currentRole == StaffRoleHelper.SUPER
+        val durationHint = if (allowPermanent) "المدة: 7 أو 15 أو 30 أو permanent" else "المدة بالأيام: " + allowedDays.joinToString(" أو ")
+        val form = formFields(listOf("معرّف المستخدم", durationHint))
         AlertDialog.Builder(this).setTitle("إهداء إطار أو دخولية").setView(form.first)
             .setNegativeButton("إلغاء", null).setPositiveButton("مراجعة ثم إهداء", null)
             .create().also { dialog ->
@@ -2013,8 +2076,8 @@ class AdminConsoleActivity : ThemedActivity() {
                         val term = form.second[1].text.toString().trim().lowercase()
                         val permanent = term == "permanent" || term == "دائم"
                         val days = term.toIntOrNull()
-                        if (userId.isBlank() || (!permanent && (days == null || days !in listOf(7, 15, 30)))) {
-                            toast("أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent")
+                        if (userId.isBlank() || (permanent && !allowPermanent) || (!permanent && (days == null || days !in allowedDays))) {
+                            toast(if (allowPermanent) "أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent" else "المدة المسموحة: " + allowedDays.joinToString(" أو ") + " أيام")
                             return@setOnClickListener
                         }
                         val durationLabel = if (permanent) "بشكل دائم" else "لمدة " + days + " يوم"
@@ -2035,7 +2098,10 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showGrantVanityDialog(publicId: String) {
-        val form = formFields(listOf("معرّف المستخدم", "المدة: 7 أو 15 أو 30 أو permanent"))
+        val allowedDays = if (currentRole == StaffRoleHelper.ADMIN) listOf(1, 3, 7, 15) else listOf(7, 15, 30)
+        val allowPermanent = currentRole == StaffRoleHelper.SUPER
+        val durationHint = if (allowPermanent) "المدة: 7 أو 15 أو 30 أو permanent" else "المدة بالأيام: " + allowedDays.joinToString(" أو ")
+        val form = formFields(listOf("معرّف المستخدم", durationHint))
         AlertDialog.Builder(this).setTitle("إهداء الآي دي " + publicId).setView(form.first)
             .setNegativeButton("إلغاء", null).setPositiveButton("مراجعة ثم إهداء", null)
             .create().also { dialog ->
@@ -2045,8 +2111,8 @@ class AdminConsoleActivity : ThemedActivity() {
                         val term = form.second[1].text.toString().trim().lowercase()
                         val permanent = term == "permanent" || term == "دائم"
                         val days = term.toIntOrNull()
-                        if (userId.isBlank() || (!permanent && days !in listOf(7, 15, 30))) {
-                            toast("أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent")
+                        if (userId.isBlank() || (permanent && !allowPermanent) || (!permanent && days !in allowedDays)) {
+                            toast(if (allowPermanent) "أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent" else "المدة المسموحة: " + allowedDays.joinToString(" أو ") + " أيام")
                             return@setOnClickListener
                         }
                         val durationLabel = if (permanent) "بشكل دائم" else "لمدة " + days + " يوم"
@@ -2206,7 +2272,10 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showAssignVipDialog() {
-        val form = formFields(listOf("معرّف المستخدم", "معرّف خطة VIP", "المدة: 7 أو 15 أو 30 أو permanent"))
+        val allowedDays = if (currentRole == StaffRoleHelper.ADMIN) listOf(1, 3, 7, 15) else listOf(7, 15, 30)
+        val allowPermanent = currentRole == StaffRoleHelper.SUPER
+        val durationHint = if (allowPermanent) "المدة: 7 أو 15 أو 30 أو permanent" else "المدة بالأيام: " + allowedDays.joinToString(" أو ")
+        val form = formFields(listOf("معرّف المستخدم", "معرّف خطة VIP", durationHint))
         AlertDialog.Builder(this)
             .setTitle("منح عضوية VIP")
             .setView(form.first)
@@ -2221,8 +2290,9 @@ class AdminConsoleActivity : ThemedActivity() {
                         val permanent = term == "permanent" || term == "دائم"
                         val days = term.toIntOrNull()
                         if (userId.isBlank() || planId.isBlank() ||
-                            (!permanent && (days == null || days !in listOf(7, 15, 30)))) {
-                            toast("أدخل معرّف المستخدم والخطة ومدة 7 أو 15 أو 30 أو permanent")
+                            (permanent && !allowPermanent) ||
+                            (!permanent && (days == null || days !in allowedDays))) {
+                            toast(if (allowPermanent) "أدخل معرّف المستخدم والخطة ومدة 7 أو 15 أو 30 أو permanent" else "المدة المسموحة: " + allowedDays.joinToString(" أو ") + " أيام")
                             return@setOnClickListener
                         }
                         val durationLabel = if (permanent) "بشكل دائم" else "لمدة " + days + " يوم"
