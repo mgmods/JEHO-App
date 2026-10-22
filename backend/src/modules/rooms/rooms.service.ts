@@ -1236,7 +1236,30 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return (row?.meta as Record<string, unknown> | null) ?? null;
   }
 
-  private async attachFrame(user: any, vipLevel = 0) {
+  private async displayRankMapForUsers(userIds: string[]) {
+    const ids = [...new Set((userIds || []).filter(Boolean))];
+    const result = new Map<string, { customDisplayRankName: string | null; customDisplayRankImageUrl: string | null; customDisplayRankAnimated: boolean }>();
+    if (!ids.length) return result;
+    const rows = await this.dataSource.query(
+      `SELECT DISTINCT ON (ub."userId")
+              ub."userId" AS "userId", b.name AS "name",
+              b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated"
+         FROM user_badges ub
+         JOIN badges b ON b.id = ub."badgeId"
+        WHERE ub."userId" = ANY($1::uuid[])
+          AND b.category = 'display_rank' AND b."isActive" = true
+        ORDER BY ub."userId", ub."grantedAt" DESC, b."sortOrder" ASC`,
+      [ids],
+    );
+    for (const row of rows || []) result.set(String(row.userId), {
+      customDisplayRankName: row.name ? String(row.name) : null,
+      customDisplayRankImageUrl: row.imageUrl ? String(row.imageUrl) : null,
+      customDisplayRankAnimated: row.isAnimated === true || row.isAnimated === 'true',
+    });
+    return result;
+  }
+
+  private async attachFrame(user: any, vipLevel = 0, displayRank?: Record<string, unknown> | null) {
     if (!user) return null;
     const profile = user.profile || {};
     const rawHost = profile.hostBadgeUrl ?? user.hostBadgeUrl ?? null;
@@ -1271,6 +1294,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       levelBadgeUrl,
       roomCardUrl: profile.roomCardUrl ?? user.roomCardUrl ?? null,
       vipLevel: level,
+      ...(displayRank || {}),
       profile: undefined,
     };
   }
@@ -1456,7 +1480,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       if (s.userId) userIds.push(s.userId);
       else if (s.user?.id) userIds.push(s.user.id);
     }
-    const vipMap = await this.vipMapForUsers(userIds);
+    const [vipMap, displayRanks] = await Promise.all([
+      this.vipMapForUsers(userIds),
+      this.displayRankMapForUsers(userIds),
+    ]);
     const uploadedRoomBackground = this.isUploadedRoomImageUrl(room.backgroundUrl)
       ? String(room.backgroundUrl).trim()
       : null;
@@ -1483,7 +1510,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const decoratedSeats = await Promise.all(
       (room.seats || []).map(async (s: any) => {
         const uid = s.userId || s.user?.id;
-        const attached = await this.attachFrame(s.user, vipMap.get(uid) || 0);
+        const attached = await this.attachFrame(s.user, vipMap.get(uid) || 0, displayRanks.get(uid) || null);
         const anonymous = await this.mysteriousRoomIdentity(uid);
         return {
           ...s,
@@ -1498,7 +1525,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const isOwnersPersonalRoom = !room.agencyId
       && room.roomKind === RoomKind.STANDARD
       && !!room.hostId;
-    const attachedHost = isPlatformRoom ? null : await this.attachFrame(room.host, vipMap.get(room.hostId) || 0);
+    const attachedHost = isPlatformRoom ? null : await this.attachFrame(room.host, vipMap.get(room.hostId) || 0, displayRanks.get(room.hostId) || null);
     const hostAnonymous = !isPlatformRoom && !isOwnersPersonalRoom && room.hostId
       ? await this.mysteriousRoomIdentity(room.hostId)
       : null;
@@ -1835,12 +1862,15 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         const uid = seat?.userId || seat?.user?.id;
         if (uid) fastUserIds.push(uid);
       }
-      const fastVipMap = await this.vipMapForUsers(fastUserIds);
+      const [fastVipMap, fastRanks] = await Promise.all([
+        this.vipMapForUsers(fastUserIds),
+        this.displayRankMapForUsers(fastUserIds),
+      ]);
       const fastSeats = await Promise.all((room.seats || []).map(async (seat: any) => {
         const uid = seat?.userId || seat?.user?.id;
-        return { ...seat, user: await this.attachFrame(seat.user, fastVipMap.get(uid) || 0) };
+        return { ...seat, user: await this.attachFrame(seat.user, fastVipMap.get(uid) || 0, fastRanks.get(uid) || null) };
       }));
-      const fastHost = await this.attachFrame(room.host, fastVipMap.get(room.hostId) || 0);
+      const fastHost = await this.attachFrame(room.host, fastVipMap.get(room.hostId) || 0, fastRanks.get(room.hostId) || null);
       return {
         ...safeRoom,
         host: fastHost,
