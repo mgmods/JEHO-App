@@ -158,6 +158,7 @@ export class ToastManagerController {
       key: 'toast_manager_config', value: JSON.stringify(next),
       description: 'Dashboard-managed gift send, lucky-win toast and lucky button assets/effects',
     }));
-    return next;
+    // Read the canonical persisted value back so the dashboard confirms what the app will consume.
+    return this.getConfig();
   }
 }
