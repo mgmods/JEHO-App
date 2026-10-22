@@ -50,7 +50,7 @@ export class ToastManagerController {
     const giftSend = {
       backgroundUrl: cleanUrl(parsed.giftSend?.backgroundUrl, cleanUrl(parsed.backgroundUrl)),
       shineEnabled: parsed.giftSend?.shineEnabled !== false && parsed.shineEnabled !== false,
-      frameGlowEnabled: false,
+      frameGlowEnabled: parsed.giftSend?.frameGlowEnabled !== false && parsed.frameGlowEnabled !== false,
       durationSeconds: clampSeconds(parsed.giftSend?.durationSeconds, oldDuration),
       avatarX: clampPercent(parsed.giftSend?.avatarX, 8),
       avatarY: clampPercent(parsed.giftSend?.avatarY, 50),
@@ -68,7 +68,7 @@ export class ToastManagerController {
     const winDefaults = (source: any, fallback: any) => ({
       backgroundUrl: cleanUrl(source?.backgroundUrl, fallback.backgroundUrl),
       shineEnabled: source?.shineEnabled !== false,
-      frameGlowEnabled: false,
+      frameGlowEnabled: source?.frameGlowEnabled !== false,
       durationSeconds: clampSeconds(source?.durationSeconds, fallback.durationSeconds),
       avatarX: clampPercent(source?.avatarX, fallback.avatarX),
       avatarY: clampPercent(source?.avatarY, fallback.avatarY),
@@ -102,7 +102,7 @@ export class ToastManagerController {
     const giftSend = {
       backgroundUrl: cleanUrl(body?.giftSend?.backgroundUrl, cleanUrl(body?.backgroundUrl, oldGift.backgroundUrl)),
       shineEnabled: typeof body?.giftSend?.shineEnabled === 'boolean' ? body.giftSend.shineEnabled : (typeof body?.shineEnabled === 'boolean' ? body.shineEnabled : oldGift.shineEnabled),
-      frameGlowEnabled: false,
+      frameGlowEnabled: typeof body?.giftSend?.frameGlowEnabled === 'boolean' ? body.giftSend.frameGlowEnabled : oldGift.frameGlowEnabled !== false,
       durationSeconds: clampSeconds(body?.giftSend?.durationSeconds ?? body?.durationSeconds, oldGift.durationSeconds),
       avatarX: clampPercent(body?.giftSend?.avatarX, oldGift.avatarX ?? 8),
       avatarY: clampPercent(body?.giftSend?.avatarY, oldGift.avatarY ?? 50),
@@ -123,7 +123,7 @@ export class ToastManagerController {
       return {
         backgroundUrl: cleanUrl(input.backgroundUrl, old.backgroundUrl),
         shineEnabled: typeof input.shineEnabled === 'boolean' ? input.shineEnabled : old.shineEnabled,
-        frameGlowEnabled: false,
+        frameGlowEnabled: typeof input.frameGlowEnabled === 'boolean' ? input.frameGlowEnabled : old.frameGlowEnabled !== false,
         durationSeconds: clampSeconds(input.durationSeconds, old.durationSeconds),
         avatarX: clampPercent(input.avatarX, old.avatarX),
         avatarY: clampPercent(input.avatarY, old.avatarY),
