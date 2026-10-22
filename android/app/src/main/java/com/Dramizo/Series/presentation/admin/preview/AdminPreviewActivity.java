@@ -30,10 +30,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Isolated native-only design preview. All records and actions are local demo data.
- * No AdminApi, Retrofit, backend, or production mutations are used by this screen.
- */
+/** Native role-aware hub. Real data and actions open in AdminConsoleActivity; server guards remain authoritative. */
 public final class AdminPreviewActivity extends ThemedActivity {
     private static final int INK = Color.rgb(35, 35, 52);
     private static final int MUTED = Color.rgb(119, 120, 139);
@@ -48,6 +45,7 @@ public final class AdminPreviewActivity extends ThemedActivity {
     private LinearLayout moduleRail;
     private EditText search;
     private String activeSection = "overview";
+    private String currentRole = StaffRoleHelper.NONE;
     private final List<Module> modules = Arrays.asList(
             new Module("overview", "نظرة عامة", "⌂", "الإحصائيات الحية"),
             new Module("users", "المستخدمون", "♙", "بحث وإدارة الحسابات"),
@@ -90,12 +88,13 @@ public final class AdminPreviewActivity extends ThemedActivity {
         try {
             user = ContainerProvider.from(this).getSessionManager().getUser();
         } catch (Exception ignored) { }
-        // The preview is intentionally restricted to a real server-authorized super admin.
-        if (!StaffRoleHelper.isSuper(user)) {
-            Toast.makeText(this, "معاينة اللوحة متاحة للسوبر أدمن فقط", Toast.LENGTH_LONG).show();
+        // The hub is available to authenticated staff, while every section is filtered by role.
+        if (!StaffRoleHelper.isStaff(user)) {
+            Toast.makeText(this, "مركز الإدارة مخصص لحسابات فريق JEHO", Toast.LENGTH_LONG).show();
             finish();
             return;
         }
+        currentRole = StaffRoleHelper.normalize(user);
         buildScreen();
         renderSection(activeSection, "");
     }
@@ -120,7 +119,8 @@ public final class AdminPreviewActivity extends ThemedActivity {
         TextView title = label("لوحة الإدارة التجريبية", 22, INK, true);
         title.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
         titleRow.addView(title);
-        TextView role = label("سوبر أدمن", 11, PURPLE, true);
+        String roleText = StaffRoleHelper.SUPER.equals(currentRole) ? "سوبر أدمن" : StaffRoleHelper.ADMIN.equals(currentRole) ? "أدمن" : "مانجر";
+        TextView role = label(roleText, 11, PURPLE, true);
         role.setGravity(Gravity.CENTER);
         role.setPadding(dp(11), dp(7), dp(11), dp(7));
         role.setBackground(pill(PURPLE_LIGHT, 14, 0));
@@ -199,6 +199,7 @@ public final class AdminPreviewActivity extends ThemedActivity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         for (Module module : modules) {
+            if (!isModuleAllowed(module.key)) continue;
             if (!matches(module.title + " " + module.description, query)) continue;
             TextView chip = label(module.icon + "  " + module.title, 12,
                     activeSection.equals(module.key) ? Color.WHITE : INK, true);
@@ -220,17 +221,13 @@ public final class AdminPreviewActivity extends ThemedActivity {
      * remains the authority; this screen never performs privileged mutations itself.
      */
     private void openConnectedSection(String key) {
-        String target;
-        switch (key) {
-            case "overview": target = null; break;
-            case "roles": target = "operators"; break;
-            case "store": target = "cosmetics"; break;
-            case "messages": target = "notifications"; break;
-            case "settings": target = "roomPkSettings"; break;
-            default: target = key; break;
+        if (!isModuleAllowed(key)) {
+            Toast.makeText(this, "هذا القسم غير متاح لرتبتك", Toast.LENGTH_SHORT).show();
+            return;
         }
+        String target = targetSection(key);
         Intent intent = new Intent(this, com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class);
-        if (target != null) intent.putExtra("admin_initial_section", target);
+        if (!"home".equals(target)) intent.putExtra("admin_initial_section", target);
         startActivity(intent);
     }
 
@@ -245,69 +242,70 @@ public final class AdminPreviewActivity extends ThemedActivity {
         if (content == null) return;
         content.removeAllViews();
         Module module = findModule(key);
-        if (module == null) return;
+        if (module == null || !isModuleAllowed(key)) return;
         addSectionHeader(module.title, module.description);
         if ("overview".equals(key)) {
-            addNotice("مركز إدارة JEHO", "اختر أي قسم لفتح وظائف الإدارة الفعلية داخل Android. تبقى صلاحيات الحساب والتحقق النهائي مفروضة من الخادم.");
+            addNotice("مركز إدارة JEHO", "هذه الواجهة تحافظ على التصميم المعتمد، بينما تُفتح البيانات الحقيقية والإجراءات من أقسام الإدارة المتصلة. تظهر لكل رتبة الأقسام المسموح بها فقط.");
             LinearLayout stats = new LinearLayout(this);
             stats.setOrientation(LinearLayout.HORIZONTAL);
-            stats.addView(statCard("المستخدمون", "—", "فتح الإدارة", PURPLE), weighted());
-            stats.addView(statCard("الغرف النشطة", "—", "فتح الإدارة", 0xFF248A73), weighted());
-            stats.addView(statCard("طلبات المراجعة", "—", "فتح الإدارة", 0xFFE09A31), weighted());
+            stats.addView(statCard("رتبتك", StaffRoleHelper.SUPER.equals(currentRole) ? "سوبر" : StaffRoleHelper.ADMIN.equals(currentRole) ? "أدمن" : "مانجر", "صلاحيات معتمدة", PURPLE), weighted());
+            stats.addView(statCard("مصدر البيانات", "الخادم", "مباشر", 0xFF248A73), weighted());
+            stats.addView(statCard("الوضع", "آمن", "لا توجد بيانات وهمية", 0xFFE09A31), weighted());
             content.addView(stats);
             addGap(14);
-            addCardTitle("الوصول السريع", "كل قسم يفتح شاشة فرعية داخل النموذج");
+            addCardTitle("أقسامك المتاحة", "اضغط على القسم لفتح بياناته الحقيقية وإجراءاته");
             for (Module item : modules) {
-                if ("overview".equals(item.key) || !matches(item.title + " " + item.description, query)) continue;
+                if ("overview".equals(item.key) || !isModuleAllowed(item.key)
+                        || !matches(item.title + " " + item.description, query)) continue;
                 addModuleRow(item);
             }
             if (!hasModuleMatch(query)) addEmpty(query);
-            addCardTitle("وصول سريع", "افتح القسم المطلوب لإدارة بيانات الخادم");
-            addRecord("✦", "كتالوج العناصر", "الإطارات والدخوليات وVIP", "فتح القسم");
-            addRecord("♙", "إدارة المستخدمين", "بحث وإجراءات حسب الصلاحية", "فتح القسم");
-        } else if ("users".equals(key)) {
-            addNotice("قائمة مستخدمين تجريبية", "البحث والتفاصيل يعملان محلياً. الحظر وتعديل الرتب غير موصولين بالخادم.");
-            addRecord("ن", "نور الشام", "ID: DEMO-1024 · مستوى 32 · VIP", "التفاصيل");
-            addRecord("م", "محمد الورد", "ID: DEMO-2088 · مستوى 18 · عادي", "التفاصيل");
-            addRecord("ل", "ليان", "ID: DEMO-3140 · مستوى 41 · VIP", "التفاصيل");
-            addRecord("س", "سامر", "ID: DEMO-4771 · مستوى 12 · عادي", "التفاصيل");
-            addLocalAction("اختبار البحث المحلي", "جرّب كتابة اسم أو معرّف تجريبي في شريط البحث بالأعلى.");
-        } else if ("rooms".equals(key)) {
-            addNotice("غرف وهمية", "لا يتم الانضمام إلى الغرف الحقيقية أو تعديل إعداداتها.");
-            addRecord("♫", "جلسة السهرة", "ROOM-DEMO-01 · 6 / 12 مقعداً", "تفاصيل الغرفة");
-            addRecord("♫", "أصدقاء للأبد", "ROOM-DEMO-02 · 9 / 12 مقعداً", "تفاصيل الغرفة");
-            addRecord("♫", "استراحة JEHO", "ROOM-DEMO-03 · 3 / 12 مقعداً", "تفاصيل الغرفة");
-        } else if ("roles".equals(key)) {
-            addNotice("عرض الصلاحيات فقط", "الرتبة التجريبية هنا لا تمنح أي صلاحية حقيقية في النظام.");
-            addRecord("✦", "سوبر أدمن تجريبي", "كل أقسام النموذج متاحة · بلا وصول إداري فعلي", "التفاصيل");
-            addRecord("◆", "أدمن", "إشراف وحظر مؤقت حسب سياسة المنصة", "التفاصيل");
-            addRecord("◇", "مانجر", "إدارة نطاق الغرف والبلاغات", "التفاصيل");
-            addLocalAction("مصفوفة الصلاحيات", "في النسخة المعتمدة لاحقاً، يجب أن تبقى صلاحيات الإنتاج مفروضة من الخادم.");
-        } else if ("store".equals(key)) {
-            addNotice("معرض المتجر التجريبي", "العناصر التالية بطاقات تصميم فقط وليست عناصر قابلة للشراء.");
-            addRecord("👑", "عضوية VIP", "تجربة عرض باقات العضوية", "معاينة");
-            addRecord("▣", "إطار متحرك بنفسجي", "عنصر تجميلي تجريبي", "معاينة");
-            addRecord("✧", "دخولية ملكية", "تأثير دخول تجريبي", "معاينة");
-            addRecord("◈", "معرّف مميز", "نموذج عرض المعرّفات", "معاينة");
-        } else if ("gifts".equals(key)) {
-            addNotice("معاينة الهدايا والتوستات", "لا يتم إرسال هدايا ولا خصم عملات. خيارات المعاينة لا تحفظ إعدادات الداشبورد.");
-            addRecord("🎁", "توست إرسال هدية", "اسم المرسل · الهدية · X", "معاينة التوست");
-            addRecord("✦", "توست هدية محظوظة", "صورة · X · قيمة الربح", "معاينة التوست");
-            addRecord("◇", "زر هدايا المحظوظ", "شكل الزر والحركة فقط", "معاينة");
-            addLocalAction("اختبار موضع التوست", "هذه النسخة تعرض شكل عناصر الإدارة فقط؛ الربط الفعلي يأتي بعد موافقتك.");
-        } else if ("messages".equals(key)) {
-            addNotice("رسائل محلية فقط", "لا توجد رسائل بث أو إشعارات حقيقية في نموذج التصميم.");
-            addRecord("◉", "الأخبار الرسمية", "معاينة بطاقة خبر", "عرض");
-            addRecord("✉", "رسائل الإدارة", "معاينة بطاقة رسالة", "عرض");
-            addRecord("♧", "الإشعارات", "معاينة قائمة الإشعارات", "عرض");
-        } else if ("settings".equals(key)) {
-            addNotice("إعدادات شكلية", "تغيير الخيارات هنا لا يغير إعدادات التطبيق أو الخادم.");
-            addSettingRow("المظهر", "فاتح · أبيض ورمادي وبنفسجي");
-            addSettingRow("اللغة", "العربية · اتجاه RTL");
-            addSettingRow("مصدر البيانات", "محلي تجريبي");
-            addSettingRow("اتصال API", "غير متصل في هذه المعاينة");
-            addLocalAction("حدود الأمان", "لن تُنفذ أي عملية إنتاجية قبل اعتماد التصميم ومراجعة صلاحيات الخادم.");
+        } else {
+            String target = targetSection(key);
+            addNotice("القسم متصل بلوحة الإدارة", "سيتم فتح شاشة الإدارة الأصلية وقراءة البيانات الحالية من الخادم. أي إجراء سيخضع لصلاحيات رتبتك والتحقق من الخادم.");
+            content.addView(makeActionButton("فتح " + module.title + " مباشرة", () -> openConnectedSection(key)));
+            if ("cosmetics".equals(target) || "grantCosmetics".equals(target) || "gifts".equals(target)
+                    || "toastManager".equals(target) || "staffIdentity".equals(target)) {
+                addNotice("المعاينة الحية", "داخل القسم المتصل ستظهر الأصول التي يرجعها الخادم، مع معاينة مرئية للإطارات والهدايا وخلفيات التوستات قبل اعتماد الإعدادات.");
+            }
         }
+    }
+
+    private TextView makeActionButton(String text, Runnable action) {
+        TextView button = label("↗  " + text, 13, PURPLE, true);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dp(16), dp(14), dp(16), dp(14));
+        button.setBackground(pill(PURPLE_LIGHT, 14, BORDER));
+        button.setOnClickListener(v -> action.run());
+        addCard(button);
+        return button;
+    }
+
+    private String targetSection(String key) {
+        switch (key) {
+            case "overview": return "home";
+            case "roles": return "operators";
+            case "store": return "cosmetics";
+            case "messages": return "notifications";
+            case "settings": return "roomPkSettings";
+            default: return key;
+        }
+    }
+
+    private boolean isModuleAllowed(String key) {
+        String target = targetSection(key);
+        if ("home".equals(target)) return true;
+        if (StaffRoleHelper.MANAGER.equals(currentRole)) {
+            return Arrays.asList("rooms", "streams", "reports").contains(target);
+        }
+        if (StaffRoleHelper.ADMIN.equals(currentRole)) {
+            List<String> superOnly = Arrays.asList("notifications", "toastManager", "mysteriousMan",
+                    "luckyCannon", "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
+                    "vip", "logs", "staffIdentity", "operators", "genderVerifications", "recharges",
+                    "withdrawals", "walletTransactions", "walletAdjust", "cosmetics", "gifts");
+            return !superOnly.contains(target);
+        }
+        return StaffRoleHelper.SUPER.equals(currentRole);
     }
 
     private void addSectionHeader(String title, String subtitle) {
@@ -428,7 +426,7 @@ public final class AdminPreviewActivity extends ThemedActivity {
     }
 
     private boolean hasModuleMatch(String query) {
-        for (Module m : modules) if (!"overview".equals(m.key) && matches(m.title + " " + m.description, query)) return true;
+        for (Module m : modules) if (!"overview".equals(m.key) && isModuleAllowed(m.key) && matches(m.title + " " + m.description, query)) return true;
         return false;
     }
 
