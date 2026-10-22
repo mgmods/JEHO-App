@@ -3564,8 +3564,9 @@ export class AdminService {
     if (!user) throw new NotFoundException('User not found');
     const permanent = body.permanent === true;
     const days = Number(body.days ?? 30);
-    if (!permanent && ![7, 15, 30].includes(days)) {
-      throw new BadRequestException('VIP duration must be 7, 15 or 30 days, or permanent=true');
+    // The controller applies rank-specific limits (Admin: 1/3/7/15; Super Admin: 7/15/30 or permanent).
+    if (!permanent && ![1, 3, 7, 15, 30].includes(days)) {
+      throw new BadRequestException('VIP duration must be 1, 3, 7, 15 or 30 days, or permanent=true');
     }
     await this.userVipRepo.update({ userId: body.userId, isActive: true }, { isActive: false });
     const startsAt = new Date();
