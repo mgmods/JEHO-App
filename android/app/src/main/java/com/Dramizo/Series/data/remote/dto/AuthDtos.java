@@ -10,6 +10,10 @@ public final class AuthDtos {
         @SerializedName("password") public String password;
         @SerializedName("username") public String username;
         @SerializedName("displayName") public String displayName;
+        /** Decorative rank configured by admins; never an authorization role. */
+        @SerializedName("customDisplayRankName") public String customDisplayRankName;
+        @SerializedName("customDisplayRankImageUrl") public String customDisplayRankImageUrl;
+        @SerializedName("customDisplayRankAnimated") public boolean customDisplayRankAnimated;
 
         public RegisterRequest(String email, String password, String username, String displayName) {
             this.email = email;
