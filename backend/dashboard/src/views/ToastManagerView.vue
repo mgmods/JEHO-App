@@ -321,13 +321,29 @@ async function save() {
     toast().danger(error.value)
     return
   }
+  const fieldsToVerify = [
+    'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
+    'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
+    'durationSeconds', 'shineEnabled', 'frameGlowEnabled', 'backgroundUrl',
+  ]
+  for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh']) {
+    for (const field of fieldsToVerify) {
+      const expected = payload[key]?.[field]
+      const actual = cfg[key]?.[field]
+      if (expected !== undefined && String(actual ?? '') !== String(expected ?? '')) {
+        error.value = `لم يتم تأكيد حفظ ${key}.${field} من قاعدة البيانات. أعد المحاولة بعد التأكد من اتصال الخادم.`
+        toast().danger(error.value)
+        return
+      }
+    }
+  }
   Object.assign(form.giftSend, cfg.giftSend)
   Object.assign(form.luckyWinNormal, cfg.luckyWinNormal)
   Object.assign(form.luckyReturn, cfg.luckyReturn)
   Object.assign(form.luckyWinHigh, cfg.luckyWinHigh)
   Object.assign(form.luckyButton, cfg.luckyButton)
   form.version = Number(cfg.version) || form.version
-  success.value = 'تم الحفظ والتحقق من الإعدادات بقراءة جديدة من الخادم. إذا عادت القيم بعد تحديث الصفحة، فالمشكلة من نسخة الخادم المنشورة أو قاعدة إعداداته وليست من المعاينة.'
+  success.value = 'تم الحفظ والتحقق من القيم بقراءة جديدة من الخادم. الإعدادات التي لم تُحفظ ستظهر كخطأ ولن تُعرض رسالة نجاح.'
   toast().success(success.value)
 }
 onMounted(load)
