@@ -9,7 +9,37 @@
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
-    <div class="d-flex flex-wrap gap-2 mb-3">
+    <section class="cosmetics-guide mb-4" aria-label="دليل أقسام العناصر التجميلية">
+      <div class="cosmetics-guide-head">
+        <div>
+          <div class="cosmetics-guide-eyebrow">دليل لوحة التجميل</div>
+          <h2>اعرف وظيفة كل قسم قبل رفع الصور</h2>
+          <p>كل بطاقة توضّح أين يظهر العنصر داخل التطبيق. اضغط على القسم المناسب أدناه لإدارة ملفاته ومعاينتها.</p>
+        </div>
+        <span class="cosmetics-guide-pill">معاينة واضحة · تصنيف ملوّن</span>
+      </div>
+      <div class="cosmetics-guide-grid">
+        <div class="cosmetics-guide-card guide-frame">
+          <div class="guide-icon"><span>◉</span></div>
+          <div class="guide-copy"><strong>الإطارات</strong><span>تُحيط بصورة المستخدم الشخصية، وقد تكون ثابتة أو متحركة.</span><small>القسم: الإطارات · VIP / فعاليات</small></div>
+        </div>
+        <div class="cosmetics-guide-card guide-name">
+          <div class="guide-icon"><span>Aa</span></div>
+          <div class="guide-copy"><strong>بطاقات الاسم والرتب</strong><span>زخرفة خلف الاسم أو لوحة الاسم التي تظهر بجانب بيانات المستخدم.</span><small>القسم: لوحة الاسم / بطاقات الملف</small></div>
+        </div>
+        <div class="cosmetics-guide-card guide-entry">
+          <div class="guide-icon"><span>✦</span></div>
+          <div class="guide-copy"><strong>الدخوليات</strong><span>تأثير بصري أو حركة تظهر عند دخول المستخدم إلى الغرفة.</span><small>القسم: الدخولية · صورة متحركة أو فيديو</small></div>
+        </div>
+        <div class="cosmetics-guide-card guide-badge">
+          <div class="guide-icon"><span>◆</span></div>
+          <div class="guide-copy"><strong>الشارات والميداليات</strong><span>شارة إنجاز أو رتبة تظهر كأيقونة مستقلة، وليست إطار صورة.</span><small>القسم: الشارات والمداليات</small></div>
+        </div>
+      </div>
+      <div class="cosmetics-guide-note"><strong>مهم:</strong> ارفع ملف المعاينة المناسب، ثم راجع المعاينة داخل البطاقة قبل الحفظ. إذا كان العنصر متحركًا، أضف ملف الحركة أيضًا. الخلفية الداكنة المتدرجة حول المعاينة هدفها إظهار الصور الشفافة بوضوح ولا تُضاف إلى الصورة نفسها.</div>
+    </section>
+
+    <div class="d-flex flex-wrap gap-2 mb-3 cosmetics-tabs">
       <button
         v-for="item in tabs"
         :key="item.key"
@@ -133,7 +163,7 @@
           </div>
           <div class="widget-card-body">
             <h3 class="widget-card-title text-truncate">{{ displayName(item) }}</h3>
-            <div class="widget-card-meta mb-2">{{ item.code }} · {{ frameKindLabel(item) || item.type }}</div>
+            <div class="widget-card-meta mb-2">{{ item.code }} · {{ frameKindLabel(item) || cosmeticTypeLabel(item.type || tab) }}</div>
             <div class="small mb-2">
               <span v-if="item.coinPrice">{{ item.coinPrice }} {{ t('app.coins') }}</span>
               <span v-else class="text-muted">—</span>
@@ -375,6 +405,25 @@ function frameBucket(item) {
   }
   if (item?.meta?.hasSvga === true || mediaKind(wearSrc(item)) === 'svga') return 'animated'
   return 'event'
+}
+
+function cosmeticTypeLabel(type) {
+  const labels = {
+    vip_badge: 'إطار صورة',
+    host_badge: 'شارة المضيف',
+    entry_effect: 'تأثير دخولية',
+    room_card: 'بطاقة غرفة',
+    profile_card: 'بطاقة ملف شخصي',
+    chat_bubble: 'فقاعة دردشة',
+    nameplate: 'بطاقة اسم / رتبة',
+    room_background: 'خلفية غرفة',
+    level_badge: 'شارة مستوى',
+    name_card: 'بطاقة اسم',
+    namecard: 'بطاقة اسم',
+    name_plate: 'بطاقة اسم / رتبة',
+    title_card: 'بطاقة رتبة',
+  }
+  return labels[String(type || '').toLowerCase()] || 'عنصر تجميلي'
 }
 
 function frameKindLabel(item) {
@@ -751,6 +800,48 @@ onMounted(load)
 </script>
 
 <style scoped>
+.cosmetics-guide {
+  border: 1px solid rgba(130, 150, 190, .24);
+  border-radius: 20px;
+  padding: 22px;
+  color: #edf2ff;
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(99, 102, 241, .22), transparent 42%),
+    radial-gradient(ellipse at 95% 100%, rgba(20, 184, 166, .14), transparent 38%),
+    linear-gradient(135deg, #111827 0%, #172033 55%, #101a2a 100%);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, .12);
+}
+.cosmetics-guide-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+.cosmetics-guide-eyebrow { color:#a5b4fc; font-size:.76rem; font-weight:800; letter-spacing:.08em; margin-bottom:6px; }
+.cosmetics-guide-head h2 { font-size:1.25rem; line-height:1.4; margin:0 0 6px; font-weight:800; color:#fff; }
+.cosmetics-guide-head p { color:#c1cbe0; margin:0; max-width:780px; font-size:.9rem; line-height:1.7; }
+.cosmetics-guide-pill { flex-shrink:0; padding:7px 11px; border-radius:999px; color:#dbeafe; background:rgba(99,102,241,.16); border:1px solid rgba(165,180,252,.28); font-size:.76rem; font-weight:700; }
+.cosmetics-guide-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.cosmetics-guide-card { display:flex; align-items:center; gap:13px; min-width:0; padding:15px; border:1px solid rgba(226,232,240,.13); border-radius:15px; background:rgba(255,255,255,.045); }
+.guide-icon { width:48px; height:48px; flex:0 0 48px; display:grid; place-items:center; border-radius:14px; font-size:1.35rem; font-weight:900; }
+.guide-copy { display:flex; flex-direction:column; min-width:0; gap:4px; }
+.guide-copy strong { color:#fff; font-size:.97rem; font-weight:800; }
+.guide-copy span { color:#d0d8e8; font-size:.82rem; line-height:1.55; }
+.guide-copy small { font-size:.73rem; line-height:1.5; font-weight:700; }
+.guide-frame { border-inline-start:3px solid #a78bfa; } .guide-frame .guide-icon { color:#ddd6fe; background:rgba(139,92,246,.2); } .guide-frame small { color:#c4b5fd; }
+.guide-name { border-inline-start:3px solid #38bdf8; } .guide-name .guide-icon { color:#bae6fd; background:rgba(14,165,233,.18); } .guide-name small { color:#7dd3fc; }
+.guide-entry { border-inline-start:3px solid #fbbf24; } .guide-entry .guide-icon { color:#fde68a; background:rgba(245,158,11,.17); } .guide-entry small { color:#fcd34d; }
+.guide-badge { border-inline-start:3px solid #2dd4bf; } .guide-badge .guide-icon { color:#99f6e4; background:rgba(20,184,166,.17); } .guide-badge small { color:#5eead4; }
+.cosmetics-guide-note { margin-top:14px; padding:11px 13px; border-radius:12px; color:#d6deed; background:rgba(2,6,23,.32); font-size:.81rem; line-height:1.7; }
+.cosmetics-guide-note strong { color:#fde68a; }
+.cosmetics-tabs { padding-bottom:12px; border-bottom:1px solid rgba(100,116,139,.22); }
+.widget-card-media.preview-wrap { outline:1px solid rgba(148,163,184,.24); outline-offset:-1px; }
+.preview-wrap.vip_badge { background-color:#151329; }
+.preview-wrap.entry_effect { background-color:#1c1427; }
+.preview-wrap.nameplate, .preview-wrap.profile_card { background-color:#10202b; }
+.preview-wrap.level_badge { background-color:#102521; }
+@media (max-width: 760px) {
+  .cosmetics-guide { padding:16px; border-radius:16px; }
+  .cosmetics-guide-head { flex-direction:column; }
+  .cosmetics-guide-pill { white-space:normal; }
+  .cosmetics-guide-grid { grid-template-columns:1fr; }
+  .cosmetics-guide-card { padding:12px; }
+}
 .preview-wrap {
   aspect-ratio: 1;
   position: relative;
