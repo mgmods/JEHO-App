@@ -160,7 +160,25 @@ export class ToastManagerController {
       key: 'toast_manager_config', value: JSON.stringify(next),
       description: 'Dashboard-managed gift send, lucky-win toast and lucky button assets/effects',
     }));
-    // Read the canonical persisted value back so the dashboard confirms what the app will consume.
+    // Read the durable row back and verify all geometry and typography fields before
+    // reporting success. This prevents the dashboard from silently accepting dropped values.
+    const persisted = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+    if (!persisted?.value) throw new Error('Toast settings were not persisted; reload was not confirmed');
+    let stored: any;
+    try { stored = JSON.parse(persisted.value); } catch {
+      throw new Error('Saved toast settings could not be read back from storage');
+    }
+    const verifyFields = [
+      'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
+      'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
+    ];
+    for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh']) {
+      for (const field of verifyFields) {
+        if (Number(stored?.[key]?.[field]) !== Number(next[key]?.[field])) {
+          throw new Error(`Toast setting did not persist: ${key}.${field}`);
+        }
+      }
+    }
     return this.getConfig();
   }
 }
