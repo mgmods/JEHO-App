@@ -50,11 +50,8 @@
         <section class="settings-card h-100">
           <h3 class="settings-card-title">موضع الصورة والكتابة</h3>
           <p class="small text-secondary">اسحب الصورة والاسم والمردود وعداد X مباشرة داخل المعاينة في كل نوع توست، بما فيها أرباح المحظوظ العادية والعالية. كل عنصر مستقل؛ احفظ التعديلات لتبقى مواضعها محفوظة وتُطبّق على التطبيق.</p>
-          <div class="position-control">
-            <label class="form-label">عرض التوست: {{ currentStyle.widthDp }} dp</label>
-            <input v-model.number="currentStyle.widthDp" class="form-range" type="range" min="220" max="360" step="5" />
-            <label class="form-label">ارتفاع التوست: {{ currentStyle.heightDp }} dp</label>
-            <input v-model.number="currentStyle.heightDp" class="form-range" type="range" min="60" max="180" step="2" />
+          <div class="position-control small text-secondary">
+            حجم خلفية التوست ثابت (340 × 100 dp) في المعاينة والتطبيق، ولا يتغير عند رفع صورة جديدة.
           </div>
           <div class="position-control">
             <label class="form-label">حجم صورة المستخدم: {{ currentStyle.avatarSizeDp }} dp</label>
@@ -186,9 +183,11 @@ const uploading = ref(false)
 const error = ref('')
 const success = ref('')
 const resolveStyleUrl = (style) => resolveAsset(style?.backgroundUrl)
+const TOAST_WIDTH_DP = 340
+const TOAST_HEIGHT_DP = 100
 const canvasStyle = computed(() => ({
-  width: Math.max(220, Math.min(360, Number(currentStyle.value.widthDp) || 340)) + 'px',
-  height: Math.max(60, Math.min(180, Number(currentStyle.value.heightDp) || 100)) + 'px',
+  width: TOAST_WIDTH_DP + 'px',
+  height: TOAST_HEIGHT_DP + 'px',
   boxShadow: 'none',
 }))
 const avatarPreviewStyle = computed(() => ({ left: currentStyle.value.avatarX + '%', top: currentStyle.value.avatarY + '%', width: currentStyle.value.avatarSizeDp + 'px', height: currentStyle.value.avatarSizeDp + 'px' }))
@@ -274,28 +273,23 @@ async function uploadAsset(event) {
   if (activeTab.value === 'luckyButton') form.luckyButton.iconUrl = url
   else {
     currentStyle.value.backgroundUrl = url
-    // Match the canvas to the uploaded artwork's aspect ratio instead of stretching it to screen dimensions.
-    const artwork = new Image()
-    artwork.onload = () => {
-      if (artwork.naturalWidth > 0 && artwork.naturalHeight > 0) {
-        currentStyle.value.widthDp = 340
-        currentStyle.value.heightDp = Math.max(60, Math.min(180, Math.round(340 * artwork.naturalHeight / artwork.naturalWidth)))
-      }
-    }
-    artwork.src = resolveAsset(url)
+    // Keep the toast canvas fixed-size; replacing artwork must not resize the toast.
+    currentStyle.value.widthDp = TOAST_WIDTH_DP
+    currentStyle.value.heightDp = TOAST_HEIGHT_DP
   }
-  toast().success('تم رفع الصورة. ضُبطت المعاينة على نسبة أبعاد التصميم؛ يمكنك تعديل الحجم وسحب العناصر ثم الحفظ.')
+  toast().success('تم رفع الخلفية. حجم التوست ثابت، ويمكنك تحريك العناصر ثم الحفظ.')
 }
 async function save() {
   if (!canWriteSettings.value) { toast().danger('لا تملك صلاحية تعديل إعدادات الداشبورد'); return }
   saving.value = true
   error.value = ''
   success.value = ''
+  const fixedToastStyle = (style) => ({ ...style, widthDp: TOAST_WIDTH_DP, heightDp: TOAST_HEIGHT_DP })
   const payload = {
-    giftSend: { ...form.giftSend },
-    luckyWinNormal: { ...form.luckyWinNormal },
-    luckyReturn: { ...form.luckyReturn },
-    luckyWinHigh: { ...form.luckyWinHigh },
+    giftSend: fixedToastStyle(form.giftSend),
+    luckyWinNormal: fixedToastStyle(form.luckyWinNormal),
+    luckyReturn: fixedToastStyle(form.luckyReturn),
+    luckyWinHigh: fixedToastStyle(form.luckyWinHigh),
     luckyButton: { ...form.luckyButton },
   }
   const { error: saveError } = await toastManagerApi.save(payload)
