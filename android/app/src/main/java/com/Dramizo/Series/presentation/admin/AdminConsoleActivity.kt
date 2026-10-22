@@ -2517,6 +2517,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     }, LinearLayout.LayoutParams(dp(76), dp(48)))
                     panel.addView(row)
                 }
+                addIdentityAssetPreview(panel, roleKey)
                 body.addView(panel)
             }
             body.addView(button("حفظ الهوية الإدارية") {
@@ -2537,6 +2538,66 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
             })
         }
+    }
+
+    private fun addIdentityAssetPreview(parent: LinearLayout, roleKey: String) {
+        addText(parent, "معاينة الأصول الحية", 12f, true, ACCENT)
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            background = roundRect(0xFFF8F7FC.toInt(), 12)
+        }
+        val specs = listOf(
+            Triple("badgeUrl", "الشارة", "الشارة"),
+            Triple("frameUrl", "الإطار", "إطار الصورة"),
+            Triple("nameplateUrl", "الاسم", "بطاقة الاسم")
+        )
+        specs.forEach { (fieldKey, label, description) ->
+            val column = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    setMargins(dp(3), 0, dp(3), 0)
+                }
+            }
+            val image = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = "$description لرتبة $roleKey"
+            }
+            column.addView(image, LinearLayout.LayoutParams(dp(62), dp(62)))
+            val caption = TextView(this).apply {
+                text = label
+                textSize = 10f
+                gravity = Gravity.CENTER
+                setTextColor(MUTED)
+            }
+            column.addView(caption)
+            row.addView(column)
+            val input = staffIdentityFields["$roleKey.$fieldKey"]
+            fun refresh() {
+                val raw = input?.text?.toString()?.trim().orEmpty()
+                if (raw.isBlank()) {
+                    Glide.with(this@AdminConsoleActivity).clear(image)
+                    image.setImageDrawable(null)
+                } else {
+                    val resolved = AssetCatalog.absoluteUrl(raw) ?: raw
+                    Glide.with(this@AdminConsoleActivity).load(resolved).fitCenter().into(image)
+                }
+            }
+            input?.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { refresh() }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+            refresh()
+        }
+        parent.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(6)
+            bottomMargin = dp(8)
+        })
     }
 
     private fun identityInput(hintText: String, value: String): EditText = EditText(this).apply {
