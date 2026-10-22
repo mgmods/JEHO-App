@@ -1802,9 +1802,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     });
     if (!room) throw new NotFoundException('Room not found');
     await this.assertAgencyRoomActive(room);
-    // Respect host-configured size (guest mics + host seat). Never force back to default 11.
+    // JEHO rollout: guarantee 30 real seats (including host) for existing rooms.
+    // Keep the 31-seat backend ceiling for compatibility with explicitly configured rooms.
     const desiredSeatCount = Math.max(
-      2,
+      DEFAULT_ROOM_SEAT_COUNT,
       Math.min(31, Number(room.seatCount) || DEFAULT_ROOM_SEAT_COUNT),
     );
     if (room.seatCount !== desiredSeatCount) {
