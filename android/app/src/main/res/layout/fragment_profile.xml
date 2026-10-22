@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F4F5F5">
+    android:background="#FF0A0C0C">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -278,7 +278,7 @@
                     android:gravity="center"
                     android:includeFontPadding="false"
                     android:text="♥"
-                    android:textColor="#FFFF5277"
+                    android:textColor="#FF35D39A"
                     android:textSize="27sp"
                     android:textStyle="bold" />
                 <FrameLayout
