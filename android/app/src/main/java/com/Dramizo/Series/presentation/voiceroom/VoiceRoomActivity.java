@@ -12842,6 +12842,61 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private void showRoomPkChallengeDialog() {
+        if (roomId == null || roomId.isEmpty() || !isOwner) {
+            Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show(); return;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("اختيار نوع تحدّي PK")
+            .setItems(new String[]{"🔴 شخص ضد شخص", "⚔ فريق ضد فريق", "🏠 روم ضد روم"}, (d, which) -> {
+                if (which == 2) showRoomVsRoomPkChallengeDialog();
+                else showInRoomPkSetup(which == 0 ? "person_vs_person" : "team_vs_team");
+            }).setNegativeButton("إلغاء", null).show();
+    }
+
+    private void showInRoomPkSetup(String type) {
+        java.util.List<RoomDtos.SeatDto> occupied = new java.util.ArrayList<>();
+        if (roomPkLatestGridSeats != null) for (RoomDtos.SeatDto seat : roomPkLatestGridSeats) {
+            String uid = seatUserId(seat); if (uid != null && !uid.trim().isEmpty()) occupied.add(seat);
+        }
+        if (occupied.size() < 2) { Toast.makeText(this, "يجب وجود مشاركين اثنين على الأقل", Toast.LENGTH_LONG).show(); return; }
+        java.util.List<String> aIds = new java.util.ArrayList<>(), bIds = new java.util.ArrayList<>();
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this); root.setOrientation(1);
+        root.setPadding(dp(16), dp(12), dp(16), dp(12)); scroll.addView(root);
+        TextView note = new TextView(this); note.setText("اختر أسماء من المقاعد المشغولة. لن تتغير المقاعد أو اتصالات الصوت."); note.setTextColor(0xFF263247); root.addView(note);
+        final int[] mins = {5};
+        android.widget.RadioGroup rg = new android.widget.RadioGroup(this); rg.setOrientation(0);
+        for (int m : new int[]{5,10,20}) { android.widget.RadioButton rb = new android.widget.RadioButton(this); rb.setText(m+" دقائق"); rb.setTag(m); rg.addView(rb); if(m==5) rb.setChecked(true); }
+        rg.setOnCheckedChangeListener((g,id)->{ android.widget.RadioButton rb=g.findViewById(id); if(rb!=null) mins[0]=(Integer)rb.getTag(); }); root.addView(rg);
+        root.addView(roomPkFormLabel("🔴 الفريق الأحمر"));
+        android.widget.LinearLayout la=new android.widget.LinearLayout(this); la.setOrientation(1); root.addView(la);
+        root.addView(roomPkFormLabel("🔵 الفريق الأزرق"));
+        android.widget.LinearLayout lb=new android.widget.LinearLayout(this); lb.setOrientation(1); root.addView(lb);
+        for (RoomDtos.SeatDto seat : occupied) {
+            final String uid=seatUserId(seat);
+            String name=seat.user!=null && seat.user.displayName!=null && !seat.user.displayName.trim().isEmpty()?seat.user.displayName:"مشارك";
+            String label="مقعد "+(seat.seatIndex+1)+" · "+name;
+            android.widget.CheckBox ca=new android.widget.CheckBox(this), cb=new android.widget.CheckBox(this);
+            ca.setText(label); cb.setText(label); ca.setTextColor(0xFF9D2441); cb.setTextColor(0xFF205AA4);
+            ca.setOnCheckedChangeListener((v,on)->{ if(on){ if(aIds.contains(uid)||bIds.contains(uid)||("person_vs_person".equals(type)&&!aIds.isEmpty())){v.setChecked(false);return;} aIds.add(uid); cb.setEnabled(false);}else{aIds.remove(uid);cb.setEnabled(true);} });
+            cb.setOnCheckedChangeListener((v,on)->{ if(on){ if(aIds.contains(uid)||bIds.contains(uid)||("person_vs_person".equals(type)&&!bIds.isEmpty())){v.setChecked(false);return;} bIds.add(uid);ca.setEnabled(false);}else{bIds.remove(uid);ca.setEnabled(true);} });
+            la.addView(ca); lb.addView(cb);
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("إعداد تحدّي PK").setView(scroll)
+            .setNegativeButton("إلغاء",null).setPositiveButton("بدء التحدّي",(d,w)->{
+                if(aIds.isEmpty()||bIds.isEmpty()){Toast.makeText(this,"اختر مشاركاً لكل فريق",Toast.LENGTH_LONG).show();return;}
+                java.util.Map<String,Object> body=new java.util.HashMap<>(); body.put("roomId",roomId);body.put("challengeType",type);
+                body.put("durationMinutes",mins[0]);body.put("participantIdsA",new java.util.ArrayList<>(aIds));body.put("participantIdsB",new java.util.ArrayList<>(bIds));body.put("scoringMode","coins");
+                ContainerProvider.from(this).getContestsApi().createInRoomPk(body).enqueue(new retrofit2.Callback<ApiResponse<Object>>(){
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,retrofit2.Response<ApiResponse<Object>> res){
+                        if(!res.isSuccessful()||res.body()==null||!res.body().success){Toast.makeText(VoiceRoomActivity.this,res.body()!=null&&res.body().message!=null?res.body().message:"تعذّر بدء تحدّي PK",Toast.LENGTH_LONG).show();return;}
+                        Toast.makeText(VoiceRoomActivity.this,"بدأ تحدّي PK!",Toast.LENGTH_SHORT).show();
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call,Throwable e){Toast.makeText(VoiceRoomActivity.this,"تعذّر الاتصال لبدء التحدّي",Toast.LENGTH_LONG).show();}
+                });
+            }).show();
+    }
+
     private void showRoomVsRoomPkChallengeDialog() {
         if (roomId == null || roomId.isEmpty() || !isOwner) {
             Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
