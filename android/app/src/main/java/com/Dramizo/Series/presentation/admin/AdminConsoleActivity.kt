@@ -916,7 +916,13 @@ class AdminConsoleActivity : ThemedActivity() {
             contentDescription = "أيقونة زر المحظوظ"
         }
         row.addView(icon, LinearLayout.LayoutParams(dp(58), dp(58)).apply { marginStart = dp(10) })
-        addText(row, "معاينة حية لأيقونة الزر من الرابط المحدد", 12f, true, MUTED)
+        row.addView(TextView(this).apply {
+            text = "معاينة حية لأيقونة الزر من الرابط المحدد"
+            textSize = 12f
+            setTextColor(MUTED)
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(0, -2, 1f))
         parent.addView(row)
         fun refresh() {
             val raw = urlField.text?.toString()?.trim().orEmpty()
