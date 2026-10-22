@@ -549,7 +549,7 @@ export class VanityIdsController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('admin/assign')
-  @ApiOperation({ summary: 'Grant a vanity ID to a user for 7, 15, 30 days or permanently' })
+  @ApiOperation({ summary: 'Grant a vanity ID with rank-specific duration limits' })
   async adminAssign(
     @Body() body: { userId?: string; publicId?: string; days?: number; permanent?: boolean },
     @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
