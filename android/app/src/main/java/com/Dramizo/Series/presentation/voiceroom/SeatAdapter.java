@@ -697,6 +697,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgSeatHostMark.setVisibility(isCreator ? View.VISIBLE : View.GONE);
             }
             bindStaffSeatBadge(holder, seat.user);
+            bindCustomDisplayRank(holder, seat.user);
             if (holder.b.tvStatus != null) {
                 holder.b.tvStatus.setVisibility(View.GONE);
             }
@@ -722,6 +723,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.imgSeatHostMark.setVisibility(View.GONE);
         }
         bindStaffSeatBadge(holder, null);
+        bindCustomDisplayRank(holder, null);
         if (holder.b.tvGiftCount != null) {
             holder.b.tvGiftCount.setVisibility(View.GONE);
         }
@@ -1095,6 +1097,28 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         AvatarCosmetics.applyHostWear(holder.b.imgFrame, holder.b.imgHostBadge, holder.b.imgAvatar,
                 null, null, null, null);
+    }
+
+    private void bindCustomDisplayRank(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (holder.b.rowCustomDisplayRank == null || holder.b.tvCustomRankBadge == null || holder.b.imgCustomRankBadge == null) return;
+        String title = user != null ? user.customDisplayRankName : null;
+        String imageUrl = user != null ? user.customDisplayRankImageUrl : null;
+        if (title == null || title.trim().isEmpty()) {
+            holder.b.rowCustomDisplayRank.setVisibility(View.GONE);
+            holder.b.tvCustomRankBadge.setText("");
+            Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+            return;
+        }
+        holder.b.rowCustomDisplayRank.setVisibility(View.VISIBLE);
+        holder.b.tvCustomRankBadge.setText(title.trim());
+        if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+            holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
+            // Glide animates GIF assets; static images remain static.
+            Glide.with(holder.itemView).load(imageUrl).into(holder.b.imgCustomRankBadge);
+        } else {
+            holder.b.imgCustomRankBadge.setVisibility(View.GONE);
+            Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+        }
     }
 
     private void bindStaffSeatBadge(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
