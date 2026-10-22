@@ -292,15 +292,42 @@ async function save() {
     luckyButton: { ...form.luckyButton },
   }
   const { data, error: err } = await toastManagerApi.save(payload)
+  if (err) {
+    saving.value = false
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+
+  // Confirm using a fresh GET, not just the PATCH response. This catches a stale
+  // backend, wrong persistence target, or a server that silently drops coordinates.
+  const { data: freshData, error: freshErr } = await toastManagerApi.get()
   saving.value = false
-  if (err) { error.value = err.message; toast().danger(err.message); return }
-  const cfg = data?.data || data || {}
-  Object.assign(form.giftSend, cfg.giftSend || {})
-  Object.assign(form.luckyWinNormal, cfg.luckyWinNormal || {})
-  Object.assign(form.luckyWinHigh, cfg.luckyWinHigh || {})
+  if (freshErr) {
+    error.value = 'أُرسل الحفظ لكن تعذّر التحقق من الإعدادات بعد الحفظ. لا تعتبر التغييرات مؤكدة؛ أعد المحاولة.'
+    toast().danger(error.value)
+    return
+  }
+  const cfg = freshData?.data || freshData || {}
+  const fieldsToVerify = [
+    'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
+    'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
+  ]
+  for (const key of ['giftSend', 'luckyWinNormal', 'luckyWinHigh']) {
+    for (const field of fieldsToVerify) {
+      const expected = Number(payload[key]?.[field])
+      const actual = Number(cfg[key]?.[field])
+      if (Number.isFinite(expected) && (!Number.isFinite(actual) || Math.abs(expected - actual) > 0.01)) {
+        error.value = `لم تُحفظ إعدادات ${key} بشكل دائم (العنصر: ${field}). لم يتم تأكيد الحفظ؛ تحقق من اتصال الخادم وقاعدة البيانات ثم أعد المحاولة.`
+        toast().danger(error.value)
+        return
+      }
+    }
+    Object.assign(form[key], cfg[key] || {})
+  }
   Object.assign(form.luckyButton, cfg.luckyButton || {})
   form.version = Number(cfg.version) || form.version
-  success.value = 'تم حفظ جميع الإعدادات. ستُنفّذ الحركة محلياً على الأجهزة التي تدعم هذه النسخة.'
+  success.value = 'تم الحفظ والتحقق من قاعدة البيانات. جرّب تحديث الصفحة؛ يجب أن تبقى المواضع والأحجام كما ضبطتها.'
   toast().success(success.value)
 }
 onMounted(load)
