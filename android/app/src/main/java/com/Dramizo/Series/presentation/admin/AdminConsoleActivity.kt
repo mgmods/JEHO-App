@@ -31,6 +31,7 @@ import com.Dramizo.Series.data.remote.dto.ApiResponse
 import com.Dramizo.Series.presentation.common.ContainerProvider
 import com.Dramizo.Series.presentation.common.ThemedActivity
 import com.Dramizo.Series.util.StaffRoleHelper
+import com.Dramizo.Series.util.StaffIdentityConfigCache
 import com.Dramizo.Series.util.AssetCatalog
 import com.bumptech.glide.Glide
 import retrofit2.Call
@@ -2629,8 +2630,10 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 confirm("حفظ هويات السوبر أدمن والأدمن والمانجر؟") {
                     load(api.updateStaffIdentity(payload)) {
-                        toast("تم حفظ إعدادات الهوية الإدارية")
-                        showStaffIdentityEditor()
+                        StaffIdentityConfigCache.refresh(this) {
+                            toast("تم حفظ الهوية وتحديث إطارات الرتب في التطبيق")
+                            showStaffIdentityEditor()
+                        }
                     }
                 }
             })
