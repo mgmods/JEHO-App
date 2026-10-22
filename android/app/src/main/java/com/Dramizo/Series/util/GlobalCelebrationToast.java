@@ -220,7 +220,7 @@ public final class GlobalCelebrationToast {
 
     private static void refreshToastStyle(Activity activity) {
         long now = System.currentTimeMillis();
-        if (now - lastStyleFetchAt < 15_000L) return;
+        if (now - lastStyleFetchAt < 3_000L) return;
         lastStyleFetchAt = now;
         try {
             com.Dramizo.Series.AuraLiveApp app =
