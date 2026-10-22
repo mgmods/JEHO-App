@@ -169,6 +169,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private TextView roomPkTeamAScore;
     @Nullable private TextView roomPkTeamBName;
     @Nullable private TextView roomPkTeamBScore;
+    @Nullable private TextView roomPkTeamAMembers;
+    @Nullable private TextView roomPkTeamBMembers;
     @Nullable private android.view.View roomPkProgressA;
     @Nullable private android.view.View roomPkProgressB;
     @Nullable private android.widget.LinearLayout roomPkOpponentSeatPanel;
@@ -13496,6 +13498,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private String formatRoomPkMembers(JsonObject side) {
+        if (side == null || !side.has("participantIds") || !side.get("participantIds").isJsonArray()) return "";
+        JsonArray ids = side.getAsJsonArray("participantIds");
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (int i = 0; i < ids.size(); i++) {
+            String id = ids.get(i).isJsonNull() ? "" : ids.get(i).getAsString();
+            String name = "مشارك";
+            if (roomPkLatestGridSeats != null) for (RoomDtos.SeatDto seat : roomPkLatestGridSeats) {
+                if (id.equals(seatUserId(seat))) {
+                    if (seat.user != null && seat.user.displayName != null && !seat.user.displayName.trim().isEmpty()) name = seat.user.displayName;
+                    else if (seat.user != null && seat.user.username != null && !seat.user.username.trim().isEmpty()) name = seat.user.username;
+                    else name = "مقعد " + (seat.seatIndex + 1);
+                    break;
+                }
+            }
+            names.add(name);
+        }
+        return android.text.TextUtils.join(" · ", names);
+    }
+
     private void showRoomPkScoreBanner(String event, @Nullable JsonObject payload) {
         if (payload == null || binding == null) return;
         JsonObject sideA = payload.has("sideA") && payload.get("sideA").isJsonObject()
@@ -13606,6 +13628,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             progress.addView(roomPkProgressB, new android.widget.LinearLayout.LayoutParams(1, dp(6), 1f));
             panel.addView(progress, new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(6)));
+            android.widget.LinearLayout membersRow = new android.widget.LinearLayout(this);
+            membersRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            membersRow.setGravity(Gravity.CENTER_VERTICAL);
+            roomPkTeamAMembers = new TextView(this);
+            roomPkTeamAMembers.setTextColor(0xFFFFC1CB);
+            roomPkTeamAMembers.setTextSize(10f);
+            roomPkTeamAMembers.setMaxLines(2);
+            roomPkTeamAMembers.setGravity(Gravity.CENTER);
+            roomPkTeamBMembers = new TextView(this);
+            roomPkTeamBMembers.setTextColor(0xFFB9D9FF);
+            roomPkTeamBMembers.setTextSize(10f);
+            roomPkTeamBMembers.setMaxLines(2);
+            roomPkTeamBMembers.setGravity(Gravity.CENTER);
+            membersRow.addView(roomPkTeamAMembers, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
+            membersRow.addView(roomPkTeamBMembers, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
+            panel.addView(membersRow, new android.widget.LinearLayout.LayoutParams(-1, -2));
 
             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
                     new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
@@ -13630,6 +13668,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         roomPkTeamAScore.setText(String.format(java.util.Locale.US, "%,d", scoreA));
         roomPkTeamBName.setText("🔵 " + nameB);
         roomPkTeamBScore.setText(String.format(java.util.Locale.US, "%,d", scoreB));
+        if (roomPkTeamAMembers != null) roomPkTeamAMembers.setText(formatRoomPkMembers(sideA));
+        if (roomPkTeamBMembers != null) roomPkTeamBMembers.setText(formatRoomPkMembers(sideB));
         float ratioA = scoreA + scoreB <= 0L ? 0.5f
                 : Math.max(0.04f, Math.min(0.96f, (float) ((double) scoreA / ((double) scoreA + (double) scoreB))));
         float ratioB = 1f - ratioA;
