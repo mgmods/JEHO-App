@@ -12842,7 +12842,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
-    private void showRoomPkChallengeDialog() {
+    private void showRoomVsRoomPkChallengeDialog() {
         if (roomId == null || roomId.isEmpty() || !isOwner) {
             Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
             return;
@@ -13564,7 +13564,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             roomPkSplitContainer = panel;
         }
 
-        if (!ended) showRoomPkSeatSplit(nameA, nameB);
+        boolean inRoomBattle = "person_vs_person".equals(memberStr(payload, "challengeType"))
+                || "team_vs_team".equals(memberStr(payload, "challengeType"));
+        if (inRoomBattle) hideRoomPkSeatSplit();
+        else if (!ended) showRoomPkSeatSplit(nameA, nameB);
         else hideRoomPkSeatSplit();
 
         roomPkBannerBaseText = label;
