@@ -218,7 +218,29 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private mapMessage(message: ChatMessage, vipLevel = 0) {
+  private async displayRankMapForUsers(userIds: string[]) {
+    const ids = [...new Set((userIds || []).filter(Boolean))];
+    const result = new Map<string, { customDisplayRankName: string | null; customDisplayRankImageUrl: string | null; customDisplayRankAnimated: boolean }>();
+    if (!ids.length) return result;
+    const rows = await this.dataSource.query(
+      `SELECT DISTINCT ON (ub."userId")
+              ub."userId" AS "userId", b.name AS "name",
+              b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated"
+         FROM user_badges ub JOIN badges b ON b.id = ub."badgeId"
+        WHERE ub."userId" = ANY($1::uuid[])
+          AND b.category = 'display_rank' AND b."isActive" = true
+        ORDER BY ub."userId", ub."grantedAt" DESC, b."sortOrder" ASC`,
+      [ids],
+    );
+    for (const row of rows || []) result.set(String(row.userId), {
+      customDisplayRankName: row.name ? String(row.name) : null,
+      customDisplayRankImageUrl: row.imageUrl ? String(row.imageUrl) : null,
+      customDisplayRankAnimated: row.isAnimated === true || row.isAnimated === 'true',
+    });
+    return result;
+  }
+
+  private mapMessage(message: ChatMessage, vipLevel = 0, displayRank?: any) {
     const sender: any = message.sender;
     const profile = sender?.profile;
     const reply = (message as any).replyTo as ChatMessage | undefined;
@@ -247,6 +269,9 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
             username: sender.username,
             displayName: sender.displayName,
             avatarUrl: sender.avatarUrl,
+            customDisplayRankName: displayRank?.customDisplayRankName ?? null,
+            customDisplayRankImageUrl: displayRank?.customDisplayRankImageUrl ?? null,
+            customDisplayRankAnimated: displayRank?.customDisplayRankAnimated === true,
             hostBadgeUrl: profile?.hostBadgeUrl ?? null,
             vipBadgeUrl: profile?.vipBadgeUrl ?? null,
             roomCardUrl: profile?.roomCardUrl ?? null,
@@ -301,6 +326,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     conv: ChatConversation,
     userId: string,
     vipByUser?: Map<string, number>,
+    displayRanks?: Map<string, any>,
   ) {
     const my = (conv.participants || []).find((p) => p.userId === userId);
     const peerPart = (conv.participants || []).find((p) => p.userId !== userId);
@@ -312,7 +338,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       });
       if (msg && !msg.isUnsent) {
         const senderVip = vipByUser?.get(msg.senderId) ?? 0;
-        lastMessage = this.mapMessage(msg, senderVip);
+        lastMessage = this.mapMessage(msg, senderVip, displayRanks?.get(msg.senderId));
       }
     }
     const peerVip = peerPart?.userId ? vipByUser?.get(peerPart.userId) ?? 0 : 0;
@@ -339,6 +365,9 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
             username: peerPart.user.username,
             displayName: peerPart.user.displayName,
             avatarUrl: peerPart.user.avatarUrl,
+            customDisplayRankName: displayRanks?.get(peerPart.user.id)?.customDisplayRankName ?? null,
+            customDisplayRankImageUrl: displayRanks?.get(peerPart.user.id)?.customDisplayRankImageUrl ?? null,
+            customDisplayRankAnimated: displayRanks?.get(peerPart.user.id)?.customDisplayRankAnimated === true,
             hostBadgeUrl: (peerPart.user as any).profile?.hostBadgeUrl ?? null,
             vipBadgeUrl: (peerPart.user as any).profile?.vipBadgeUrl ?? null,
             roomCardUrl: (peerPart.user as any).profile?.roomCardUrl ?? null,
@@ -386,12 +415,14 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const peerIds: string[] = [];
     for (const part of parts) {
       for (const peer of part.conversation?.participants || []) {
-        if (peer.userId && peer.userId !== userId) peerIds.push(peer.userId);
+        if (peer.userId) peerIds.push(peer.userId);
       }
     }
-    const vipByUser = await this.vipMapForUsers(peerIds);
+    const [vipByUser, displayRanks] = await Promise.all([
+      this.vipMapForUsers(peerIds), this.displayRankMapForUsers(peerIds),
+    ]);
     const items = await Promise.all(
-      parts.map((p) => this.decorateConversation(p.conversation, userId, vipByUser)),
+      parts.map((p) => this.decorateConversation(p.conversation, userId, vipByUser, displayRanks)),
     );
     return paginate(items, total, query.page || 1, Math.min(Math.max(query.limit || 20, 1), 50));
   }
@@ -419,9 +450,11 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         if (part.conversation?.lastMessageId && peer.userId) peerIds.push(peer.userId);
       }
     }
-    const vipByUser = await this.vipMapForUsers(peerIds);
+    const [vipByUser, displayRanks] = await Promise.all([
+      this.vipMapForUsers(peerIds), this.displayRankMapForUsers(peerIds),
+    ]);
     const items = await Promise.all(
-      parts.map((p) => this.decorateConversation(p.conversation, userId, vipByUser)),
+      parts.map((p) => this.decorateConversation(p.conversation, userId, vipByUser, displayRanks)),
     );
     return paginate(items, total, query.page || 1, query.limit || 20);
   }
@@ -437,8 +470,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const peerIds = (conv.participants || [])
       .map((p) => p.userId)
       .filter((id): id is string => !!id);
-    const vipByUser = await this.vipMapForUsers(peerIds);
-    return this.decorateConversation(conv, userId, vipByUser);
+    const [vipByUser, displayRanks] = await Promise.all([
+      this.vipMapForUsers(peerIds), this.displayRankMapForUsers(peerIds),
+    ]);
+    return this.decorateConversation(conv, userId, vipByUser, displayRanks);
   }
 
   async send(conversationId: string, senderId: string, dto: SendMessageDto) {
@@ -591,8 +626,8 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       where: { id: message.id },
       relations: ['sender', 'sender.profile', 'replyTo'],
     });
-    const senderVip = (await this.vipMapForUsers([senderId])).get(senderId) ?? 0;
-    const mapped: any = this.mapMessage(full || message, senderVip);
+    const [senderVipMap, senderRanks] = await Promise.all([this.vipMapForUsers([senderId]), this.displayRankMapForUsers([senderId])]);
+    const mapped: any = this.mapMessage(full || message, senderVipMap.get(senderId) ?? 0, senderRanks.get(senderId));
     const paidTransaction = await this.dataSource.getRepository(WalletTransaction).findOne({
       where: { userId: senderId, referenceType: 'paid_message', referenceId: message.id },
     });
@@ -715,7 +750,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       order: { createdAt: 'DESC' },
     });
     const items = newestFirst.slice().reverse();
-    const vipByUser = await this.vipMapForUsers(items.map((m) => m.senderId));
+    const senderIds = items.map((m) => m.senderId);
+    const [vipByUser, displayRanks] = await Promise.all([
+      this.vipMapForUsers(senderIds), this.displayRankMapForUsers(senderIds),
+    ]);
     const readAt = new Date();
     await this.partRepo.update(
       { conversationId, userId },
@@ -724,7 +762,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     await this.emitReadReceipt(conversationId, userId, readAt);
     const peers = await this.partRepo.find({ where: { conversationId } });
     const peerPart = peers.find((p) => p.userId !== userId);
-    const mappedItems: any[] = items.map((m) => this.mapMessage(m, vipByUser.get(m.senderId) ?? 0));
+    const mappedItems: any[] = items.map((m) => this.mapMessage(m, vipByUser.get(m.senderId) ?? 0, displayRanks.get(m.senderId)));
     const paidIds = items.map((m) => m.id);
     if (paidIds.length) {
       const [paidRows, refundRows] = await Promise.all([
@@ -801,8 +839,8 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     msg.isEdited = true;
     msg.editedAt = new Date();
     const saved = await this.msgRepo.save(msg);
-    const senderVip = (await this.vipMapForUsers([userId])).get(userId) ?? 0;
-    const mapped = this.mapMessage({ ...saved, sender: msg.sender }, senderVip);
+    const [senderVipMap, senderRanks] = await Promise.all([this.vipMapForUsers([userId]), this.displayRankMapForUsers([userId])]);
+    const mapped = this.mapMessage({ ...saved, sender: msg.sender }, senderVipMap.get(userId) ?? 0, senderRanks.get(userId));
     const conversation = await this.convRepo.findOne({ where: { id: msg.conversationId } });
     const touchesPreview = conversation?.lastMessageId === msg.id;
     const payload = {
@@ -1049,7 +1087,8 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       if (current) {
         const vip =
           (await this.vipMapForUsers([current.senderId])).get(current.senderId) ?? 0;
-        lastMessage = this.mapMessage(current, vip);
+        const ranks = await this.displayRankMapForUsers([current.senderId]);
+        lastMessage = this.mapMessage(current, vip, ranks.get(current.senderId));
       }
     }
 
