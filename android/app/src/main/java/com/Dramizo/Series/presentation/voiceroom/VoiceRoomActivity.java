@@ -3023,7 +3023,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         // Host / owner: end live + summon (restored on side panel).
-        boolean hostActions = isHost || isOwner || canManageRoom;
+        boolean hostActions = isHost || isOwner || canManageRoom || isPlatformSuper() || isPlatformAdmin();
         if (rowHostActions != null) {
             rowHostActions.setVisibility(hostActions ? View.VISIBLE : View.GONE);
         }
@@ -3251,16 +3251,49 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         exitRoom(true);
     }
 
-    /** Confirm before host ends broadcast and closes the room for everyone. */
+    /** Staff uses the authenticated platform close endpoint; ordinary members still use host rules. */
+    private void endBroadcastAsPlatformStaff() {
+        if (exiting || roomId == null || roomId.trim().isEmpty()) return;
+        Toast.makeText(this, "جارٍ إنهاء البث وإغلاق الروم…", Toast.LENGTH_SHORT).show();
+        ContainerProvider.from(this).getAdminApi().closeRoom(roomId)
+                .enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+                    @Override
+                    public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                                           retrofit2.Response<ApiResponse<Object>> response) {
+                        ApiResponse<Object> envelope = response.body();
+                        if (response.isSuccessful() && envelope != null && envelope.success) {
+                            clearRoomChatSession();
+                            exitRoom(true);
+                        } else {
+                            String message = envelope != null && envelope.message != null
+                                    ? envelope.message : "تعذر إنهاء البث (HTTP " + response.code() + ")";
+                            Toast.makeText(VoiceRoomActivity.this, message, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                    @Override
+                    public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                        Toast.makeText(VoiceRoomActivity.this,
+                                "تعذر الاتصال بالخادم؛ لم يتم تأكيد إنهاء البث", Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    /** Host/owner or authorized platform Admin/Super Admin may end the live room. */
     private void confirmEndBroadcast() {
-        if (!(isHost || isOwner || canManageRoom)) {
-            Toast.makeText(this, "إنهاء البث لصاحب الغرفة فقط", Toast.LENGTH_SHORT).show();
+        boolean platformCanEnd = isPlatformSuper() || isPlatformAdmin();
+        if (!(isHost || isOwner || canManageRoom || platformCanEnd)) {
+            Toast.makeText(this, "إنهاء البث لصاحب الغرفة أو الإدارة المخولة فقط", Toast.LENGTH_SHORT).show();
             return;
         }
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle(R.string.room_side_end_live)
-                .setMessage("هل تريد إنهاء البث وإغلاق الغرفة للجميع؟")
-                .setPositiveButton(R.string.room_side_end_live, (d, w) -> endBroadcastAndExit())
+                .setMessage(platformCanEnd
+                        ? "سيتم إنهاء البث وإغلاق الروم للجميع عبر صلاحية الإدارة. هل تريد المتابعة؟"
+                        : "هل تريد إنهاء البث وإغلاق الغرفة للجميع؟")
+                .setPositiveButton(R.string.room_side_end_live, (d, w) -> {
+                    if (platformCanEnd) endBroadcastAsPlatformStaff();
+                    else endBroadcastAndExit();
+                })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
@@ -8433,10 +8466,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private boolean canModerateRoom() {
-        // Full room settings / admin panel: host, owner, or explicit canManageRoom only.
-        // Presence in moderatorIds alone must NOT unlock room admin for everyone.
-        if (isPlatformSuper()) return true;
-        if (isPlatformManager()) return true;
+        // Platform Admin/Super/Manager get only the staff actions enforced by backend;
+        // appointed room moderators never inherit platform-wide privileges.
+        if (isPlatformStaff()) return true;
         if (isHost || isOwner) return true;
         return canManageRoom;
     }
@@ -8470,8 +8502,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private boolean isPlatformAdmin() {
+        try {
+            return com.Dramizo.Series.util.StaffRoleHelper.ADMIN.equals(
+                    com.Dramizo.Series.util.StaffRoleHelper.normalize(
+                            ContainerProvider.from(this).getSessionManager().getUser()));
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     private boolean isPlatformStaff() {
-        return isPlatformSuper() || isPlatformManager();
+        return isPlatformSuper() || isPlatformAdmin() || isPlatformManager();
     }
 
     private boolean isFreeMicEnabled() {
