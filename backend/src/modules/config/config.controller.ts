@@ -151,9 +151,9 @@ export class ConfigController {
     const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
     const defaults = {
       backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1,
-      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
-      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
-      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
       luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
     };
     let parsed: any = {};
@@ -187,6 +187,9 @@ export class ConfigController {
       widthDp: Math.max(220, Math.min(360, Math.round(Number(oldGift.widthDp) || 340))),
       heightDp: Math.max(60, Math.min(180, Math.round(Number(oldGift.heightDp) || 100))),
       avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(oldGift.avatarSizeDp) || 44))),
+      titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.titleSizeSp) || 13))),
+      bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.bodySizeSp) || 12))),
+      countSizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.countSizeSp) || 12))),
     };
     const win = (key: 'luckyWinNormal' | 'luckyWinHigh') => {
       const value = parsed[key] || {};
@@ -207,6 +210,9 @@ export class ConfigController {
         widthDp: Math.max(220, Math.min(360, Math.round(Number(value.widthDp) || fallback.widthDp))),
         heightDp: Math.max(60, Math.min(180, Math.round(Number(value.heightDp) || fallback.heightDp))),
         avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(value.avatarSizeDp) || fallback.avatarSizeDp))),
+        titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(value.titleSizeSp) || fallback.titleSizeSp || 13))),
+        bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(value.bodySizeSp) || fallback.bodySizeSp || 12))),
+        countSizeSp: Math.max(8, Math.min(30, Math.round(Number(value.countSizeSp) || fallback.countSizeSp || 12))),
       };
     };
     const button = parsed.luckyButton || {};
