@@ -2581,6 +2581,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 "badgeUrl" to "رابط الشارة",
                 "frameUrl" to "رابط إطار الصورة",
                 "nameplateUrl" to "رابط بطاقة الاسم",
+                "messageCardUrl" to "رابط بطاقة الرسائل",
                 "entryEffectUrl" to "رابط الدخولية"
             )
             roles.forEach { (roleKey, roleTitle, color) ->
@@ -2623,7 +2624,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 val payload = mutableMapOf<String, Any>()
                 roles.forEach { (roleKey, _, _) ->
                     val values = mutableMapOf<String, Any>()
-                    listOf("label", "accentColor", "badgeUrl", "frameUrl", "nameplateUrl", "entryEffectUrl").forEach { key ->
+                    listOf("label", "accentColor", "badgeUrl", "frameUrl", "nameplateUrl", "messageCardUrl", "entryEffectUrl").forEach { key ->
                         values[key] = staffIdentityFields["$roleKey.$key"]?.text?.toString()?.trim().orEmpty()
                     }
                     payload[roleKey] = values
@@ -2652,7 +2653,8 @@ class AdminConsoleActivity : ThemedActivity() {
         val specs = listOf(
             Triple("badgeUrl", "الشارة", "الشارة"),
             Triple("frameUrl", "الإطار", "إطار الصورة"),
-            Triple("nameplateUrl", "الاسم", "بطاقة الاسم")
+            Triple("nameplateUrl", "الاسم", "بطاقة الاسم"),
+            Triple("messageCardUrl", "الرسائل", "بطاقة الرسائل")
         )
         specs.forEach { (fieldKey, label, description) ->
             val column = LinearLayout(this).apply {
