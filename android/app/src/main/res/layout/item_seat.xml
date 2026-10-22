@@ -196,6 +196,39 @@
             android:textSize="11sp" />
     </LinearLayout>
 
+    <!-- Decorative admin-assigned rank. This is separate from platform staff permissions. -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:id="@+id/rowCustomDisplayRank">
+
+        <ImageView
+            android:id="@+id/imgCustomRankBadge"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginEnd="2dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter" />
+
+        <TextView
+            android:id="@+id/tvCustomRankBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxWidth="84dp"
+            android:maxLines="1"
+            android:paddingHorizontal="4dp"
+            android:paddingVertical="1dp"
+            android:textColor="#FFFFD580"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <!-- Platform staff (super / manager) under seat name -->
     <TextView
         android:id="@+id/tvStaffSeatBadge"
