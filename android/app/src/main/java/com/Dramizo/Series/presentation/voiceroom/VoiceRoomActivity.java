@@ -10640,7 +10640,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
-    /** Small join-style toast for lucky win (never a full-screen dialog). */
+    /** Lucky-win announcement: the dashboard-controlled top toast is the only toast surface. */
     public void showLuckyResultToast(
             @Nullable String displayName,
             @Nullable String avatarUrl,
@@ -10649,15 +10649,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String message
     ) {
         if (areCelebrationPopupsMuted() || binding == null) return;
-        String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
         String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
-        // Lucky return/multiplier is a compact upper toast, never a large mid-screen bubble.
-        if (binding.comingMsgView != null) {
-            binding.comingMsgView.setupView(who, avatarUrl, userLevel, vipLevel, msg);
-            binding.comingMsgView.bringToFront();
-            binding.comingMsgView.setElevation(luckyCannonDp(90));
-            binding.comingMsgView.play(2600L);
-        }
+        // Intentionally do not show ComingMsgView here: it is the legacy sliding room toast
+        // that appeared around the middle of the room and ignored dashboard toast styling.
         if (roomBannerEnabled()) appendGameCelebrationLine(msg, null);
     }
 
