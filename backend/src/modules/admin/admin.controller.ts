@@ -153,22 +153,6 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
-  @Get('toast-manager')
-  @ApiOperation({ summary: 'Get global toast animation and lucky-button styles' })
-  getToastManagerConfig() {
-    return this.adminService.getToastManagerConfig();
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Patch('toast-manager')
-  @ApiOperation({ summary: 'Update global toast animation and lucky-button styles' })
-  patchToastManagerConfig(@Body() body: Record<string, unknown>) {
-    return this.adminService.patchToastManagerConfig(body || {});
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
   @Get('mysterious-man/config')
   @ApiOperation({ summary: 'Get shared Mysterious Man media configured by dashboard' })
   getMysteriousManConfig() {
