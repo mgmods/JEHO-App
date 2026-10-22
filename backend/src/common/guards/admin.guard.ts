@@ -104,6 +104,13 @@ export class AdminGuard implements CanActivate {
           throw new ForbiddenException('This module is not available to Admin');
         }
         if (isTemporaryBan) return true; // service enforces 1–24h and own-ban unban.
+        if (path.startsWith('/admin/users') && !readOnly) {
+          throw new ForbiddenException('Admin may change user access only through owned temporary-ban endpoints');
+        }
+        if (path.startsWith('/admin/streams') && !readOnly &&
+            !/^\/admin\/streams\/[^/]+\/end$/.test(path)) {
+          throw new ForbiddenException('Admin may end a stream normally; forced or bulk stream actions are Super Admin-only');
+        }
         if (path.startsWith('/admin/cosmetics')) {
           if (readOnly || isCosmeticGrant) return true;
           throw new ForbiddenException('Admin may grant existing cosmetics only');
@@ -129,12 +136,20 @@ export class AdminGuard implements CanActivate {
         if (resolved.kind !== 'module' || !allowedModules.has(resolved.module)) {
           throw new ForbiddenException('Manager access is limited to room moderation, streams, reports, and frames/entrances');
         }
+        if (path.startsWith('/admin/dashboard') && !readOnly) {
+          throw new ForbiddenException('Manager dashboard access is read-only');
+        }
         if (path.startsWith('/admin/rooms') && !readOnly) {
           throw new ForbiddenException('Manager cannot change room configuration or close/delete rooms');
         }
         if (path.startsWith('/admin/streams') && !readOnly &&
             !/^\/admin\/streams\/[^/]+\/end$/.test(path)) {
           throw new ForbiddenException('Manager may end a live stream normally; forced end is Super Admin-only');
+        }
+        if (path.startsWith('/admin/reports') && !readOnly &&
+            !(/^\/admin\/reports\/[^/]+$/.test(path) && verb === 'PATCH') &&
+            !(/^\/admin\/reports\/[^/]+\/(resolve|dismiss)$/.test(path) && verb === 'POST')) {
+          throw new ForbiddenException('Manager may only resolve, dismiss, or update an existing report');
         }
         if (path.startsWith('/admin/cosmetics')) {
           if (readOnly || isCosmeticGrant) return true;
