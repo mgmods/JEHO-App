@@ -1484,7 +1484,7 @@ class AdminConsoleActivity : ThemedActivity() {
      * Shows the actual icon/preview URL returned by the live catalog API.
      * This is read-only; it never purchases, grants, or sends an item.
      */
-    private fun addLiveAssetPreview(parent: LinearLayout, item: Map<*, *>, type: String, title: String) {
+    private fun addLiveAssetPreview(parent: LinearLayout, item: Any, type: String, title: String) {
         val assetUrl = if (type == "gifts") {
             value(item, "iconUrl", "previewUrl", "thumbnailUrl")
         } else {
