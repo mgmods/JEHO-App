@@ -405,6 +405,29 @@ public final class UserProfileCardSheet {
                                     });
                                 } catch (Exception ignored) { }
                             }
+                            if (!latest.badgeUrl.isEmpty()) {
+                                try {
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.badgeUrl)).into(new CustomTarget<Drawable>() {
+                                        @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                            if (dialog.isShowing() && ("staff:" + staffRole).equals(tvName.getTag())) {
+                                                resource.setBounds(0, 0, Math.round(18 * activity.getResources().getDisplayMetrics().density), Math.round(18 * activity.getResources().getDisplayMetrics().density));
+                                                tvName.setCompoundDrawables(null, null, resource, null);
+                                            }
+                                        }
+                                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                                    });
+                                } catch (Exception ignored) { }
+                            }
+                            if (!latest.messageCardUrl.isEmpty() && userCardBg != null) {
+                                try {
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.messageCardUrl)).into(new CustomTarget<Drawable>() {
+                                        @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                            if (dialog.isShowing() && ("staff:" + staffRole).equals(tvName.getTag())) userCardBg.setBackground(resource);
+                                        }
+                                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                                    });
+                                } catch (Exception ignored) { }
+                            }
                         });
                     } else {
                         tvName.setTag(null);
