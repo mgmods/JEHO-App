@@ -7,6 +7,15 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.widget.Toast;
+import com.Dramizo.Series.presentation.admin.preview.AdminPreviewActivity;
+import com.Dramizo.Series.util.StaffRoleHelper;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
@@ -76,6 +85,59 @@ public abstract class ThemedActivity extends AppCompatActivity {
                 }
             });
         }
+
+        // Staff can open the native admin hub from anywhere in the app.
+        // Voice rooms have their own contextual moderation controls and keep their room chrome untouched.
+        addStaffQuickAccess();
+    }
+
+    private void addStaffQuickAccess() {
+        String screen = getClass().getSimpleName();
+        if (containsAny(screen, "VoiceRoom", "AdminPreview", "AdminConsole", "Splash", "Login",
+                "Register", "Otp", "Guest", "ProfileSetup")) return;
+        try {
+            if (!StaffRoleHelper.isStaff(ContainerProvider.from(this).getSessionManager().getUser())) return;
+            View content = findViewById(android.R.id.content);
+            if (!(content instanceof FrameLayout)) return;
+            FrameLayout host = (FrameLayout) content;
+            if (host.findViewWithTag("jeho_staff_quick_access") != null) return;
+
+            TextView shortcut = new TextView(this);
+            shortcut.setTag("jeho_staff_quick_access");
+            shortcut.setText("⚙");
+            shortcut.setTextSize(22f);
+            shortcut.setTextColor(Color.WHITE);
+            shortcut.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            shortcut.setGravity(Gravity.CENTER);
+            shortcut.setContentDescription("فتح مركز إدارة JEHO");
+            GradientDrawable surface = new GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    new int[]{0xFF7855D9, 0xFF39266F});
+            surface.setShape(GradientDrawable.OVAL);
+            surface.setStroke(dpQuickAccess(1), 0x88FFFFFF);
+            shortcut.setBackground(surface);
+            shortcut.setElevation(dpQuickAccess(8));
+            shortcut.setOnClickListener(v -> {
+                try {
+                    Intent intent = new Intent(this, AdminPreviewActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(this, "تعذر فتح مركز الإدارة", Toast.LENGTH_SHORT).show();
+                }
+            });
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    dpQuickAccess(46), dpQuickAccess(46), Gravity.TOP | Gravity.END);
+            lp.topMargin = dpQuickAccess(86);
+            lp.setMarginEnd(dpQuickAccess(12));
+            host.addView(shortcut, lp);
+        } catch (Exception ignored) {
+            // Never let an unavailable staff shortcut interfere with normal screen startup.
+        }
+    }
+
+    private int dpQuickAccess(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     /**

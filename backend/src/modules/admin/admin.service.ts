@@ -256,7 +256,7 @@ export class AdminService {
 
   private staffIdentityDefaults() {
     const role = (label: string, accentColor: string) => ({
-      label, accentColor, badgeUrl: '', frameUrl: '', nameplateUrl: '', entryEffectUrl: '',
+      label, accentColor, badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '',
     });
     return {
       super: role('Super Admin', '#D8B35B'),
@@ -277,7 +277,7 @@ export class AdminService {
         const url = (key: string) => typeof source[key] === 'string' && /^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(source[key]) ? source[key].slice(0, 2048) : '';
         const color = typeof source.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(source.accentColor) ? source.accentColor : fallback.accentColor;
         const label = typeof source.label === 'string' && source.label.trim() ? source.label.trim().slice(0, 32) : fallback.label;
-        return { label, accentColor: color, badgeUrl: url('badgeUrl'), frameUrl: url('frameUrl'), nameplateUrl: url('nameplateUrl'), entryEffectUrl: url('entryEffectUrl') };
+        return { label, accentColor: color, badgeUrl: url('badgeUrl'), frameUrl: url('frameUrl'), nameplateUrl: url('nameplateUrl'), messageCardUrl: url('messageCardUrl'), entryEffectUrl: url('entryEffectUrl') };
       };
       return { super: clean('super'), admin: clean('admin'), manager: clean('manager') };
     } catch {
@@ -287,7 +287,7 @@ export class AdminService {
 
   async patchStaffIdentityConfig(input: Record<string, unknown>) {
     const current = await this.getStaffIdentityConfig();
-    const allowed = ['badgeUrl', 'frameUrl', 'nameplateUrl', 'entryEffectUrl'];
+    const allowed = ['badgeUrl', 'frameUrl', 'nameplateUrl', 'messageCardUrl', 'entryEffectUrl'];
     const url = (value: unknown, key: string) => {
       if (value === undefined) return undefined;
       const raw = String(value || '').trim();
@@ -3564,8 +3564,9 @@ export class AdminService {
     if (!user) throw new NotFoundException('User not found');
     const permanent = body.permanent === true;
     const days = Number(body.days ?? 30);
-    if (!permanent && ![7, 15, 30].includes(days)) {
-      throw new BadRequestException('VIP duration must be 7, 15 or 30 days, or permanent=true');
+    // The controller applies rank-specific limits (Admin: 1/3/7/15; Super Admin: 7/15/30 or permanent).
+    if (!permanent && ![1, 3, 7, 15, 30].includes(days)) {
+      throw new BadRequestException('VIP duration must be 1, 3, 7, 15 or 30 days, or permanent=true');
     }
     await this.userVipRepo.update({ userId: body.userId, isActive: true }, { isActive: false });
     const startsAt = new Date();

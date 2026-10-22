@@ -34,6 +34,8 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.util.AgencyInviteCodec;
 import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.util.StaffIdentityConfigCache;
+import com.Dramizo.Series.util.StaffRoleHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.CosmeticMedia;
 import com.Dramizo.Series.util.DeviceTimeFormat;
@@ -313,8 +315,29 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             }
         }
 
-        // Dashboard-managed chat bubble artwork overrides the fallback/VIP skin when equipped.
+        // Staff message cards are role-owned assets, not store cosmetics. Prefer the
+        // configured role card and refresh it asynchronously if the public config is stale.
+        AuthDtos.UserDto bubbleSender = mine ? me : msg.sender;
+        String staffRole = StaffRoleHelper.normalize(bubbleSender);
         String customBubble = mine ? (me != null ? me.chatBubbleUrl : null) : peerChatBubbleUrl;
+        if (StaffRoleHelper.isStaff(bubbleSender)) {
+            StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(staffRole);
+            if (identity.messageCardUrl != null && !identity.messageCardUrl.isEmpty()) {
+                customBubble = identity.messageCardUrl;
+            }
+            final int bindPosition = holder.getBindingAdapterPosition();
+            final ChatDtos.MessageDto boundMessage = msg;
+            StaffIdentityConfigCache.load(holder.itemView.getContext(), () -> {
+                if (bindPosition == RecyclerView.NO_POSITION
+                        || holder.getBindingAdapterPosition() != bindPosition
+                        || bindPosition >= items.size()
+                        || items.get(bindPosition) != boundMessage) return;
+                StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(staffRole);
+                if (latest.messageCardUrl != null && !latest.messageCardUrl.isEmpty()) {
+                    applyCustomBubbleArtwork(holder.b.bubbleRoot, latest.messageCardUrl);
+                }
+            });
+        }
         applyCustomBubbleArtwork(holder.b.bubbleRoot, customBubble);
 
         // VIP-aware body colors (white on rose/VIP; dark on peer light gray).

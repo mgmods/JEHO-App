@@ -2775,8 +2775,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (canRemoveFromMic && canTarget && seatRef != null) {
             menu.getMenu().add(0, i++, 0, "إزالة من المايك");
         }
-        if ((canKickUsers || canBanUsers) && canTarget) {
+        if ((canKickUsers || canBanUsers || isPlatformManager() || isPlatformAdmin() || isPlatformSuper()) && canTarget) {
             menu.getMenu().add(0, i++, 0, "طرد / إخراج");
+        }
+        // Platform-level account actions are available directly from the tapped profile/chat row.
+        // The backend still validates role permissions and the target UUID.
+        if (canTarget && (isPlatformAdmin() || isPlatformSuper())) {
+            menu.getMenu().add(0, i++, 0, "حظر مؤقت للحساب");
+        }
+        if (canTarget && isPlatformSuper()) {
+            menu.getMenu().add(0, i++, 0, "حظر الحساب نهائياً");
+            menu.getMenu().add(0, i++, 0, "إلغاء حظر الحساب");
         }
         if (messageText != null && !messageText.trim().isEmpty()) {
             menu.getMenu().add(0, i++, 0, "ترجمة التعليق");
@@ -2820,6 +2829,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (userId != null) viewModel.removeMemberFromMic(roomId, userId);
             } else if ("طرد / إخراج".equals(t)) {
                 showKickAndBanDialog(userId);
+            } else if ("حظر مؤقت للحساب".equals(t)) {
+                promptTemporaryPlatformBan(userId, name);
+            } else if ("حظر الحساب نهائياً".equals(t)) {
+                confirmPlatformAccountBan(userId, name, true);
+            } else if ("إلغاء حظر الحساب".equals(t)) {
+                confirmPlatformAccountBan(userId, name, false);
             } else if ("ترجمة التعليق".equals(t)) {
                 translateRoomComment(messageText);
             } else if ("حذف التعليق".equals(t)) {
@@ -2830,6 +2845,91 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return true;
         });
         menu.show();
+    }
+
+    /** Global account ban/unban from a user already visible in the room; no manual ID entry. */
+    private void confirmPlatformAccountBan(String userId, @Nullable String displayName, boolean ban) {
+        if (!isPlatformSuper()) {
+            Toast.makeText(this, "هذا الإجراء للسوبر أدمن فقط", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String name = displayName == null || displayName.trim().isEmpty() ? "هذا المستخدم" : displayName.trim();
+        new AlertDialog.Builder(this)
+                .setTitle(ban ? "حظر الحساب نهائياً" : "إلغاء حظر الحساب")
+                .setMessage(ban
+                        ? "سيتم حظر حساب " + name + " على مستوى المنصة، وليس من هذا الروم فقط. هل أنت متأكد؟"
+                        : "هل تريد إعادة تفعيل حساب " + name + "؟")
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(ban ? "تأكيد الحظر" : "إلغاء الحظر", (dialog, which) -> {
+                    retrofit2.Call<ApiResponse<Object>> call = ban
+                            ? ContainerProvider.from(this).getAdminApi().banUser(userId)
+                            : ContainerProvider.from(this).getAdminApi().unbanUser(userId);
+                    runPlatformUserAction(call, ban ? "تم حظر الحساب على مستوى المنصة" : "تم إلغاء حظر الحساب");
+                })
+                .show();
+    }
+
+    /** Admin and Super Admin can issue a reasoned global temporary ban (backend caps at 24h). */
+    private void promptTemporaryPlatformBan(String userId, @Nullable String displayName) {
+        if (!(isPlatformAdmin() || isPlatformSuper())) {
+            Toast.makeText(this, "الحظر المؤقت للإدارة المخولة فقط", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String[] durations = {"1 ساعة", "6 ساعات", "12 ساعة", "24 ساعة"};
+        final int[] hours = {1, 6, 12, 24};
+        final int[] selected = {3};
+        new AlertDialog.Builder(this)
+                .setTitle("مدة الحظر المؤقت")
+                .setSingleChoiceItems(durations, selected[0], (dialog, which) -> selected[0] = which)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton("متابعة", (dialog, which) -> {
+                    EditText reasonInput = new EditText(this);
+                    reasonInput.setHint("سبب الحظر (مطلوب)");
+                    reasonInput.setMinLines(2);
+                    reasonInput.setGravity(Gravity.TOP | Gravity.START);
+                    int pad = Math.round(16 * getResources().getDisplayMetrics().density);
+                    reasonInput.setPadding(pad, pad, pad, pad);
+                    new AlertDialog.Builder(this)
+                            .setTitle("سبب الحظر")
+                            .setMessage("الحساب: " + (displayName == null ? "المستخدم المحدد" : displayName)
+                                    + "\nالمدة: " + durations[selected[0]])
+                            .setView(reasonInput)
+                            .setNegativeButton(R.string.cancel, null)
+                            .setPositiveButton("تنفيذ الحظر", (d, w) -> {
+                                String reason = reasonInput.getText() == null ? "" : reasonInput.getText().toString().trim();
+                                if (reason.isEmpty()) {
+                                    Toast.makeText(this, "اكتب سبب الحظر أولاً", Toast.LENGTH_SHORT).show();
+                                    return;
+                                }
+                                Map<String, Object> body = new HashMap<>();
+                                body.put("hours", hours[selected[0]]);
+                                body.put("reason", reason);
+                                runPlatformUserAction(ContainerProvider.from(this).getAdminApi()
+                                        .temporaryBanUser(userId, body), "تم تنفيذ الحظر المؤقت");
+                            })
+                            .show();
+                })
+                .show();
+    }
+
+    private void runPlatformUserAction(retrofit2.Call<ApiResponse<Object>> call, String successMessage) {
+        call.enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+            @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                                             retrofit2.Response<ApiResponse<Object>> response) {
+                ApiResponse<Object> result = response.body();
+                if (response.isSuccessful() && result != null && result.success) {
+                    Toast.makeText(VoiceRoomActivity.this, successMessage, Toast.LENGTH_LONG).show();
+                } else {
+                    String message = result != null && result.message != null
+                            ? result.message : "رفض الخادم الإجراء؛ لم يتم تأكيد التغيير";
+                    Toast.makeText(VoiceRoomActivity.this, message, Toast.LENGTH_LONG).show();
+                }
+            }
+            @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                Toast.makeText(VoiceRoomActivity.this,
+                        "تعذر الاتصال بالخادم؛ لم يتم تأكيد الإجراء", Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     /** Small seat controls when the user taps their own occupied mic. */
@@ -3023,7 +3123,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         // Host / owner: end live + summon (restored on side panel).
-        boolean hostActions = isHost || isOwner || canManageRoom;
+        boolean hostActions = isHost || isOwner || canManageRoom || isPlatformSuper() || isPlatformAdmin();
         if (rowHostActions != null) {
             rowHostActions.setVisibility(hostActions ? View.VISIBLE : View.GONE);
         }
@@ -3251,16 +3351,49 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         exitRoom(true);
     }
 
-    /** Confirm before host ends broadcast and closes the room for everyone. */
+    /** Staff uses the authenticated platform close endpoint; ordinary members still use host rules. */
+    private void endBroadcastAsPlatformStaff() {
+        if (exiting || roomId == null || roomId.trim().isEmpty()) return;
+        Toast.makeText(this, "جارٍ إنهاء البث وإغلاق الروم…", Toast.LENGTH_SHORT).show();
+        ContainerProvider.from(this).getAdminApi().endStream(roomId)
+                .enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+                    @Override
+                    public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                                           retrofit2.Response<ApiResponse<Object>> response) {
+                        ApiResponse<Object> envelope = response.body();
+                        if (response.isSuccessful() && envelope != null && envelope.success) {
+                            clearRoomChatSession();
+                            exitRoom(true);
+                        } else {
+                            String message = envelope != null && envelope.message != null
+                                    ? envelope.message : "تعذر إنهاء البث (HTTP " + response.code() + ")";
+                            Toast.makeText(VoiceRoomActivity.this, message, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                    @Override
+                    public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                        Toast.makeText(VoiceRoomActivity.this,
+                                "تعذر الاتصال بالخادم؛ لم يتم تأكيد إنهاء البث", Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    /** Host/owner or authorized platform Admin/Super Admin may end the live room. */
     private void confirmEndBroadcast() {
-        if (!(isHost || isOwner || canManageRoom)) {
-            Toast.makeText(this, "إنهاء البث لصاحب الغرفة فقط", Toast.LENGTH_SHORT).show();
+        boolean platformCanEnd = isPlatformSuper() || isPlatformAdmin();
+        if (!(isHost || isOwner || canManageRoom || platformCanEnd)) {
+            Toast.makeText(this, "إنهاء البث لصاحب الغرفة أو الإدارة المخولة فقط", Toast.LENGTH_SHORT).show();
             return;
         }
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle(R.string.room_side_end_live)
-                .setMessage("هل تريد إنهاء البث وإغلاق الغرفة للجميع؟")
-                .setPositiveButton(R.string.room_side_end_live, (d, w) -> endBroadcastAndExit())
+                .setMessage(platformCanEnd
+                        ? "سيتم إنهاء البث وإغلاق الروم للجميع عبر صلاحية الإدارة. هل تريد المتابعة؟"
+                        : "هل تريد إنهاء البث وإغلاق الغرفة للجميع؟")
+                .setPositiveButton(R.string.room_side_end_live, (d, w) -> {
+                    if (platformCanEnd) endBroadcastAsPlatformStaff();
+                    else endBroadcastAndExit();
+                })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
@@ -8433,10 +8566,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private boolean canModerateRoom() {
-        // Full room settings / admin panel: host, owner, or explicit canManageRoom only.
-        // Presence in moderatorIds alone must NOT unlock room admin for everyone.
-        if (isPlatformSuper()) return true;
-        if (isPlatformManager()) return true;
+        // Platform Admin/Super/Manager get only the staff actions enforced by backend;
+        // appointed room moderators never inherit platform-wide privileges.
+        if (isPlatformStaff()) return true;
         if (isHost || isOwner) return true;
         return canManageRoom;
     }
@@ -8470,8 +8602,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private boolean isPlatformAdmin() {
+        try {
+            return com.Dramizo.Series.util.StaffRoleHelper.ADMIN.equals(
+                    com.Dramizo.Series.util.StaffRoleHelper.normalize(
+                            ContainerProvider.from(this).getSessionManager().getUser()));
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     private boolean isPlatformStaff() {
-        return isPlatformSuper() || isPlatformManager();
+        return isPlatformSuper() || isPlatformAdmin() || isPlatformManager();
     }
 
     private boolean isFreeMicEnabled() {

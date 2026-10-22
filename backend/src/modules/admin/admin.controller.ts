@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   UseGuards,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
@@ -1216,7 +1217,21 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('vip/assign')
-  assignVip(@Body() body: { userId: string; planId: string; days?: number; permanent?: boolean }) {
+  assignVip(
+    @Body() body: { userId: string; planId: string; days?: number; permanent?: boolean },
+    @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    const isSuper = !!actor?.isSuperAdmin || role === 'super';
+    if (!isSuper && role !== 'admin') {
+      throw new ForbiddenException('Only Admin or Super Admin can grant VIP');
+    }
+    if (!isSuper) {
+      const days = Number(body?.days);
+      if (body?.permanent === true || !Number.isInteger(days) || ![1, 3, 7, 15].includes(days)) {
+        throw new BadRequestException('Admin VIP grants must be limited to 1, 3, 7 or 15 days');
+      }
+    }
     return this.adminService.assignVip(body);
   }
 
@@ -1905,26 +1920,50 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('cosmetics/grant')
-  @ApiOperation({ summary: 'Grant an existing cosmetic to a user for 7, 15, 30 days or permanently' })
+  @ApiOperation({ summary: 'Grant an existing cosmetic with role-specific type and duration limits' })
   async grantCosmeticToUser(
     @Body() body: { userId?: string; cosmeticCode?: string; days?: number; permanent?: boolean },
+    @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
   ) {
     const userId = String(body?.userId || '').trim();
     const cosmeticCode = String(body?.cosmeticCode || '').trim();
+    const role = String(actor?.staffRole || '').toLowerCase();
+    const isSuper = !!actor?.isSuperAdmin || role === 'super';
+    if (!isSuper && role !== 'admin' && role !== 'manager') {
+      throw new ForbiddenException('Only Manager, Admin or Super Admin can grant cosmetics');
+    }
     if (!userId || !cosmeticCode) {
       throw new BadRequestException('userId and cosmeticCode are required');
     }
     await this.adminService.getUser(userId);
     const catalog = await this.cosmeticsService.adminList();
-    if (!catalog.some((item) => item.code === cosmeticCode && item.isActive)) {
+    const item = catalog.find((entry) => entry.code === cosmeticCode && entry.isActive);
+    if (!item) {
       throw new BadRequestException('Active cosmetic code not found');
     }
     const permanent = body?.permanent === true;
-    const days = Number(body?.days || 7);
-    if (!permanent && ![7, 15, 30].includes(days)) {
-      throw new BadRequestException('days must be 7, 15 or 30, or permanent=true');
+    const days = Number(body?.days);
+    const frameAndEntranceTypes = new Set(['entry_effect', 'profile_card', 'room_card', 'nameplate']);
+    if (isSuper) {
+      if (permanent !== true && (!Number.isInteger(days) || ![7, 15, 30].includes(days))) {
+        throw new BadRequestException('Super Admin cosmetic grants must be 7, 15, 30 days or permanent');
+      }
+    } else if (role === 'admin') {
+      if (permanent || !Number.isInteger(days) || ![1, 3, 7, 15].includes(days)) {
+        throw new BadRequestException('Admin cosmetic grants must be limited to 1, 3, 7 or 15 days');
+      }
+      if (!frameAndEntranceTypes.has(String((item as any).type || '').toLowerCase())) {
+        throw new ForbiddenException('Admin may grant frames/nameplates and entrance effects only');
+      }
+    } else {
+      if (permanent || !Number.isInteger(days) || ![1, 3, 7].includes(days)) {
+        throw new BadRequestException('Manager cosmetic grants must be limited to 1, 3 or 7 days');
+      }
+      if (!frameAndEntranceTypes.has(String((item as any).type || '').toLowerCase())) {
+        throw new ForbiddenException('Manager may grant frames/nameplates and entrance effects only');
+      }
     }
-    return this.cosmeticsService.grantTemporary(userId, cosmeticCode, days, { permanent });
+    return this.cosmeticsService.grantTemporary(userId, cosmeticCode, days || 7, { permanent });
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)

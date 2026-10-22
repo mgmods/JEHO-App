@@ -13,6 +13,8 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ArrayAdapter
@@ -24,10 +26,14 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import com.Dramizo.Series.data.remote.api.AdminApi
+import com.Dramizo.Series.data.remote.api.RoomApi
 import com.Dramizo.Series.data.remote.dto.ApiResponse
 import com.Dramizo.Series.presentation.common.ContainerProvider
 import com.Dramizo.Series.presentation.common.ThemedActivity
 import com.Dramizo.Series.util.StaffRoleHelper
+import com.Dramizo.Series.util.StaffIdentityConfigCache
+import com.Dramizo.Series.util.AssetCatalog
+import com.bumptech.glide.Glide
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -39,6 +45,7 @@ import retrofit2.Response
  */
 class AdminConsoleActivity : ThemedActivity() {
     private lateinit var api: AdminApi
+    private lateinit var roomApi: RoomApi
     private lateinit var body: LinearLayout
     private lateinit var progress: ProgressBar
     private lateinit var titleView: TextView
@@ -104,8 +111,20 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         currentRole = StaffRoleHelper.normalize(user)
         api = ContainerProvider.from(this).adminApi
+        roomApi = ContainerProvider.from(this).roomApi
         buildShell()
-        showHome()
+        val requestedSection = intent.getStringExtra("admin_initial_section")
+        if (requestedSection.isNullOrBlank()) {
+            showHome()
+        } else if (requestedSection == "home") {
+            showHome()
+        } else if (modules.any { it.key == requestedSection }) {
+            // Open a real connected section requested from the light native admin hub.
+            // The normal role gate above still runs before any API-backed section opens.
+            openModule(requestedSection)
+        } else {
+            showHome()
+        }
     }
 
     private fun buildShell() {
@@ -326,15 +345,7 @@ class AdminConsoleActivity : ThemedActivity() {
             }
         }
 
-        val superOnly = setOf("notifications", "toastManager", "mysteriousMan", "luckyCannon",
-            "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics", "vip", "logs",
-            "staffIdentity", "operators", "genderVerifications", "recharges", "withdrawals",
-            "walletTransactions", "walletAdjust", "cosmetics", "gifts")
-        val visibleModules = when (currentRole) {
-            StaffRoleHelper.MANAGER -> modules.filter { it.key in setOf("rooms", "streams", "reports") }
-            StaffRoleHelper.ADMIN -> modules.filter { it.key !in superOnly }
-            else -> modules
-        }
+        val visibleModules = modules.filter { roleCanAccessModule(it.key) }
 
         val search = EditText(this).apply {
             hint = "⌕   ابحث عن مستخدمين، رومات، هدايا..."
@@ -467,16 +478,27 @@ class AdminConsoleActivity : ThemedActivity() {
         })
     }
 
+    private fun roleCanAccessModule(key: String): Boolean {
+        return when (currentRole) {
+            StaffRoleHelper.SUPER -> true
+            StaffRoleHelper.ADMIN -> key in setOf(
+                "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
+                "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds"
+            )
+            StaffRoleHelper.MANAGER -> key in setOf(
+                "rooms", "streams", "reports", "cosmetics", "gifts", "grantCosmetics"
+            )
+            else -> false
+        }
+    }
+
     private fun openModule(key: String) {
-        val superOnlyModules = listOf(
-            "notifications", "toastManager", "mysteriousMan", "luckyCannon",
-            "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
-            "vip", "logs", "staffIdentity", "operators", "genderVerifications",
-            "recharges", "withdrawals", "walletTransactions", "walletAdjust", "cosmetics", "gifts"
-        )
-        if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams", "reports")) ||
-            (currentRole == StaffRoleHelper.ADMIN && key in superOnlyModules)) {
-            toast(if (currentRole == StaffRoleHelper.MANAGER) "صلاحية المانجر تقتصر على الرومات والبث المباشر والبلاغات" else "هذا القسم مخصص للسوبر أدمن")
+        if (!roleCanAccessModule(key)) {
+            toast(when (currentRole) {
+                StaffRoleHelper.MANAGER -> "صلاحية المانجر تقتصر على إشراف الرومات والبث والبلاغات وإهداء الإطارات والدخوليات"
+                StaffRoleHelper.ADMIN -> "هذا القسم غير متاح لرتبة الأدمن"
+                else -> "هذا القسم مخصص لفريق الإدارة"
+            })
             return
         }
         currentSection = key
@@ -489,19 +511,30 @@ class AdminConsoleActivity : ThemedActivity() {
             "users" -> {
                 val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
                 val search = EditText(this).apply {
-                    hint = "ابحث بالاسم أو المعرّف"
+                    hint = "ID المستخدم أو UUID أو الاسم أو البريد"
                     textSize = 15f
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
                     textDirection = View.TEXT_DIRECTION_RTL
                     gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
                     setSingleLine(true)
+                    imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
                     setTextColor(TEXT)
                     setHintTextColor(MUTED)
                     background = roundRect(Color.WHITE, 12)
                     setPadding(dp(12), dp(10), dp(12), dp(10))
+                    setOnEditorActionListener { _, actionId, _ ->
+                        if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                            loadUsers(text.toString().trim())
+                            true
+                        } else false
+                    }
                 }
                 searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
-                searchRow.addView(button("بحث") { loadUsers(search.text.toString().trim()) })
+                searchRow.addView(button("بحث") {
+                    val query = search.text.toString().trim()
+                    if (query.isBlank()) toast("أدخل ID المستخدم أو الاسم للبحث")
+                    else loadUsers(query)
+                })
                 body.addView(searchRow)
                 module?.let { addSectionIntro(it) }
                 loadUsers("")
@@ -536,18 +569,22 @@ class AdminConsoleActivity : ThemedActivity() {
             "cosmetics" -> load(api.cosmetics()) { renderItems(it, "cosmetics") }
             "grantCosmetics" -> load(api.cosmetics()) { renderItems(it, "grantCosmetics") }
             "vanityIds" -> {
-                body.addView(button("＋ إضافة آي دي إلى الكتالوج") { showCreateVanityDialog() })
+                if (currentRole == StaffRoleHelper.SUPER) {
+                    body.addView(button("＋ إضافة آي دي إلى الكتالوج") { showCreateVanityDialog() })
+                }
                 load(api.vanityIds()) { renderItems(it, "vanityIds") }
             }
             "gifts" -> load(api.gifts()) { renderItems(it, "gifts") }
             "vip" -> {
                 body.addView(button("＋ منح عضوية VIP") { showAssignVipDialog() })
-                body.addView(button("＋ إنشاء خطة VIP") { showCreateVipPlanDialog() })
+                if (currentRole == StaffRoleHelper.SUPER) {
+                    body.addView(button("＋ إنشاء خطة VIP") { showCreateVipPlanDialog() })
+                }
                 load(api.vipMembers(1, 40)) { renderItems(it, "vip") }
                 val plansButton = button("إدارة خطط VIP") {
                     load(api.vipPlans()) { renderItems(it, "vipPlans") }
                 }
-                body.addView(plansButton)
+                if (currentRole == StaffRoleHelper.SUPER) body.addView(plansButton)
             }
             "toastManager" -> showToastManager()
             "mysteriousMan" -> showMysteriousManSettings()
@@ -766,6 +803,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val giftDuration = field(giftCard, "مدة الظهور بالثواني (1–12)", value(gift, "durationSeconds", "3"))
             val giftShine = checked(giftCard, "لمعة متحركة", bool(gift, "shineEnabled", true))
             val giftGlow = checked(giftCard, "توهج الإطار", bool(gift, "frameGlowEnabled", true))
+            addToastLivePreview(giftCard, giftUrl, "توست إرسال الهدايا", "اسم المستخدم  ·  الهدية ×7")
             body.addView(giftCard)
 
             val normalCard = card()
@@ -774,6 +812,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val normalDuration = field(normalCard, "مدة الظهور بالثواني (1–12)", value(normal, "durationSeconds", "4"))
             val normalShine = checked(normalCard, "لمعة متحركة", bool(normal, "shineEnabled", true))
             val normalGlow = checked(normalCard, "توهج الإطار", bool(normal, "frameGlowEnabled", true))
+            addToastLivePreview(normalCard, normalUrl, "توست الربح المحظوظ", "الفائز  ·  ×7  ·  +12,500")
             body.addView(normalCard)
 
             val highCard = card()
@@ -782,6 +821,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val highDuration = field(highCard, "مدة الظهور بالثواني (1–12)", value(high, "durationSeconds", "5"))
             val highShine = checked(highCard, "لمعة متحركة", bool(high, "shineEnabled", true))
             val highGlow = checked(highCard, "توهج الإطار", bool(high, "frameGlowEnabled", true))
+            addToastLivePreview(highCard, highUrl, "توست الربح العالي", "الفائز  ·  ×177  ·  +250,000")
             body.addView(highCard)
 
             val buttonCard = card()
@@ -789,6 +829,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val buttonUrl = field(buttonCard, "رابط أيقونة الزر", value(luckyButton, "iconUrl", ""), "https://…")
             val buttonDuration = field(buttonCard, "مدة ظهور الزر بالثواني (1–12)", value(luckyButton, "durationSeconds", "5"))
             val buttonPulse = checked(buttonCard, "نبضة وحركة خفيفة للزر", bool(luckyButton, "pulseEnabled", true))
+            addToastIconPreview(buttonCard, buttonUrl)
             body.addView(buttonCard)
 
             body.addView(button("حفظ وتطبيق الإعدادات") {
@@ -829,6 +870,98 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
             })
         }
+    }
+
+    /**
+     * Live native preview of the exact background URL configured in the dashboard.
+     * FIT_CENTER preserves the uploaded artwork and its transparency; the sample copy
+     * is an overlay only and is not baked into or uploaded with the image.
+     */
+    private fun addToastLivePreview(parent: LinearLayout, urlField: EditText, title: String, sample: String) {
+        addText(parent, "معاينة حية — $title", 12f, true, ACCENT)
+        val frame = FrameLayout(this).apply {
+            background = roundRect(0xFFF0EDF8.toInt(), 16)
+            clipToPadding = true
+            layoutParams = LinearLayout.LayoutParams(-1, dp(174)).apply {
+                topMargin = dp(6)
+                bottomMargin = dp(8)
+            }
+        }
+        val artwork = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "الخلفية الفعلية لـ $title"
+        }
+        frame.addView(artwork, FrameLayout.LayoutParams(-1, -1))
+        val overlay = TextView(this).apply {
+            text = sample
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            background = GradientDrawable().apply {
+                setColor(0x990E1020.toInt())
+                cornerRadius = dp(10).toFloat()
+            }
+        }
+        frame.addView(overlay, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
+            setMargins(dp(12), 0, dp(12), dp(10))
+        })
+        parent.addView(frame)
+        fun refresh() {
+            val raw = urlField.text?.toString()?.trim().orEmpty()
+            if (raw.isBlank()) {
+                Glide.with(this).clear(artwork)
+                artwork.setImageDrawable(null)
+            } else {
+                val resolved = AssetCatalog.absoluteUrl(raw) ?: raw
+                Glide.with(this).load(resolved).fitCenter().into(artwork)
+            }
+        }
+        urlField.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { refresh() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        refresh()
+    }
+
+    private fun addToastIconPreview(parent: LinearLayout, urlField: EditText) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = roundRect(0xFFF8F7FC.toInt(), 12)
+        }
+        val icon = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "أيقونة زر المحظوظ"
+        }
+        row.addView(icon, LinearLayout.LayoutParams(dp(58), dp(58)).apply { marginStart = dp(10) })
+        row.addView(TextView(this).apply {
+            text = "معاينة حية لأيقونة الزر من الرابط المحدد"
+            textSize = 12f
+            setTextColor(MUTED)
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        parent.addView(row)
+        fun refresh() {
+            val raw = urlField.text?.toString()?.trim().orEmpty()
+            if (raw.isBlank()) {
+                Glide.with(this).clear(icon)
+                icon.setImageDrawable(null)
+            } else {
+                val resolved = AssetCatalog.absoluteUrl(raw) ?: raw
+                Glide.with(this).load(resolved).fitCenter().into(icon)
+            }
+        }
+        urlField.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { refresh() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        refresh()
     }
 
     private fun showTemporaryBanDialog(userId: String) {
@@ -992,7 +1125,13 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun renderItems(data: Any?, type: String) {
-        val items = extractItems(data)
+        val extractedItems = extractItems(data)
+        val grantableTypes = setOf("entry_effect", "profile_card", "nameplate")
+        val items = if (type == "grantCosmetics" && currentRole != StaffRoleHelper.SUPER) {
+            extractedItems.filter { item ->
+                value(item, "type")?.trim()?.lowercase() in grantableTypes
+            }
+        } else extractedItems
         val countPanel = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -1076,6 +1215,9 @@ class AdminConsoleActivity : ThemedActivity() {
             val vipLevel = value(item, "level") ?: "1"
             val vipPrice = value(item, "coinPriceMonthly", "price") ?: "0"
             addText(card, primary, 15f, true, TEXT)
+            if (type in listOf("cosmetics", "grantCosmetics", "gifts")) {
+                addLiveAssetPreview(card, item, type, primary)
+            }
             if (!id.isNullOrBlank()) addText(card, "معرّف السجل: $id", 11f, false, MUTED)
             if (type == "users" && !publicId.isNullOrBlank() && publicId != id) {
                 val publicIdRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
@@ -1162,13 +1304,15 @@ class AdminConsoleActivity : ThemedActivity() {
                             load(api.endStream(id)) { toast("استجاب الخادم لطلب إنهاء البث"); openModule("streams") }
                         }
                     })
-                    card.addView(button("إنهاء قسري للبث") {
-                        confirm("استخدم الإنهاء القسري فقط إذا فشل الإنهاء العادي. متابعة؟") {
-                            load(api.forceEndStream(id, mapOf("reason" to "super_admin_force_end"))) {
-                                toast("استجاب الخادم لطلب الإنهاء القسري"); openModule("streams")
+                    if (currentRole == StaffRoleHelper.SUPER) {
+                        card.addView(button("إنهاء قسري للبث") {
+                            confirm("استخدم الإنهاء القسري فقط إذا فشل الإنهاء العادي. متابعة؟") {
+                                load(api.forceEndStream(id, mapOf("reason" to "super_admin_force_end"))) {
+                                    toast("استجاب الخادم لطلب الإنهاء القسري"); openModule("streams")
+                                }
                             }
-                        }
-                    })
+                        })
+                    }
                 }
                 "agencies" -> if (!id.isNullOrBlank()) {
                     val suspended = status?.contains("suspended", true) == true
@@ -1324,7 +1468,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     })
                 }
-                "gifts" -> if (!id.isNullOrBlank()) {
+                "gifts" -> if (!id.isNullOrBlank() && currentRole == StaffRoleHelper.SUPER) {
                     val active = status?.equals("true", true) == true || status?.equals("active", true) == true
                     card.addView(button(if (active) "تعطيل الهدية" else "تفعيل الهدية") {
                         confirm("تغيير حالة الهدية؟") {
@@ -1339,7 +1483,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 "vanityIds" -> if (!id.isNullOrBlank() && !publicId.isNullOrBlank()) {
                     card.addView(button("إهداء الآي دي لمستخدم") { showGrantVanityDialog(publicId) })
-                    when (status?.lowercase()) {
+                    if (currentRole == StaffRoleHelper.SUPER) when (status?.lowercase()) {
                         "owned", "reserved" -> card.addView(button("سحب الآي دي وإعادته للسوق") {
                             confirm("سيُستعاد الآي دي السابق للمالك إن وجد، ثم يعود هذا الآي دي للسوق. متابعة؟") {
                                 load(api.revokeVanityId(id)) { toast("تمت معالجة طلب سحب الآي دي"); openModule("vanityIds") }
@@ -1357,7 +1501,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         })
                     }
                 }
-                "cosmetics" -> if (!id.isNullOrBlank()) {
+                "cosmetics" -> if (!id.isNullOrBlank() && currentRole == StaffRoleHelper.SUPER) {
                     val active = status?.contains("true", true) == true || status?.contains("active", true) == true
                     card.addView(button(if (active) "تعطيل الميزة" else "تفعيل الميزة") {
                         confirm("تغيير حالة الميزة؟") {
@@ -1370,6 +1514,60 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             body.addView(card)
         }
+    }
+
+    /**
+     * Shows the actual icon/preview URL returned by the live catalog API.
+     * This is read-only; it never purchases, grants, or sends an item.
+     */
+    private fun addLiveAssetPreview(parent: LinearLayout, item: Any, type: String, title: String) {
+        val assetUrl = if (type == "gifts") {
+            value(item, "iconUrl", "previewUrl", "thumbnailUrl")
+        } else {
+            value(item, "previewUrl", "thumbnailUrl", "iconUrl", "imageUrl")
+        }?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        val absolute = AssetCatalog.absoluteUrl(assetUrl) ?: assetUrl
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = GradientDrawable().apply {
+                setColor(0xFFF8F7FC.toInt())
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), 0xFFE9E5F4.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(8)
+                bottomMargin = dp(8)
+            }
+        }
+        val image = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "معاينة $title"
+            background = roundRect(Color.WHITE, 10)
+        }
+        row.addView(image, LinearLayout.LayoutParams(dp(94), dp(94)).apply { marginStart = dp(12) })
+        Glide.with(this).load(absolute).fitCenter().into(image)
+        val textCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
+        addText(textCol, "معاينة مباشرة من الكتالوج", 12f, true, ACCENT)
+        addText(textCol, if (type == "gifts") "أيقونة الهدية الفعلية" else "صورة العنصر الفعلية", 11f, false, MUTED)
+        textCol.addView(button("تكبير المعاينة") {
+            val large = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                setBackgroundColor(Color.WHITE)
+                contentDescription = "المعاينة الكاملة لـ $title"
+            }
+            Glide.with(this).load(absolute).fitCenter().into(large)
+            AlertDialog.Builder(this).setTitle(title)
+                .setView(large.apply { layoutParams = LinearLayout.LayoutParams(-1, dp(300)) })
+                .setPositiveButton("إغلاق", null).show()
+        })
+        row.addView(textCol, LinearLayout.LayoutParams(0, -2, 1f))
+        parent.addView(row)
     }
 
     private fun showAdjustWalletDialog() {
@@ -1547,7 +1745,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     showEditRoomDialog(id, roomTitle, accessMode, entryFee)
                 })
             }
-            if (currentRole == StaffRoleHelper.SUPER) {
+            if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
                 actions.addView(button("إغلاق الروم") {
                     confirm("سيتم إغلاق الروم على الخادم. هذا الإجراء قد يؤثر على الموجودين فيه. هل تريد المتابعة؟") {
                         load(api.closeRoom(id)) {
@@ -1557,8 +1755,56 @@ class AdminConsoleActivity : ThemedActivity() {
                     }
                 })
             }
-            if (currentRole == StaffRoleHelper.MANAGER) {
-                addText(actions, "وضع إشرافي: لا تتوفر هنا إجراءات تعديل أو إغلاق الروم لهذه الرتبة.", 12f, false, MUTED)
+            if (currentRole == StaffRoleHelper.ADMIN || currentRole == StaffRoleHelper.MANAGER) {
+                addText(actions, "إشراف على هذا الروم فقط: لا يتغير حظر الحساب العام ولا إعدادات الصوت أو ZEGO.", 11f, false, MUTED)
+                val targetInput = EditText(this).apply {
+                    hint = "UUID المستخدم المراد الإشراف عليه"
+                    textSize = 13f
+                    setSingleLine(true)
+                    setTextColor(TEXT)
+                    setHintTextColor(MUTED)
+                    layoutDirection = View.LAYOUT_DIRECTION_LTR
+                    textDirection = View.TEXT_DIRECTION_LTR
+                    background = roundRect(0xFFF7F6FC.toInt(), 10)
+                    setPadding(dp(12), dp(10), dp(12), dp(10))
+                }
+                actions.addView(targetInput, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
+                fun targetId(): String? {
+                    val target = targetInput.text.toString().trim()
+                    if (target.isBlank()) {
+                        targetInput.error = "معرّف المستخدم مطلوب"
+                        return null
+                    }
+                    return target
+                }
+                actions.addView(button("كتم مايك المستخدم داخل الروم") {
+                    val target = targetId() ?: return@button
+                    load(roomApi.setMic(id, mapOf("userId" to target, "muted" to true))) {
+                        toast("تم إرسال طلب كتم المايك لهذا الروم")
+                    }
+                })
+                actions.addView(button("فك كتم المايك داخل الروم") {
+                    val target = targetId() ?: return@button
+                    load(roomApi.setMic(id, mapOf("userId" to target, "muted" to false))) {
+                        toast("تم إرسال طلب فك كتم المايك لهذا الروم")
+                    }
+                })
+                actions.addView(button("إنزال المستخدم من المايك فقط") {
+                    val target = targetId() ?: return@button
+                    confirm("سيبقى المستخدم داخل الروم وسيُزال من المايك فقط. متابعة؟") {
+                        load(roomApi.forceLeaveSeat(id, mapOf("userId" to target, "reason" to "إجراء إشرافي من لوحة JEHO"))) {
+                            toast("تم إرسال طلب إنزال المستخدم من المايك")
+                        }
+                    }
+                })
+                actions.addView(button("إخراج المستخدم من الروم") {
+                    val target = targetId() ?: return@button
+                    confirm("سيتم إخراج المستخدم من هذا الروم فقط. متابعة؟") {
+                        load(roomApi.kick(id, mapOf("userId" to target, "reason" to "إجراء إشرافي من لوحة JEHO"))) {
+                            toast("تم إرسال طلب إخراج المستخدم من الروم")
+                        }
+                    }
+                })
             }
         }
 
@@ -1835,7 +2081,14 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showGrantCosmeticDialog(code: String) {
-        val form = formFields(listOf("معرّف المستخدم", "المدة: 7 أو 15 أو 30 أو permanent"))
+        val allowedDays = when (currentRole) {
+            StaffRoleHelper.MANAGER -> listOf(1, 3, 7)
+            StaffRoleHelper.ADMIN -> listOf(1, 3, 7, 15)
+            else -> listOf(7, 15, 30)
+        }
+        val allowPermanent = currentRole == StaffRoleHelper.SUPER
+        val durationHint = if (allowPermanent) "المدة: 7 أو 15 أو 30 أو permanent" else "المدة بالأيام: " + allowedDays.joinToString(" أو ")
+        val form = formFields(listOf("معرّف المستخدم", durationHint))
         AlertDialog.Builder(this).setTitle("إهداء إطار أو دخولية").setView(form.first)
             .setNegativeButton("إلغاء", null).setPositiveButton("مراجعة ثم إهداء", null)
             .create().also { dialog ->
@@ -1845,8 +2098,8 @@ class AdminConsoleActivity : ThemedActivity() {
                         val term = form.second[1].text.toString().trim().lowercase()
                         val permanent = term == "permanent" || term == "دائم"
                         val days = term.toIntOrNull()
-                        if (userId.isBlank() || (!permanent && (days == null || days !in listOf(7, 15, 30)))) {
-                            toast("أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent")
+                        if (userId.isBlank() || (permanent && !allowPermanent) || (!permanent && (days == null || days !in allowedDays))) {
+                            toast(if (allowPermanent) "أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent" else "المدة المسموحة: " + allowedDays.joinToString(" أو ") + " أيام")
                             return@setOnClickListener
                         }
                         val durationLabel = if (permanent) "بشكل دائم" else "لمدة " + days + " يوم"
@@ -1867,7 +2120,10 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showGrantVanityDialog(publicId: String) {
-        val form = formFields(listOf("معرّف المستخدم", "المدة: 7 أو 15 أو 30 أو permanent"))
+        val allowedDays = if (currentRole == StaffRoleHelper.ADMIN) listOf(1, 3, 7, 15) else listOf(7, 15, 30)
+        val allowPermanent = currentRole == StaffRoleHelper.SUPER
+        val durationHint = if (allowPermanent) "المدة: 7 أو 15 أو 30 أو permanent" else "المدة بالأيام: " + allowedDays.joinToString(" أو ")
+        val form = formFields(listOf("معرّف المستخدم", durationHint))
         AlertDialog.Builder(this).setTitle("إهداء الآي دي " + publicId).setView(form.first)
             .setNegativeButton("إلغاء", null).setPositiveButton("مراجعة ثم إهداء", null)
             .create().also { dialog ->
@@ -1877,8 +2133,8 @@ class AdminConsoleActivity : ThemedActivity() {
                         val term = form.second[1].text.toString().trim().lowercase()
                         val permanent = term == "permanent" || term == "دائم"
                         val days = term.toIntOrNull()
-                        if (userId.isBlank() || (!permanent && days !in listOf(7, 15, 30))) {
-                            toast("أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent")
+                        if (userId.isBlank() || (permanent && !allowPermanent) || (!permanent && days !in allowedDays)) {
+                            toast(if (allowPermanent) "أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent" else "المدة المسموحة: " + allowedDays.joinToString(" أو ") + " أيام")
                             return@setOnClickListener
                         }
                         val durationLabel = if (permanent) "بشكل دائم" else "لمدة " + days + " يوم"
@@ -2038,7 +2294,10 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showAssignVipDialog() {
-        val form = formFields(listOf("معرّف المستخدم", "معرّف خطة VIP", "المدة: 7 أو 15 أو 30 أو permanent"))
+        val allowedDays = if (currentRole == StaffRoleHelper.ADMIN) listOf(1, 3, 7, 15) else listOf(7, 15, 30)
+        val allowPermanent = currentRole == StaffRoleHelper.SUPER
+        val durationHint = if (allowPermanent) "المدة: 7 أو 15 أو 30 أو permanent" else "المدة بالأيام: " + allowedDays.joinToString(" أو ")
+        val form = formFields(listOf("معرّف المستخدم", "معرّف خطة VIP", durationHint))
         AlertDialog.Builder(this)
             .setTitle("منح عضوية VIP")
             .setView(form.first)
@@ -2053,8 +2312,9 @@ class AdminConsoleActivity : ThemedActivity() {
                         val permanent = term == "permanent" || term == "دائم"
                         val days = term.toIntOrNull()
                         if (userId.isBlank() || planId.isBlank() ||
-                            (!permanent && (days == null || days !in listOf(7, 15, 30)))) {
-                            toast("أدخل معرّف المستخدم والخطة ومدة 7 أو 15 أو 30 أو permanent")
+                            (permanent && !allowPermanent) ||
+                            (!permanent && (days == null || days !in allowedDays))) {
+                            toast(if (allowPermanent) "أدخل معرّف المستخدم والخطة ومدة 7 أو 15 أو 30 أو permanent" else "المدة المسموحة: " + allowedDays.joinToString(" أو ") + " أيام")
                             return@setOnClickListener
                         }
                         val durationLabel = if (permanent) "بشكل دائم" else "لمدة " + days + " يوم"
@@ -2321,6 +2581,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 "badgeUrl" to "رابط الشارة",
                 "frameUrl" to "رابط إطار الصورة",
                 "nameplateUrl" to "رابط بطاقة الاسم",
+                "messageCardUrl" to "رابط بطاقة الرسائل",
                 "entryEffectUrl" to "رابط الدخولية"
             )
             roles.forEach { (roleKey, roleTitle, color) ->
@@ -2355,6 +2616,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     }, LinearLayout.LayoutParams(dp(76), dp(48)))
                     panel.addView(row)
                 }
+                addIdentityAssetPreview(panel, roleKey)
                 body.addView(panel)
             }
             body.addView(button("حفظ الهوية الإدارية") {
@@ -2362,19 +2624,82 @@ class AdminConsoleActivity : ThemedActivity() {
                 val payload = mutableMapOf<String, Any>()
                 roles.forEach { (roleKey, _, _) ->
                     val values = mutableMapOf<String, Any>()
-                    listOf("label", "accentColor", "badgeUrl", "frameUrl", "nameplateUrl", "entryEffectUrl").forEach { key ->
+                    listOf("label", "accentColor", "badgeUrl", "frameUrl", "nameplateUrl", "messageCardUrl", "entryEffectUrl").forEach { key ->
                         values[key] = staffIdentityFields["$roleKey.$key"]?.text?.toString()?.trim().orEmpty()
                     }
                     payload[roleKey] = values
                 }
                 confirm("حفظ هويات السوبر أدمن والأدمن والمانجر؟") {
                     load(api.updateStaffIdentity(payload)) {
-                        toast("تم حفظ إعدادات الهوية الإدارية")
-                        showStaffIdentityEditor()
+                        StaffIdentityConfigCache.refresh(this) {
+                            toast("تم حفظ الهوية وتحديث إطارات الرتب في التطبيق")
+                            showStaffIdentityEditor()
+                        }
                     }
                 }
             })
         }
+    }
+
+    private fun addIdentityAssetPreview(parent: LinearLayout, roleKey: String) {
+        addText(parent, "معاينة الأصول الحية", 12f, true, ACCENT)
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            background = roundRect(0xFFF8F7FC.toInt(), 12)
+        }
+        val specs = listOf(
+            Triple("badgeUrl", "الشارة", "الشارة"),
+            Triple("frameUrl", "الإطار", "إطار الصورة"),
+            Triple("nameplateUrl", "الاسم", "بطاقة الاسم"),
+            Triple("messageCardUrl", "الرسائل", "بطاقة الرسائل")
+        )
+        specs.forEach { (fieldKey, label, description) ->
+            val column = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    setMargins(dp(3), 0, dp(3), 0)
+                }
+            }
+            val image = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = "$description لرتبة $roleKey"
+            }
+            column.addView(image, LinearLayout.LayoutParams(dp(62), dp(62)))
+            val caption = TextView(this).apply {
+                text = label
+                textSize = 10f
+                gravity = Gravity.CENTER
+                setTextColor(MUTED)
+            }
+            column.addView(caption)
+            row.addView(column)
+            val input = staffIdentityFields["$roleKey.$fieldKey"]
+            fun refresh() {
+                val raw = input?.text?.toString()?.trim().orEmpty()
+                if (raw.isBlank()) {
+                    Glide.with(this@AdminConsoleActivity).clear(image)
+                    image.setImageDrawable(null)
+                } else {
+                    val resolved = AssetCatalog.absoluteUrl(raw) ?: raw
+                    Glide.with(this@AdminConsoleActivity).load(resolved).fitCenter().into(image)
+                }
+            }
+            input?.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { refresh() }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+            refresh()
+        }
+        parent.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(6)
+            bottomMargin = dp(8)
+        })
     }
 
     private fun identityInput(hintText: String, value: String): EditText = EditText(this).apply {

@@ -201,6 +201,11 @@ export const notificationsApi = {
   send: (data) => safeRequest(() => api.post('/admin/notifications/send', data)),
 }
 
+export const staffIdentityApi = {
+  get: () => safeRequest(() => api.get('/admin/staff-identity')),
+  update: (payload) => safeRequest(() => api.patch('/admin/staff-identity', payload)),
+}
+
 export const mysteriousManApi = {
   get: () => safeRequest(() => api.get('/admin/mysterious-man/config')),
   update: (data) => safeRequest(() => api.patch('/admin/mysterious-man/config', data)),

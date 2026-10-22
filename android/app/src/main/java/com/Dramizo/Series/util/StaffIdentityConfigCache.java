@@ -25,15 +25,17 @@ public final class StaffIdentityConfigCache {
         public final String badgeUrl;
         public final String frameUrl;
         public final String nameplateUrl;
+        public final String messageCardUrl;
         public final String entryEffectUrl;
 
         RoleIdentity(String label, String accentColor, String badgeUrl, String frameUrl,
-                     String nameplateUrl, String entryEffectUrl) {
+                     String nameplateUrl, String messageCardUrl, String entryEffectUrl) {
             this.label = label;
             this.accentColor = accentColor;
             this.badgeUrl = badgeUrl;
             this.frameUrl = frameUrl;
             this.nameplateUrl = nameplateUrl;
+            this.messageCardUrl = messageCardUrl;
             this.entryEffectUrl = entryEffectUrl;
         }
     }
@@ -43,6 +45,8 @@ public final class StaffIdentityConfigCache {
     private static final List<Runnable> WAITERS = new ArrayList<>();
     private static boolean loaded;
     private static boolean loading;
+    private static long loadedAtMs;
+    private static final long CACHE_TTL_MS = 60_000L;
 
     private StaffIdentityConfigCache() {}
 
@@ -56,10 +60,11 @@ public final class StaffIdentityConfigCache {
 
     public static void load(Context context, @Nullable Runnable onReady) {
         synchronized (LOCK) {
-            if (loaded) {
+            if (loaded && System.currentTimeMillis() - loadedAtMs < CACHE_TTL_MS) {
                 if (onReady != null) onReady.run();
                 return;
             }
+            if (loaded && System.currentTimeMillis() - loadedAtMs >= CACHE_TTL_MS) loaded = false;
             if (onReady != null) WAITERS.add(onReady);
             if (loading) return;
             loading = true;
@@ -88,6 +93,12 @@ public final class StaffIdentityConfigCache {
         }
     }
 
+    /** Force a fresh role-identity read after an administrator saves role assets. */
+    public static void refresh(Context context, @Nullable Runnable onReady) {
+        synchronized (LOCK) { loaded = false; }
+        load(context, onReady);
+    }
+
     private static void finish(Map<String, RoleIdentity> parsed) {
         List<Runnable> callbacks;
         synchronized (LOCK) {
@@ -95,6 +106,7 @@ public final class StaffIdentityConfigCache {
                 CACHE.put(role, parsed.getOrDefault(role, defaults(role)));
             }
             loaded = true;
+            loadedAtMs = System.currentTimeMillis();
             loading = false;
             callbacks = new ArrayList<>(WAITERS);
             WAITERS.clear();
@@ -112,6 +124,7 @@ public final class StaffIdentityConfigCache {
                 safe(value.get("badgeUrl"), "", 2048),
                 safe(value.get("frameUrl"), "", 2048),
                 safe(value.get("nameplateUrl"), "", 2048),
+                safe(value.get("messageCardUrl"), "", 2048),
                 safe(value.get("entryEffectUrl"), "", 2048));
     }
 
@@ -122,9 +135,9 @@ public final class StaffIdentityConfigCache {
     }
 
     private static RoleIdentity defaults(String role) {
-        if (StaffRoleHelper.SUPER.equals(role)) return new RoleIdentity("Super Admin", "#D8B35B", "", "", "", "");
-        if (StaffRoleHelper.ADMIN.equals(role)) return new RoleIdentity("Admin", "#9AA8C7", "", "", "", "");
-        if (StaffRoleHelper.MANAGER.equals(role)) return new RoleIdentity("Manager", "#37A889", "", "", "", "");
-        return new RoleIdentity("", "#6B4CC2", "", "", "", "");
+        if (StaffRoleHelper.SUPER.equals(role)) return new RoleIdentity("Super Admin", "#D8B35B", "", "", "", "", "");
+        if (StaffRoleHelper.ADMIN.equals(role)) return new RoleIdentity("Admin", "#9AA8C7", "", "", "", "", "");
+        if (StaffRoleHelper.MANAGER.equals(role)) return new RoleIdentity("Manager", "#37A889", "", "", "", "", "");
+        return new RoleIdentity("", "#6B4CC2", "", "", "", "", "");
     }
 }

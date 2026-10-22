@@ -51,6 +51,30 @@
           <SectionBackgroundPanel />
         </template>
 
+        <template v-else-if="settingsTab === 'staff-identity'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">هوية السوبر أدمن والأدمن والمانجر</h3>
+            <p class="form-text mb-3">ارفع أصولاً مستقلة لكل رتبة. بعد الحفظ تُستخدم الهوية المخصصة للرتبة فقط، ولا تُعرض هذه الأصول كعناصر قابلة للشراء في المتجر.</p>
+            <div v-if="staffIdentityLoading" class="py-4"><LoadingSpinner /></div>
+            <div v-else>
+              <div v-for="role in staffIdentityRoles" :key="role.key" class="border rounded-4 p-3 mb-3">
+                <div class="d-flex align-items-center gap-2 mb-3"><span class="badge rounded-pill" :style="{background: staffIdentityForm[role.key].accentColor, color:'#111'}">{{ role.title }}</span><span class="small text-secondary">أصول حصرية لهذه الرتبة</span></div>
+                <div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">اسم الرتبة الظاهر</label><input v-model="staffIdentityForm[role.key].label" maxlength="32" class="form-control" /></div>
+                  <div class="col-md-6"><label class="form-label">لون الهوية</label><div class="d-flex gap-2"><input v-model="staffIdentityForm[role.key].accentColor" type="color" class="form-control form-control-color" /><input v-model="staffIdentityForm[role.key].accentColor" maxlength="7" class="form-control" dir="ltr" /></div></div></div>
+                <div class="row g-3"><div v-for="asset in staffIdentityAssets" :key="role.key + '-' + asset.key" class="col-md-6 col-xl-4"><div class="h-100 rounded-3 border p-3">
+                  <label class="form-label fw-semibold">{{ asset.title }}</label><div class="d-flex align-items-center justify-content-center rounded-3 bg-body-tertiary mb-2 overflow-hidden" style="min-height:110px">
+                    <SvgaPreview v-if="staffIdentityForm[role.key][asset.key] && staffIdentityIsSvga(staffIdentityForm[role.key][asset.key])" :src="staffIdentityForm[role.key][asset.key]" />
+                    <video v-else-if="staffIdentityForm[role.key][asset.key] && staffIdentityIsVideo(staffIdentityForm[role.key][asset.key])" :src="resolveAsset(staffIdentityForm[role.key][asset.key])" controls muted loop playsinline style="max-width:100%;max-height:140px" />
+                    <img v-else-if="staffIdentityForm[role.key][asset.key]" :src="resolveAsset(staffIdentityForm[role.key][asset.key])" :alt="asset.title" style="max-width:100%;max-height:120px;object-fit:contain" /><span v-else class="small text-secondary">لم يتم رفع ملف</span></div>
+                  <input :ref="el => setStaffIdentityInput(role.key, asset.key, el)" type="file" class="form-control form-control-sm mb-2" :accept="asset.accept" @change="uploadStaffIdentityAsset(role.key, asset, $event)" />
+                  <div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-secondary btn-sm" :disabled="staffIdentityUploading === role.key + ':' + asset.key" @click="chooseStaffIdentityFile(role.key, asset.key)">{{ staffIdentityUploading === role.key + ':' + asset.key ? 'جارٍ الرفع…' : 'رفع ملف' }}</button>
+                    <button v-if="staffIdentityForm[role.key][asset.key]" type="button" class="btn btn-link btn-sm text-danger" @click="staffIdentityForm[role.key][asset.key] = ''">إزالة</button></div><div class="form-text mt-2">{{ asset.help }}</div>
+                </div></div></div></div>
+              <div class="alert alert-info small">الإطار، الشارة، بطاقة الاسم، بطاقة الرسائل، والدخولية محفوظة كإعدادات هوية رتبة وليست عناصر متجر.</div>
+              <div class="d-flex justify-content-end"><button type="button" class="btn btn-aurora" :disabled="staffIdentitySaving || staffIdentityLoading || !auth.can('settings', 'write')" @click="saveStaffIdentity"><span v-if="staffIdentitySaving" class="spinner-border spinner-border-sm me-1"></span>حفظ هوية الرتب</button></div>
+            </div>
+          </section>
+        </template>
         <template v-else-if="settingsTab === 'mysterious-man'">
           <section class="settings-card">
             <h3 class="settings-card-title">إعدادات الرجل الغامض</h3>
@@ -660,11 +684,12 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { settingsApi, authApi, operatorsApi, mysteriousManApi, uploadsApi } from '@/api'
+import { settingsApi, authApi, operatorsApi, mysteriousManApi, staffIdentityApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import SvgaPreview from '@/components/SvgaPreview.vue'
 import EconomyPanel from '@/components/settings/EconomyPanel.vue'
 import OperationalSettingsPanel from '@/components/settings/OperationalSettingsPanel.vue'
 import PaymentSettingsPanel from '@/components/settings/PaymentSettingsPanel.vue'
@@ -695,6 +720,7 @@ const settingTabs = computed(() => {
     { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected' },
     { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image' },
     { id: 'mysterious-man', label: 'إعدادات الرجل الغامض', icon: 'bi-incognito' },
+    { id: 'staff-identity', label: 'هوية الإدارة والرتب', icon: 'bi-person-badge' },
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
     { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card' },
@@ -708,6 +734,64 @@ const settingTabs = computed(() => {
   return tabs
 })
 
+const staffIdentityLoading = ref(false)
+const staffIdentitySaving = ref(false)
+const staffIdentityUploading = ref('')
+const staffIdentityInputs = {}
+const staffIdentityRoles = [{ key: 'super', title: 'Super Admin' }, { key: 'admin', title: 'Admin' }, { key: 'manager', title: 'Manager' }]
+const staffIdentityAssets = [
+  { key: 'frameUrl', title: 'إطار الحساب', help: 'إطار خاص بهذه الرتبة.', accept: 'image/png,image/jpeg,image/webp,image/gif,.svga,video/mp4,video/webm' },
+  { key: 'badgeUrl', title: 'شارة / شعار الرتبة', help: 'شارة بصرية خاصة بالرتبة.', accept: 'image/png,image/jpeg,image/webp,image/gif' },
+  { key: 'nameplateUrl', title: 'بطاقة الاسم', help: 'لوحة اسم مخصصة لهذه الرتبة.', accept: 'image/png,image/jpeg,image/webp,image/gif' },
+  { key: 'messageCardUrl', title: 'بطاقة الرسائل', help: 'تصميم بطاقة رسائل الموظف.', accept: 'image/png,image/jpeg,image/webp,image/gif' },
+  { key: 'entryEffectUrl', title: 'الدخولية / تأثير الدخول', help: 'تأثير الدخول المخصص للرتبة.', accept: 'video/mp4,video/webm,video/quicktime,.svga,image/gif' },
+]
+const staffIdentityForm = reactive({
+  super: { label: 'Super Admin', accentColor: '#D8B35B', badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '' },
+  admin: { label: 'Admin', accentColor: '#9AA8C7', badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '' },
+  manager: { label: 'Manager', accentColor: '#37A889', badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '' },
+})
+function setStaffIdentityInput(role, key, el) { if (el) staffIdentityInputs[role + ':' + key] = el }
+function chooseStaffIdentityFile(role, key) { staffIdentityInputs[role + ':' + key]?.click() }
+function staffIdentityIsSvga(raw) { return /\.svga(\?|$)/i.test(String(raw || '')) }
+function staffIdentityIsVideo(raw) { return /\.(mp4|webm|mov)(\?|$)/i.test(String(raw || '')) }
+async function loadStaffIdentity() {
+  staffIdentityLoading.value = true
+  const { data, error: err } = await staffIdentityApi.get()
+  staffIdentityLoading.value = false
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const cfg = data?.data || data || {}
+  for (const role of staffIdentityRoles) Object.assign(staffIdentityForm[role.key], cfg[role.key] || {})
+}
+async function uploadStaffIdentityAsset(role, asset, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  const image = /\.(png|jpe?g|webp|gif)$/i.test(file.name)
+  const motion = /\.(mp4|webm|mov|svga)$/i.test(file.name)
+  if (!(image || motion) || (asset.key !== 'entryEffectUrl' && !image && asset.key !== 'frameUrl')) { toast().danger('صيغة الملف غير مدعومة لهذا الحقل'); event.target.value = ''; return }
+  const max = motion ? 40 : 8
+  if (file.size > max * 1024 * 1024) { toast().danger('حجم الملف يتجاوز الحد المسموح (' + max + ' ميغابايت)'); event.target.value = ''; return }
+  staffIdentityUploading.value = role + ':' + asset.key
+  const { data, error: err } = await uploadsApi.upload(file)
+  staffIdentityUploading.value = ''; event.target.value = ''
+  if (err) { toast().danger(err.message); return }
+  const uploaded = data?.data || data || {}
+  const url = String(uploaded.url || uploaded.path || (uploaded.filename ? '/uploads/' + uploaded.filename : '')).trim()
+  if (!url) { toast().danger('لم يرجع الخادم رابطاً صالحاً للملف'); return }
+  staffIdentityForm[role][asset.key] = url
+  toast().success('تم رفع الملف. اضغط حفظ هوية الرتب لتطبيقه.')
+}
+async function saveStaffIdentity() {
+  if (!auth.can('settings', 'write')) { toast().danger(t('settings.readOnly')); return }
+  staffIdentitySaving.value = true; error.value = ''
+  const { data, error: err } = await staffIdentityApi.update(JSON.parse(JSON.stringify(staffIdentityForm)))
+  staffIdentitySaving.value = false
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const cfg = data?.data || data || {}
+  for (const role of staffIdentityRoles) Object.assign(staffIdentityForm[role.key], cfg[role.key] || {})
+  success.value = 'تم حفظ إعدادات هوية السوبر أدمن والأدمن والمانجر'
+  toast().success(success.value)
+}
 const mysteryLoading = ref(false)
 const mysterySaving = ref(false)
 const mysteryUploading = ref('')
@@ -1022,6 +1106,7 @@ function normalizeAppName(raw) {
 function selectTab(id) {
   settingsTab.value = id
   if (id === 'mysterious-man') loadMysteryConfig()
+  if (id === 'staff-identity') loadStaffIdentity()
   router.replace({ name: 'settings', query: { tab: id } })
   if (id === 'account') fillAccountFromAuth()
   if (id === 'admins') loadOperators()
@@ -1144,6 +1229,9 @@ async function load() {
 
 function reloadActive() {
   if (isCoreTab.value) load()
+  else if (settingsTab.value === 'staff-identity') loadStaffIdentity()
+  else if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
+  else if (settingsTab.value === 'admins') loadOperators()
 }
 
 async function save() {
@@ -1215,6 +1303,7 @@ onMounted(async () => {
   await auth.fetchMe()
   syncTabFromRoute()
   if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
+  if (settingsTab.value === 'staff-identity') loadStaffIdentity()
   fillAccountFromAuth()
   load()
 })

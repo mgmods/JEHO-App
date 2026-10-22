@@ -387,11 +387,42 @@ public final class UserProfileCardSheet {
                             if (!dialog.isShowing() || !("staff:" + staffRole).equals(tvName.getTag())) return;
                             StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(staffRole);
                             tvName.setText(displayName + "\n" + (latest.label.isEmpty() ? staffBadge : latest.label));
+                            // Staff role frames are assigned by role, not by mall ownership.
+                            // Keep normal user wear when no dedicated staff frame is configured.
+                            if (!latest.frameUrl.isEmpty() && frame != null) {
+                                try {
+                                    frame.setVisibility(View.VISIBLE);
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.frameUrl)).into(frame);
+                                } catch (Exception ignored) { }
+                            }
                             if (!latest.nameplateUrl.isEmpty()) {
                                 try {
                                     Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.nameplateUrl)).into(new CustomTarget<Drawable>() {
                                         @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
                                             if (dialog.isShowing() && ("staff:" + staffRole).equals(tvName.getTag())) tvName.setBackground(resource);
+                                        }
+                                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                                    });
+                                } catch (Exception ignored) { }
+                            }
+                            if (!latest.badgeUrl.isEmpty()) {
+                                try {
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.badgeUrl)).into(new CustomTarget<Drawable>() {
+                                        @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                            if (dialog.isShowing() && ("staff:" + staffRole).equals(tvName.getTag())) {
+                                                resource.setBounds(0, 0, Math.round(18 * activity.getResources().getDisplayMetrics().density), Math.round(18 * activity.getResources().getDisplayMetrics().density));
+                                                tvName.setCompoundDrawables(null, null, resource, null);
+                                            }
+                                        }
+                                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                                    });
+                                } catch (Exception ignored) { }
+                            }
+                            if (!latest.messageCardUrl.isEmpty() && userCardBg != null) {
+                                try {
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.messageCardUrl)).into(new CustomTarget<Drawable>() {
+                                        @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                            if (dialog.isShowing() && ("staff:" + staffRole).equals(tvName.getTag())) userCardBg.setBackground(resource);
                                         }
                                         @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
                                     });
