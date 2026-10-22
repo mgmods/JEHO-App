@@ -365,14 +365,24 @@ const disabledGames = ref([])
 const gameWinRates = reactive({})
 const gameRtpRates = reactive({})
 const manageableGames = [
-  ...['7updown','bounty-football','camel-racing','cleopatra-slot','cleopatra-slots','crash','fishing','football-plinko','fortune-slot','greedy-box','greedy-lion','hilo','line-slots','luck-car','lucky77','megaways-slots','olympians','pirate-king','royal-battle','slot777','sugar-rush','swimsuit-party'].map(id => ({ id, label: id })),
-  { id: 'slots', label: 'سلوت مصغّر' }, { id: 'roulette', label: 'الروليت' }, { id: 'plinko', label: 'بلينكو مصغّر' }, { id: 'rps', label: 'حجر ورقة مقص' }, { id: 'blackjack', label: 'بلاك جاك مصغّر' }, { id: 'poker', label: 'بوكر النرد' }, { id: 'tarot', label: 'التاروت' }, { id: 'penalty', label: 'ركلة الجزاء' }, { id: 'reaction', label: 'رد الفعل' }, { id: 'witch', label: 'العرافة' }, { id: 'dice', label: 'النرد' }, { id: 'lucky-wheel', label: 'عجلة الحظ' }, { id: 'ono', label: 'أونو' }, { id: 'domino', label: 'الدومينو' }, { id: 'ludo', label: 'لودو' },
+  ...MIKOO.map(([id, title]) => ({ id, label: title })),
+  { id: 'slots', label: 'السلوت المصغّر' },
+  { id: 'roulette', label: 'الروليت' },
+  { id: 'plinko', label: 'بلينكو' },
+  { id: 'crash', label: 'كراش المصغّر' },
+  { id: 'rps', label: 'حجر ورقة مقص' },
+  { id: 'hilo', label: 'هاي لو المصغّر' },
+  { id: 'witch', label: 'العرافة' },
+  { id: 'blackjack', label: 'بلاك جاك' },
+  { id: 'poker', label: 'بوكر النرد' },
+  { id: 'tarot', label: 'التاروت' },
+  { id: 'penalty', label: 'ركلة الجزاء' },
+  { id: 'reaction', label: 'رد الفعل' },
+  { id: 'dice', label: 'النرد' },
+  { id: 'lucky-wheel', label: 'عجلة الحظ' },
 ]
 const directWinRateGameIds = new Set([
-  'slots','roulette','plinko','crash','rps','hilo','witch','blackjack','poker','tarot','penalty','reaction',
-  'dice','lucky-wheel','cleopatra-slot','cleopatra-slots','fishing','football-plinko','fortune-slot',
-  'line-slots','megaways-slots','olympians','pirate-king','slot777','sugar-rush','swimsuit-party',
-  'royal-battle',
+  'slots','roulette','plinko','crash','rps','hilo','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
 ])
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
 const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
@@ -443,6 +453,24 @@ async function saveOdds() {
     return
   }
   applyOddsPayload(data?.data ?? data)
+  // Confirm persistence through a fresh GET; do not claim success on a transient UI update.
+  const readBack = await gameOddsApi.get()
+  const stored = readBack?.data?.data ?? readBack?.data
+  if (readBack?.error || !stored || !Array.isArray(stored.disabledGames)) {
+    error.value = 'تم إرسال الإعدادات لكن تعذّر تأكيد قراءتها من الخادم. حدّث الصفحة وتحقق قبل الاعتماد عليها.'
+    toast().danger(error.value)
+    return
+  }
+  const expectedDisabled = [...disabledGames.value].sort().join(',')
+  const actualDisabled = [...stored.disabledGames].sort().join(',')
+  const expectedRates = Object.fromEntries(Object.entries(gameWinRates).filter(([id, value]) => supportsDirectWinRate(id) && value !== undefined && value !== '').map(([id, value]) => [id, Number(value)]))
+  const ratesMatch = Object.entries(expectedRates).every(([id, value]) => Number(stored.gameWinRates?.[id]) === value)
+  if (expectedDisabled !== actualDisabled || !ratesMatch) {
+    error.value = 'الخادم لم يُرجع كل حالات التشغيل ونسب الفوز كما حُفظت؛ لم يتم تأكيد الحفظ.'
+    toast().danger(error.value)
+    return
+  }
+  applyOddsPayload(stored)
   success.value = t('games.oddsSaved')
   toast().success(success.value)
 }
@@ -512,7 +540,7 @@ function buildDefaults() {
     id,
     title,
     titleEn: titleEn || title,
-    coverUrl: `${ORIGIN}/games/mikoo/covers/${id}.png?v=20260804g`,
+    coverUrl: `${ORIGIN}/games/mikoo/covers/${id}.jpg?v=20260807coversJpg1`,
     playUrl: `${ORIGIN}/games/mikoo/${id}/index.html`,
     sortOrder: order++,
     mode: 'mikoo_slot',
@@ -769,16 +797,32 @@ async function save() {
       sortOrder: i + 1,
       enabled: g.enabled !== false,
     }))
-  const { error: err } = await gamesCatalogApi.save(JSON.stringify(payload))
+  const { data: savedResponse, error: err } = await gamesCatalogApi.save(JSON.stringify(payload))
   saving.value = false
   if (err) {
     error.value = err.message
     toast().danger(err.message)
-  } else {
-    games.value = payload.map(normalizeGame)
-    success.value = t('games.gamesSaved')
-    toast().success(success.value)
+    return
   }
+  // Verify the durable catalog with a fresh GET so the dashboard cannot report a false save.
+  const readBack = await gamesCatalogApi.get()
+  const readError = readBack?.error
+  const wrapped = readBack?.data?.data ?? readBack?.data ?? {}
+  const raw = typeof wrapped === 'string' ? wrapped : (wrapped?.value ?? wrapped?.catalog ?? '')
+  let stored = Array.isArray(raw) ? raw : []
+  if (!stored.length && String(raw || '').trim()) {
+    try { const parsed = JSON.parse(String(raw)); if (Array.isArray(parsed)) stored = parsed } catch (_) {}
+  }
+  const expectedIds = payload.map((g) => String(g.id).toLowerCase()).sort().join(',')
+  const storedIds = stored.map((g) => String(g?.id || '').toLowerCase()).filter(Boolean).sort().join(',')
+  if (readError || expectedIds !== storedIds) {
+    error.value = 'لم يتم تأكيد قائمة الألعاب المحفوظة بعد إعادة قراءتها من الخادم؛ لم نعرض رسالة نجاح.'
+    toast().danger(error.value)
+    return
+  }
+  games.value = stored.map(normalizeGame).sort((a, b) => Number(a.sortOrder || 9999) - Number(b.sortOrder || 9999))
+  success.value = t('games.gamesSaved')
+  toast().success(success.value)
 }
 
 onMounted(() => {
