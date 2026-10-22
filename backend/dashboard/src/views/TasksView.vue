@@ -369,6 +369,14 @@ function cosmeticTypeLabel(type) {
     entrance: 'دخوليّة',
     avatar_frame: 'إطار صورة',
     profile_frame: 'إطار ملف شخصي',
+    name_card: 'كرت اسم',
+    namecard: 'كرت اسم',
+    name_plate: 'كرت اسم',
+    nameplate: 'كرت اسم',
+    title_card: 'كرت اسم',
+    entry: 'دخوليّة',
+    entry_effect: 'دخوليّة',
+    entrance_effect: 'دخوليّة',
     badge: 'شارة',
     vip_badge: 'شارة VIP',
     room_background: 'خلفية غرفة',
@@ -435,17 +443,53 @@ async function saveDailyLogin() {
   dailyLoginSaving.value = true
   dailyLoginError.value = ''
   dailyLoginSuccess.value = ''
-  const { error: err } = await dailyLoginRewardsApi.save({
+  const submitted = {
     enabled: dailyLoginEnabled.value,
-    days: dailyLoginDays.value,
-  })
-  dailyLoginSaving.value = false
+    days: dailyLoginDays.value.map((day, i) => ({
+      ...day,
+      day: i + 1,
+      amount: Math.max(0, Math.floor(Number(day.amount) || 0)),
+      durationDays: Math.max(1, Math.min(365, Math.floor(Number(day.durationDays) || 7))),
+      cosmeticCode: String(day.cosmeticCode || '').trim(),
+    })),
+  }
+  const { error: err } = await dailyLoginRewardsApi.save(submitted)
   if (err) {
+    dailyLoginSaving.value = false
     dailyLoginError.value = err.message || 'تعذر حفظ مكافآت تسجيل الدخول'
     toast().danger(dailyLoginError.value)
     return
   }
-  dailyLoginSuccess.value = 'تم حفظ مكافآت تسجيل الدخول اليومية بنجاح'
+
+  // Read the durable server value back before telling the operator the save worked.
+  const { data: freshData, error: readErr } = await dailyLoginRewardsApi.get()
+  dailyLoginSaving.value = false
+  if (readErr) {
+    dailyLoginError.value = 'تم إرسال الحفظ، لكن تعذر التحقق من الإعدادات المحفوظة. أعد تحميل القسم للتأكد.'
+    toast().danger(dailyLoginError.value)
+    return
+  }
+  const fresh = freshData?.data ?? freshData ?? {}
+  const same = fresh.enabled === submitted.enabled
+    && Array.isArray(fresh.days)
+    && fresh.days.length === 7
+    && submitted.days.every((day, i) => {
+      const saved = fresh.days.find((item) => Number(item.day) === i + 1)
+      return !!saved
+        && String(saved.type || 'coins') === String(day.type || 'coins')
+        && Number(saved.amount || 0) === Number(day.amount || 0)
+        && String(saved.cosmeticCode || '') === String(day.cosmeticCode || '')
+        && Number(saved.durationDays || 7) === Number(day.durationDays || 7)
+    })
+  if (!same) {
+    dailyLoginError.value = 'الإعدادات لم تتطابق مع القيم المحفوظة على الخادم. لم أعتبر العملية ناجحة؛ راجع القيم ثم أعد الحفظ.'
+    toast().danger(dailyLoginError.value)
+    await loadDailyLogin()
+    return
+  }
+  dailyLoginDays.value = fresh.days.map((day, i) => ({ ...dailyLoginDays.value[i], ...day, day: i + 1 }))
+  dailyLoginEnabled.value = fresh.enabled !== false
+  dailyLoginSuccess.value = 'تم حفظ مكافآت الأيام السبعة والتحقق من حفظها بنجاح'
   toast().success(dailyLoginSuccess.value)
 }
 
