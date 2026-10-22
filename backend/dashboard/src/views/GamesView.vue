@@ -493,7 +493,7 @@ const MIKOO = [
 ]
 
 function isLegacyHtmlGame(g) {
-  if (!g) return true
+  if (!g || typeof g !== 'object' || Array.isArray(g)) return true
   const id = String(g.id || '').toLowerCase()
   const playUrl = String(g.playUrl || '').toLowerCase()
   return id === 'lucky-wheel' || id === 'dice' || id === 'wheel'
@@ -525,6 +525,9 @@ const defaults = buildDefaults()
 games.value = defaults.map((game) => ({ ...game }))
 
 function normalizeGame(g) {
+  // A stale/corrupt catalog may contain null, strings or arrays. Normalize defensively
+  // before reading fields so one malformed record can never crash the entire dashboard.
+  if (!g || typeof g !== 'object' || Array.isArray(g)) g = {}
   const normalizeGameUrl = (value) => {
     const raw = String(value || '').trim()
     if (!raw) return ''
@@ -687,7 +690,7 @@ async function load() {
       const normalized = normalizeGame(game)
       merged.set(String(normalized.id || '').toLowerCase(), normalized)
     }
-    for (const game of saved.filter((item) => item && !isLegacyHtmlGame(item))) {
+    for (const game of saved.filter((item) => item && typeof item === 'object' && !Array.isArray(item) && !isLegacyHtmlGame(item))) {
       const normalized = normalizeGame(game)
       const id = String(normalized.id || '').trim().toLowerCase()
       if (!id) continue

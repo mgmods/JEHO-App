@@ -327,9 +327,9 @@ export class AdminService {
     const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
     const defaults = {
       version: 1,
-      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
       luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
     };
     if (!row?.value) return defaults;
@@ -342,10 +342,20 @@ export class AdminService {
           shineEnabled: raw.shineEnabled !== false,
           frameGlowEnabled: raw.frameGlowEnabled !== false,
           durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(raw.durationSeconds) || duration))),
-          avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? 8))),
-          avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? 50))),
-          textX: Math.max(0, Math.min(100, Number(raw.textX ?? 25))),
-          textY: Math.max(0, Math.min(100, Number(raw.textY ?? 50))),
+          avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? (key === 'giftSend' ? 8 : 8)) || 0)),
+          avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? (key === 'giftSend' ? 50 : 42)) || 0)),
+          textX: Math.max(0, Math.min(100, Number(raw.textX ?? 25) || 0)),
+          textY: Math.max(0, Math.min(100, Number(raw.textY ?? (key === 'giftSend' ? 50 : 42)) || 0)),
+          bodyX: Math.max(0, Math.min(100, Number(raw.bodyX ?? (key === 'giftSend' ? 25 : 25)) || 0)),
+          bodyY: Math.max(0, Math.min(100, Number(raw.bodyY ?? (key === 'giftSend' ? 67 : 62)) || 0)),
+          countX: Math.max(0, Math.min(100, Number(raw.countX ?? 88) || 0)),
+          countY: Math.max(0, Math.min(100, Number(raw.countY ?? 50) || 0)),
+          widthDp: Math.max(220, Math.min(360, Math.round(Number(raw.widthDp) || 340))),
+          heightDp: Math.max(60, Math.min(180, Math.round(Number(raw.heightDp) || 100))),
+          avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(raw.avatarSizeDp) || 44))),
+          titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.titleSizeSp) || 13))),
+          bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.bodySizeSp) || 12))),
+          countSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.countSizeSp) || 12))),
         };
       };
       const button = parsed?.luckyButton && typeof parsed.luckyButton === 'object' ? parsed.luckyButton : {};
@@ -386,10 +396,20 @@ export class AdminService {
         shineEnabled: raw.shineEnabled !== false,
         frameGlowEnabled: raw.frameGlowEnabled !== false,
         durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(raw.durationSeconds) || duration))),
-        avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? old.avatarX))),
-        avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? old.avatarY))),
-        textX: Math.max(0, Math.min(100, Number(raw.textX ?? old.textX))),
-        textY: Math.max(0, Math.min(100, Number(raw.textY ?? old.textY))),
+        avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? old.avatarX) || 0)),
+        avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? old.avatarY) || 0)),
+        textX: Math.max(0, Math.min(100, Number(raw.textX ?? old.textX) || 0)),
+        textY: Math.max(0, Math.min(100, Number(raw.textY ?? old.textY) || 0)),
+        bodyX: Math.max(0, Math.min(100, Number(raw.bodyX ?? old.bodyX) || 0)),
+        bodyY: Math.max(0, Math.min(100, Number(raw.bodyY ?? old.bodyY) || 0)),
+        countX: Math.max(0, Math.min(100, Number(raw.countX ?? old.countX) || 0)),
+        countY: Math.max(0, Math.min(100, Number(raw.countY ?? old.countY) || 0)),
+        widthDp: Math.max(220, Math.min(360, Math.round(Number(raw.widthDp ?? old.widthDp) || 340))),
+        heightDp: Math.max(60, Math.min(180, Math.round(Number(raw.heightDp ?? old.heightDp) || 100))),
+        avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(raw.avatarSizeDp ?? old.avatarSizeDp) || 44))),
+        titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.titleSizeSp ?? old.titleSizeSp) || 13))),
+        bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.bodySizeSp ?? old.bodySizeSp) || 12))),
+        countSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.countSizeSp ?? old.countSizeSp) || 12))),
       };
     };
     const button = input.luckyButton && typeof input.luckyButton === 'object' ? input.luckyButton as Record<string, unknown> : {};

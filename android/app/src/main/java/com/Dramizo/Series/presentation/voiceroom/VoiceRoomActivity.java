@@ -7393,10 +7393,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void showLuckyWinOverlay(String openerName, String rewardLabel) {
         String title = (openerName != null && !openerName.isEmpty() ? openerName : "مستخدم")
                 + " · صندوق الحظ";
-        // Premium 3D PNG burst — no Lottie / DotLottie.
-        RewardBurstOverlay.showLuckyWin(this,
-                openerName != null ? openerName : "",
-                rewardLabel != null ? rewardLabel : "جائزة");
+        // Intentionally do not show the legacy full-screen/center reward burst.
+        // Lucky reward details remain in the room chat; the global top toast is the
+        // only toast surface used for gift/lucky-win announcements.
         if (binding != null && binding.luckyWinOverlay != null) {
             try {
                 if (binding.lottieLuckyWin != null) {
@@ -10641,7 +10640,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
-    /** Small join-style toast for lucky win (never a full-screen dialog). */
+    /** Lucky-win announcement: the dashboard-controlled top toast is the only toast surface. */
     public void showLuckyResultToast(
             @Nullable String displayName,
             @Nullable String avatarUrl,
@@ -10650,15 +10649,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String message
     ) {
         if (areCelebrationPopupsMuted() || binding == null) return;
-        String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
         String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
-        // Lucky return/multiplier is a compact upper toast, never a large mid-screen bubble.
-        if (binding.comingMsgView != null) {
-            binding.comingMsgView.setupView(who, avatarUrl, userLevel, vipLevel, msg);
-            binding.comingMsgView.bringToFront();
-            binding.comingMsgView.setElevation(luckyCannonDp(90));
-            binding.comingMsgView.play(2600L);
-        }
+        // Intentionally do not show ComingMsgView here: it is the legacy sliding room toast
+        // that appeared around the middle of the room and ignored dashboard toast styling.
         if (roomBannerEnabled()) appendGameCelebrationLine(msg, null);
     }
 
@@ -10768,15 +10761,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             chat = coins > 0
                     ? ("مبروك " + who + " فاز بـ " + coins + " عملة · حظ")
                     : ("مبروك " + who + " · حظ");
-            if (bubbleFx != null && coins > 0) {
-                bubbleFx.showSlotWinBubble(who, null, coins, "حظ", badgeUrl);
-                if (binding != null && binding.giftChatEffects != null) {
-                    binding.giftChatEffects.setVisibility(View.VISIBLE);
-                    binding.giftChatEffects.bringToFront();
-                }
-            } else if (bubbleFx != null) {
-                bubbleFx.showRoomEventBubble(null, null, who + " · " + toastMsg, badgeUrl);
-            }
+            // Use the dashboard-controlled top toast for lucky wins; never the legacy
+            // animated card in the center of the room.
+            GlobalCelebrationToast.show(
+                    this, who, chat, avatarUrl, badgeUrl,
+                    dedupeKey != null ? dedupeKey : ("lucky-room-" + System.currentTimeMillis()),
+                    28, 1d, Math.max(0L, coins), who, "lucky_hit", null);
+            // The dashboard-controlled top toast is the only lucky-win toast.
+            // Do not add the legacy moving center-screen bubble for lucky wins.
             if (roomBannerEnabled()) {
                 appendGameCelebrationLine(chat, badgeUrl);
             }
@@ -11270,8 +11262,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int mul = Math.max(1, multiplier);
             line = "ضرب حظه وربح ×" + mul + " · +" + Math.max(0L, wonCoins);
         }
-        // Small join-style toast only — never the big crawling overlay.
-        showLuckyResultToast(who, avatarUrl, 1, 0, line);
+        // Use the same dashboard-controlled top toast as every other lucky-win event.
+        // Do not route this through ComingMsgView: that legacy sliding toast ignored the design controls.
+        GlobalCelebrationToast.show(
+                this, who, line, avatarUrl, null,
+                "lucky-room-hit-" + who + "-" + Math.max(0L, wonCoins) + "-" + multiplier,
+                28, Math.max(0, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
         if (roomBannerEnabled()) {
             appendChatLine(who, line, 0, 1, null, null, avatarUrl, null);
         }

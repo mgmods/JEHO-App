@@ -96,6 +96,10 @@
             <div><div class="settings-switch-title">لمعة ذهبية متحركة</div><div class="settings-switch-hint">تُرسم محلياً على الجهاز، بدون طلبات متكررة للخادم.</div></div>
             <input v-model="currentStyle.shineEnabled" class="form-check-input" type="checkbox" role="switch" />
           </label>
+          <label class="settings-switch mt-2">
+            <div><div class="settings-switch-title">توهج إطار التوست</div><div class="settings-switch-hint">يتحكم بتوهج التوست عند إرسال الهدية أو ظهور ربح المحظوظ.</div></div>
+            <input v-model="currentStyle.frameGlowEnabled" class="form-check-input" type="checkbox" role="switch" />
+          </label>
           <div class="mt-3">
             <label class="form-label">مدة ظهور التوست: {{ currentStyle.durationSeconds }} ثانية</label>
             <input v-model.number="currentStyle.durationSeconds" class="form-range" type="range" min="1" max="12" step="1" />
@@ -223,7 +227,7 @@ async function load() {
     Object.assign(form[key], {
       backgroundUrl: String(incoming.backgroundUrl || ''),
       shineEnabled: incoming.shineEnabled !== false,
-      frameGlowEnabled: false,
+      frameGlowEnabled: incoming.frameGlowEnabled !== false,
       durationSeconds: Math.max(1, Math.min(12, Number(incoming.durationSeconds) || (key === 'giftSend' ? 3 : key === 'luckyWinNormal' ? 4 : 5))),
       avatarX: Number.isFinite(Number(incoming.avatarX)) ? Number(incoming.avatarX) : 8,
       avatarY: Number.isFinite(Number(incoming.avatarY)) ? Number(incoming.avatarY) : 50,
@@ -291,16 +295,35 @@ async function save() {
     luckyWinHigh: { ...form.luckyWinHigh },
     luckyButton: { ...form.luckyButton },
   }
-  const { data, error: err } = await toastManagerApi.save(payload)
+  const { error: saveError } = await toastManagerApi.save(payload)
+  if (saveError) {
+    saving.value = false
+    error.value = saveError.message
+    toast().danger(saveError.message)
+    return
+  }
+
+  // Verify persistence from a fresh GET instead of trusting the PATCH response.
+  // This catches a backend that accepted a save but serves stale/default settings on reload.
+  const { data: readBack, error: readError } = await toastManagerApi.get()
   saving.value = false
-  if (err) { error.value = err.message; toast().danger(err.message); return }
-  const cfg = data?.data || data || {}
-  Object.assign(form.giftSend, cfg.giftSend || {})
-  Object.assign(form.luckyWinNormal, cfg.luckyWinNormal || {})
-  Object.assign(form.luckyWinHigh, cfg.luckyWinHigh || {})
-  Object.assign(form.luckyButton, cfg.luckyButton || {})
+  if (readError) {
+    error.value = 'تم إرسال الحفظ، لكن تعذّر التحقق من الإعدادات بعد الحفظ: ' + readError.message
+    toast().danger(error.value)
+    return
+  }
+  const cfg = readBack?.data || readBack || {}
+  if (!cfg.giftSend || !cfg.luckyWinNormal || !cfg.luckyWinHigh || !cfg.luckyButton) {
+    error.value = 'الخادم لم يُرجع إعدادات التوست المحفوظة كاملة؛ لم نعرض نجاحاً غير مؤكّد.'
+    toast().danger(error.value)
+    return
+  }
+  Object.assign(form.giftSend, cfg.giftSend)
+  Object.assign(form.luckyWinNormal, cfg.luckyWinNormal)
+  Object.assign(form.luckyWinHigh, cfg.luckyWinHigh)
+  Object.assign(form.luckyButton, cfg.luckyButton)
   form.version = Number(cfg.version) || form.version
-  success.value = 'تم حفظ جميع الإعدادات. ستُنفّذ الحركة محلياً على الأجهزة التي تدعم هذه النسخة.'
+  success.value = 'تم الحفظ والتحقق من الإعدادات بقراءة جديدة من الخادم. إذا عادت القيم بعد تحديث الصفحة، فالمشكلة من نسخة الخادم المنشورة أو قاعدة إعداداته وليست من المعاينة.'
   toast().success(success.value)
 }
 onMounted(load)
