@@ -63,7 +63,6 @@ public final class AdminPreviewActivity extends ThemedActivity {
             new Module("reports", "البلاغات والمراجعة", "⚑", "مراجعة البلاغات"),
             new Module("genderVerifications", "طلبات التحقق", "✓", "مراجعة طلبات التحقق"),
             new Module("operators", "مديرو الإدارة", "♜", "إدارة المدراء المحدودين"),
-            new Module("store", "المتجر والعناصر", "◇", "VIP والإطارات والدخوليات"),
             new Module("cosmetics", "كتالوج العناصر", "▣", "العناصر التجميلية"),
             new Module("grantCosmetics", "إهداء الإطارات والدخوليات", "✧", "منح العناصر بمدة"),
             new Module("vanityIds", "الآي دي المميز", "＃", "كتالوج الآيديات"),
