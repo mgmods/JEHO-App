@@ -708,6 +708,39 @@ public class ProfileFragment extends Fragment {
                         com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class));
             });
         }
+        // Isolated design preview: visible only to a server-authorized super admin.
+        // It opens local demo data and never calls production admin endpoints.
+        if (binding.btnAdminPreview != null) {
+            android.widget.TextView previewEntry = binding.btnAdminPreview;
+            previewEntry.setText("◈  معاينة لوحة الإدارة الجديدة");
+            previewEntry.setTextColor(0xFF6542C8);
+            previewEntry.setTextSize(14f);
+            previewEntry.setTypeface(android.graphics.Typeface.create(
+                    "sans-serif-medium", android.graphics.Typeface.BOLD));
+            previewEntry.setGravity(android.view.Gravity.CENTER);
+            previewEntry.setMinHeight(Math.round(48 * getResources().getDisplayMetrics().density));
+            android.graphics.drawable.GradientDrawable previewBackground =
+                    new android.graphics.drawable.GradientDrawable();
+            previewBackground.setColor(0xFFF3EFFF);
+            previewBackground.setCornerRadius(16 * getResources().getDisplayMetrics().density);
+            previewBackground.setStroke(Math.round(getResources().getDisplayMetrics().density), 0xFFD9CEF9);
+            previewEntry.setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(0x226542C8),
+                    previewBackground, null));
+            previewEntry.setVisibility(StaffRoleHelper.SUPER.equals(role) ? View.VISIBLE : View.GONE);
+            previewEntry.setOnClickListener(v -> {
+                if (!isAdded()) return;
+                com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto current =
+                        ContainerProvider.from(requireActivity()).getSessionManager().getUser();
+                if (!StaffRoleHelper.isSuper(current)) {
+                    Toast.makeText(requireContext(), "معاينة اللوحة متاحة للسوبر أدمن فقط",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                startActivity(new Intent(requireContext(),
+                        com.Dramizo.Series.presentation.admin.preview.AdminPreviewActivity.class));
+            });
+        }
         if (binding.panelStaffPowers != null) {
             if (isStaff) {
                 binding.panelStaffPowers.setVisibility(View.VISIBLE);
