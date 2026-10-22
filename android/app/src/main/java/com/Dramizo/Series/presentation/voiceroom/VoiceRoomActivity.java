@@ -9995,8 +9995,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         TextView btnRoomPk = sheet.findViewById(R.id.btnRoomPkChallenge);
         if (btnRoomPk != null) {
-            boolean canStartPk = isOwner && roomPkFeatureEnabled && roomPkCurrentContestId == null;
-            btnRoomPk.setVisibility(canStartPk ? View.VISIBLE : View.GONE);
+            boolean canStartPk = roomPkFeatureEnabled && roomPkCurrentContestId == null;
+            // Keep the PK entry visible to the room owner; global enablement controls availability, not discoverability.
+            btnRoomPk.setVisibility(isOwner ? View.VISIBLE : View.GONE);
+            btnRoomPk.setAlpha(canStartPk ? 1.0f : 0.65f);
+            btnRoomPk.setText(canStartPk ? "⚔ تحدّي PK بين الغرف" : "⚔ تحدّي PK بين الغرف (غير متاح حالياً)");
             btnRoomPk.setOnClickListener(v -> {
                 if (!isOwner || !roomPkFeatureEnabled) {
                     Toast.makeText(this, "تحدّي PK غير متاح حالياً", Toast.LENGTH_SHORT).show();
