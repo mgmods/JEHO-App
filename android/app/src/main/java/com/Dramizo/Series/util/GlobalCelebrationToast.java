@@ -141,19 +141,22 @@ public final class GlobalCelebrationToast {
         String chosenBackground = giftSend ? remoteBackgroundUrl
                 : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        int requestedWidthDp = giftSend ? remoteGiftWidthDp : luckyHigh ? remoteLuckyHighWidthDp : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
-        int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
+        // Keep the uploaded toast artwork at one stable size. Older saved width/height
+        // values are intentionally ignored so the background cannot jump or resize.
+        final int requestedWidthDp = 340;
+        final int requestedHeightDp = 100;
         ViewGroup.LayoutParams activeParams = active.getLayoutParams();
         if (activeParams instanceof FrameLayout.LayoutParams) {
             activeParams.width = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
             activeParams.height = dp(activity, requestedHeightDp);
             active.setLayoutParams(activeParams);
         }
-        String imageUrl = AssetCatalog.absoluteUrl(chosenBackground);
+        String imageUrl = toastBackgroundUrl(chosenBackground);
         if (background != null) {
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 active.setBackgroundColor(android.graphics.Color.TRANSPARENT);
                 background.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                background.setScaleType(ImageView.ScaleType.FIT_XY);
                 background.setVisibility(View.VISIBLE);
                 try {
                     Glide.with(activity).load(imageUrl).dontTransform().into(background);
@@ -643,12 +646,13 @@ public final class GlobalCelebrationToast {
         banner.setTranslationX(dp(activity, 140));
         if (toastBackground != null) {
             String selectedBackground = giftSend ? remoteBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
-            String imageUrl = customToastStyle ? AssetCatalog.absoluteUrl(selectedBackground) : null;
+            String imageUrl = customToastStyle ? toastBackgroundUrl(selectedBackground) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 // The uploaded artwork owns its pixels, edges and alpha channel. Do not add
                 // the built-in rounded frame behind a transparent PNG/WebP design.
                 banner.setBackground(null);
                 toastBackground.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                toastBackground.setScaleType(ImageView.ScaleType.FIT_XY);
                 toastBackground.setVisibility(View.VISIBLE);
                 try { Glide.with(activity.getApplicationContext()).load(imageUrl).dontTransform().into(toastBackground); }
                 catch (Exception ignored) { toastBackground.setVisibility(View.GONE); }
@@ -841,6 +845,17 @@ public final class GlobalCelebrationToast {
 
     private static int dp(View view, int value) {
         return Math.round(value * view.getResources().getDisplayMetrics().density);
+    }
+
+    /**
+     * Dashboard uploads can be returned as /api/v1/uploads/... by older API
+     * versions. Static media is served from /uploads/...; normalize that path
+     * before Glide requests it so a saved background works in the Android app.
+     */
+    private static String toastBackgroundUrl(String pathOrUrl) {
+        String absolute = AssetCatalog.absoluteUrl(pathOrUrl);
+        if (absolute == null || absolute.isEmpty()) return absolute;
+        return absolute.replaceFirst("/api/v\\\\d+(?=/uploads/)", "");
     }
 
     private static int dp(Activity activity, int value) {
