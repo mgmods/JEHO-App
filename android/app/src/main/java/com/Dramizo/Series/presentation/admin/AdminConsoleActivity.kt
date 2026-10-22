@@ -1114,7 +1114,7 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun renderItems(data: Any?, type: String) {
         val extractedItems = extractItems(data)
-        val grantableTypes = setOf("entry_effect", "profile_card", "nameplate")
+        val grantableTypes = setOf("entry_effect", "profile_card", "room_card", "nameplate")
         val items = if (type == "grantCosmetics" && currentRole != StaffRoleHelper.SUPER) {
             extractedItems.filter { item ->
                 value(item, "type")?.trim()?.lowercase() in grantableTypes
