@@ -263,7 +263,7 @@
         android:layout_height="48dp"
         android:layout_marginTop="12dp"
         android:background="@drawable/bg_room_dialog_item"
-        android:drawableStart="@drawable/icon_room_opera_admin"
+        android:drawableStart="@drawable/icon_room_opera_pk_open"
         android:drawablePadding="10dp"
         android:gravity="center_vertical"
         android:paddingStart="14dp"
