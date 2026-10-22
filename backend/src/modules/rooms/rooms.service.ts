@@ -3295,7 +3295,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     // Room moderators cannot override the host/cohost or another appointed
     // moderator, but platform managers and the room owner can perform mic-only removal.
-    if (actorStaff !== 'super' && actorStaff !== 'manager' && room.hostId !== actorId) {
+    if (actorStaff !== 'super' && actorStaff !== 'admin' && actorStaff !== 'manager' && room.hostId !== actorId) {
       if (room.cohostId === uid) {
         throw new ForbiddenException('لا يمكن للمشرف استهداف المضيف المساعد');
       }
