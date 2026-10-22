@@ -365,7 +365,28 @@ const disabledGames = ref([])
 const gameWinRates = reactive({})
 const gameRtpRates = reactive({})
 const manageableGames = [
-  ...MIKOO.map(([id, title]) => ({ id, label: title })),
+  { id: '7updown', label: '٧ فوق تحت' },
+  { id: 'bounty-football', label: 'كرة القدم الجوائز' },
+  { id: 'camel-racing', label: 'سباق الأسود' },
+  { id: 'cleopatra-slot', label: 'كليوباترا' },
+  { id: 'cleopatra-slots', label: 'فتحات كليوباترا' },
+  { id: 'crash', label: 'كراش' },
+  { id: 'fishing', label: 'صيد السمك' },
+  { id: 'football-plinko', label: 'بلينكو كرة القدم' },
+  { id: 'fortune-slot', label: 'جواهر الحظ' },
+  { id: 'greedy-box', label: 'صندوق الطمع' },
+  { id: 'greedy-lion', label: 'الأسد الطماع' },
+  { id: 'hilo', label: 'هاي لو' },
+  { id: 'line-slots', label: 'فتحات الخط' },
+  { id: 'luck-car', label: 'سيارة الحظ' },
+  { id: 'lucky77', label: 'لاكي ٧٧' },
+  { id: 'megaways-slots', label: 'ميجاوايز' },
+  { id: 'olympians', label: 'الأوليمبيون' },
+  { id: 'pirate-king', label: 'ملك القراصنة' },
+  { id: 'royal-battle', label: 'المعركة الملكية' },
+  { id: 'slot777', label: 'سلوت ٧٧٧' },
+  { id: 'sugar-rush', label: 'سكر راش' },
+  { id: 'swimsuit-party', label: 'حفلة السباحة' },
   { id: 'slots', label: 'السلوت المصغّر' },
   { id: 'roulette', label: 'الروليت' },
   { id: 'plinko', label: 'بلينكو' },
@@ -797,7 +818,7 @@ async function save() {
       sortOrder: i + 1,
       enabled: g.enabled !== false,
     }))
-  const { data: savedResponse, error: err } = await gamesCatalogApi.save(JSON.stringify(payload))
+  const { error: err } = await gamesCatalogApi.save(JSON.stringify(payload))
   saving.value = false
   if (err) {
     error.value = err.message
