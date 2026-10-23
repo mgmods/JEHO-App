@@ -365,15 +365,6 @@ export const rankingApi = {
 }
 
 
-export const badgesApi = {
-  list: () => safeRequest(() => api.get('/admin/badges')),
-  create: (data) => safeRequest(() => api.post('/admin/badges', data)),
-  update: (id, data) => safeRequest(() => api.put(`/admin/badges/${id}`, data)),
-  remove: (id) => safeRequest(() => api.delete(`/admin/badges/${id}`)),
-  grant: (id, userId, durationDays = 0) => safeRequest(() => api.post(`/admin/badges/${id}/grant`, { userId, durationDays })),
-  userBadges: (userId) => safeRequest(() => api.get(`/users/${encodeURIComponent(userId)}/badges`)),
-  revoke: (id, userId) => safeRequest(() => api.delete(`/admin/badges/${id}/users/${encodeURIComponent(userId)}`)),
-}
 
 export const supportChestApi = {
   getConfig: () => safeRequest(() => api.get('/admin/support-chest/config')),
