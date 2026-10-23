@@ -90,7 +90,7 @@ async function save() {
   finally { saving.value = false }
 }
 function parseUserIds(value) {
-  return [...new Set(String(value || '').split(/[\\s,;]+/).map((id) => id.trim()).filter(Boolean))]
+  return [...new Set(String(value || '').split(/[\s,;]+/).map((id) => id.trim()).filter(Boolean))]
 }
 async function grantBadge() {
   error.value = ''
