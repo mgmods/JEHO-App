@@ -1,46 +1,41 @@
-FROM node:20-alpine AS dashboard-builder
-
+# Build the existing dashboard as a preserved fallback route.
+FROM node:20-alpine AS legacy-dashboard-builder
 WORKDIR /dashboard
-
-COPY dashboard/package*.json ./
+COPY backend/dashboard/package*.json ./
 RUN npm ci
-
-COPY dashboard/ ./
-ENV VITE_BASE=/admin/
+COPY backend/dashboard/ ./
+ENV VITE_BASE=/admin-legacy/
 RUN npm run build
 
+# Build the Flutter Web administration panel for the live /admin/ path.
+FROM ghcr.io/cirruslabs/flutter:stable AS flutter-dashboard-builder
+WORKDIR /dashboard
+COPY flutter_dashboard/ ./
+RUN flutter create --platforms=web --project-name jeho_admin_flutter . \
+ && flutter pub get \
+ && flutter build web --release --base-href /admin/ --dart-define=JEHO_API_BASE_URL=https://jeho-own-backend.mgs.blitz.cloud/api/v1/
+
 FROM node:20-alpine AS builder
-
 WORKDIR /app
-
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm ci
-
-COPY . .
+COPY backend/ ./
 RUN npm run build
 
 FROM node:20-alpine AS runner
-
 WORKDIR /app
-
 ENV NODE_ENV=production
-
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
-
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
-COPY --from=dashboard-builder /dashboard/dist ./public/admin
-
+# The old dashboard remains available for rollback without affecting API data.
+COPY --from=legacy-dashboard-builder /dashboard/dist ./public/admin-legacy
+# The Flutter dashboard is now what the existing /admin/ URL serves.
+COPY --from=flutter-dashboard-builder /dashboard/build/web ./public/admin
 RUN mkdir -p uploads && chown -R node:node /app
-
 USER node
-
 EXPOSE 3000
-
-# JEHO-OWN keeps its database isolated in the "jeho_own" schema.
-# Seed first so TypeORM creates/updates all tables and default settings
-# before Nest starts serving requests. The compiled seed is in dist/.
-COPY --from=builder /app/scripts ./scripts
-
+# Keep the existing isolated JEHO-OWN database startup procedure unchanged.
+COPY backend/scripts ./scripts
 CMD ["node", "scripts/start-production.js"]
