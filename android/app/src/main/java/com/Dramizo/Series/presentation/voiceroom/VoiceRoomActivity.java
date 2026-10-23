@@ -1243,9 +1243,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 canManageSeats = true;
                 canInviteMic = true;
             }
-            if (isPlatformAdmin()) {
-                // Platform admins can manage music in every room, but this is only the
-                // dedicated music stream; microphone capture gain is never changed here.
+            if (isPlatformAdmin() || isPlatformManager()) {
+                // Platform admins/managers can manage music in every room, but this is
+                // only the dedicated music stream; microphone capture gain is untouched.
                 canManageMusic = true;
             }
             if (isPlatformSuper()) {
