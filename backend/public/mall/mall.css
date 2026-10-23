@@ -199,3 +199,36 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
 /* Remove the explanatory preview/promo section from the mall page. */
 .mall-shell>.hero{display:none!important}
+
+
+/* Room-card lease selector: only visible in the room-card store category. */
+.room-card-duration {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.48);
+}
+.room-card-duration[hidden] { display: none !important; }
+.room-card-duration label {
+  color: var(--text, #f8fafc);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.room-card-duration select {
+  min-width: 130px;
+  padding: 8px 12px;
+  color: var(--text, #f8fafc);
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 10px;
+}
+.room-card-duration span {
+  flex-basis: 100%;
+  color: var(--muted, #94a3b8);
+  font-size: 0.78rem;
+}
