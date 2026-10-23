@@ -214,7 +214,7 @@
         </div>
       </div>
       <div class="row g-2">
-        <div v-for="game in manageableGames.filter(g => supportsSharedRtp(game.id))" :key="'rtp-'+game.id" class="col-6 col-md-4 col-lg-3">
+        <div v-for="game in safeManageableGames.filter((g) => supportsSharedRtp(g.id))" :key="'rtp-'+game.id" class="col-6 col-md-4 col-lg-3">
           <label class="form-label small mb-1">{{ game.label }} — عائد اللاعب %</label>
           <input :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
         </div>
