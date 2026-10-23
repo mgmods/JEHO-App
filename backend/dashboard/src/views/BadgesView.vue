@@ -98,6 +98,7 @@ async function grantBadge() {
   bulkBusy.value = true
   const success = []
   const failed = []
+  const notificationWarnings = []
   try {
     for (const userId of ids) {
       const result = await badgesApi.grant(grant.badgeId, userId)
@@ -113,11 +114,18 @@ async function grantBadge() {
       }
       const rows = Array.isArray(verification?.data) ? verification.data
         : Array.isArray(verification?.data?.data) ? verification.data.data : []
-      if (rows.some((badge) => String(badge?.id) === String(grant.badgeId) && badge?.earned === true)) success.push(userId)
-      else failed.push(userId + ': لم يؤكد الخادم ظهور الشارة')
+      if (rows.some((badge) => String(badge?.id) === String(grant.badgeId) && badge?.earned === true)) {
+        success.push(userId)
+        const payload = result?.data?.data ?? result?.data ?? result
+        if (payload?.notificationCreated === false) notificationWarnings.push(userId + ': تم حفظ الشارة لكن تعذر حفظ إشعارها')
+      } else failed.push(userId + ': لم يؤكد الخادم ظهور الشارة')
     }
     const summary = 'تم التأكيد لـ ' + success.length + ' من ' + ids.length + ' حساب.'
-    if (failed.length) error.value = summary + '\nالحسابات التي تحتاج مراجعة:\n' + failed.join('\n')
+    const details = [
+      ...(failed.length ? ['الحسابات التي تحتاج مراجعة:', ...failed] : []),
+      ...(notificationWarnings.length ? ['تنبيهات الإشعار:', ...notificationWarnings] : []),
+    ]
+    if (details.length) error.value = summary + '\n' + details.join('\n')
     else window.alert(summary)
   } catch (e) {
     error.value = e?.message || e?.response?.data?.message || 'تعذر منح الشارة.'

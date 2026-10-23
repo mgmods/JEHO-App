@@ -135,18 +135,28 @@ export class NotificationsService {
         data: dto.data || null,
       }),
     );
-    this.realtime.emitToUser(dto.userId, 'notification:new', notif);
+    // Persist first. Realtime and push delivery are best-effort and must never
+    // turn a successfully stored in-app notification into a reported failure.
+    try {
+      this.realtime.emitToUser(dto.userId, 'notification:new', notif);
+    } catch (err) {
+      this.logger.warn(`Realtime notification emit failed: ${(err as Error).message}`);
+    }
     if (dto.sendPush !== false) {
-      const sent = await this.sendFcm(dto.userId, dto.title, dto.body, {
-        ...(dto.data || {}),
-        type: dto.type,
-        notificationId: notif.id,
-        title: dto.title,
-        body: dto.body,
-      });
-      if (sent) {
-        notif.fcmSent = true;
-        await this.notifRepo.save(notif);
+      try {
+        const sent = await this.sendFcm(dto.userId, dto.title, dto.body, {
+          ...(dto.data || {}),
+          type: dto.type,
+          notificationId: notif.id,
+          title: dto.title,
+          body: dto.body,
+        });
+        if (sent) {
+          notif.fcmSent = true;
+          await this.notifRepo.save(notif);
+        }
+      } catch (err) {
+        this.logger.warn(`Push notification delivery failed: ${(err as Error).message}`);
       }
     }
     return notif;
