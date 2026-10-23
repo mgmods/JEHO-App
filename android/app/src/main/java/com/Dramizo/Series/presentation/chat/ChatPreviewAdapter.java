@@ -127,7 +127,11 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         if (va != vb) return false;
         String ra = a.peer != null ? a.peer.customDisplayRankName : null;
         String rb = b.peer != null ? b.peer.customDisplayRankName : null;
-        return eq(ra, rb);
+        String colorA = a.peer != null ? a.peer.customDisplayRankColor : null;
+        String colorB = b.peer != null ? b.peer.customDisplayRankColor : null;
+        String plateA = a.peer != null ? a.peer.customDisplayRankNameplateUrl : null;
+        String plateB = b.peer != null ? b.peer.customDisplayRankNameplateUrl : null;
+        return eq(ra, rb) && eq(colorA, colorB) && eq(plateA, plateB);
     }
 
     private static boolean sameAvatar(
