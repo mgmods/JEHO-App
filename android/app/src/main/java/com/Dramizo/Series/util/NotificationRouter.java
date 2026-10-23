@@ -43,6 +43,16 @@ public final class NotificationRouter {
             return i;
         }
 
+        // Admin-originated notifications (including legacy system-type broadcasts)
+        // must open the dedicated Admin Messages inbox, not the generic notification list.
+        if ("true".equalsIgnoreCase(first(data, "adminMessage"))
+                || "admin".equalsIgnoreCase(first(data, "source"))) {
+            Intent i = new Intent(context,
+                    com.Dramizo.Series.presentation.notifications.AdminMessagesActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            return i;
+        }
+
         if (("chat".equals(t) || "message".equals(t)) && !TextUtils.isEmpty(conversationId)) {
             Intent i = new Intent(context, ChatConversationActivity.class);
             i.putExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID, conversationId);
