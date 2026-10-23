@@ -213,30 +213,6 @@
                     android:src="@drawable/ic_me_setting" />
             </LinearLayout>
 
-            <!-- Earned dashboard/achievement badges sit directly below the main profile avatar. -->
-            <LinearLayout
-                android:id="@+id/rowProfileBadges"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:paddingHorizontal="20dp"
-                android:gravity="start|center_vertical"
-                android:orientation="horizontal"
-                android:layoutDirection="rtl"
-                android:foreground="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:visibility="gone"
-                android:contentDescription="عرض الشارات المكتسبة">
-
-                <LinearLayout
-                    android:id="@+id/earnedBadgesContainer"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal" />
-            </LinearLayout>
-
             <!-- Active relationship: own avatar large, partner avatar smaller, animated bond symbol between them. -->
             <LinearLayout
                 android:id="@+id/rowMyProfileCp"

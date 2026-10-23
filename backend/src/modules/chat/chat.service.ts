@@ -220,12 +220,14 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
   private async displayRankMapForUsers(userIds: string[]) {
     const ids = [...new Set((userIds || []).filter(Boolean))];
-    const result = new Map<string, { customDisplayRankName: string | null; customDisplayRankImageUrl: string | null; customDisplayRankAnimated: boolean }>();
+    const result = new Map<string, { customDisplayRankName: string | null; customDisplayRankImageUrl: string | null; customDisplayRankAnimated: boolean; customDisplayRankColor: string; customDisplayRankFrameUrl: string | null; customDisplayRankNameplateUrl: string | null; customDisplayRankEntryEffectUrl: string | null }>();
     if (!ids.length) return result;
     const rows = await this.dataSource.query(
       `SELECT DISTINCT ON (ub."userId")
               ub."userId" AS "userId", b.name AS "name",
-              b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated"
+              b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated",
+              b."displayColor" AS "displayColor", b."frameUrl" AS "frameUrl",
+              b."nameplateUrl" AS "nameplateUrl", b."entryEffectUrl" AS "entryEffectUrl"
          FROM user_badges ub JOIN badges b ON b.id = ub."badgeId"
         WHERE ub."userId" = ANY($1::uuid[])
           AND b.category = 'display_rank' AND b."isActive" = true
@@ -237,6 +239,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       customDisplayRankName: row.name ? String(row.name) : null,
       customDisplayRankImageUrl: row.imageUrl ? String(row.imageUrl) : null,
       customDisplayRankAnimated: row.isAnimated === true || row.isAnimated === 'true',
+      customDisplayRankColor: row.displayColor ? String(row.displayColor) : '#D8B35B',
+      customDisplayRankFrameUrl: row.frameUrl ? String(row.frameUrl) : null,
+      customDisplayRankNameplateUrl: row.nameplateUrl ? String(row.nameplateUrl) : null,
+      customDisplayRankEntryEffectUrl: row.entryEffectUrl ? String(row.entryEffectUrl) : null,
     });
     return result;
   }
@@ -273,6 +279,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
             customDisplayRankName: displayRank?.customDisplayRankName ?? null,
             customDisplayRankImageUrl: displayRank?.customDisplayRankImageUrl ?? null,
             customDisplayRankAnimated: displayRank?.customDisplayRankAnimated === true,
+            customDisplayRankColor: displayRank?.customDisplayRankColor ?? '#D8B35B',
+            customDisplayRankFrameUrl: displayRank?.customDisplayRankFrameUrl ?? null,
+            customDisplayRankNameplateUrl: displayRank?.customDisplayRankNameplateUrl ?? null,
+            customDisplayRankEntryEffectUrl: displayRank?.customDisplayRankEntryEffectUrl ?? null,
             hostBadgeUrl: profile?.hostBadgeUrl ?? null,
             vipBadgeUrl: profile?.vipBadgeUrl ?? null,
             roomCardUrl: profile?.roomCardUrl ?? null,
@@ -369,6 +379,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
             customDisplayRankName: displayRanks?.get(peerPart.user.id)?.customDisplayRankName ?? null,
             customDisplayRankImageUrl: displayRanks?.get(peerPart.user.id)?.customDisplayRankImageUrl ?? null,
             customDisplayRankAnimated: displayRanks?.get(peerPart.user.id)?.customDisplayRankAnimated === true,
+            customDisplayRankColor: displayRanks?.get(peerPart.user.id)?.customDisplayRankColor ?? '#D8B35B',
+            customDisplayRankFrameUrl: displayRanks?.get(peerPart.user.id)?.customDisplayRankFrameUrl ?? null,
+            customDisplayRankNameplateUrl: displayRanks?.get(peerPart.user.id)?.customDisplayRankNameplateUrl ?? null,
+            customDisplayRankEntryEffectUrl: displayRanks?.get(peerPart.user.id)?.customDisplayRankEntryEffectUrl ?? null,
             hostBadgeUrl: (peerPart.user as any).profile?.hostBadgeUrl ?? null,
             vipBadgeUrl: (peerPart.user as any).profile?.vipBadgeUrl ?? null,
             roomCardUrl: (peerPart.user as any).profile?.roomCardUrl ?? null,

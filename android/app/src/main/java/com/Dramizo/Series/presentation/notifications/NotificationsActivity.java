@@ -54,10 +54,7 @@ public class NotificationsActivity extends ThemedActivity {
         adapter = new NotificationAdapter(n -> {
             if (n != null && n.id != null && !n.isRead) vm.markRead(n.id);
             if (isBadgeAwardNotification(n)) {
-                String currentUserId = ContainerProvider.from(this).getSessionManager().getUserId();
-                Intent badges = new Intent(this, com.Dramizo.Series.presentation.profile.BadgeActivity.class);
-                badges.putExtra(com.Dramizo.Series.presentation.profile.BadgeActivity.EXTRA_USER_ID, currentUserId);
-                startActivity(badges);
+                Toast.makeText(this, "ميزة الميداليات والشارات غير متاحة", Toast.LENGTH_SHORT).show();
                 return;
             }
             if (isCpRequestNotification(n)) {

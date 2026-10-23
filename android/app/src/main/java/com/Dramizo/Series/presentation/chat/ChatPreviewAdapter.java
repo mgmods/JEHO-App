@@ -1,6 +1,10 @@
 package com.Dramizo.Series.presentation.chat;
 
 import android.graphics.Typeface;
+import android.graphics.Color;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -127,7 +131,11 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         if (va != vb) return false;
         String ra = a.peer != null ? a.peer.customDisplayRankName : null;
         String rb = b.peer != null ? b.peer.customDisplayRankName : null;
-        return eq(ra, rb);
+        String colorA = a.peer != null ? a.peer.customDisplayRankColor : null;
+        String colorB = b.peer != null ? b.peer.customDisplayRankColor : null;
+        String plateA = a.peer != null ? a.peer.customDisplayRankNameplateUrl : null;
+        String plateB = b.peer != null ? b.peer.customDisplayRankNameplateUrl : null;
+        return eq(ra, rb) && eq(colorA, colorB) && eq(plateA, plateB);
     }
 
     private static boolean sameAvatar(
@@ -135,10 +143,13 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         if (a == b) return true;
         if (a == null || b == null) return false;
         String rankImageA = a.peer != null ? a.peer.customDisplayRankImageUrl : null;
+        String rankColorA = a.peer != null ? a.peer.customDisplayRankColor : null;
+        String rankColorB = b.peer != null ? b.peer.customDisplayRankColor : null;
         String rankImageB = b.peer != null ? b.peer.customDisplayRankImageUrl : null;
         return eq(resolveAvatarUrl(a), resolveAvatarUrl(b))
                 && eq(resolveFrameUrl(a), resolveFrameUrl(b))
-                && eq(rankImageA, rankImageB);
+                && eq(rankImageA, rankImageB)
+                && eq(rankColorA, rankColorB);
     }
 
     private static String resolveAvatarUrl(ChatDtos.ConversationDto item) {
@@ -151,6 +162,7 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
 
     private static String resolveFrameUrl(ChatDtos.ConversationDto item) {
         if (item == null || item.peer == null) return null;
+        if (item.peer.customDisplayRankFrameUrl != null && !item.peer.customDisplayRankFrameUrl.trim().isEmpty()) return item.peer.customDisplayRankFrameUrl;
         return item.peer.vipBadgeUrl;
     }
 
@@ -185,9 +197,21 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         }
         String rankName = item.peer != null ? item.peer.customDisplayRankName : null;
         if (rankName != null && !rankName.trim().isEmpty()) {
-            displayName = displayName + "  ·  " + rankName.trim();
+            String rankLabel = rankName.trim();
+            SpannableStringBuilder title = new SpannableStringBuilder(displayName)
+                    .append("\n").append(rankLabel);
+            int rankColor;
+            try {
+                rankColor = Color.parseColor(item.peer.customDisplayRankColor);
+            } catch (Exception ignored) {
+                rankColor = Color.parseColor("#D8B35B");
+            }
+            title.setSpan(new ForegroundColorSpan(rankColor), title.length() - rankLabel.length(),
+                    title.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            holder.b.tvTitle.setText(title);
+        } else {
+            holder.b.tvTitle.setText(displayName);
         }
-        holder.b.tvTitle.setText(displayName);
 
         boolean verified = item.peer != null && item.peer.genderVerified;
         if (holder.b.imgOfficial != null) {

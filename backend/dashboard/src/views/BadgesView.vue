@@ -10,6 +10,7 @@
         <div class="col-md-3"><label class="form-label">رفع صورة من الجهاز</label><input class="form-control" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" :disabled="uploadingImage" @change="uploadImage" /><small v-if="uploadingImage" class="text-muted">جارٍ رفع الصورة…</small></div>
         <div class="col-md-6"><label class="form-label">الوصف</label><input v-model.trim="form.description" class="form-control" maxlength="500" /></div>
         <div class="col-md-3"><label class="form-label">نوع العنصر</label><select v-model="form.category" class="form-select"><option v-if="!isRankPage" value="general">ميدالية عادية</option><option v-if="isRankPage" value="display_rank">صفة شكلية تظهر للجميع</option><option v-if="form.category && !['general', 'display_rank'].includes(form.category)" :value="form.category">{{ form.category }}</option></select><small v-if="form.category === 'display_rank'" class="text-muted">تظهر الصفة مع اسم الحساب في الغرف والتعليقات والملف الشخصي والمحادثات، دون أي صلاحيات إدارية.</small></div>
+        <div v-if="isRankPage" class="col-12"><div class="rank-style-panel"><h6>مظهر الصفة — يظهر للمستخدمين المعيّنين فقط</h6><div class="row g-3"><div class="col-md-3"><label class="form-label">لون اسم الصفة</label><div class="d-flex align-items-center gap-2"><input v-model="form.displayColor" type="color" class="form-control form-control-color" /><code>{{ form.displayColor }}</code></div></div><div v-for="asset in rankAssets" :key="asset.key" class="col-md-3"><label class="form-label">{{ asset.label }}</label><input v-model.trim="form[asset.key]" class="form-control form-control-sm mb-2" placeholder="رابط الملف (اختياري)" /><input type="file" class="form-control form-control-sm" accept="image/*,.svga,.json" :disabled="uploadingRankAsset === asset.key" @change="uploadRankAsset(asset.key, $event)" /><small v-if="uploadingRankAsset === asset.key" class="text-muted">جارٍ الرفع…</small><img v-if="form[asset.key]" :src="resolveAsset(form[asset.key])" :alt="asset.label" style="display:block;max-width:100%;max-height:72px;object-fit:contain;margin-top:6px" /></div></div><small class="text-muted">الإطار يخص صورة الحساب، وبطاقة الاسم تزيّن الاسم، والدخولية تُمرر إلى التطبيق عند دخول الغرفة. لا تمنح الصفة أي صلاحيات إدارية.</small></div></div>
         <div class="col-md-2"><label class="form-label">نوع المنح</label><select v-model="form.awardType" class="form-select"><option value="manual">يدوي</option><option value="achievement">إنجاز تلقائي</option></select></div>
         <template v-if="form.awardType === 'achievement'">
           <div class="col-md-4"><label class="form-label">شرط الإنجاز</label><select v-model="form.achievementKey" class="form-select" required><option :value="null" disabled>اختر الشرط</option><option value="level">المستوى</option><option value="experience">الخبرة</option><option value="followers">عدد المتابعين</option><option value="recharge">إجمالي الشحن التراكمي</option><option value="support">إجمالي الدعم المرسل للآخرين</option><option value="received">إجمالي الهدايا المستلمة</option></select></div>
@@ -50,10 +51,16 @@ const badges = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const uploadingImage = ref(false)
+const uploadingRankAsset = ref('')
+const rankAssets = [
+  { key: 'frameUrl', label: 'إطار الحساب' },
+  { key: 'nameplateUrl', label: 'بطاقة الاسم' },
+  { key: 'entryEffectUrl', label: 'الدخولية' },
+]
 const bulkBusy = ref(false)
 const error = ref('')
 const editingId = ref('')
-const blank = () => ({ name: '', description: '', imageUrl: '', category: isRankPage.value ? 'display_rank' : 'general', awardType: 'manual', achievementKey: null, achievementThreshold: 0, isActive: true, isAnimated: false, sortOrder: 0 })
+const blank = () => ({ name: '', description: '', imageUrl: '', category: isRankPage.value ? 'display_rank' : 'general', displayColor: '#D8B35B', frameUrl: '', nameplateUrl: '', entryEffectUrl: '', awardType: 'manual', achievementKey: null, achievementThreshold: 0, isActive: true, isAnimated: false, sortOrder: 0 })
 const form = reactive(blank())
 const grant = reactive({ badgeId: '', userId: '', durationDays: 0 })
 
@@ -83,6 +90,23 @@ async function uploadImage(event) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر رفع صورة الميدالية.'
   } finally {
     uploadingImage.value = false
+    event.target.value = ''
+  }
+}
+async function uploadRankAsset(field, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  uploadingRankAsset.value = field
+  error.value = ''
+  try {
+    const response = await uploadsApi.upload(file)
+    const payload = response?.data?.data ?? response?.data ?? {}
+    if (!payload.url) throw new Error('لم يُرجع الخادم رابط الملف.')
+    form[field] = resolveAsset(payload.url)
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر رفع ملف الصفة.'
+  } finally {
+    uploadingRankAsset.value = ''
     event.target.value = ''
   }
 }

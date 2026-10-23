@@ -134,7 +134,14 @@ const sections = computed(() => [
     label: 'إدارة المتجر',
     items: [
       { name: 'cosmetics', icon: 'bi-shop-window', label: 'إعدادات المتجر: الإطارات والدخوليات' },
-      { name: 'staff-identity', icon: 'bi-person-badge-fill', label: 'إطارات وشارات وبطاقات الرتب الإدارية', module: 'settings' },
+    ],
+  },
+  {
+    id: 'identity',
+    label: 'الصفات والهوية',
+    items: [
+      { name: 'display-ranks', icon: 'bi-patch-check', label: 'الصفات الشكلية' },
+      { name: 'staff-identity', icon: 'bi-person-badge-fill', label: 'هوية السوبر أدمن والأدمن والمانجر', module: 'settings' },
     ],
   },
   {
@@ -143,8 +150,6 @@ const sections = computed(() => [
     items: [
       { name: 'vip', query: {}, icon: 'bi-diamond', label: 'VIP ومظاهره' },
       { name: 'mysterious-man', icon: 'bi-incognito', label: 'الرجل الغامض', module: 'settings' },
-      { name: 'badges', icon: 'bi-award', label: 'الميداليات' },
-      { name: 'display-ranks', icon: 'bi-patch-check', label: 'الصفات الشكلية' },
       { name: 'vanity-ids', icon: 'bi-hash', label: 'الأيدي المميزة والمتحركة' },
       { name: 'offers', icon: 'bi-box-seam', label: t('nav.offers') },
       { name: 'promos', icon: 'bi-stars', label: t('nav.promos') },

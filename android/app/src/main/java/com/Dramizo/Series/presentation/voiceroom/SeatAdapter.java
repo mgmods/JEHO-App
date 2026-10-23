@@ -1106,11 +1106,39 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (title == null || title.trim().isEmpty()) {
             holder.b.rowCustomDisplayRank.setVisibility(View.GONE);
             holder.b.tvCustomRankBadge.setText("");
+            holder.b.tvCustomRankBadge.setBackground(null);
             Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
             return;
         }
         holder.b.rowCustomDisplayRank.setVisibility(View.VISIBLE);
         holder.b.tvCustomRankBadge.setText(title.trim());
+        try {
+            holder.b.tvCustomRankBadge.setTextColor(Color.parseColor(
+                    user.customDisplayRankColor == null ? "#D8B35B" : user.customDisplayRankColor));
+        } catch (Exception ignored) {
+            holder.b.tvCustomRankBadge.setTextColor(Color.parseColor("#D8B35B"));
+        }
+        String rankNameplateUrl = user.customDisplayRankNameplateUrl;
+        if (rankNameplateUrl != null && !rankNameplateUrl.trim().isEmpty()) {
+            Glide.with(holder.itemView).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rankNameplateUrl.trim()))
+                    .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
+                        @Override public void onResourceReady(@NonNull android.graphics.drawable.Drawable resource, @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.drawable.Drawable> transition) {
+                            holder.b.tvCustomRankBadge.setBackground(resource);
+                        }
+                        @Override public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {
+                            holder.b.tvCustomRankBadge.setBackground(null);
+                        }
+                    });
+        } else {
+            holder.b.tvCustomRankBadge.setBackground(null);
+        }
+        String rankFrameUrl = user.customDisplayRankFrameUrl;
+        if (rankFrameUrl != null && !rankFrameUrl.trim().isEmpty() && holder.b.imgFrame != null) {
+            holder.b.imgFrame.setVisibility(View.VISIBLE);
+            Glide.with(holder.itemView)
+                    .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rankFrameUrl.trim()))
+                    .into(holder.b.imgFrame);
+        }
         if (imageUrl != null && !imageUrl.trim().isEmpty()) {
             holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
             // Glide animates GIF assets; static images remain static.
