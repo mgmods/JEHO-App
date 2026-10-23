@@ -14125,7 +14125,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 who = fromUsername != null ? fromUsername : "مستخدم";
             }
             long won = Math.max(0L, memberLong(payload, "luckyCoinsWon", 0L));
-            if (won <= 0) return;
+            // A zero-payout lucky result is still a real outcome and must show the
+            // configured return/loss toast; only coin rain/audio require a payout.
             int mul = 1;
             boolean soft = false;
             if (payload.has("luckyMultiplier") && !payload.get("luckyMultiplier").isJsonNull()) {
@@ -14144,11 +14145,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     memberStr(payload, "at"));
             if (luckyToastEventKey == null) luckyToastEventKey = String.valueOf(System.currentTimeMillis());
             showLuckyHitBanner(who, memberStr(payload, "senderAvatarUrl"), won, mul, luckyToastEventKey);
-            GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
-            // Only float/rain on the winner's seat.
-            if (senderId != null && !senderId.isEmpty()) {
-                showLuckyReturnOnMics(java.util.Collections.singletonList(senderId), won);
-                playCoinRainToUsers(java.util.Collections.singletonList(senderId), 16);
+            if (won > 0) {
+                GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
+                // Only float/rain on the winner's seat when a payout actually occurred.
+                if (senderId != null && !senderId.isEmpty()) {
+                    showLuckyReturnOnMics(java.util.Collections.singletonList(senderId), won);
+                    playCoinRainToUsers(java.util.Collections.singletonList(senderId), 16);
+                }
             }
         } else if ("game:update".equals(event) || "game:invite".equals(event)) {
             // XO retired — ignore legacy realtime payloads
