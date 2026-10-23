@@ -141,14 +141,17 @@ public final class GlobalCelebrationToast {
         String chosenBackground = giftSend ? remoteBackgroundUrl
                 : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        // Keep the uploaded toast artwork at one stable size. Older saved width/height
-        // values are intentionally ignored so the background cannot jump or resize.
-        final int requestedWidthDp = 340;
-        final int requestedHeightDp = 100;
+        final int requestedWidthDp = giftSend ? remoteGiftWidthDp
+                : luckyHigh ? remoteLuckyHighWidthDp
+                : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
+        final int requestedHeightDp = giftSend ? remoteGiftHeightDp
+                : luckyHigh ? remoteLuckyHighHeightDp
+                : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
         ViewGroup.LayoutParams activeParams = active.getLayoutParams();
         if (activeParams instanceof FrameLayout.LayoutParams) {
-            activeParams.width = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
-            activeParams.height = dp(activity, requestedHeightDp);
+            int maxWidth = Math.max(dp(activity, 220), screenWidth - dp(activity, 24));
+            activeParams.width = Math.min(dp(activity, Math.max(220, Math.min(360, requestedWidthDp))), maxWidth);
+            activeParams.height = dp(activity, Math.max(60, Math.min(180, requestedHeightDp)));
             active.setLayoutParams(activeParams);
         }
         String imageUrl = toastBackgroundUrl(chosenBackground);
@@ -427,9 +430,17 @@ public final class GlobalCelebrationToast {
             return;
         }
         showing = true;
-        showInternal(activity, request.title, request.body, request.avatarUrl,
-                request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
-                request.displayName, request.kind, request.roomId);
+        try {
+            showInternal(activity, request.title, request.body, request.avatarUrl,
+                    request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
+                    request.displayName, request.kind, request.roomId);
+        } catch (Throwable error) {
+            // A single malformed asset/activity must not leave the global toast queue
+            // permanently marked as showing and hide every later celebration.
+            android.util.Log.w("GlobalCelebrationToast", "Toast rendering failed", error);
+            showing = false;
+            MAIN.post(GlobalCelebrationToast::showNext);
+        }
     }
 
     private static void showInternal(
