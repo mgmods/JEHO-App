@@ -4967,12 +4967,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         binding.tvMusicTitle.setText(title != null && !title.isEmpty() ? title : "موسيقى الغرفة");
         binding.tvMusicArtist.setText(artist != null && !artist.isEmpty() ? artist : "من هاتف المضيف");
+        // Listeners can hear the shared music but never receive playback/playlist/volume controls.
+        // Authorization is also enforced by the backend; this keeps the room UI unambiguous.
+        int musicControlVisibility = canManageMusic ? View.VISIBLE : View.GONE;
+        binding.btnMusicPlayPause.setVisibility(musicControlVisibility);
         binding.btnMusicPlayPause.setEnabled(canManageMusic);
+        binding.btnMusicSkip.setVisibility(musicControlVisibility);
         binding.btnMusicSkip.setEnabled(canManageMusic);
+        binding.btnMusicStop.setVisibility(musicControlVisibility);
         binding.btnMusicStop.setEnabled(canManageMusic);
+        binding.seekMusic.setVisibility(musicControlVisibility);
         binding.seekMusic.setEnabled(canManageMusic);
-        if (binding.btnMusicVolumeDown != null) binding.btnMusicVolumeDown.setEnabled(canManageMusic);
-        if (binding.btnMusicVolumeUp != null) binding.btnMusicVolumeUp.setEnabled(canManageMusic);
+        if (binding.seekMusicVolume != null) {
+            binding.seekMusicVolume.setVisibility(musicControlVisibility);
+            binding.seekMusicVolume.setEnabled(canManageMusic);
+        }
+        if (binding.btnMusicVolumeDown != null) {
+            binding.btnMusicVolumeDown.setVisibility(musicControlVisibility);
+            binding.btnMusicVolumeDown.setEnabled(canManageMusic);
+        }
+        if (binding.btnMusicVolumeUp != null) {
+            binding.btnMusicVolumeUp.setVisibility(musicControlVisibility);
+            binding.btnMusicVolumeUp.setEnabled(canManageMusic);
+        }
         updateMusicProgressUi();
         binding.btnMusicPlayPause.setImageResource(playing
                 ? android.R.drawable.ic_media_pause
