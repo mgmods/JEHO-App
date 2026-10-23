@@ -1337,8 +1337,6 @@ export class CosmeticsService implements OnModuleInit {
       { code: 'room_mikoo_border_top6', name: 'إطار الروم · المركز 6', file: 'bg_room_border_top6.webp', price: 139, sortOrder: 55 },
       { code: 'room_mikoo_border_top7', name: 'إطار الروم · المركز 7', file: 'bg_room_border_top7.webp', price: 119, sortOrder: 56 },
     ];
-    const keepCodes = new Set(mikooBorders.map((b) => b.code));
-
     let created = 0;
     for (const b of mikooBorders) {
       const previewUrl = `/assets/rooms/mikoo/${b.file}?v=${v}`;
