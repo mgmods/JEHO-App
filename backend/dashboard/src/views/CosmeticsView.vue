@@ -267,6 +267,13 @@
                   <label class="form-label">{{ t('cosmetics.metaJson') }}</label>
                   <textarea v-model="form.metaJson" class="form-control font-monospace" rows="3" placeholder='{"offsetX":0,"offsetY":-4,"scale":1.15,"avatarScale":0.7}' />
                 </div>
+                <div v-if="form.type === 'room_card'" class="col-12">
+                  <div class="form-text">
+                    بطاقات الروم: السعر الأساسي هو سعر 30 يومًا. لإعداد سعر دائم مخصص، أضف إلى البيانات الإضافية
+                    <code>{"roomCardPermanentPrice":1200}</code>. إذا لم تضف القيمة، يكون السعر الدائم أربعة أضعاف سعر 30 يومًا.
+                    ارفع GIF أو WebP أو MP4 أو SVGA في ملف الحركة ليظهر التأثير متحركًا.
+                  </div>
+                </div>
                 <div class="col-12">
                   <div class="form-check form-switch">
                     <input id="cosmeticActive" v-model="form.isActive" class="form-check-input" type="checkbox" />
