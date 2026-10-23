@@ -501,7 +501,7 @@ public final class GlobalCelebrationToast {
         boolean luckyReturn = luckyWin && (explicitReturn || (!explicitHigh
                 && (multiplier <= 0d || (body != null
                 && (body.contains("مردود جزئي") || body.contains("مردود +")
-                || body.contains("مردود الهدية")))));
+                || body.contains("مردود الهدية"))))));
         boolean luckyHigh = luckyWin && !luckyReturn
                 && (explicitHigh || multiplier >= 10d || coinsWon >= 1000L);
         String toastKindTag = giftSend ? "gift_send" : luckyWin ? (luckyReturn ? "lucky_hit_return" : luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
