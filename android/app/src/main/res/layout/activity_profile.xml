@@ -248,6 +248,15 @@
                         tools:text="أحمد" />
 
                     <ImageView
+                        android:id="@+id/imgCustomDisplayRank"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="5dp"
+                        android:contentDescription="@null"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                    <ImageView
                         android:id="@+id/imgGender"
                         android:layout_width="16dp"
                         android:layout_height="16dp"
