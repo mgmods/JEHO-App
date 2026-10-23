@@ -27,7 +27,10 @@ export function normalizeStaffRole(user: {
     return 'operator';
   }
   if (raw === 'manager' || raw === 'moderator' || raw === 'mod') return 'manager';
-  // Legacy dashboard flag without staffRole column filled in.
+  // Only use the legacy isAdmin flag when staffRole is genuinely absent.
+  // An explicit non-staff role (for example "user" after demotion) must win,
+  // otherwise stale isAdmin=true would resurrect Super Admin after downgrade.
+  if (raw.length > 0) return 'none';
   if (user.isAdmin) return 'super';
   return 'none';
 }
