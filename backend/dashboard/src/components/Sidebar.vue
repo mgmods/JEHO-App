@@ -167,7 +167,7 @@ const sections = computed(() => [
     id: 'media',
     label: t('nav.mediaGames'),
     items: [
-      { name: 'games', icon: 'bi-controller', label: t('nav.games') },
+      { name: 'games', icon: 'bi-controller', label: t('nav.games'), module: 'games' },
       { name: 'game-ads', icon: 'bi-badge-ad', label: t('nav.gameAds') },
       { name: 'drama', icon: 'bi-film', label: t('nav.drama') },
       { name: 'banners', icon: 'bi-images', label: t('nav.banners') },
