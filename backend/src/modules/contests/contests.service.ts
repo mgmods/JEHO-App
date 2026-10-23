@@ -100,7 +100,11 @@ export class ContestsService implements OnModuleInit {
     const scoreA = Math.max(0, Number(sideA.score || 0));
     const scoreB = Math.max(0, Number(sideB.score || 0));
     const winner = scoreA === scoreB ? 'draw' : scoreA > scoreB ? 'sideA' : 'sideB';
+    // In-room person/team PK stores its single room on contest.roomId; room-vs-room
+    // stores both room IDs in sideA/sideB. Include both shapes so end events reach
+    // every client in the room and the PK banner/layout can reset reliably.
     const roomIds = [...new Set([
+      ...(contest.roomId ? [String(contest.roomId)] : []),
       ...(Array.isArray(sideA.roomIds) ? sideA.roomIds.map(String) : []),
       ...(Array.isArray(sideB.roomIds) ? sideB.roomIds.map(String) : []),
     ].filter(Boolean))];
