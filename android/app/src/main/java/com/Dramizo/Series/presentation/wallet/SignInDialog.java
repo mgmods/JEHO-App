@@ -141,17 +141,17 @@ public class SignInDialog extends DialogFragment {
                     ImageView image = rewardImages.get(i);
                     TextView label = rewardLabels.get(i);
                     if (day != null && "cosmetic".equalsIgnoreCase(day.type)) {
-                        String url = nonEmpty(day.previewUrl) ? day.previewUrl : day.animationUrl;
+                        String url = nonEmpty(day.previewUrl) ? day.previewUrl : day.animationUrl;\n                        // The selected catalogue item supplies its own artwork URL (frame, entry effect, etc.).
                         if (nonEmpty(url)) {
                             Glide.with(this).load(url).placeholder(R.drawable.ic_gold_coin)
                                     .error(R.drawable.ic_gold_coin).into(image);
                         } else image.setImageResource(R.drawable.ic_gold_coin);
-                        label.setText(nonEmpty(day.name) ? day.name : "عنصر تجميلي");
+                        label.setText(nonEmpty(day.name) ? day.name : (nonEmpty(day.label) ? day.label : "عنصر تجميلي"));
                         if (day.durationDays > 0) label.setText(label.getText() + "\n" + day.durationDays + " يوم");
                     } else {
                         image.setImageResource(R.drawable.ic_gold_coin);
                         long amount = day == null ? 0 : day.amount;
-                        label.setText(String.format(Locale.getDefault(), "%,d كوينز", amount));
+                        label.setText(nonEmpty(day == null ? null : day.label) ? day.label : String.format(Locale.getDefault(), "%,d كوينز", amount));
                     }
                     dayLabels.get(i).setText("اليوم " + (i + 1) + (day != null && day.claimed ? " ✓" : ""));
                     if (day != null && day.day == status.currentDay) {
