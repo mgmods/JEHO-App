@@ -62,10 +62,12 @@ export class BadgesService {
     });
     return grants
       .filter((grant) => !!grant.badge)
+      .filter((grant) => !grant.expiresAt || new Date(grant.expiresAt).getTime() > Date.now())
       .map((grant) => ({
         ...grant.badge,
         earned: true,
         grantedAt: grant.grantedAt,
+        expiresAt: grant.expiresAt ?? null,
         source: grant.source,
       }));
   }
@@ -78,7 +80,11 @@ export class BadgesService {
       // Always load the full catalogue so a badge already granted to a user does not
       // disappear from their profile if an admin later hides it from the public catalogue.
       this.badges.find({ order: { sortOrder: 'ASC', name: 'ASC' } }),
-      this.userBadges.find({ where: { userId }, relations: { badge: true } }),
+      this.userBadges.createQueryBuilder('ub')
+        .leftJoinAndSelect('ub.badge', 'badge')
+        .where('ub.userId = :userId', { userId })
+        .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
+        .getMany(),
     ]);
     const ownedById = new Map(owned.map((row) => [row.badgeId, row]));
     // Active badges are discoverable by everyone; previously granted badges remain
@@ -199,7 +205,7 @@ export class BadgesService {
     return { success: true };
   }
 
-  async grant(badgeId: string, userIdentifier: string, adminId: string | null) {
+  async grant(badgeId: string, userIdentifier: string, adminId: string | null, durationDaysRaw?: number) {
     const badge = await this.badges.findOne({ where: { id: badgeId } });
     if (!badge) throw new NotFoundException('Badge not found');
     const identifier = (userIdentifier || '').trim();
@@ -209,11 +215,29 @@ export class BadgesService {
       select: { id: true, publicId: true, username: true, displayName: true },
     });
     if (!user) throw new NotFoundException('User not found by UUID or public ID');
+    const durationDays = durationDaysRaw == null || durationDaysRaw === 0
+      ? 0
+      : Math.min(3650, Math.max(1, Math.floor(Number(durationDaysRaw))));
+    if (durationDaysRaw != null && (!Number.isFinite(Number(durationDaysRaw)) || Number(durationDaysRaw) < 0)) {
+      throw new BadRequestException('Badge duration must be 0 (permanent) or a positive number of days');
+    }
+    const expiresAt = durationDays > 0 ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000) : null;
     const existing = await this.userBadges.findOne({ where: { badgeId, userId: user.id } });
-    if (existing) throw new ConflictException('User already owns this badge');
-    const grant = await this.userBadges.save(this.userBadges.create({
-      badgeId, userId: user.id, grantedByAdminId: adminId, source: 'manual',
-    }));
+    let grant: UserBadge;
+    if (existing) {
+      if (!existing.expiresAt || new Date(existing.expiresAt).getTime() > Date.now()) {
+        throw new ConflictException('User already owns this badge');
+      }
+      existing.grantedAt = new Date();
+      existing.grantedByAdminId = adminId;
+      existing.source = 'manual';
+      existing.expiresAt = expiresAt;
+      grant = await this.userBadges.save(existing);
+    } else {
+      grant = await this.userBadges.save(this.userBadges.create({
+        badgeId, userId: user.id, grantedByAdminId: adminId, source: 'manual', expiresAt,
+      }));
+    }
     const notification = await this.notifications.notifyUser(
       user.id,
       NotificationType.SYSTEM,
@@ -225,6 +249,7 @@ export class BadgesService {
       ...grant,
       user: { id: user.id, publicId: user.publicId, username: user.username, displayName: user.displayName },
       badge,
+      expiresAt: grant.expiresAt ?? null,
       notificationCreated: Boolean(notification),
       notificationId: notification?.id ?? null,
     };
