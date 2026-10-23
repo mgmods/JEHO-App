@@ -4123,7 +4123,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     const staffRole = await this.platformStaffRole(actorId);
-    if (staffRole === 'super' || staffRole === 'admin') return;
+    if (staffRole === 'super' || staffRole === 'admin' || staffRole === 'manager') return;
     const mod = await this.modsRepo.findOne({ where: { roomId, userId: actorId } });
     if (!mod?.canManageMusic) {
       throw new ForbiddenException('Music permission is required');
