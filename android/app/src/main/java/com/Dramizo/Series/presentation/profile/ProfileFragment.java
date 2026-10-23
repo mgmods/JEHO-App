@@ -518,8 +518,7 @@ public class ProfileFragment extends Fragment {
                         && agencyMine.agency != null
                         && agencyMine.agency.id != null
                         && !agencyMine.agency.id.isEmpty()
-                        && (agencyMine.agency.status == null
-                        || !"rejected".equalsIgnoreCase(agencyMine.agency.status));
+                        && "active".equalsIgnoreCase(String.valueOf(agencyMine.agency.status));
                 if (binding.btnQuickAgency != null) {
                     binding.btnQuickAgency.setVisibility(hasAgency ? View.VISIBLE : View.GONE);
                 }
@@ -585,12 +584,28 @@ public class ProfileFragment extends Fragment {
         // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
         if (viewModel != null) viewModel.loadMe(false);
         loadAgencyAction();
+        // Prevent any stale observer or retained view from resurrecting the retired cabinet.
+        if (binding != null) {
+            if (binding.rowProfileBadges != null) binding.rowProfileBadges.setVisibility(View.GONE);
+            if (binding.earnedBadgesContainer != null) binding.earnedBadgesContainer.setVisibility(View.GONE);
+        }
         refreshWalletBalances(false);
     }
 
     private void loadProfileBadges(String userId) {
-        if (binding == null || binding.earnedBadgesContainer == null
-                || userId == null || userId.trim().isEmpty()) return;
+        // Badge/medal cabinet is retired platform-wide. Keep it hidden even if an
+        // older caller still invokes this loader after a profile refresh.
+        if (binding != null) {
+            if (binding.rowProfileBadges != null) {
+                binding.rowProfileBadges.setVisibility(View.GONE);
+                binding.rowProfileBadges.setOnClickListener(null);
+            }
+            if (binding.earnedBadgesContainer != null) {
+                binding.earnedBadgesContainer.removeAllViews();
+                binding.earnedBadgesContainer.setVisibility(View.GONE);
+            }
+        }
+        return;
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned =
