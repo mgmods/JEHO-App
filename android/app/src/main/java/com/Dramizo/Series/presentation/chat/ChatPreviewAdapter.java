@@ -154,6 +154,7 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
 
     private static String resolveFrameUrl(ChatDtos.ConversationDto item) {
         if (item == null || item.peer == null) return null;
+        if (item.peer.customDisplayRankFrameUrl != null && !item.peer.customDisplayRankFrameUrl.trim().isEmpty()) return item.peer.customDisplayRankFrameUrl;
         return item.peer.vipBadgeUrl;
     }
 
