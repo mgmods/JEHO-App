@@ -34,8 +34,10 @@ public final class RoomChatMemory {
             Collections.synchronizedMap(new LinkedHashMap<>());
     private static final Map<String, Long> PERSIST_SEQ =
             Collections.synchronizedMap(new LinkedHashMap<>());
+    private static final Map<String, java.util.concurrent.ScheduledFuture<?>> PERSIST_TASKS =
+            Collections.synchronizedMap(new LinkedHashMap<>());
     @Nullable private static Context appCtx;
-    @Nullable private static java.util.concurrent.ExecutorService diskIo;
+    @Nullable private static java.util.concurrent.ScheduledExecutorService diskIo;
 
     private RoomChatMemory() {}
 
@@ -44,11 +46,11 @@ public final class RoomChatMemory {
         appCtx = context.getApplicationContext();
     }
 
-    private static java.util.concurrent.ExecutorService diskIo() {
+    private static java.util.concurrent.ScheduledExecutorService diskIo() {
         if (diskIo == null) {
             synchronized (RoomChatMemory.class) {
                 if (diskIo == null) {
-                    diskIo = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                    diskIo = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
                         Thread t = new Thread(r, "room-chat-disk");
                         t.setDaemon(true);
                         t.setPriority(Thread.NORM_PRIORITY - 1);
@@ -121,25 +123,39 @@ public final class RoomChatMemory {
             seq = (prev != null ? prev : 0L) + 1L;
             PERSIST_SEQ.put(roomId, seq);
         }
-        diskIo().execute(() -> {
-            try {
-                Thread.sleep(180L); // coalesce bursts during join welcome + floods
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            }
-            Long latest;
-            synchronized (PERSIST_SEQ) {
-                latest = PERSIST_SEQ.get(roomId);
-            }
-            if (latest == null || latest != seq) return; // superseded
-            List<Line> copy;
-            synchronized (BY_ROOM) {
-                List<Line> list = BY_ROOM.get(roomId);
-                if (list == null) return;
-                copy = new ArrayList<>(list);
-            }
-            persistLocked(roomId, copy);
-        });
+        // True debounce: replace the pending write instead of queuing one sleeping
+        // task per chat line. Busy rooms can receive many events per second.
+        synchronized (PERSIST_TASKS) {
+            java.util.concurrent.ScheduledFuture<?> previous = PERSIST_TASKS.remove(roomId);
+            if (previous != null) previous.cancel(false);
+            java.util.concurrent.ScheduledFuture<?> next = diskIo().schedule(() -> {
+                try {
+                    Long latest;
+                    synchronized (PERSIST_SEQ) {
+                        latest = PERSIST_SEQ.get(roomId);
+                    }
+                    if (latest == null || latest != seq) return;
+                    List<Line> copy;
+                    synchronized (BY_ROOM) {
+                        List<Line> list = BY_ROOM.get(roomId);
+                        if (list == null) return;
+                        copy = new ArrayList<>(list);
+                    }
+                    persistLocked(roomId, copy);
+                } finally {
+                    Long latest;
+                    synchronized (PERSIST_SEQ) {
+                        latest = PERSIST_SEQ.get(roomId);
+                    }
+                    if (latest != null && latest == seq) {
+                        synchronized (PERSIST_TASKS) {
+                            PERSIST_TASKS.remove(roomId);
+                        }
+                    }
+                }
+            }, 180L, java.util.concurrent.TimeUnit.MILLISECONDS);
+            PERSIST_TASKS.put(roomId, next);
+        }
     }
 
     public static List<Line> snapshot(@Nullable String roomId) {
@@ -172,6 +188,10 @@ public final class RoomChatMemory {
         synchronized (PERSIST_SEQ) {
             Long previous = PERSIST_SEQ.get(roomId);
             PERSIST_SEQ.put(roomId, (previous != null ? previous : 0L) + 1L);
+        }
+        synchronized (PERSIST_TASKS) {
+            java.util.concurrent.ScheduledFuture<?> pending = PERSIST_TASKS.remove(roomId);
+            if (pending != null) pending.cancel(false);
         }
         deleteSessionArtifacts(roomId);
         writeClearedMeta(roomId, stamp);

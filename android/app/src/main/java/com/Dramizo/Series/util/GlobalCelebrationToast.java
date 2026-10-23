@@ -480,7 +480,12 @@ public final class GlobalCelebrationToast {
                 "game_win".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind));
         boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
         boolean luckyWin = kind != null && "lucky_hit".equalsIgnoreCase(kind);
-        boolean luckyReturn = luckyWin && body != null && body.contains("مردود جزئي");
+        // Different send paths phrase partial returns differently ("مردود +..." vs
+        // "مردود جزئي ..."). Classify by the outcome, not one exact UI string, so the
+        // dashboard's dedicated return-toast background/style is used on every client.
+        boolean luckyReturn = luckyWin && (multiplier <= 0d || (body != null
+                && (body.contains("مردود جزئي") || body.contains("مردود +")
+                || body.contains("مردود الهدية"))));
         boolean luckyHigh = luckyWin && !luckyReturn && (multiplier >= 10d || coinsWon >= 1000L);
         String toastKindTag = giftSend ? "gift_send" : luckyWin ? (luckyReturn ? "lucky_hit_return" : luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
         banner.setTag(toastKindTag);

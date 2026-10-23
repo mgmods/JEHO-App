@@ -116,10 +116,14 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
 /** Route name (vue-router) → module */
 export const ROUTE_MODULE: Record<string, DashboardModule | 'super-only'> = {
   dashboard: 'dashboard',
+  conversations: 'conversations',
+  'paid-messages': 'paidMessages',
+  'profile-action-icons': 'profileActionIcons',
   users: 'users',
   'user-detail': 'users',
   agencies: 'agencies',
   rooms: 'rooms',
+  streams: 'rooms',
   'support-chest': 'supportChest',
   gifts: 'gifts',
   'toast-manager': 'settings',
@@ -130,6 +134,7 @@ export const ROUTE_MODULE: Record<string, DashboardModule | 'super-only'> = {
   vip: 'vip',
   'mysterious-man': 'settings',
   badges: 'badges',
+  'display-ranks': 'badges',
   'vanity-ids': 'vanityIds',
   cosmetics: 'cosmetics',
   offers: 'offers',
@@ -144,11 +149,14 @@ export const ROUTE_MODULE: Record<string, DashboardModule | 'super-only'> = {
   'game-ads': 'gameAds',
   drama: 'drama',
   banners: 'banners',
+  splash: 'banners',
   'nav-icons': 'navIcons',
   'seat-stickers': 'seatStickers',
   reports: 'reports',
   moments: 'reports',
   notifications: 'notifications',
+  'cp-settings': 'cpSettings',
+  'staff-identity': 'settings',
   settings: 'settings',
   logs: 'logs',
   'policy-brochure': 'policyBrochure',
@@ -203,8 +211,22 @@ export function canAccessModule(
   need: 'read' | 'write' = 'read',
 ): boolean {
   if (!user) return false;
-  const role = String(user.staffRole || '').toLowerCase();
-  if (user.isSuperAdmin || role === 'super') return true;
+  const role = String(user.staffRole || '').trim().toLowerCase();
+  // Explicit limited staff roles must override stale cached super-admin flags.
+  const limitedRoles = new Set([
+    'admin', 'manager', 'moderator', 'operator', 'dashboard_operator',
+    'admin_op', 'staff', 'user', 'none',
+  ]);
+  if (limitedRoles.has(role)) {
+    // Continue to the assigned module permissions below.
+  } else if (
+    user.isSuperAdmin
+    || role === 'super'
+    || role === 'super_admin'
+    || role === 'superadmin'
+  ) {
+    return true;
+  }
 
   const perms = user.permissions || {};
   const level = (perms as PermissionsMap)[module as DashboardModule] || 'none';

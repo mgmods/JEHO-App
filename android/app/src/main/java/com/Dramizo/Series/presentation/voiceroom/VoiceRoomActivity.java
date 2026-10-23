@@ -291,7 +291,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         @Override public void run() {
             if (isFinishing() || isDestroyed() || !sRoomUiVisible) return;
             refreshLuckyToastButtonStyle();
-            handler.postDelayed(this, 15_000L);
+            // Config is low-frequency; avoid repeated network wakeups while users chat.
+            handler.postDelayed(this, 60_000L);
         }
     };
     @Nullable private String luckyCannonGiftId;
@@ -2588,8 +2589,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     name, text, vipLevel, userLevel, frameUrl, userId, avatarUrl, giftIconUrl,
                     wealthScore, charmScore));
         }
-        // Soft memory safety only (very high); still never auto-wipe mid-session intentionally.
-        while (binding.chatLog.getChildCount() > 800) {
+        // Keep the active view hierarchy small on mid-range phones. Full session
+        // history remains in RoomChatMemory; only old rendered rows are recycled away.
+        while (binding.chatLog.getChildCount() > 240) {
             binding.chatLog.removeViewAt(0);
         }
         // TikTok-style: always stick to latest comments.
@@ -2599,6 +2601,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean restoringRoomChat;
     private boolean roomChatRestored;
     private int roomChatMemorySyncedCount;
+    private boolean chatScrollPending;
+    private final Runnable coalescedChatScroll = () -> {
+        chatScrollPending = false;
+        if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
+        int bottom = Math.max(0, binding.chatLog.getHeight() - binding.scrollChat.getHeight());
+        // A direct scroll avoids stacking multiple smooth-scroll animations during chat floods.
+        binding.scrollChat.scrollTo(0, bottom);
+    };
 
     /** Restore chat from this live session after Activity recreate / minimize return. */
     private void restoreRoomChatIfNeeded() {
@@ -2613,7 +2623,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         restoringRoomChat = true;
         try {
             binding.chatLog.removeAllViews();
-            for (RoomChatMemory.Line line : lines) {
+            // Rebuilding hundreds of richly styled rows on the UI thread can stall
+            // mic/gift controls after returning to a room. Restore only the latest
+            // visible window; the complete session history stays in RoomChatMemory.
+            final int firstVisible = Math.max(0, lines.size() - 120);
+            for (int i = firstVisible; i < lines.size(); i++) {
+                RoomChatMemory.Line line = lines.get(i);
                 appendChatLine(
                         line.name,
                         line.text,
@@ -2629,6 +2644,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } finally {
             restoringRoomChat = false;
             roomChatRestored = true;
+            // Mark the entire snapshot as synced so hidden older rows are not appended later.
             roomChatMemorySyncedCount = lines.size();
         }
         scrollChatToBottom(false);
@@ -2722,21 +2738,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void scrollChatToBottom(boolean animated) {
         if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
-        binding.scrollChat.post(() -> {
-            if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
-            int bottom = Math.max(0, binding.chatLog.getHeight() - binding.scrollChat.getHeight());
-            if (animated) {
-                binding.scrollChat.smoothScrollTo(0, bottom);
-            } else {
-                binding.scrollChat.scrollTo(0, bottom);
-            }
-        });
-        // Second pass after layout settles (keyboard / new bubble height).
-        binding.scrollChat.postDelayed(() -> {
-            if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
-            int bottom = Math.max(0, binding.chatLog.getHeight() - binding.scrollChat.getHeight());
-            binding.scrollChat.scrollTo(0, bottom);
-        }, 120);
+        // Coalesce bursts: gift + chat + room-event messages can arrive together.
+        // One scheduled layout adjustment is enough; never queue two callbacks per line.
+        if (chatScrollPending) return;
+        chatScrollPending = true;
+        handler.postDelayed(coalescedChatScroll, 32L);
     }
 
     private void showChatUserActions(
@@ -3884,6 +3890,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setClipToPadding(false);
         layer.setClickable(false);
         layer.setFocusable(false);
+        // Never expose the sender's draggable launcher to other room members on room entry.
+        // It becomes visible only after this device successfully arms its own lucky gift.
+        layer.setVisibility(View.GONE);
         ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
                 luckyCannonDp(96), luckyCannonDp(96));
         // Default position: bottom-center of the room content, with room for the control bar.
@@ -4184,10 +4193,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     Math.max(1, quantity), Math.max(1, personCount), null);
             return;
         }
+        // The draggable launcher is a private sender control, never a room-wide UI.
+        // Remote members render only the gift-flight celebration, not another tappable cannon.
         boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
-        if (!keepVisible) luckyCannonLayer.setVisibility(View.VISIBLE);
+        luckyCannonLayer.setVisibility(keepVisible ? View.VISIBLE : View.GONE);
         // The sender already received immediate local press feedback; other room members
-        // still animate when the shared launch event arrives.
+        // still animate the launch effect without exposing the launcher control.
         if (!localSender && luckyCannonPulseEnabled) luckyCannonView.fire();
         if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
         playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount);
@@ -10687,8 +10698,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     ) {
         if (areCelebrationPopupsMuted() || binding == null) return;
         String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
-        // Intentionally do not show ComingMsgView here: it is the legacy sliding room toast
-        // that appeared around the middle of the room and ignored dashboard toast styling.
+        String who = displayName != null && !displayName.trim().isEmpty()
+                ? displayName.trim() : "مستخدم";
+        // Do not use the legacy mid-room ComingMsgView. Keep the compact top toast as the
+        // visible announcement, so this path cannot silently degrade to chat-only output.
+        GlobalCelebrationToast.show(
+                this, who, msg, avatarUrl, null,
+                "room-result-" + who + "-" + System.currentTimeMillis(),
+                28);
         if (roomBannerEnabled()) appendGameCelebrationLine(msg, null);
     }
 
@@ -14165,14 +14182,33 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 allReceivers.add(receiverId);
             }
             String giftEventKey = firstNonEmpty(memberStr(payload, "sendId"),
-                    memberStr(payload, "eventId"), memberStr(payload, "at"));
-            if (giftEventKey == null) {
-                giftEventKey = String.valueOf(senderId) + '|' + memberStr(payload, "giftId")
-                        + '|' + receiverId + '|' + combo + '|' + personCount;
-            }
+                    memberStr(payload, "eventId"), memberStr(payload, "at"),
+                    memberStr(payload, "createdAt"), memberStr(payload, "requestId"));
             long giftNow = System.currentTimeMillis();
+            if (giftEventKey == null) {
+                // Some legacy send paths omit event IDs. Include send-specific fields and
+                // a time component so repeated identical gifts do not suppress each other's
+                // toast for the full 15-second dedupe window.
+                giftEventKey = String.valueOf(senderId) + '|' + memberStr(payload, "giftId")
+                        + '|' + receiverId + '|' + combo + '|' + personCount
+                        + '|' + memberInt(payload, "quantity", 1)
+                        + '|' + memberLong(payload, "totalCoins", 0L)
+                        + '|' + (giftNow / 750L);
+            }
             recentGiftEffects.entrySet().removeIf(entry -> giftNow - entry.getValue() > 15_000L);
             if (recentGiftEffects.put(giftEventKey, giftNow) != null) return;
+
+            int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
+
+            // Show the same configured gift toast to every room member, including the
+            // sender. There is no separate local-send toast path; the room event is canonical.
+            // This is after recentGiftEffects dedupe, so the room/user echo cannot double-show it.
+            String senderAvatar = firstNonEmpty(
+                    memberStr(payload, "senderAvatarUrl"),
+                    memberStr(payload, "avatarUrl"));
+            GlobalCelebrationToast.showGiftCount(
+                    this, sender, name, senderAvatar, icon, qtyRemote);
+
             // A single-recipient gift must name the receiver in the room chat. Group gifts
             // intentionally stay anonymous as a group, without listing all recipients.
             String receiverName = memberStr(payload, "receiverName");
@@ -14180,7 +14216,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 appendGiftEconomyLine(sender + " أهدى " + receiverName + " " + name);
             }
             boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
-            int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
             boolean cannonLaunch = memberBool(payload, "cannonLaunch", false);
             if (cannonLaunch) {
                 playLuckyCannonEvent(icon, allReceivers, totalCoins, qtyRemote,

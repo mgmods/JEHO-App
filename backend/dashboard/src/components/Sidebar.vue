@@ -134,7 +134,7 @@ const sections = computed(() => [
     label: 'إدارة المتجر',
     items: [
       { name: 'cosmetics', icon: 'bi-shop-window', label: 'إعدادات المتجر: الإطارات والدخوليات' },
-      { name: 'staff-identity', icon: 'bi-person-badge-fill', label: 'إطارات وشارات وبطاقات الرتب الإدارية', module: 'settings' },
+      { name: 'staff-identity', icon: 'bi-person-badge-fill', label: 'إطارات وشارات وبطاقات الرتب الإدارية', module: 'settings', superOnly: true },
     ],
   },
   {
@@ -200,9 +200,11 @@ const sections = computed(() => [
 ])
 
 function itemAllowed(item) {
+  if (item.superOnly) return auth.isSuperAdmin
   if (auth.isSuperAdmin) return true
   const mod = item.module || ROUTE_MODULE[item.name]
-  if (!mod) return true
+  // Fail closed: an unmapped route must never become visible by default.
+  if (!mod) return false
   return auth.can(mod, 'read')
 }
 

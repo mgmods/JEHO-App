@@ -10,6 +10,7 @@ export const ROUTE_MODULE = {
   'user-detail': 'users',
   agencies: 'agencies',
   rooms: 'rooms',
+  streams: 'rooms',
   'support-chest': 'supportChest',
   gifts: 'gifts',
   'toast-manager': 'settings',
@@ -44,6 +45,9 @@ export const ROUTE_MODULE = {
   logs: 'logs',
   'policy-brochure': 'policyBrochure',
   'gender-verifications': 'genderVerifications',
+  'staff-identity': 'settings',
+  'display-ranks': 'badges',
+  moments: 'reports',
 }
 
 export const DASHBOARD_MODULES = [
