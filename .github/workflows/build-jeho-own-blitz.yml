@@ -45,7 +45,6 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ghcr.io/mgmods/jeho-own-backend:jeho-own
             ghcr.io/mgmods/jeho-own-backend:mg-jeho
             ghcr.io/mgmods/jeho-own-backend:badge-fix-8f26b6dc33d198fc5ce695be7bc638658b8693e8
             ghcr.io/mgmods/jeho-own-backend:mg-jeho-${{ github.event.workflow_run.head_sha || github.sha }}
