@@ -131,7 +131,6 @@ export const ROUTE_MODULE: Record<string, DashboardModule | 'super-only'> = {
   'recharge-agents': 'rechargeAgents',
   vip: 'vip',
   'mysterious-man': 'settings',
-  badges: 'badges',
   'vanity-ids': 'vanityIds',
   cosmetics: 'cosmetics',
   offers: 'offers',
