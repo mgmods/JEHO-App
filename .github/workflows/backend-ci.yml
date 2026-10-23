@@ -7,7 +7,7 @@ on:
       - ".github/workflows/backend-ci.yml"
       - "backend/**"
   pull_request:
-    branches: [MG-JEHO, jeho-own]
+    branches: [jeho-own]
     paths:
       - ".github/workflows/backend-ci.yml"
       - "backend/**"
