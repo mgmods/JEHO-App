@@ -2588,8 +2588,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     name, text, vipLevel, userLevel, frameUrl, userId, avatarUrl, giftIconUrl,
                     wealthScore, charmScore));
         }
-        // Soft memory safety only (very high); still never auto-wipe mid-session intentionally.
-        while (binding.chatLog.getChildCount() > 800) {
+        // Keep the active view hierarchy small on mid-range phones. Full session
+        // history remains in RoomChatMemory; only old rendered rows are recycled away.
+        while (binding.chatLog.getChildCount() > 240) {
             binding.chatLog.removeViewAt(0);
         }
         // TikTok-style: always stick to latest comments.
@@ -2613,7 +2614,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         restoringRoomChat = true;
         try {
             binding.chatLog.removeAllViews();
-            for (RoomChatMemory.Line line : lines) {
+            // Rebuilding hundreds of richly styled rows on the UI thread can stall
+            // mic/gift controls after returning to a room. Restore only the latest
+            // visible window; the complete session history stays in RoomChatMemory.
+            final int firstVisible = Math.max(0, lines.size() - 120);
+            for (int i = firstVisible; i < lines.size(); i++) {
+                RoomChatMemory.Line line = lines.get(i);
                 appendChatLine(
                         line.name,
                         line.text,
@@ -2629,6 +2635,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } finally {
             restoringRoomChat = false;
             roomChatRestored = true;
+            // Mark the entire snapshot as synced so hidden older rows are not appended later.
             roomChatMemorySyncedCount = lines.size();
         }
         scrollChatToBottom(false);
