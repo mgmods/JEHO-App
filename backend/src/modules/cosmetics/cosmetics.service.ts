@@ -506,7 +506,7 @@ export class CosmeticsService implements OnModuleInit {
     }
   }
 
-  async purchase(userId: string, cosmeticId: string) {
+  async purchase(userId: string, cosmeticId: string, duration?: string) {
     const cosmetic = await this.cosmeticsRepo.findOne({ where: { id: cosmeticId, isActive: true } });
     if (!cosmetic) throw new NotFoundException('Cosmetic not found');
 
@@ -520,8 +520,24 @@ export class CosmeticsService implements OnModuleInit {
 
     await this.assertCosmeticRequirements(userId, cosmetic);
 
-    const fullPrice = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
-    const leaseDays = this.mallLeaseDays();
+    const basePrice = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
+    const isRoomCard = cosmetic.type === CosmeticType.ROOM_CARD;
+    if (duration && !isRoomCard) {
+      throw new BadRequestException('اختيار المدة متاح لبطاقات الغرف فقط');
+    }
+    const permanent = isRoomCard && duration === 'permanent';
+    const requestedDays = isRoomCard && duration && duration !== 'permanent'
+      ? Number(duration)
+      : this.mallLeaseDays();
+    const leaseDays = permanent ? null : Math.max(1, Math.min(30, Math.floor(requestedDays || 30)));
+    const configuredPermanentPrice = Number((cosmetic.meta as any)?.roomCardPermanentPrice);
+    const fullPrice = permanent
+      ? (Number.isFinite(configuredPermanentPrice) && configuredPermanentPrice >= 0
+          ? Math.floor(configuredPermanentPrice)
+          : basePrice * 4)
+      : (isRoomCard && leaseDays !== 30 && basePrice > 0
+          ? Math.max(1, Math.ceil(basePrice * Number(leaseDays) / 30))
+          : basePrice);
     const now = new Date();
 
     const result = await this.cosmeticsRepo.manager.transaction(async (manager) => {
@@ -564,8 +580,8 @@ export class CosmeticsService implements OnModuleInit {
             balanceAfter: wallet.coins,
             referenceType: 'cosmetic_purchase',
             referenceId: cosmeticId,
-            description: renew
-              ? `تجديد ${cosmetic.name || cosmetic.code} (${leaseDays} يوم · نصف السعر)`
+            description: permanent
+              ? `شراء دائم ${cosmetic.name || cosmetic.code}`
               : `شراء ${cosmetic.name || cosmetic.code} (${leaseDays} يوم)`,
           }),
         );
@@ -576,14 +592,14 @@ export class CosmeticsService implements OnModuleInit {
           userId,
           cosmeticId,
           equipped: false,
-          expiresAt: new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000),
+          expiresAt: permanent ? null : new Date(now.getTime() + Number(leaseDays) * 24 * 60 * 60 * 1000),
         });
       } else {
         // An expired lease starts a fresh term from now; never stack days.
-        owned.expiresAt = new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000);
+        owned.expiresAt = permanent ? null : new Date(now.getTime() + Number(leaseDays) * 24 * 60 * 60 * 1000);
       }
       owned = await manager.save(UserCosmetic, owned);
-      return { owned, renew, price, fullPrice, leaseDays, expiresAt: owned.expiresAt };
+      return { owned, renew, price, fullPrice, leaseDays, permanent, expiresAt: owned.expiresAt };
     });
 
     // Buying only adds the item to the bag. Wearing is a separate explicit action.
@@ -1380,19 +1396,10 @@ export class CosmeticsService implements OnModuleInit {
       if (dirty) await this.cosmeticsRepo.save(existing);
     }
 
-    // Deactivate every other room_card (kenar / legacy clones).
-    const allCards = await this.cosmeticsRepo.find({ where: { type: CosmeticType.ROOM_CARD } });
-    let retired = 0;
-    for (const row of allCards) {
-      if (keepCodes.has(String(row.code || ''))) continue;
-      if (!row.isActive) continue;
-      row.isActive = false;
-      await this.cosmeticsRepo.save(row);
-      retired += 1;
-    }
-
-    if (created > 0 || retired > 0) {
-      this.logger.log(`Room cards: seeded=${created}, retired=${retired} (kept Mikoo borders top1–7)`);
+    // Do not deactivate custom dashboard-uploaded room cards here.
+    // The dashboard catalog is authoritative for user-created cards and animations.
+    if (created > 0) {
+      this.logger.log(`Room cards: seeded=${created}; preserved dashboard/custom cards`);
     }
   }
 
