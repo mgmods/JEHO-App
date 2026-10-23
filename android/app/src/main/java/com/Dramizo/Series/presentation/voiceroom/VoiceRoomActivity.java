@@ -4967,6 +4967,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         binding.tvMusicTitle.setText(title != null && !title.isEmpty() ? title : "موسيقى الغرفة");
         binding.tvMusicArtist.setText(artist != null && !artist.isEmpty() ? artist : "من هاتف المضيف");
+        // Room music is controlled only by the host/cohost or a moderator explicitly
+        // granted canManageMusic. Hide controls for listeners instead of merely disabling
+        // them, so no play/skip/seek/volume affordance appears on their devices.
+        int musicControlVisibility = canManageMusic ? View.VISIBLE : View.GONE;
+        binding.btnMusicPlayPause.setVisibility(musicControlVisibility);
+        binding.btnMusicSkip.setVisibility(musicControlVisibility);
+        binding.btnMusicStop.setVisibility(musicControlVisibility);
+        binding.seekMusic.setVisibility(musicControlVisibility);
+        if (binding.seekMusicVolume != null) {
+            binding.seekMusicVolume.setVisibility(musicControlVisibility);
+        }
+        if (binding.btnMusicVolumeDown != null) {
+            binding.btnMusicVolumeDown.setVisibility(musicControlVisibility);
+        }
+        if (binding.btnMusicVolumeUp != null) {
+            binding.btnMusicVolumeUp.setVisibility(musicControlVisibility);
+        }
         binding.btnMusicPlayPause.setEnabled(canManageMusic);
         binding.btnMusicSkip.setEnabled(canManageMusic);
         binding.btnMusicStop.setEnabled(canManageMusic);
