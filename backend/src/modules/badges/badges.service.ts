@@ -214,14 +214,20 @@ export class BadgesService {
     const grant = await this.userBadges.save(this.userBadges.create({
       badgeId, userId: user.id, grantedByAdminId: adminId, source: 'manual',
     }));
-    await this.notifications.notifyUser(
+    const notification = await this.notifications.notifyUser(
       user.id,
       NotificationType.SYSTEM,
-      'تم منحك شارة جديدة! 🏅',
-      `تمت إضافة شارة ${badge.name} إلى حسابك`,
+      'تم إهداؤك شارة جديدة! 🏅',
+      `مبروك! تمت إضافة شارة ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
       { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
     );
-    return { ...grant, user: { id: user.id, publicId: user.publicId, username: user.username, displayName: user.displayName }, badge };
+    return {
+      ...grant,
+      user: { id: user.id, publicId: user.publicId, username: user.username, displayName: user.displayName },
+      badge,
+      notificationCreated: Boolean(notification),
+      notificationId: notification?.id ?? null,
+    };
   }
 
   async revoke(badgeId: string, userIdentifier: string) {
