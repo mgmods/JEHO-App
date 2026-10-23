@@ -1,9 +1,10 @@
 name: Build and publish MG-JEHO image for Blitz Cloud
 
 on:
-  push:
-    branches:
-      - MG-JEHO
+  workflow_run:
+    workflows: ["JEHO-OWN Backend and Dashboard Checks"]
+    types: [completed]
+    branches: [MG-JEHO]
   workflow_dispatch:
 
 permissions:
@@ -18,11 +19,14 @@ concurrency:
 
 jobs:
   build-and-publish:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Checkout MG-JEHO
+      - name: Checkout the exact commit that passed checks
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -44,7 +48,7 @@ jobs:
             ghcr.io/mgmods/jeho-own-backend:jeho-own
             ghcr.io/mgmods/jeho-own-backend:mg-jeho
             ghcr.io/mgmods/jeho-own-backend:badge-fix-8f26b6dc33d198fc5ce695be7bc638658b8693e8
-            ghcr.io/mgmods/jeho-own-backend:mg-jeho-${{ github.sha }}
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho-${{ github.event.workflow_run.head_sha || github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/mgmods/JEHO-App
             org.opencontainers.image.revision=${{ github.sha }}
