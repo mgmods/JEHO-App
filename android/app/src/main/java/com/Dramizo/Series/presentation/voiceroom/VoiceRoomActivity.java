@@ -14185,6 +14185,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             recentGiftEffects.entrySet().removeIf(entry -> giftNow - entry.getValue() > 15_000L);
             if (recentGiftEffects.put(giftEventKey, giftNow) != null) return;
 
+            int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
+
             // The sender already gets the send toast from the successful local send result.
             // Every other room member must also get the dashboard-configured gift toast,
             // regardless of gift animation type (static, video/SVGA, lucky or cannon).
@@ -14203,7 +14205,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 appendGiftEconomyLine(sender + " أهدى " + receiverName + " " + name);
             }
             boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
-            int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
             boolean cannonLaunch = memberBool(payload, "cannonLaunch", false);
             if (cannonLaunch) {
                 playLuckyCannonEvent(icon, allReceivers, totalCoins, qtyRemote,
