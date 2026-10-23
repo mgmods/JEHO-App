@@ -11336,7 +11336,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                    long wonCoins, int multiplier, @Nullable String eventKey) {
         String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
         String line;
-        if (multiplier <= 0) {
+        if (wonCoins <= 0) {
+            line = "لم يحالف الحظ " + who + " هذه المرة";
+        } else if (multiplier <= 0) {
             line = "ضرب حظه · مردود +" + Math.max(0L, wonCoins);
         } else {
             int mul = Math.max(1, multiplier);
@@ -14141,7 +14143,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 try {
                     double raw = payload.get("luckyMultiplier").getAsDouble();
                     soft = raw > 0 && raw < 1.0;
-                    mul = soft ? 0 : Math.max(1, (int) Math.round(raw));
+                    mul = raw <= 0 || soft ? 0 : Math.max(1, (int) Math.round(raw));
                 } catch (Exception ignored) {
                     mul = Math.max(1, memberInt(payload, "luckyMultiplier", 1));
                 }
