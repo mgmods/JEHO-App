@@ -5317,8 +5317,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         // For device music mixed into the host's published audio, adjust only the
         // dedicated ZEGO media player; microphone capture gain remains untouched.
-        if (canManageMusic) {
-            // Also cache the gain before a device track is loaded.
+        // Room metadata/role flags can arrive late, so also recognize the active publisher.
+        if (canManageMusic || isHost || isOwner || isRoomStaff()
+                || sameUser(myUserId, currentMusicPublisherId)) {
             RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
         }
         if (binding != null && binding.seekMusicVolume != null
@@ -8791,13 +8792,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void applyRoomSpeakerMute(boolean muted) {
         RoomSoundFx.setMuted(muted);
         RoomRtcEngine.getInstance().setSpeakerMuted(muted);
+        // Preserve the selected music gain on every track type. This does not touch
+        // microphone capture gain; only the dedicated music player is adjusted.
         if (roomMusicPlayer != null) {
-            if (isYoutubeMusicUrl(currentMusicUrl)
-                    || (currentMusicUrl != null && !isLocalMusicUrl(currentMusicUrl))) {
-                applySharedMusicVolume();
-            } else {
-                roomMusicPlayer.setVolume(muted ? 0f : 1f);
-            }
+            applySharedMusicVolume();
         }
         if (!muted) {
             // Resume pulling seat streams after mute (minutes billing resumes only now).
