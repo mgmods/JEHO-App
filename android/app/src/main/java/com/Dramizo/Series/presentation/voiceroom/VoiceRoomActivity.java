@@ -11325,7 +11325,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
     public void showLuckyHitBanner(@Nullable String displayName, @Nullable String avatarUrl,
-                                   long wonCoins, int multiplier) {
+                                   long wonCoins, int multiplier, @Nullable String eventKey) {
         String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
         String line;
         if (multiplier <= 0) {
@@ -11338,7 +11338,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Do not route this through ComingMsgView: that legacy sliding toast ignored the design controls.
         GlobalCelebrationToast.show(
                 this, who, line, avatarUrl, null,
-                "lucky-room-hit-" + who + "-" + Math.max(0L, wonCoins) + "-" + multiplier,
+                "lucky-room-hit-" + (eventKey == null || eventKey.trim().isEmpty()
+                        ? String.valueOf(System.currentTimeMillis()) : eventKey.trim()),
                 28, Math.max(0, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
         if (roomBannerEnabled()) {
             appendChatLine(who, line, 0, 1, null, null, avatarUrl, null);
@@ -14136,7 +14137,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     mul = Math.max(1, memberInt(payload, "luckyMultiplier", 1));
                 }
             }
-            showLuckyHitBanner(who, memberStr(payload, "senderAvatarUrl"), won, mul);
+            String luckyToastEventKey = firstNonEmpty(
+                    memberStr(payload, "eventId"),
+                    memberStr(payload, "sendId"),
+                    memberStr(payload, "requestId"),
+                    memberStr(payload, "at"));
+            if (luckyToastEventKey == null) luckyToastEventKey = String.valueOf(System.currentTimeMillis());
+            showLuckyHitBanner(who, memberStr(payload, "senderAvatarUrl"), won, mul, luckyToastEventKey);
             GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
             // Only float/rain on the winner's seat.
             if (senderId != null && !senderId.isEmpty()) {
