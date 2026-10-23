@@ -618,11 +618,11 @@
 <string name="settings_version">الإصدار</string>
 <string name="settings_user_agreement">اتفاقية المستخدم</string>
 <string name="switch_account">تبديل الحساب</string>
-<string name="badges">الشارات</string>
-<string name="honourship">التكريم</string>
-<string name="badge">شارة</string>
+<string name="badges">الميداليات</string>
+<string name="honourship">الميداليات</string>
+<string name="badge">ميدالية</string>
 <string name="mine">خاصتي</string>
-<string name="have_not_yet_received_badge">لم تحصل على شارة بعد</string>
+<string name="have_not_yet_received_badge">لم تحصل على ميداليات بعد</string>
 <string name="medal_vip_tier">VIP %1$d</string>
 <string name="task_center">مركز المهام</string>
 <string name="contests">المسابقات</string>
@@ -844,7 +844,7 @@
 <string name="agency_welcome_hint">نص الترحيب في الغرفة</string>
 <string name="agency_save_branding">حفظ الاسم والترحيب</string>
 <string name="agency_mall_frames">إطارات</string>
-<string name="agency_mall_badges">شارات</string>
+<string name="agency_mall_badges">ميداليات</string>
 <string name="agency_member_search_hint">بحث بالاسم أو ID</string>
 <string name="agency_notice_section">إشعار قبول المضيفات</string>
 <string name="agency_delete">حذف الوكالة</string>

@@ -49,6 +49,14 @@ export async function ensureBadgeTables(dataSource: DataSource): Promise<void> {
       )
     `);
     await manager.query(`
+      ALTER TABLE "jeho_own"."user_badges"
+      ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz
+    `);
+    await manager.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_user_badges_user_expiry"
+      ON "jeho_own"."user_badges" ("userId", "expiresAt")
+    `);
+    await manager.query(`
       CREATE INDEX IF NOT EXISTS "IDX_user_badges_user"
       ON "jeho_own"."user_badges" ("userId")
     `);

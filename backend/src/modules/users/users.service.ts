@@ -136,6 +136,7 @@ export class UsersService {
            FROM user_badges ub
            JOIN badges b ON b.id = ub."badgeId"
           WHERE ub."userId" = $1 AND b.category = 'display_rank' AND b."isActive" = true
+            AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
           ORDER BY ub."grantedAt" DESC, b."sortOrder" ASC
           LIMIT 1`,
         [userId],

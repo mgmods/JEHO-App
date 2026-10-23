@@ -120,13 +120,13 @@ public class ProfileActivity extends ThemedActivity {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
-        // Keep achievement badges separate from the existing VIP medal screen.
+        // Show the recipient's awarded medals in the profile medal cabinet.
         if (binding.rowBadges != null) {
             binding.rowBadges.setVisibility(View.VISIBLE);
             binding.rowBadges.setOnClickListener(v -> {
                 String profileId = targetUserIdHold[0];
                 if (profileId == null || profileId.trim().isEmpty()) {
-                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الشارات", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الميداليات", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 Intent intent = new Intent(this, BadgeActivity.class);
@@ -332,6 +332,16 @@ public class ProfileActivity extends ThemedActivity {
                 profileDisplayName = profileDisplayName + "  ·  " + user.customDisplayRankName.trim();
             }
             binding.tvDisplayName.setText(profileDisplayName);
+            String customRankImageUrl = user.customDisplayRankImageUrl;
+            if (customRankImageUrl != null && !customRankImageUrl.trim().isEmpty()) {
+                binding.imgCustomDisplayRank.setVisibility(View.VISIBLE);
+                Glide.with(binding.imgCustomDisplayRank)
+                        .load(customRankImageUrl.trim())
+                        .into(binding.imgCustomDisplayRank);
+            } else {
+                Glide.with(binding.imgCustomDisplayRank).clear(binding.imgCustomDisplayRank);
+                binding.imgCustomDisplayRank.setVisibility(View.GONE);
+            }
             GenderVerifiedBadge.bind(binding.tvDisplayName, null, user.genderVerified);
             bindGenderIcon(binding.imgGender, user.gender);
 

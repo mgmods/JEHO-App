@@ -229,6 +229,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
          FROM user_badges ub JOIN badges b ON b.id = ub."badgeId"
         WHERE ub."userId" = ANY($1::uuid[])
           AND b.category = 'display_rank' AND b."isActive" = true
+          AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
         ORDER BY ub."userId", ub."grantedAt" DESC, b."sortOrder" ASC`,
       [ids],
     );

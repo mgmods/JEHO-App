@@ -39,4 +39,7 @@ export class UserBadge {
 
   @CreateDateColumn({ type: 'timestamptz' })
   grantedAt: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  expiresAt: Date | null;
 }

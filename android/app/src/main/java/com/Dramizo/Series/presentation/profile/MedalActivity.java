@@ -28,7 +28,7 @@ import java.util.List;
 
 import retrofit2.Response;
 
-/** Honour/medals (شارات) — VIP 1–7, system-bar safe. */
+/** Honour/medals (ميداليات) — VIP 1–7, system-bar safe. */
 public class MedalActivity extends ThemedActivity {
     private static final int MAX_VIP = 7;
 

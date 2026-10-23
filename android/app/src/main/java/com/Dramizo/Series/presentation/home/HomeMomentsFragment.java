@@ -401,6 +401,8 @@ public class HomeMomentsFragment extends Fragment {
             String name = string(post, "displayName");
             if (name.isEmpty()) name = string(post, "username");
             if (name.isEmpty()) name = "مستخدم";
+            String rankName = string(post, "customDisplayRankName");
+            if (!rankName.isEmpty()) name = name + "  ·  " + rankName;
             final String authorId = string(post, "userId");
             LinearLayout authorRow = new LinearLayout(requireContext());
             authorRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -442,6 +444,16 @@ public class HomeMomentsFragment extends Fragment {
             }
             avatarStack.addView(avatar);
             avatarStack.addView(avatarFrame);
+            String rankImageUrl = string(post, "customDisplayRankImageUrl");
+            if (!rankImageUrl.isEmpty()) {
+                ImageView rankBadge = new ImageView(requireContext());
+                FrameLayout.LayoutParams rankBadgeLp = new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.TOP | Gravity.END);
+                rankBadge.setLayoutParams(rankBadgeLp);
+                rankBadge.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                rankBadge.setElevation(dp(8));
+                Glide.with(this).load(rankImageUrl).into(rankBadge);
+                avatarStack.addView(rankBadge);
+            }
             LinearLayout authorInfo = new LinearLayout(requireContext());
             authorInfo.setOrientation(LinearLayout.VERTICAL);
             authorInfo.setPadding(dp(10), 0, 0, 0);
@@ -1074,6 +1086,8 @@ public class HomeMomentsFragment extends Fragment {
         String name = string(comment, "displayName");
         if (name.isEmpty()) name = string(comment, "username");
         if (name.isEmpty()) name = "مستخدم";
+        String rankName = string(comment, "customDisplayRankName");
+        if (!rankName.isEmpty()) name = name + "  ·  " + rankName;
         final String commentId = string(comment, "id");
         final String displayName = name;
         String parentId = string(comment, "parentCommentId");
@@ -1090,7 +1104,16 @@ public class HomeMomentsFragment extends Fragment {
         authorLine.setGravity(Gravity.CENTER_VERTICAL);
         TextView author = text(name, 13, 0xFF302B35, true);
         authorLine.addView(author, new LinearLayout.LayoutParams(0, -2, 1));
-        
+        String rankImageUrl = string(comment, "customDisplayRankImageUrl");
+        if (!rankImageUrl.isEmpty()) {
+            ImageView rankBadge = new ImageView(requireContext());
+            rankBadge.setLayoutParams(new LinearLayout.LayoutParams(dp(18), dp(18)));
+            rankBadge.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            rankBadge.setContentDescription("شارة رتبة شكلية");
+            Glide.with(this).load(rankImageUrl).into(rankBadge);
+            authorLine.addView(rankBadge);
+        }
+
         card.addView(authorLine, matchWrap());
         TextView body = text(string(comment, "body"), 14, 0xFF413B46, false);
         body.setPadding(0, dp(3), 0, dp(5));

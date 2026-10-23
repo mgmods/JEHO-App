@@ -69,6 +69,15 @@
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
                 android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgCustomRankBadge"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="bottom|end"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
         </FrameLayout>
 
         <FrameLayout

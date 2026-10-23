@@ -594,8 +594,22 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         String customRankName = mine
                 ? (me != null ? me.customDisplayRankName : null)
                 : (msg.sender != null ? msg.sender.customDisplayRankName : null);
+        String customRankImageUrl = mine
+                ? (me != null ? me.customDisplayRankImageUrl : null)
+                : (msg.sender != null ? msg.sender.customDisplayRankImageUrl : null);
         if (customRankName != null && !customRankName.trim().isEmpty()) {
             name = name + "  ·  " + customRankName.trim();
+        }
+        if (holder.b.imgCustomRankBadge != null) {
+            if (customRankImageUrl != null && !customRankImageUrl.trim().isEmpty() && showAvatar) {
+                holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
+                Glide.with(holder.itemView)
+                        .load(customRankImageUrl.trim())
+                        .into(holder.b.imgCustomRankBadge);
+            } else {
+                Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+                holder.b.imgCustomRankBadge.setVisibility(View.GONE);
+            }
         }
 
         if (showAvatar) {
@@ -1556,6 +1570,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final ImageView imgAvatar;
         final ImageView imgFrame;
         final ImageView imgHostBadge;
+        final ImageView imgCustomRankBadge;
         final View bubbleColumn;
         final LinearLayout bubbleRoot;
         final TextView tvDaySeparator;
@@ -1606,6 +1621,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             imgAvatar = root.findViewById(R.id.imgAvatar);
             imgFrame = root.findViewById(R.id.imgFrame);
             imgHostBadge = root.findViewById(R.id.imgHostBadge);
+            imgCustomRankBadge = root.findViewById(R.id.imgCustomRankBadge);
             bubbleColumn = root.findViewById(R.id.bubbleColumn);
             bubbleRoot = root.findViewById(R.id.bubbleRoot);
             tvDaySeparator = root.findViewById(R.id.tvDaySeparator);

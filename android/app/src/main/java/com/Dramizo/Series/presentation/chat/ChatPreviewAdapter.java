@@ -134,8 +134,11 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
             ChatDtos.ConversationDto a, ChatDtos.ConversationDto b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
+        String rankImageA = a.peer != null ? a.peer.customDisplayRankImageUrl : null;
+        String rankImageB = b.peer != null ? b.peer.customDisplayRankImageUrl : null;
         return eq(resolveAvatarUrl(a), resolveAvatarUrl(b))
-                && eq(resolveFrameUrl(a), resolveFrameUrl(b));
+                && eq(resolveFrameUrl(a), resolveFrameUrl(b))
+                && eq(rankImageA, rankImageB);
     }
 
     private static String resolveAvatarUrl(ChatDtos.ConversationDto item) {
@@ -198,6 +201,16 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
                 holder.b.imgFrame,
                 resolveAvatarUrl(item),
                 resolveFrameUrl(item));
+        String rankImageUrl = item.peer != null ? item.peer.customDisplayRankImageUrl : null;
+        if (rankImageUrl != null && !rankImageUrl.trim().isEmpty()) {
+            holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
+            com.bumptech.glide.Glide.with(holder.itemView)
+                    .load(rankImageUrl.trim())
+                    .into(holder.b.imgCustomRankBadge);
+        } else {
+            com.bumptech.glide.Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+            holder.b.imgCustomRankBadge.setVisibility(View.GONE);
+        }
 
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(item);
