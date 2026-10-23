@@ -11348,12 +11348,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Do not route this through ComingMsgView: that legacy sliding toast ignored the design controls.
         GlobalCelebrationToast.show(
                 this, who, line, avatarUrl, null,
-                "lucky-room-hit-" + (eventKey == null || eventKey.trim().isEmpty()
-                        ? String.valueOf(System.currentTimeMillis()) : eventKey.trim()),
+                eventKey == null || eventKey.trim().isEmpty()
+                        ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim(),
                 28, Math.max(0, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
-        if (roomBannerEnabled()) {
-            appendChatLine(who, line, 0, 1, null, null, avatarUrl, null);
-        }
+        // Chat is written by the matching global celebration event; sharing the same
+        // event key prevents a second toast/chat entry when both realtime paths arrive.
     }
 
     /** Official-news style crawl — disabled (too large). Use ComingMsgView instead. */
