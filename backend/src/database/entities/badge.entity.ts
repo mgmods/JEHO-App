@@ -26,6 +26,19 @@ export class Badge {
   @Column({ type: 'varchar', length: 32, default: 'general' })
   category: string;
 
+  /** Optional visual styling for display-rank badges only. */
+  @Column({ type: 'varchar', length: 16, default: '#D8B35B' })
+  displayColor: string;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  frameUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  nameplateUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  entryEffectUrl: string | null;
+
   @Column({ type: 'varchar', length: 32, default: 'manual' })
   awardType: string;
 
