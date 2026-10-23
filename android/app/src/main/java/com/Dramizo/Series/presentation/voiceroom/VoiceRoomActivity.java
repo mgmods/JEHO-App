@@ -11332,16 +11332,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
     public void showLuckyHitBanner(@Nullable String displayName, @Nullable String avatarUrl,
-                                   long wonCoins, int multiplier, @Nullable String eventKey) {
+                                   long wonCoins, double multiplier, @Nullable String eventKey) {
         String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
         String line;
         if (wonCoins <= 0) {
             line = "لم يحالف الحظ " + who + " هذه المرة";
-        } else if (multiplier <= 0) {
-            line = "ضرب حظه · مردود +" + Math.max(0L, wonCoins);
+        } else if (multiplier > 0d && multiplier < 1d) {
+            line = "مردود ×" + formatMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
+        } else if (multiplier <= 0d) {
+            line = "مردود +" + Math.max(0L, wonCoins);
         } else {
-            int mul = Math.max(1, multiplier);
-            line = "ضرب حظه وربح ×" + mul + " · +" + Math.max(0L, wonCoins);
+            line = "ضرب حظه وربح ×" + formatMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
         }
         // Use the same dashboard-controlled toast as every other lucky outcome.
         // Do not route this through ComingMsgView: that legacy sliding toast ignored the design controls.
@@ -11349,7 +11350,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 this, who, line, avatarUrl, null,
                 eventKey == null || eventKey.trim().isEmpty()
                         ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim(),
-                28, Math.max(0, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
+                28, Math.max(0d, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
         // Positive outcomes also arrive through the global celebration event, which owns
         // the chat line. No-payout outcomes are room-scoped, so announce those here.
         if (wonCoins <= 0 && roomBannerEnabled()) {
@@ -14144,15 +14145,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             long won = Math.max(0L, memberLong(payload, "luckyCoinsWon", 0L));
             // A zero-payout lucky result is still a real outcome and must show the
             // configured return/loss toast; only coin rain/audio require a payout.
-            int mul = 1;
+            int mul = 0;
             boolean soft = false;
+            double rawMultiplier = 0d;
             if (payload.has("luckyMultiplier") && !payload.get("luckyMultiplier").isJsonNull()) {
                 try {
-                    double raw = payload.get("luckyMultiplier").getAsDouble();
-                    soft = raw > 0 && raw < 1.0;
-                    mul = raw <= 0 || soft ? 0 : Math.max(1, (int) Math.round(raw));
+                    rawMultiplier = Math.max(0d, payload.get("luckyMultiplier").getAsDouble());
+                    soft = rawMultiplier > 0d && rawMultiplier < 1d;
+                    mul = rawMultiplier <= 0d ? 0 : Math.max(1, (int) Math.round(rawMultiplier));
                 } catch (Exception ignored) {
-                    mul = Math.max(1, memberInt(payload, "luckyMultiplier", 1));
+                    rawMultiplier = Math.max(0d, memberInt(payload, "luckyMultiplier", 0));
+                    mul = rawMultiplier <= 0d ? 0 : Math.max(1, (int) Math.round(rawMultiplier));
                 }
             }
             String luckyToastEventKey = firstNonEmpty(
@@ -14161,7 +14164,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     memberStr(payload, "requestId"),
                     memberStr(payload, "at"));
             if (luckyToastEventKey == null) luckyToastEventKey = String.valueOf(System.currentTimeMillis());
-            showLuckyHitBanner(who, memberStr(payload, "senderAvatarUrl"), won, mul, luckyToastEventKey);
+            showLuckyHitBanner(who, memberStr(payload, "senderAvatarUrl"), won, rawMultiplier, luckyToastEventKey);
             if (won > 0) {
                 GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
                 // Only float/rain on the winner's seat when a payout actually occurred.
