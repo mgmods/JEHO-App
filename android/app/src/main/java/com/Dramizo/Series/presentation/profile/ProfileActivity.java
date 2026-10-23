@@ -313,15 +313,21 @@ public class ProfileActivity extends ThemedActivity {
 
             String profileDisplayName = user.displayName != null && !user.displayName.isEmpty()
                     ? user.displayName : "مستخدم";
-            if (user.customDisplayRankName != null && !user.customDisplayRankName.trim().isEmpty()) {
-                profileDisplayName = profileDisplayName + "  ·  " + user.customDisplayRankName.trim();
-            }
             binding.tvDisplayName.setText(profileDisplayName);
+            String customRankName = user.customDisplayRankName;
+            boolean hasCustomRank = customRankName != null && !customRankName.trim().isEmpty();
+            binding.rowCustomDisplayRank.setVisibility(hasCustomRank ? View.VISIBLE : View.GONE);
+            binding.tvCustomDisplayRankLabel.setText(hasCustomRank ? customRankName.trim() : "");
+            try {
+                binding.tvCustomDisplayRankLabel.setTextColor(Color.parseColor(
+                        user.customDisplayRankColor == null ? "#D8B35B" : user.customDisplayRankColor));
+            } catch (Exception ignored) {
+                binding.tvCustomDisplayRankLabel.setTextColor(Color.parseColor("#D8B35B"));
+            }
             String customRankImageUrl = user.customDisplayRankImageUrl;
-            if (customRankImageUrl != null && !customRankImageUrl.trim().isEmpty()) {
+            if (hasCustomRank && customRankImageUrl != null && !customRankImageUrl.trim().isEmpty()) {
                 binding.imgCustomDisplayRank.setVisibility(View.VISIBLE);
-                Glide.with(binding.imgCustomDisplayRank)
-                        .load(customRankImageUrl.trim())
+                Glide.with(binding.imgCustomDisplayRank).load(customRankImageUrl.trim())
                         .into(binding.imgCustomDisplayRank);
             } else {
                 Glide.with(binding.imgCustomDisplayRank).clear(binding.imgCustomDisplayRank);
@@ -409,12 +415,13 @@ public class ProfileActivity extends ThemedActivity {
             bindVipMedal(binding.imgVipMedal, vip, user.levelBadgeUrl);
             bindEntryRide(
                     binding.imgEntryRide,
-                    firstNonEmpty(user.entryAnimationUrl, user.entryEffectUrl));
+                    firstNonEmpty(user.customDisplayRankEntryEffectUrl, user.entryAnimationUrl, user.entryEffectUrl));
 
             // Profile: fixed VIP nobility frame (ud_vip_tou); mall SVGA stays on mics only.
             String nobilityFrame = VipStyle.profileNobilityFrameUrl(vip, user.vipTouUrl);
-            String profileFrame = user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()
-                    ? user.vipBadgeUrl : nobilityFrame;
+            String profileFrame = user.customDisplayRankFrameUrl != null && !user.customDisplayRankFrameUrl.trim().isEmpty()
+                    ? user.customDisplayRankFrameUrl
+                    : (user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty() ? user.vipBadgeUrl : nobilityFrame);
             AvatarCosmetics.bindProfileWear(
                     binding.webProfileHostSignal,
                     binding.imgAvatar,
