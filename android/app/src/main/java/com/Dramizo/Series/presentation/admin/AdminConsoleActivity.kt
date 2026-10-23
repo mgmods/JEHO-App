@@ -2434,7 +2434,7 @@ class AdminConsoleActivity : ThemedActivity() {
                                         showError(response.body()?.message ?: "تعذر البحث عن المستخدم (HTTP ${response.code()})")
                                         return
                                     }
-                                    val page = response.body()?.data as? Map<*, *>
+                                    val page = response.body()?.getData() as? Map<*, *>
                                     val users = page?.get("items") as? List<*> ?: emptyList<Any>()
                                     val matched = users.firstOrNull { item ->
                                         val row = item as? Map<*, *>
@@ -2458,7 +2458,7 @@ class AdminConsoleActivity : ThemedActivity() {
                                                     showError(response.body()?.message ?: "تعذر فتح المحادثة (HTTP ${response.code()})")
                                                     return
                                                 }
-                                                val data = response.body()?.data
+                                                val data = response.body()?.getData()
                                                 val conversationId = (data as? Map<*, *>)?.get("id")?.toString()
                                                 if (conversationId.isNullOrBlank()) {
                                                     progress.visibility = View.GONE
@@ -2609,7 +2609,7 @@ class AdminConsoleActivity : ThemedActivity() {
             ContainerProvider.from(this).getUploadApi().upload(part).enqueue(object : Callback<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> {
                 override fun onResponse(call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>, response: Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>) {
                     notificationImageUploadInProgress = false
-                    val result = response.body()?.data
+                    val result = response.body()?.getData()
                     if (response.isSuccessful && response.body()?.success == true && !result?.url.isNullOrBlank()) {
                         notificationImageUrl = result!!.url
                         notificationImageStatus?.text = "✓ تم رفع الصورة بنجاح"
@@ -2804,7 +2804,7 @@ class AdminConsoleActivity : ThemedActivity() {
             ContainerProvider.from(this).getUploadApi().upload(part).enqueue(object : Callback<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> {
                 override fun onResponse(call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>, response: Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>) {
                     staffIdentityUploadInProgress = false
-                    val result = response.body()?.data
+                    val result = response.body()?.getData()
                     val input = staffIdentityFields[key]
                     if (response.isSuccessful && response.body()?.success == true && !result?.url.isNullOrBlank() && input != null) {
                         input.setText(result!!.url)
