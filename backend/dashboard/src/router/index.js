@@ -193,8 +193,11 @@ const routes = [
       {
         path: 'games',
         name: 'games',
-        component: () => import('@/views/GamesViewBoundary.vue'),
-        meta: { titleKey: 'routes.games' },
+        // Match the working source dashboard: load the games page directly.
+        // The extra async boundary had its own 15s timeout/retry and could leave
+        // the route stuck on a failure screen on a slow/cold dashboard load.
+        component: () => import('@/views/GamesView.vue'),
+        meta: { titleKey: 'routes.games', module: 'games' },
       },
       {
         path: 'game-ads',
