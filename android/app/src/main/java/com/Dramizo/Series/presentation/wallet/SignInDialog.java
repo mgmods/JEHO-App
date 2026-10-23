@@ -2,6 +2,7 @@ package com.Dramizo.Series.presentation.wallet;
 
 import android.app.Dialog;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -10,6 +11,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.GridLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,8 +33,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/** Mikoo SignInDialog — daily check-in via TasksApi.checkin(). */
+/** Native daily check-in dialog. Claims remain backed by TasksApi.checkin(). */
 public class SignInDialog extends DialogFragment {
+
+    private static final int GREEN = Color.rgb(33, 134, 83);
+    private static final int DARK = Color.rgb(35, 45, 40);
+    private static final int MUTED = Color.rgb(112, 122, 116);
 
     public static void show(@Nullable FragmentManager fm) {
         if (fm == null || fm.isStateSaved()) return;
@@ -78,21 +85,47 @@ public class SignInDialog extends DialogFragment {
         if (binding == null) return;
         GridLayout grid = binding.gridDays;
         grid.removeAllViews();
-        String[] labels = {"يوم 1", "يوم 2", "يوم 3", "يوم 4", "يوم 5", "يوم 6", "يوم 7"};
-        for (int i = 0; i < labels.length; i++) {
-            TextView cell = new TextView(requireContext());
+        for (int i = 0; i < 7; i++) {
+            LinearLayout card = new LinearLayout(requireContext());
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setGravity(Gravity.CENTER);
+            card.setBackgroundResource(R.drawable.bg_sign_day_cell);
+            card.setPadding(dp(4), dp(8), dp(4), dp(8));
+
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
             lp.width = 0;
-            lp.height = dp(64);
-            lp.columnSpec = GridLayout.spec(i % 4, 1f);
+            lp.height = dp(106);
+            lp.columnSpec = GridLayout.spec(i < 4 ? i : i - 4, 1f);
+            lp.rowSpec = GridLayout.spec(i < 4 ? 0 : 1);
             lp.setMargins(dp(4), dp(4), dp(4), dp(4));
-            cell.setLayoutParams(lp);
-            cell.setBackgroundResource(R.drawable.bg_sign_day_cell);
-            cell.setGravity(Gravity.CENTER);
-            cell.setText(labels[i] + "\n+coins");
-            cell.setTextColor(0xFF663300);
-            cell.setTextSize(11f);
-            grid.addView(cell);
+            card.setLayoutParams(lp);
+
+            TextView day = new TextView(requireContext());
+            day.setText("اليوم " + (i + 1));
+            day.setTextColor(DARK);
+            day.setTextSize(11f);
+            day.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            day.setGravity(Gravity.CENTER);
+
+            ImageView reward = new ImageView(requireContext());
+            LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(dp(42), dp(42));
+            imageLp.topMargin = dp(5);
+            imageLp.bottomMargin = dp(4);
+            reward.setLayoutParams(imageLp);
+            reward.setImageResource(R.drawable.ic_gold_coin);
+            reward.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            reward.setContentDescription("مكافأة اليوم " + (i + 1));
+
+            TextView rewardLabel = new TextView(requireContext());
+            rewardLabel.setText("مكافأة");
+            rewardLabel.setTextColor(MUTED);
+            rewardLabel.setTextSize(10f);
+            rewardLabel.setGravity(Gravity.CENTER);
+
+            card.addView(day);
+            card.addView(reward);
+            card.addView(rewardLabel);
+            grid.addView(card);
         }
     }
 
@@ -119,12 +152,11 @@ public class SignInDialog extends DialogFragment {
                 }
                 binding.tvSignHint.setText(done
                         ? getString(R.string.check_in_done)
-                        : (reward != null ? reward : "سجّل حضورك يومياً واربح كوينز"));
+                        : (reward != null ? reward : "سجّل حضورك يومياً واحصل على مكافأتك"));
                 binding.bltvCheckIn.setEnabled(!done);
-                binding.bltvCheckIn.setAlpha(done ? 0.45f : 1f);
-                binding.bltvCheckIn.setText(done
-                        ? R.string.check_in_done
-                        : R.string.check_in_action);
+                binding.bltvCheckIn.setAlpha(1f);
+                binding.bltvCheckIn.setText(done ? "تم الاستلام" : "استلام");
+                binding.bltvCheckIn.setTextColor(GREEN);
             });
         });
     }
@@ -140,6 +172,11 @@ public class SignInDialog extends DialogFragment {
             requireActivity().runOnUiThread(() -> {
                 claiming = false;
                 if (r.success) {
+                    if (binding != null) {
+                        binding.bltvCheckIn.setText("تم الاستلام");
+                        binding.bltvCheckIn.setEnabled(false);
+                        binding.bltvCheckIn.setTextColor(GREEN);
+                    }
                     Toast.makeText(requireContext(), R.string.check_in_done, Toast.LENGTH_SHORT).show();
                     loadHint();
                 } else {
