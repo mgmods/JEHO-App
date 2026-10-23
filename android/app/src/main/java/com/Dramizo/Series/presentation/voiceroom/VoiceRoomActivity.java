@@ -11772,7 +11772,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (forcedAnim != null) return forcedAnim;
         String forcedPreview = forceMp4Sibling(preview);
         if (forcedPreview != null) return forcedPreview;
-        // No video available: skip still image so UI does not flash a half-white PNG.
+        // If no sibling MP4 exists, still show the purchased preview instead of
+        // silently suppressing the entrance on every room client (PNG/WebP/SVGA).
+        if (anim != null) return anim;
+        if (preview != null) return preview;
         return null;
     }
 
