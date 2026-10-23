@@ -1117,6 +1117,20 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         } catch (Exception ignored) {
             holder.b.tvCustomRankBadge.setTextColor(Color.parseColor("#D8B35B"));
         }
+        String rankNameplateUrl = user.customDisplayRankNameplateUrl;
+        if (rankNameplateUrl != null && !rankNameplateUrl.trim().isEmpty()) {
+            Glide.with(holder.itemView).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rankNameplateUrl.trim()))
+                    .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
+                        @Override public void onResourceReady(@NonNull android.graphics.drawable.Drawable resource, @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.drawable.Drawable> transition) {
+                            holder.b.tvCustomRankBadge.setBackground(resource);
+                        }
+                        @Override public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {
+                            holder.b.tvCustomRankBadge.setBackground(null);
+                        }
+                    });
+        } else {
+            holder.b.tvCustomRankBadge.setBackground(null);
+        }
         String rankFrameUrl = user.customDisplayRankFrameUrl;
         if (rankFrameUrl != null && !rankFrameUrl.trim().isEmpty() && holder.b.imgFrame != null) {
             holder.b.imgFrame.setVisibility(View.VISIBLE);
