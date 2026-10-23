@@ -24,8 +24,9 @@
       <h5 class="mb-3">منح أو سحب شارة / رتبة شكلية</h5>
       <p class="text-muted small mb-3">يمكن تعيين نفس الشارة لعدة حسابات. هذا التعيين تجميلي فقط ولا يمنح صلاحيات إدارية.</p>
       <div class="row g-2 align-items-end">
-        <div class="col-md-5"><label class="form-label">الشارة</label><select v-model="grant.badgeId" class="form-select"><option value="">اختر شارة</option><option v-for="b in badges" :key="b.id" :value="b.id">{{ b.name }}</option></select></div>
-        <div class="col-md-5"><label class="form-label">معرّفات المستخدمين (ID عام أو UUID)</label><textarea v-model="grant.userId" class="form-control" rows="2" placeholder="مثال: 123456, 234567 أو كل ID بسطر" /></div>
+        <div class="col-md-4"><label class="form-label">الشارة أو الصفة</label><select v-model="grant.badgeId" class="form-select"><option value="">اختر شارة</option><option v-for="badge in badges" :key="badge.id" :value="badge.id">{{ badge.name }}</option></select></div>
+        <div class="col-md-4"><label class="form-label">معرّفات المستخدمين (ID عام أو UUID)</label><textarea v-model="grant.userId" class="form-control" rows="2" placeholder="مثال: 123456, 234567 أو كل ID بسطر" /></div>
+        <div class="col-md-2"><label class="form-label">المدة بالأيام</label><input v-model.number="grant.durationDays" type="number" min="0" max="3650" step="1" class="form-control" /><small class="text-muted">0 = دائمة</small></div>
         <div class="col-md-2 d-grid gap-2"><button class="btn btn-success" :disabled="!grant.badgeId || !parseUserIds(grant.userId).length || bulkBusy" @click="grantBadge">{{ bulkBusy ? 'جارٍ التنفيذ…' : 'منح للجميع' }}</button><button class="btn btn-outline-danger" :disabled="!grant.badgeId || !parseUserIds(grant.userId).length || bulkBusy" @click="revokeBadge">سحب من الجميع</button></div>
       </div>
     </div>
@@ -50,7 +51,7 @@ const error = ref('')
 const editingId = ref('')
 const blank = () => ({ name: '', description: '', imageUrl: '', category: 'general', awardType: 'manual', achievementKey: null, achievementThreshold: 0, isActive: true, isAnimated: false, sortOrder: 0 })
 const form = reactive(blank())
-const grant = reactive({ badgeId: '', userId: '' })
+const grant = reactive({ badgeId: '', userId: '', durationDays: 0 })
 
 async function load() {
   loading.value = true
