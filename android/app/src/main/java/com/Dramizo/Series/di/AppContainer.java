@@ -107,6 +107,7 @@ public class AppContainer {
     private final AuraDatabase database;
     private final ExecutorService ioExecutor;
     private final Retrofit retrofit;
+    private final AuthApi authApi;
     private final BillingHelper billingHelper;
 
     private final AuthRepository authRepository;
@@ -248,7 +249,8 @@ public class AppContainer {
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
 
-        AuthApi authApi = retrofit.create(AuthApi.class);
+        this.authApi = retrofit.create(AuthApi.class);
+        AuthApi authApi = this.authApi;
         UserApi userApi = retrofit.create(UserApi.class);
         RoomApi roomApi = retrofit.create(RoomApi.class);
         chatApi = retrofit.create(ChatApi.class);
