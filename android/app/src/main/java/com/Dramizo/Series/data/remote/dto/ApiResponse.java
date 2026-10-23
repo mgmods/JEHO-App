@@ -11,4 +11,7 @@ public class ApiResponse<T> {
     public String timestamp;
     @SerializedName("message")
     public String message;
+
+    public T getData() { return data; }
+    public boolean isSuccess() { return success; }
 }
