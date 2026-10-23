@@ -200,7 +200,10 @@ export class NotificationsService {
       where: { userId, type: NotificationType.CHAT },
       order: { createdAt: 'DESC' },
     });
-    const messages = rows.filter((n) => (n.data as any)?.adminMessage === true);
+    const messages = rows.filter((n) => {
+      const data = (n.data || {}) as any;
+      return data.adminMessage === true || data.source === 'admin';
+    });
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(200, Math.max(1, query.limit || 80));
     const chronological = messages.slice((page - 1) * limit, page * limit).reverse();
@@ -212,7 +215,10 @@ export class NotificationsService {
       where: { userId, type: NotificationType.CHAT },
       order: { createdAt: 'DESC' },
     });
-    const messages = rows.filter((n) => (n.data as any)?.adminMessage === true);
+    const messages = rows.filter((n) => {
+      const data = (n.data || {}) as any;
+      return data.adminMessage === true || data.source === 'admin';
+    });
     const latest = messages[0];
     return {
       unread: messages.filter((n) => !n.isRead).length,
@@ -357,8 +363,10 @@ export class NotificationsService {
             audience,
             channel,
             officialNews: isOfficial,
-            ...(type === NotificationType.CHAT ? { adminMessage: true } : {}),
+            // Mark admin-originated sends so tapping their push opens Admin Messages.
+            adminMessage: true,
             source: 'admin',
+            originalType: type,
             targetUserId: userId,
             ...(richHtml ? { html: richHtml, bodyHtml: richHtml } : {}),
             ...(imageUrl ? { imageUrl } : {}),
@@ -369,6 +377,31 @@ export class NotificationsService {
         });
         saved += 1;
         if (notif.fcmSent) pushed += 1;
+
+        // Keep the normal notification/official-news entry and also place the same
+        // admin broadcast in the dedicated Admin Messages inbox. Do not send a
+        // second push: this mirror exists only for the in-app conversation list.
+        if (type !== NotificationType.CHAT) {
+          await this.create({
+            userId,
+            type: NotificationType.CHAT,
+            title: dto.title,
+            body: plainBody,
+            data: {
+              audience,
+              channel,
+              adminMessage: true,
+              source: 'admin',
+              originalType: type,
+              mirroredAdminMessage: true,
+              targetUserId: userId,
+              ...(richHtml ? { html: richHtml, bodyHtml: richHtml } : {}),
+              ...(imageUrl ? { imageUrl } : {}),
+              ...(link ? { url: link, link } : {}),
+            },
+            sendPush: false,
+          });
+        }
       } else if (pushNow) {
         const ok = await this.sendFcm(userId, dto.title, plainBody, {
           type,
