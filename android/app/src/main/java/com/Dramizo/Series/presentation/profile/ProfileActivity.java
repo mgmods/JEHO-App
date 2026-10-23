@@ -324,6 +324,20 @@ public class ProfileActivity extends ThemedActivity {
             } catch (Exception ignored) {
                 binding.tvCustomDisplayRankLabel.setTextColor(Color.parseColor("#D8B35B"));
             }
+            String rankNameplateUrl = user.customDisplayRankNameplateUrl;
+            if (hasCustomRank && rankNameplateUrl != null && !rankNameplateUrl.trim().isEmpty()) {
+                Glide.with(binding.tvCustomDisplayRankLabel).load(rankNameplateUrl.trim())
+                        .into(new com.bumptech.glide.request.target.CustomTarget<Drawable>() {
+                            @Override public void onResourceReady(@androidx.annotation.NonNull Drawable resource, @androidx.annotation.Nullable com.bumptech.glide.request.transition.Transition<? super Drawable> transition) {
+                                binding.tvCustomDisplayRankLabel.setBackground(resource);
+                            }
+                            @Override public void onLoadCleared(@androidx.annotation.Nullable Drawable placeholder) {
+                                binding.tvCustomDisplayRankLabel.setBackground(null);
+                            }
+                        });
+            } else {
+                binding.tvCustomDisplayRankLabel.setBackground(null);
+            }
             String customRankImageUrl = user.customDisplayRankImageUrl;
             if (hasCustomRank && customRankImageUrl != null && !customRankImageUrl.trim().isEmpty()) {
                 binding.imgCustomDisplayRank.setVisibility(View.VISIBLE);
