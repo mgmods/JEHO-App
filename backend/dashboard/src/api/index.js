@@ -64,6 +64,10 @@ export const usersApi = {
 export const roomsApi = {
   list: (params) => safeRequest(() => api.get('/admin/rooms', { params })),
   get: (id) => safeRequest(() => api.get(`/admin/rooms/${id}`)),
+  createPlatform: (data) => safeRequest(() => api.post('/admin/rooms/platform', data)),
+  platformStaff: (id) => safeRequest(() => api.get(`/admin/rooms/${id}/platform-staff`)),
+  addPlatformStaff: (id, publicId) => safeRequest(() => api.post(`/admin/rooms/${id}/platform-staff`, { publicId })),
+  removePlatformStaff: (id, publicId) => safeRequest(() => api.delete(`/admin/rooms/${id}/platform-staff/${encodeURIComponent(publicId)}`)),
   update: (id, data) => safeRequest(() => api.patch(`/admin/rooms/${id}`, data)),
   setCustomerService: (id, enabled) =>
     safeRequest(() =>
