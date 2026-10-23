@@ -382,13 +382,18 @@ export class AgenciesService implements OnModuleInit {
         userId,
         status: AgencyMemberStatus.ACTIVE,
         isActive: true,
+        agency: { status: AgencyStatus.ACTIVE },
       },
       relations: ['agency'],
       order: { joinedAt: 'DESC' },
     });
     if (!membership) {
       membership = await this.membersRepo.findOne({
-        where: { userId, status: AgencyMemberStatus.PENDING },
+        where: {
+          userId,
+          status: AgencyMemberStatus.PENDING,
+          agency: { status: AgencyStatus.ACTIVE },
+        },
         relations: ['agency'],
         order: { joinedAt: 'DESC' },
       });
@@ -999,7 +1004,10 @@ export class AgenciesService implements OnModuleInit {
         relations: ['owner'],
       });
     }
-    if (!agency) throw new NotFoundException('Agency not found');
+    // Do not expose suspended/inactive agencies through stale public profile links.
+    if (!agency || agency.status !== AgencyStatus.ACTIVE) {
+      throw new NotFoundException('Agency not found');
+    }
     agency = await this.ensureAgencyPublicId(agency);
     const publicUser = (user: User | null | undefined) =>
       user
