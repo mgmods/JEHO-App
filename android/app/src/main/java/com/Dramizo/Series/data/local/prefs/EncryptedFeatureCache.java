@@ -93,6 +93,12 @@ public final class EncryptedFeatureCache {
         }
     }
 
+    /** Remove one feature cache entry without flushing unrelated user caches. */
+    public void remove(String userId, String namespace) {
+        if (userId == null || userId.isEmpty() || namespace == null || namespace.isEmpty()) return;
+        prefs.edit().remove(key(userId, namespace)).apply();
+    }
+
     public void clearUser(String userId) {
         if (userId == null || userId.isEmpty()) return;
         String prefix = userId + "::";

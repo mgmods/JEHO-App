@@ -4758,7 +4758,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (binding != null) {
                 updateMusicProgressUi();
             }
-            handler.postDelayed(this, 500);
+            // Playback timing is server-synchronized; a 1s UI tick is sufficient and lighter.
+            handler.postDelayed(this, 1_000L);
         }
     };
 
@@ -10722,7 +10723,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         GlobalCelebrationToast.show(
                 this, who, msg, avatarUrl, null,
                 "room-result-" + who + "-" + System.currentTimeMillis(),
-                28);
+                28, 0d, 0L, who, "lucky_hit", null);
         if (roomBannerEnabled()) appendGameCelebrationLine(msg, null);
     }
 
