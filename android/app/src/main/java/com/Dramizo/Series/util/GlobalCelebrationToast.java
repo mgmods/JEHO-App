@@ -238,7 +238,7 @@ public final class GlobalCelebrationToast {
 
     private static void refreshToastStyle(Activity activity) {
         long now = System.currentTimeMillis();
-        if (now - lastStyleFetchAt < 3_000L) return;
+        if (now - lastStyleFetchAt < 60_000L) return;
         lastStyleFetchAt = now;
         try {
             com.Dramizo.Series.AuraLiveApp app =
@@ -400,7 +400,7 @@ public final class GlobalCelebrationToast {
         }
         if ("gift_send".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind)) refreshToastStyle(activity);
         long now = System.currentTimeMillis();
-        if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 8_000L) {
+        if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 1_200L) {
             return;
         }
         lastDedupeKey = dedupeKey;
