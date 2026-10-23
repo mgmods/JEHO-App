@@ -135,10 +135,13 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         if (a == b) return true;
         if (a == null || b == null) return false;
         String rankImageA = a.peer != null ? a.peer.customDisplayRankImageUrl : null;
+        String rankColorA = a.peer != null ? a.peer.customDisplayRankColor : null;
+        String rankColorB = b.peer != null ? b.peer.customDisplayRankColor : null;
         String rankImageB = b.peer != null ? b.peer.customDisplayRankImageUrl : null;
         return eq(resolveAvatarUrl(a), resolveAvatarUrl(b))
                 && eq(resolveFrameUrl(a), resolveFrameUrl(b))
-                && eq(rankImageA, rankImageB);
+                && eq(rankImageA, rankImageB)
+                && eq(rankColorA, rankColorB);
     }
 
     private static String resolveAvatarUrl(ChatDtos.ConversationDto item) {
@@ -185,9 +188,21 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         }
         String rankName = item.peer != null ? item.peer.customDisplayRankName : null;
         if (rankName != null && !rankName.trim().isEmpty()) {
-            displayName = displayName + "  ·  " + rankName.trim();
+            String rankLabel = rankName.trim();
+            SpannableStringBuilder title = new SpannableStringBuilder(displayName)
+                    .append("\n").append(rankLabel);
+            int rankColor;
+            try {
+                rankColor = Color.parseColor(item.peer.customDisplayRankColor);
+            } catch (Exception ignored) {
+                rankColor = Color.parseColor("#D8B35B");
+            }
+            title.setSpan(new ForegroundColorSpan(rankColor), title.length() - rankLabel.length(),
+                    title.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            holder.b.tvTitle.setText(title);
+        } else {
+            holder.b.tvTitle.setText(displayName);
         }
-        holder.b.tvTitle.setText(displayName);
 
         boolean verified = item.peer != null && item.peer.genderVerified;
         if (holder.b.imgOfficial != null) {
