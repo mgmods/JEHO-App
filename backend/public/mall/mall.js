@@ -25,6 +25,7 @@
     equipped: {},
     expiresAt: {},
     leaseDays: 30,
+    roomCardDuration: '30',
     selectedId: null,
     busy: false,
     nativeFramePreview: false,
@@ -53,6 +54,8 @@
     btnRecharge: document.getElementById('btnRecharge'),
     catalogCount: document.getElementById('catalogCount'),
     catalogCaption: document.getElementById('catalogCaption'),
+    roomCardDuration: document.getElementById('roomCardDuration'),
+    roomCardDurationSelect: document.getElementById('roomCardDurationSelect'),
   };
 
   function qs(name) {
@@ -623,6 +626,36 @@
       n.toLocaleString('en-US') + '</span>';
   }
 
+  function selectedRoomCardPrice(item) {
+    var base = Math.max(0, Math.floor(Number(item && item.coinPrice) || 0));
+    if (!item || state.type !== 'room_card') return base;
+    if (state.roomCardDuration === 'permanent') {
+      var meta = item.meta || {};
+      var configured = Number(meta.roomCardPermanentPrice);
+      return Object.prototype.hasOwnProperty.call(meta, 'roomCardPermanentPrice')
+        && Number.isFinite(configured) && configured >= 0
+        ? Math.floor(configured)
+        : base * 4;
+    }
+    var days = Number(state.roomCardDuration) || 30;
+    return days === 30 || base === 0 ? base : Math.max(1, Math.ceil(base * days / 30));
+  }
+
+  function roomCardDurationLabel() {
+    return state.roomCardDuration === 'permanent'
+      ? 'دائم'
+      : (String(state.roomCardDuration || '30') + ' يوم');
+  }
+
+  function syncRoomCardDuration() {
+    if (!el.roomCardDuration) return;
+    var visible = state.type === 'room_card' && !state.bagMode;
+    el.roomCardDuration.hidden = !visible;
+    if (el.roomCardDurationSelect && el.roomCardDurationSelect.value !== state.roomCardDuration) {
+      el.roomCardDurationSelect.value = state.roomCardDuration;
+    }
+  }
+
   function syncActionButtons(item) {
     el.btnSecondary.hidden = true;
     if (!item) {
@@ -633,13 +666,15 @@
     var owned = isActiveOwned(item.id);
     var equipped = !!state.equipped[item.id];
     var left = daysLeft(item.id);
+    var purchasePrice = selectedRoomCardPrice(item);
+    var purchaseTerm = state.type === 'room_card' ? roomCardDurationLabel() : '30 يوم';
     el.btnPrimary.disabled = state.busy;
 
     if (state.type === 'room_background') {
       if (!owned) {
-        el.btnPrimary.innerHTML = item.coinPrice > 0
-          ? ('شراء ' + coinMarkup(item.coinPrice) + ' · 30 يوم')
-          : 'احصل مجاناً · 30 يوم';
+        el.btnPrimary.innerHTML = purchasePrice > 0
+          ? ('شراء ' + coinMarkup(purchasePrice) + ' · ' + purchaseTerm)
+          : 'احصل مجاناً · ' + purchaseTerm;
         el.btnPrimary.className = 'btn btn-buy';
       } else if (state.roomId) {
         el.btnPrimary.textContent = 'طبّق على الروم';
@@ -655,9 +690,9 @@
     }
 
     if (!owned) {
-      el.btnPrimary.innerHTML = item.coinPrice > 0
-        ? ('شراء ' + coinMarkup(item.coinPrice) + ' · 30 يوم')
-        : 'احصل مجاناً · 30 يوم';
+      el.btnPrimary.innerHTML = purchasePrice > 0
+        ? ('شراء ' + coinMarkup(purchasePrice) + ' · ' + purchaseTerm)
+        : 'احصل مجاناً · ' + purchaseTerm;
       el.btnPrimary.className = 'btn btn-buy';
     } else if (equipped) {
       el.btnPrimary.textContent = left != null ? ('خلع · ' + left + ' يوم') : 'خلع';
@@ -745,6 +780,7 @@
     if (el.catalogCount) el.catalogCount.textContent = list.length ? (list.length + ' عنصر') : '';
     if (el.catalogCaption) el.catalogCaption.textContent = state.bagMode ? 'العناصر الموجودة في حقيبتك' : 'مختارات هذا القسم';
     syncBagButton();
+    syncRoomCardDuration();
 
     var pendingSvga = [];
     var pendingVideos = [];
@@ -984,12 +1020,15 @@
       if (!owned) {
         var bought = await api('cosmetics/purchase', {
           method: 'POST',
-          body: JSON.stringify({ cosmeticId: item.id }),
+          body: JSON.stringify(state.type === 'room_card'
+            ? { cosmeticId: item.id, duration: state.roomCardDuration }
+            : { cosmeticId: item.id }),
         });
         state.owned[item.id] = true;
         if (bought && bought.expiresAt) state.expiresAt[item.id] = bought.expiresAt;
-        setStatus('تم الشراء لمدة 30 يوماً', 'ok');
-        toastNative('تم الشراء · 30 يوم');
+        var purchasedTerm = state.type === 'room_card' ? roomCardDurationLabel() : '30 يوم';
+        setStatus('تم الشراء · ' + purchasedTerm, 'ok');
+        toastNative('تم الشراء · ' + purchasedTerm);
         await loadInventory();
       } else if (state.type === 'room_background') {
         if (!state.roomId) {
@@ -1097,6 +1136,14 @@
   };
 
   el.btnPrimary.addEventListener('click', onPrimary);
+  if (el.roomCardDurationSelect) {
+    el.roomCardDurationSelect.addEventListener('change', function () {
+      var next = String(el.roomCardDurationSelect.value || '30');
+      state.roomCardDuration = ['7', '15', '30', 'permanent'].indexOf(next) >= 0 ? next : '30';
+      var item = selectedItem();
+      syncActionButtons(item);
+    });
+  }
   el.btnSecondary.addEventListener('click', function () {
     var item = selectedItem();
     if (item && state.equipped[item.id] && state.type !== 'room_background') {

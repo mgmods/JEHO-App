@@ -76,6 +76,16 @@
         <div class="catalog-caption"><span class="catalog-dot"></span><span id="catalogCaption">مختارات تناسبك</span></div>
         <span class="catalog-count" id="catalogCount"></span>
       </div>
+      <div class="room-card-duration" id="roomCardDuration" hidden>
+        <label for="roomCardDurationSelect">مدة مؤثر كرت الروم</label>
+        <select id="roomCardDurationSelect" aria-label="مدة مؤثر كرت الروم">
+          <option value="7">7 أيام</option>
+          <option value="15">15 يومًا</option>
+          <option value="30" selected>30 يومًا</option>
+          <option value="permanent">دائم</option>
+        </select>
+        <span>السعر يتغير حسب المدة المختارة</span>
+      </div>
       <p class="status" id="status" role="status" aria-live="polite" hidden></p>
       <p class="empty" id="empty" hidden>لا توجد عناصر في هذا القسم</p>
       <main class="grid" id="grid" aria-live="polite"></main>

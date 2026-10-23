@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsEnum, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CosmeticsService } from './cosmetics.service';
 import { CurrentUser, Public } from '../../common/decorators';
@@ -10,6 +10,11 @@ class PurchaseCosmeticDto {
   @ApiProperty()
   @IsUUID()
   cosmeticId: string;
+
+  @ApiPropertyOptional({ description: 'Room-card lease: permanent or 7, 15, 30 days' })
+  @IsOptional()
+  @IsIn(['permanent', '7', '15', '30'])
+  duration?: string;
 }
 
 class EquipCosmeticDto {
@@ -51,7 +56,7 @@ export class CosmeticsController {
 
   @Post('purchase')
   purchase(@CurrentUser('sub') userId: string, @Body() dto: PurchaseCosmeticDto) {
-    return this.cosmeticsService.purchase(userId, dto.cosmeticId);
+    return this.cosmeticsService.purchase(userId, dto.cosmeticId, dto.duration);
   }
 
   @Post('equip')

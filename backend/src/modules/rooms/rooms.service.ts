@@ -1727,6 +1727,37 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async list(query: PaginationDto) {
+    // Clear expired equipped room-card effects before building public room cards.
+    // This is lazy, idempotent cleanup: it does not touch room seats, audio, or gifts.
+    await this.dataSource.query(
+      `UPDATE user_profiles up
+          SET "roomCardUrl" = NULL
+        WHERE up."roomCardUrl" IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+              FROM user_cosmetics uc
+              JOIN cosmetics c ON c.id = uc."cosmeticId"
+             WHERE uc."userId" = up."userId"
+               AND c.type = 'room_card'
+               AND uc.equipped = true
+               AND uc."expiresAt" IS NOT NULL
+               AND uc."expiresAt" <= NOW()
+          )`,
+    ).catch(() => undefined);
+    await this.dataSource.query(
+      `UPDATE rooms r
+          SET "roomCardUrl" = NULL, "roomCardEquippedById" = NULL
+        WHERE r."roomCardEquippedById" IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+              FROM user_cosmetics uc
+              JOIN cosmetics c ON c.id = uc."cosmeticId"
+             WHERE uc."userId" = r."roomCardEquippedById"
+               AND c.type = 'room_card'
+               AND uc.equipped = true
+               AND (uc."expiresAt" IS NULL OR uc."expiresAt" > NOW())
+          )`,
+    ).catch(() => undefined);
     const countQb = this.roomsRepo.createQueryBuilder('room');
     this.applyPublicRoomListFilters(countQb, query);
     const total = await countQb.getCount();
