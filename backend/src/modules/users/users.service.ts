@@ -158,6 +158,8 @@ export class UsersService {
       customDisplayRankFrameUrl: rank?.frameUrl ? String(rank.frameUrl) : null,
       customDisplayRankNameplateUrl: rank?.nameplateUrl ? String(rank.nameplateUrl) : null,
       customDisplayRankEntryEffectUrl: rank?.entryEffectUrl ? String(rank.entryEffectUrl) : null,
+      entryEffectUrl: rank?.entryEffectUrl ? String(rank.entryEffectUrl) : (flat.entryEffectUrl ?? null),
+      nameplateUrl: rank?.nameplateUrl ? String(rank.nameplateUrl) : (flat.nameplateUrl ?? null),
     };
   }
 
