@@ -474,26 +474,25 @@ public class ProfileActivity extends ThemedActivity {
                         isFollowingTarget ? R.string.unfollow : R.string.follow);
             }
 
-            // Property strip
-            String agencyId = null;
-            if (binding.tvProfileAgencyName != null) {
-                if (user.agency != null
-                        && user.agency.name != null
-                        && !user.agency.name.isEmpty()) {
-                    binding.tvProfileAgencyName.setText(user.agency.name.trim());
-                } else {
-                    binding.tvProfileAgencyName.setText(R.string.user_card_prop_family);
-                }
+            // Only show the agency/family tile when the backend confirms an active
+            // membership. Deleted or suspended agencies must disappear from every profile.
+            boolean hasActiveAgency = user.agency != null
+                    && user.agency.id != null && !user.agency.id.trim().isEmpty()
+                    && user.agency.name != null && !user.agency.name.trim().isEmpty();
+            String agencyId = hasActiveAgency ? user.agency.id : null;
+            if (binding.propProfileFamily != null) {
+                binding.propProfileFamily.setVisibility(hasActiveAgency ? View.VISIBLE : View.GONE);
             }
-            if (user.agency != null && user.agency.id != null && !user.agency.id.isEmpty()) {
-                agencyId = user.agency.id;
+            if (binding.tvProfileAgencyName != null) {
+                binding.tvProfileAgencyName.setText(hasActiveAgency
+                        ? user.agency.name.trim() : "");
             }
             UserSocialNav.bindFamilyClick(
                     this,
                     binding.propProfileFamily,
                     agencyId,
                     null);
-            bindAgencyStrip(user.agency);
+            bindAgencyStrip(hasActiveAgency ? user.agency : null);
         });
         vm.getError().observe(this, e -> {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
