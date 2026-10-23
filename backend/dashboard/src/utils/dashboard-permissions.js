@@ -45,7 +45,7 @@ export const ROUTE_MODULE = {
   'policy-brochure': 'policyBrochure',
   'gender-verifications': 'genderVerifications',
   'staff-identity': 'settings',
-undefined  moments: 'reports',
+  moments: 'reports',
 }
 
 export const DASHBOARD_MODULES = [
