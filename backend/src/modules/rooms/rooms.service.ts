@@ -1302,6 +1302,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       roomCardUrl: profile.roomCardUrl ?? user.roomCardUrl ?? null,
       vipLevel: level,
       ...(displayRank || {}),
+      entryEffectUrl: displayRank?.customDisplayRankEntryEffectUrl || user.entryEffectUrl || profile.entryEffectUrl || null,
+      nameplateUrl: displayRank?.customDisplayRankNameplateUrl || user.nameplateUrl || profile.nameplateUrl || null,
       profile: undefined,
     };
   }
