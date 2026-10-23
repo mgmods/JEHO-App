@@ -218,9 +218,7 @@ public class HomeMeFragment extends Fragment {
                 binding.imgProfileVipBadge.setVisibility(View.GONE);
             }
             bindProfileRoleBadge(c, me);
-            binding.tvProfileMedals.setOnClickListener(v ->
-                    startActivity(new Intent(requireContext(),
-                            com.Dramizo.Series.presentation.profile.MedalActivity.class)));
+            binding.tvProfileMedals.setVisibility(View.GONE);
             binding.tvProfileVerified.setVisibility(me.genderVerified
                     ? View.VISIBLE : View.GONE);
             if (me.avatarUrl != null && !me.avatarUrl.trim().isEmpty()) {
