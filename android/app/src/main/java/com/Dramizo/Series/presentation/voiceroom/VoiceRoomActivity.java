@@ -13376,11 +13376,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                 || response.body().data.roomPkEnabled;
                         handler.post(VoiceRoomActivity.this::ensureRoomPkActionButton);
                         for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
-                            if (contest == null || !"room_vs_room".equals(contest.challengeType)
-                                    || !"active".equalsIgnoreCase(contest.status)
+                            if (contest == null || !"active".equalsIgnoreCase(contest.status)
                                     || contest.sideA == null || contest.sideB == null) continue;
-                            boolean belongs = (contest.sideA.roomIds != null && contest.sideA.roomIds.contains(roomId))
-                                    || (contest.sideB.roomIds != null && contest.sideB.roomIds.contains(roomId));
+                            boolean inRoomPk = "person_vs_person".equals(contest.challengeType)
+                                    || "team_vs_team".equals(contest.challengeType);
+                            boolean belongs = inRoomPk
+                                    ? roomId.equals(contest.roomId)
+                                    : "room_vs_room".equals(contest.challengeType)
+                                        && ((contest.sideA.roomIds != null && contest.sideA.roomIds.contains(roomId))
+                                            || (contest.sideB.roomIds != null && contest.sideB.roomIds.contains(roomId)));
                             if (!belongs) continue;
                             JsonObject payload = new JsonObject();
                             if (contest.id != null) payload.addProperty("contestId", contest.id);
