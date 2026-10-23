@@ -405,7 +405,13 @@ const manageableGames = [
 // Guard all render/save paths against malformed entries injected by stale hot reloads or cached state.
 const safeManageableGames = manageableGames.filter((game) => game && typeof game === 'object' && typeof game.id === 'string' && game.id.trim())
 const directWinRateGameIds = new Set([
+  // JEHO-owned mini-games: outcome is resolved directly in our backend.
   'slots','roulette','plinko','rps','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
+  // Server-hosted Mikoo/BaiShun adapters: spinPayout reads getGameWinRate(gameId).
+  'cleopatra-slot','cleopatra-slots','football-plinko','fortune-slot','fishing',
+  'line-slots','megaways-slots','olympians','pirate-king','slot777','sugar-rush','swimsuit-party',
+  // These two game engines have dedicated server-side win-gate logic.
+  'hilo','royal-battle',
 ])
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
 const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
