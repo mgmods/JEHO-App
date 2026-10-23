@@ -639,11 +639,17 @@ public final class GlobalCelebrationToast {
         }
 
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        // Fixed toast dimensions: background artwork never changes size based on old settings.
-        final int requestedWidthDp = 340;
-        final int requestedHeightDp = 100;
-        int toastWidth = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
-        int toastHeight = customToastStyle ? dp(activity, requestedHeightDp) : ViewGroup.LayoutParams.WRAP_CONTENT;
+        final int requestedWidthDp = giftSend ? remoteGiftWidthDp
+                : luckyHigh ? remoteLuckyHighWidthDp
+                : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
+        final int requestedHeightDp = giftSend ? remoteGiftHeightDp
+                : luckyHigh ? remoteLuckyHighHeightDp
+                : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
+        int maxToastWidth = Math.max(dp(activity, 220), screenWidth - dp(activity, 24));
+        int toastWidth = Math.min(dp(activity, Math.max(220, Math.min(360, requestedWidthDp))), maxToastWidth);
+        int toastHeight = customToastStyle
+                ? dp(activity, Math.max(60, Math.min(180, requestedHeightDp)))
+                : ViewGroup.LayoutParams.WRAP_CONTENT;
         // Keep the text elements content-sized like the dashboard's draggable preview.
         // Full-width TextViews cannot be positioned by their left-edge percentage.
         int textMaxWidth = Math.max(dp(activity, 84), Math.round(toastWidth * 0.66f));
