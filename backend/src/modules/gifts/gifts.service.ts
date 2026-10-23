@@ -2539,12 +2539,14 @@ export class GiftsService implements OnModuleInit {
         if (gift.type === GiftType.LUCKY) {
           const luckyMultiplier = Number(result.luckyMultiplier || 0);
           const luckyCoinsWon = Math.max(0, Number(result.luckyCoinsWon || 0));
+          const luckyEventId = `lucky:${senderId}:${animationPayload.at}`;
           // Broadcast every lucky outcome, including a no-payout loss, so each client
           // renders the configured normal/return toast consistently.
           this.realtime?.emitToRoom(dto.roomId, 'room:event', {
             roomId: dto.roomId,
             event: 'lucky:hit',
             payload: {
+              eventId: luckyEventId,
               senderId,
               senderName: animationPayload.senderName,
               senderAvatarUrl: animationPayload.senderAvatarUrl,
@@ -2578,6 +2580,7 @@ export class GiftsService implements OnModuleInit {
             quantity: qty,
             luckyMultiplier,
             luckyCoinsWon,
+            eventId: luckyEventId,
           });
         }
         if (taskRoom?.agencyId) {
@@ -3067,10 +3070,12 @@ export class GiftsService implements OnModuleInit {
       if (gift.type === GiftType.LUCKY) {
         const luckyMultiplier = Number(result.luckyMultiplier || 0);
         const luckyCoinsWon = Math.max(0, Number(result.luckyCoinsWon || 0));
+        const luckyEventId = `lucky:${senderId}:${at}`;
         this.realtime?.emitToRoom(dto.roomId, 'room:event', {
           roomId: dto.roomId,
           event: 'lucky:hit',
           payload: {
+            eventId: luckyEventId,
             senderId,
             senderName: animationPayload.senderName,
             senderAvatarUrl: animationPayload.senderAvatarUrl,
@@ -3100,6 +3105,7 @@ export class GiftsService implements OnModuleInit {
           quantity: qty * Math.max(1, personCount),
           luckyMultiplier,
           luckyCoinsWon,
+          eventId: luckyEventId,
         });
       }
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
@@ -3121,6 +3127,7 @@ export class GiftsService implements OnModuleInit {
     quantity: number;
     luckyMultiplier: number;
     luckyCoinsWon: number;
+    eventId?: string;
   }) {
     const stake = Math.max(0, Math.floor(Number(opts.coinPrice) || 0))
       * Math.max(1, Math.floor(Number(opts.quantity) || 1));
@@ -3141,7 +3148,7 @@ export class GiftsService implements OnModuleInit {
         : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
     this.realtime.emitToAll('celebration:toast', {
       kind: 'lucky_hit',
-      id: `lucky:${opts.senderId}:${Date.now()}`,
+      id: opts.eventId || `lucky:${opts.senderId}:${Date.now()}`,
       userId: opts.senderId,
       displayName: name,
       avatarUrl: opts.avatarUrl || '',
