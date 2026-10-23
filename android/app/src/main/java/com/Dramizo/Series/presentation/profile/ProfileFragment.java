@@ -571,9 +571,6 @@ public class ProfileFragment extends Fragment {
         } catch (Exception ignored) {
             applyTasksFeatureVisibility();
         }
-        // Refresh earned badges on returning to the app so dashboard grants appear without
-        // requiring the user to sign out or reinstall.
-        if (myId != null && !myId.trim().isEmpty()) loadProfileBadges(myId);
         // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
         if (viewModel != null) viewModel.loadMe(false);
         loadAgencyAction();
