@@ -120,21 +120,6 @@ public class ProfileActivity extends ThemedActivity {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
-        // Show the recipient's awarded medals in the profile medal cabinet.
-        if (binding.rowBadges != null) {
-            binding.rowBadges.setVisibility(View.VISIBLE);
-            binding.rowBadges.setOnClickListener(v -> {
-                String profileId = targetUserIdHold[0];
-                if (profileId == null || profileId.trim().isEmpty()) {
-                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الميداليات", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                Intent intent = new Intent(this, BadgeActivity.class);
-                intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
-                startActivity(intent);
-            });
-        }
-
         if (binding.rowMoments != null) {
             binding.rowMoments.setOnClickListener(v -> {
                 String profileId = targetUserIdHold[0];
@@ -397,7 +382,6 @@ public class ProfileActivity extends ThemedActivity {
             if (binding.imgCountryFlag != null) {
                 FlagImages.bind(binding.imgCountryFlag, user.country);
             }
-            loadEarnedBadges(user.id);
 
             long charm = user.popularityLevel > 0 ? user.popularityLevel
                     : Math.max(0, Math.max(user.charmScore, user.popularityScore));
@@ -1099,66 +1083,6 @@ public class ProfileActivity extends ThemedActivity {
             case "marriage": return "💞 علاقة زواج";
             default: return "علاقة CP";
         }
-    }
-
-    private void loadEarnedBadges(String profileId) {
-        if (binding == null || binding.rowEarnedBadges == null
-                || profileId == null || profileId.trim().isEmpty()) return;
-        if (binding.tvBadgesEmpty != null) binding.tvBadgesEmpty.setVisibility(View.VISIBLE);
-        if (binding.tvBadgeCount != null) binding.tvBadgeCount.setText("0 مكتسبة");
-        container.getIoExecutor().execute(() -> {
-            java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned = new java.util.ArrayList<>();
-            boolean loaded = false;
-            try {
-                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
-                        container.getUserApi().earnedBadges(profileId).execute();
-                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
-                    loaded = true;
-                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
-                        // Only real earned ownership is displayed; catalog-only badges stay in admin.
-                        if (badge != null && badge.earned) earned.add(badge);
-                    }
-                }
-            } catch (Exception ignored) { }
-            final boolean catalogLoaded = loaded;
-            runOnUiThread(() -> {
-                if (binding == null || isFinishing() || isDestroyed()) return;
-                binding.rowEarnedBadges.removeAllViews();
-                binding.rowEarnedBadges.setVisibility(earned.isEmpty() ? View.GONE : View.VISIBLE);
-                if (binding.tvBadgeCount != null) {
-                    binding.tvBadgeCount.setText(earned.size() + " مكتسبة");
-                }
-                if (binding.tvBadgesEmpty != null) {
-                    binding.tvBadgesEmpty.setText(catalogLoaded
-                            ? "لم تحصل على شارات بعد"
-                            : "تعذر تحميل الشارات، حاول لاحقًا");
-                    binding.tvBadgesEmpty.setVisibility(earned.isEmpty() ? View.VISIBLE : View.GONE);
-                }
-                for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
-                    ImageView icon = new ImageView(this);
-                    int size = (int) (28 * getResources().getDisplayMetrics().density + 0.5f);
-                    android.widget.LinearLayout.LayoutParams lp =
-                            new android.widget.LinearLayout.LayoutParams(size, size);
-                    lp.setMargins(3, 0, 3, 0);
-                    icon.setLayoutParams(lp);
-                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    icon.setContentDescription(badge.name == null ? "شارة مكتسبة" : badge.name);
-                    Glide.with(this).load(AssetCatalog.absoluteUrl(badge.imageUrl))
-                            .placeholder(R.drawable.ic_medal_default)
-                            .error(R.drawable.ic_medal_default).into(icon);
-                    icon.setOnClickListener(v -> openBadgeCatalog(profileId));
-                    binding.rowEarnedBadges.addView(icon);
-                }
-                binding.rowBadges.setOnClickListener(v -> openBadgeCatalog(profileId));
-            });
-        });
-    }
-
-    private void openBadgeCatalog(String profileId) {
-        if (profileId == null || profileId.trim().isEmpty()) return;
-        Intent intent = new Intent(this, BadgeActivity.class);
-        intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
-        startActivity(intent);
     }
 
     private void sendSocialRequest(String targetId, String type, String labelAr) {
