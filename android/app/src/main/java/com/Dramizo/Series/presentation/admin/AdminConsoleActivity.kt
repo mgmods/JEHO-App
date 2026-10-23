@@ -155,7 +155,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     roleRefreshInFlight = false
                     if (isFinishing || isDestroyed) return
                     val result = response.body()?.getData()
-                    val freshUser = if (response.isSuccessful && response.body()?.success == true) result?.user else null
+                    val freshUser = if (response.isSuccessful && response.body()?.isSuccess == true) result?.user else null
                     if (freshUser != null) {
                         val oldRole = currentRole
                         session.saveSession(result)
