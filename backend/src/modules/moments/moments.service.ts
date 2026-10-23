@@ -72,6 +72,7 @@ export class MomentsService {
          FROM "jeho_own"."user_badges" ub
          JOIN "jeho_own"."badges" b ON b.id = ub."badgeId"
          WHERE ub."userId" = u.id AND b.category = 'display_rank' AND b."isActive" = true
+           AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
          ORDER BY ub."grantedAt" DESC, b."sortOrder" ASC
          LIMIT 1
        ) display_rank ON TRUE
@@ -104,6 +105,7 @@ export class MomentsService {
          FROM "jeho_own"."user_badges" ub
          JOIN "jeho_own"."badges" b ON b.id = ub."badgeId"
          WHERE ub."userId" = u.id AND b.category = 'display_rank' AND b."isActive" = true
+           AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
          ORDER BY ub."grantedAt" DESC, b."sortOrder" ASC
          LIMIT 1
        ) display_rank ON TRUE
@@ -144,6 +146,7 @@ export class MomentsService {
          FROM "jeho_own"."user_badges" ub
          JOIN "jeho_own"."badges" b ON b.id = ub."badgeId"
          WHERE ub."userId" = u.id AND b.category = 'display_rank' AND b."isActive" = true
+           AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
          ORDER BY ub."grantedAt" DESC, b."sortOrder" ASC
          LIMIT 1
        ) display_rank ON TRUE
@@ -197,6 +200,7 @@ export class MomentsService {
          FROM "jeho_own"."user_badges" ub
          JOIN "jeho_own"."badges" b ON b.id = ub."badgeId"
          WHERE ub."userId" = u.id AND b.category = 'display_rank' AND b."isActive" = true
+           AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
          ORDER BY ub."grantedAt" DESC, b."sortOrder" ASC
          LIMIT 1
        ) display_rank ON TRUE
