@@ -120,20 +120,12 @@ public class ProfileActivity extends ThemedActivity {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
-        // Show the recipient's awarded medals in the profile medal cabinet.
+        // Achievement badges/medals are intentionally hidden from profile pages.
         if (binding.rowBadges != null) {
-            binding.rowBadges.setVisibility(View.VISIBLE);
-            binding.rowBadges.setOnClickListener(v -> {
-                String profileId = targetUserIdHold[0];
-                if (profileId == null || profileId.trim().isEmpty()) {
-                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الميداليات", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                Intent intent = new Intent(this, BadgeActivity.class);
-                intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
-                startActivity(intent);
-            });
+            binding.rowBadges.setVisibility(View.GONE);
+            binding.rowBadges.setOnClickListener(null);
         }
+        if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
 
         if (binding.rowMoments != null) {
             binding.rowMoments.setOnClickListener(v -> {
@@ -397,7 +389,7 @@ public class ProfileActivity extends ThemedActivity {
             if (binding.imgCountryFlag != null) {
                 FlagImages.bind(binding.imgCountryFlag, user.country);
             }
-            loadEarnedBadges(user.id);
+            // Profile badge cabinet is disabled platform-wide; skip its extra API request.
 
             long charm = user.popularityLevel > 0 ? user.popularityLevel
                     : Math.max(0, Math.max(user.charmScore, user.popularityScore));
