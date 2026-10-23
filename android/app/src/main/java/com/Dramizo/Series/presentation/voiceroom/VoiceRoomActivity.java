@@ -4184,10 +4184,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     Math.max(1, quantity), Math.max(1, personCount), null);
             return;
         }
+        // The draggable launcher is a private sender control, never a room-wide UI.
+        // Remote members render only the gift-flight celebration, not another tappable cannon.
         boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
-        if (!keepVisible) luckyCannonLayer.setVisibility(View.VISIBLE);
+        luckyCannonLayer.setVisibility(keepVisible ? View.VISIBLE : View.GONE);
         // The sender already received immediate local press feedback; other room members
-        // still animate when the shared launch event arrives.
+        // still animate the launch effect without exposing the launcher control.
         if (!localSender && luckyCannonPulseEnabled) luckyCannonView.fire();
         if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
         playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount);
