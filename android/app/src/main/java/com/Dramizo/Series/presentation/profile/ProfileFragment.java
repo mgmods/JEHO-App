@@ -105,8 +105,7 @@ public class ProfileFragment extends Fragment {
             startActivity(new Intent(requireContext(), TaskCenterActivity.class));
         });
         applyTasksFeatureVisibility();
-        bindRow(binding.btnContests, v ->
-                startActivity(new Intent(requireContext(), MedalActivity.class)));
+        if (binding.btnContests != null) binding.btnContests.setVisibility(View.GONE);
         bindRow(binding.btnMyRoom, v -> RoomOpenChooser.open(requireActivity()));
         loadAgencyAction();
         bindRow(binding.btnVisitors, v ->
