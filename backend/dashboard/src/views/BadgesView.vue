@@ -1,6 +1,6 @@
 <template>
   <div class="container-fluid">
-    <PageHeader title="الشارات والمداليات" subtitle="إدارة الشارات والإنجازات التلقائية ومنحها للمستخدمين" />
+    <PageHeader title="الشارات والصفات الشكلية" subtitle="إنشاء شارات احترافية وألقاب عامة، ثم إهداؤها للحسابات لتظهر في أنحاء التطبيق دون منح صلاحيات إدارية" />
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <div class="glass p-3 mb-3">
       <h5 class="mb-3">{{ editingId ? 'تعديل شارة' : 'إضافة شارة جديدة' }}</h5>
@@ -9,7 +9,7 @@
         <div class="col-md-5"><label class="form-label">رابط صورة الشارة</label><input v-model.trim="form.imageUrl" class="form-control" maxlength="512" placeholder="https://... أو ارفع صورة" required /><img v-if="form.imageUrl" :src="resolveAsset(form.imageUrl)" alt="معاينة الشارة" style="display:block;width:64px;height:64px;object-fit:contain;margin-top:8px" /></div>
         <div class="col-md-3"><label class="form-label">رفع صورة من الجهاز</label><input class="form-control" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" :disabled="uploadingImage" @change="uploadImage" /><small v-if="uploadingImage" class="text-muted">جارٍ رفع الصورة…</small></div>
         <div class="col-md-6"><label class="form-label">الوصف</label><input v-model.trim="form.description" class="form-control" maxlength="500" /></div>
-        <div class="col-md-2"><label class="form-label">الفئة</label><input v-model.trim="form.category" class="form-control" placeholder="general أو display_rank" /></div>
+        <div class="col-md-3"><label class="form-label">نوع الشارة</label><select v-model="form.category" class="form-select"><option value="general">شارة عادية</option><option value="display_rank">صفة شكلية تظهر للجميع</option><option v-if="form.category && !['general', 'display_rank'].includes(form.category)" :value="form.category">{{ form.category }}</option></select><small v-if="form.category === 'display_rank'" class="text-muted">تظهر الصفة مع اسم الحساب في الغرف والتعليقات والملف الشخصي والمحادثات، دون أي صلاحيات إدارية.</small></div>
         <div class="col-md-2"><label class="form-label">نوع المنح</label><select v-model="form.awardType" class="form-select"><option value="manual">يدوي</option><option value="achievement">إنجاز تلقائي</option></select></div>
         <template v-if="form.awardType === 'achievement'">
           <div class="col-md-4"><label class="form-label">شرط الإنجاز</label><select v-model="form.achievementKey" class="form-select" required><option :value="null" disabled>اختر الشرط</option><option value="level">المستوى</option><option value="experience">الخبرة</option><option value="followers">عدد المتابعين</option><option value="recharge">إجمالي الشحن التراكمي</option><option value="support">إجمالي الدعم المرسل للآخرين</option><option value="received">إجمالي الهدايا المستلمة</option></select></div>
