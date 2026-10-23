@@ -69,7 +69,7 @@
           </div>
           <div class="daily-login-preview">
             <template v-if="reward.type === 'coins'">
-              <img class="daily-login-coin-image" src="/assets/gifts/lucky-coin-100.png" alt="صورة العملات" />
+              <i class="bi bi-coin daily-login-coin"></i>
               <strong>{{ Number(reward.amount || 0).toLocaleString() }}</strong>
               <span>كوينز</span>
             </template>
