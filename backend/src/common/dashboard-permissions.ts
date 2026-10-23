@@ -211,8 +211,22 @@ export function canAccessModule(
   need: 'read' | 'write' = 'read',
 ): boolean {
   if (!user) return false;
-  const role = String(user.staffRole || '').toLowerCase();
-  if (user.isSuperAdmin || role === 'super') return true;
+  const role = String(user.staffRole || '').trim().toLowerCase();
+  // Explicit limited staff roles must override stale cached super-admin flags.
+  const limitedRoles = new Set([
+    'admin', 'manager', 'moderator', 'operator', 'dashboard_operator',
+    'admin_op', 'staff', 'user', 'none',
+  ]);
+  if (limitedRoles.has(role)) {
+    // Continue to the assigned module permissions below.
+  } else if (
+    user.isSuperAdmin
+    || role === 'super'
+    || role === 'super_admin'
+    || role === 'superadmin'
+  ) {
+    return true;
+  }
 
   const perms = user.permissions || {};
   const level = (perms as PermissionsMap)[module as DashboardModule] || 'none';
