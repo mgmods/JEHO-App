@@ -169,6 +169,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private TextView roomPkTeamAScore;
     @Nullable private TextView roomPkTeamBName;
     @Nullable private TextView roomPkTeamBScore;
+    @Nullable private TextView roomPkTeamAMembers;
+    private boolean roomPkInRoomChallenge;
+    private boolean roomPkAutoEndRequested;
+    @Nullable private TextView roomPkTeamBMembers;
     @Nullable private android.view.View roomPkProgressA;
     @Nullable private android.view.View roomPkProgressB;
     @Nullable private android.widget.LinearLayout roomPkOpponentSeatPanel;
@@ -214,7 +218,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     ? String.format(java.util.Locale.US, "%02d:%02d", remaining / 60000L, (remaining / 1000L) % 60L)
                     : (roomPkEndsAtMs > 0L ? "بانتظار تثبيت النتيجة" : "مباشر");
             roomPkScoreBanner.setText(roomPkBannerBaseText + "   •   ⏱ " + clock);
-            if (remaining > 0L) handler.postDelayed(this, 1000L);
+            if (remaining > 0L) {
+                handler.postDelayed(this, 1000L);
+            } else if (roomPkEndsAtMs > 0L && roomPkInRoomChallenge && isOwner
+                    && !roomPkAutoEndRequested && roomPkCurrentContestId != null
+                    && !roomPkCurrentContestId.isEmpty()) {
+                roomPkAutoEndRequested = true;
+                ContainerProvider.from(VoiceRoomActivity.this).getContestsApi()
+                        .endInRoomPk(roomPkCurrentContestId).enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                            retrofit2.Response<ApiResponse<Object>> response) {
+                        if (!response.isSuccessful() || response.body() == null || !response.body().success) {
+                            roomPkAutoEndRequested = false;
+                        }
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                        roomPkAutoEndRequested = false;
+                    }
+                });
+            }
         }
     };
     private final Runnable hideRoomPkScoreBanner = () -> {
@@ -9995,11 +10017,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         TextView btnRoomPk = sheet.findViewById(R.id.btnRoomPkChallenge);
         if (btnRoomPk != null) {
-            boolean canStartPk = isOwner && roomPkFeatureEnabled && roomPkCurrentContestId == null;
-            btnRoomPk.setVisibility(canStartPk ? View.VISIBLE : View.GONE);
+            // Keep PK discoverable for the room host; validate availability when tapped.
+            boolean challengeRunning = roomPkCurrentContestId != null
+                    && !roomPkCurrentContestId.isEmpty()
+                    && !"pending".equals(roomPkCurrentContestId);
+            btnRoomPk.setVisibility(isOwner ? View.VISIBLE : View.GONE);
+            btnRoomPk.setAlpha(roomPkFeatureEnabled && !challengeRunning ? 1.0f : 0.65f);
+            btnRoomPk.setText(challengeRunning
+                    ? "⚔ تحدّي PK — المواجهة جارية"
+                    : (roomPkFeatureEnabled ? "⚔ تحدّي PK بين الغرف" : "⚔ تحدّي PK (غير متاح حالياً)"));
             btnRoomPk.setOnClickListener(v -> {
-                if (!isOwner || !roomPkFeatureEnabled) {
-                    Toast.makeText(this, "تحدّي PK غير متاح حالياً", Toast.LENGTH_SHORT).show();
+                if (!isOwner) {
+                    Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!roomPkFeatureEnabled) {
+                    Toast.makeText(this, "تحدّي PK معطّل من لوحة التحكم", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (challengeRunning) {
+                    Toast.makeText(this, "يوجد تحدّي PK جارٍ في هذه الغرفة", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 dialog.dismiss();
@@ -12844,6 +12881,64 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void showRoomPkChallengeDialog() {
         if (roomId == null || roomId.isEmpty() || !isOwner) {
+            Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show(); return;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("اختيار نوع تحدّي PK")
+            .setItems(new String[]{"🔴 شخص ضد شخص", "⚔ فريق ضد فريق", "🏠 روم ضد روم"}, (d, which) -> {
+                if (which == 2) showRoomVsRoomPkChallengeDialog();
+                else showInRoomPkSetup(which == 0 ? "person_vs_person" : "team_vs_team");
+            }).setNegativeButton("إلغاء", null).show();
+    }
+
+    private void showInRoomPkSetup(String type) {
+        java.util.List<RoomDtos.SeatDto> occupied = new java.util.ArrayList<>();
+        if (roomPkLatestGridSeats != null) for (RoomDtos.SeatDto seat : roomPkLatestGridSeats) {
+            String uid = seatUserId(seat); if (uid != null && !uid.trim().isEmpty()) occupied.add(seat);
+        }
+        if (occupied.size() < 2) { Toast.makeText(this, "يجب وجود مشاركين اثنين على الأقل", Toast.LENGTH_LONG).show(); return; }
+        java.util.List<String> aIds = new java.util.ArrayList<>(), bIds = new java.util.ArrayList<>();
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this); root.setOrientation(1);
+        root.setPadding(dp(16), dp(12), dp(16), dp(12)); scroll.addView(root);
+        TextView note = new TextView(this); note.setText("اختر أسماء من المقاعد المشغولة. لن تتغير المقاعد أو اتصالات الصوت."); note.setTextColor(0xFF263247); root.addView(note);
+        final int[] mins = {5};
+        android.widget.RadioGroup rg = new android.widget.RadioGroup(this); rg.setOrientation(0);
+        for (int m : new int[]{5,10,20}) { android.widget.RadioButton rb = new android.widget.RadioButton(this); rb.setText(m+" دقائق"); rb.setTag(m); rg.addView(rb); if(m==5) rb.setChecked(true); }
+        rg.setOnCheckedChangeListener((g,id)->{ android.widget.RadioButton rb=g.findViewById(id); if(rb!=null) mins[0]=(Integer)rb.getTag(); }); root.addView(rg);
+        root.addView(roomPkFormLabel("🔴 الفريق الأحمر"));
+        android.widget.LinearLayout la=new android.widget.LinearLayout(this); la.setOrientation(1); root.addView(la);
+        root.addView(roomPkFormLabel("🔵 الفريق الأزرق"));
+        android.widget.LinearLayout lb=new android.widget.LinearLayout(this); lb.setOrientation(1); root.addView(lb);
+        for (RoomDtos.SeatDto seat : occupied) {
+            final String uid=seatUserId(seat);
+            String name=seat.user!=null && seat.user.displayName!=null && !seat.user.displayName.trim().isEmpty()?seat.user.displayName:"مشارك";
+            String label="مقعد "+(seat.seatIndex+1)+" · "+name;
+            android.widget.CheckBox ca=new android.widget.CheckBox(this), cb=new android.widget.CheckBox(this);
+            ca.setText(label); cb.setText(label); ca.setTextColor(0xFF9D2441); cb.setTextColor(0xFF205AA4);
+            ca.setOnCheckedChangeListener((v,on)->{ if(on){ if(aIds.contains(uid)||bIds.contains(uid)||("person_vs_person".equals(type)&&!aIds.isEmpty())){v.setChecked(false);return;} aIds.add(uid); cb.setEnabled(false);}else{aIds.remove(uid);cb.setEnabled(true);} });
+            cb.setOnCheckedChangeListener((v,on)->{ if(on){ if(aIds.contains(uid)||bIds.contains(uid)||("person_vs_person".equals(type)&&!bIds.isEmpty())){v.setChecked(false);return;} bIds.add(uid);ca.setEnabled(false);}else{bIds.remove(uid);ca.setEnabled(true);} });
+            la.addView(ca); lb.addView(cb);
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("إعداد تحدّي PK").setView(scroll)
+            .setNegativeButton("إلغاء",null).setPositiveButton("بدء التحدّي",(d,w)->{
+                if(aIds.isEmpty()||bIds.isEmpty()){Toast.makeText(this,"اختر مشاركاً لكل فريق",Toast.LENGTH_LONG).show();return;}
+                java.util.Map<String,Object> body=new java.util.HashMap<>(); body.put("roomId",roomId);body.put("challengeType",type);
+                body.put("durationMinutes",mins[0]);body.put("participantIdsA",new java.util.ArrayList<>(aIds));body.put("participantIdsB",new java.util.ArrayList<>(bIds));body.put("scoringMode","coins");
+                ContainerProvider.from(this).getContestsApi().createInRoomPk(body).enqueue(new retrofit2.Callback<ApiResponse<Object>>(){
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,retrofit2.Response<ApiResponse<Object>> res){
+                        if(!res.isSuccessful()||res.body()==null||!res.body().success){Toast.makeText(VoiceRoomActivity.this,res.body()!=null&&res.body().message!=null?res.body().message:"تعذّر بدء تحدّي PK",Toast.LENGTH_LONG).show();return;}
+                        Toast.makeText(VoiceRoomActivity.this,"بدأ تحدّي PK!",Toast.LENGTH_SHORT).show();
+                        // Socket delivery is realtime-first; refresh from the API as a safe
+                        // fallback so the host still sees the banner after reconnects.
+                        handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 350L);
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call,Throwable e){Toast.makeText(VoiceRoomActivity.this,"تعذّر الاتصال لبدء التحدّي",Toast.LENGTH_LONG).show();}
+                });
+            }).show();
+    }
+
+    private void showRoomVsRoomPkChallengeDialog() {
+        if (roomId == null || roomId.isEmpty() || !isOwner) {
             Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -13284,15 +13379,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                 || response.body().data.roomPkEnabled;
                         handler.post(VoiceRoomActivity.this::ensureRoomPkActionButton);
                         for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
-                            if (contest == null || !"room_vs_room".equals(contest.challengeType)
-                                    || !"active".equalsIgnoreCase(contest.status)
+                            if (contest == null || !"active".equalsIgnoreCase(contest.status)
                                     || contest.sideA == null || contest.sideB == null) continue;
-                            boolean belongs = (contest.sideA.roomIds != null && contest.sideA.roomIds.contains(roomId))
-                                    || (contest.sideB.roomIds != null && contest.sideB.roomIds.contains(roomId));
+                            boolean inRoomPk = "person_vs_person".equals(contest.challengeType)
+                                    || "team_vs_team".equals(contest.challengeType);
+                            boolean belongs = inRoomPk
+                                    ? roomId.equals(contest.roomId)
+                                    : "room_vs_room".equals(contest.challengeType)
+                                        && ((contest.sideA.roomIds != null && contest.sideA.roomIds.contains(roomId))
+                                            || (contest.sideB.roomIds != null && contest.sideB.roomIds.contains(roomId)));
                             if (!belongs) continue;
                             JsonObject payload = new JsonObject();
                             if (contest.id != null) payload.addProperty("contestId", contest.id);
                             if (contest.endAt != null) payload.addProperty("endAt", contest.endAt);
+                            // Preserve the challenge type when restoring from the API, not only
+                            // from the live socket event; in-room PK must never split/move seats.
+                            if (contest.challengeType != null) payload.addProperty("challengeType", contest.challengeType);
+                            if (contest.roomId != null) payload.addProperty("roomId", contest.roomId);
+                            if (contest.startAt != null) payload.addProperty("startAt", contest.startAt);
+                            if (contest.scoringMode != null) payload.addProperty("scoringMode", contest.scoringMode);
                             payload.add("sideA", new com.google.gson.Gson().toJsonTree(contest.sideA).getAsJsonObject());
                             payload.add("sideB", new com.google.gson.Gson().toJsonTree(contest.sideB).getAsJsonObject());
                             roomPkCurrentContestId = contest.id;
@@ -13441,6 +13546,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private String formatRoomPkMembers(JsonObject side) {
+        if (side == null || !side.has("participantIds") || !side.get("participantIds").isJsonArray()) return "";
+        JsonArray ids = side.getAsJsonArray("participantIds");
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (int i = 0; i < ids.size(); i++) {
+            String id = ids.get(i).isJsonNull() ? "" : ids.get(i).getAsString();
+            String name = "مشارك";
+            if (roomPkLatestGridSeats != null) for (RoomDtos.SeatDto seat : roomPkLatestGridSeats) {
+                if (id.equals(seatUserId(seat))) {
+                    if (seat.user != null && seat.user.displayName != null && !seat.user.displayName.trim().isEmpty()) name = seat.user.displayName;
+                    else if (seat.user != null && seat.user.username != null && !seat.user.username.trim().isEmpty()) name = seat.user.username;
+                    else name = "مقعد " + (seat.seatIndex + 1);
+                    break;
+                }
+            }
+            names.add(name);
+        }
+        return android.text.TextUtils.join(" · ", names);
+    }
+
     private void showRoomPkScoreBanner(String event, @Nullable JsonObject payload) {
         if (payload == null || binding == null) return;
         JsonObject sideA = payload.has("sideA") && payload.get("sideA").isJsonObject()
@@ -13551,6 +13676,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             progress.addView(roomPkProgressB, new android.widget.LinearLayout.LayoutParams(1, dp(6), 1f));
             panel.addView(progress, new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(6)));
+            android.widget.LinearLayout membersRow = new android.widget.LinearLayout(this);
+            membersRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            membersRow.setGravity(Gravity.CENTER_VERTICAL);
+            roomPkTeamAMembers = new TextView(this);
+            roomPkTeamAMembers.setTextColor(0xFFFFC1CB);
+            roomPkTeamAMembers.setTextSize(10f);
+            roomPkTeamAMembers.setMaxLines(2);
+            roomPkTeamAMembers.setGravity(Gravity.CENTER);
+            roomPkTeamBMembers = new TextView(this);
+            roomPkTeamBMembers.setTextColor(0xFFB9D9FF);
+            roomPkTeamBMembers.setTextSize(10f);
+            roomPkTeamBMembers.setMaxLines(2);
+            roomPkTeamBMembers.setGravity(Gravity.CENTER);
+            membersRow.addView(roomPkTeamAMembers, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
+            membersRow.addView(roomPkTeamBMembers, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
+            panel.addView(membersRow, new android.widget.LinearLayout.LayoutParams(-1, -2));
 
             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
                     new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
@@ -13564,7 +13705,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             roomPkSplitContainer = panel;
         }
 
-        if (!ended) showRoomPkSeatSplit(nameA, nameB);
+        boolean inRoomBattle = "person_vs_person".equals(memberStr(payload, "challengeType"))
+                || "team_vs_team".equals(memberStr(payload, "challengeType"));
+        if (inRoomBattle) hideRoomPkSeatSplit();
+        else if (!ended) showRoomPkSeatSplit(nameA, nameB);
         else hideRoomPkSeatSplit();
 
         roomPkBannerBaseText = label;
@@ -13572,6 +13716,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         roomPkTeamAScore.setText(String.format(java.util.Locale.US, "%,d", scoreA));
         roomPkTeamBName.setText("🔵 " + nameB);
         roomPkTeamBScore.setText(String.format(java.util.Locale.US, "%,d", scoreB));
+        if (roomPkTeamAMembers != null) roomPkTeamAMembers.setText(formatRoomPkMembers(sideA));
+        if (roomPkTeamBMembers != null) roomPkTeamBMembers.setText(formatRoomPkMembers(sideB));
         float ratioA = scoreA + scoreB <= 0L ? 0.5f
                 : Math.max(0.04f, Math.min(0.96f, (float) ((double) scoreA / ((double) scoreA + (double) scoreB))));
         float ratioB = 1f - ratioA;
@@ -13737,10 +13883,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (payload.has("contestId") && !payload.get("contestId").isJsonNull()) {
                 roomPkCurrentContestId = payload.get("contestId").getAsString();
             }
+            roomPkInRoomChallenge = "person_vs_person".equals(memberStr(payload, "challengeType"))
+                    || "team_vs_team".equals(memberStr(payload, "challengeType"));
+            if ("contest:pk-started".equals(event)) roomPkAutoEndRequested = false;
             ensureRoomPkActionButton();
             showRoomPkScoreBanner("contest:pk-started".equals(event) ? "contest:team-score" : event, payload);
             if ("contest:team-ended".equals(event)) {
                 roomPkCurrentContestId = null;
+                roomPkInRoomChallenge = false;
+                roomPkAutoEndRequested = false;
                 handler.postDelayed(this::ensureRoomPkActionButton, 12000L);
             }
             return;

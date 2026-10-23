@@ -47,6 +47,28 @@ export class ContestsController {
     return this.contests.respondRoomPkChallenge(userId, id, dto.accept === true);
   }
 
+  @Post('room-pk/in-room')
+  @ApiOperation({ summary: 'Start a person-vs-person or team-vs-team PK challenge inside one room' })
+  createInRoomPk(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: {
+      roomId: string;
+      challengeType: 'person_vs_person' | 'team_vs_team';
+      durationMinutes: number;
+      participantIdsA: string[];
+      participantIdsB: string[];
+      scoringMode?: string;
+    },
+  ) {
+    return this.contests.createInRoomPkChallenge(userId, dto);
+  }
+
+  @Post(':id/room-pk/end')
+  @ApiOperation({ summary: 'End an in-room PK challenge and restore its visual seat layout' })
+  endInRoomPk(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
+    return this.contests.endInRoomPkChallenge(userId, id);
+  }
+
   @Get(':id/room-pk/rosters')
   @ApiOperation({ summary: 'Read live room seat rosters for an active PK challenge' })
   roomPkRosters(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {

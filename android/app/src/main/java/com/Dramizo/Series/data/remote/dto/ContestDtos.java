@@ -29,6 +29,9 @@ public final class ContestDtos {
         @SerializedName("scoringMode") public String scoringMode;
         @SerializedName("challengeType") public String challengeType;
         @SerializedName("isInteractive") public boolean isInteractive;
+        @SerializedName("durationSeconds") public long durationSeconds;
+        @SerializedName("remainingSeconds") public long remainingSeconds;
+        @SerializedName("startedAt") public String startedAt;
         @SerializedName("sideA") public SideDto sideA;
         @SerializedName("sideB") public SideDto sideB;
         @SerializedName("rules") public Map<String, Object> rules;
@@ -42,6 +45,7 @@ public final class ContestDtos {
         @SerializedName("score") public long score;
         @SerializedName("roomIds") public List<String> roomIds;
         @SerializedName("agencyIds") public List<String> agencyIds;
+        @SerializedName("participantIds") public List<String> participantIds;
     }
 
     public static class MilestoneDto {
@@ -70,6 +74,7 @@ public final class ContestDtos {
         @SerializedName("displayName") public String displayName;
         @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("hostBadgeUrl") public String hostBadgeUrl;
+        @SerializedName("side") public String side;
     }
 
     public static class ContestDetail {
