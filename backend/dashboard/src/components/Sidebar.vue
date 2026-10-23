@@ -137,11 +137,17 @@ const sections = computed(() => [
     ],
   },
   {
-    id: 'memberships',
+    id: 'identity',
     label: 'الصفات والهوية',
     items: [
       { name: 'display-ranks', icon: 'bi-patch-check', label: 'الصفات الشكلية' },
       { name: 'staff-identity', icon: 'bi-person-badge-fill', label: 'هوية السوبر أدمن والأدمن والمانجر', module: 'settings' },
+    ],
+  },
+  {
+    id: 'memberships',
+    label: t('nav.memberships'),
+    items: [
       { name: 'vip', query: {}, icon: 'bi-diamond', label: 'VIP ومظاهره' },
       { name: 'mysterious-man', icon: 'bi-incognito', label: 'الرجل الغامض', module: 'settings' },
       { name: 'vanity-ids', icon: 'bi-hash', label: 'الأيدي المميزة والمتحركة' },
