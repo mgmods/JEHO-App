@@ -10692,8 +10692,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     ) {
         if (areCelebrationPopupsMuted() || binding == null) return;
         String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
-        // Intentionally do not show ComingMsgView here: it is the legacy sliding room toast
-        // that appeared around the middle of the room and ignored dashboard toast styling.
+        String who = displayName != null && !displayName.trim().isEmpty()
+                ? displayName.trim() : "مستخدم";
+        // Do not use the legacy mid-room ComingMsgView. Keep the compact top toast as the
+        // visible announcement, so this path cannot silently degrade to chat-only output.
+        GlobalCelebrationToast.show(
+                this, who, msg, avatarUrl, null,
+                "room-result-" + who + "-" + System.currentTimeMillis(),
+                28);
         if (roomBannerEnabled()) appendGameCelebrationLine(msg, null);
     }
 
