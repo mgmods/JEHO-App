@@ -11338,11 +11338,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (wonCoins <= 0) {
             line = "لم يحالف الحظ " + who + " هذه المرة";
         } else if (multiplier > 0d && multiplier < 1d) {
-            line = "مردود ×" + formatMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
+            line = "مردود ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
         } else if (multiplier <= 0d) {
             line = "مردود +" + Math.max(0L, wonCoins);
         } else {
-            line = "ضرب حظه وربح ×" + formatMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
+            line = "ضرب حظه وربح ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
         }
         // Use the same dashboard-controlled toast as every other lucky outcome.
         // Do not route this through ComingMsgView: that legacy sliding toast ignored the design controls.
@@ -11356,6 +11356,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (wonCoins <= 0 && roomBannerEnabled()) {
             appendChatLine(who, line, 0, 1, null, null, avatarUrl, null);
         }
+    }
+
+    private static String formatLuckyMultiplier(double multiplier) {
+        if (Math.abs(multiplier - Math.rint(multiplier)) < 0.0001d) {
+            return String.format(java.util.Locale.US, "%.0f", multiplier);
+        }
+        return String.format(java.util.Locale.US, "%.2f", multiplier)
+                .replaceAll("0+$", "").replaceAll("\\.$", "");
     }
 
     /** Official-news style crawl — disabled (too large). Use ComingMsgView instead. */
