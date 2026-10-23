@@ -227,6 +227,17 @@ public final class GlobalCelebrationToast {
     private static String stringValue(Object value, String fallback) {
         return value instanceof String ? ((String) value).trim() : fallback;
     }
+    private static boolean isLuckyToastKind(@Nullable String kind) {
+        if (kind == null) return false;
+        String normalized = kind.trim().toLowerCase(java.util.Locale.ROOT);
+        return "lucky_hit".equals(normalized)
+                || "lucky_hit_normal".equals(normalized)
+                || "lucky_hit_high".equals(normalized)
+                || "lucky_hit_return".equals(normalized)
+                || "lucky_return".equals(normalized)
+                || "lucky_high".equals(normalized);
+    }
+
     private static int intValue(Object value, int fallback) {
         try { return Math.max(1, Math.min(12, (int) Math.round(Double.parseDouble(String.valueOf(value))))); }
         catch (Exception ignored) { return fallback; }
@@ -398,7 +409,7 @@ public final class GlobalCelebrationToast {
             }
         } catch (Exception ignored) {
         }
-        if ("gift_send".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind)) refreshToastStyle(activity);
+        if ("gift_send".equalsIgnoreCase(kind) || isLuckyToastKind(kind)) refreshToastStyle(activity);
         long now = System.currentTimeMillis();
         if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 1_200L) {
             return;
@@ -477,16 +488,22 @@ public final class GlobalCelebrationToast {
 
         boolean planet = kind != null && "planet_summon".equalsIgnoreCase(kind);
         boolean gameOrLucky = kind != null && (
-                "game_win".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind));
+                "game_win".equalsIgnoreCase(kind) || isLuckyToastKind(kind));
         boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
-        boolean luckyWin = kind != null && "lucky_hit".equalsIgnoreCase(kind);
+        boolean luckyWin = isLuckyToastKind(kind);
         // Different send paths phrase partial returns differently ("مردود +..." vs
         // "مردود جزئي ..."). Classify by the outcome, not one exact UI string, so the
         // dashboard's dedicated return-toast background/style is used on every client.
-        boolean luckyReturn = luckyWin && (multiplier <= 0d || (body != null
+        boolean explicitReturn = kind != null && ("lucky_hit_return".equalsIgnoreCase(kind)
+                || "lucky_return".equalsIgnoreCase(kind));
+        boolean explicitHigh = kind != null && ("lucky_hit_high".equalsIgnoreCase(kind)
+                || "lucky_high".equalsIgnoreCase(kind));
+        boolean luckyReturn = luckyWin && (explicitReturn || (!explicitHigh
+                && (multiplier <= 0d || (body != null
                 && (body.contains("مردود جزئي") || body.contains("مردود +")
-                || body.contains("مردود الهدية"))));
-        boolean luckyHigh = luckyWin && !luckyReturn && (multiplier >= 10d || coinsWon >= 1000L);
+                || body.contains("مردود الهدية")))));
+        boolean luckyHigh = luckyWin && !luckyReturn
+                && (explicitHigh || multiplier >= 10d || coinsWon >= 1000L);
         String toastKindTag = giftSend ? "gift_send" : luckyWin ? (luckyReturn ? "lucky_hit_return" : luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
         banner.setTag(toastKindTag);
         boolean customToastStyle = giftSend || luckyWin;
