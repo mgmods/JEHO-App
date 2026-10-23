@@ -882,6 +882,7 @@ public class ProfileActivity extends ThemedActivity {
                 }
                 String name = "";
                 String avatar = "";
+                String partnerId = "";
                 String partnerFrameUrl = "";
                 String partnerHostBadgeUrl = "";
                 Map<String, ?> partnerHostBadgeMeta = null;
@@ -889,6 +890,11 @@ public class ProfileActivity extends ThemedActivity {
                 String partnerVipTouUrl = "";
                 String type = relation.get("type") == null ? "" : String.valueOf(relation.get("type")).trim();
                 if (partner != null) {
+                    Object partnerIdValue = firstNonEmpty(
+                            partner.get("id") == null ? null : String.valueOf(partner.get("id")),
+                            partner.get("userId") == null ? null : String.valueOf(partner.get("userId")),
+                            partner.get("user_id") == null ? null : String.valueOf(partner.get("user_id")));
+                    partnerId = partnerIdValue == null ? "" : String.valueOf(partnerIdValue).trim();
                     Object displayName = partner.get("displayName");
                     Object username = partner.get("username");
                     name = displayName != null && !String.valueOf(displayName).trim().isEmpty()
@@ -963,6 +969,28 @@ public class ProfileActivity extends ThemedActivity {
                         partnerHostBadgeUrl,
                         null,
                         partnerHostBadgeMeta);
+
+                // Both the portrait and its frame are one tappable target. Open only the
+                // actual linked account returned by the active CP relationship; never guess
+                // from a display name or avatar URL.
+                final String linkedPartnerId = partnerId;
+                if (!linkedPartnerId.isEmpty() && !linkedPartnerId.equals(targetId)) {
+                    View.OnClickListener openLinkedProfile = v -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        Intent intent = new Intent(ProfileActivity.this, ProfileActivity.class);
+                        intent.putExtra(EXTRA_USER_ID, linkedPartnerId);
+                        startActivity(intent);
+                    };
+                    binding.imgProfileCpPartner.setOnClickListener(openLinkedProfile);
+                    binding.imgProfileCpPartnerFrame.setOnClickListener(openLinkedProfile);
+                    binding.imgProfileCpPartner.setClickable(true);
+                    binding.imgProfileCpPartnerFrame.setClickable(true);
+                } else {
+                    binding.imgProfileCpPartner.setOnClickListener(null);
+                    binding.imgProfileCpPartnerFrame.setOnClickListener(null);
+                    binding.imgProfileCpPartner.setClickable(false);
+                    binding.imgProfileCpPartnerFrame.setClickable(false);
+                }
 
                 // Mirror the same live relationship into the decorative CV card.
                 bindRealCpAvatar(binding.imgProfileCpCvSelf, ownAvatarUrl);
