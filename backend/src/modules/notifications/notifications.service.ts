@@ -412,10 +412,37 @@ export class NotificationsService {
           title: dto.title,
           body: plainBody,
           targetUserId: userId,
+          // Route taps to Admin Messages even when the dashboard uses push-only delivery.
+          adminMessage: true,
+          source: 'admin',
+          originalType: type,
           ...(imageUrl ? { imageUrl } : {}),
           ...(link ? { url: link } : {}),
         });
         if (ok) pushed += 1;
+
+        // Push-only must still leave an in-app copy in the Admin Messages inbox.
+        // No second push is sent by this mirror.
+        await this.create({
+          userId,
+          type: NotificationType.CHAT,
+          title: dto.title,
+          body: plainBody,
+          data: {
+            audience,
+            channel,
+            adminMessage: true,
+            source: 'admin',
+            originalType: type,
+            mirroredAdminMessage: true,
+            targetUserId: userId,
+            ...(richHtml ? { html: richHtml, bodyHtml: richHtml } : {}),
+            ...(imageUrl ? { imageUrl } : {}),
+            ...(link ? { url: link, link } : {}),
+          },
+          sendPush: false,
+        });
+        saved += 1;
       }
     }
 
