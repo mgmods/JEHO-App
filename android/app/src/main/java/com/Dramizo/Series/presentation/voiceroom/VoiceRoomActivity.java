@@ -291,7 +291,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         @Override public void run() {
             if (isFinishing() || isDestroyed() || !sRoomUiVisible) return;
             refreshLuckyToastButtonStyle();
-            handler.postDelayed(this, 15_000L);
+            // Config is low-frequency; avoid repeated network wakeups while users chat.
+            handler.postDelayed(this, 60_000L);
         }
     };
     @Nullable private String luckyCannonGiftId;
@@ -14183,12 +14184,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 allReceivers.add(receiverId);
             }
             String giftEventKey = firstNonEmpty(memberStr(payload, "sendId"),
-                    memberStr(payload, "eventId"), memberStr(payload, "at"));
-            if (giftEventKey == null) {
-                giftEventKey = String.valueOf(senderId) + '|' + memberStr(payload, "giftId")
-                        + '|' + receiverId + '|' + combo + '|' + personCount;
-            }
+                    memberStr(payload, "eventId"), memberStr(payload, "at"),
+                    memberStr(payload, "createdAt"), memberStr(payload, "requestId"));
             long giftNow = System.currentTimeMillis();
+            if (giftEventKey == null) {
+                // Some legacy send paths omit event IDs. Include send-specific fields and
+                // a time component so repeated identical gifts do not suppress each other's
+                // toast for the full 15-second dedupe window.
+                giftEventKey = String.valueOf(senderId) + '|' + memberStr(payload, "giftId")
+                        + '|' + receiverId + '|' + combo + '|' + personCount
+                        + '|' + memberInt(payload, "quantity", 1)
+                        + '|' + memberLong(payload, "totalCoins", 0L)
+                        + '|' + (giftNow / 750L);
+            }
             recentGiftEffects.entrySet().removeIf(entry -> giftNow - entry.getValue() > 15_000L);
             if (recentGiftEffects.put(giftEventKey, giftNow) != null) return;
 
