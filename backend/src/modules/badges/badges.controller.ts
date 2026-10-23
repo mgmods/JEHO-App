@@ -52,8 +52,8 @@ export class BadgesController {
 
   @Post('admin/badges/:id/grant')
   @UseGuards(JwtAuthGuard, AdminGuard)
-  grant(@Param('id', ParseUUIDPipe) id: string, @Body() body: { userId: string }, @CurrentUser('sub') adminId: string) {
-    return this.service.grant(id, body?.userId, adminId);
+  grant(@Param('id', ParseUUIDPipe) id: string, @Body() body: { userId: string; durationDays?: number }, @CurrentUser('sub') adminId: string) {
+    return this.service.grant(id, body?.userId, adminId, body?.durationDays);
   }
 
   @Delete('admin/badges/:id/users/:userId')
