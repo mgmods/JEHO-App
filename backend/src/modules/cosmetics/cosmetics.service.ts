@@ -521,7 +521,18 @@ export class CosmeticsService implements OnModuleInit {
     await this.assertCosmeticRequirements(userId, cosmetic);
 
     const fullPrice = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
-    const leaseDays = this.mallLeaseDays();
+    // Room-card duration is configured per catalog item; all other cosmetic types
+    // retain the existing global mall lease duration.
+    const roomCardMeta = cosmetic.type === CosmeticType.ROOM_CARD
+      ? ((cosmetic.meta || {}) as Record<string, unknown>)
+      : null;
+    const roomCardPermanent = roomCardMeta?.roomCardDuration === 'permanent';
+    const configuredRoomCardDays = Number(roomCardMeta?.roomCardDurationDays);
+    const leaseDays = roomCardPermanent
+      ? 0
+      : cosmetic.type === CosmeticType.ROOM_CARD
+        ? Math.max(1, Math.min(365, Math.floor(configuredRoomCardDays || this.mallLeaseDays())))
+        : this.mallLeaseDays();
     const now = new Date();
 
     const result = await this.cosmeticsRepo.manager.transaction(async (manager) => {
@@ -565,8 +576,8 @@ export class CosmeticsService implements OnModuleInit {
             referenceType: 'cosmetic_purchase',
             referenceId: cosmeticId,
             description: renew
-              ? `تجديد ${cosmetic.name || cosmetic.code} (${leaseDays} يوم · نصف السعر)`
-              : `شراء ${cosmetic.name || cosmetic.code} (${leaseDays} يوم)`,
+              ? `تجديد ${cosmetic.name || cosmetic.code} (${roomCardPermanent ? 'دائم' : `${leaseDays} يوم · نصف السعر`})`
+              : `شراء ${cosmetic.name || cosmetic.code} (${roomCardPermanent ? 'دائم' : `${leaseDays} يوم`})`,
           }),
         );
       }
@@ -576,14 +587,14 @@ export class CosmeticsService implements OnModuleInit {
           userId,
           cosmeticId,
           equipped: false,
-          expiresAt: new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000),
+          expiresAt: roomCardPermanent ? null : new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000),
         });
       } else {
         // An expired lease starts a fresh term from now; never stack days.
-        owned.expiresAt = new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000);
+        owned.expiresAt = roomCardPermanent ? null : new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000);
       }
       owned = await manager.save(UserCosmetic, owned);
-      return { owned, renew, price, fullPrice, leaseDays, expiresAt: owned.expiresAt };
+      return { owned, renew, price, fullPrice, leaseDays: roomCardPermanent ? null : leaseDays, permanent: roomCardPermanent, expiresAt: owned.expiresAt };
     });
 
     // Buying only adds the item to the bag. Wearing is a separate explicit action.
