@@ -141,7 +141,8 @@ public class SignInDialog extends DialogFragment {
                     ImageView image = rewardImages.get(i);
                     TextView label = rewardLabels.get(i);
                     if (day != null && "cosmetic".equalsIgnoreCase(day.type)) {
-                        String url = nonEmpty(day.previewUrl) ? day.previewUrl : day.animationUrl;\n                        // The selected catalogue item supplies its own artwork URL (frame, entry effect, etc.).
+                        String url = nonEmpty(day.previewUrl) ? day.previewUrl : day.animationUrl;
+                        // The selected catalogue item supplies its own artwork URL (frame, entry effect, etc.).
                         if (nonEmpty(url)) {
                             Glide.with(this).load(url).placeholder(R.drawable.ic_gold_coin)
                                     .error(R.drawable.ic_gold_coin).into(image);
