@@ -14187,16 +14187,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
             int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
 
-            // The sender already gets the send toast from the successful local send result.
-            // Every other room member must also get the dashboard-configured gift toast,
-            // regardless of gift animation type (static, video/SVGA, lucky or cannon).
-            if (!localSenderEcho) {
-                String senderAvatar = firstNonEmpty(
-                        memberStr(payload, "senderAvatarUrl"),
-                        memberStr(payload, "avatarUrl"));
-                GlobalCelebrationToast.showGiftCount(
-                        this, sender, name, senderAvatar, icon, qtyRemote);
-            }
+            // Show the same configured gift toast to every room member, including the
+            // sender. There is no separate local-send toast path; the room event is canonical.
+            // This is after recentGiftEffects dedupe, so the room/user echo cannot double-show it.
+            String senderAvatar = firstNonEmpty(
+                    memberStr(payload, "senderAvatarUrl"),
+                    memberStr(payload, "avatarUrl"));
+            GlobalCelebrationToast.showGiftCount(
+                    this, sender, name, senderAvatar, icon, qtyRemote);
 
             // A single-recipient gift must name the receiver in the room chat. Group gifts
             // intentionally stay anonymous as a group, without listing all recipients.
