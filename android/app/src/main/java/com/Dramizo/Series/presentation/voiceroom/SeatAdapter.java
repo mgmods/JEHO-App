@@ -1111,6 +1111,19 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         holder.b.rowCustomDisplayRank.setVisibility(View.VISIBLE);
         holder.b.tvCustomRankBadge.setText(title.trim());
+        try {
+            holder.b.tvCustomRankBadge.setTextColor(Color.parseColor(
+                    user.customDisplayRankColor == null ? "#D8B35B" : user.customDisplayRankColor));
+        } catch (Exception ignored) {
+            holder.b.tvCustomRankBadge.setTextColor(Color.parseColor("#D8B35B"));
+        }
+        String rankFrameUrl = user.customDisplayRankFrameUrl;
+        if (rankFrameUrl != null && !rankFrameUrl.trim().isEmpty() && holder.b.imgFrame != null) {
+            holder.b.imgFrame.setVisibility(View.VISIBLE);
+            Glide.with(holder.itemView)
+                    .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rankFrameUrl.trim()))
+                    .into(holder.b.imgFrame);
+        }
         if (imageUrl != null && !imageUrl.trim().isEmpty()) {
             holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
             // Glide animates GIF assets; static images remain static.
