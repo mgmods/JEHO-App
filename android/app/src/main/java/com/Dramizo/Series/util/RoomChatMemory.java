@@ -143,9 +143,14 @@ public final class RoomChatMemory {
                     }
                     persistLocked(roomId, copy);
                 } finally {
-                    synchronized (PERSIST_TASKS) {
-                        java.util.concurrent.ScheduledFuture<?> current = PERSIST_TASKS.get(roomId);
-                        if (current != null && current.isDone()) PERSIST_TASKS.remove(roomId);
+                    Long latest;
+                    synchronized (PERSIST_SEQ) {
+                        latest = PERSIST_SEQ.get(roomId);
+                    }
+                    if (latest != null && latest == seq) {
+                        synchronized (PERSIST_TASKS) {
+                            PERSIST_TASKS.remove(roomId);
+                        }
                     }
                 }
             }, 180L, java.util.concurrent.TimeUnit.MILLISECONDS);
