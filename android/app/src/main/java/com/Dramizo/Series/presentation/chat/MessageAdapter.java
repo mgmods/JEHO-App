@@ -20,6 +20,9 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -597,9 +600,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         String customRankImageUrl = mine
                 ? (me != null ? me.customDisplayRankImageUrl : null)
                 : (msg.sender != null ? msg.sender.customDisplayRankImageUrl : null);
-        if (customRankName != null && !customRankName.trim().isEmpty()) {
-            name = name + "  ·  " + customRankName.trim();
-        }
+        boolean hasCustomRank = customRankName != null && !customRankName.trim().isEmpty();
         if (holder.b.imgCustomRankBadge != null) {
             if (customRankImageUrl != null && !customRankImageUrl.trim().isEmpty() && showAvatar) {
                 holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
@@ -628,8 +629,50 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.imgFrame.setVisibility(View.GONE);
         }
 
-        holder.b.tvSender.setVisibility(View.GONE);
-        holder.b.tvSender.setText(name);
+        if (hasCustomRank && showAvatar) {
+            String rankLabel = customRankName.trim();
+            SpannableStringBuilder senderLabel = new SpannableStringBuilder(name)
+                    .append("\n").append(rankLabel);
+            int color;
+            try {
+                color = Color.parseColor(mine
+                        ? (me != null ? me.customDisplayRankColor : null)
+                        : (msg.sender != null ? msg.sender.customDisplayRankColor : null));
+            } catch (Exception ignored) {
+                color = Color.parseColor("#D8B35B");
+            }
+            senderLabel.setSpan(new ForegroundColorSpan(color),
+                    senderLabel.length() - rankLabel.length(), senderLabel.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            holder.b.tvSender.setText(senderLabel);
+            holder.b.tvSender.setVisibility(View.VISIBLE);
+            String nameplateUrl = mine
+                    ? (me != null ? me.customDisplayRankNameplateUrl : null)
+                    : (msg.sender != null ? msg.sender.customDisplayRankNameplateUrl : null);
+            if (nameplateUrl != null && !nameplateUrl.trim().isEmpty()) {
+                Glide.with(holder.itemView).load(nameplateUrl.trim()).into(new com.bumptech.glide.request.target.CustomTarget<Drawable>() {
+                    @Override public void onResourceReady(@NonNull Drawable resource, @Nullable com.bumptech.glide.request.transition.Transition<? super Drawable> transition) {
+                        holder.b.tvSender.setBackground(resource);
+                    }
+                    @Override public void onLoadCleared(@Nullable Drawable placeholder) {
+                        holder.b.tvSender.setBackground(null);
+                    }
+                });
+            } else {
+                holder.b.tvSender.setBackground(null);
+            }
+        } else {
+            holder.b.tvSender.setVisibility(View.GONE);
+            holder.b.tvSender.setText(name);
+            holder.b.tvSender.setBackground(null);
+        }
+        String rankFrameUrl = mine
+                ? (me != null ? me.customDisplayRankFrameUrl : null)
+                : (msg.sender != null ? msg.sender.customDisplayRankFrameUrl : null);
+        if (rankFrameUrl != null && !rankFrameUrl.trim().isEmpty() && holder.b.imgFrame != null) {
+            Glide.with(holder.itemView).load(rankFrameUrl.trim()).into(holder.b.imgFrame);
+            holder.b.imgFrame.setVisibility(View.VISIBLE);
+        }
 
         if (showAvatar && listener != null) {
             String clickUserId;
