@@ -11343,15 +11343,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int mul = Math.max(1, multiplier);
             line = "ضرب حظه وربح ×" + mul + " · +" + Math.max(0L, wonCoins);
         }
-        // Use the same dashboard-controlled top toast as every other lucky-win event.
+        // Use the same dashboard-controlled toast as every other lucky outcome.
         // Do not route this through ComingMsgView: that legacy sliding toast ignored the design controls.
         GlobalCelebrationToast.show(
                 this, who, line, avatarUrl, null,
                 eventKey == null || eventKey.trim().isEmpty()
                         ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim(),
                 28, Math.max(0, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
-        // Chat is written by the matching global celebration event; sharing the same
-        // event key prevents a second toast/chat entry when both realtime paths arrive.
+        // Positive outcomes also arrive through the global celebration event, which owns
+        // the chat line. No-payout outcomes are room-scoped, so announce those here.
+        if (wonCoins <= 0 && roomBannerEnabled()) {
+            appendChatLine(who, line, 0, 1, null, null, avatarUrl, null);
+        }
     }
 
     /** Official-news style crawl — disabled (too large). Use ComingMsgView instead. */
