@@ -142,6 +142,16 @@
                         android:text="@string/edit_profile_hint"
                         android:textColor="@color/text_hint"
                         android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:paddingHorizontal="22dp"
+                        android:text="يمكنك اختيار صورة متحركة GIF أو WebP (حتى 6 ميغابايت)، وستبقى متحركة في الملف الشخصي والغرف."
+                        android:textColor="@color/text_hint"
+                        android:textSize="11sp" />
                 </LinearLayout>
 
                 <View
