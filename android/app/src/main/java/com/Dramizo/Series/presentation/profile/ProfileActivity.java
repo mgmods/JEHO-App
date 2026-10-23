@@ -710,19 +710,11 @@ public class ProfileActivity extends ThemedActivity {
             @androidx.annotation.Nullable ImageView medal,
             int vipLevel,
             @androidx.annotation.Nullable String levelBadgeUrl) {
-        if (medal == null) return;
-        if (vipLevel <= 0) {
+        // Medal visuals are intentionally hidden with the retired profile badge cabinet.
+        if (medal != null) {
             medal.setVisibility(View.GONE);
             medal.setImageDrawable(null);
-            return;
         }
-        String path = levelBadgeUrl;
-        if (path == null || path.isEmpty() || !path.contains("vip_medal")) {
-            int t = Math.min(7, Math.max(1, vipLevel));
-            path = "/assets/cosmetics/vip/vip_medal_mikoo_" + t + ".png";
-        }
-        medal.setVisibility(View.VISIBLE);
-        ServerAssets.load(medal, path);
     }
 
     private void bindEntryRide(
