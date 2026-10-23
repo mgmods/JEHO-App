@@ -232,7 +232,10 @@ export class NotificationsService {
     const rows = await this.notifRepo.find({
       where: { userId, type: NotificationType.CHAT, isRead: false },
     });
-    const ids = rows.filter((n) => (n.data as any)?.adminMessage === true).map((n) => n.id);
+    const ids = rows.filter((n) => {
+      const data = (n.data || {}) as any;
+      return data.adminMessage === true || data.source === 'admin';
+    }).map((n) => n.id);
     if (ids.length) await this.notifRepo.update({ id: In(ids), userId }, { isRead: true });
     return { success: true, updated: ids.length };
   }
