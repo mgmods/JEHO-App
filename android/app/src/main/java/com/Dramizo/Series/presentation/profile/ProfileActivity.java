@@ -126,6 +126,9 @@ public class ProfileActivity extends ThemedActivity {
             binding.rowBadges.setOnClickListener(null);
         }
         if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
+        // Also hide the separate VIP medal/rank strip; otherwise medals remain visible
+        // even though the achievement badge cabinet is hidden.
+        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.GONE);
 
         if (binding.rowMoments != null) {
             binding.rowMoments.setOnClickListener(v -> {
