@@ -195,6 +195,13 @@ public class AgencyViewModel extends ViewModel {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getAgencyRepository().delete(id);
             if (r.success) {
+                String uid = c.getSessionManager().getUserId();
+                if (uid != null) {
+                    c.getFeatureCache().remove(uid, EncryptedFeatureCache.NS_AGENCY_MINE);
+                }
+                // Clear the in-memory copy before reloading so the deleted agency cannot flash back.
+                mine.postValue(null);
+                earnings.postValue(null);
                 message.postValue("agency_deleted");
                 load();
             } else {
