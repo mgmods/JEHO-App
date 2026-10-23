@@ -791,17 +791,30 @@ public final class GlobalCelebrationToast {
         if (target == null || container == null || container.getWidth() <= 0 || container.getHeight() <= 0) return;
         float desiredX = container.getWidth() * Math.max(0f, Math.min(100f, xPercent)) / 100f;
         float desiredY = container.getHeight() * Math.max(0f, Math.min(100f, yPercent)) / 100f;
+        float targetWidth = Math.max(1, target.getWidth());
+        float targetHeight = Math.max(1, target.getHeight());
+        // Keep all configured elements inside the artwork even when a saved slider
+        // value is 0% or 100%; otherwise the avatar/name/reward/X can disappear off-edge.
+        if (centerX) {
+            desiredX = Math.max(targetWidth / 2f,
+                    Math.min(container.getWidth() - targetWidth / 2f, desiredX));
+        } else {
+            desiredX = Math.max(0f,
+                    Math.min(Math.max(0f, container.getWidth() - targetWidth), desiredX));
+        }
+        desiredY = Math.max(targetHeight / 2f,
+                Math.min(container.getHeight() - targetHeight / 2f, desiredY));
         int[] targetLocation = new int[2];
         int[] containerLocation = new int[2];
         target.getLocationOnScreen(targetLocation);
         container.getLocationOnScreen(containerLocation);
         // Dashboard preview stores the avatar/count center but the text's left edge.
         // Remove existing translations before deriving the layout baseline so repeated
-        // live-style refreshes are idempotent and never push elements off the artwork.
+        // live-style refreshes are idempotent.
         float baseX = targetLocation[0] - containerLocation[0] - target.getTranslationX();
         float baseY = targetLocation[1] - containerLocation[1] - target.getTranslationY();
-        target.setTranslationX(desiredX - baseX - (centerX ? target.getWidth() / 2f : 0f));
-        target.setTranslationY(desiredY - baseY - target.getHeight() / 2f);
+        target.setTranslationX(desiredX - baseX - (centerX ? targetWidth / 2f : 0f));
+        target.setTranslationY(desiredY - baseY - targetHeight / 2f);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
