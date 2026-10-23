@@ -10,6 +10,7 @@ export const ROUTE_MODULE = {
   'user-detail': 'users',
   agencies: 'agencies',
   rooms: 'rooms',
+  streams: 'rooms',
   'support-chest': 'supportChest',
   gifts: 'gifts',
   'toast-manager': 'settings',
