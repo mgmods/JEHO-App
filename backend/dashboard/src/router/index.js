@@ -193,7 +193,7 @@ const routes = [
       {
         path: 'games',
         name: 'games',
-        component: () => import('@/views/GamesViewBoundary.vue'),
+        component: () => import('@/views/GamesView.vue'),
         meta: { titleKey: 'routes.games' },
       },
       {
