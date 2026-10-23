@@ -722,7 +722,6 @@ const settingTabs = computed(() => {
     { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected', superOnly: true },
     { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image', permission: 'settings' },
     { id: 'mysterious-man', label: 'إعدادات الرجل الغامض', icon: 'bi-incognito', superOnly: true },
-    { id: 'staff-identity', label: 'هوية الإدارة والرتب', icon: 'bi-person-badge', superOnly: true },
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles', permission: 'settings' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check', permission: 'settings' },
     { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card', permission: 'settings' },
