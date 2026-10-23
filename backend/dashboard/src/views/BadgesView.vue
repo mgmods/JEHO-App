@@ -102,7 +102,7 @@ async function grantBadge() {
   const notificationWarnings = []
   try {
     for (const userId of ids) {
-      const result = await badgesApi.grant(grant.badgeId, userId)
+      const result = await badgesApi.grant(grant.badgeId, userId, grant.durationDays)
       if (result?.error) {
         failed.push(userId + ': ' + (result.error.message || 'رفض الخادم المنح'))
         continue
