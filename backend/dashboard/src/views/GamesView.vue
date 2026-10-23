@@ -204,21 +204,6 @@
         </div>
       </div>
       <div class="small text-muted mt-2">0% = لا فوز في ألعاب الخادم التي تدعم هذا الضبط، 100% = فوز في كل محاولة مؤهلة. قد تبقى حدود الجوائز والحد الأقصى للربح مطبّقة.</div>
-      <div class="mt-4">
-        <h4 class="h6 mb-1">معدل العائد لكل لعبة تدعمه (RTP)</h4>
-        <p class="small text-muted mb-3">هذه النسبة تخص الألعاب التي يدعم محركها إعداد العائد. لا تغيّر نتيجة لعبة مزوّد خارجي إذا كان المزوّد لا يوفّر تحكماً بهذا الإعداد.</p>
-        <div class="row g-2">
-          <div v-for="game in manageableGames.filter(supportsSharedRtp)" :key="'rtp-'+game.id" class="col-6 col-md-4 col-lg-3">
-            <label class="form-label small mb-1">{{ game.label }} — RTP %</label>
-            <input
-              :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)"
-              @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value))) / 100"
-              type="number" min="55" max="82" step="1" class="form-control form-control-sm"
-            />
-            <div class="small text-muted mt-1">عائد مستهدف بين 55% و82%</div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div class="glass p-3 mb-4">
