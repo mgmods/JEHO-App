@@ -4763,8 +4763,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (binding != null) {
                 updateMusicProgressUi();
             }
-            // Playback timing is server-synchronized; a 1s UI tick is sufficient and lighter.
-            handler.postDelayed(this, 1_000L);
+            // Keep the progress clock responsive while playing, but reduce idle UI work
+            // when the room has no active track. Room events refresh state immediately.
+            boolean activeTrack = "playing".equalsIgnoreCase(currentMusicStatus)
+                    || "paused".equalsIgnoreCase(currentMusicStatus);
+            handler.postDelayed(this, activeTrack ? 1_000L : 5_000L);
         }
     };
 
