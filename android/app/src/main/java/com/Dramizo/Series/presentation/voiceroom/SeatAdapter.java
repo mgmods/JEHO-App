@@ -1049,12 +1049,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     .getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
                     .getString("avatar_url", "");
             if (sharedAvatar != null && !sharedAvatar.trim().isEmpty()) {
-                Glide.with(holder.b.imgAvatar)
-                        .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(sharedAvatar.trim()))
-                        .apply(com.Dramizo.Series.util.MediaAssetSync.requestOptions())
-                        .placeholder(R.drawable.ic_mysterious_man)
-                        .error(R.drawable.ic_mysterious_man)
-                        .into(holder.b.imgAvatar);
+                com.Dramizo.Series.util.AvatarImageLoader.load(holder.b.imgAvatar, sharedAvatar.trim());
             } else {
                 holder.b.imgAvatar.setImageResource(R.drawable.ic_mysterious_man);
             }
