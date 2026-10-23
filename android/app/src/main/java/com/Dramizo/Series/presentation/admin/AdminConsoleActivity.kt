@@ -52,6 +52,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private lateinit var backButton: TextView
     private var currentSection = "home"
     private var currentRole = StaffRoleHelper.NONE
+    @Volatile private var roleRefreshInFlight = false
     private var notificationImageUrl: String? = null
     private var notificationImageStatus: TextView? = null
     private var notificationImageUploadInProgress = false
@@ -124,6 +125,76 @@ class AdminConsoleActivity : ThemedActivity() {
             openModule(requestedSection)
         } else {
             showHome()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-read the signed-in account from the server on every return to this screen.
+        // Refresh returns the database-backed user role; cached staffRole is never authoritative.
+        refreshStaffRoleFromServer()
+    }
+
+    private fun refreshStaffRoleFromServer() {
+        if (roleRefreshInFlight || !::api.isInitialized) return
+        val session = try { ContainerProvider.from(this).sessionManager } catch (_: Exception) { return }
+        val refreshToken = session.refreshToken
+        if (refreshToken.isNullOrBlank()) {
+            revokeLocalStaffAccess()
+            return
+        }
+        roleRefreshInFlight = true
+        try {
+            ContainerProvider.from(this).authApi.refresh(
+                com.Dramizo.Series.data.remote.dto.AuthDtos.RefreshTokenRequest(refreshToken)
+            ).enqueue(object : Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.AuthDtos.AuthResult>> {
+                override fun onResponse(
+                    call: Call<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.AuthDtos.AuthResult>>,
+                    response: Response<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.AuthDtos.AuthResult>>
+                ) {
+                    roleRefreshInFlight = false
+                    if (isFinishing || isDestroyed) return
+                    val result = response.body()?.data
+                    val freshUser = if (response.isSuccessful && response.body()?.success == true) result?.user else null
+                    if (freshUser != null) {
+                        val oldRole = currentRole
+                        session.saveSession(result)
+                        val freshRole = StaffRoleHelper.normalize(freshUser)
+                        if (!StaffRoleHelper.isStaff(freshUser)) {
+                            revokeLocalStaffAccess()
+                            return
+                        }
+                        if (freshRole != oldRole) {
+                            currentRole = freshRole
+                            StaffIdentityConfigCache.refresh(this@AdminConsoleActivity, null)
+                            runOnUiThread {
+                                if (!isFinishing && !isDestroyed) showHome()
+                            }
+                        }
+                    } else if (response.code() == 401 || response.code() == 403) {
+                        revokeLocalStaffAccess()
+                    }
+                }
+                override fun onFailure(
+                    call: Call<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.AuthDtos.AuthResult>>,
+                    error: Throwable
+                ) {
+                    roleRefreshInFlight = false
+                    // A transient network failure must not log out a legitimate staff member.
+                }
+            })
+        } catch (_: Exception) {
+            roleRefreshInFlight = false
+        }
+    }
+
+    private fun revokeLocalStaffAccess() {
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            currentRole = StaffRoleHelper.NONE
+            StaffIdentityConfigCache.refresh(this, null)
+            Toast.makeText(this, "تم سحب صلاحية الإدارة من هذا الحساب", Toast.LENGTH_LONG).show()
+            finish()
         }
     }
 
