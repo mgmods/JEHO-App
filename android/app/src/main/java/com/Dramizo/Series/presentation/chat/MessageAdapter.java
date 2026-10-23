@@ -594,8 +594,22 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         String customRankName = mine
                 ? (me != null ? me.customDisplayRankName : null)
                 : (msg.sender != null ? msg.sender.customDisplayRankName : null);
+        String customRankImageUrl = mine
+                ? (me != null ? me.customDisplayRankImageUrl : null)
+                : (msg.sender != null ? msg.sender.customDisplayRankImageUrl : null);
         if (customRankName != null && !customRankName.trim().isEmpty()) {
             name = name + "  ·  " + customRankName.trim();
+        }
+        if (holder.b.imgCustomRankBadge != null) {
+            if (customRankImageUrl != null && !customRankImageUrl.trim().isEmpty() && showAvatar) {
+                holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
+                Glide.with(holder.itemView)
+                        .load(customRankImageUrl.trim())
+                        .into(holder.b.imgCustomRankBadge);
+            } else {
+                Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+                holder.b.imgCustomRankBadge.setVisibility(View.GONE);
+            }
         }
 
         if (showAvatar) {
