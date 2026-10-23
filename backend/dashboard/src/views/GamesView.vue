@@ -204,6 +204,21 @@
         </div>
       </div>
       <div class="small text-muted mt-2">0% = لا فوز في ألعاب الخادم التي تدعم هذا الضبط، 100% = فوز في كل محاولة مؤهلة. قد تبقى حدود الجوائز والحد الأقصى للربح مطبّقة.</div>
+      <div class="mt-4">
+        <h4 class="h6 mb-1">معدل العائد لكل لعبة تدعمه (RTP)</h4>
+        <p class="small text-muted mb-3">هذه النسبة تخص الألعاب التي يدعم محركها إعداد العائد. لا تغيّر نتيجة لعبة مزوّد خارجي إذا كان المزوّد لا يوفّر تحكماً بهذا الإعداد.</p>
+        <div class="row g-2">
+          <div v-for="game in manageableGames.filter(supportsSharedRtp)" :key="'rtp-'+game.id" class="col-6 col-md-4 col-lg-3">
+            <label class="form-label small mb-1">{{ game.label }} — RTP %</label>
+            <input
+              :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)"
+              @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value))) / 100"
+              type="number" min="55" max="82" step="1" class="form-control form-control-sm"
+            />
+            <div class="small text-muted mt-1">عائد مستهدف بين 55% و82%</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="glass p-3 mb-4">
@@ -364,19 +379,21 @@ const coveredGames = ref([])
 const disabledGames = ref([])
 const gameWinRates = reactive({})
 const gameRtpRates = reactive({})
+// One stable ID per game. Mikoo/provider IDs stay separate from JEHO-owned mini-games;
+ // in particular, do not duplicate crash/hilo IDs and accidentally apply the wrong controls.
 const manageableGames = [
   { id: '7updown', label: '٧ فوق تحت' },
   { id: 'bounty-football', label: 'كرة القدم الجوائز' },
   { id: 'camel-racing', label: 'سباق الأسود' },
   { id: 'cleopatra-slot', label: 'كليوباترا' },
   { id: 'cleopatra-slots', label: 'فتحات كليوباترا' },
-  { id: 'crash', label: 'كراش' },
+  { id: 'crash', label: 'كراش (مزود خارجي)' },
   { id: 'fishing', label: 'صيد السمك' },
   { id: 'football-plinko', label: 'بلينكو كرة القدم' },
   { id: 'fortune-slot', label: 'جواهر الحظ' },
   { id: 'greedy-box', label: 'صندوق الطمع' },
   { id: 'greedy-lion', label: 'الأسد الطماع' },
-  { id: 'hilo', label: 'هاي لو' },
+  { id: 'hilo', label: 'هاي لو (مزود خارجي)' },
   { id: 'line-slots', label: 'فتحات الخط' },
   { id: 'luck-car', label: 'سيارة الحظ' },
   { id: 'lucky77', label: 'لاكي ٧٧' },
@@ -390,9 +407,7 @@ const manageableGames = [
   { id: 'slots', label: 'السلوت المصغّر' },
   { id: 'roulette', label: 'الروليت' },
   { id: 'plinko', label: 'بلينكو' },
-  { id: 'crash', label: 'كراش المصغّر' },
   { id: 'rps', label: 'حجر ورقة مقص' },
-  { id: 'hilo', label: 'هاي لو المصغّر' },
   { id: 'witch', label: 'العرافة' },
   { id: 'blackjack', label: 'بلاك جاك' },
   { id: 'poker', label: 'بوكر النرد' },
@@ -403,7 +418,7 @@ const manageableGames = [
   { id: 'lucky-wheel', label: 'عجلة الحظ' },
 ]
 const directWinRateGameIds = new Set([
-  'slots','roulette','plinko','crash','rps','hilo','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
+  'slots','roulette','plinko','rps','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
 ])
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
 const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
