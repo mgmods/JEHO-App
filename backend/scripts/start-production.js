@@ -80,27 +80,6 @@ async function databaseIsReady() {
 }
 
 
-async function ensureBadgeExpiryColumn() {
-  const client = new Client(process.env.DATABASE_URL ? {
-    connectionString: process.env.DATABASE_URL,
-  } : {
-    host: process.env.DB_HOST || 'localhost',
-    port: Number(process.env.DB_PORT || 5432),
-    user: process.env.DB_USER || process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    database: process.env.DB_NAME || process.env.DB_DATABASE || 'auralive',
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
-  });
-  try {
-    await client.connect();
-    // Additive/idempotent repair for older JEHO deployments. Never drops or rewrites grants.
-    await client.query('ALTER TABLE IF EXISTS "jeho_own"."user_badges" ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz');
-    await client.query('ALTER TABLE IF EXISTS "public"."user_badges" ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz');
-    console.log('[JEHO-OWN startup] Badge ownership expiration column ensured.');
-  } finally {
-    await client.end().catch(() => {});
-  }
-}
 
 async function runProcess(label, command, args) {
   console.log(`[JEHO-OWN startup] Starting ${label}...`);
@@ -148,7 +127,6 @@ async function main() {
     console.log('[JEHO-OWN startup] Seed completed successfully.');
   }
 
-  await ensureBadgeExpiryColumn();
 
   const app = spawn(process.execPath, ['dist/main.js'], {
     stdio: 'inherit',
