@@ -217,6 +217,19 @@
                   <label class="form-label">{{ t('app.price') }}</label>
                   <input v-model.number="form.coinPrice" type="number" min="0" class="form-control" />
                 </div>
+                <div v-if="form.type === 'room_card'" class="col-md-4">
+                  <label class="form-label">مدة ملكية كرت الروم</label>
+                  <select v-model="form.roomCardDuration" class="form-select">
+                    <option value="permanent">دائم — شراء مرة واحدة</option>
+                    <option value="temporary">مؤقت</option>
+                  </select>
+                  <div class="form-text">يظهر المؤثر لجميع المستخدمين على كرت روم المالك.</div>
+                </div>
+                <div v-if="form.type === 'room_card' && form.roomCardDuration === 'temporary'" class="col-md-4">
+                  <label class="form-label">مدة المؤثر بالأيام</label>
+                  <input v-model.number="form.roomCardDurationDays" type="number" min="1" max="365" class="form-control" />
+                  <div class="form-text">من يوم إلى 365 يومًا.</div>
+                </div>
                 <div class="col-md-3">
                   <label class="form-label">{{ t('cosmetics.minVip') }}</label>
                   <input v-model.number="form.minVipLevel" type="number" min="0" max="100" class="form-control" />
@@ -546,6 +559,8 @@ function emptyForm() {
     previewUrl: '',
     animationUrl: '',
     metaJson: '',
+    roomCardDuration: 'temporary',
+    roomCardDurationDays: 30,
     isActive: true,
   }
 }
@@ -634,6 +649,8 @@ function openEdit(item) {
     previewUrl: item.previewUrl || '',
     animationUrl: item.animationUrl || '',
     metaJson: item.meta ? JSON.stringify(item.meta, null, 2) : '',
+    roomCardDuration: item.meta?.roomCardDuration === 'permanent' ? 'permanent' : 'temporary',
+    roomCardDurationDays: Math.max(1, Math.min(365, Number(item.meta?.roomCardDurationDays) || 30)),
     isActive: item.isActive !== false,
   }
   showModal.value = true
@@ -713,6 +730,14 @@ async function save() {
         meta = JSON.parse(rawMeta)
       } catch {
         throw new Error(t('cosmetics.metaInvalid'))
+      }
+    }
+    if (form.value.type === 'room_card') {
+      // Explicit dashboard controls take precedence over free-form JSON values.
+      meta = {
+        ...(meta && typeof meta === 'object' ? meta : {}),
+        roomCardDuration: form.value.roomCardDuration === 'permanent' ? 'permanent' : 'temporary',
+        roomCardDurationDays: Math.max(1, Math.min(365, Math.floor(Number(form.value.roomCardDurationDays) || 30))),
       }
     }
     const payload = {
