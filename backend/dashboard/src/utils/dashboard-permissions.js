@@ -20,7 +20,6 @@ export const ROUTE_MODULE = {
   'recharge-agents': 'rechargeAgents',
   vip: 'vip',
   'mysterious-man': 'settings',
-  badges: 'badges',
   'vanity-ids': 'vanityIds',
   cosmetics: 'cosmetics',
   offers: 'offers',
@@ -46,8 +45,7 @@ export const ROUTE_MODULE = {
   'policy-brochure': 'policyBrochure',
   'gender-verifications': 'genderVerifications',
   'staff-identity': 'settings',
-  'display-ranks': 'badges',
-  moments: 'reports',
+undefined  moments: 'reports',
 }
 
 export const DASHBOARD_MODULES = [
@@ -65,7 +63,6 @@ export const DASHBOARD_MODULES = [
   'withdrawals',
   'rechargeAgents',
   'vip',
-  'badges',
   'vanityIds',
   'cosmetics',
   'offers',
