@@ -108,6 +108,10 @@ public final class AuthDtos {
         @SerializedName("customDisplayRankName") public String customDisplayRankName;
         @SerializedName("customDisplayRankImageUrl") public String customDisplayRankImageUrl;
         @SerializedName("customDisplayRankAnimated") public boolean customDisplayRankAnimated;
+        @SerializedName("customDisplayRankColor") public String customDisplayRankColor;
+        @SerializedName("customDisplayRankFrameUrl") public String customDisplayRankFrameUrl;
+        @SerializedName("customDisplayRankNameplateUrl") public String customDisplayRankNameplateUrl;
+        @SerializedName("customDisplayRankEntryEffectUrl") public String customDisplayRankEntryEffectUrl;
         @SerializedName("publicIdStyleMode") public String publicIdStyleMode;
         @SerializedName("publicIdStyleVipLevel") public int publicIdStyleVipLevel;
         @SerializedName("publicIdStyleColor1") public String publicIdStyleColor1;
