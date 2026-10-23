@@ -2,8 +2,8 @@
   <div class="sauti-home">
     <AlertMessage v-if="error" :message="error" :title="t('dashboard.apiUnavailable')" type="warning" @dismiss="error = ''" />
 
-    <!-- KPI -->
-    <div class="row g-3 mb-3">
+    <!-- KPI cards are permission-scoped; a dashboard grant alone must not expose every metric. -->
+    <div v-if="cards.length" class="row g-3 mb-3">
       <div class="col-6 col-xl-3" v-for="card in cards" :key="card.label">
         <StatCard
           :label="card.label"
@@ -19,7 +19,7 @@
     </div>
 
     <!-- Server health + log cleanup (card style, no separate board) -->
-    <div class="mb-3">
+    <div v-if="auth.can('logs', 'read')" class="mb-3">
       <ServerHealthCard
         :health="systemHealth"
         :loading="healthLoading"
@@ -30,8 +30,8 @@
     </div>
 
     <!-- Charts -->
-    <div class="row g-3 mb-3">
-      <div class="col-lg-8">
+    <div v-if="auth.can('users', 'read') || auth.can('rooms', 'read') || auth.can('wallet', 'read')" class="row g-3 mb-3">
+      <div v-if="auth.can('users', 'read') || auth.can('rooms', 'read')" class="col-lg-8">
         <ChartCard
           :title="t('dashboard.generalStats')"
           type="line"
@@ -39,7 +39,7 @@
           :datasets="combinedChart.datasets"
         />
       </div>
-      <div class="col-lg-4">
+      <div v-if="auth.can('wallet', 'read')" class="col-lg-4">
         <ChartCard
           :title="t('dashboard.revenueByChannel') || 'إيرادات حسب القناة'"
           type="doughnut"
@@ -63,7 +63,7 @@
 
     <!-- Lists -->
     <div class="row g-3 mb-3">
-      <div class="col-lg-4">
+      <div v-if="auth.can('rooms', 'read')" class="col-lg-4">
         <div class="s-panel">
           <div class="s-panel-head">
             <h3>{{ t('dashboard.topRooms') }}</h3>
@@ -89,7 +89,7 @@
         </div>
       </div>
 
-      <div class="col-lg-4">
+      <div v-if="auth.can('wallet', 'read')" class="col-lg-4">
         <div class="s-panel">
           <div class="s-panel-head">
             <h3>{{ t('dashboard.latestTx') }}</h3>
@@ -112,7 +112,7 @@
         </div>
       </div>
 
-      <div class="col-lg-4">
+      <div v-if="auth.can('rooms', 'read') || auth.can('reports', 'read')" class="col-lg-4">
         <div class="s-panel">
           <div class="s-panel-head">
             <h3>{{ t('dashboard.liveActivity') }}</h3>
@@ -135,7 +135,7 @@
     </div>
 
     <!-- Bottom 5 -->
-    <div class="s-mini-row">
+    <div v-if="miniStats.length" class="s-mini-row">
       <div v-for="m in miniStats" :key="m.label" class="s-mini" :class="m.tone">
         <div class="s-mini-ic"><i :class="['bi', m.icon]"></i></div>
         <div>
@@ -153,6 +153,7 @@ import { useI18n } from 'vue-i18n'
 import { dashboardApi, walletApi, logsApi } from '@/api'
 import { extractList, formatNumber, formatMoney } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
+import { useAuthStore } from '@/stores/auth'
 import StatCard from '@/components/StatCard.vue'
 import ServerHealthCard from '@/components/ServerHealthCard.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -160,6 +161,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const ChartCard = defineAsyncComponent(() => import('@/components/ChartCard.vue'))
 const { t, locale } = useI18n()
+const auth = useAuthStore()
 
 const loading = ref(false)
 const error = ref('')
@@ -192,6 +194,7 @@ const cards = computed(() => {
   return [
     {
       label: t('dashboard.totalUsersLabel'),
+      module: 'users',
       value: o.users ?? o.totalUsers ?? 0,
       tone: 'users',
       delta: seriesDelta(usersSeries) || '+0%',
@@ -199,6 +202,7 @@ const cards = computed(() => {
     },
     {
       label: t('dashboard.activeRoomsNow'),
+      module: 'rooms',
       value: o.liveRooms ?? o.streams ?? o.liveStreams ?? o.activeStreams ?? 0,
       tone: 'rooms',
       delta: seriesDelta(roomsSeries) || '+0%',
@@ -206,6 +210,7 @@ const cards = computed(() => {
     },
     {
       label: t('dashboard.activeUsersNow'),
+      module: 'rooms',
       value: o.openRooms ?? o.rooms ?? 0,
       tone: 'live',
       delta: '',
@@ -213,13 +218,14 @@ const cards = computed(() => {
     },
     {
       label: t('dashboard.totalRevenueLabel'),
+      module: 'wallet',
       value: formatMoney(o.revenue ?? o.totalRevenue ?? o.totalRechargeFiat ?? 0),
       tone: 'revenue',
       raw: true,
       delta: '',
       hint: t('dashboard.allTime'),
     },
-  ]
+  ].filter((card) => auth.can(card.module, 'read'))
 })
 
 const centerTotal = computed(() => formatNumber(overview.value?.users ?? overview.value?.totalUsers ?? 0))
@@ -245,27 +251,30 @@ const miniStats = computed(() => {
   const todayRooms = rSeries.length ? Number(rSeries[rSeries.length - 1] || 0) : 0
   const coinVol = charts.value?.revenue?.coinVolume?.values || []
   return [
-    { label: t('dashboard.newUsersToday'), value: `+${formatNumber(todayUsers)}`, icon: 'bi-person-plus', tone: 't-p' },
-    { label: t('dashboard.newRoomsToday'), value: `+${formatNumber(todayRooms)}`, icon: 'bi-door-open', tone: 't-b' },
+    { label: t('dashboard.newUsersToday'), value: `+${formatNumber(todayUsers)}`, icon: 'bi-person-plus', tone: 't-p', module: 'users' },
+    { label: t('dashboard.newRoomsToday'), value: `+${formatNumber(todayRooms)}`, icon: 'bi-door-open', tone: 't-b', module: 'rooms' },
     {
       label: t('dashboard.txToday') || 'إيراد اليوم',
       value: formatMoney(o.todayRevenue ?? 0),
       icon: 'bi-cash-stack',
       tone: 't-g',
+      module: 'wallet',
     },
     {
       label: t('dashboard.rechargeCoins'),
       value: formatNumber(coinVol[0] ?? 0),
       icon: 'bi-gem',
       tone: 't-y',
+      module: 'coins',
     },
     {
       label: t('dashboard.giftsSent'),
       value: formatNumber(coinVol[1] ?? o.activeGifts ?? 0),
       icon: 'bi-gift-fill',
       tone: 't-r',
+      module: 'gifts',
     },
-  ]
+  ].filter((item) => auth.can(item.module, 'read'))
 })
 
 const activity = computed(() => {
@@ -300,7 +309,7 @@ const combinedChart = computed(() => {
   return {
     labels,
     datasets: [
-      {
+      ...(auth.can('users', 'read') ? [{
         label: t('dashboard.users'),
         data: uData,
         borderColor: '#6c5ce7',
@@ -313,7 +322,8 @@ const combinedChart = computed(() => {
         pointBorderWidth: 2,
         borderWidth: 2.5,
       },
-      {
+      }] : []),
+      ...(auth.can('rooms', 'read') ? [{
         label: t('dashboard.roomsCreated'),
         data: rData,
         borderColor: '#3b82f6',
@@ -326,7 +336,8 @@ const combinedChart = computed(() => {
         pointBorderWidth: 2,
         borderWidth: 2.5,
       },
-      {
+      }] : []),
+      ...(auth.can('users', 'read') && auth.can('rooms', 'read') ? [{
         label: t('dashboard.activitySeries'),
         data: sumData,
         borderColor: '#00c566',
@@ -338,7 +349,7 @@ const combinedChart = computed(() => {
         pointBorderColor: '#1c1e2d',
         pointBorderWidth: 2,
         borderWidth: 2.5,
-      },
+      }] : []),
     ],
   }
 })
