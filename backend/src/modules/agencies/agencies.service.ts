@@ -403,6 +403,12 @@ export class AgenciesService implements OnModuleInit {
       order: { createdAt: 'DESC' },
     });
     let agency = membership?.agency || null;
+    // A suspended/inactive agency must disappear from the member's app and profile.
+    // This also covers stale pending memberships left behind by older deployments.
+    if (agency && agency.status !== AgencyStatus.ACTIVE) {
+      agency = null;
+      membership = null;
+    }
     const visibleApplication =
       application?.status === AgencyApplicationStatus.APPROVED &&
       (!agency || !application.agencyId || application.agencyId !== agency.id)

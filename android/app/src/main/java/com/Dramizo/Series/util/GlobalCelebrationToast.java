@@ -141,14 +141,17 @@ public final class GlobalCelebrationToast {
         String chosenBackground = giftSend ? remoteBackgroundUrl
                 : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        // Keep the uploaded toast artwork at one stable size. Older saved width/height
-        // values are intentionally ignored so the background cannot jump or resize.
-        final int requestedWidthDp = 340;
-        final int requestedHeightDp = 100;
+        final int requestedWidthDp = giftSend ? remoteGiftWidthDp
+                : luckyHigh ? remoteLuckyHighWidthDp
+                : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
+        final int requestedHeightDp = giftSend ? remoteGiftHeightDp
+                : luckyHigh ? remoteLuckyHighHeightDp
+                : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
         ViewGroup.LayoutParams activeParams = active.getLayoutParams();
         if (activeParams instanceof FrameLayout.LayoutParams) {
-            activeParams.width = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
-            activeParams.height = dp(activity, requestedHeightDp);
+            int maxWidth = Math.max(dp(activity, 220), screenWidth - dp(activity, 24));
+            activeParams.width = Math.min(dp(activity, Math.max(220, Math.min(360, requestedWidthDp))), maxWidth);
+            activeParams.height = dp(activity, Math.max(60, Math.min(180, requestedHeightDp)));
             active.setLayoutParams(activeParams);
         }
         String imageUrl = toastBackgroundUrl(chosenBackground);
@@ -438,9 +441,17 @@ public final class GlobalCelebrationToast {
             return;
         }
         showing = true;
-        showInternal(activity, request.title, request.body, request.avatarUrl,
-                request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
-                request.displayName, request.kind, request.roomId);
+        try {
+            showInternal(activity, request.title, request.body, request.avatarUrl,
+                    request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
+                    request.displayName, request.kind, request.roomId);
+        } catch (Throwable error) {
+            // A single malformed asset/activity must not leave the global toast queue
+            // permanently marked as showing and hide every later celebration.
+            android.util.Log.w("GlobalCelebrationToast", "Toast rendering failed", error);
+            showing = false;
+            MAIN.post(GlobalCelebrationToast::showNext);
+        }
     }
 
     private static void showInternal(
@@ -646,11 +657,17 @@ public final class GlobalCelebrationToast {
         }
 
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        // Fixed toast dimensions: background artwork never changes size based on old settings.
-        final int requestedWidthDp = 340;
-        final int requestedHeightDp = 100;
-        int toastWidth = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
-        int toastHeight = customToastStyle ? dp(activity, requestedHeightDp) : ViewGroup.LayoutParams.WRAP_CONTENT;
+        final int requestedWidthDp = giftSend ? remoteGiftWidthDp
+                : luckyHigh ? remoteLuckyHighWidthDp
+                : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
+        final int requestedHeightDp = giftSend ? remoteGiftHeightDp
+                : luckyHigh ? remoteLuckyHighHeightDp
+                : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
+        int maxToastWidth = Math.max(dp(activity, 220), screenWidth - dp(activity, 24));
+        int toastWidth = Math.min(dp(activity, Math.max(220, Math.min(360, requestedWidthDp))), maxToastWidth);
+        int toastHeight = customToastStyle
+                ? dp(activity, Math.max(60, Math.min(180, requestedHeightDp)))
+                : ViewGroup.LayoutParams.WRAP_CONTENT;
         // Keep the text elements content-sized like the dashboard's draggable preview.
         // Full-width TextViews cannot be positioned by their left-edge percentage.
         int textMaxWidth = Math.max(dp(activity, 84), Math.round(toastWidth * 0.66f));
@@ -792,17 +809,30 @@ public final class GlobalCelebrationToast {
         if (target == null || container == null || container.getWidth() <= 0 || container.getHeight() <= 0) return;
         float desiredX = container.getWidth() * Math.max(0f, Math.min(100f, xPercent)) / 100f;
         float desiredY = container.getHeight() * Math.max(0f, Math.min(100f, yPercent)) / 100f;
+        float targetWidth = Math.max(1, target.getWidth());
+        float targetHeight = Math.max(1, target.getHeight());
+        // Keep all configured elements inside the artwork even when a saved slider
+        // value is 0% or 100%; otherwise the avatar/name/reward/X can disappear off-edge.
+        if (centerX) {
+            desiredX = Math.max(targetWidth / 2f,
+                    Math.min(container.getWidth() - targetWidth / 2f, desiredX));
+        } else {
+            desiredX = Math.max(0f,
+                    Math.min(Math.max(0f, container.getWidth() - targetWidth), desiredX));
+        }
+        desiredY = Math.max(targetHeight / 2f,
+                Math.min(container.getHeight() - targetHeight / 2f, desiredY));
         int[] targetLocation = new int[2];
         int[] containerLocation = new int[2];
         target.getLocationOnScreen(targetLocation);
         container.getLocationOnScreen(containerLocation);
         // Dashboard preview stores the avatar/count center but the text's left edge.
         // Remove existing translations before deriving the layout baseline so repeated
-        // live-style refreshes are idempotent and never push elements off the artwork.
+        // live-style refreshes are idempotent.
         float baseX = targetLocation[0] - containerLocation[0] - target.getTranslationX();
         float baseY = targetLocation[1] - containerLocation[1] - target.getTranslationY();
-        target.setTranslationX(desiredX - baseX - (centerX ? target.getWidth() / 2f : 0f));
-        target.setTranslationY(desiredY - baseY - target.getHeight() / 2f);
+        target.setTranslationX(desiredX - baseX - (centerX ? targetWidth / 2f : 0f));
+        target.setTranslationY(desiredY - baseY - targetHeight / 2f);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */

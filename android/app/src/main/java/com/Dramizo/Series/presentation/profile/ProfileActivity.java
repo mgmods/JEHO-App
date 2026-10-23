@@ -477,26 +477,25 @@ public class ProfileActivity extends ThemedActivity {
                         isFollowingTarget ? R.string.unfollow : R.string.follow);
             }
 
-            // Property strip
-            String agencyId = null;
-            if (binding.tvProfileAgencyName != null) {
-                if (user.agency != null
-                        && user.agency.name != null
-                        && !user.agency.name.isEmpty()) {
-                    binding.tvProfileAgencyName.setText(user.agency.name.trim());
-                } else {
-                    binding.tvProfileAgencyName.setText(R.string.user_card_prop_family);
-                }
+            // Only show the agency/family tile when the backend confirms an active
+            // membership. Deleted or suspended agencies must disappear from every profile.
+            boolean hasActiveAgency = user.agency != null
+                    && user.agency.id != null && !user.agency.id.trim().isEmpty()
+                    && user.agency.name != null && !user.agency.name.trim().isEmpty();
+            String agencyId = hasActiveAgency ? user.agency.id : null;
+            if (binding.propProfileFamily != null) {
+                binding.propProfileFamily.setVisibility(hasActiveAgency ? View.VISIBLE : View.GONE);
             }
-            if (user.agency != null && user.agency.id != null && !user.agency.id.isEmpty()) {
-                agencyId = user.agency.id;
+            if (binding.tvProfileAgencyName != null) {
+                binding.tvProfileAgencyName.setText(hasActiveAgency
+                        ? user.agency.name.trim() : "");
             }
             UserSocialNav.bindFamilyClick(
                     this,
                     binding.propProfileFamily,
                     agencyId,
                     null);
-            bindAgencyStrip(user.agency);
+            bindAgencyStrip(hasActiveAgency ? user.agency : null);
         });
         vm.getError().observe(this, e -> {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
@@ -714,19 +713,11 @@ public class ProfileActivity extends ThemedActivity {
             @androidx.annotation.Nullable ImageView medal,
             int vipLevel,
             @androidx.annotation.Nullable String levelBadgeUrl) {
-        if (medal == null) return;
-        if (vipLevel <= 0) {
+        // Medal visuals are intentionally hidden with the retired profile badge cabinet.
+        if (medal != null) {
             medal.setVisibility(View.GONE);
             medal.setImageDrawable(null);
-            return;
         }
-        String path = levelBadgeUrl;
-        if (path == null || path.isEmpty() || !path.contains("vip_medal")) {
-            int t = Math.min(7, Math.max(1, vipLevel));
-            path = "/assets/cosmetics/vip/vip_medal_mikoo_" + t + ".png";
-        }
-        medal.setVisibility(View.VISIBLE);
-        ServerAssets.load(medal, path);
     }
 
     private void bindEntryRide(
@@ -1096,65 +1087,7 @@ public class ProfileActivity extends ThemedActivity {
         }
     }
 
-    private void loadEarnedBadges(String profileId) {
-        if (binding == null || binding.rowEarnedBadges == null
-                || profileId == null || profileId.trim().isEmpty()) return;
-        if (binding.tvBadgesEmpty != null) binding.tvBadgesEmpty.setVisibility(View.VISIBLE);
-        if (binding.tvBadgeCount != null) binding.tvBadgeCount.setText("0 مكتسبة");
-        container.getIoExecutor().execute(() -> {
-            java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned = new java.util.ArrayList<>();
-            boolean loaded = false;
-            try {
-                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
-                        container.getUserApi().earnedBadges(profileId).execute();
-                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
-                    loaded = true;
-                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
-                        // Only real earned ownership is displayed; catalog-only badges stay in admin.
-                        if (badge != null && badge.earned) earned.add(badge);
-                    }
-                }
-            } catch (Exception ignored) { }
-            final boolean catalogLoaded = loaded;
-            runOnUiThread(() -> {
-                if (binding == null || isFinishing() || isDestroyed()) return;
-                binding.rowEarnedBadges.removeAllViews();
-                binding.rowEarnedBadges.setVisibility(earned.isEmpty() ? View.GONE : View.VISIBLE);
-                if (binding.tvBadgeCount != null) {
-                    binding.tvBadgeCount.setText(earned.size() + " مكتسبة");
-                }
-                if (binding.tvBadgesEmpty != null) {
-                    binding.tvBadgesEmpty.setText(catalogLoaded
-                            ? "لم تحصل على شارات بعد"
-                            : "تعذر تحميل الشارات، حاول لاحقًا");
-                    binding.tvBadgesEmpty.setVisibility(earned.isEmpty() ? View.VISIBLE : View.GONE);
-                }
-                for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
-                    ImageView icon = new ImageView(this);
-                    int size = (int) (28 * getResources().getDisplayMetrics().density + 0.5f);
-                    android.widget.LinearLayout.LayoutParams lp =
-                            new android.widget.LinearLayout.LayoutParams(size, size);
-                    lp.setMargins(3, 0, 3, 0);
-                    icon.setLayoutParams(lp);
-                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    icon.setContentDescription(badge.name == null ? "شارة مكتسبة" : badge.name);
-                    Glide.with(this).load(AssetCatalog.absoluteUrl(badge.imageUrl))
-                            .placeholder(R.drawable.ic_medal_default)
-                            .error(R.drawable.ic_medal_default).into(icon);
-                    icon.setOnClickListener(v -> openBadgeCatalog(profileId));
-                    binding.rowEarnedBadges.addView(icon);
-                }
-                binding.rowBadges.setOnClickListener(v -> openBadgeCatalog(profileId));
-            });
-        });
-    }
-
-    private void openBadgeCatalog(String profileId) {
-        if (profileId == null || profileId.trim().isEmpty()) return;
-        Intent intent = new Intent(this, BadgeActivity.class);
-        intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
-        startActivity(intent);
-    }
+    /** Badge/medal cabinet is disabled platform-wide; no async loader may reveal it. */
 
     private void sendSocialRequest(String targetId, String type, String labelAr) {
         AppContainer container = ContainerProvider.from(this);

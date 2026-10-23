@@ -630,7 +630,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.giftChatEffects != null) {
             giftVisualEffects = new RoomVisualEffects(binding.giftChatEffects);
         }
-        binding.getRoot().postDelayed(this::preloadRoomGiftMedia, 1_200L);
+        // Defer nonessential gift-media warming until room join/audio controls settle.
+        binding.getRoot().postDelayed(this::preloadRoomGiftMedia, 3_000L);
         effectQueue = new RoomEffectQueue(effect -> {
             if (effect.isEntry()) {
                 if (!roomEntryEffectsEnabled()) {
@@ -1241,6 +1242,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 canBanUsers = true;
                 canManageSeats = true;
                 canInviteMic = true;
+            }
+            if (isPlatformAdmin() || isPlatformManager()) {
+                // Platform admins/managers can manage music in every room, but this is
+                // only the dedicated music stream; microphone capture gain is untouched.
+                canManageMusic = true;
             }
             if (isPlatformSuper()) {
                 canManageMusic = true;
@@ -4758,8 +4764,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (binding != null) {
                 updateMusicProgressUi();
             }
-            // Playback timing is server-synchronized; a 1s UI tick is sufficient and lighter.
-            handler.postDelayed(this, 1_000L);
+            // Keep the progress clock responsive while playing, but reduce idle UI work
+            // when the room has no active track. Room events refresh state immediately.
+            boolean activeTrack = "playing".equalsIgnoreCase(currentMusicStatus)
+                    || "paused".equalsIgnoreCase(currentMusicStatus);
+            handler.postDelayed(this, activeTrack ? 1_000L : 5_000L);
         }
     };
 
@@ -5308,8 +5317,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         // For device music mixed into the host's published audio, adjust only the
         // dedicated ZEGO media player; microphone capture gain remains untouched.
-        if (canManageMusic) {
-            // Also cache the gain before a device track is loaded.
+        // Room metadata/role flags can arrive late, so also recognize the active publisher.
+        if (canManageMusic || isHost || isOwner || isRoomStaff()
+                || sameUser(myUserId, currentMusicPublisherId)) {
             RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
         }
         if (binding != null && binding.seekMusicVolume != null
@@ -8782,13 +8792,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void applyRoomSpeakerMute(boolean muted) {
         RoomSoundFx.setMuted(muted);
         RoomRtcEngine.getInstance().setSpeakerMuted(muted);
+        // Preserve the selected music gain on every track type. This does not touch
+        // microphone capture gain; only the dedicated music player is adjusted.
         if (roomMusicPlayer != null) {
-            if (isYoutubeMusicUrl(currentMusicUrl)
-                    || (currentMusicUrl != null && !isLocalMusicUrl(currentMusicUrl))) {
-                applySharedMusicVolume();
-            } else {
-                roomMusicPlayer.setVolume(muted ? 0f : 1f);
-            }
+            applySharedMusicVolume();
         }
         if (!muted) {
             // Resume pulling seat streams after mute (minutes billing resumes only now).
@@ -11325,24 +11332,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
     public void showLuckyHitBanner(@Nullable String displayName, @Nullable String avatarUrl,
-                                   long wonCoins, int multiplier) {
+                                   long wonCoins, double multiplier, @Nullable String eventKey) {
         String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
         String line;
-        if (multiplier <= 0) {
-            line = "ضرب حظه · مردود +" + Math.max(0L, wonCoins);
+        if (wonCoins <= 0) {
+            line = "لم يحالف الحظ " + who + " هذه المرة";
+        } else if (multiplier > 0d && multiplier < 1d) {
+            line = "مردود ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
+        } else if (multiplier <= 0d) {
+            line = "مردود +" + Math.max(0L, wonCoins);
         } else {
-            int mul = Math.max(1, multiplier);
-            line = "ضرب حظه وربح ×" + mul + " · +" + Math.max(0L, wonCoins);
+            line = "ضرب حظه وربح ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
         }
-        // Use the same dashboard-controlled top toast as every other lucky-win event.
+        // Use the same dashboard-controlled toast as every other lucky outcome.
         // Do not route this through ComingMsgView: that legacy sliding toast ignored the design controls.
         GlobalCelebrationToast.show(
                 this, who, line, avatarUrl, null,
-                "lucky-room-hit-" + who + "-" + Math.max(0L, wonCoins) + "-" + multiplier,
-                28, Math.max(0, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
-        if (roomBannerEnabled()) {
+                eventKey == null || eventKey.trim().isEmpty()
+                        ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim(),
+                28, Math.max(0d, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
+        // Positive outcomes also arrive through the global celebration event, which owns
+        // the chat line. No-payout outcomes are room-scoped, so announce those here.
+        if (wonCoins <= 0 && roomBannerEnabled()) {
             appendChatLine(who, line, 0, 1, null, null, avatarUrl, null);
         }
+    }
+
+    private static String formatLuckyMultiplier(double multiplier) {
+        if (Math.abs(multiplier - Math.rint(multiplier)) < 0.0001d) {
+            return String.format(java.util.Locale.US, "%.0f", multiplier);
+        }
+        return String.format(java.util.Locale.US, "%.2f", multiplier)
+                .replaceAll("0+$", "").replaceAll("\\.$", "");
     }
 
     /** Official-news style crawl — disabled (too large). Use ComingMsgView instead. */
@@ -11747,20 +11768,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Result<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftList> r =
                         c.getGiftsUseCase.execute();
                 if (!r.success || r.data == null || r.data.isEmpty()) return;
-                java.util.ArrayList<String> urls = new java.util.ArrayList<>();
+                java.util.LinkedHashSet<String> uniqueUrls = new java.util.LinkedHashSet<>();
+                // Warm only the first small slice of the catalog. Preloading every gift
+                // animation at room entry competes with mic setup and can spike memory/network.
                 for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : r.data) {
                     if (g == null) continue;
                     String resolved = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
                             g.name, g.iconUrl, g.animationUrl);
                     if (resolved != null && !resolved.isEmpty()) {
-                        urls.add(resolved);
+                        uniqueUrls.add(resolved);
                     } else if (g.animationUrl != null && !g.animationUrl.isEmpty()) {
-                        urls.add(g.animationUrl);
+                        uniqueUrls.add(g.animationUrl);
                     }
-                    if (g.iconUrl != null && !g.iconUrl.isEmpty()) urls.add(g.iconUrl);
-                    if (urls.size() > 100) break;
+                    if (g.iconUrl != null && !g.iconUrl.isEmpty()) uniqueUrls.add(g.iconUrl);
+                    if (uniqueUrls.size() >= 24) break;
                 }
-                com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(this, urls);
+                if (isFinishing() || isDestroyed() || binding == null || uniqueUrls.isEmpty()) return;
+                com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
+                        this, new java.util.ArrayList<>(uniqueUrls));
             } catch (Exception ignored) {
             }
         });
@@ -12337,6 +12362,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Override
     protected void onDestroy() {
         if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        // Avoid retaining destroyed room activities through the recurring music UI tick.
+        handler.removeCallbacks(musicProgressRunnable);
         if (luckyCannonView != null) luckyCannonView.release();
         unregisterAudioRouteReceiver();
         if (sAliveRoom != null && sAliveRoom.get() == this) {
@@ -14115,33 +14142,44 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (rewardLabel == null) rewardLabel = "جائزة";
             showLuckyWinOverlay(opener, rewardLabel);
         } else if ("lucky:hit".equals(event)) {
-            // Lucky gift multiplier rain — show for everyone except the sender (local already did).
+            // The room event is the canonical source for the configured win/return toast.
+            // No local-response toast is emitted elsewhere, so include the sender as well.
             String senderId = memberStr(payload, "senderId");
             if (senderId == null) senderId = fromUserId;
-            if (myUserId != null && sameUser(myUserId, senderId)) return;
             String who = memberStr(payload, "senderName");
             if (who == null || who.isEmpty()) {
                 who = fromUsername != null ? fromUsername : "مستخدم";
             }
             long won = Math.max(0L, memberLong(payload, "luckyCoinsWon", 0L));
-            if (won <= 0) return;
-            int mul = 1;
+            // A zero-payout lucky result is still a real outcome and must show the
+            // configured return/loss toast; only coin rain/audio require a payout.
+            int mul = 0;
             boolean soft = false;
+            double rawMultiplier = 0d;
             if (payload.has("luckyMultiplier") && !payload.get("luckyMultiplier").isJsonNull()) {
                 try {
-                    double raw = payload.get("luckyMultiplier").getAsDouble();
-                    soft = raw > 0 && raw < 1.0;
-                    mul = soft ? 0 : Math.max(1, (int) Math.round(raw));
+                    rawMultiplier = Math.max(0d, payload.get("luckyMultiplier").getAsDouble());
+                    soft = rawMultiplier > 0d && rawMultiplier < 1d;
+                    mul = rawMultiplier <= 0d ? 0 : Math.max(1, (int) Math.round(rawMultiplier));
                 } catch (Exception ignored) {
-                    mul = Math.max(1, memberInt(payload, "luckyMultiplier", 1));
+                    rawMultiplier = Math.max(0d, memberInt(payload, "luckyMultiplier", 0));
+                    mul = rawMultiplier <= 0d ? 0 : Math.max(1, (int) Math.round(rawMultiplier));
                 }
             }
-            showLuckyHitBanner(who, memberStr(payload, "senderAvatarUrl"), won, mul);
-            GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
-            // Only float/rain on the winner's seat.
-            if (senderId != null && !senderId.isEmpty()) {
-                showLuckyReturnOnMics(java.util.Collections.singletonList(senderId), won);
-                playCoinRainToUsers(java.util.Collections.singletonList(senderId), 16);
+            String luckyToastEventKey = firstNonEmpty(
+                    memberStr(payload, "eventId"),
+                    memberStr(payload, "sendId"),
+                    memberStr(payload, "requestId"),
+                    memberStr(payload, "at"));
+            if (luckyToastEventKey == null) luckyToastEventKey = String.valueOf(System.currentTimeMillis());
+            showLuckyHitBanner(who, memberStr(payload, "senderAvatarUrl"), won, rawMultiplier, luckyToastEventKey);
+            if (won > 0) {
+                GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
+                // Only float/rain on the winner's seat when a payout actually occurred.
+                if (senderId != null && !senderId.isEmpty()) {
+                    showLuckyReturnOnMics(java.util.Collections.singletonList(senderId), won);
+                    playCoinRainToUsers(java.util.Collections.singletonList(senderId), 16);
+                }
             }
         } else if ("game:update".equals(event) || "game:invite".equals(event)) {
             // XO retired — ignore legacy realtime payloads
