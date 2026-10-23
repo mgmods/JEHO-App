@@ -59,7 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
   function canRoute(routeName, need = 'read') {
     if (isSuperAdmin.value) return true
     const mod = ROUTE_MODULE[routeName]
-    if (!mod) return true
+    if (!mod) return false
     return can(mod, need)
   }
 
