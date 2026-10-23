@@ -322,7 +322,7 @@ const combinedChart = computed(() => {
         pointBorderWidth: 2,
         borderWidth: 2.5,
       },
-      }] : []),
+      ] : []),
       ...(auth.can('rooms', 'read') ? [{
         label: t('dashboard.roomsCreated'),
         data: rData,
@@ -336,7 +336,7 @@ const combinedChart = computed(() => {
         pointBorderWidth: 2,
         borderWidth: 2.5,
       },
-      }] : []),
+      ] : []),
       ...(auth.can('users', 'read') && auth.can('rooms', 'read') ? [{
         label: t('dashboard.activitySeries'),
         data: sumData,
