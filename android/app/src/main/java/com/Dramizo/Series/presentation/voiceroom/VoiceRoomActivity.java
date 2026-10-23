@@ -3884,6 +3884,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setClipToPadding(false);
         layer.setClickable(false);
         layer.setFocusable(false);
+        // Never expose the sender's draggable launcher to other room members on room entry.
+        // It becomes visible only after this device successfully arms its own lucky gift.
+        layer.setVisibility(View.GONE);
         ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
                 luckyCannonDp(96), luckyCannonDp(96));
         // Default position: bottom-center of the room content, with room for the control bar.
