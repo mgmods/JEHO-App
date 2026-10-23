@@ -332,6 +332,16 @@ public class ProfileActivity extends ThemedActivity {
                 profileDisplayName = profileDisplayName + "  ·  " + user.customDisplayRankName.trim();
             }
             binding.tvDisplayName.setText(profileDisplayName);
+            String customRankImageUrl = user.customDisplayRankImageUrl;
+            if (customRankImageUrl != null && !customRankImageUrl.trim().isEmpty()) {
+                binding.imgCustomDisplayRank.setVisibility(View.VISIBLE);
+                Glide.with(binding.imgCustomDisplayRank)
+                        .load(customRankImageUrl.trim())
+                        .into(binding.imgCustomDisplayRank);
+            } else {
+                Glide.with(binding.imgCustomDisplayRank).clear(binding.imgCustomDisplayRank);
+                binding.imgCustomDisplayRank.setVisibility(View.GONE);
+            }
             GenderVerifiedBadge.bind(binding.tvDisplayName, null, user.genderVerified);
             bindGenderIcon(binding.imgGender, user.gender);
 
