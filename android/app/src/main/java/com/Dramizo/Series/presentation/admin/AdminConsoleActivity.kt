@@ -28,8 +28,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import com.Dramizo.Series.data.remote.api.AdminApi
 import com.Dramizo.Series.data.remote.api.RoomApi
 import com.Dramizo.Series.data.remote.dto.ApiResponse
-import AuthResult
-import RefreshTokenRequest
+import com.Dramizo.Series.data.remote.dto.AuthDtos.AuthResult
+import com.Dramizo.Series.data.remote.dto.AuthDtos.RefreshTokenRequest
 import com.Dramizo.Series.presentation.common.ContainerProvider
 import com.Dramizo.Series.presentation.common.ThemedActivity
 import com.Dramizo.Series.util.StaffRoleHelper
