@@ -22,7 +22,7 @@
     </div>
     <div class="glass p-3 mb-3">
       <h5 class="mb-3">إهداء أو سحب ميدالية / صفة شكلية</h5>
-      <p class="text-muted small mb-3">يمكن تعيين نفس الشارة لعدة حسابات. هذا التعيين تجميلي فقط ولا يمنح صلاحيات إدارية.</p>
+      <p class="text-muted small mb-3">يمكن إهداء نفس الميدالية لعدة حسابات. هذا التعيين تجميلي فقط ولا يمنح صلاحيات إدارية.</p>
       <div class="row g-2 align-items-end">
         <div class="col-md-4"><label class="form-label">الميدالية أو الصفة</label><select v-model="grant.badgeId" class="form-select"><option value="">اختر ميدالية</option><option v-for="badge in badges" :key="badge.id" :value="badge.id">{{ badge.name }}</option></select></div>
         <div class="col-md-4"><label class="form-label">معرّفات المستخدمين (ID عام أو UUID)</label><textarea v-model="grant.userId" class="form-control" rows="2" placeholder="مثال: 123456, 234567 أو كل ID بسطر" /></div>
