@@ -23,11 +23,13 @@ export const useAuthStore = defineStore('auth', () => {
     const role = String(u.staffRole || '')
       .trim()
       .toLowerCase()
-    if (role === 'super' || role === 'super_admin' || role === 'superadmin' || role === 'admin') {
+    // Explicit Admin and Manager roles are limited roles. Only a true Super role
+    // may bypass module permissions; a stale isAdmin flag must not widen access.
+    if (role === 'super' || role === 'super_admin' || role === 'superadmin') {
       return true
     }
-    // Legacy sessions: isAdmin without operator/manager = Super owner
-    if (u.isAdmin && role !== 'operator' && role !== 'manager' && role !== 'moderator') {
+    // Backward compatibility only for legacy sessions with no role field at all.
+    if (u.isAdmin && !role) {
       return true
     }
     return false
