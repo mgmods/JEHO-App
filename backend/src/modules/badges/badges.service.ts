@@ -164,8 +164,8 @@ export class BadgesService {
     await Promise.all(newlyEarned.map((badge) => this.notifications.notifyUser(
       userId,
       NotificationType.SYSTEM,
-      'شارة جديدة! 🏅',
-      `حصلت على شارة ${badge.name}`,
+      'ميدالية جديدة! 🏅',
+      `حصلت على ميدالية ${badge.name}`,
       { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
     )));
   }
@@ -241,8 +241,8 @@ export class BadgesService {
     const notification = await this.notifications.notifyUser(
       user.id,
       NotificationType.SYSTEM,
-      'تم إهداؤك شارة جديدة! 🏅',
-      `مبروك! تمت إضافة شارة ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
+      'تم إهداؤك ميدالية جديدة! 🏅',
+      `مبروك! تمت إضافة ميدالية ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
       { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
     );
     return {
