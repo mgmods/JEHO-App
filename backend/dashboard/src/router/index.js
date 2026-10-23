@@ -152,7 +152,13 @@ const routes = [
         path: 'badges',
         name: 'badges',
         component: () => import('@/views/BadgesView.vue'),
-        meta: { title: 'ميداليات' },
+        meta: { title: 'الميداليات' },
+      },
+      {
+        path: 'display-ranks',
+        name: 'display-ranks',
+        component: () => import('@/views/BadgesView.vue'),
+        meta: { title: 'الصفات الشكلية' },
       },
       {
         path: 'vip',

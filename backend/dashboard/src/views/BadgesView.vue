@@ -1,47 +1,51 @@
 <template>
   <div class="container-fluid">
-    <PageHeader title="الميداليات والصفات الشكلية" subtitle="إنشاء ميداليات احترافية وصفات شكلية، ثم إهداؤها للحسابات لتظهر في أنحاء التطبيق دون منح صلاحيات إدارية" />
+    <PageHeader :title="isRankPage ? 'الصفات الشكلية' : 'الميداليات'" subtitle="إدارة مستقلة للميداليات والصفات الشكلية وإهداؤها للحسابات دون منح الصفات أي صلاحيات إدارية" />
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <div class="glass p-3 mb-3">
-      <h5 class="mb-3">{{ editingId ? 'تعديل ميدالية' : 'إضافة ميدالية جديدة' }}</h5>
+      <h5 class="mb-3">{{ editingId ? 'تعديل ' + itemLabel : 'إضافة ' + itemLabel }}</h5>
       <form class="row g-3" @submit.prevent="save">
-        <div class="col-md-4"><label class="form-label">اسم الميدالية</label><input v-model.trim="form.name" class="form-control" maxlength="80" required /></div>
-        <div class="col-md-5"><label class="form-label">رابط صورة الميدالية</label><input v-model.trim="form.imageUrl" class="form-control" maxlength="512" placeholder="https://... أو ارفع صورة" required /><img v-if="form.imageUrl" :src="resolveAsset(form.imageUrl)" alt="معاينة الميدالية" style="display:block;width:64px;height:64px;object-fit:contain;margin-top:8px" /></div>
+        <div class="col-md-4"><label class="form-label">اسم {{ isRankPage ? 'الصفة' : 'الميدالية' }}</label><input v-model.trim="form.name" class="form-control" maxlength="80" required /></div>
+        <div class="col-md-5"><label class="form-label">رابط صورة {{ isRankPage ? 'الصفة' : 'الميدالية' }}</label><input v-model.trim="form.imageUrl" class="form-control" maxlength="512" placeholder="https://... أو ارفع صورة" required /><img v-if="form.imageUrl" :src="resolveAsset(form.imageUrl)" alt="معاينة العنصر التجميلي" style="display:block;width:64px;height:64px;object-fit:contain;margin-top:8px" /></div>
         <div class="col-md-3"><label class="form-label">رفع صورة من الجهاز</label><input class="form-control" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" :disabled="uploadingImage" @change="uploadImage" /><small v-if="uploadingImage" class="text-muted">جارٍ رفع الصورة…</small></div>
         <div class="col-md-6"><label class="form-label">الوصف</label><input v-model.trim="form.description" class="form-control" maxlength="500" /></div>
-        <div class="col-md-3"><label class="form-label">نوع الميدالية</label><select v-model="form.category" class="form-select"><option value="general">ميدالية عادية</option><option value="display_rank">صفة شكلية تظهر للجميع</option><option v-if="form.category && !['general', 'display_rank'].includes(form.category)" :value="form.category">{{ form.category }}</option></select><small v-if="form.category === 'display_rank'" class="text-muted">تظهر الصفة مع اسم الحساب في الغرف والتعليقات والملف الشخصي والمحادثات، دون أي صلاحيات إدارية.</small></div>
+        <div class="col-md-3"><label class="form-label">نوع العنصر</label><select v-model="form.category" class="form-select"><option v-if="!isRankPage" value="general">ميدالية عادية</option><option v-if="isRankPage" value="display_rank">صفة شكلية تظهر للجميع</option><option v-if="form.category && !['general', 'display_rank'].includes(form.category)" :value="form.category">{{ form.category }}</option></select><small v-if="form.category === 'display_rank'" class="text-muted">تظهر الصفة مع اسم الحساب في الغرف والتعليقات والملف الشخصي والمحادثات، دون أي صلاحيات إدارية.</small></div>
         <div class="col-md-2"><label class="form-label">نوع المنح</label><select v-model="form.awardType" class="form-select"><option value="manual">يدوي</option><option value="achievement">إنجاز تلقائي</option></select></div>
         <template v-if="form.awardType === 'achievement'">
           <div class="col-md-4"><label class="form-label">شرط الإنجاز</label><select v-model="form.achievementKey" class="form-select" required><option :value="null" disabled>اختر الشرط</option><option value="level">المستوى</option><option value="experience">الخبرة</option><option value="followers">عدد المتابعين</option><option value="recharge">إجمالي الشحن التراكمي</option><option value="support">إجمالي الدعم المرسل للآخرين</option><option value="received">إجمالي الهدايا المستلمة</option></select></div>
           <div class="col-md-3"><label class="form-label">الحد المطلوب</label><input v-model.number="form.achievementThreshold" type="number" min="1" step="1" class="form-control" required /></div>
         </template>
         <div class="col-md-2"><label class="form-label">الترتيب</label><input v-model.number="form.sortOrder" type="number" class="form-control" /></div>
-        <div class="col-md-2 d-flex align-items-end gap-3"><label class="form-check"><input v-model="form.isActive" class="form-check-input" type="checkbox" /> مفعلة</label><label class="form-check"><input v-model="form.isAnimated" class="form-check-input" type="checkbox" /> متحركة</label></div><div class="col-12"><small class="text-muted">اختر «رتبة شكلية تظهر للجميع» للرتب المخصصة. الصورة واسم الرتبة تجميليان فقط ولا يمنحان أي صلاحية إدارية.</small></div>
-        <div class="col-12 d-flex gap-2"><button class="btn btn-aurora" :disabled="saving">{{ saving ? 'جارٍ الحفظ…' : 'حفظ الميدالية' }}</button><button v-if="editingId" class="btn btn-outline-secondary" type="button" @click="reset">إلغاء التعديل</button></div>
+        <div class="col-md-2 d-flex align-items-end gap-3"><label class="form-check"><input v-model="form.isActive" class="form-check-input" type="checkbox" /> مفعلة</label><label class="form-check"><input v-model="form.isAnimated" class="form-check-input" type="checkbox" /> متحركة</label></div><div class="col-12"><small class="text-muted">اختر «صفة شكلية تظهر للجميع» للرتب المخصصة. الصورة واسم الرتبة تجميليان فقط ولا يمنحان أي صلاحية إدارية.</small></div>
+        <div class="col-12 d-flex gap-2"><button class="btn btn-aurora" :disabled="saving">{{ saving ? 'جارٍ الحفظ…' : 'حفظ العنصر' }}</button><button v-if="editingId" class="btn btn-outline-secondary" type="button" @click="reset">إلغاء التعديل</button></div>
       </form>
     </div>
     <div class="glass p-3 mb-3">
-      <h5 class="mb-3">إهداء أو سحب ميدالية / صفة شكلية</h5>
+      <h5 class="mb-3">إهداء أو سحب {{ isRankPage ? 'صفة شكلية' : 'ميدالية' }}</h5>
       <p class="text-muted small mb-3">يمكن إهداء نفس الميدالية لعدة حسابات. هذا التعيين تجميلي فقط ولا يمنح صلاحيات إدارية.</p>
       <div class="row g-2 align-items-end">
-        <div class="col-md-4"><label class="form-label">الميدالية أو الصفة</label><select v-model="grant.badgeId" class="form-select"><option value="">اختر ميدالية</option><option v-for="badge in badges" :key="badge.id" :value="badge.id">{{ badge.name }}</option></select></div>
+        <div class="col-md-4"><label class="form-label">{{ isRankPage ? 'الصفة الشكلية' : 'الميدالية' }}</label><select v-model="grant.badgeId" class="form-select"><option value="">اختر {{ isRankPage ? 'صفة شكلية' : 'ميدالية' }}</option><option v-for="badge in badges" :key="badge.id" :value="badge.id">{{ badge.name }}{{ badge.category === 'display_rank' ? ' — صفة شكلية' : ' — ميدالية' }}</option></select></div>
         <div class="col-md-4"><label class="form-label">معرّفات المستخدمين (ID عام أو UUID)</label><textarea v-model="grant.userId" class="form-control" rows="2" placeholder="مثال: 123456, 234567 أو كل ID بسطر" /></div>
         <div class="col-md-2"><label class="form-label">المدة بالأيام</label><input v-model.number="grant.durationDays" type="number" min="0" max="3650" step="1" class="form-control" /><small class="text-muted">0 = دائمة</small></div>
         <div class="col-md-2 d-grid gap-2"><button class="btn btn-success" :disabled="!grant.badgeId || !parseUserIds(grant.userId).length || bulkBusy" @click="grantBadge">{{ bulkBusy ? 'جارٍ التنفيذ…' : 'منح للجميع' }}</button><button class="btn btn-outline-danger" :disabled="!grant.badgeId || !parseUserIds(grant.userId).length || bulkBusy" @click="revokeBadge">سحب من الجميع</button></div>
       </div>
     </div>
     <div class="glass p-0 overflow-hidden">
-      <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>الميدالية</th><th>الوصف</th><th>الفئة</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
-      <tbody><tr v-for="b in badges" :key="b.id"><td><div class="d-flex align-items-center gap-2"><img :src="resolveAsset(b.imageUrl)" alt="" style="width:42px;height:42px;object-fit:contain" /><strong>{{ b.name }}</strong></div></td><td>{{ b.description || '—' }}</td><td>{{ b.category }}</td><td>{{ b.isActive ? 'مفعلة' : 'مخفية' }}</td><td class="text-nowrap"><button class="btn btn-sm btn-outline-primary me-2" @click="edit(b)">تعديل</button><button class="btn btn-sm btn-outline-danger" @click="remove(b)">حذف</button></td></tr><tr v-if="!loading && !badges.length"><td colspan="5" class="text-center p-4">لا توجد ميداليات بعد. أضف أول ميدالية أعلاه.</td></tr></tbody></table></div>
+      <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>العنصر</th><th>الوصف</th><th>النوع</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+      <tbody><tr v-for="b in badges" :key="b.id"><td><div class="d-flex align-items-center gap-2"><img :src="resolveAsset(b.imageUrl)" alt="" style="width:42px;height:42px;object-fit:contain" /><strong>{{ b.name }}</strong></div></td><td>{{ b.description || '—' }}</td><td><span class="badge" :class="b.category === 'display_rank' ? 'text-bg-primary' : 'text-bg-secondary'">{{ b.category === 'display_rank' ? 'صفة شكلية' : 'ميدالية' }}</span></td><td>{{ b.isActive ? 'مفعلة' : 'مخفية' }}</td><td class="text-nowrap"><button class="btn btn-sm btn-outline-primary me-2" @click="edit(b)">تعديل</button><button class="btn btn-sm btn-outline-danger" @click="remove(b)">حذف</button></td></tr><tr v-if="!loading && !badges.length"><td colspan="5" class="text-center p-4">لا توجد {{ isRankPage ? 'صفات شكلية' : 'ميداليات' }} بعد. أضف أول عنصر أعلاه.</td></tr></tbody></table></div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { badgesApi, uploadsApi } from '@/api'
 import { resolveAsset } from '@/utils/assets'
 
+const route = useRoute()
+const isRankPage = computed(() => route.name === 'display-ranks')
+const itemLabel = computed(() => isRankPage.value ? 'الصفة الشكلية' : 'الميدالية')
 const badges = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -49,13 +53,18 @@ const uploadingImage = ref(false)
 const bulkBusy = ref(false)
 const error = ref('')
 const editingId = ref('')
-const blank = () => ({ name: '', description: '', imageUrl: '', category: 'general', awardType: 'manual', achievementKey: null, achievementThreshold: 0, isActive: true, isAnimated: false, sortOrder: 0 })
+const blank = () => ({ name: '', description: '', imageUrl: '', category: isRankPage.value ? 'display_rank' : 'general', awardType: 'manual', achievementKey: null, achievementThreshold: 0, isActive: true, isAnimated: false, sortOrder: 0 })
 const form = reactive(blank())
 const grant = reactive({ badgeId: '', userId: '', durationDays: 0 })
 
 async function load() {
   loading.value = true
-  try { const r = await badgesApi.list(); badges.value = r?.data?.data ?? r?.data ?? [] }
+  try {
+    const r = await badgesApi.list()
+    const all = r?.data?.data ?? r?.data ?? []
+    badges.value = (Array.isArray(all) ? all : []).filter((item) => isRankPage.value ? item.category === 'display_rank' : item.category !== 'display_rank')
+    if (editingId.value && !badges.value.some((item) => item.id === editingId.value)) reset()
+  }
   catch (e) { error.value = e?.response?.data?.message || 'تعذر تحميل الميداليات. تحقق من صلاحيات الداشبورد.' }
   finally { loading.value = false }
 }
@@ -82,7 +91,7 @@ function edit(b) { editingId.value = b.id; Object.assign(form, { ...blank(), ...
 async function save() {
   saving.value = true; error.value = ''
   try {
-    const payload = { ...form }
+    const payload = { ...form, category: isRankPage.value ? 'display_rank' : (form.category === 'display_rank' ? 'general' : form.category) }
     if (editingId.value) await badgesApi.update(editingId.value, payload)
     else await badgesApi.create(payload)
     reset(); await load()
@@ -158,4 +167,5 @@ async function remove(b) {
   catch (e) { error.value = e?.response?.data?.message || 'تعذر حذف الميدالية.' }
 }
 onMounted(load)
+watch(() => route.name, () => { reset(); load() })
 </script>
