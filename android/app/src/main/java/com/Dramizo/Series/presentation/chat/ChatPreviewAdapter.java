@@ -1,6 +1,10 @@
 package com.Dramizo.Series.presentation.chat;
 
 import android.graphics.Typeface;
+import android.graphics.Color;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
