@@ -592,71 +592,7 @@ public class ProfileFragment extends Fragment {
         refreshWalletBalances(false);
     }
 
-    private void loadProfileBadges(String userId) {
-        // Badge/medal cabinet is retired platform-wide. Keep it hidden even if an
-        // older caller still invokes this loader after a profile refresh.
-        if (binding != null) {
-            if (binding.rowProfileBadges != null) {
-                binding.rowProfileBadges.setVisibility(View.GONE);
-                binding.rowProfileBadges.setOnClickListener(null);
-            }
-            if (binding.earnedBadgesContainer != null) {
-                binding.earnedBadgesContainer.removeAllViews();
-                binding.earnedBadgesContainer.setVisibility(View.GONE);
-            }
-        }
-        return;
-        AppContainer c = ContainerProvider.from(requireActivity());
-        c.getIoExecutor().execute(() -> {
-            java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned =
-                    new java.util.ArrayList<>();
-            try {
-                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<
-                        java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
-                        c.getUserApi().badges(userId).execute();
-                if (response.isSuccessful() && response.body() != null
-                        && response.body().data != null) {
-                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
-                        if (badge != null && (badge.earned
-                                || (badge.grantedAt != null && !badge.grantedAt.trim().isEmpty())
-                                || (badge.source != null && !badge.source.trim().isEmpty()))) earned.add(badge);
-                    }
-                }
-            } catch (Exception ignored) {
-                // Keep the profile usable when the network is temporarily unavailable.
-            }
-            if (!isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
-                if (binding == null || !isAdded()) return;
-                binding.earnedBadgesContainer.removeAllViews();
-                if (binding.rowProfileBadges != null) {
-                    binding.rowProfileBadges.setVisibility(earned.isEmpty() ? View.GONE : View.VISIBLE);
-                }
-                for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
-                    android.widget.ImageView icon = new android.widget.ImageView(requireContext());
-                    int size = (int) (27 * getResources().getDisplayMetrics().density + 0.5f);
-                    android.widget.LinearLayout.LayoutParams lp =
-                            new android.widget.LinearLayout.LayoutParams(size, size);
-                    lp.setMargins(0, 0, (int) (6 * getResources().getDisplayMetrics().density + 0.5f), 0);
-                    icon.setLayoutParams(lp);
-                    icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-                    icon.setContentDescription(badge.name == null ? "شارة مكتسبة" : badge.name);
-                    Glide.with(ProfileFragment.this)
-                            .load(AssetCatalog.absoluteUrl(badge.imageUrl))
-                            .placeholder(R.drawable.ic_medal_default)
-                            .error(R.drawable.ic_medal_default)
-                            .into(icon);
-                    icon.setOnClickListener(v -> {
-                        Intent badges = new Intent(requireContext(), BadgeActivity.class);
-                        badges.putExtra(BadgeActivity.EXTRA_USER_ID, userId);
-                        startActivity(badges);
-                    });
-                    binding.earnedBadgesContainer.addView(icon);
-                }
-            });
-        });
-    }
-
+    /** Badge/medal cabinet is disabled platform-wide; no request or rendering path remains. */
     private void applyTasksFeatureVisibility() {
         if (binding == null) return;
         // Entire row GONE — no "مهام" label left on profile.
