@@ -498,7 +498,8 @@ public final class GlobalCelebrationToast {
                 || "lucky_return".equalsIgnoreCase(kind));
         boolean explicitHigh = kind != null && ("lucky_hit_high".equalsIgnoreCase(kind)
                 || "lucky_high".equalsIgnoreCase(kind));
-        boolean luckyReturn = luckyWin && (explicitReturn || (!explicitHigh
+        boolean explicitNormal = kind != null && "lucky_hit_normal".equalsIgnoreCase(kind);
+        boolean luckyReturn = luckyWin && (explicitReturn || (!explicitHigh && !explicitNormal
                 && (multiplier <= 0d || (body != null
                 && (body.contains("مردود جزئي") || body.contains("مردود +")
                 || body.contains("مردود الهدية"))))));
