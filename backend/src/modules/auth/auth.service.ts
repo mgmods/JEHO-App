@@ -492,9 +492,9 @@ export class AuthService implements OnModuleInit {
       sub: user.id,
       username: user.username,
       publicId: user.publicId,
-      isAdmin: user.isAdmin || staffRole === 'super',
+      isAdmin: staffRole === 'super',
       staffRole,
-      role: user.isAdmin || staffRole === 'super' ? 'admin' : 'user',
+      role: staffRole === 'super' ? 'admin' : 'user',
       isGuest: user.isGuest,
     };
 
