@@ -2536,7 +2536,11 @@ export class GiftsService implements OnModuleInit {
           from: { userId: senderId },
           at: animationPayload.at,
         });
-        if (result.luckyMultiplier && result.luckyCoinsWon > 0) {
+        if (gift.type === GiftType.LUCKY) {
+          const luckyMultiplier = Number(result.luckyMultiplier || 0);
+          const luckyCoinsWon = Math.max(0, Number(result.luckyCoinsWon || 0));
+          // Broadcast every lucky outcome, including a no-payout loss, so each client
+          // renders the configured normal/return toast consistently.
           this.realtime?.emitToRoom(dto.roomId, 'room:event', {
             roomId: dto.roomId,
             event: 'lucky:hit',
@@ -2548,9 +2552,11 @@ export class GiftsService implements OnModuleInit {
               giftIconUrl: gift.iconUrl,
               coinPrice: gift.coinPrice,
               quantity: qty,
-              luckyMultiplier: result.luckyMultiplier,
-              luckyCoinsWon: result.luckyCoinsWon,
-              formula: `${gift.coinPrice * qty} × ${result.luckyMultiplier}`,
+              luckyMultiplier,
+              luckyCoinsWon,
+              formula: luckyMultiplier > 0
+                ? `${gift.coinPrice * qty} × ${luckyMultiplier}`
+                : 'no_payout',
             },
             from: { userId: senderId },
             at: animationPayload.at,
@@ -2570,8 +2576,8 @@ export class GiftsService implements OnModuleInit {
             giftIconUrl: gift.iconUrl,
             coinPrice: gift.coinPrice,
             quantity: qty,
-            luckyMultiplier: result.luckyMultiplier,
-            luckyCoinsWon: result.luckyCoinsWon,
+            luckyMultiplier,
+            luckyCoinsWon,
           });
         }
         if (taskRoom?.agencyId) {
@@ -3058,7 +3064,9 @@ export class GiftsService implements OnModuleInit {
         from: { userId: senderId },
         at,
       });
-      if (result.luckyMultiplier && result.luckyCoinsWon > 0) {
+      if (gift.type === GiftType.LUCKY) {
+        const luckyMultiplier = Number(result.luckyMultiplier || 0);
+        const luckyCoinsWon = Math.max(0, Number(result.luckyCoinsWon || 0));
         this.realtime?.emitToRoom(dto.roomId, 'room:event', {
           roomId: dto.roomId,
           event: 'lucky:hit',
@@ -3071,9 +3079,11 @@ export class GiftsService implements OnModuleInit {
             coinPrice: gift.coinPrice,
             quantity: qty,
             personCount,
-            luckyMultiplier: result.luckyMultiplier,
-            luckyCoinsWon: result.luckyCoinsWon,
-            formula: `${totalCoins} × ${result.luckyMultiplier}`,
+            luckyMultiplier,
+            luckyCoinsWon,
+            formula: luckyMultiplier > 0
+              ? `${totalCoins} × ${luckyMultiplier}`
+              : 'no_payout',
             allMic: true,
           },
           from: { userId: senderId },
@@ -3088,8 +3098,8 @@ export class GiftsService implements OnModuleInit {
           giftIconUrl: gift.iconUrl,
           coinPrice: gift.coinPrice,
           quantity: qty * Math.max(1, personCount),
-          luckyMultiplier: result.luckyMultiplier,
-          luckyCoinsWon: result.luckyCoinsWon,
+          luckyMultiplier,
+          luckyCoinsWon,
         });
       }
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
@@ -3116,17 +3126,19 @@ export class GiftsService implements OnModuleInit {
       * Math.max(1, Math.floor(Number(opts.quantity) || 1));
     const mul = Number(opts.luckyMultiplier) || 0;
     const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
-    // Every positive lucky-gift return gets a global toast, including small wins.
-    // Keep the payload lightweight: one compact event, no media or animation data.
-    if (won <= 0 || !this.realtime) return;
+    // Every lucky result gets one lightweight global toast, including losses.
+    if (!this.realtime) return;
     const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
     const soft = mul > 0 && mul < 1;
     const times = Math.max(1, Math.round(mul));
     const giftLabel = (opts.giftName || '').trim();
-    const title = soft ? 'مردود جزئي' : 'حظ سعيد!';
-    const body = soft
-      ? `مبروك ${name} حصل على ${won} · مردود جزئي`
-      : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
+    const loss = won <= 0 || mul <= 0;
+    const title = loss ? 'حظ أوفر' : soft ? 'مردود جزئي' : 'حظ سعيد!';
+    const body = loss
+      ? `لم يحالف الحظ ${name} هذه المرة`
+      : soft
+        ? `مبروك ${name} حصل على ${won} · مردود جزئي`
+        : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
     this.realtime.emitToAll('celebration:toast', {
       kind: 'lucky_hit',
       id: `lucky:${opts.senderId}:${Date.now()}`,
