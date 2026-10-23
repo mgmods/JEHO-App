@@ -824,7 +824,7 @@ public class ProfileFragment extends Fragment {
             return;
         }
         view.setVisibility(View.VISIBLE);
-        Glide.with(this).load(AssetCatalog.absoluteUrl(avatarUrl.trim())).into(view);
+        com.Dramizo.Series.util.AvatarImageLoader.load(view, avatarUrl.trim());
     }
 
     private String myCpTypeLabel(String type) {
