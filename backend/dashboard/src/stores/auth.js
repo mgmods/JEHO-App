@@ -19,15 +19,17 @@ export const useAuthStore = defineStore('auth', () => {
   const isSuperAdmin = computed(() => {
     const u = user.value
     if (!u) return false
-    if (u.isSuperAdmin === true) return true
     const role = String(u.staffRole || '')
       .trim()
       .toLowerCase()
-    // Explicit Admin and Manager roles are limited roles. Only a true Super role
-    // may bypass module permissions; a stale isAdmin flag must not widen access.
+    // An explicit limited role wins over stale cached flags from older sessions.
+    if (['admin', 'manager', 'moderator', 'operator', 'dashboard_operator', 'admin_op', 'staff', 'user', 'none'].includes(role)) {
+      return false
+    }
     if (role === 'super' || role === 'super_admin' || role === 'superadmin') {
       return true
     }
+    if (u.isSuperAdmin === true) return true
     // Backward compatibility only for legacy sessions with no role field at all.
     if (u.isAdmin && !role) {
       return true
