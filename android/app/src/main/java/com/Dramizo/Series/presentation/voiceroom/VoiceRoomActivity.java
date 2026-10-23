@@ -2601,6 +2601,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean restoringRoomChat;
     private boolean roomChatRestored;
     private int roomChatMemorySyncedCount;
+    private boolean chatScrollPending;
+    private final Runnable coalescedChatScroll = () -> {
+        chatScrollPending = false;
+        if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
+        int bottom = Math.max(0, binding.chatLog.getHeight() - binding.scrollChat.getHeight());
+        // A direct scroll avoids stacking multiple smooth-scroll animations during chat floods.
+        binding.scrollChat.scrollTo(0, bottom);
+    };
 
     /** Restore chat from this live session after Activity recreate / minimize return. */
     private void restoreRoomChatIfNeeded() {
@@ -2730,21 +2738,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void scrollChatToBottom(boolean animated) {
         if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
-        binding.scrollChat.post(() -> {
-            if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
-            int bottom = Math.max(0, binding.chatLog.getHeight() - binding.scrollChat.getHeight());
-            if (animated) {
-                binding.scrollChat.smoothScrollTo(0, bottom);
-            } else {
-                binding.scrollChat.scrollTo(0, bottom);
-            }
-        });
-        // Second pass after layout settles (keyboard / new bubble height).
-        binding.scrollChat.postDelayed(() -> {
-            if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
-            int bottom = Math.max(0, binding.chatLog.getHeight() - binding.scrollChat.getHeight());
-            binding.scrollChat.scrollTo(0, bottom);
-        }, 120);
+        // Coalesce bursts: gift + chat + room-event messages can arrive together.
+        // One scheduled layout adjustment is enough; never queue two callbacks per line.
+        if (chatScrollPending) return;
+        chatScrollPending = true;
+        handler.postDelayed(coalescedChatScroll, 32L);
     }
 
     private void showChatUserActions(
