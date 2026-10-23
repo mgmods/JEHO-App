@@ -1094,8 +1094,20 @@ public class ProfileActivity extends ThemedActivity {
     }
 
     private void loadEarnedBadges(String profileId) {
-        if (binding == null || binding.rowEarnedBadges == null
-                || profileId == null || profileId.trim().isEmpty()) return;
+        // The public profile must not expose the badge/medal cabinet, including through
+        // legacy asynchronous loaders that may complete after onCreate.
+        if (binding != null) {
+            if (binding.rowBadges != null) {
+                binding.rowBadges.setVisibility(View.GONE);
+                binding.rowBadges.setOnClickListener(null);
+            }
+            if (binding.rowEarnedBadges != null) {
+                binding.rowEarnedBadges.removeAllViews();
+                binding.rowEarnedBadges.setVisibility(View.GONE);
+            }
+            if (binding.tvBadgesEmpty != null) binding.tvBadgesEmpty.setVisibility(View.GONE);
+        }
+        return;
         if (binding.tvBadgesEmpty != null) binding.tvBadgesEmpty.setVisibility(View.VISIBLE);
         if (binding.tvBadgeCount != null) binding.tvBadgeCount.setText("0 مكتسبة");
         container.getIoExecutor().execute(() -> {
