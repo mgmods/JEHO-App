@@ -93,8 +93,13 @@ export class JwtAuthGuard implements CanActivate {
             if (required) throw new UnauthorizedException('Dashboard account is disabled or unavailable');
             return false;
           }
-          const staffRole = String(admin.staffRole || (admin.role === AdminRole.SUPER ? 'super' : 'operator'));
-          const superAdmin = staffRole === 'super' || admin.role === 'super';
+          // Normalize legacy and dashboard role spellings consistently. The
+          // database role remains authoritative for legacy Super accounts.
+          const staffRole = normalizeStaffRole({
+            staffRole: admin.staffRole,
+            isAdmin: admin.role === AdminRole.SUPER,
+          });
+          const superAdmin = staffRole === 'super' || admin.role === AdminRole.SUPER;
           const permissions = superAdmin
             ? fullPermissions()
             : normalizePermissions(admin.dashboardPermissions);

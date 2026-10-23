@@ -15294,11 +15294,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int id = v.getId();
             if (id == R.id.btnSeats15) guestMics = 15;
             else if (id == R.id.btnSeats20) guestMics = 20;
-            viewModel.resizeSeats(roomId, totalSeatCountForGuestMics(guestMics));
-            Toast.makeText(this, "تم ضبط المقاعد: " + guestMics, Toast.LENGTH_SHORT).show();
+            int totalSeats = id == R.id.btnSeats30 ? 30 : totalSeatCountForGuestMics(guestMics);
+            viewModel.resizeSeats(roomId, totalSeats);
+            Toast.makeText(this, "تم ضبط عدد المقاعد: " + totalSeats, Toast.LENGTH_SHORT).show();
             if (onPicked != null) onPicked.run();
         };
-        int[] ids = {R.id.btnSeats10, R.id.btnSeats15, R.id.btnSeats20};
+        int[] ids = {R.id.btnSeats10, R.id.btnSeats15, R.id.btnSeats20, R.id.btnSeats30};
         for (int btnId : ids) {
             View button = sheet.findViewById(btnId);
             if (button != null) {
