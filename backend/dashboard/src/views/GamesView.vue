@@ -364,19 +364,21 @@ const coveredGames = ref([])
 const disabledGames = ref([])
 const gameWinRates = reactive({})
 const gameRtpRates = reactive({})
+// One stable ID per game. Mikoo/provider IDs stay separate from JEHO-owned mini-games;
+ // in particular, do not duplicate crash/hilo IDs and accidentally apply the wrong controls.
 const manageableGames = [
   { id: '7updown', label: '٧ فوق تحت' },
   { id: 'bounty-football', label: 'كرة القدم الجوائز' },
   { id: 'camel-racing', label: 'سباق الأسود' },
   { id: 'cleopatra-slot', label: 'كليوباترا' },
   { id: 'cleopatra-slots', label: 'فتحات كليوباترا' },
-  { id: 'crash', label: 'كراش' },
+  { id: 'crash', label: 'كراش (مزود خارجي)' },
   { id: 'fishing', label: 'صيد السمك' },
   { id: 'football-plinko', label: 'بلينكو كرة القدم' },
   { id: 'fortune-slot', label: 'جواهر الحظ' },
   { id: 'greedy-box', label: 'صندوق الطمع' },
   { id: 'greedy-lion', label: 'الأسد الطماع' },
-  { id: 'hilo', label: 'هاي لو' },
+  { id: 'hilo', label: 'هاي لو (مزود خارجي)' },
   { id: 'line-slots', label: 'فتحات الخط' },
   { id: 'luck-car', label: 'سيارة الحظ' },
   { id: 'lucky77', label: 'لاكي ٧٧' },
@@ -390,9 +392,7 @@ const manageableGames = [
   { id: 'slots', label: 'السلوت المصغّر' },
   { id: 'roulette', label: 'الروليت' },
   { id: 'plinko', label: 'بلينكو' },
-  { id: 'crash', label: 'كراش المصغّر' },
   { id: 'rps', label: 'حجر ورقة مقص' },
-  { id: 'hilo', label: 'هاي لو المصغّر' },
   { id: 'witch', label: 'العرافة' },
   { id: 'blackjack', label: 'بلاك جاك' },
   { id: 'poker', label: 'بوكر النرد' },
@@ -403,7 +403,7 @@ const manageableGames = [
   { id: 'lucky-wheel', label: 'عجلة الحظ' },
 ]
 const directWinRateGameIds = new Set([
-  'slots','roulette','plinko','crash','rps','hilo','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
+  'slots','roulette','plinko','rps','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
 ])
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
 const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
