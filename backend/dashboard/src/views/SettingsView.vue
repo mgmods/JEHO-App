@@ -714,24 +714,30 @@ const isCoreTab = computed(() => CORE_TABS.has(settingsTab.value))
 const canWriteSettings = computed(() => auth.can('settings', 'write'))
 
 const settingTabs = computed(() => {
+  // Tabs inherit the narrowest existing module permission. Global/security tabs
+  // remain Super-Admin-only and are not merely disabled for limited staff.
   const tabs = [
-    { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders' },
-    { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin' },
-    { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected' },
-    { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image' },
-    { id: 'mysterious-man', label: 'إعدادات الرجل الغامض', icon: 'bi-incognito' },
-    { id: 'staff-identity', label: 'هوية الإدارة والرتب', icon: 'bi-person-badge' },
-    { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles' },
-    { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
-    { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card' },
-    { id: 'zego', label: t('settings.tabZego'), icon: 'bi-broadcast-pin' },
-    { id: 'account', label: t('settings.tabAccount'), icon: 'bi-person-lock' },
+    { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders', permission: 'settings' },
+    { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin', permission: 'coins' },
+    { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected', superOnly: true },
+    { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image', permission: 'banners' },
+    { id: 'mysterious-man', label: 'إعدادات الرجل الغامض', icon: 'bi-incognito', superOnly: true },
+    { id: 'staff-identity', label: 'هوية الإدارة والرتب', icon: 'bi-person-badge', superOnly: true },
+    { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles', permission: 'settings' },
+    { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check', permission: 'reports' },
+    { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card', permission: 'wallet' },
+    { id: 'zego', label: t('settings.tabZego'), icon: 'bi-broadcast-pin', permission: 'settings' },
+    { id: 'account', label: t('settings.tabAccount'), icon: 'bi-person-lock', self: true },
+    { id: 'other', label: t('settings.tabOther'), icon: 'bi-three-dots', permission: 'settings' },
   ]
   if (auth.isSuperAdmin) {
-    tabs.push({ id: 'admins', label: t('settings.tabAdmins'), icon: 'bi-people-fill' })
+    tabs.push({ id: 'admins', label: t('settings.tabAdmins'), icon: 'bi-people-fill', superOnly: true })
   }
-  tabs.push({ id: 'other', label: t('settings.tabOther'), icon: 'bi-three-dots' })
-  return tabs
+  return tabs.filter((tab) => {
+    if (tab.superOnly) return auth.isSuperAdmin
+    if (tab.self) return true
+    return tab.permission ? auth.can(tab.permission, 'read') : false
+  })
 })
 
 const staffIdentityLoading = ref(false)
