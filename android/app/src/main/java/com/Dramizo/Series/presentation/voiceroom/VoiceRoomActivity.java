@@ -10705,7 +10705,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         GlobalCelebrationToast.show(
                 this, who, msg, avatarUrl, null,
                 "room-result-" + who + "-" + System.currentTimeMillis(),
-                28);
+                28, 0d, 0L, who, "lucky_hit", null);
         if (roomBannerEnabled()) appendGameCelebrationLine(msg, null);
     }
 
