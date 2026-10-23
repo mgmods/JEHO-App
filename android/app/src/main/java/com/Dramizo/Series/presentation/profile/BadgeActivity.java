@@ -35,7 +35,7 @@ import java.util.List;
 
 import retrofit2.Response;
 
-/** Independent profile achievement badge catalog. Kept separate from VIP medals. */
+/** Dashboard-awarded medals shown on the user's profile. */
 public class BadgeActivity extends ThemedActivity {
     public static final String EXTRA_USER_ID = "user_id";
     private final List<BadgeDto> badges = new ArrayList<>();
@@ -79,7 +79,7 @@ public class BadgeActivity extends ThemedActivity {
         back.setOnClickListener(v -> finish());
 
         TextView title = new TextView(this);
-        title.setText("الشارات والمداليات");
+        title.setText("الميداليات");
         title.setTextColor(Color.WHITE);
         title.setTextSize(21);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -87,7 +87,7 @@ public class BadgeActivity extends ThemedActivity {
         root.addView(header);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("الشارات التي حصل عليها هذا الحساب");
+        subtitle.setText("الميداليات التي حصل عليها هذا الحساب");
         subtitle.setTextColor(0xFFB5C0C0);
         subtitle.setTextSize(13);
         subtitle.setPadding(dp(4), 0, 0, dp(12));
@@ -111,7 +111,7 @@ public class BadgeActivity extends ThemedActivity {
         emptyState.setGravity(Gravity.CENTER);
         emptyState.setOrientation(LinearLayout.VERTICAL);
         TextView emptyText = new TextView(this);
-        emptyText.setText("لم يحصل هذا الحساب على شارات بعد");
+        emptyText.setText("لم يحصل هذا الحساب على ميداليات بعد");
         emptyText.setTextColor(0xFFB5C0C0);
         emptyText.setTextSize(14);
         emptyState.addView(emptyText);
@@ -133,15 +133,31 @@ public class BadgeActivity extends ThemedActivity {
                         c.getUserApi().earnedBadges(userId).execute();
                 if (response.isSuccessful() && response.body() != null
                         && response.body().data != null) {
-                    // This screen is the earned-medals cabinet, not the admin catalogue.
                     for (BadgeDto badge : response.body().data) {
                         if (badge != null && badge.earned) result.add(badge);
                     }
                 } else {
-                    failure = "تعذر تحميل الشارات";
+                    failure = "تعذر تحميل الميداليات";
+                }
+                // Compatibility fallback for older backend deployments: query the regular
+                // catalogue and use its persisted ownership flag if /earned returns empty.
+                if (result.isEmpty()) {
+                    try {
+                        Response<ApiResponse<List<BadgeDto>>> catalogResponse =
+                                c.getUserApi().badges(userId).execute();
+                        if (catalogResponse.isSuccessful() && catalogResponse.body() != null
+                                && catalogResponse.body().data != null) {
+                            for (BadgeDto badge : catalogResponse.body().data) {
+                                if (badge != null && badge.earned) result.add(badge);
+                            }
+                            if (!result.isEmpty()) failure = null;
+                        }
+                    } catch (Exception ignored) {
+                        // Keep the primary endpoint's error if both routes fail.
+                    }
                 }
             } catch (Exception e) {
-                failure = "تعذر الاتصال بالخادم لتحميل الشارات";
+                failure = "تعذر الاتصال بالخادم لتحميل الميداليات";
             }
             final String error = failure;
             runOnUiThread(() -> {
@@ -190,7 +206,7 @@ public class BadgeActivity extends ThemedActivity {
 
         @Override public void onBindViewHolder(@NonNull Holder h, int position) {
             BadgeDto badge = badges.get(position);
-            h.name.setText(badge.name == null ? "شارة" : badge.name);
+            h.name.setText(badge.name == null ? "ميدالية" : badge.name);
             h.state.setText(badge.earned ? "✓ مكتسبة" : "غير مكتسبة");
             h.state.setTextColor(badge.earned ? 0xFF65D9A0 : 0xFF8A9494);
             String url = AssetCatalog.absoluteUrl(badge.imageUrl);
@@ -243,10 +259,10 @@ public class BadgeActivity extends ThemedActivity {
 
     private void showDetails(BadgeDto badge) {
         String description = badge.description == null || badge.description.trim().isEmpty()
-                ? "لا يوجد وصف إضافي لهذه الشارة." : badge.description;
-        String status = badge.earned ? "\n\nالحالة: مكتسبة" : "\n\nالحالة: لم تُكتسب بعد";
+                ? "لا يوجد وصف إضافي لهذه الميدالية." : badge.description;
+        String status = badge.earned ? "\n\nالحالة: مستلمة" : "\n\nالحالة: غير مستلمة";
         new AlertDialog.Builder(this)
-                .setTitle(badge.name == null ? "تفاصيل الشارة" : badge.name)
+                .setTitle(badge.name == null ? "تفاصيل الميدالية" : badge.name)
                 .setMessage(description + status)
                 .setPositiveButton("حسنًا", null)
                 .show();
