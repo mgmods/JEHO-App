@@ -143,7 +143,8 @@ const sections = computed(() => [
     items: [
       { name: 'vip', query: {}, icon: 'bi-diamond', label: 'VIP ومظاهره' },
       { name: 'mysterious-man', icon: 'bi-incognito', label: 'الرجل الغامض', module: 'settings' },
-      { name: 'badges', icon: 'bi-award', label: 'ميداليات' },
+      { name: 'badges', icon: 'bi-award', label: 'الميداليات' },
+      { name: 'display-ranks', icon: 'bi-patch-check', label: 'الصفات الشكلية' },
       { name: 'vanity-ids', icon: 'bi-hash', label: 'الأيدي المميزة والمتحركة' },
       { name: 'offers', icon: 'bi-box-seam', label: t('nav.offers') },
       { name: 'promos', icon: 'bi-stars', label: t('nav.promos') },
