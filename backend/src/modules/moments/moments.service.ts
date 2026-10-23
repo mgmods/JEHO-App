@@ -230,11 +230,24 @@ export class MomentsService {
       [momentId, userId, parentCommentId, body],
     );
     const [author] = await this.dataSource.query(
-      `SELECT username, "displayName", "avatarUrl", "publicId",
-        COALESCE(to_jsonb("users")->>'frameUrl', to_jsonb("users")->>'avatarFrameUrl',
-                 to_jsonb("users")->>'equippedFrameUrl', to_jsonb("users")->>'profileFrameUrl',
-                 to_jsonb("users")->>'frameImageUrl', to_jsonb("users")->>'currentFrameUrl') AS "frameUrl"
-       FROM "jeho_own"."users" WHERE id = $1`,
+      `SELECT u.username, u."displayName", u."avatarUrl", u."publicId",
+        COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+                 to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
+                 to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl",
+        display_rank.name AS "customDisplayRankName",
+        display_rank."imageUrl" AS "customDisplayRankImageUrl",
+        display_rank."isAnimated" AS "customDisplayRankAnimated"
+       FROM "jeho_own"."users" u
+       LEFT JOIN LATERAL (
+         SELECT b.name, b."imageUrl", b."isAnimated"
+         FROM "jeho_own"."user_badges" ub
+         JOIN "jeho_own"."badges" b ON b.id = ub."badgeId"
+         WHERE ub."userId" = u.id AND b.category = 'display_rank' AND b."isActive" = true
+           AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
+         ORDER BY ub."grantedAt" DESC, b."sortOrder" ASC
+         LIMIT 1
+       ) display_rank ON TRUE
+       WHERE u.id = $1`,
       [userId],
     );
     return { ...row, ...author };
