@@ -12928,6 +12928,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,retrofit2.Response<ApiResponse<Object>> res){
                         if(!res.isSuccessful()||res.body()==null||!res.body().success){Toast.makeText(VoiceRoomActivity.this,res.body()!=null&&res.body().message!=null?res.body().message:"تعذّر بدء تحدّي PK",Toast.LENGTH_LONG).show();return;}
                         Toast.makeText(VoiceRoomActivity.this,"بدأ تحدّي PK!",Toast.LENGTH_SHORT).show();
+                        // Socket delivery is realtime-first; refresh from the API as a safe
+                        // fallback so the host still sees the banner after reconnects.
+                        handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 350L);
                     }
                     @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call,Throwable e){Toast.makeText(VoiceRoomActivity.this,"تعذّر الاتصال لبدء التحدّي",Toast.LENGTH_LONG).show();}
                 });
@@ -13389,6 +13392,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             JsonObject payload = new JsonObject();
                             if (contest.id != null) payload.addProperty("contestId", contest.id);
                             if (contest.endAt != null) payload.addProperty("endAt", contest.endAt);
+                            // Preserve the challenge type when restoring from the API, not only
+                            // from the live socket event; in-room PK must never split/move seats.
+                            if (contest.challengeType != null) payload.addProperty("challengeType", contest.challengeType);
+                            if (contest.roomId != null) payload.addProperty("roomId", contest.roomId);
+                            if (contest.startAt != null) payload.addProperty("startAt", contest.startAt);
+                            if (contest.scoringMode != null) payload.addProperty("scoringMode", contest.scoringMode);
                             payload.add("sideA", new com.google.gson.Gson().toJsonTree(contest.sideA).getAsJsonObject());
                             payload.add("sideB", new com.google.gson.Gson().toJsonTree(contest.sideB).getAsJsonObject());
                             roomPkCurrentContestId = contest.id;
