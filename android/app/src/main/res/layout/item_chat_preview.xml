@@ -51,6 +51,16 @@
                 android:layout_height="0dp"
                 android:visibility="gone" />
 
+            <ImageView
+                android:id="@+id/imgCustomRankBadge"
+                android:layout_width="17dp"
+                android:layout_height="17dp"
+                android:layout_gravity="top|end"
+                android:contentDescription="@null"
+                android:elevation="8dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
             <View
                 android:id="@+id/onlineDot"
                 android:layout_width="12dp"
