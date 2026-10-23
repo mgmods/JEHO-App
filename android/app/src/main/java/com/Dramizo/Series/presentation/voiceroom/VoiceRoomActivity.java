@@ -14121,10 +14121,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (rewardLabel == null) rewardLabel = "جائزة";
             showLuckyWinOverlay(opener, rewardLabel);
         } else if ("lucky:hit".equals(event)) {
-            // Lucky gift multiplier rain — show for everyone except the sender (local already did).
+            // The room event is the canonical source for the configured win/return toast.
+            // No local-response toast is emitted elsewhere, so include the sender as well.
             String senderId = memberStr(payload, "senderId");
             if (senderId == null) senderId = fromUserId;
-            if (myUserId != null && sameUser(myUserId, senderId)) return;
             String who = memberStr(payload, "senderName");
             if (who == null || who.isEmpty()) {
                 who = fromUsername != null ? fromUsername : "مستخدم";
