@@ -23,6 +23,10 @@ export async function ensureBadgeTables(dataSource: DataSource): Promise<void> {
         description varchar(500) NOT NULL DEFAULT '',
         "imageUrl" varchar(512) NOT NULL,
         category varchar(32) NOT NULL DEFAULT 'general',
+        "displayColor" varchar(16) NOT NULL DEFAULT '#D8B35B',
+        "frameUrl" varchar(512),
+        "nameplateUrl" varchar(512),
+        "entryEffectUrl" varchar(512),
         "awardType" varchar(32) NOT NULL DEFAULT 'manual',
         "achievementKey" varchar(64),
         "achievementThreshold" integer NOT NULL DEFAULT 0,
@@ -32,6 +36,13 @@ export async function ensureBadgeTables(dataSource: DataSource): Promise<void> {
         "createdAt" timestamptz NOT NULL DEFAULT now(),
         "updatedAt" timestamptz NOT NULL DEFAULT now()
       )
+    `);
+    await manager.query(`
+      ALTER TABLE "jeho_own"."badges"
+      ADD COLUMN IF NOT EXISTS "displayColor" varchar(16) NOT NULL DEFAULT '#D8B35B',
+      ADD COLUMN IF NOT EXISTS "frameUrl" varchar(512),
+      ADD COLUMN IF NOT EXISTS "nameplateUrl" varchar(512),
+      ADD COLUMN IF NOT EXISTS "entryEffectUrl" varchar(512)
     `);
     await manager.query(`
       CREATE INDEX IF NOT EXISTS "IDX_badges_active_sort"
