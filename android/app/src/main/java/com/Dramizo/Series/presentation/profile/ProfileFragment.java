@@ -89,13 +89,12 @@ public class ProfileFragment extends Fragment {
         };
         binding.headerProfile.setOnClickListener(openProfile);
         binding.imgAvatar.setOnClickListener(openProfile);
+        // Keep the badges/medals section hidden in the Me tab as well as public profiles.
         if (binding.rowProfileBadges != null) {
-            binding.rowProfileBadges.setOnClickListener(v -> {
-                Intent badges = new Intent(requireContext(), BadgeActivity.class);
-                if (myId != null) badges.putExtra(BadgeActivity.EXTRA_USER_ID, myId);
-                startActivity(badges);
-            });
+            binding.rowProfileBadges.setVisibility(View.GONE);
+            binding.rowProfileBadges.setOnClickListener(null);
         }
+        if (binding.earnedBadgesContainer != null) binding.earnedBadgesContainer.setVisibility(View.GONE);
 
         // Bind only views that exist in fragment_profile.xml. The former action*/icon* IDs
         // belonged to a removed shortcut grid and caused FragmentProfileBinding compilation errors.
@@ -189,7 +188,7 @@ public class ProfileFragment extends Fragment {
         viewModel.getUser().observe(getViewLifecycleOwner(), user -> {
             if (user == null) return;
             myId = user.id;
-            loadProfileBadges(user.id);
+            // Badge cabinet is disabled platform-wide; avoid its additional network request.
             bindMyCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
             binding.tvDisplayName.setText(user.displayName);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
@@ -582,7 +581,7 @@ public class ProfileFragment extends Fragment {
         }
         // Refresh earned badges on returning to the app so dashboard grants appear without
         // requiring the user to sign out or reinstall.
-        if (myId != null && !myId.trim().isEmpty()) loadProfileBadges(myId);
+        // Badge cabinet is disabled; do not fetch it when returning to the app.
         // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
         if (viewModel != null) viewModel.loadMe(false);
         loadAgencyAction();
