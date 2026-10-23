@@ -342,6 +342,7 @@ public class AppContainer {
         return url.endsWith("/") ? url : url + "/";
     }
 
+    public AuthApi getAuthApi() { return authApi; }
     public SessionManager getSessionManager() { return sessionManager; }
     public EncryptedFeatureCache getFeatureCache() { return featureCache; }
     public AuraDatabase getDatabase() { return database; }
