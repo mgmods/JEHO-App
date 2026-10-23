@@ -167,12 +167,6 @@ const routes = [
         meta: { titleKey: 'routes.cosmetics', title: 'إدارة المتجر', module: 'cosmetics' },
       },
       {
-        path: 'staff-identity',
-        name: 'staff-identity',
-        component: () => import('@/views/StaffIdentityView.vue'),
-        meta: { title: 'هوية الرتب الإدارية', module: 'settings' },
-      },
-      {
         path: 'contests',
         name: 'contests',
         component: () => import('@/views/ContestsView.vue'),
