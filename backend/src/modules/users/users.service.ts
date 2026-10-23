@@ -126,13 +126,19 @@ export class UsersService {
     customDisplayRankName: string | null;
     customDisplayRankImageUrl: string | null;
     customDisplayRankAnimated: boolean;
+    customDisplayRankColor: string;
+    customDisplayRankFrameUrl: string | null;
+    customDisplayRankNameplateUrl: string | null;
+    customDisplayRankEntryEffectUrl: string | null;
   }> {
     // Resolve optional decorative rank as public display metadata; never use it for permissions.
     const userId = String(flat.id || '');
     const [hostBadgeMeta, ranks] = await Promise.all([
       this.wearMetaForUrl(flat.hostBadgeUrl as string | null | undefined),
       userId ? this.dataSource.query(
-        `SELECT b.name AS "name", b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated"
+        `SELECT b.name AS "name", b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated",
+                b."displayColor" AS "displayColor", b."frameUrl" AS "frameUrl",
+                b."nameplateUrl" AS "nameplateUrl", b."entryEffectUrl" AS "entryEffectUrl"
            FROM user_badges ub
            JOIN badges b ON b.id = ub."badgeId"
           WHERE ub."userId" = $1 AND b.category = 'display_rank' AND b."isActive" = true
@@ -148,6 +154,10 @@ export class UsersService {
       customDisplayRankName: rank?.name ? String(rank.name) : null,
       customDisplayRankImageUrl: rank?.imageUrl ? String(rank.imageUrl) : null,
       customDisplayRankAnimated: rank?.isAnimated === true || rank?.isAnimated === 'true',
+      customDisplayRankColor: rank?.displayColor ? String(rank.displayColor) : '#D8B35B',
+      customDisplayRankFrameUrl: rank?.frameUrl ? String(rank.frameUrl) : null,
+      customDisplayRankNameplateUrl: rank?.nameplateUrl ? String(rank.nameplateUrl) : null,
+      customDisplayRankEntryEffectUrl: rank?.entryEffectUrl ? String(rank.entryEffectUrl) : null,
     };
   }
 
