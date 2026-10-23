@@ -104,7 +104,7 @@
         <div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="setAllGamesEnabled(false)">إيقاف الكل</button><button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="setAllGamesEnabled(true)">تشغيل الكل</button><button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ حالة الألعاب</button></div>
       </div>
       <div class="row g-2">
-        <div v-for="game in manageableGames" :key="game.id" class="col-6 col-md-4 col-lg-3">
+        <div v-for="game in safeManageableGames" :key="game.id" class="col-6 col-md-4 col-lg-3">
           <label class="form-check form-switch border rounded p-2 ps-5 d-block h-100"><input class="form-check-input" type="checkbox" :checked="!disabledGames.includes(game.id)" @change="setGameEnabled(game.id, $event.target.checked)" /><span class="small">{{ game.label }}</span><span class="d-block small" :class="disabledGames.includes(game.id) ? 'text-danger' : 'text-success'">{{ disabledGames.includes(game.id) ? 'متوقفة' : 'مفعّلة' }}</span></label>
         </div>
       </div>
@@ -197,7 +197,7 @@
         <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ نسب الفوز</button>
       </div>
       <div class="row g-2">
-        <div v-for="game in manageableGames" :key="'rate-'+game.id" class="col-6 col-md-4 col-lg-3">
+        <div v-for="game in safeManageableGames" :key="'rate-'+game.id" class="col-6 col-md-4 col-lg-3">
           <label class="form-label small mb-1">{{ game.label }} — نسبة الفوز %</label>
           <input :value="gameWinRates[game.id] ?? ''" @input="gameWinRates[game.id] = $event.target.value === '' ? undefined : Math.max(0, Math.min(100, Number($event.target.value)))" type="number" min="0" max="100" step="1" class="form-control form-control-sm" :disabled="!supportsDirectWinRate(game.id)" />
           <div class="small mt-1" :class="supportsDirectWinRate(game.id) ? 'text-success' : 'text-muted'">{{ supportsDirectWinRate(game.id) ? 'تُطبّق من الخادم' : 'نتيجة مشتركة/محرك خارجي؛ يلزم ضبط منفصل' }}</div>
@@ -402,6 +402,8 @@ const manageableGames = [
   { id: 'dice', label: 'النرد' },
   { id: 'lucky-wheel', label: 'عجلة الحظ' },
 ]
+// Guard all render/save paths against malformed entries injected by stale hot reloads or cached state.
+const safeManageableGames = manageableGames.filter((game) => game && typeof game === 'object' && typeof game.id === 'string' && game.id.trim())
 const directWinRateGameIds = new Set([
   'slots','roulette','plinko','rps','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
 ])
@@ -460,13 +462,13 @@ function setGameEnabled(gameId, enabled) {
 }
 
 function setAllGamesEnabled(enabled) {
-  disabledGames.value = enabled ? [] : manageableGames.map((game) => game.id)
+  disabledGames.value = enabled ? [] : safeManageableGames.map((game) => game.id)
 }
 
 async function saveOdds() {
   savingOdds.value = true
   error.value = ''
-  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(manageableGames.filter(g => supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), gameRtpRates: Object.fromEntries(manageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), gameRtpRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
   savingOdds.value = false
   if (err) {
     error.value = err.message
