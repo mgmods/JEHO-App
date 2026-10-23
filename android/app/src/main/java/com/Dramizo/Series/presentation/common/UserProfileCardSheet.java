@@ -223,20 +223,14 @@ public final class UserProfileCardSheet {
                     String resolvedPartnerAvatar = partnerAvatar == null || partnerAvatar.trim().isEmpty()
                             ? null : AssetCatalog.absoluteUrl(partnerAvatar.trim());
                     if (imgCpPartnerAvatar != null) {
-                        Glide.with(activity).load(resolvedPartnerAvatar)
-                                .placeholder(R.drawable.ic_tab_me)
-                                .error(R.drawable.ic_tab_me)
-                                .into(imgCpPartnerAvatar);
+                        com.Dramizo.Series.util.AvatarImageLoader.load(imgCpPartnerAvatar, partnerAvatar);
                     }
                     // Same paired-avatar header used in the room card: large account photo,
                     // smaller real linked partner photo, and the relationship symbol between them.
                     if (cpTopPartnerWrap != null && cpPartner != null) {
                         cpTopPartnerWrap.setVisibility(View.VISIBLE);
                         if (imgCpPartnerTop != null) {
-                            Glide.with(activity).load(resolvedPartnerAvatar)
-                                    .placeholder(R.drawable.ic_tab_me)
-                                    .error(R.drawable.ic_tab_me)
-                                    .into(imgCpPartnerTop);
+                            com.Dramizo.Series.util.AvatarImageLoader.load(imgCpPartnerTop, partnerAvatar);
                         }
                         if (imgCpPartnerTopFrame != null) {
                             if (partnerFrameUrl.isEmpty()) {
