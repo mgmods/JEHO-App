@@ -3133,8 +3133,9 @@ export class GiftsService implements OnModuleInit {
       * Math.max(1, Math.floor(Number(opts.quantity) || 1));
     const mul = Number(opts.luckyMultiplier) || 0;
     const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
-    // Every lucky result gets one lightweight global toast, including losses.
-    if (!this.realtime) return;
+    // Global celebration toasts are reserved for positive payouts. No-payout results
+    // remain room-scoped through lucky:hit, avoiding platform-wide toast spam.
+    if (won <= 0 || !this.realtime) return;
     const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
     const soft = mul > 0 && mul < 1;
     const times = Math.max(1, Math.round(mul));
