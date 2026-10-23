@@ -630,7 +630,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.giftChatEffects != null) {
             giftVisualEffects = new RoomVisualEffects(binding.giftChatEffects);
         }
-        binding.getRoot().postDelayed(this::preloadRoomGiftMedia, 1_200L);
+        // Defer nonessential gift-media warming until room join/audio controls settle.
+        binding.getRoot().postDelayed(this::preloadRoomGiftMedia, 3_000L);
         effectQueue = new RoomEffectQueue(effect -> {
             if (effect.isEntry()) {
                 if (!roomEntryEffectsEnabled()) {
@@ -11757,20 +11758,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Result<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftList> r =
                         c.getGiftsUseCase.execute();
                 if (!r.success || r.data == null || r.data.isEmpty()) return;
-                java.util.ArrayList<String> urls = new java.util.ArrayList<>();
+                java.util.LinkedHashSet<String> uniqueUrls = new java.util.LinkedHashSet<>();
+                // Warm only the first small slice of the catalog. Preloading every gift
+                // animation at room entry competes with mic setup and can spike memory/network.
                 for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : r.data) {
                     if (g == null) continue;
                     String resolved = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
                             g.name, g.iconUrl, g.animationUrl);
                     if (resolved != null && !resolved.isEmpty()) {
-                        urls.add(resolved);
+                        uniqueUrls.add(resolved);
                     } else if (g.animationUrl != null && !g.animationUrl.isEmpty()) {
-                        urls.add(g.animationUrl);
+                        uniqueUrls.add(g.animationUrl);
                     }
-                    if (g.iconUrl != null && !g.iconUrl.isEmpty()) urls.add(g.iconUrl);
-                    if (urls.size() > 100) break;
+                    if (g.iconUrl != null && !g.iconUrl.isEmpty()) uniqueUrls.add(g.iconUrl);
+                    if (uniqueUrls.size() >= 24) break;
                 }
-                com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(this, urls);
+                if (isFinishing() || isDestroyed() || binding == null || uniqueUrls.isEmpty()) return;
+                com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
+                        this, new java.util.ArrayList<>(uniqueUrls));
             } catch (Exception ignored) {
             }
         });
