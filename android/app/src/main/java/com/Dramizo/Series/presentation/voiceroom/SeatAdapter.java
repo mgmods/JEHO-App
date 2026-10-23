@@ -1106,6 +1106,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (title == null || title.trim().isEmpty()) {
             holder.b.rowCustomDisplayRank.setVisibility(View.GONE);
             holder.b.tvCustomRankBadge.setText("");
+            holder.b.tvCustomRankBadge.setBackground(null);
             Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
             return;
         }
