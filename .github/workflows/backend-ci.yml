@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   push:
-    branches: [MG-JEHO, jeho-own]
+    branches: [jeho-own]
     paths:
       - ".github/workflows/backend-ci.yml"
       - "backend/**"
