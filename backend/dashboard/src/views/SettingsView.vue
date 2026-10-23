@@ -1119,14 +1119,22 @@ function selectTab(id) {
 }
 
 function syncTabFromRoute() {
-  const raw = String(route.query.tab || 'general')
-  const allowed = new Set(settingTabs.value.map((x) => x.id))
-  settingsTab.value = allowed.has(raw) ? raw : 'general'
+  const raw = String(route.query.tab || '')
+  const tabs = settingTabs.value
+  const allowed = new Set(tabs.map((x) => x.id))
+  // Never leave a hidden/unpermitted tab active, including after a role refresh.
+  settingsTab.value = allowed.has(raw)
+    ? raw
+    : (allowed.has(settingsTab.value) ? settingsTab.value : (tabs[0]?.id || 'account'))
   if (settingsTab.value === 'account') fillAccountFromAuth()
   if (settingsTab.value === 'admins') loadOperators()
 }
 
 watch(() => route.query.tab, syncTabFromRoute)
+watch(settingTabs, () => {
+  const allowed = new Set(settingTabs.value.map((x) => x.id))
+  if (!allowed.has(settingsTab.value)) syncTabFromRoute()
+}, { deep: true })
 
 async function load() {
   loading.value = true
