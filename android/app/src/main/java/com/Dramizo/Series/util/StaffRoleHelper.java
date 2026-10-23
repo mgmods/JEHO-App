@@ -19,6 +19,9 @@ public final class StaffRoleHelper {
         if (user == null) return NONE;
         String role = normalize(user.staffRole);
         if (!NONE.equals(role)) return role;
+        // An explicit role from the server is authoritative; do not revive a
+        // removed staff role from a stale legacy isAdmin flag.
+        if (user.staffRole != null && !user.staffRole.trim().isEmpty()) return NONE;
         return user.isAdmin ? SUPER : NONE;
     }
 
