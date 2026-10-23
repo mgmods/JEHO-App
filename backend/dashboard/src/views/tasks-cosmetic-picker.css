@@ -26,3 +26,5 @@
 .daily-login-admin .daily-login-card .fw-semibold{color:#f3f4ff}
 .daily-login-admin .daily-login-card .form-control-sm,.daily-login-admin .daily-login-card .form-select-sm{font-size:.82rem}
 @media(max-width:600px){.daily-login-admin .daily-login-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.daily-login-admin .daily-login-card{padding:10px;border-radius:15px}.daily-login-admin .daily-login-preview{height:96px}.daily-login-admin>.d-flex:first-child{align-items:flex-start!important}.daily-login-admin .daily-login-day{font-size:.72rem}}
+
+.daily-login-coin-image { width: 54px; height: 54px; object-fit: contain; display: block; margin: 0 auto 4px; }
