@@ -28,6 +28,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import com.Dramizo.Series.data.remote.api.AdminApi
 import com.Dramizo.Series.data.remote.api.RoomApi
 import com.Dramizo.Series.data.remote.dto.ApiResponse
+import AuthResult
+import RefreshTokenRequest
 import com.Dramizo.Series.presentation.common.ContainerProvider
 import com.Dramizo.Series.presentation.common.ThemedActivity
 import com.Dramizo.Series.util.StaffRoleHelper
@@ -146,11 +148,11 @@ class AdminConsoleActivity : ThemedActivity() {
         roleRefreshInFlight = true
         try {
             ContainerProvider.from(this).authApi.refresh(
-                com.Dramizo.Series.data.remote.dto.AuthDtos.RefreshTokenRequest(refreshToken)
-            ).enqueue(object : Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.AuthDtos.AuthResult>> {
+                RefreshTokenRequest(refreshToken)
+            ).enqueue(object : Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<AuthResult>> {
                 override fun onResponse(
-                    call: Call<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.AuthDtos.AuthResult>>,
-                    response: Response<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.AuthDtos.AuthResult>>
+                    call: Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AuthResult>>,
+                    response: Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AuthResult>>
                 ) {
                     roleRefreshInFlight = false
                     if (isFinishing || isDestroyed) return
@@ -176,7 +178,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     }
                 }
                 override fun onFailure(
-                    call: Call<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.AuthDtos.AuthResult>>,
+                    call: Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AuthResult>>,
                     error: Throwable
                 ) {
                     roleRefreshInFlight = false
