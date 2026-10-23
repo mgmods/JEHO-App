@@ -15,6 +15,10 @@ export interface UpsertBadgeDto {
   description?: string;
   imageUrl: string;
   category?: string;
+  displayColor?: string;
+  frameUrl?: string | null;
+  nameplateUrl?: string | null;
+  entryEffectUrl?: string | null;
   awardType?: string;
   achievementKey?: string | null;
   achievementThreshold?: number;
@@ -180,6 +184,10 @@ export class BadgesService {
       ...dto,
       description: dto.description ?? '',
       category: dto.category ?? 'general',
+      displayColor: dto.displayColor ?? '#D8B35B',
+      frameUrl: dto.frameUrl ?? null,
+      nameplateUrl: dto.nameplateUrl ?? null,
+      entryEffectUrl: dto.entryEffectUrl ?? null,
       awardType: dto.awardType ?? 'manual',
       achievementKey: dto.achievementKey ?? null,
       achievementThreshold: dto.achievementThreshold ?? 0,
