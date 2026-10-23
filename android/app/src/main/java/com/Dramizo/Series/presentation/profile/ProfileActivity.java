@@ -120,13 +120,13 @@ public class ProfileActivity extends ThemedActivity {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
-        // Keep achievement badges separate from the existing VIP medal screen.
+        // Show the recipient's awarded medals in the profile medal cabinet.
         if (binding.rowBadges != null) {
             binding.rowBadges.setVisibility(View.VISIBLE);
             binding.rowBadges.setOnClickListener(v -> {
                 String profileId = targetUserIdHold[0];
                 if (profileId == null || profileId.trim().isEmpty()) {
-                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الشارات", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الميداليات", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 Intent intent = new Intent(this, BadgeActivity.class);
