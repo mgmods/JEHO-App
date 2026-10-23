@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Outline;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.provider.OpenableColumns;
 import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.widget.ImageView;
@@ -149,10 +150,33 @@ public final class AvatarImageLoader {
 
         String sourceMime = resolver.getType(uri);
         if (sourceMime != null) sourceMime = sourceMime.toLowerCase(Locale.US);
-
-        boolean animated = sourceMime != null
-                && (sourceMime.contains("gif") || sourceMime.contains("webp"));
-        if (animated) {
+        String displayName = "";
+        try (android.database.Cursor cursor = resolver.query(
+                uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (column >= 0) displayName = cursor.getString(column);
+            }
+        } catch (Exception ignored) {}
+        String lowerName = displayName == null ? "" : displayName.toLowerCase(Locale.US);
+        boolean gif = (sourceMime != null && sourceMime.contains("gif")) || lowerName.endsWith(".gif");
+        boolean webp = (sourceMime != null && sourceMime.contains("webp")) || lowerName.endsWith(".webp");
+        // Some gallery/providers return a generic MIME type. Inspect the file signature
+        // before deciding to recompress it, otherwise a GIF can silently become a JPEG.
+        if (!gif && !webp) {
+            try (InputStream in = resolver.openInputStream(uri)) {
+                if (in != null) {
+                    byte[] header = new byte[12];
+                    int n = in.read(header);
+                    gif = n >= 3 && header[0] == 'G' && header[1] == 'I' && header[2] == 'F';
+                    webp = n >= 12 && header[0] == 'R' && header[1] == 'I'
+                            && header[2] == 'F' && header[3] == 'F'
+                            && header[8] == 'W' && header[9] == 'E'
+                            && header[10] == 'B' && header[11] == 'P';
+                }
+            } catch (Exception ignored) {}
+        }
+        if (gif || webp) {
             byte[] bytes;
             try (InputStream in = resolver.openInputStream(uri)) {
                 if (in == null) throw new IllegalStateException("تعذر قراءة الصورة");
@@ -161,7 +185,7 @@ public final class AvatarImageLoader {
             if (bytes.length > MAX_UPLOAD_BYTES) {
                 throw new IllegalArgumentException("الصورة المتحركة كبيرة جداً (الحد 6MB)");
             }
-            String mime = sourceMime.contains("gif") ? "image/gif" : "image/webp";
+            String mime = gif ? "image/gif" : "image/webp";
             String ext = extensionForMime(mime);
             String name = (baseName != null && !baseName.isEmpty() ? baseName : "avatar") + ext;
             return MultipartBody.Part.createFormData(
