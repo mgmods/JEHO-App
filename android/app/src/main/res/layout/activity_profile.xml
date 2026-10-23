@@ -248,15 +248,6 @@
                         tools:text="أحمد" />
 
                     <ImageView
-                        android:id="@+id/imgCustomDisplayRank"
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="5dp"
-                        android:contentDescription="@null"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-
-                    <ImageView
                         android:id="@+id/imgGender"
                         android:layout_width="16dp"
                         android:layout_height="16dp"
@@ -279,6 +270,36 @@
                         android:visibility="gone"
                         tools:text="متصل الآن"
                         tools:visibility="visible" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/rowCustomDisplayRank"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginTop="2dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/imgCustomDisplayRank"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginEnd="4dp"
+                        android:contentDescription="@null"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tvCustomDisplayRankLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#FFD8B35B"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <TextView
