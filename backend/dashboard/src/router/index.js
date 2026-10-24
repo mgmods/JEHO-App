@@ -197,6 +197,12 @@ const routes = [
         meta: { titleKey: 'routes.luckyBoxes' },
       },
       {
+        path: 'daily-login-rewards',
+        name: 'daily-login-rewards',
+        component: () => import('@/views/DailyLoginRewardsView.vue'),
+        meta: { title: 'مكافآت تسجيل الدخول اليومية', module: 'tasks' },
+      },
+      {
         path: 'tasks',
         name: 'tasks',
         component: () => import('@/views/TasksView.vue'),

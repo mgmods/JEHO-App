@@ -26,6 +26,7 @@ export const ROUTE_MODULE = {
   promos: 'promos',
   'lucky-boxes': 'luckyBoxes',
   tasks: 'tasks',
+  'daily-login-rewards': 'tasks',
   'host-target': 'hostTarget',
   contests: 'contests',
   ranking: 'ranking',
