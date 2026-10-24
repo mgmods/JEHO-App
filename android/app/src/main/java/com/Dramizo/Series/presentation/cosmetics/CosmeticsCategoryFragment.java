@@ -92,7 +92,7 @@ public class CosmeticsCategoryFragment extends Fragment {
                 return vm.leaseDays(item);
             }
         });
-        binding.recycler.setLayoutManager(new GridLayoutManager(requireContext(), 3));
+        binding.recycler.setLayoutManager(new GridLayoutManager(requireContext(), 2));
         binding.recycler.setHasFixedSize(true);
         binding.recycler.setItemViewCacheSize(8);
         binding.recycler.setAdapter(adapter);
