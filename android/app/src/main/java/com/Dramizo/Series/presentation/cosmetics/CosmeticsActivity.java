@@ -273,8 +273,8 @@ public class CosmeticsActivity extends ThemedActivity {
             String url = AssetCatalog.absoluteUrl(playable);
             Glide.with(this).load(url == null ? playable : url)
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .placeholder(R.drawable.ic_launcher_foreground)
-                    .error(R.drawable.ic_launcher_foreground)
+                    .placeholder(R.drawable.jeho_logo)
+                    .error(R.drawable.jeho_logo)
                     .fitCenter().into(heroMedia);
         }
     }
