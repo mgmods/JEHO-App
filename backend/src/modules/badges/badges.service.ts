@@ -191,7 +191,7 @@ export class BadgesService {
 
   async update(id: string, dto: Partial<UpsertBadgeDto>) {
     const badge = await this.badges.findOne({ where: { id } });
-    if (!badge) throw new NotFoundException('Badge not found');
+    if (!badge) throw new NotFoundException('Medal not found');
     const merged = { ...badge, ...dto };
     this.validate(merged);
     Object.assign(badge, dto);
@@ -200,14 +200,14 @@ export class BadgesService {
 
   async remove(id: string) {
     const badge = await this.badges.findOne({ where: { id } });
-    if (!badge) throw new NotFoundException('Badge not found');
+    if (!badge) throw new NotFoundException('Medal not found');
     await this.badges.remove(badge);
     return { success: true };
   }
 
   async grant(badgeId: string, userIdentifier: string, adminId: string | null, durationDaysRaw?: number) {
     const badge = await this.badges.findOne({ where: { id: badgeId } });
-    if (!badge) throw new NotFoundException('Badge not found');
+    if (!badge) throw new NotFoundException('Medal not found');
     const identifier = (userIdentifier || '').trim();
     if (!identifier) throw new BadRequestException('User ID is required');
     const user = await this.users.findOne({
@@ -219,7 +219,7 @@ export class BadgesService {
       ? 0
       : Math.min(3650, Math.max(1, Math.floor(Number(durationDaysRaw))));
     if (durationDaysRaw != null && (!Number.isFinite(Number(durationDaysRaw)) || Number(durationDaysRaw) < 0)) {
-      throw new BadRequestException('Badge duration must be 0 (permanent) or a positive number of days');
+      throw new BadRequestException('Medal duration must be 0 (permanent) or a positive number of days');
     }
     const expiresAt = durationDays > 0 ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000) : null;
     const existing = await this.userBadges.findOne({ where: { badgeId, userId: user.id } });
@@ -341,15 +341,15 @@ export class BadgesService {
     const user = await this.users.findOne({ where: [{ id: identifier }, { publicId: identifier }] });
     if (!user) throw new NotFoundException('User not found by UUID or public ID');
     const grant = await this.userBadges.findOne({ where: { badgeId, userId: user.id } });
-    if (!grant) throw new NotFoundException('Badge ownership not found');
+    if (!grant) throw new NotFoundException('Medal ownership not found');
     await this.userBadges.remove(grant);
     return { success: true };
   }
 
   private validate(dto: UpsertBadgeDto) {
-    if (!dto.name?.trim()) throw new BadRequestException('Badge name is required');
-    if (!dto.imageUrl?.trim()) throw new BadRequestException('Badge image URL is required');
-    if (dto.name.length > 80 || dto.imageUrl.length > 512) throw new BadRequestException('Badge field is too long');
+    if (!dto.name?.trim()) throw new BadRequestException('Medal name is required');
+    if (!dto.imageUrl?.trim()) throw new BadRequestException('Medal image URL is required');
+    if (dto.name.length > 80 || dto.imageUrl.length > 512) throw new BadRequestException('Medal field is too long');
     if (dto.awardType === 'achievement') {
       if (!dto.achievementKey || !['level', 'experience', 'followers', 'recharge', 'support', 'received'].includes(dto.achievementKey)) {
         throw new BadRequestException('Achievement key must be level, experience, followers, recharge, support, or received');
