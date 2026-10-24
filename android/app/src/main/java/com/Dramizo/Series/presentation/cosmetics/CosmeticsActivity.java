@@ -1,320 +1,351 @@
 package com.Dramizo.Series.presentation.cosmetics;
 
-import android.annotation.SuppressLint;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.view.View;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.webkit.WebResourceResponse;
-
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.local.prefs.SessionManager;
+import com.Dramizo.Series.data.remote.dto.CosmeticDtos;
+import com.Dramizo.Series.data.remote.dto.WalletDtos;
+import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
-import com.Dramizo.Series.util.ApiOrigin;
+import com.Dramizo.Series.presentation.common.ViewModelFactory;
+import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.BalanceRedirect;
+import com.Dramizo.Series.util.CosmeticMedia;
+import com.Dramizo.Series.util.HostSignalView;
+import com.Dramizo.Series.util.VanityIdStyle;
+import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * JEHO store hosted HTML surface. The page owns its RTL layout and catalog UI;
- * the bridge exposes only the current session and native recharge/toast actions.
+ * Native Android appearance store. The catalogue, ownership, purchase and equipment
+ * continue to use the existing repository/API; no WebView or hosted HTML is required.
  */
 public class CosmeticsActivity extends ThemedActivity {
     public static final String EXTRA_ROOM_ID = "room_id";
     static final String[] TYPES = {
-            "vip_badge", "entry_effect",
-            "level_badge", "room_card", "room_background", "profile_card", "chat_bubble", "nameplate"
+            "vip_badge", "entry_effect", "room_card", "room_background",
+            "profile_card", "chat_bubble", "nameplate"
+    };
+    private static final String[] TITLES = {
+            "الإطارات", "تأثيرات الدخول", "بطاقات الغرف", "خلفيات الغرف",
+            "إطارات الملف", "فقاعات الدردشة", "بطاقات الأسماء"
     };
 
-    @Nullable private WebView mallWebView;
-    @Nullable private SessionManager session;
-    @Nullable private String roomId;
-    @Nullable private String mallOrigin;
-    @Nullable private String localFallbackUrl;
-    private boolean triedLocalFallback;
-    private boolean mallMainFrameLoaded;
-    @Nullable private String mallRemoteUrl;
-    private final Handler mallFallbackHandler = new Handler(Looper.getMainLooper());
-    @Nullable private Runnable mallFallbackRunnable;
+    private CosmeticsViewModel vm;
+    private SessionManager session;
+    private TabLayout tabs;
+    private androidx.viewpager2.widget.ViewPager2 pager;
+    private TextView title, bagButton, rechargeButton, balanceView, heroName, heroHint, heroDays, storeTagline;
+    private HostSignalView heroFrame;
+    private HostSignalView storeUserFrame;
+    private TextView storeUserName, storeUserPublicId;
+    private ImageView heroMedia;
+    private FrameLayout heroMediaHolder;
+    private VideoView heroVideo;
+    private String roomId;
+    private boolean bagMode;
+    private String initialType = "vip_badge";
+    private TabLayoutMediator mediator;
+    private final List<CosmeticsCategoryFragment> pages = new ArrayList<>();
 
-    @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_cosmetics);
         session = ContainerProvider.from(this).getSessionManager();
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
         if (roomId == null || roomId.isEmpty()) roomId = getIntent().getStringExtra("roomId");
+        bagMode = getIntent().getBooleanExtra("bag_mode", false);
 
-        mallOrigin = ApiOrigin.origin();
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(12, 14, 28));
-        WebView webView = new WebView(this);
-        mallWebView = webView;
-        webView.setBackgroundColor(Color.rgb(12, 14, 28));
-        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        webView.setVerticalScrollBarEnabled(false);
-        webView.setHorizontalScrollBarEnabled(false);
-        webView.setFocusable(true);
-        webView.setFocusableInTouchMode(true);
+        String type = getIntent().getStringExtra(CosmeticsViewModel.EXTRA_TYPE);
+        if (type == null || type.isEmpty()) type = getIntent().getStringExtra("type");
+        String section = getIntent().getStringExtra("store_section");
+        // These legacy store entry points already have native flows backed by their
+        // dedicated APIs. Preserve them instead of silently mapping them to cosmetics.
+        if ("id".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.profile.VanityIdsActivity.class));
+            finish();
+            return;
+        }
+        if ("level".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.profile.UserLevelActivity.class));
+            finish();
+            return;
+        }
+        if ("badges".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.profile.BadgeActivity.class));
+            finish();
+            return;
+        }
+        if ("vip".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.vip.VipActivity.class));
+            finish();
+            return;
+        }
+        initialType = normalizeType(type);
 
-        android.webkit.WebSettings settings = webView.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setSupportZoom(false);
-        settings.setBuiltInZoomControls(false);
-        settings.setDisplayZoomControls(false);
-        settings.setLoadsImagesAutomatically(true);
-        settings.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        webView.addJavascriptInterface(new MallBridge(), "MallBridge");
-        webView.setWebChromeClient(new WebChromeClient());
-        webView.setWebViewClient(new WebViewClient() {
-            private static final String ASSET_HOST = "appassets.androidplatform.net";
-            private static final String ASSET_PREFIX = "/assets/mall/";
+        title = findViewById(R.id.tvTitle);
+        bagButton = findViewById(R.id.btnBag);
+        rechargeButton = findViewById(R.id.btnRecharge);
+        balanceView = findViewById(R.id.tvStoreBalance);
+        storeTagline = findViewById(R.id.tvStoreTagline);
+        tabs = findViewById(R.id.tabs);
+        pager = findViewById(R.id.pager);
+        heroName = findViewById(R.id.tvHeroName);
+        heroHint = findViewById(R.id.tvHeroHint);
+        heroDays = findViewById(R.id.tvHeroDays);
+        heroFrame = findViewById(R.id.nativeHeroFrame);
+        heroMedia = findViewById(R.id.heroMedia);
+        heroMediaHolder = (FrameLayout) heroMedia.getParent();
+        storeUserFrame = findViewById(R.id.storeUserFrame);
+        storeUserName = findViewById(R.id.tvStoreUserName);
+        storeUserPublicId = findViewById(R.id.tvStoreUserPublicId);
+        bindStoreUserHeader();
 
-            @Override
-            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                Uri uri = request.getUrl();
-                if (ASSET_HOST.equalsIgnoreCase(String.valueOf(uri.getHost()))
-                        && uri.getPath() != null && uri.getPath().startsWith(ASSET_PREFIX)) {
-                    String relative = Uri.decode(uri.getPath().substring(ASSET_PREFIX.length()));
-                    if (relative.isEmpty() || relative.endsWith("/")) relative += "index.html";
-                    try {
-                        InputStream stream = getAssets().open("mall/" + relative);
-                        Map<String, String> headers = new HashMap<>();
-                        headers.put("Cache-Control", "no-store");
-                        String mime = mimeType(relative);
-                        String encoding = (mime.startsWith("text/")
-                                || mime.contains("javascript") || mime.contains("json"))
-                                ? "UTF-8" : null;
-                        return new WebResourceResponse(mime, encoding, 200,
-                                "OK", headers, stream);
-                    } catch (Exception ignored) {
-                        // Let WebView report missing generated assets rather than crash the Activity.
-                    }
-                }
-                return super.shouldInterceptRequest(view, request);
+        findViewById(R.id.btnBack).setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
+        bagButton.setOnClickListener(v -> {
+            if (!bagMode) {
+                android.content.Intent intent = getIntent();
+                intent.putExtra("bag_mode", true);
+                recreate();
+            } else {
+                getIntent().putExtra("bag_mode", false);
+                recreate();
             }
+        });
+        bagButton.setText(bagMode ? "‹ المتجر" : "👜  حقيبتي");
+        bagButton.setBackgroundResource(bagMode
+                ? R.drawable.bg_mall_action_outline
+                : R.drawable.bg_mall_action_primary);
+        bagButton.setTextColor(bagMode ? 0xFF5B35B5 : 0xFFFFFFFF);
+        bagButton.setElevation(bagMode ? 0f : dp(4));
+        rechargeButton.setOnClickListener(v -> BalanceRedirect.openRecharge(this));
+        balanceView.setOnClickListener(v -> BalanceRedirect.openRecharge(this));
+        findViewById(R.id.tvStoreBalanceLabel).setOnClickListener(v -> BalanceRedirect.openRecharge(this));
+        title.setText(bagMode ? "حقيبتي" : "متجر JEHO");
+        // Inventory mode prioritizes the owned-item grid instead of reserving space
+        // for the promotional preview. The store keeps the hero when browsing.
+        findViewById(R.id.nativeHeroWrap).setVisibility(bagMode ? View.GONE : View.VISIBLE);
+        if (storeTagline != null) {
+            storeTagline.setText(bagMode ? "عناصرك المملوكة وتجهيزها" : "اكتشف إطلالتك الجديدة  ✦");
+        }
 
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                Uri uri = request.getUrl();
-                String scheme = uri.getScheme();
-                String host = uri.getHost();
-                boolean sameApiHost = host != null && mallOrigin != null
-                        && host.equalsIgnoreCase(Uri.parse(mallOrigin).getHost());
-                boolean localMallHost = host != null && host.equalsIgnoreCase(ASSET_HOST);
-                return !("https".equalsIgnoreCase(scheme) && (sameApiHost || localMallHost));
+        vm = new ViewModelProvider(this,
+                new ViewModelFactory(ContainerProvider.from(this))).get(CosmeticsViewModel.class);
+        vm.setBagMode(bagMode);
+        vm.setCurrentRoomId(roomId);
+        pager.setOffscreenPageLimit(1);
+        pager.setAdapter(new FragmentStateAdapter(this) {
+            @Override public int getItemCount() { return TYPES.length; }
+            @Override public Fragment createFragment(int position) {
+                CosmeticsCategoryFragment f = CosmeticsCategoryFragment.newInstance(
+                        TYPES[position], bagMode ? "العناصر التي تملكها في هذا القسم" : "");
+                pages.add(f);
+                return f;
             }
+        });
+        mediator = new TabLayoutMediator(tabs, pager,
+                (tab, position) -> tab.setText(TITLES[position]));
+        mediator.attach();
+        int start = indexForType(initialType);
+        pager.setCurrentItem(start, false);
+        vm.setFilterType(initialType);
 
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                if (url != null && (url.equals(mallRemoteUrl) || url.equals(localFallbackUrl))) {
-                    mallMainFrameLoaded = true;
-                    if (mallFallbackRunnable != null) {
-                        mallFallbackHandler.removeCallbacks(mallFallbackRunnable);
-                    }
-                }
+        vm.getSelectedItem().observe(this, this::showPreview);
+        vm.getMessage().observe(this, msg -> {
+            if (msg != null && !msg.isEmpty()) {
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                rechargeButton.postInvalidate();
             }
-
-            @Override
-            public void onReceivedError(WebView view, WebResourceRequest request,
-                                        android.webkit.WebResourceError error) {
-                super.onReceivedError(view, request, error);
-                if (request.isForMainFrame()) {
-                    String failedUrl = request.getUrl() == null ? "" : request.getUrl().toString();
-                    // Prefer the HTML served by the active backend image so mall/dashboard
-                    // page updates reach the app without waiting for a new APK. If the
-                    // hosted page is unavailable, fall back to the bundled copy.
-                    if (!triedLocalFallback && localFallbackUrl != null
-                            && mallOrigin != null
-                            && failedUrl.startsWith(mallOrigin + "/mall/")) {
-                        triedLocalFallback = true;
-                        view.loadUrl(localFallbackUrl);
-                        return;
-                    }
-                    Toast.makeText(CosmeticsActivity.this,
-                            "تعذّر تحميل المتجر، تحقق من الاتصال وحاول مجدداً",
-                            Toast.LENGTH_LONG).show();
+        });
+        vm.getError().observe(this, msg -> {
+            if (msg != null && !msg.trim().isEmpty()) {
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                String normalized = msg.toLowerCase(java.util.Locale.ROOT);
+                if (msg.contains("رصيد") || normalized.contains("balance")
+                        || normalized.contains("insufficient coins")
+                        || normalized.contains("not enough coins")) {
+                    BalanceRedirect.handleForced(this, msg);
                 }
             }
         });
-        root.addView(webView, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT));
-        setContentView(root);
+        tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override public void onTabSelected(TabLayout.Tab tab) {
+                if (tab.getPosition() >= 0 && tab.getPosition() < TYPES.length) {
+                    vm.setFilterType(TYPES[tab.getPosition()]);
+                    vm.clearSelection();
+                }
+            }
+            @Override public void onTabUnselected(TabLayout.Tab tab) { }
+            @Override public void onTabReselected(TabLayout.Tab tab) { }
+        });
+        pager.registerOnPageChangeCallback(new androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+            @Override public void onPageSelected(int position) {
+                if (position >= 0 && position < TYPES.length) vm.setFilterType(TYPES[position]);
+            }
+        });
+    }
 
-        String type = normalizeType(getIntent().getStringExtra("type"));
-        String initial = getIntent().getStringExtra(
-                com.Dramizo.Series.presentation.cosmetics.CosmeticsViewModel.EXTRA_TYPE);
-        if (initial != null && !initial.isEmpty()) type = normalizeType(initial);
-        boolean bag = getIntent().getBooleanExtra("bag_mode", false);
-        String section = getIntent().getStringExtra("store_section");
-        if ("level".equals(section) || "badges".equals(section)
-                || "id".equals(section) || "vip".equals(section)) {
-            String fallback = "https://appassets.androidplatform.net/assets/mall/" + section + ".html";
-            loadRemoteWithFastLocalFallback(webView, mallOrigin + "/mall/" + section + ".html", fallback);
+    private void bindStoreUserHeader() {
+        if (session == null || storeUserName == null || storeUserPublicId == null) return;
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto me = session.getUser();
+        if (me == null) return;
+        String name = me.displayName != null && !me.displayName.trim().isEmpty()
+                ? me.displayName : me.username;
+        storeUserName.setText(name == null || name.trim().isEmpty() ? "مستخدم JEHO" : name);
+        String publicId = me.displayPublicId();
+        storeUserPublicId.setText(publicId == null || publicId.isEmpty() ? "—" : publicId);
+        VanityIdStyle.bind(storeUserPublicId, ContainerProvider.from(this).getVanityApi(),
+                publicId, me.vipLevel);
+        if (storeUserFrame != null) {
+            storeUserFrame.bind(me.hostBadgeUrl, me.avatarUrl, me.hostBadgeMeta, 1);
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void refreshWalletBalance() {
+        if (balanceView == null) return;
+        balanceView.setText("…");
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<WalletDtos.WalletDto> result =
+                    ContainerProvider.from(this).getWalletRepository().getWallet();
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed() || balanceView == null) return;
+                if (result != null && result.success && result.data != null) {
+                    balanceView.setText(String.format(java.util.Locale.US, "%,d", result.data.coins));
+                } else {
+                    balanceView.setText("عرض الرصيد");
+                }
+            });
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshWalletBalance();
+    }
+
+    private void showPreview(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (item == null) {
+            heroName.setText("اختر قطعة لمعاينتها");
+            heroHint.setText("معاينة قبل الشراء أو الارتداء");
+            heroDays.setVisibility(View.GONE);
+            stopVideo();
+            heroMedia.setVisibility(View.GONE);
+            heroFrame.clearSignal();
             return;
         }
-        Uri.Builder page = Uri.parse(mallOrigin + "/mall/index.html")
-                .buildUpon()
-                .appendQueryParameter("type", type)
-                .appendQueryParameter("bag", bag ? "1" : "0");
-        if (roomId != null && !roomId.isEmpty()) {
-            page.appendQueryParameter("roomId", roomId);
+        heroName.setText(item.name == null ? "عنصر JEHO" : item.name);
+        heroHint.setText(item.coinPrice > 0 ? item.coinPrice + " عملة • صلاحية " +
+                vm.leaseDays(item) + " يوم" : "عنصر مميز في متجر JEHO • صلاحية " + vm.leaseDays(item) + " يوم");
+        Integer days = vm.daysLeft(item.id);
+        if (days != null && days > 0) {
+            heroDays.setText("متبقي " + days + " يوم");
+            heroDays.setVisibility(View.VISIBLE);
+        } else {
+            heroDays.setVisibility(View.GONE);
         }
-        Uri.Builder localPage = Uri.parse("https://appassets.androidplatform.net/assets/mall/index.html")
-                .buildUpon()
-                .appendQueryParameter("type", type)
-                .appendQueryParameter("bag", bag ? "1" : "0");
-        if (roomId != null && !roomId.isEmpty()) {
-            localPage.appendQueryParameter("roomId", roomId);
+
+        String media = item.animationUrl;
+        if (media == null || media.trim().isEmpty()) media = item.previewUrl;
+        String playable = CosmeticMedia.playableUrl(media);
+        CosmeticMedia.Kind kind = CosmeticMedia.kind(playable);
+        stopVideo();
+        if ("vip_badge".equals(item.type) || "host_badge".equals(item.type)) {
+            heroMedia.setVisibility(View.GONE);
+            heroFrame.setVisibility(View.VISIBLE);
+            String avatar = session == null ? null : session.getAvatarUrl();
+            // Only the selected hero runs the full frame renderer, so GIF/SVGA/video
+            // can animate here without creating heavy renderers in every grid cell.
+            heroFrame.bind(playable, avatar, item.meta, 1);
+        } else if (kind == CosmeticMedia.Kind.VIDEO && playable != null) {
+            heroFrame.clearSignal();
+            heroFrame.setVisibility(View.GONE);
+            heroMedia.setVisibility(View.GONE);
+            heroVideo = new VideoView(this);
+            heroVideo.setBackgroundColor(Color.TRANSPARENT);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+            heroMediaHolder.addView(heroVideo, lp);
+            String url = AssetCatalog.absoluteUrl(playable);
+            heroVideo.setVideoURI(Uri.parse(url == null ? playable : url));
+            heroVideo.setOnPreparedListener(mp -> {
+                mp.setLooping(true);
+                mp.setVolume(0f, 0f);
+                mp.start();
+            });
+            heroVideo.setOnErrorListener((mp, what, extra) -> {
+                Toast.makeText(this, "تعذرت معاينة الفيديو لهذا العنصر", Toast.LENGTH_SHORT).show();
+                return true;
+            });
+        } else {
+            heroFrame.clearSignal();
+            heroFrame.setVisibility(View.GONE);
+            heroMedia.setVisibility(View.VISIBLE);
+            String url = AssetCatalog.absoluteUrl(playable);
+            Glide.with(this).load(url == null ? playable : url)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .placeholder(R.drawable.jeho_logo)
+                    .error(R.drawable.jeho_logo)
+                    .fitCenter().into(heroMedia);
         }
-        loadRemoteWithFastLocalFallback(webView, page.build().toString(), localPage.build().toString());
     }
 
-    /**
-     * Prefer the hosted page when it responds quickly, but don't leave the store blank while
-     * Blitz is waking from idle. Fall back to the bundled shell after a short first-load budget.
-     */
-    private void loadRemoteWithFastLocalFallback(WebView view, String remoteUrl, String fallbackUrl) {
-        mallRemoteUrl = remoteUrl;
-        localFallbackUrl = fallbackUrl;
-        triedLocalFallback = false;
-        mallMainFrameLoaded = false;
-        if (mallFallbackRunnable != null) mallFallbackHandler.removeCallbacks(mallFallbackRunnable);
-        mallFallbackRunnable = () -> {
-            if (mallWebView != view || mallMainFrameLoaded || triedLocalFallback || isFinishing() || isDestroyed()) {
-                return;
-            }
-            triedLocalFallback = true;
-            try { view.stopLoading(); } catch (Exception ignored) {}
-            view.loadUrl(fallbackUrl);
-        };
-        view.loadUrl(remoteUrl);
-        mallFallbackHandler.postDelayed(mallFallbackRunnable, 850L);
-    }
-
-    /** The app uses the system back gesture/button; the HTML intentionally has no top back button. */
-    @Override
-    public void onBackPressed() {
-        super.onBackPressed();
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (mallFallbackRunnable != null) mallFallbackHandler.removeCallbacks(mallFallbackRunnable);
-        WebView webView = mallWebView;
-        mallWebView = null;
-        if (webView != null) {
-            try { webView.stopLoading(); } catch (Exception ignored) {}
-            try { webView.removeJavascriptInterface("MallBridge"); } catch (Exception ignored) {}
-            try { webView.loadUrl("about:blank"); } catch (Exception ignored) {}
-            try { webView.destroy(); } catch (Exception ignored) {}
+    private void stopVideo() {
+        if (heroVideo != null) {
+            try { heroVideo.stopPlayback(); } catch (Exception ignored) { }
+            if (heroMediaHolder != null) heroMediaHolder.removeView(heroVideo);
+            heroVideo = null;
         }
-        super.onDestroy();
     }
 
-    private static String mimeType(String path) {
-        String p = path.toLowerCase(java.util.Locale.ROOT);
-        if (p.endsWith(".html")) return "text/html";
-        if (p.endsWith(".js")) return "application/javascript";
-        if (p.endsWith(".css")) return "text/css";
-        if (p.endsWith(".json")) return "application/json";
-        if (p.endsWith(".svg")) return "image/svg+xml";
-        if (p.endsWith(".png")) return "image/png";
-        if (p.endsWith(".jpg") || p.endsWith(".jpeg")) return "image/jpeg";
-        if (p.endsWith(".webp")) return "image/webp";
-        if (p.endsWith(".gif")) return "image/gif";
-        if (p.endsWith(".mp4")) return "video/mp4";
-        if (p.endsWith(".webm")) return "video/webm";
-        if (p.endsWith(".svga")) return "application/octet-stream";
-        return "application/octet-stream";
+    private static int indexForType(String type) {
+        for (int i = 0; i < TYPES.length; i++) if (TYPES[i].equals(type)) return i;
+        return 0;
     }
 
     static String normalizeType(@Nullable String type) {
         if (type == null || type.isEmpty()) return "vip_badge";
-        if ("frames".equals(type) || "host_badge".equals(type) || "vip_badge".equals(type)) {
-            return "vip_badge";
-        }
+        if ("frames".equals(type) || "host_badge".equals(type) || "vip_badge".equals(type)) return "vip_badge";
         if ("join_toast".equals(type) || "entry_effect".equals(type)) return "entry_effect";
-        if ("badges".equals(type) || "level_badge".equals(type)) return "level_badge";
-        if ("room_card".equals(type)) return "room_card";
-        if ("room_background".equals(type)) return "room_background";
-        if ("profile_card".equals(type)) return "profile_card";
-        if ("chat_bubble".equals(type)) return "chat_bubble";
-        if ("nameplate".equals(type)) return "nameplate";
+
+        for (String candidate : TYPES) if (candidate.equals(type)) return type;
         return "vip_badge";
     }
 
-    private final class MallBridge {
-        @JavascriptInterface
-        public String getApiBase() { return ApiOrigin.apiV1(); }
-
-        @JavascriptInterface
-        public String getToken() {
-            return session != null && session.getAccessToken() != null
-                    ? session.getAccessToken() : "";
-        }
-
-        @JavascriptInterface
-        public String getAvatarUrl() {
-            return session != null && session.getAvatarUrl() != null
-                    ? session.getAvatarUrl() : "";
-        }
-
-        @JavascriptInterface
-        public String getDisplayName() {
-            return session != null && session.getDisplayName() != null
-                    ? session.getDisplayName() : "";
-        }
-
-        @JavascriptInterface
-        public String getRoomId() { return roomId != null ? roomId : ""; }
-
-        @JavascriptInterface
-        public boolean hasNativeFramePreview() { return false; }
-
-        @JavascriptInterface
-        public void toast(String message) {
-            runOnUiThread(() -> Toast.makeText(CosmeticsActivity.this,
-                    message == null ? "" : message, Toast.LENGTH_SHORT).show());
-        }
-
-        @JavascriptInterface
-        public void openRecharge() {
-            runOnUiThread(() -> BalanceRedirect.openRecharge(CosmeticsActivity.this));
-        }
-
-        @JavascriptInterface
-        public void openRechargeIfNeeded(String message) {
-            runOnUiThread(() -> BalanceRedirect.handleForced(CosmeticsActivity.this, message));
-        }
-
-        // The HTML preview draws the selected media itself. These compatibility methods
-        // intentionally do not alter profile or room voice state.
-        @JavascriptInterface
-        public void previewWear(String type, String animationUrl, String previewUrl) { }
-
-        @JavascriptInterface
-        public void clearWear() { }
-
-        @JavascriptInterface
-        public void onEquipped(String itemId, String type) { }
+    @Override
+    protected void onDestroy() {
+        stopVideo();
+        if (mediator != null) mediator.detach();
+        if (storeUserFrame != null) storeUserFrame.destroy();
+        super.onDestroy();
     }
 }

@@ -51,6 +51,7 @@ public class CosmeticsViewModel extends ViewModel {
     private final AtomicInteger loadSeq = new AtomicInteger();
     private volatile String filterType;
     private volatile boolean bagMode;
+    private volatile String currentRoomId;
     private volatile long inventoryLoadedAtMs;
     private static final long INVENTORY_CACHE_MS = 8_000L;
 
@@ -70,7 +71,25 @@ public class CosmeticsViewModel extends ViewModel {
 
     public boolean isBagMode() { return bagMode; }
 
+    public void setCurrentRoomId(@Nullable String roomId) {
+        this.currentRoomId = roomId == null || roomId.trim().isEmpty() ? null : roomId.trim();
+    }
+
     public void setBagMode(boolean bagMode) { this.bagMode = bagMode; }
+
+    /** Per-item validity configured by the dashboard; defaults to the legacy 30 days. */
+    public int leaseDays(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (item == null || item.meta == null) return LEASE_DAYS;
+        Object raw = item.meta.get("leaseDays");
+        try {
+            int days = raw instanceof Number
+                    ? ((Number) raw).intValue()
+                    : Integer.parseInt(String.valueOf(raw));
+            return days >= 1 && days <= 3650 ? days : LEASE_DAYS;
+        } catch (Exception ignored) {
+            return LEASE_DAYS;
+        }
+    }
 
     public boolean isOwned(String cosmeticId) {
         if (cosmeticId == null) return false;
@@ -232,26 +251,19 @@ public class CosmeticsViewModel extends ViewModel {
                 error.postValue(r.error);
                 return;
             }
-            if (r.data != null && r.data.expiresAt != null) {
-                synchronized (ownedIds) {
-                    ownedIds.add(cosmeticId);
+            // Successful purchase means ownership even for permanent items (expiresAt == null).
+            synchronized (ownedIds) {
+                ownedIds.add(cosmeticId);
+                if (r.data != null && r.data.expiresAt != null && !r.data.expiresAt.isEmpty()) {
                     expiresAtById.put(cosmeticId, r.data.expiresAt);
+                } else {
+                    expiresAtById.remove(cosmeticId);
                 }
             }
-            // Server already auto-equips; call equip again to sync worn URLs into session.
-            Result<CosmeticDtos.EquipResult> eq =
-                    container.getCosmeticsRepository().equip(cosmeticId);
-            if (eq.success && eq.data != null && eq.data.profile != null) {
-                applyEquipProfile(eq.data.profile);
-            } else {
-                Result<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto> me =
-                        container.getUserRepository().getMe();
-                if (me.success && me.data != null) {
-                    container.getSessionManager().updateCachedUser(me.data);
-                }
-            }
+            // Purchase only adds the item to the bag. Wearing is a separate explicit action.
+            // Do not call equip here: the card must switch from "شراء" to "ارتداء".
             inventoryLoadedAtMs = 0;
-            message.postValue("تم الشراء والارتداء");
+            message.postValue("تم الشراء بنجاح — يمكنك ارتداء العنصر من الحقيبة");
             loadForType(type);
         });
     }
@@ -274,6 +286,13 @@ public class CosmeticsViewModel extends ViewModel {
 
     public void equip(String cosmeticId) {
         final String type = filterType;
+        final CosmeticDtos.CosmeticDto target = findInCurrentPage(cosmeticId);
+        final boolean roomBackground = target != null && "room_background".equals(target.type);
+        final String room = currentRoomId;
+        if (roomBackground && (room == null || room.isEmpty())) {
+            error.postValue("لتطبيق خلفية الغرفة، افتح المتجر من داخل الغرفة أولاً");
+            return;
+        }
         container.getIoExecutor().execute(() -> {
             Result<CosmeticDtos.EquipResult> r =
                     container.getCosmeticsRepository().equip(cosmeticId);
@@ -286,8 +305,30 @@ public class CosmeticsViewModel extends ViewModel {
                 if (me.success && me.data != null) {
                     container.getSessionManager().updateCachedUser(me.data);
                 }
+                if (roomBackground) {
+                    String backgroundUrl = target.previewUrl;
+                    if (backgroundUrl == null || backgroundUrl.trim().isEmpty()) {
+                        backgroundUrl = target.animationUrl;
+                    }
+                    if (backgroundUrl == null || backgroundUrl.trim().isEmpty()) {
+                        error.postValue("هذا العنصر لا يحتوي على رابط خلفية صالح");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                    Result<Object> applied = container.getRoomRepository().setBackground(room, backgroundUrl);
+                    if (applied == null || !applied.success) {
+                        error.postValue(applied != null && applied.error != null
+                                ? applied.error : "تم ارتداء العنصر لكن تعذر تطبيق خلفية الغرفة");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                    message.postValue("تم تطبيق خلفية الغرفة بنجاح");
+                } else {
+                    message.postValue("تم الارتداء بنجاح");
+                }
                 inventoryLoadedAtMs = 0;
-                message.postValue("تم الارتداء");
                 loadForType(type);
             } else {
                 error.postValue(r.error);
@@ -326,6 +367,9 @@ public class CosmeticsViewModel extends ViewModel {
         cached.entryEffectUrl = profile.entryEffectUrl;
         cached.entryAnimationUrl = profile.entryAnimationUrl;
         cached.roomCardUrl = profile.roomCardUrl;
+        cached.profileCardUrl = profile.profileCardUrl;
+        cached.chatBubbleUrl = profile.chatBubbleUrl;
+        cached.nameplateUrl = profile.nameplateUrl;
         cached.levelBadgeUrl = profile.levelBadgeUrl;
         cached.vipBadgeUrl = profile.vipBadgeUrl;
         cached.hostBadgeUrl = profile.hostBadgeUrl;
