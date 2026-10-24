@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_home_full_gradient">
+    android:background="#FFF5F6FB">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -23,8 +23,8 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="@color/white"
-            android:elevation="2dp"
+            android:background="#FFF5F6FB"
+            android:elevation="1dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="4dp">
@@ -73,7 +73,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="16dp"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_vanity_hero"
+                    android:background="@drawable/bg_vanity_store_hero"
                     android:orientation="vertical"
                     android:padding="18dp">
 
@@ -82,7 +82,7 @@
                         android:layout_height="wrap_content"
                         android:letterSpacing="0.1"
                         android:text="JEHO SPECIAL ID"
-                        android:textColor="#99FDE68A"
+                        android:textColor="#DFFFFFFF"
                         android:textSize="11sp"
                         android:textStyle="bold" />
 
@@ -110,7 +110,7 @@
                         android:layout_marginTop="8dp"
                         android:gravity="center"
                         android:text="@string/vanity_subscription_current"
-                        android:textColor="#B6F5EE"
+                        android:textColor="#E6FFFFFF"
                         android:textSize="12sp" />
 
                     <View
@@ -131,7 +131,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="@string/vanity_coins_balance_label"
-                            android:textColor="#CCFBF1"
+                            android:textColor="#E6FFFFFF"
                             android:textSize="12sp" />
 
                         <TextView
@@ -139,7 +139,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="—"
-                            android:textColor="#FDE68A"
+                            android:textColor="#FFFFFFFF"
                             android:textSize="18sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -156,7 +156,7 @@
                     app:boxCornerRadiusBottomStart="14dp"
                     app:boxCornerRadiusTopEnd="14dp"
                     app:boxCornerRadiusTopStart="14dp"
-                    app:boxStrokeColor="@color/aurora_gold"
+                    app:boxStrokeColor="#FF8B6BE8"
                     app:hintTextColor="@color/text_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -168,6 +168,72 @@
                         android:textColor="@color/text_primary"
                         android:textSize="14sp" />
                 </com.google.android.material.textfield.TextInputLayout>
+
+                <LinearLayout
+                    android:id="@+id/searchPreviewWrap"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_vanity_live_preview"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvSearchPreviewLabel"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="معاينة حية للآيدي"
+                            android:textColor="#FF77718A"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvSearchPreviewNumber"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="5dp"
+                            android:fontFamily="sans-serif-medium"
+                            android:gravity="center_vertical"
+                            android:letterSpacing="0.10"
+                            android:maxLines="1"
+                            android:text="123456"
+                            android:textColor="#FF6844C5"
+                            android:textSize="25sp"
+                            android:textStyle="bold"
+                            app:autoSizeMaxTextSize="25sp"
+                            app:autoSizeMinTextSize="15sp"
+                            app:autoSizeTextType="uniform" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="الألوان والتوهج والحركة حسب إعدادات هذا الآيدي"
+                            android:textColor="#FF8A849B"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:background="@drawable/bg_mall_balance_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="10dp"
+                        android:text="LIVE"
+                        android:textColor="#FF6844C5"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"

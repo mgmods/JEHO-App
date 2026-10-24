@@ -43,6 +43,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         int myVipLevel();
         /** Account level (not VIP). Used only for non-frame gates. */
         int myUserLevel();
+        int leaseDays(CosmeticDtos.CosmeticDto item);
     }
 
     private final List<CosmeticDtos.CosmeticDto> items = new ArrayList<>();
@@ -96,8 +97,8 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         } else {
             holder.b.tvPrice.setText(item.coinPrice > 0
                     ? holder.itemView.getContext().getString(
-                            R.string.mall_price_days, item.coinPrice, CosmeticsViewModel.LEASE_DAYS)
-                    : holder.itemView.getContext().getString(R.string.mall_free_days, CosmeticsViewModel.LEASE_DAYS));
+                            R.string.mall_price_days, item.coinPrice, listener.leaseDays(item))
+                    : holder.itemView.getContext().getString(R.string.mall_free_days, listener.leaseDays(item)));
         }
 
         if (holder.b.tvVipLock != null) {
@@ -113,8 +114,8 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
 
         String sel = listener.selectedId();
         boolean selected = sel != null && sel.equals(item.id);
-        holder.b.getRoot().setStrokeWidth(selected ? 3 : 1);
-        holder.b.getRoot().setStrokeColor(selected ? 0xFFE8A317 : 0x1A000000);
+        holder.b.getRoot().setStrokeWidth(selected ? 2 : 1);
+        holder.b.getRoot().setStrokeColor(selected ? 0xFF8B6BE8 : 0xFFEAE5F7);
         holder.b.getRoot().setAlpha(locked ? 0.72f : 1f);
 
         holder.b.btnPurchase.setVisibility(owned ? View.GONE : View.VISIBLE);
@@ -135,7 +136,9 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
                         : holder.itemView.getContext().getString(R.string.mall_requires_level, needLvl));
                 holder.b.btnPurchase.setAlpha(0.85f);
             } else {
-                holder.b.btnPurchase.setText(R.string.purchase);
+                // An expired lease is eligible for a fresh term at the configured full price.
+                holder.b.btnPurchase.setText(days != null && days == 0
+                        ? "تجديد" : holder.itemView.getContext().getString(R.string.purchase));
                 holder.b.btnPurchase.setAlpha(1f);
             }
         }

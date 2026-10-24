@@ -12,7 +12,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
@@ -28,6 +28,7 @@ import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AppLoadingOverlay;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.ErrorToasts;
+import com.Dramizo.Series.util.VanityIdStyle;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,6 +46,9 @@ public class VanityIdsActivity extends ThemedActivity {
     private TextView tvCurrentId;
     private TextView tvBalance;
     private TextView tvEmpty;
+    private View searchPreviewWrap;
+    private TextView tvSearchPreviewNumber;
+    private TextView tvSearchPreviewLabel;
     private EditText etSearch;
     private RecyclerView recycler;
     private CatalogAdapter adapter;
@@ -73,11 +77,15 @@ public class VanityIdsActivity extends ThemedActivity {
         tvCurrentId = findViewById(R.id.tvCurrentId);
         tvBalance = findViewById(R.id.tvBalance);
         tvEmpty = findViewById(R.id.tvEmpty);
+        searchPreviewWrap = findViewById(R.id.searchPreviewWrap);
+        tvSearchPreviewNumber = findViewById(R.id.tvSearchPreviewNumber);
+        tvSearchPreviewLabel = findViewById(R.id.tvSearchPreviewLabel);
         recycler = findViewById(R.id.recycler);
         etSearch = findViewById(R.id.etVanitySearch);
 
         adapter = new CatalogAdapter();
-        recycler.setLayoutManager(new LinearLayoutManager(this));
+        recycler.setLayoutManager(new GridLayoutManager(this, 2));
+        recycler.setItemAnimator(null);
         recycler.setAdapter(adapter);
         recycler.setNestedScrollingEnabled(false);
 
@@ -102,18 +110,27 @@ public class VanityIdsActivity extends ThemedActivity {
 
     private void bindHero() {
         if (myLease != null && myLease.active && myLease.publicId != null) {
-            if (tvCurrentIdNumber != null) tvCurrentIdNumber.setText(myLease.publicId);
+            if (tvCurrentIdNumber != null) {
+                tvCurrentIdNumber.setText(myLease.publicId);
+                VanityIdStyle.bind(tvCurrentIdNumber, c == null ? null : c.getVanityApi(), myLease.publicId, 0);
+            }
             if (tvCurrentId != null) {
                 String exp = formatExpires(myLease.expiresAt);
                 tvCurrentId.setText(getString(R.string.vanity_hero_active_until, exp));
             }
         } else if (userPublicId != null && !userPublicId.isEmpty()) {
-            if (tvCurrentIdNumber != null) tvCurrentIdNumber.setText(userPublicId);
+            if (tvCurrentIdNumber != null) {
+                tvCurrentIdNumber.setText(userPublicId);
+                VanityIdStyle.bind(tvCurrentIdNumber, c == null ? null : c.getVanityApi(), userPublicId, 0);
+            }
             if (tvCurrentId != null) {
                 tvCurrentId.setText(R.string.vanity_hero_current_hint);
             }
         } else {
-            if (tvCurrentIdNumber != null) tvCurrentIdNumber.setText("—");
+            if (tvCurrentIdNumber != null) {
+                tvCurrentIdNumber.setText("—");
+                VanityIdStyle.bind(tvCurrentIdNumber, null, null, 0);
+            }
             if (tvCurrentId != null) {
                 tvCurrentId.setText(R.string.vanity_hero_pick_hint);
             }
@@ -133,6 +150,34 @@ public class VanityIdsActivity extends ThemedActivity {
             shown.add(it);
         }
         adapter.submit(shown);
+
+        // Show a larger live preview only for a complete catalog ID match. This
+        // reuses the exact dashboard-configured colors/glow/animation via the
+        // shared renderer and avoids sending a style request on every typed digit.
+        VanityDtos.VanityItem exactMatch = null;
+        if (!q.isEmpty()) {
+            for (VanityDtos.VanityItem it : shown) {
+                if (it.publicId != null && it.publicId.equals(q)) {
+                    exactMatch = it;
+                    break;
+                }
+            }
+        }
+        if (searchPreviewWrap != null) {
+            boolean showPreview = exactMatch != null && tvSearchPreviewNumber != null;
+            searchPreviewWrap.setVisibility(showPreview ? View.VISIBLE : View.GONE);
+            if (showPreview) {
+                tvSearchPreviewNumber.setText(exactMatch.publicId);
+                if (tvSearchPreviewLabel != null) {
+                    tvSearchPreviewLabel.setText("معاينة حية للآيدي " + exactMatch.publicId);
+                }
+                VanityIdStyle.bind(tvSearchPreviewNumber, c == null ? null : c.getVanityApi(),
+                        exactMatch.publicId, 0);
+            } else if (tvSearchPreviewNumber != null) {
+                VanityIdStyle.bind(tvSearchPreviewNumber, null, null, 0);
+            }
+        }
+
         if (tvEmpty != null) {
             boolean empty = shown.isEmpty();
             tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);

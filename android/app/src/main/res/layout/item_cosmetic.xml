@@ -4,11 +4,11 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="5dp"
-    app:cardBackgroundColor="#FFFCFDFE"
-    app:cardCornerRadius="20dp"
-    app:cardElevation="2dp"
-    app:strokeColor="#1A0E7490"
+    android:layout_margin="3dp"
+    app:cardBackgroundColor="#FFFFFFFF"
+    app:cardCornerRadius="18dp"
+    app:cardElevation="1dp"
+    app:strokeColor="#FFE8E1F7"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -16,20 +16,20 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="9dp">
+        android:padding="7dp">
 
         <!-- Lightweight preview: NO HostSignalView / SVGA in mall grid (OOM crash). -->
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="116dp"
+            android:layout_height="88dp"
             android:background="@drawable/bg_cosmetic_preview"
             android:clipChildren="true"
             android:clipToPadding="true">
 
             <ImageView
                 android:id="@+id/imgFace"
-                android:layout_width="64dp"
-                android:layout_height="64dp"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
@@ -49,10 +49,10 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="top|start"
                 android:layout_margin="6dp"
-                android:background="@drawable/bg_cosmetic_price_chip"
+                android:background="@drawable/bg_mall_balance_pill"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="2dp"
-                android:textColor="#FF8A4B08"
+                android:textColor="#FF5B35B5"
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:visibility="gone"
@@ -64,13 +64,13 @@
             android:id="@+id/tvName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="7dp"
             android:ellipsize="end"
             android:gravity="center"
             android:maxLines="2"
             android:minLines="2"
             android:textColor="#FF1A1F2E"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textStyle="bold"
             tools:text="إطار ذهبي" />
 
@@ -78,23 +78,26 @@
             android:id="@+id/tvPrice"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/bg_cosmetic_price_chip"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/bg_mall_balance_pill"
             android:ellipsize="end"
             android:gravity="center"
             android:maxLines="1"
-            android:paddingHorizontal="10dp"
+            android:paddingHorizontal="6dp"
             android:paddingVertical="3dp"
-            android:textColor="#FF8A4B08"
-            android:textSize="11sp"
+            android:textColor="#FF5B35B5"
+            android:textSize="10sp"
             android:textStyle="bold"
             tools:text="500 عملة" />
 
         <TextView
             android:id="@+id/btnPurchase"
             android:layout_width="match_parent"
-            android:layout_height="42dp"
-            android:layout_marginTop="10dp"
+            android:layout_height="36dp"
+            android:layout_marginTop="7dp"
+            android:foreground="@drawable/bg_store_button_ripple"
+            android:clickable="true"
+            android:focusable="true"
             android:background="@drawable/bg_cosmetic_btn_buy"
             android:gravity="center"
             android:text="@string/purchase"
@@ -105,8 +108,11 @@
         <TextView
             android:id="@+id/btnEquip"
             android:layout_width="match_parent"
-            android:layout_height="42dp"
+            android:layout_height="44dp"
             android:layout_marginTop="10dp"
+            android:foreground="@drawable/bg_store_button_ripple"
+            android:clickable="true"
+            android:focusable="true"
             android:background="@drawable/bg_cosmetic_btn_equip"
             android:gravity="center"
             android:text="@string/equip"

@@ -293,7 +293,12 @@ export class CosmeticsService implements OnModuleInit {
     });
   }
 
-  private mallLeaseDays() {
+  private mallLeaseDays(cosmetic?: Cosmetic) {
+    // Per-item duration is stored in the existing JSON metadata to avoid a schema migration.
+    const configured = Number((cosmetic?.meta as any)?.leaseDays);
+    if (Number.isFinite(configured) && configured >= 1 && configured <= 3650) {
+      return Math.floor(configured);
+    }
     return 30;
   }
 
@@ -521,7 +526,7 @@ export class CosmeticsService implements OnModuleInit {
     await this.assertCosmeticRequirements(userId, cosmetic);
 
     const fullPrice = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
-    const leaseDays = this.mallLeaseDays();
+    const leaseDays = this.mallLeaseDays(cosmetic);
     const now = new Date();
 
     const result = await this.cosmeticsRepo.manager.transaction(async (manager) => {
