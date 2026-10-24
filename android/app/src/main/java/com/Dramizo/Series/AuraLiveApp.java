@@ -315,7 +315,9 @@ public class AuraLiveApp extends Application {
                         aliveRoom.runOnUiThread(() -> aliveRoom.onGlobalCelebration(
                                 kind, title, body, displayName, avatar, badge, dedupe,
                                 coinsFinal, gameFinal, roomFinal));
-                        if (!appVisible) {
+                        if (!appVisible
+                                && (!"lucky_hit".equalsIgnoreCase(kind) || highValueLucky)) {
+                            // Small lucky outcomes must never escape the room as notifications.
                             showCelebrationSystemNotification(title, body, avatar, dedupe);
                         }
                         return;
@@ -327,7 +329,7 @@ public class AuraLiveApp extends Application {
                                 room.onGlobalCelebration(
                                         kind, title, body, displayName, avatar, badge, dedupe,
                                         coinsFinal, gameFinal, roomFinal);
-                            } else {
+                            } else if (!"lucky_hit".equalsIgnoreCase(kind) || highValueLucky) {
                                 com.Dramizo.Series.util.GlobalCelebrationToast.show(
                                         activity, title, body, avatar, badge, dedupe,
                                         28, mulFinal, coinsFinal, displayName, kind, roomFinal);
