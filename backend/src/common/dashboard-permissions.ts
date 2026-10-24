@@ -60,6 +60,7 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   'profile-action-icons': 'profileActionIcons',
   'policy-brochure': 'policyBrochure',
   users: 'users',
+  badges: 'users',
   agencies: 'agencies',
   rooms: 'rooms',
   'support-chest': 'supportChest',

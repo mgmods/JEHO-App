@@ -191,7 +191,7 @@ export class BadgesService {
 
   async update(id: string, dto: Partial<UpsertBadgeDto>) {
     const badge = await this.badges.findOne({ where: { id } });
-    if (!badge) throw new NotFoundException('Badge not found');
+    if (!badge) throw new NotFoundException('Medal not found');
     const merged = { ...badge, ...dto };
     this.validate(merged);
     Object.assign(badge, dto);
@@ -200,14 +200,14 @@ export class BadgesService {
 
   async remove(id: string) {
     const badge = await this.badges.findOne({ where: { id } });
-    if (!badge) throw new NotFoundException('Badge not found');
+    if (!badge) throw new NotFoundException('Medal not found');
     await this.badges.remove(badge);
     return { success: true };
   }
 
   async grant(badgeId: string, userIdentifier: string, adminId: string | null, durationDaysRaw?: number) {
     const badge = await this.badges.findOne({ where: { id: badgeId } });
-    if (!badge) throw new NotFoundException('Badge not found');
+    if (!badge) throw new NotFoundException('Medal not found');
     const identifier = (userIdentifier || '').trim();
     if (!identifier) throw new BadRequestException('User ID is required');
     const user = await this.users.findOne({
@@ -219,7 +219,7 @@ export class BadgesService {
       ? 0
       : Math.min(3650, Math.max(1, Math.floor(Number(durationDaysRaw))));
     if (durationDaysRaw != null && (!Number.isFinite(Number(durationDaysRaw)) || Number(durationDaysRaw) < 0)) {
-      throw new BadRequestException('Badge duration must be 0 (permanent) or a positive number of days');
+      throw new BadRequestException('Medal duration must be 0 (permanent) or a positive number of days');
     }
     const expiresAt = durationDays > 0 ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000) : null;
     const existing = await this.userBadges.findOne({ where: { badgeId, userId: user.id } });
@@ -255,21 +255,101 @@ export class BadgesService {
     };
   }
 
+  /** Grant one medal to every existing account without duplicating active ownership. */
+  async grantAll(badgeId: string, adminId: string | null, durationDaysRaw?: number) {
+    const badge = await this.badges.findOne({ where: { id: badgeId } });
+    if (!badge) throw new NotFoundException('Medal not found');
+    const durationDays = durationDaysRaw == null || durationDaysRaw === 0
+      ? 0
+      : Math.min(3650, Math.max(1, Math.floor(Number(durationDaysRaw))));
+    if (durationDaysRaw != null && (!Number.isFinite(Number(durationDaysRaw)) || Number(durationDaysRaw) < 0)) {
+      throw new BadRequestException('Medal duration must be 0 (permanent) or a positive number of days');
+    }
+    const expiresAt = durationDays > 0 ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000) : null;
+    const users = await this.users.find({ select: { id: true } });
+    let granted = 0;
+    let skipped = 0;
+    const notifications: Array<{ userId: string; renewed: boolean }> = [];
+
+    // Process in bounded chunks so a large community does not create one enormous SQL query.
+    for (let offset = 0; offset < users.length; offset += 250) {
+      const chunk = users.slice(offset, offset + 250);
+      const ids = chunk.map((user) => user.id);
+      const existing = await this.userBadges.find({ where: { badgeId, userId: In(ids) } });
+      const byUser = new Map(existing.map((row) => [row.userId, row]));
+      const inserts: Array<{ badgeId: string; userId: string; grantedByAdminId: string | null; source: string; expiresAt: Date | null }> = [];
+      const renewals: UserBadge[] = [];
+      for (const userId of ids) {
+        const row = byUser.get(userId);
+        if (row && (!row.expiresAt || new Date(row.expiresAt).getTime() > Date.now())) {
+          skipped += 1;
+          continue;
+        }
+        if (row) {
+          row.grantedAt = new Date();
+          row.grantedByAdminId = adminId;
+          row.source = 'manual';
+          row.expiresAt = expiresAt;
+          renewals.push(row);
+          notifications.push({ userId, renewed: true });
+        } else {
+          inserts.push({ badgeId, userId, grantedByAdminId: adminId, source: 'manual', expiresAt });
+          notifications.push({ userId, renewed: false });
+        }
+      }
+      if (renewals.length) {
+        await this.userBadges.save(renewals);
+        granted += renewals.length;
+      }
+      if (inserts.length) {
+        const result = await this.userBadges.createQueryBuilder()
+          .insert()
+          .values(inserts)
+          .orIgnore()
+          .returning(['userId'])
+          .execute();
+        const insertedIds = new Set<string>((result.raw || []).map((row: { userId?: string; user_id?: string }) =>
+          String(row.userId || row.user_id || ''),
+        ).filter(Boolean));
+        granted += insertedIds.size;
+        // Drop notifications for rows that lost a uniqueness race.
+        for (let i = notifications.length - 1; i >= 0; i--) {
+          if (!notifications[i].renewed && ids.includes(notifications[i].userId) && !insertedIds.has(notifications[i].userId)) {
+            notifications.splice(i, 1);
+            skipped += 1;
+          }
+        }
+      }
+    }
+
+    // Limit notification concurrency to keep bulk gifting gentle on the API/database.
+    for (let offset = 0; offset < notifications.length; offset += 25) {
+      await Promise.all(notifications.slice(offset, offset + 25).map(({ userId }) => this.notifications.notifyUser(
+        userId,
+        NotificationType.SYSTEM,
+        'تم إهداؤك ميدالية جديدة! 🏅',
+        `مبروك! تمت إضافة ميدالية ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
+        { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
+      )));
+    }
+    return { success: true, badge, totalUsers: users.length, granted, skipped, durationDays };
+  }
+
   async revoke(badgeId: string, userIdentifier: string) {
     const identifier = (userIdentifier || '').trim();
     if (!identifier) throw new BadRequestException('User ID is required');
     const user = await this.users.findOne({ where: [{ id: identifier }, { publicId: identifier }] });
     if (!user) throw new NotFoundException('User not found by UUID or public ID');
     const grant = await this.userBadges.findOne({ where: { badgeId, userId: user.id } });
-    if (!grant) throw new NotFoundException('Badge ownership not found');
+    if (!grant) throw new NotFoundException('Medal ownership not found');
     await this.userBadges.remove(grant);
     return { success: true };
   }
 
   private validate(dto: UpsertBadgeDto) {
-    if (!dto.name?.trim()) throw new BadRequestException('Badge name is required');
-    if (!dto.imageUrl?.trim()) throw new BadRequestException('Badge image URL is required');
-    if (dto.name.length > 80 || dto.imageUrl.length > 512) throw new BadRequestException('Badge field is too long');
+    if (!dto.name?.trim()) throw new BadRequestException('Medal name is required');
+    if (!dto.imageUrl?.trim()) throw new BadRequestException('Medal image URL is required');
+    if (dto.name.length > 80 || dto.imageUrl.length > 512) throw new BadRequestException('Medal field is too long');
     if (dto.awardType === 'achievement') {
       if (!dto.achievementKey || !['level', 'experience', 'followers', 'recharge', 'support', 'received'].includes(dto.achievementKey)) {
         throw new BadRequestException('Achievement key must be level, experience, followers, recharge, support, or received');
