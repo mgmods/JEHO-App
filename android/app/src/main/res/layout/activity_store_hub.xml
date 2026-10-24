@@ -151,16 +151,20 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_store_hub_card"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="6dp"
-                    android:paddingVertical="6dp">
+                    android:orientation="vertical"
+                    android:padding="8dp">
 
                     <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+<LinearLayout
                         android:id="@+id/rowMall"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_marginEnd="5dp"
+                        
                         android:layout_height="150dp"
+                        android:layout_marginEnd="6dp"
                         android:foreground="?attr/selectableItemBackground"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
@@ -211,19 +215,13 @@
                             android:src="@drawable/ic_arrow_right_me"
                             app:tint="#FF94A3B8" />
                     </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="0.5dp"
-                        android:visibility="gone"
-                        android:layout_marginStart="64dp"
-                        android:background="#FFFFE4A6" />
-
-                    <LinearLayout
-                        android:id="@+id/rowBadges"
-                        android:visibility="gone"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+<LinearLayout
+                        android:id="@+id/rowVanity"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        
+                        android:layout_height="150dp"
+                        android:layout_marginStart="6dp"
                         android:foreground="?attr/selectableItemBackground"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
@@ -233,14 +231,14 @@
                         <FrameLayout
                             android:layout_width="44dp"
                             android:layout_height="44dp"
-                            android:background="@drawable/bg_store_icon_badge">
+                            android:background="@drawable/bg_store_icon_vanity">
 
                             <ImageView
                                 android:layout_width="26dp"
                                 android:layout_height="26dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/me_badge" />
+                                android:src="@drawable/ic_me_invite" />
                         </FrameLayout>
 
                         <LinearLayout
@@ -253,7 +251,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/badges"
+                                android:text="@string/vanity_id"
                                 android:textColor="@color/text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
@@ -262,7 +260,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="أوسمة وميداليات"
+                                android:text="أرقام ID مميزة · عادية"
                                 android:textColor="@color/text_secondary"
                                 android:textSize="11sp" />
                         </LinearLayout>
@@ -274,19 +272,19 @@
                             android:src="@drawable/ic_arrow_right_me"
                             app:tint="#FF94A3B8" />
                     </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="0.5dp"
-                        android:layout_marginStart="64dp"
-                        android:background="#FFE8ECF0"
-                        android:visibility="gone" />
+                    </LinearLayout>
 
                     <LinearLayout
-                        android:id="@+id/rowVip"
-                        android:visibility="gone"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+<LinearLayout
+                        android:id="@+id/rowVip"
+                        android:layout_width="0dp"
+                        android:layout_height="150dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
                         android:foreground="?attr/selectableItemBackground"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
@@ -337,130 +335,10 @@
                             android:src="@drawable/ic_arrow_right_me"
                             app:tint="#FF94A3B8" />
                     </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="0.5dp"
-                        android:layout_marginStart="64dp"
-                        android:background="#FFE8ECF0" />
-
-                    <LinearLayout
-                        android:id="@+id/rowLevel"
-                        android:visibility="gone"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:foreground="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="12dp">
-
-                        <FrameLayout
-                            android:layout_width="44dp"
-                            android:layout_height="44dp"
-                            android:background="@drawable/bg_store_icon_level">
-
-                            <ImageView
-                                android:layout_width="26dp"
-                                android:layout_height="26dp"
-                                android:layout_gravity="center"
-                                android:contentDescription="@null"
-                                android:src="@drawable/ic_me_level_card" />
-                        </FrameLayout>
-
-                        <LinearLayout
+                        <View
                             android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/user_level"
-                                android:textColor="@color/text_primary"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="مستوى · ثروة · شعبية"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="11sp" />
-                        </LinearLayout>
-
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_arrow_right_me"
-                            app:tint="#FF94A3B8" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="0.5dp"
-                        android:layout_marginStart="64dp"
-                        android:background="#FFE8ECF0" />
-
-                    <LinearLayout
-                        android:id="@+id/rowVanity"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="5dp"
-                        android:layout_height="150dp"
-                        android:foreground="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="12dp">
-
-                        <FrameLayout
-                            android:layout_width="44dp"
-                            android:layout_height="44dp"
-                            android:background="@drawable/bg_store_icon_vanity">
-
-                            <ImageView
-                                android:layout_width="26dp"
-                                android:layout_height="26dp"
-                                android:layout_gravity="center"
-                                android:contentDescription="@null"
-                                android:src="@drawable/ic_me_invite" />
-                        </FrameLayout>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/vanity_id"
-                                android:textColor="@color/text_primary"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="أرقام ID مميزة · عادية"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="11sp" />
-                        </LinearLayout>
-
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_arrow_right_me"
-                            app:tint="#FF94A3B8" />
+                            android:layout_height="1dp"
+                            android:layout_weight="1" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
