@@ -300,6 +300,16 @@ export const cosmeticsApi = {
   remove: (id) => safeRequest(() => api.delete(`/admin/cosmetics/${id}`)),
 }
 
+export const badgesApi = {
+  list: () => safeRequest(() => api.get('/admin/badges')),
+  create: (data) => safeRequest(() => api.post('/admin/badges', data)),
+  update: (id, data) => safeRequest(() => api.put(`/admin/badges/${id}`, data)),
+  remove: (id) => safeRequest(() => api.delete(`/admin/badges/${id}`)),
+  grant: (id, userId, durationDays = 0) => safeRequest(() => api.post(`/admin/badges/${id}/grant`, { userId, durationDays })),
+  grantAll: (id, durationDays = 0) => safeRequest(() => api.post(`/admin/badges/${id}/grant-all`, { durationDays })),
+  revoke: (id, userId) => safeRequest(() => api.delete(`/admin/badges/${id}/users/${encodeURIComponent(userId)}`)),
+}
+
 export const uploadsApi = {
   upload: (file) =>
     safeRequest(() => {
