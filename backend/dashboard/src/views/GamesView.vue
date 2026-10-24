@@ -198,9 +198,11 @@
       </div>
       <div class="row g-2">
         <div v-for="game in safeManageableGames" :key="'rate-'+game.id" class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small mb-1">{{ game.label }} — نسبة الفوز %</label>
-          <input :value="gameWinRates[game.id] ?? ''" @input="gameWinRates[game.id] = $event.target.value === '' ? undefined : Math.max(0, Math.min(100, Number($event.target.value)))" type="number" min="0" max="100" step="1" class="form-control form-control-sm" :disabled="!supportsDirectWinRate(game.id)" />
-          <div class="small mt-1" :class="supportsDirectWinRate(game.id) ? 'text-success' : 'text-muted'">{{ supportsDirectWinRate(game.id) ? 'تُطبّق من الخادم' : 'نتيجة مشتركة/محرك خارجي؛ يلزم ضبط منفصل' }}</div>
+          <label class="form-label small mb-1">{{ game.label }} — {{ supportsSharedRtp(game.id) ? 'العائد للاعب %' : game.id === 'crash' ? 'خصم السحب %' : 'نسبة الفوز %' }}</label>
+          <input v-if="supportsDirectWinRate(game.id)" :value="gameWinRates[game.id] ?? ''" @input="gameWinRates[game.id] = $event.target.value === '' ? undefined : Math.max(0, Math.min(100, Number($event.target.value)))" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
+          <input v-else-if="supportsSharedRtp(game.id)" :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
+          <input v-else-if="game.id === 'crash'" v-model.number="odds.crashCashoutRake" type="number" min="90" max="99" step="1" class="form-control form-control-sm" />
+          <div class="small mt-1" :class="supportsDirectWinRate(game.id) || supportsSharedRtp(game.id) || game.id === 'crash' ? 'text-success' : 'text-muted'">{{ supportsDirectWinRate(game.id) ? 'نسبة الفوز الفعلية من محرك الخادم' : supportsSharedRtp(game.id) ? 'عائد الجولة المشتركة من الخادم' : game.id === 'crash' ? 'خصم السحب يطبّق على محرك Crash' : 'لا يوجد محرك إعدادات لهذه اللعبة' }}</div>
         </div>
       </div>
       <div class="small text-muted mt-2">0% = لا فوز في ألعاب الخادم التي تدعم هذا الضبط، 100% = فوز في كل محاولة مؤهلة. قد تبقى حدود الجوائز والحد الأقصى للربح مطبّقة.</div>
@@ -494,8 +496,10 @@ async function saveOdds() {
   const actualDisabled = [...stored.disabledGames].sort().join(',')
   const expectedRates = Object.fromEntries(Object.entries(gameWinRates).filter(([id, value]) => supportsDirectWinRate(id) && value !== undefined && value !== '').map(([id, value]) => [id, Number(value)]))
   const ratesMatch = Object.entries(expectedRates).every(([id, value]) => Number(stored.gameWinRates?.[id]) === value)
-  if (expectedDisabled !== actualDisabled || !ratesMatch) {
-    error.value = 'الخادم لم يُرجع كل حالات التشغيل ونسب الفوز كما حُفظت؛ لم يتم تأكيد الحفظ.'
+  const expectedRtpRates = Object.fromEntries(safeManageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)]))
+  const rtpRatesMatch = Object.entries(expectedRtpRates).every(([id, value]) => Math.abs(Number(stored.gameRtpRates?.[id]) - value) < 0.000001)
+  if (expectedDisabled !== actualDisabled || !ratesMatch || !rtpRatesMatch) {
+    error.value = 'الخادم لم يُرجع كل حالات التشغيل ونسب الفوز والعائد لكل لعبة كما حُفظت؛ لم يتم تأكيد الحفظ.'
     toast().danger(error.value)
     return
   }
