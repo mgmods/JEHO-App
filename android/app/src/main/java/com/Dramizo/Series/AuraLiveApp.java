@@ -299,9 +299,10 @@ public class AuraLiveApp extends Application {
                     VoiceRoomActivity aliveRoom = VoiceRoomActivity.getAliveInstance();
                     Activity activity = foregroundActivity;
 
-                    // Lucky wins use one compact global banner on whichever app section is visible,
-                    // including Home while a voice room remains alive in the background.
-                    if ("lucky_hit".equalsIgnoreCase(kind) && appVisible
+                    // Only large lucky payouts/multipliers are shown app-wide.
+                    // Small wins and returns arrive only through the originating room socket event.
+                    boolean highValueLucky = coinsFinal >= 1000L || mulFinal >= 10d;
+                    if ("lucky_hit".equalsIgnoreCase(kind) && highValueLucky && appVisible
                             && activity != null && !activity.isFinishing()) {
                         activity.runOnUiThread(() ->
                                 com.Dramizo.Series.util.GlobalCelebrationToast.show(
