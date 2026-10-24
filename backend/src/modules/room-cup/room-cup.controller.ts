@@ -127,6 +127,7 @@ export class RoomCupController implements OnModuleInit {
       prizes = [];
     }
     const seasonKey = board.seasonKey;
+    const period = board.period || (await this.setting('room_cup.period', 'weekly'));
     // Make closing a season idempotent: retries must never grant prizes twice.
     const lastClosedSeason = await this.setting('room_cup.season_key', '');
     if (lastClosedSeason === seasonKey) {
