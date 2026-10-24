@@ -197,6 +197,12 @@ const routes = [
         meta: { titleKey: 'routes.luckyBoxes' },
       },
       {
+        path: 'badges',
+        name: 'badges',
+        component: () => import('@/views/BadgesView.vue'),
+        meta: { title: 'الشارات وإهداؤها', module: 'users' },
+      },
+      {
         path: 'daily-login-rewards',
         name: 'daily-login-rewards',
         component: () => import('@/views/DailyLoginRewardsView.vue'),
