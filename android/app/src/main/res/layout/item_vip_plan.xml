@@ -4,8 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="16dp"
-    android:background="@drawable/bg_vip_plan_card"
-    android:elevation="2dp"
+    android:background="@drawable/bg_vip_plan_card_premium"
+    android:elevation="4dp"
     android:orientation="vertical">
 
     <View
@@ -18,7 +18,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="14dp">
+        android:padding="15dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -26,27 +26,48 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <ImageView
-                android:id="@+id/imgVipDefault"
-                android:layout_width="76dp"
-                android:layout_height="76dp"
-                android:contentDescription="@string/vip"
-                android:scaleType="fitCenter"
-                android:src="@drawable/vip_medal_mikoo_1" />
+            <FrameLayout
+                android:layout_width="82dp"
+                android:layout_height="82dp">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_vip_hero" />
+
+                <ImageView
+                    android:id="@+id/imgVipDefault"
+                    android:layout_width="76dp"
+                    android:layout_height="76dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/vip"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/vip_medal_mikoo_1" />
+            </FrameLayout>
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="13dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvPlanTag"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="✦ امتيازات حصرية"
+                    android:textColor="#FFE8C26A"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text_primary"
-                    android:textSize="18sp"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#FFFFE7B0"
+                    android:textSize="19sp"
                     android:textStyle="bold"
                     tools:text="VIP 3 · زمردي" />
 
@@ -54,30 +75,29 @@
                     android:id="@+id/tvPrice"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="#B45309"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#FFF4D38A"
                     android:textSize="13sp"
                     android:textStyle="bold"
                     tools:text="399 عملة / شهر · إيجار" />
 
                 <TextView
-                    android:id="@+id/tvPlanTag"
+                    android:id="@+id/tvPlanSummary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:lineSpacingExtra="2dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp"
-                    tools:text="باقة شاملة: هوية · غرف · وكالات · مول" />
+                    android:layout_marginTop="4dp"
+                    android:text="هوية مميزة ومزايا داخل الغرف"
+                    android:textColor="#FFB9BED0"
+                    android:textSize="11sp" />
             </LinearLayout>
         </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="15dp"
             android:text="@string/vip_includes_title"
-            android:textColor="@color/text_primary"
+            android:textColor="#FFF6F2FF"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -100,14 +120,12 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
-
                     <ImageView
                         android:id="@+id/imgIncludeMedal"
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:contentDescription="@null"
                         android:scaleType="fitCenter" />
-
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -122,14 +140,12 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
-
                     <ImageView
                         android:id="@+id/imgIncludeFrame"
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:contentDescription="@null"
                         android:scaleType="fitCenter" />
-
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -144,7 +160,6 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
-
                     <TextView
                         android:id="@+id/tvIncludeBubble"
                         android:layout_width="48dp"
@@ -155,7 +170,6 @@
                         android:textColor="#FFFFFFFF"
                         android:textSize="9sp"
                         android:textStyle="bold" />
-
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -170,14 +184,12 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
-
                     <ImageView
                         android:id="@+id/imgIncludeHead"
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:contentDescription="@null"
                         android:scaleType="fitCenter" />
-
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -192,7 +204,6 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
-
                     <ImageView
                         android:id="@+id/imgIncludeMallFrame"
                         android:layout_width="48dp"
@@ -200,7 +211,6 @@
                         android:contentDescription="@null"
                         android:scaleType="fitCenter"
                         android:src="@drawable/vip_medal_mikoo_1" />
-
                     <TextView
                         android:id="@+id/tvIncludeMallLabel"
                         android:layout_width="wrap_content"
@@ -218,7 +228,6 @@
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
                     android:paddingTop="6dp">
-
                     <TextView
                         android:id="@+id/tvIncludeRoomChip"
                         android:layout_width="48dp"
@@ -226,10 +235,9 @@
                         android:background="@drawable/bg_vip_hero"
                         android:gravity="center"
                         android:text="غرفة"
-                        android:textColor="#E8C26A"
+                        android:textColor="#FFE8C26A"
                         android:textSize="10sp"
                         android:textStyle="bold" />
-
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -246,7 +254,6 @@
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
                     android:paddingTop="6dp">
-
                     <TextView
                         android:id="@+id/tvIncludeAgencyChip"
                         android:layout_width="48dp"
@@ -254,10 +261,9 @@
                         android:background="@drawable/bg_vip_hero"
                         android:gravity="center"
                         android:text="وكالة"
-                        android:textColor="#93C5FD"
+                        android:textColor="#FF93C5FD"
                         android:textSize="10sp"
                         android:textStyle="bold" />
-
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -287,8 +293,8 @@
             android:id="@+id/btnBuy"
             style="@style/Widget.AuraLive.Button.Gold"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="12dp"
+            android:layout_height="50dp"
+            android:layout_marginTop="13dp"
             android:text="@string/buy_vip"
             android:textAllCaps="false"
             android:textStyle="bold" />
