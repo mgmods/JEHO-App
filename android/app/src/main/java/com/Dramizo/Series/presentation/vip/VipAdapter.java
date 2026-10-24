@@ -101,7 +101,7 @@ public class VipAdapter {
         MaterialButton btnBuy = root.findViewById(R.id.btnBuy);
 
         tvName.setText(VipCatalog.headlineAr(level));
-        tvName.setTextColor(darkenForLightBg(VipCatalog.accent(level)));
+        tvName.setTextColor(0xFFFFE7B0);
         tvPrice.setText(String.format(Locale.US, "%,d عملة / شهر · إيجار فقط",
                 Math.max(0, plan.coinPriceMonthly)));
         tvPlanTag.setText("باقة شاملة: هوية بصرية · مزايا الغرف · بطاقات الوكالات · فتح المول");
