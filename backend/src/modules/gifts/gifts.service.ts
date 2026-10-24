@@ -3116,6 +3116,11 @@ export class GiftsService implements OnModuleInit {
   /**
    * Global toast for OUR lucky gifts only (catalog lucky_* rolls) — not invented Mikoo packs.
    */
+  /**
+   * Small lucky outcomes stay inside the originating room. Only high-value wins
+   * are broadcast as app-wide celebrations. Thresholds match the Android toast
+   * classifier: multiplier >= 10x or payout >= 1,000 coins.
+   */
   private broadcastLuckyCelebration(opts: {
     roomId?: string;
     senderId: string;
@@ -3129,25 +3134,22 @@ export class GiftsService implements OnModuleInit {
     luckyCoinsWon: number;
     eventId?: string;
   }) {
+    if (!this.realtime) return;
     const stake = Math.max(0, Math.floor(Number(opts.coinPrice) || 0))
       * Math.max(1, Math.floor(Number(opts.quantity) || 1));
     const mul = Number(opts.luckyMultiplier) || 0;
     const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
-    // Global celebration toasts are reserved for positive payouts. No-payout results
-    // remain room-scoped through lucky:hit, avoiding platform-wide toast spam.
-    if (won <= 0 || !this.realtime) return;
     const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
     const soft = mul > 0 && mul < 1;
     const times = Math.max(1, Math.round(mul));
     const giftLabel = (opts.giftName || '').trim();
-    const loss = won <= 0 || mul <= 0;
-    const title = loss ? 'حظ أوفر' : soft ? 'مردود جزئي' : 'حظ سعيد!';
-    const body = loss
+    const title = won <= 0 || mul <= 0 ? 'حظ أوفر' : soft ? 'مردود جزئي' : 'حظ سعيد!';
+    const body = won <= 0 || mul <= 0
       ? `لم يحالف الحظ ${name} هذه المرة`
       : soft
         ? `مبروك ${name} حصل على ${won} · مردود جزئي`
         : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
-    this.realtime.emitToAll('celebration:toast', {
+    const payload = {
       kind: 'lucky_hit',
       id: opts.eventId || `lucky:${opts.senderId}:${Date.now()}`,
       userId: opts.senderId,
@@ -3162,7 +3164,14 @@ export class GiftsService implements OnModuleInit {
       title,
       body,
       at: new Date().toISOString(),
-    });
+    };
+    const highValueWin = won >= 1000 || mul >= 10;
+    if (highValueWin) {
+      this.realtime.emitToAll('celebration:toast', payload);
+    } else if (opts.roomId) {
+      // Room-only event: no platform-wide toast spam for small wins/returns.
+      this.realtime.emitToRoom(opts.roomId, 'celebration:toast', payload);
+    }
   }
 
   async history(userId: string, query: PaginationDto) {
