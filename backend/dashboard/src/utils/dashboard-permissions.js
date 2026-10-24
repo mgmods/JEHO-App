@@ -7,6 +7,7 @@ export const ROUTE_MODULE = {
   'profile-action-icons': 'profileActionIcons',
   'cp-settings': 'cpSettings',
   users: 'users',
+  medals: 'users',
   'user-detail': 'users',
   agencies: 'agencies',
   rooms: 'rooms',
