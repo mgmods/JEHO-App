@@ -72,6 +72,55 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/storeBalanceStrip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="14dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvStoreBalanceLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:gravity="center_vertical"
+                android:text="رصيدك"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvStoreBalance"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_cosmetic_price_chip"
+                android:drawableStart="@drawable/ic_coin"
+                android:drawablePadding="5dp"
+                android:gravity="center"
+                android:paddingHorizontal="12dp"
+                android:text="—"
+                android:textColor="#FF8A4B08"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/tvStoreTagline"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:gravity="center_vertical"
+                android:text="جدّد إطلالتك ✦"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
         <!-- Native hero: HostSignalView (SVGA) for frames — same engine as live room. -->
         <LinearLayout
             android:id="@+id/nativeHeroWrap"
