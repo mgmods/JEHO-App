@@ -200,7 +200,7 @@ const routes = [
         path: 'badges',
         name: 'badges',
         component: () => import('@/views/BadgesView.vue'),
-        meta: { title: 'الشارات وإهداؤها', module: 'users' },
+        meta: { title: 'الميداليات وإهداؤها', module: 'users' },
       },
       {
         path: 'daily-login-rewards',
