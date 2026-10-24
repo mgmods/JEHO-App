@@ -3168,10 +3168,10 @@ export class GiftsService implements OnModuleInit {
     const highValueWin = won >= 1000 || mul >= 10;
     if (highValueWin) {
       this.realtime.emitToAll('celebration:toast', payload);
-    } else if (opts.roomId) {
-      // Room-only event: no platform-wide toast spam for small wins/returns.
-      this.realtime.emitToRoom(opts.roomId, 'celebration:toast', payload);
     }
+    // Small wins/returns are already emitted as the room-scoped lucky:hit
+    // event by the send paths above. Do not emit a second toast event here:
+    // it would duplicate the in-room toast on clients that handle both events.
   }
 
   async history(userId: string, query: PaginationDto) {
