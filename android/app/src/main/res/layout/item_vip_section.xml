@@ -10,7 +10,7 @@
         android:id="@+id/tvSectionTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="@color/text_primary"
+        android:textColor="#FFF7F2FF"
         android:textSize="13sp"
         android:textStyle="bold"
         tools:text="مزايا داخل الغرف" />
@@ -21,7 +21,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
         android:layout_marginBottom="4dp"
-        android:textColor="@color/text_secondary"
+        android:textColor="#FFB9BED0"
         android:textSize="11sp"
         tools:text="تظهر فور دخولك" />
 
