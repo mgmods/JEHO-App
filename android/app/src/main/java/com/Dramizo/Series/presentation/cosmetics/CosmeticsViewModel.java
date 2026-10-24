@@ -232,10 +232,13 @@ public class CosmeticsViewModel extends ViewModel {
                 error.postValue(r.error);
                 return;
             }
-            if (r.data != null && r.data.expiresAt != null) {
-                synchronized (ownedIds) {
-                    ownedIds.add(cosmeticId);
+            // Successful purchase means ownership even for permanent items (expiresAt == null).
+            synchronized (ownedIds) {
+                ownedIds.add(cosmeticId);
+                if (r.data != null && r.data.expiresAt != null && !r.data.expiresAt.isEmpty()) {
                     expiresAtById.put(cosmeticId, r.data.expiresAt);
+                } else {
+                    expiresAtById.remove(cosmeticId);
                 }
             }
             // Server already auto-equips; call equip again to sync worn URLs into session.
@@ -326,6 +329,9 @@ public class CosmeticsViewModel extends ViewModel {
         cached.entryEffectUrl = profile.entryEffectUrl;
         cached.entryAnimationUrl = profile.entryAnimationUrl;
         cached.roomCardUrl = profile.roomCardUrl;
+        cached.profileCardUrl = profile.profileCardUrl;
+        cached.chatBubbleUrl = profile.chatBubbleUrl;
+        cached.nameplateUrl = profile.nameplateUrl;
         cached.levelBadgeUrl = profile.levelBadgeUrl;
         cached.vipBadgeUrl = profile.vipBadgeUrl;
         cached.hostBadgeUrl = profile.hostBadgeUrl;
