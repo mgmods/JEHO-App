@@ -441,13 +441,9 @@ export class SlotGamesService {
 
       language,
 
-      gameMode:
-        game.id === 'fishing'
-          ? // 2 = half-screen (in-room); 3 = full immersive splash outside room.
-            voiceRoomId
-            ? '2'
-            : '3'
-          : '2',
+      // 2 = half-screen inside a voice room; 3 = full-screen from the Games tab.
+      // Apply the same scene mode to every game, not only Fishing.
+      gameMode: voiceRoomId ? '2' : '3',
 
       currencyIcon,
 
