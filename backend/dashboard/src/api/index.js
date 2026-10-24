@@ -370,3 +370,12 @@ export const supportChestApi = {
   getConfig: () => safeRequest(() => api.get('/admin/support-chest/config')),
   saveConfig: (payload) => safeRequest(() => api.patch('/admin/support-chest/config', payload)),
 }
+
+export const medalsApi = {
+  list: () => safeRequest(() => api.get('/admin/badges')),
+  create: (payload) => safeRequest(() => api.post('/admin/badges', payload)),
+  update: (id, payload) => safeRequest(() => api.put(`/admin/badges/${id}`, payload)),
+  remove: (id) => safeRequest(() => api.delete(`/admin/badges/${id}`)),
+  grant: (id, payload) => safeRequest(() => api.post(`/admin/badges/${id}/grant`, payload)),
+  grantAll: (id, payload) => safeRequest(() => api.post(`/admin/badges/${id}/grant-all`, payload)),
+}
