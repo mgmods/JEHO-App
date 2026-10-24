@@ -20,6 +20,8 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.local.prefs.SessionManager;
 import com.Dramizo.Series.data.remote.dto.CosmeticDtos;
+import com.Dramizo.Series.data.remote.dto.WalletDtos;
+import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
@@ -52,7 +54,7 @@ public class CosmeticsActivity extends ThemedActivity {
     private SessionManager session;
     private TabLayout tabs;
     private androidx.viewpager2.widget.ViewPager2 pager;
-    private TextView title, bagButton, rechargeButton, heroName, heroHint, heroDays;
+    private TextView title, bagButton, rechargeButton, balanceView, heroName, heroHint, heroDays;
     private HostSignalView heroFrame;
     private ImageView heroMedia;
     private FrameLayout heroMediaHolder;
@@ -106,6 +108,7 @@ public class CosmeticsActivity extends ThemedActivity {
         title = findViewById(R.id.tvTitle);
         bagButton = findViewById(R.id.btnBag);
         rechargeButton = findViewById(R.id.btnRecharge);
+        balanceView = findViewById(R.id.tvStoreBalance);
         tabs = findViewById(R.id.tabs);
         pager = findViewById(R.id.pager);
         heroName = findViewById(R.id.tvHeroName);
@@ -128,11 +131,14 @@ public class CosmeticsActivity extends ThemedActivity {
         });
         bagButton.setText(bagMode ? "المتجر" : "حقيبتي");
         rechargeButton.setOnClickListener(v -> BalanceRedirect.openRecharge(this));
+        balanceView.setOnClickListener(v -> BalanceRedirect.openRecharge(this));
+        findViewById(R.id.tvStoreBalanceLabel).setOnClickListener(v -> BalanceRedirect.openRecharge(this));
         title.setText(bagMode ? "حقيبتي" : "متجر JEHO");
 
         vm = new ViewModelProvider(this,
                 new ViewModelFactory(ContainerProvider.from(this))).get(CosmeticsViewModel.class);
         vm.setBagMode(bagMode);
+        refreshWalletBalance();
         pager.setOffscreenPageLimit(1);
         pager.setAdapter(new FragmentStateAdapter(this) {
             @Override public int getItemCount() { return TYPES.length; }
@@ -180,6 +186,29 @@ public class CosmeticsActivity extends ThemedActivity {
                 if (position >= 0 && position < TYPES.length) vm.setFilterType(TYPES[position]);
             }
         });
+    }
+
+    private void refreshWalletBalance() {
+        if (balanceView == null) return;
+        balanceView.setText("…");
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<WalletDtos.WalletDto> result =
+                    ContainerProvider.from(this).getWalletRepository().getWallet();
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed() || balanceView == null) return;
+                if (result != null && result.success && result.data != null) {
+                    balanceView.setText(String.format(java.util.Locale.US, "%,d", result.data.coins));
+                } else {
+                    balanceView.setText("عرض الرصيد");
+                }
+            });
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshWalletBalance();
     }
 
     private void showPreview(@Nullable CosmeticDtos.CosmeticDto item) {
