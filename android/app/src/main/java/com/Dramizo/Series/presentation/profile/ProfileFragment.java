@@ -89,12 +89,14 @@ public class ProfileFragment extends Fragment {
         };
         binding.headerProfile.setOnClickListener(openProfile);
         binding.imgAvatar.setOnClickListener(openProfile);
-        // Keep the badges/medals section hidden in the Me tab as well as public profiles.
         if (binding.rowProfileBadges != null) {
-            binding.rowProfileBadges.setVisibility(View.GONE);
-            binding.rowProfileBadges.setOnClickListener(null);
+            binding.rowProfileBadges.setOnClickListener(v -> {
+                if (myId == null || myId.trim().isEmpty()) return;
+                Intent medals = new Intent(requireContext(), BadgeActivity.class);
+                medals.putExtra(BadgeActivity.EXTRA_USER_ID, myId);
+                startActivity(medals);
+            });
         }
-        if (binding.earnedBadgesContainer != null) binding.earnedBadgesContainer.setVisibility(View.GONE);
 
         // Bind only views that exist in fragment_profile.xml. The former action*/icon* IDs
         // belonged to a removed shortcut grid and caused FragmentProfileBinding compilation errors.
@@ -187,7 +189,7 @@ public class ProfileFragment extends Fragment {
         viewModel.getUser().observe(getViewLifecycleOwner(), user -> {
             if (user == null) return;
             myId = user.id;
-            // Badge cabinet is disabled platform-wide; avoid its additional network request.
+            loadProfileBadges(user.id);
             bindMyCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
             binding.tvDisplayName.setText(user.displayName);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
@@ -577,21 +579,76 @@ public class ProfileFragment extends Fragment {
         } catch (Exception ignored) {
             applyTasksFeatureVisibility();
         }
-        // Refresh earned badges on returning to the app so dashboard grants appear without
-        // requiring the user to sign out or reinstall.
-        // Badge cabinet is disabled; do not fetch it when returning to the app.
+        // Refresh gifted medals when returning from the dashboard or another screen.
+        if (myId != null && !myId.trim().isEmpty()) loadProfileBadges(myId);
         // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
         if (viewModel != null) viewModel.loadMe(false);
         loadAgencyAction();
-        // Prevent any stale observer or retained view from resurrecting the retired cabinet.
-        if (binding != null) {
-            if (binding.rowProfileBadges != null) binding.rowProfileBadges.setVisibility(View.GONE);
-            if (binding.earnedBadgesContainer != null) binding.earnedBadgesContainer.setVisibility(View.GONE);
-        }
         refreshWalletBalances(false);
     }
 
-    /** Badge/medal cabinet is disabled platform-wide; no request or rendering path remains. */
+    private void loadProfileBadges(String userId) {
+        if (binding == null || binding.earnedBadgesContainer == null
+                || userId == null || userId.trim().isEmpty()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned =
+                    new java.util.ArrayList<>();
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<
+                        java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
+                        c.getUserApi().earnedBadges(userId).execute();
+                if (response.isSuccessful() && response.body() != null
+                        && response.body().data != null) {
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto medal : response.body().data) {
+                        if (medal != null && medal.earned) earned.add(medal);
+                    }
+                }
+            } catch (Exception ignored) {
+                // Keep the profile usable if the network is temporarily unavailable.
+            }
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || !isAdded()) return;
+                binding.earnedBadgesContainer.removeAllViews();
+                if (binding.rowProfileBadges != null) {
+                    binding.rowProfileBadges.setVisibility(earned.isEmpty() ? View.GONE : View.VISIBLE);
+                }
+                for (com.Dramizo.Series.data.remote.dto.BadgeDto medal : earned) {
+                    android.widget.ImageView icon = new android.widget.ImageView(requireContext());
+                    int size = (int) (28 * getResources().getDisplayMetrics().density + 0.5f);
+                    int pad = (int) (3 * getResources().getDisplayMetrics().density + 0.5f);
+                    android.widget.LinearLayout.LayoutParams lp =
+                            new android.widget.LinearLayout.LayoutParams(size, size);
+                    lp.setMargins(0, 0, (int) (5 * getResources().getDisplayMetrics().density + 0.5f), 0);
+                    icon.setLayoutParams(lp);
+                    icon.setPadding(pad, pad, pad, pad);
+                    icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                    android.graphics.drawable.GradientDrawable chip =
+                            new android.graphics.drawable.GradientDrawable();
+                    chip.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                    chip.setCornerRadius(size / 2f);
+                    chip.setColor(0x1AFFD479);
+                    chip.setStroke(Math.max(1, (int) (getResources().getDisplayMetrics().density + 0.5f)),
+                            0x99FFD479);
+                    icon.setBackground(chip);
+                    icon.setContentDescription(medal.name == null ? "ميدالية مكتسبة" : medal.name);
+                    Glide.with(ProfileFragment.this)
+                            .load(AssetCatalog.absoluteUrl(medal.imageUrl))
+                            .placeholder(R.drawable.ic_medal_default)
+                            .error(R.drawable.ic_medal_default)
+                            .into(icon);
+                    icon.setOnClickListener(v -> {
+                        Intent intent = new Intent(requireContext(), BadgeActivity.class);
+                        intent.putExtra(BadgeActivity.EXTRA_USER_ID, userId);
+                        startActivity(intent);
+                    });
+                    binding.earnedBadgesContainer.addView(icon);
+                }
+            });
+        });
+    }
+
     private void applyTasksFeatureVisibility() {
         if (binding == null) return;
         // Entire row GONE — no "مهام" label left on profile.
