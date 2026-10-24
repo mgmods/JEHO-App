@@ -243,7 +243,9 @@ public class CosmeticsActivity extends ThemedActivity {
             heroMedia.setVisibility(View.GONE);
             heroFrame.setVisibility(View.VISIBLE);
             String avatar = session == null ? null : session.getAvatarUrl();
-            heroFrame.bindStaticPreview(playable, avatar, null, 1);
+            // Only the selected hero runs the full frame renderer, so GIF/SVGA/video
+            // can animate here without creating heavy renderers in every grid cell.
+            heroFrame.bind(playable, avatar, item.meta, 1);
         } else if (kind == CosmeticMedia.Kind.VIDEO && playable != null) {
             heroFrame.clearSignal();
             heroFrame.setVisibility(View.GONE);
