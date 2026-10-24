@@ -201,28 +201,14 @@
           <label class="form-label small mb-1">{{ game.label }} — {{ supportsSharedRtp(game.id) ? 'العائد للاعب %' : game.id === 'crash' ? 'خصم السحب %' : 'نسبة الفوز %' }}</label>
           <input v-if="supportsDirectWinRate(game.id)" :value="gameWinRates[game.id] ?? ''" @input="gameWinRates[game.id] = $event.target.value === '' ? undefined : Math.max(0, Math.min(100, Number($event.target.value)))" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
           <input v-else-if="supportsSharedRtp(game.id)" :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
-          <input v-else-if="game.id === 'crash'" v-model.number="odds.crashCashoutRake" type="number" min="90" max="99" step="1" class="form-control form-control-sm" />
+          <input v-else-if="game.id === 'crash'" :value="Math.round(Number(odds.crashCashoutRake) * 100)" @input="odds.crashCashoutRake = Math.max(90, Math.min(99, Number($event.target.value) || 90)) / 100" type="number" min="90" max="99" step="1" class="form-control form-control-sm" />
           <div class="small mt-1" :class="supportsDirectWinRate(game.id) || supportsSharedRtp(game.id) || game.id === 'crash' ? 'text-success' : 'text-muted'">{{ supportsDirectWinRate(game.id) ? 'نسبة الفوز الفعلية من محرك الخادم' : supportsSharedRtp(game.id) ? 'عائد الجولة المشتركة من الخادم' : game.id === 'crash' ? 'خصم السحب يطبّق على محرك Crash' : 'لا يوجد محرك إعدادات لهذه اللعبة' }}</div>
         </div>
       </div>
       <div class="small text-muted mt-2">0% = لا فوز في ألعاب الخادم التي تدعم هذا الضبط، 100% = فوز في كل محاولة مؤهلة. قد تبقى حدود الجوائز والحد الأقصى للربح مطبّقة.</div>
     </div>
 
-    <div class="glass p-3 mb-4">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <div>
-          <h3 class="h6 mb-1">نسبة العائد للألعاب ذات النتيجة المشتركة</h3>
-          <p class="small text-muted mb-0">تؤثر على اختيار نتيجة الجولة المشتركة، وليست ضمانًا أن يربح أو يخسر كل لاعب في الجولة نفسها.</p>
-        </div>
-      </div>
-      <div class="row g-2">
-        <div v-for="game in safeManageableGames.filter((g) => supportsSharedRtp(g.id))" :key="'rtp-'+game.id" class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small mb-1">{{ game.label }} — عائد اللاعب %</label>
-          <input :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
-        </div>
-      </div>
-      <div class="small text-muted mt-2">يُحفظ هذا الإعداد مع زر «حفظ نسب الفوز» أعلاه. ألعاب Crash لها إعدادات مستقلة لخصم السحب وحدّ المضاعف في القسم الأول.</div>
-    </div>
+    <div class="small text-muted mb-4">تظهر لكل لعبة آلية الضبط التي يدعمها محركها: نسبة فوز مباشرة، أو عائد نتيجة مشتركة، أو خصم السحب في Crash. لا يُعرض ضبط شكلي لا يقرأه الخادم.</div>
 
     <div v-if="editIdx !== null && editDraft" class="edit-overlay" @click.self="closeEdit">
       <div class="glass edit-panel">
