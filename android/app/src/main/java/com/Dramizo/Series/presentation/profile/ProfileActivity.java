@@ -708,7 +708,7 @@ public class ProfileActivity extends ThemedActivity {
             @androidx.annotation.Nullable ImageView medal,
             int vipLevel,
             @androidx.annotation.Nullable String levelBadgeUrl) {
-        // Medal visuals are intentionally hidden with the retired profile badge cabinet.
+        // Keep the legacy VIP/rank strip separate from the gifted profile medals.
         if (medal != null) {
             medal.setVisibility(View.GONE);
             medal.setImageDrawable(null);
