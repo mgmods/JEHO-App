@@ -4,16 +4,16 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="12dp"
-    android:background="@drawable/bg_vanity_item"
+    android:background="@drawable/bg_vanity_store_card"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="14dp">
 
     <!-- Full ID — never clipped with dots -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_vanity_hero"
-        android:minHeight="72dp"
+        android:background="@drawable/bg_vanity_store_hero"
+        android:minHeight="78dp"
         android:paddingHorizontal="14dp"
         android:paddingVertical="14dp">
 
@@ -24,7 +24,7 @@
             android:layout_gravity="center"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:letterSpacing="0.12"
+            android:letterSpacing="0.10"
             android:maxLines="1"
             android:text="00000000"
             android:textColor="#454444"
@@ -47,11 +47,11 @@
             android:id="@+id/tvTier"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_vanity_chip"
+            android:background="@drawable/bg_mall_balance_pill"
             android:paddingHorizontal="10dp"
             android:paddingVertical="4dp"
             android:text="@string/vanity_tier_special"
-            android:textColor="#0F766E"
+            android:textColor="#FF6844C5"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -95,6 +95,8 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnBuy"
         style="@style/Widget.AuraLive.Button.Gold"
+        app:backgroundTint="#FF6844C5"
+        app:cornerRadius="16dp"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_marginTop="14dp"
