@@ -134,6 +134,7 @@ const sections = computed(() => [
     label: 'إدارة المتجر',
     items: [
       { name: 'cosmetics', icon: 'bi-shop-window', label: 'إعدادات المتجر: الإطارات والدخوليات' },
+      { name: 'badges', icon: 'bi-award-fill', label: 'الشارات وإهداؤها', module: 'users' },
     ],
   },
   {
