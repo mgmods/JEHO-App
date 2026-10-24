@@ -1,30 +1,34 @@
 .task-cosmetic-thumb{width:42px;height:42px;flex:0 0 42px;object-fit:contain;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);padding:3px}.task-cosmetic-empty{display:flex;align-items:center;justify-content:center;color:#d8b45b;font-size:1.2rem}.task-cosmetic-modal{background:rgba(5,8,18,.72);z-index:1080}.task-cosmetic-modal .modal-dialog{max-width:1080px}.task-cosmetic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}.task-cosmetic-option{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;padding:12px 10px;border:1px solid rgba(255,255,255,.12);border-radius:16px;background:rgba(255,255,255,.035);color:inherit;text-align:center;transition:border-color .18s,background .18s,transform .18s}.task-cosmetic-option:hover{border-color:rgba(83,205,221,.65);background:rgba(83,205,221,.08);transform:translateY(-2px)}.task-cosmetic-option.is-current{border-color:#d8b45b;background:rgba(216,180,91,.1);box-shadow:0 0 0 1px rgba(216,180,91,.25)}.task-cosmetic-preview{display:flex;align-items:center;justify-content:center;width:100%;height:100px;border-radius:12px;background:rgba(0,0,0,.16);overflow:hidden}.task-cosmetic-preview img{width:100%;height:100%;object-fit:contain}.task-cosmetic-name{font-size:.88rem;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.task-cosmetic-type{font-size:.75rem;color:var(--bs-secondary-color,#9aa4b5)}.task-cosmetic-selected{font-size:.75rem;color:#e8c96a}.min-w-0{min-width:0}@media(max-width:600px){.task-cosmetic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.task-cosmetic-preview{height:84px}}
 .daily-login-admin{margin-top:1rem}.daily-login-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px}.daily-login-card{min-width:0;padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:16px;background:rgba(255,255,255,.035)}.daily-login-day{font-weight:800;font-size:.9rem}.daily-login-preview{height:112px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-radius:13px;background:rgba(0,0,0,.16);overflow:hidden}.daily-login-preview img{width:100%;height:100%;object-fit:contain;padding:5px}.daily-login-coin{font-size:2.2rem;color:#e6bd4b}.daily-login-preview strong{font-size:1.1rem;color:#e6bd4b}.daily-login-preview span{font-size:.75rem;color:var(--bs-secondary-color,#9aa4b5)}.daily-login-placeholder{font-size:2rem;color:#d8b45b}@media(max-width:600px){.daily-login-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.daily-login-card{padding:10px}.daily-login-preview{height:88px}}
 
-/* Premium seven-day login reward manager */
-.daily-login-admin{position:relative;overflow:hidden;border:1px solid rgba(130,151,255,.22);background:radial-gradient(ellipse at 8% 0%,rgba(112,91,255,.14),transparent 42%),linear-gradient(145deg,rgba(20,27,49,.96),rgba(12,17,32,.96));box-shadow:0 18px 48px rgba(0,0,0,.18)}
-.daily-login-admin:before{content:"";position:absolute;inset:0 0 auto;height:2px;background:linear-gradient(90deg,#7c6cff,#57d8df,#edc66c);opacity:.9}
-.daily-login-admin>.d-flex:first-child{position:relative;padding:4px 2px 16px;border-bottom:1px solid rgba(255,255,255,.09)}
-.daily-login-admin h5{font-size:1.08rem;font-weight:800;letter-spacing:.01em;color:#f5f6ff}
-.daily-login-admin .small.text-muted{line-height:1.65}
-.daily-login-admin .daily-login-grid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-top:18px}
-.daily-login-admin .daily-login-card{position:relative;display:flex;flex-direction:column;padding:14px;border:1px solid rgba(255,255,255,.095);border-radius:19px;background:linear-gradient(160deg,rgba(255,255,255,.065),rgba(255,255,255,.018));box-shadow:0 8px 22px rgba(0,0,0,.13);transition:transform .18s,border-color .18s,box-shadow .18s}
-.daily-login-admin .daily-login-card:hover{transform:translateY(-2px);border-color:rgba(120,143,255,.42);box-shadow:0 12px 26px rgba(0,0,0,.2)}
-.daily-login-admin .daily-login-day{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border:1px solid rgba(123,111,255,.28);border-radius:999px;background:rgba(112,96,255,.12);color:#e2ddff;font-size:.78rem;letter-spacing:.02em}
-.daily-login-admin .daily-login-preview{height:128px;position:relative;border:1px solid rgba(255,255,255,.075);background:radial-gradient(circle at 50% 20%,rgba(123,111,255,.12),transparent 65%),rgba(3,7,18,.38);border-radius:15px;margin-bottom:3px}
-.daily-login-admin .daily-login-preview img{max-width:100%;max-height:100%;object-fit:contain;padding:9px;filter:drop-shadow(0 5px 10px rgba(0,0,0,.25))}
-.daily-login-admin .daily-login-coin{font-size:2.35rem;color:#f2ce68;filter:drop-shadow(0 4px 9px rgba(242,206,104,.18))}
-.daily-login-admin .daily-login-preview strong{font-size:1.15rem;font-variant-numeric:tabular-nums;color:#f8d978}
-.daily-login-admin .daily-login-placeholder{font-size:2.1rem;color:#a8a0ff}
-.daily-login-admin .form-label{margin-bottom:5px;color:rgba(236,239,255,.72);font-weight:650}
-.daily-login-admin .form-control,.daily-login-admin .form-select{min-height:36px;border-color:rgba(255,255,255,.12);border-radius:10px;background-color:rgba(3,7,18,.48);color:#f5f6ff}
-.daily-login-admin .form-control:focus,.daily-login-admin .form-select:focus{border-color:rgba(124,108,255,.7);box-shadow:0 0 0 3px rgba(124,108,255,.13)}
-.daily-login-admin .form-select option{background:#151a2d;color:#f5f6ff}
-.daily-login-admin .btn-outline-info{border-color:rgba(91,207,222,.4);border-radius:10px;color:#a4eaf2}
-.daily-login-admin .btn-aurora{border-radius:12px;font-weight:750;box-shadow:0 7px 18px rgba(112,96,255,.16)}
-.daily-login-admin .alert{border-radius:12px}
-.daily-login-admin .daily-login-card .fw-semibold{color:#f3f4ff}
+/* Existing seven-day reward manager — polished, compact, and mobile-safe. */
+.daily-login-admin{position:relative;overflow:hidden;margin-top:1rem;padding:clamp(14px,2vw,24px)!important;border:1px solid #dcefe3;border-radius:20px;background:#fff;color:#183126;box-shadow:0 12px 34px rgba(20,70,42,.08)}
+.daily-login-admin:before{content:"";position:absolute;inset:0 0 auto;height:5px;background:#169447}
+.daily-login-admin>.d-flex:first-child{position:relative;padding:6px 2px 16px;border-bottom:1px solid #e5eee8}
+.daily-login-admin h5{font-size:1.12rem;font-weight:850;color:#14813c;letter-spacing:0}
+.daily-login-admin .small.text-muted{color:#66766d!important;line-height:1.65}
+.daily-login-admin .daily-login-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}
+.daily-login-admin .daily-login-card{min-width:0;display:flex;flex-direction:column;padding:12px;border:1px solid #e2eae4;border-radius:15px;background:#fff;color:#20352a;box-shadow:0 4px 13px rgba(20,70,42,.045);transition:transform .16s,border-color .16s,box-shadow .16s}
+.daily-login-admin .daily-login-card:hover{transform:translateY(-2px);border-color:#9dd8b1;box-shadow:0 9px 22px rgba(20,70,42,.09)}
+.daily-login-admin .daily-login-day{display:inline-flex;align-items:center;padding:5px 9px;border:1px solid #cdebd6;border-radius:8px;background:#effaf2;color:#16743a;font-size:.78rem;font-weight:800}
+.daily-login-admin .daily-login-preview{height:auto;aspect-ratio:1/1;min-height:105px;position:relative;border:1px solid #e6eee8;border-radius:12px;margin-bottom:7px;background:#f7faf8;color:#264333}
+.daily-login-admin .daily-login-preview img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;padding:9px;filter:none}
+.daily-login-admin .daily-login-coin{font-size:2.15rem;color:#169447;filter:none}
+.daily-login-admin .daily-login-preview strong{font-size:1.05rem;font-variant-numeric:tabular-nums;color:#16833d}
+.daily-login-admin .daily-login-preview span{color:#66766d}
+.daily-login-admin .daily-login-placeholder{font-size:2rem;color:#8ca997}
+.daily-login-admin .form-label{margin-bottom:5px;color:#455b4d;font-weight:700}
+.daily-login-admin .form-control,.daily-login-admin .form-select{min-height:36px;border:1px solid #d7e4db;border-radius:9px;background:#fff;color:#20352a}
+.daily-login-admin .form-control:focus,.daily-login-admin .form-select:focus{border-color:#50b874;box-shadow:0 0 0 3px rgba(22,148,71,.12)}
+.daily-login-admin .form-select option{background:#fff;color:#20352a}
+.daily-login-admin .btn-outline-info{border-color:#9eddb3;border-radius:9px;color:#16743a;background:#f4fbf6}
+.daily-login-admin .btn-outline-info:hover{border-color:#169447;background:#e7f8ec;color:#126d34}
+.daily-login-admin .btn-aurora{border:1px solid #16833d;border-radius:10px;background:#169447;color:#fff;font-weight:800;box-shadow:0 5px 12px rgba(22,148,71,.15)}
+.daily-login-admin .btn-aurora:hover{background:#117a39}
+.daily-login-admin .alert{border-radius:11px}
+.daily-login-admin .daily-login-card .fw-semibold{color:#20352a}
 .daily-login-admin .daily-login-card .form-control-sm,.daily-login-admin .daily-login-card .form-select-sm{font-size:.82rem}
-@media(max-width:600px){.daily-login-admin .daily-login-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.daily-login-admin .daily-login-card{padding:10px;border-radius:15px}.daily-login-admin .daily-login-preview{height:96px}.daily-login-admin>.d-flex:first-child{align-items:flex-start!important}.daily-login-admin .daily-login-day{font-size:.72rem}}
-
+.daily-login-admin .form-check-input:checked{background-color:#169447;border-color:#169447}
+@media(max-width:1000px){.daily-login-admin .daily-login-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.daily-login-admin .daily-login-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.daily-login-admin .daily-login-card{padding:9px;border-radius:13px}.daily-login-admin .daily-login-preview{min-height:0}.daily-login-admin>.d-flex:first-child{align-items:flex-start!important}.daily-login-admin .daily-login-day{font-size:.72rem}.daily-login-admin .daily-login-admin-actions{width:100%}}
 .daily-login-coin-image { width: 54px; height: 54px; object-fit: contain; display: block; margin: 0 auto 4px; }
