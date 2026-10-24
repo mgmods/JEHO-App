@@ -137,6 +137,7 @@ export const ROUTE_MODULE: Record<string, DashboardModule | 'super-only'> = {
   offers: 'offers',
   promos: 'promos',
   'lucky-boxes': 'luckyBoxes',
+  'daily-login-rewards': 'tasks',
   tasks: 'tasks',
   'host-target': 'hostTarget',
   contests: 'contests',
