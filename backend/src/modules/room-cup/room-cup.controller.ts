@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, UseGuards, OnModuleInit, Logger } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { Room } from '../../database/entities/room.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
@@ -32,6 +32,7 @@ export class RoomCupController implements OnModuleInit {
     private readonly txRepo: Repository<WalletTransaction>,
     @InjectRepository(VipPlan) private readonly vipPlansRepo: Repository<VipPlan>,
     @InjectRepository(UserVip) private readonly userVipRepo: Repository<UserVip>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async onModuleInit() {
@@ -178,6 +179,44 @@ export class RoomCupController implements OnModuleInit {
     return { enabled: true, period, seasonKey: key, periodStart: start.toISOString(), items };
   }
 
+  private async grantCurrencyPrize(
+    hostId: string,
+    seasonKey: string,
+    rank: number,
+    currency: CurrencyType,
+    amount: number,
+  ) {
+    const referenceId = `${seasonKey}:r${rank}:${currency}`;
+    await this.dataSource.transaction(async (manager) => {
+      // Serialize grants for this host and keep balance + ledger in one transaction.
+      let wallet = await manager.findOne(Wallet, {
+        where: { userId: hostId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!wallet) {
+        wallet = manager.create(Wallet, { userId: hostId });
+        wallet = await manager.save(Wallet, wallet);
+      }
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId: hostId, referenceType: 'room_cup', referenceId },
+      });
+      if (existing) return;
+      if (currency === CurrencyType.COINS) wallet.coins = Number(wallet.coins) + amount;
+      else wallet.diamonds = Number(wallet.diamonds) + amount;
+      await manager.save(Wallet, wallet);
+      await manager.save(WalletTransaction, manager.create(WalletTransaction, {
+        userId: hostId,
+        type: TransactionType.LUCKY_REWARD,
+        currency,
+        amount,
+        balanceAfter: currency === CurrencyType.COINS ? Number(wallet.coins) : Number(wallet.diamonds),
+        referenceType: 'room_cup',
+        referenceId,
+        description: `جائزة كأس الروم #${rank}`,
+      }));
+    });
+  }
+
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('admin/end-season')
@@ -217,44 +256,10 @@ export class RoomCupController implements OnModuleInit {
           wallet = await this.walletsRepo.save(this.walletsRepo.create({ userId: hostId }));
         }
         if (coins > 0) {
-          const referenceId = `${seasonKey}:r${rank}:coins`;
-          const alreadyPaid = await this.txRepo.findOne({ where: { userId: hostId, referenceType: 'room_cup', referenceId } });
-          if (!alreadyPaid) {
-          wallet.coins = Number(wallet.coins) + coins;
-          await this.walletsRepo.save(wallet);
-          await this.txRepo.save(
-            this.txRepo.create({
-              userId: hostId,
-              type: TransactionType.LUCKY_REWARD,
-              currency: CurrencyType.COINS,
-              amount: coins,
-              balanceAfter: Number(wallet.coins),
-              referenceType: 'room_cup',
-              referenceId,
-              description: `جائزة كأس الروم #${rank}`,
-            }),
-          );
-          }
+          await this.grantCurrencyPrize(hostId, seasonKey, rank, CurrencyType.COINS, coins);
         }
         if (diamonds > 0) {
-          const referenceId = `${seasonKey}:r${rank}:diamonds`;
-          const alreadyPaid = await this.txRepo.findOne({ where: { userId: hostId, referenceType: 'room_cup', referenceId } });
-          if (!alreadyPaid) {
-          wallet.diamonds = Number(wallet.diamonds) + diamonds;
-          await this.walletsRepo.save(wallet);
-          await this.txRepo.save(
-            this.txRepo.create({
-              userId: hostId,
-              type: TransactionType.LUCKY_REWARD,
-              currency: CurrencyType.DIAMONDS,
-              amount: diamonds,
-              balanceAfter: Number(wallet.diamonds),
-              referenceType: 'room_cup',
-              referenceId,
-              description: `جائزة كأس الروم #${rank}`,
-            }),
-          );
-          }
+          await this.grantCurrencyPrize(hostId, seasonKey, rank, CurrencyType.DIAMONDS, diamonds);
         }
       }
       // VIP is purchase-only — ignore vipLevel / vipPlanId prizes from room cup.
