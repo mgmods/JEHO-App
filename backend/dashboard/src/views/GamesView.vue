@@ -202,7 +202,7 @@
           <input v-if="supportsDirectWinRate(game.id)" :value="gameWinRates[game.id] ?? ''" @input="gameWinRates[game.id] = $event.target.value === '' ? undefined : Math.max(0, Math.min(100, Number($event.target.value)))" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
           <input v-else-if="supportsSharedRtp(game.id)" :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
           <input v-else-if="game.id === 'crash'" :value="Math.round(Number(odds.crashCashoutRake) * 100)" @input="odds.crashCashoutRake = Math.max(90, Math.min(99, Number($event.target.value) || 90)) / 100" type="number" min="90" max="99" step="1" class="form-control form-control-sm" />
-          <div class="small mt-1" :class="supportsDirectWinRate(game.id) || supportsSharedRtp(game.id) || game.id === 'crash' ? 'text-success' : 'text-muted'">{{ supportsDirectWinRate(game.id) ? 'نسبة الفوز الفعلية من محرك الخادم' : supportsSharedRtp(game.id) ? 'عائد الجولة المشتركة من الخادم' : game.id === 'crash' ? 'خصم السحب يطبّق على محرك Crash' : 'لا يوجد محرك إعدادات لهذه اللعبة' }}</div>
+          <div class="small mt-1" :class="supportsDirectWinRate(game.id) || supportsSharedRtp(game.id) || game.id === 'crash' ? 'text-success' : 'text-muted'">{{ game.id === 'crash' ? 'احتمال تجاوز ×1.5 من محرك الخادم' : supportsDirectWinRate(game.id) ? 'نسبة الفوز الفعلية من محرك الخادم' : supportsSharedRtp(game.id) ? 'عائد الجولة المشتركة من الخادم' : 'لا يوجد محرك إعدادات لهذه اللعبة' }}</div>
         </div>
       </div>
       <div class="small text-muted mt-2">0% = لا فوز في ألعاب الخادم التي تدعم هذا الضبط، 100% = فوز في كل محاولة مؤهلة. قد تبقى حدود الجوائز والحد الأقصى للربح مطبّقة.</div>
@@ -398,8 +398,8 @@ const directWinRateGameIds = new Set([
   // Server-hosted Mikoo/BaiShun adapters: spinPayout reads getGameWinRate(gameId).
   'cleopatra-slot','cleopatra-slots','football-plinko','fortune-slot','fishing',
   'line-slots','megaways-slots','olympians','pirate-king','slot777','sugar-rush','swimsuit-party',
-  // These two game engines have dedicated server-side win-gate logic.
-  'hilo','royal-battle',
+  // These game engines have dedicated server-side win-gate logic.
+  'hilo','royal-battle','crash',
 ])
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
 const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
