@@ -403,6 +403,9 @@ public final class GlobalCelebrationToast {
             @Nullable String kind,
             @Nullable String roomId
     ) {
+        // Gift-send confirmation toasts are intentionally disabled. The in-room
+        // gift animation/chat remain the feedback; only lucky win/return toasts use this surface.
+        if ("gift_send".equalsIgnoreCase(kind)) return;
         if (activity == null || activity.isFinishing()) return;
         try {
             android.content.Context app = activity.getApplicationContext();
