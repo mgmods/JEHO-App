@@ -97,7 +97,7 @@
                 android:layout_height="34dp"
                 android:layout_marginStart="8dp"
                 android:background="@drawable/bg_cosmetic_price_chip"
-                android:drawableStart="@drawable/ic_coin"
+                android:drawableStart="@drawable/icon_coin"
                 android:drawablePadding="5dp"
                 android:gravity="center"
                 android:paddingHorizontal="12dp"
