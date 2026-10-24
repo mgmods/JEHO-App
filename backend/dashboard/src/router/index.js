@@ -45,6 +45,12 @@ const routes = [
         meta: { titleKey: 'routes.users' },
       },
       {
+        path: 'medals',
+        name: 'medals',
+        component: () => import('@/views/MedalsView.vue'),
+        meta: { title: 'إدارة المداليات', module: 'users' },
+      },
+      {
         path: 'users/:id',
         name: 'user-detail',
         component: () => import('@/views/UserDetailView.vue'),
