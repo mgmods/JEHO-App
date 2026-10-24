@@ -255,20 +255,10 @@ public class CosmeticsViewModel extends ViewModel {
                     expiresAtById.remove(cosmeticId);
                 }
             }
-            // Server already auto-equips; call equip again to sync worn URLs into session.
-            Result<CosmeticDtos.EquipResult> eq =
-                    container.getCosmeticsRepository().equip(cosmeticId);
-            if (eq.success && eq.data != null && eq.data.profile != null) {
-                applyEquipProfile(eq.data.profile);
-            } else {
-                Result<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto> me =
-                        container.getUserRepository().getMe();
-                if (me.success && me.data != null) {
-                    container.getSessionManager().updateCachedUser(me.data);
-                }
-            }
+            // Purchase only adds the item to the bag. Wearing is a separate explicit action.
+            // Do not call equip here: the card must switch from "شراء" to "ارتداء".
             inventoryLoadedAtMs = 0;
-            message.postValue("تم الشراء والارتداء");
+            message.postValue("تم الشراء بنجاح — يمكنك ارتداء العنصر من الحقيبة");
             loadForType(type);
         });
     }
