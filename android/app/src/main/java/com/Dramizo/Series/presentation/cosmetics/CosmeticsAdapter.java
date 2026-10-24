@@ -43,6 +43,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         int myVipLevel();
         /** Account level (not VIP). Used only for non-frame gates. */
         int myUserLevel();
+        int leaseDays(CosmeticDtos.CosmeticDto item);
     }
 
     private final List<CosmeticDtos.CosmeticDto> items = new ArrayList<>();
@@ -96,8 +97,8 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         } else {
             holder.b.tvPrice.setText(item.coinPrice > 0
                     ? holder.itemView.getContext().getString(
-                            R.string.mall_price_days, item.coinPrice, CosmeticsViewModel.LEASE_DAYS)
-                    : holder.itemView.getContext().getString(R.string.mall_free_days, CosmeticsViewModel.LEASE_DAYS));
+                            R.string.mall_price_days, item.coinPrice, listener.leaseDays(item))
+                    : holder.itemView.getContext().getString(R.string.mall_free_days, listener.leaseDays(item)));
         }
 
         if (holder.b.tvVipLock != null) {
