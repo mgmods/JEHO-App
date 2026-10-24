@@ -29,6 +29,7 @@ import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.BalanceRedirect;
 import com.Dramizo.Series.util.CosmeticMedia;
 import com.Dramizo.Series.util.HostSignalView;
+import com.Dramizo.Series.util.VanityIdStyle;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
