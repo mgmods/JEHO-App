@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "807697628126-0cpcmtmonc8nr7qmhs56gg8otegq0hat.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.Dramizo.Series",
+            "certificate_hash": "fe544713a2726865005599472b4527c62818e696"
+          }
+        },
+        {
           "client_id": "807697628126-sc7hj3pccrkt4p0b8ilji91mqb9ojs53.apps.googleusercontent.com",
           "client_type": 3
         }
