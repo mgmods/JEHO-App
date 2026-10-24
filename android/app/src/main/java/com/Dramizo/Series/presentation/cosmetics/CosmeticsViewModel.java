@@ -51,6 +51,7 @@ public class CosmeticsViewModel extends ViewModel {
     private final AtomicInteger loadSeq = new AtomicInteger();
     private volatile String filterType;
     private volatile boolean bagMode;
+    private volatile String currentRoomId;
     private volatile long inventoryLoadedAtMs;
     private static final long INVENTORY_CACHE_MS = 8_000L;
 
@@ -68,7 +69,7 @@ public class CosmeticsViewModel extends ViewModel {
 
     public void setFilterType(String type) { this.filterType = type; }
 
-    public boolean isBagMode() { return bagMode; }
+    public boolean isBagMode() { return bagMode; }\n\n    public void setCurrentRoomId(@Nullable String roomId) {\n        this.currentRoomId = roomId == null || roomId.trim().isEmpty() ? null : roomId.trim();\n    }
 
     public void setBagMode(boolean bagMode) { this.bagMode = bagMode; }
 
@@ -281,6 +282,13 @@ public class CosmeticsViewModel extends ViewModel {
 
     public void equip(String cosmeticId) {
         final String type = filterType;
+        final CosmeticDtos.CosmeticDto target = findInCurrentPage(cosmeticId);
+        final boolean roomBackground = target != null && "room_background".equals(target.type);
+        final String room = currentRoomId;
+        if (roomBackground && (room == null || room.isEmpty())) {
+            error.postValue("لتطبيق خلفية الغرفة، افتح المتجر من داخل الغرفة أولاً");
+            return;
+        }
         container.getIoExecutor().execute(() -> {
             Result<CosmeticDtos.EquipResult> r =
                     container.getCosmeticsRepository().equip(cosmeticId);
@@ -293,8 +301,32 @@ public class CosmeticsViewModel extends ViewModel {
                 if (me.success && me.data != null) {
                     container.getSessionManager().updateCachedUser(me.data);
                 }
+                if (roomBackground) {
+                    String backgroundUrl = target.previewUrl;
+                    if (backgroundUrl == null || backgroundUrl.trim().isEmpty()) {
+                        backgroundUrl = target.animationUrl;
+                    }
+                    if (backgroundUrl == null || backgroundUrl.trim().isEmpty()) {
+                        error.postValue("هذا العنصر لا يحتوي على رابط خلفية صالح");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                    java.util.Map<String, String> body = new java.util.HashMap<>();
+                    body.put("backgroundUrl", backgroundUrl);
+                    Result<Object> applied = container.getRoomRepository().setBackground(room, backgroundUrl);
+                    if (applied == null || !applied.success) {
+                        error.postValue(applied != null && applied.error != null
+                                ? applied.error : "تم ارتداء العنصر لكن تعذر تطبيق خلفية الغرفة");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                    message.postValue("تم تطبيق خلفية الغرفة بنجاح");
+                } else {
+                    message.postValue("تم الارتداء بنجاح");
+                }
                 inventoryLoadedAtMs = 0;
-                message.postValue("تم الارتداء");
                 loadForType(type);
             } else {
                 error.postValue(r.error);
