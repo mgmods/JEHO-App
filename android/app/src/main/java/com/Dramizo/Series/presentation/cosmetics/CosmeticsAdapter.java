@@ -114,8 +114,8 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
 
         String sel = listener.selectedId();
         boolean selected = sel != null && sel.equals(item.id);
-        holder.b.getRoot().setStrokeWidth(selected ? 3 : 1);
-        holder.b.getRoot().setStrokeColor(selected ? 0xFFE8A317 : 0x1A000000);
+        holder.b.getRoot().setStrokeWidth(selected ? 2 : 1);
+        holder.b.getRoot().setStrokeColor(selected ? 0xFF8B6BE8 : 0xFFEAE5F7);
         holder.b.getRoot().setAlpha(locked ? 0.72f : 1f);
 
         holder.b.btnPurchase.setVisibility(owned ? View.GONE : View.VISIBLE);
