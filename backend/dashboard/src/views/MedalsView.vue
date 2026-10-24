@@ -62,6 +62,8 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { medalsApi, uploadsApi } from '@/api'
+import PageHeader from '@/components/PageHeader.vue'
+import { resolveAsset } from '@/utils/assets'
 
 const medals = ref([])
 const loading = ref(false)
@@ -101,7 +103,7 @@ async function uploadImage(event) {
     const payload = unwrap(data)
     const url = payload.url || payload.path
     if (!url) throw new Error('تم الرفع دون رابط للصورة')
-    form.imageUrl = /^https?:\/\//i.test(url) ? url : new URL(url, window.location.origin).toString()
+    form.imageUrl = resolveAsset(url)
     previewBroken.value = false
   } catch (e) { error.value = e?.message || 'فشل رفع الصورة' }
   finally { uploading.value = false; event.target.value = '' }
