@@ -130,7 +130,12 @@ public class CosmeticsActivity extends ThemedActivity {
                 recreate();
             }
         });
-        bagButton.setText(bagMode ? "المتجر" : "حقيبتي");
+        bagButton.setText(bagMode ? "‹ المتجر" : "👜  حقيبتي");
+        bagButton.setBackgroundResource(bagMode
+                ? R.drawable.bg_mall_action_outline
+                : R.drawable.bg_mall_action_primary);
+        bagButton.setTextColor(bagMode ? 0xFF5B35B5 : 0xFFFFFFFF);
+        bagButton.setElevation(bagMode ? 0f : dp(4));
         rechargeButton.setOnClickListener(v -> BalanceRedirect.openRecharge(this));
         balanceView.setOnClickListener(v -> BalanceRedirect.openRecharge(this));
         findViewById(R.id.tvStoreBalanceLabel).setOnClickListener(v -> BalanceRedirect.openRecharge(this));
@@ -197,7 +202,7 @@ public class CosmeticsActivity extends ThemedActivity {
         });
     }
 
-    private void refreshWalletBalance() {
+    private int dp(int value) {\n        return Math.round(value * getResources().getDisplayMetrics().density);\n    }\n\n    private void refreshWalletBalance() {
         if (balanceView == null) return;
         balanceView.setText("…");
         ContainerProvider.from(this).getIoExecutor().execute(() -> {
