@@ -54,7 +54,7 @@ public class CosmeticsActivity extends ThemedActivity {
     private SessionManager session;
     private TabLayout tabs;
     private androidx.viewpager2.widget.ViewPager2 pager;
-    private TextView title, bagButton, rechargeButton, balanceView, heroName, heroHint, heroDays;
+    private TextView title, bagButton, rechargeButton, balanceView, heroName, heroHint, heroDays, storeTagline;
     private HostSignalView heroFrame;
     private ImageView heroMedia;
     private FrameLayout heroMediaHolder;
@@ -109,6 +109,7 @@ public class CosmeticsActivity extends ThemedActivity {
         bagButton = findViewById(R.id.btnBag);
         rechargeButton = findViewById(R.id.btnRecharge);
         balanceView = findViewById(R.id.tvStoreBalance);
+        storeTagline = findViewById(R.id.tvStoreTagline);
         tabs = findViewById(R.id.tabs);
         pager = findViewById(R.id.pager);
         heroName = findViewById(R.id.tvHeroName);
@@ -134,6 +135,12 @@ public class CosmeticsActivity extends ThemedActivity {
         balanceView.setOnClickListener(v -> BalanceRedirect.openRecharge(this));
         findViewById(R.id.tvStoreBalanceLabel).setOnClickListener(v -> BalanceRedirect.openRecharge(this));
         title.setText(bagMode ? "حقيبتي" : "متجر JEHO");
+        // Inventory mode prioritizes the owned-item grid instead of reserving space
+        // for the promotional preview. The store keeps the hero when browsing.
+        findViewById(R.id.nativeHeroWrap).setVisibility(bagMode ? View.GONE : View.VISIBLE);
+        if (storeTagline != null) {
+            storeTagline.setText(bagMode ? "عناصرك المملوكة وتجهيزها" : "اكتشف إطلالتك الجديدة  ✦");
+        }
 
         vm = new ViewModelProvider(this,
                 new ViewModelFactory(ContainerProvider.from(this))).get(CosmeticsViewModel.class);
