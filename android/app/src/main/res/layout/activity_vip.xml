@@ -6,7 +6,7 @@
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_home_full_gradient"
+    android:background="@drawable/bg_vip_page"
     android:orientation="vertical">
 
     <ImageView
@@ -19,7 +19,7 @@
         android:id="@+id/header"
         android:layout_width="match_parent"
         android:layout_height="52dp"
-        android:background="#FFFFF0D1"
+        android:background="#FF17142E"
         android:elevation="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -32,7 +32,7 @@
             android:contentDescription="@string/back"
             android:padding="12dp"
             android:src="@drawable/ic_arrow_back"
-            app:tint="@color/text_primary" />
+            app:tint="#FFFFFFFF" />
 
         <TextView
             android:layout_width="0dp"
@@ -40,7 +40,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="@string/aristocracy"
-            android:textColor="@color/text_primary"
+            android:textColor="#FFFFFFFF"
             android:textSize="17sp"
             android:textStyle="bold" />
 
