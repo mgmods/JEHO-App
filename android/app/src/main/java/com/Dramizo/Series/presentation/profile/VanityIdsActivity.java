@@ -12,7 +12,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
@@ -84,7 +84,8 @@ public class VanityIdsActivity extends ThemedActivity {
         etSearch = findViewById(R.id.etVanitySearch);
 
         adapter = new CatalogAdapter();
-        recycler.setLayoutManager(new LinearLayoutManager(this));
+        recycler.setLayoutManager(new GridLayoutManager(this, 3));
+        recycler.setItemAnimator(null);
         recycler.setAdapter(adapter);
         recycler.setNestedScrollingEnabled(false);
 
