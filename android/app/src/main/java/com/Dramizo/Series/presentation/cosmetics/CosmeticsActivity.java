@@ -43,12 +43,12 @@ import java.util.List;
 public class CosmeticsActivity extends ThemedActivity {
     public static final String EXTRA_ROOM_ID = "room_id";
     static final String[] TYPES = {
-            "vip_badge", "entry_effect", "level_badge", "room_card",
-            "room_background", "profile_card", "chat_bubble", "nameplate"
+            "vip_badge", "entry_effect", "room_card", "room_background",
+            "profile_card", "chat_bubble", "nameplate"
     };
     private static final String[] TITLES = {
-            "الإطارات", "تأثيرات الدخول", "الشارات", "بطاقات الغرف",
-            "خلفيات الغرف", "إطارات الملف", "فقاعات الدردشة", "بطاقات الأسماء"
+            "الإطارات", "تأثيرات الدخول", "بطاقات الغرف", "خلفيات الغرف",
+            "إطارات الملف", "فقاعات الدردشة", "بطاقات الأسماء"
     };
 
     private CosmeticsViewModel vm;
@@ -57,6 +57,8 @@ public class CosmeticsActivity extends ThemedActivity {
     private androidx.viewpager2.widget.ViewPager2 pager;
     private TextView title, bagButton, rechargeButton, balanceView, heroName, heroHint, heroDays, storeTagline;
     private HostSignalView heroFrame;
+    private HostSignalView storeUserFrame;
+    private TextView storeUserName, storeUserPublicId;
     private ImageView heroMedia;
     private FrameLayout heroMediaHolder;
     private VideoView heroVideo;
@@ -119,6 +121,10 @@ public class CosmeticsActivity extends ThemedActivity {
         heroFrame = findViewById(R.id.nativeHeroFrame);
         heroMedia = findViewById(R.id.heroMedia);
         heroMediaHolder = (FrameLayout) heroMedia.getParent();
+        storeUserFrame = findViewById(R.id.storeUserFrame);
+        storeUserName = findViewById(R.id.tvStoreUserName);
+        storeUserPublicId = findViewById(R.id.tvStoreUserPublicId);
+        bindStoreUserHeader();
 
         findViewById(R.id.btnBack).setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         bagButton.setOnClickListener(v -> {
@@ -202,6 +208,22 @@ public class CosmeticsActivity extends ThemedActivity {
                 if (position >= 0 && position < TYPES.length) vm.setFilterType(TYPES[position]);
             }
         });
+    }
+
+    private void bindStoreUserHeader() {
+        if (session == null || storeUserName == null || storeUserPublicId == null) return;
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto me = session.getUser();
+        if (me == null) return;
+        String name = me.displayName != null && !me.displayName.trim().isEmpty()
+                ? me.displayName : me.username;
+        storeUserName.setText(name == null || name.trim().isEmpty() ? "مستخدم JEHO" : name);
+        String publicId = me.displayPublicId();
+        storeUserPublicId.setText(publicId == null || publicId.isEmpty() ? "—" : publicId);
+        VanityIdStyle.bind(storeUserPublicId, ContainerProvider.from(this).getVanityApi(),
+                publicId, me.vipLevel);
+        if (storeUserFrame != null) {
+            storeUserFrame.bind(me.vipBadgeUrl, me.avatarUrl, me.hostBadgeMeta, 1);
+        }
     }
 
     private int dp(int value) {
@@ -314,9 +336,8 @@ public class CosmeticsActivity extends ThemedActivity {
         if (type == null || type.isEmpty()) return "vip_badge";
         if ("frames".equals(type) || "host_badge".equals(type) || "vip_badge".equals(type)) return "vip_badge";
         if ("join_toast".equals(type) || "entry_effect".equals(type)) return "entry_effect";
-        if ("badges".equals(type) || "level_badge".equals(type)) return "level_badge";
-        if (TYPES[3].equals(type) || TYPES[4].equals(type) || TYPES[5].equals(type)
-                || TYPES[6].equals(type) || TYPES[7].equals(type)) return type;
+
+        for (String candidate : TYPES) if (candidate.equals(type)) return type;
         return "vip_badge";
     }
 
@@ -324,6 +345,7 @@ public class CosmeticsActivity extends ThemedActivity {
     protected void onDestroy() {
         stopVideo();
         if (mediator != null) mediator.detach();
+        if (storeUserFrame != null) storeUserFrame.destroy();
         super.onDestroy();
     }
 }
