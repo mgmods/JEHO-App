@@ -165,7 +165,10 @@ public class CosmeticsActivity extends ThemedActivity {
         vm.getError().observe(this, msg -> {
             if (msg != null && !msg.trim().isEmpty()) {
                 Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
-                if (msg.contains("رصيد") || msg.toLowerCase(java.util.Locale.ROOT).contains("balance")) {
+                String normalized = msg.toLowerCase(java.util.Locale.ROOT);
+                if (msg.contains("رصيد") || normalized.contains("balance")
+                        || normalized.contains("insufficient coins")
+                        || normalized.contains("not enough coins")) {
                     BalanceRedirect.handleForced(this, msg);
                 }
             }
