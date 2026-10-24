@@ -51,6 +51,19 @@ export function spinPayout(
  */
 export function biasedCrashAt(): number {
   const maxR = gamePayoutLimits().maxCrashRatio;
+  const configuredWinRate = getGameWinRate('crash');
+
+  // Dashboard win rate for Crash means the chance a round reaches at least x1.50.
+  // It is resolved here on the server, so changing the setting affects real outcomes.
+  if (configuredWinRate !== undefined) {
+    if (Math.random() * 100 >= configuredWinRate) return 1.0;
+    const u = Math.random();
+    if (u < 0.65) return Math.round((1.5 + Math.random() * 1.5) * 100) / 100;
+    const tail = 3.0 + Math.pow(Math.random(), 1.6) * Math.max(0.5, maxR - 3);
+    return Math.min(maxR, Math.round(tail * 100) / 100);
+  }
+
+  // Backward-compatible distribution until an administrator explicitly sets a Crash rate.
   const u = Math.random();
   if (u < 0.12) return 1.0;
   if (u < 0.55) return Math.round((1.01 + Math.random() * 0.44) * 100) / 100;
