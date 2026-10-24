@@ -136,7 +136,9 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
                         : holder.itemView.getContext().getString(R.string.mall_requires_level, needLvl));
                 holder.b.btnPurchase.setAlpha(0.85f);
             } else {
-                holder.b.btnPurchase.setText(R.string.purchase);
+                // An expired lease is eligible for a fresh term at the configured full price.
+                holder.b.btnPurchase.setText(days != null && days == 0
+                        ? "تجديد" : holder.itemView.getContext().getString(R.string.purchase));
                 holder.b.btnPurchase.setAlpha(1f);
             }
         }
