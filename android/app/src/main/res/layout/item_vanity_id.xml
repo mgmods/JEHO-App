@@ -3,19 +3,16 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="12dp"
+    android:layout_margin="3dp"
     android:background="@drawable/bg_vanity_store_card"
     android:orientation="vertical"
-    android:padding="14dp">
+    android:padding="6dp">
 
-    <!-- Full ID — never clipped with dots -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="64dp"
         android:background="@drawable/bg_vanity_store_hero"
-        android:minHeight="78dp"
-        android:paddingHorizontal="14dp"
-        android:paddingVertical="14dp">
+        android:padding="4dp">
 
         <TextView
             android:id="@+id/tvPublicId"
@@ -24,83 +21,88 @@
             android:layout_gravity="center"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:letterSpacing="0.10"
+            android:letterSpacing="0.02"
             android:maxLines="1"
-            android:text="00000000"
-            android:textColor="#454444"
-            android:textSize="28sp"
+            android:text="000000"
+            android:textColor="#FFFFFFFF"
+            android:textSize="21sp"
             android:textStyle="bold"
-            app:autoSizeMaxTextSize="28sp"
-            app:autoSizeMinTextSize="14sp"
+            app:autoSizeMaxTextSize="21sp"
+            app:autoSizeMinTextSize="9sp"
             app:autoSizeStepGranularity="1sp"
             app:autoSizeTextType="uniform" />
     </FrameLayout>
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/tvTier"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_mall_balance_pill"
+        android:gravity="center"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingHorizontal="3dp"
+        android:paddingVertical="3dp"
+        android:text="@string/vanity_tier_special"
+        android:textColor="#FF6844C5"
+        android:textSize="9sp"
+        android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvTier"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_mall_balance_pill"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="4dp"
-            android:text="@string/vanity_tier_special"
-            android:textColor="#FF6844C5"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+    <TextView
+        android:id="@+id/tvMineBadge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:background="@drawable/bg_vanity_chip_gold"
+        android:gravity="center"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingHorizontal="3dp"
+        android:paddingVertical="2dp"
+        android:text="@string/vanity_mine_badge"
+        android:textColor="#9A6700"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/tvMineBadge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/bg_vanity_chip_gold"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="4dp"
-            android:text="@string/vanity_mine_badge"
-            android:textColor="#9A6700"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <TextView
-            android:id="@+id/tvPrice"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-    </LinearLayout>
+    <TextView
+        android:id="@+id/tvPrice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:maxLines="2"
+        android:minLines="2"
+        android:ellipsize="end"
+        android:textColor="@color/text_primary"
+        android:textSize="10sp"
+        android:textStyle="bold" />
 
     <TextView
         android:id="@+id/tvMeta"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:lineSpacingExtra="2dp"
+        android:layout_marginTop="3dp"
+        android:gravity="center"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
+        android:textSize="9sp" />
 
-    <com.google.android.material.button.MaterialButton
+    <TextView
         android:id="@+id/btnBuy"
-        style="@style/Widget.AuraLive.Button.Gold"
-        app:backgroundTint="#FF6844C5"
-        app:cornerRadius="16dp"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="14dp"
+        android:layout_height="36dp"
+        android:layout_marginTop="7dp"
+        android:background="@drawable/bg_cosmetic_btn_buy"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:paddingHorizontal="2dp"
         android:text="@string/vanity_buy"
         android:textAllCaps="false"
-        android:textSize="14sp" />
+        android:textColor="#FFFFFFFF"
+        android:textSize="11sp"
+        android:textStyle="bold" />
 </LinearLayout>
