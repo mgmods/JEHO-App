@@ -43,7 +43,7 @@
     <div class="p-3 d-flex align-items-center justify-content-between"><h5 class="mb-0">الميداليات المتاحة ({{ badges.length }})</h5><button class="btn btn-outline-secondary btn-sm" :disabled="loading" @click="load">تحديث</button></div>
     <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>الميدالية</th><th>الوصف</th><th>الفئة</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>
       <tr v-for="b in badges" :key="b.id"><td><div class="d-flex align-items-center gap-2"><img :src="b.imageUrl" :alt="b.name" class="table-badge"/><strong>{{ b.name }}</strong></div></td><td>{{ b.description || '—' }}</td><td>{{ b.category || 'عام' }}</td><td>{{ b.isActive ? 'مفعّلة' : 'مخفية' }}</td><td class="text-nowrap"><button class="btn btn-sm btn-outline-primary me-2" @click="edit(b)">تعديل</button><button class="btn btn-sm btn-outline-danger" @click="remove(b)">حذف</button></td></tr>
-      <tr v-if="!loading && !badges.length"><td colspan="5" class="text-center p-4">لا توجد شارات بعد.</td></tr>
+      <tr v-if="!loading && !badges.length"><td colspan="5" class="text-center p-4">لا توجد ميداليات بعد.</td></tr>
     </tbody></table></div>
   </section>
 </div>
