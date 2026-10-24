@@ -391,7 +391,7 @@
                     android:orientation="vertical"
                     android:paddingHorizontal="12dp"
                     android:paddingVertical="10dp"
-                    android:visibility="gone">
+                    android:visibility="visible">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -403,7 +403,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="الشارات والمداليات"
+                            android:text="الميداليات"
                             android:textColor="#FFFFFFFF"
                             android:textSize="14sp"
                             android:textStyle="bold" />
@@ -412,7 +412,7 @@
                             android:id="@+id/tvBadgeCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="0 مكتسبة"
+                            android:text="0 ميدالية"
                             android:textColor="#FFFFD479"
                             android:textSize="11sp" />
 
@@ -447,7 +447,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:text="لم تحصل على شارات بعد"
+                        android:text="لا توجد ميداليات بعد"
                         android:textColor="#FF9BA8A8"
                         android:textSize="12sp"
                         android:visibility="gone" />
