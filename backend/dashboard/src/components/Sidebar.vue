@@ -152,6 +152,7 @@ const sections = computed(() => [
     label: t('nav.engagement'),
     items: [
       { name: 'lucky-boxes', icon: 'bi-box2-heart', label: t('nav.luckyBoxes') },
+      { name: 'daily-login-rewards', icon: 'bi-calendar2-check', label: 'مكافآت تسجيل الدخول اليومية', module: 'tasks' },
       { name: 'tasks', icon: 'bi-list-check', label: t('nav.tasks') },
       { name: 'host-target', icon: 'bi-bullseye', label: t('nav.hostTarget') },
       { name: 'contests', icon: 'bi-lightning-charge-fill', label: 'تحديات PK بين الرومات' },
