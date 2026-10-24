@@ -69,7 +69,11 @@ public class CosmeticsViewModel extends ViewModel {
 
     public void setFilterType(String type) { this.filterType = type; }
 
-    public boolean isBagMode() { return bagMode; }\n\n    public void setCurrentRoomId(@Nullable String roomId) {\n        this.currentRoomId = roomId == null || roomId.trim().isEmpty() ? null : roomId.trim();\n    }
+    public boolean isBagMode() { return bagMode; }
+
+    public void setCurrentRoomId(@Nullable String roomId) {
+        this.currentRoomId = roomId == null || roomId.trim().isEmpty() ? null : roomId.trim();
+    }
 
     public void setBagMode(boolean bagMode) { this.bagMode = bagMode; }
 
@@ -312,8 +316,6 @@ public class CosmeticsViewModel extends ViewModel {
                         loadForType(type);
                         return;
                     }
-                    java.util.Map<String, String> body = new java.util.HashMap<>();
-                    body.put("backgroundUrl", backgroundUrl);
                     Result<Object> applied = container.getRoomRepository().setBackground(room, backgroundUrl);
                     if (applied == null || !applied.success) {
                         error.postValue(applied != null && applied.error != null
