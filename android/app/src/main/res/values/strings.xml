@@ -626,11 +626,11 @@
 <string name="wealth_coin_tip">Wealth rises with every ~10 coins you send (cube-root curve).</string>
 <string name="charm_coin_tip">Charm rises when you receive gifts and support.</string>
 <string name="level_next_need">Need %1$s more to reach Lv.%2$d</string>
-<string name="badges">Badges</string>
+<string name="badges">Medals</string>
 <string name="honourship">Honour</string>
-<string name="badge">Badge</string>
+<string name="badge">Medal</string>
 <string name="mine">Mine</string>
-<string name="have_not_yet_received_badge">No badges yet</string>
+<string name="have_not_yet_received_badge">No medals yet</string>
 <string name="medal_vip_tier">VIP %1$d</string>
 <string name="task_center">Task Center</string>
 <string name="contests">Contests</string>
@@ -854,7 +854,7 @@
 <string name="agency_welcome_hint">Welcome text in the room</string>
 <string name="agency_save_branding">Save name &amp; welcome</string>
 <string name="agency_mall_frames">Frames</string>
-<string name="agency_mall_badges">Badges</string>
+<string name="agency_mall_badges">Medals</string>
 <string name="agency_member_search_hint">Search by name or ID</string>
 <string name="agency_notice_section">Host acceptance notice</string>
 <string name="agency_delete">Delete agency</string>
