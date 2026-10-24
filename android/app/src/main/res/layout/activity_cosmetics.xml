@@ -12,7 +12,7 @@
         android:contentDescription="@null"
         android:scaleType="centerCrop"
         android:background="#F5F6FB"
-        android:src="@color/ios_grouped_bg" />
+        android:src="@null" />
 
     <LinearLayout
         android:id="@+id/contentRoot"
