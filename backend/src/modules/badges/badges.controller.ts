@@ -56,6 +56,13 @@ export class BadgesController {
     return this.service.grant(id, body?.userId, adminId, body?.durationDays);
   }
 
+  @Post('admin/badges/:id/grant-all')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ summary: 'Grant a badge to every registered user' })
+  grantAll(@Param('id', ParseUUIDPipe) id: string, @Body() body: { durationDays?: number }, @CurrentUser('sub') adminId: string) {
+    return this.service.grantAll(id, adminId, body?.durationDays);
+  }
+
   @Delete('admin/badges/:id/users/:userId')
   @UseGuards(JwtAuthGuard, AdminGuard)
   revoke(@Param('id', ParseUUIDPipe) id: string, @Param('userId') userId: string) {
