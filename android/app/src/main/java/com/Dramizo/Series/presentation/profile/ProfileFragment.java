@@ -597,7 +597,7 @@ public class ProfileFragment extends Fragment {
             try {
                 retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<
                         java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
-                        c.getUserApi().badges(userId).execute();
+                        c.getUserApi().earnedBadges(userId).execute();
                 if (response.isSuccessful() && response.body() != null
                         && response.body().data != null) {
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto medal : response.body().data) {
