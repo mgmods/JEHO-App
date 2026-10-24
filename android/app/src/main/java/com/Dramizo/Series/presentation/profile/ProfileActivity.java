@@ -120,14 +120,19 @@ public class ProfileActivity extends ThemedActivity {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
-        // Achievement badges/medals are intentionally hidden from profile pages.
         if (binding.rowBadges != null) {
-            binding.rowBadges.setVisibility(View.GONE);
-            binding.rowBadges.setOnClickListener(null);
+            binding.rowBadges.setVisibility(View.VISIBLE);
+            binding.rowBadges.setOnClickListener(v -> {
+                String profileId = targetUserIdHold[0];
+                if (profileId == null || profileId.trim().isEmpty()) {
+                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الميداليات", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Intent intent = new Intent(this, BadgeActivity.class);
+                intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
+                startActivity(intent);
+            });
         }
-        if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
-        // Also hide the separate VIP medal/rank strip; otherwise medals remain visible
-        // even though the achievement badge cabinet is hidden.
         if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.GONE);
 
         if (binding.rowMoments != null) {
@@ -382,7 +387,7 @@ public class ProfileActivity extends ThemedActivity {
             if (binding.imgCountryFlag != null) {
                 FlagImages.bind(binding.imgCountryFlag, user.country);
             }
-            // Profile badge cabinet is disabled platform-wide; skip its extra API request.
+            loadEarnedBadges(user.id);
 
             long charm = user.popularityLevel > 0 ? user.popularityLevel
                     : Math.max(0, Math.max(user.charmScore, user.popularityScore));
@@ -1077,7 +1082,70 @@ public class ProfileActivity extends ThemedActivity {
         }
     }
 
-    /** Badge/medal cabinet is disabled platform-wide; no async loader may reveal it. */
+    private void loadEarnedBadges(String profileId) {
+        if (binding == null || binding.rowEarnedBadges == null
+                || profileId == null || profileId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned = new java.util.ArrayList<>();
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<
+                        java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
+                        container.getUserApi().badges(profileId).execute();
+                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto medal : response.body().data) {
+                        if (medal != null && medal.earned) earned.add(medal);
+                    }
+                }
+            } catch (Exception ignored) {
+                // A temporary network failure should not block opening a profile.
+            }
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()) return;
+                binding.rowEarnedBadges.removeAllViews();
+                if (binding.tvBadgeCount != null) {
+                    binding.tvBadgeCount.setText(earned.size() + " ميدالية");
+                }
+                if (binding.tvBadgesEmpty != null) {
+                    binding.tvBadgesEmpty.setVisibility(earned.isEmpty() ? View.VISIBLE : View.GONE);
+                    binding.tvBadgesEmpty.setText("لا توجد ميداليات بعد");
+                }
+                binding.rowEarnedBadges.setVisibility(earned.isEmpty() ? View.GONE : View.VISIBLE);
+                for (com.Dramizo.Series.data.remote.dto.BadgeDto medal : earned) {
+                    ImageView icon = new ImageView(this);
+                    int size = (int) (30 * getResources().getDisplayMetrics().density + 0.5f);
+                    int pad = (int) (3 * getResources().getDisplayMetrics().density + 0.5f);
+                    android.widget.LinearLayout.LayoutParams lp =
+                            new android.widget.LinearLayout.LayoutParams(size, size);
+                    lp.setMargins(0, 0, (int) (6 * getResources().getDisplayMetrics().density + 0.5f), 0);
+                    icon.setLayoutParams(lp);
+                    icon.setPadding(pad, pad, pad, pad);
+                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    android.graphics.drawable.GradientDrawable chip = new android.graphics.drawable.GradientDrawable();
+                    chip.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                    chip.setCornerRadius(size / 2f);
+                    chip.setColor(0x1AFFD479);
+                    chip.setStroke(Math.max(1, (int) (getResources().getDisplayMetrics().density + 0.5f)),
+                            0x99FFD479);
+                    icon.setBackground(chip);
+                    icon.setContentDescription(medal.name == null ? "ميدالية مكتسبة" : medal.name);
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(medal.imageUrl))
+                            .placeholder(R.drawable.ic_medal_default)
+                            .error(R.drawable.ic_medal_default).into(icon);
+                    icon.setOnClickListener(v -> {
+                        Intent intent = new Intent(this, BadgeActivity.class);
+                        intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
+                        startActivity(intent);
+                    });
+                    binding.rowEarnedBadges.addView(icon);
+                }
+                binding.rowEarnedBadges.setOnClickListener(v -> {
+                    Intent intent = new Intent(this, BadgeActivity.class);
+                    intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
+                    startActivity(intent);
+                });
+            });
+        });
+    }
 
     private void sendSocialRequest(String targetId, String type, String labelAr) {
         AppContainer container = ContainerProvider.from(this);
