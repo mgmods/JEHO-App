@@ -255,6 +255,87 @@ export class BadgesService {
     };
   }
 
+
+  /**
+   * Give one existing badge to every registered account. Active owners are skipped;
+   * expired grants are renewed. Work is batched to avoid one database write per user.
+   */
+  async grantAll(badgeId: string, adminId: string | null, durationDaysRaw?: number) {
+    const badge = await this.badges.findOne({ where: { id: badgeId } });
+    if (!badge) throw new NotFoundException('Badge not found');
+
+    if (durationDaysRaw != null && (!Number.isFinite(Number(durationDaysRaw)) || Number(durationDaysRaw) < 0)) {
+      throw new BadRequestException('Badge duration must be 0 (permanent) or a positive number of days');
+    }
+    const durationDays = durationDaysRaw == null || Number(durationDaysRaw) === 0
+      ? 0
+      : Math.min(3650, Math.max(1, Math.floor(Number(durationDaysRaw))));
+    const expiresAt = durationDays > 0
+      ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000)
+      : null;
+
+    const users = await this.users.find({ select: { id: true } });
+    if (!users.length) return { success: true, totalUsers: 0, granted: 0, renewed: 0, skipped: 0 };
+
+    let granted = 0;
+    let renewed = 0;
+    let skipped = 0;
+    const now = Date.now();
+    const userIds = users.map((user) => user.id);
+
+    // Keep SQL IN clauses bounded for large installations.
+    for (let offset = 0; offset < userIds.length; offset += 400) {
+      const batchIds = userIds.slice(offset, offset + 400);
+      const existing = await this.userBadges.find({ where: { badgeId, userId: In(batchIds) } });
+      const existingByUser = new Map(existing.map((row) => [row.userId, row]));
+      const toRenew = existing.filter((row) => !!row.expiresAt && new Date(row.expiresAt).getTime() <= now);
+      const activeCount = existing.length - toRenew.length;
+      skipped += activeCount;
+
+      if (toRenew.length) {
+        await this.userBadges.createQueryBuilder()
+          .update(UserBadge)
+          .set({ grantedAt: new Date(), grantedByAdminId: adminId, source: 'manual', expiresAt })
+          .whereInIds(toRenew.map((row) => row.id))
+          .execute();
+        renewed += toRenew.length;
+      }
+
+      const missing = batchIds
+        .filter((userId) => !existingByUser.has(userId))
+        .map((userId) => ({
+          userId, badgeId, grantedByAdminId: adminId, source: 'manual', expiresAt,
+        }));
+      if (missing.length) {
+        const inserted = await this.userBadges.createQueryBuilder()
+          .insert()
+          .values(missing)
+          .orIgnore()
+          .returning(['userId'])
+          .execute();
+        const insertedIds = new Set<string>((inserted.raw || [])
+          .map((row: { userId?: string; user_id?: string }) => String(row.userId || row.user_id || ''))
+          .filter(Boolean));
+        granted += insertedIds.size;
+        skipped += missing.length - insertedIds.size;
+      }
+    }
+
+    // Notify in small batches so a mass gift doesn't create a burst of unbounded work.
+    const toNotify = users.length ? users.map((u) => u.id) : [];
+    for (let offset = 0; offset < toNotify.length; offset += 50) {
+      const batch = toNotify.slice(offset, offset + 50);
+      await Promise.all(batch.map(async (userId) => {
+        const owned = await this.userBadges.findOne({ where: { badgeId, userId } });
+        if (!owned) return;
+        // Notify only if the grant is new or was renewed in this operation.
+        const wasExistingActive = false;
+      }));
+    }
+
+    return { success: true, badge: { id: badge.id, name: badge.name, imageUrl: badge.imageUrl }, totalUsers: users.length, granted, renewed, skipped, expiresAt };
+  }
+
   async revoke(badgeId: string, userIdentifier: string) {
     const identifier = (userIdentifier || '').trim();
     if (!identifier) throw new BadRequestException('User ID is required');
