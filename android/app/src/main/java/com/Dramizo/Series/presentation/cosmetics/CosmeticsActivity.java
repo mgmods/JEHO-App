@@ -75,10 +75,31 @@ public class CosmeticsActivity extends ThemedActivity {
         String type = getIntent().getStringExtra(CosmeticsViewModel.EXTRA_TYPE);
         if (type == null || type.isEmpty()) type = getIntent().getStringExtra("type");
         String section = getIntent().getStringExtra("store_section");
-        if (section != null) {
-            if ("badges".equals(section) || "level".equals(section)) type = "level_badge";
-            else if ("vip".equals(section)) type = "vip_badge";
-            else if ("id".equals(section)) type = "nameplate";
+        // These legacy store entry points already have native flows backed by their
+        // dedicated APIs. Preserve them instead of silently mapping them to cosmetics.
+        if ("id".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.profile.VanityIdsActivity.class));
+            finish();
+            return;
+        }
+        if ("level".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.profile.UserLevelActivity.class));
+            finish();
+            return;
+        }
+        if ("badges".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.profile.BadgeActivity.class));
+            finish();
+            return;
+        }
+        if ("vip".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.vip.VipActivity.class));
+            finish();
+            return;
         }
         initialType = normalizeType(type);
 
