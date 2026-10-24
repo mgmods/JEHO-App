@@ -70,7 +70,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
                 android:layout_marginTop="14dp"
-                android:background="@drawable/bg_vip_hero"
+                android:background="@drawable/bg_vip_hero_premium"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:padding="16dp">
@@ -141,14 +141,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
                 android:layout_marginTop="14dp"
-                android:background="@drawable/bg_vip_plan_card"
+                android:background="@drawable/bg_vip_plan_card_premium"
                 android:orientation="vertical"
                 android:padding="14dp">
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="🕵️ الرجل الغامض"
-                    android:textColor="@color/text_primary"
+                    android:textColor="#FFF7F2FF"
                     android:textSize="16sp"
                     android:textStyle="bold" />
                 <TextView
@@ -157,7 +157,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="5dp"
                     android:text="جارٍ التحقق من اشتراكك..."
-                    android:textColor="@color/text_secondary"
+                    android:textColor="#FFB9BED0"
                     android:textSize="12sp" />
                 <Button
                     android:id="@+id/btnMysteriousMode"
