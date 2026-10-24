@@ -194,6 +194,56 @@
             </LinearLayout>
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/storeUserHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="14dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_mall_native_hero"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="10dp">
+            <com.Dramizo.Series.util.HostSignalView
+                android:id="@+id/storeUserFrame"
+                android:layout_width="76dp"
+                android:layout_height="76dp" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/tvStoreUserName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/tvStoreUserPublicId"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:maxLines="1"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="21sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="الآيدي المميز"
+                    android:textColor="#DFFFFFFF"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- Native hero: HostSignalView (SVGA) for frames — same engine as live room. -->
         <LinearLayout
             android:id="@+id/nativeHeroWrap"
