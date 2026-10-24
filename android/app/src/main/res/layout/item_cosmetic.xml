@@ -4,11 +4,11 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
+    android:layout_margin="5dp"
     app:cardBackgroundColor="#FFFFFFFF"
-    app:cardCornerRadius="22dp"
-    app:cardElevation="3dp"
-    app:strokeColor="#FFEAE5F7"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="2dp"
+    app:strokeColor="#FFE8E1F7"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -16,12 +16,12 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="11dp">
 
         <!-- Lightweight preview: NO HostSignalView / SVGA in mall grid (OOM crash). -->
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="126dp"
+            android:layout_height="132dp"
             android:background="@drawable/bg_cosmetic_preview"
             android:clipChildren="true"
             android:clipToPadding="true">
@@ -64,13 +64,13 @@
             android:id="@+id/tvName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="11dp"
+            android:layout_marginTop="12dp"
             android:ellipsize="end"
             android:gravity="center"
             android:maxLines="2"
             android:minLines="2"
             android:textColor="#FF1A1F2E"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:textStyle="bold"
             tools:text="إطار ذهبي" />
 
@@ -94,7 +94,7 @@
             android:id="@+id/btnPurchase"
             android:layout_width="match_parent"
             android:layout_height="40dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="12dp"
             android:background="@drawable/bg_cosmetic_btn_buy"
             android:gravity="center"
             android:text="@string/purchase"
@@ -106,7 +106,7 @@
             android:id="@+id/btnEquip"
             android:layout_width="match_parent"
             android:layout_height="40dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="12dp"
             android:background="@drawable/bg_cosmetic_btn_equip"
             android:gravity="center"
             android:text="@string/equip"
