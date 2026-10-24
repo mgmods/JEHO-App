@@ -222,7 +222,7 @@ public class CosmeticsActivity extends ThemedActivity {
         }
         heroName.setText(item.name == null ? "عنصر JEHO" : item.name);
         heroHint.setText(item.coinPrice > 0 ? item.coinPrice + " عملة • صلاحية " +
-                CosmeticsViewModel.LEASE_DAYS + " يوم" : "عنصر مميز في متجر JEHO");
+                vm.leaseDays(item) + " يوم" : "عنصر مميز في متجر JEHO • صلاحية " + vm.leaseDays(item) + " يوم");
         Integer days = vm.daysLeft(item.id);
         if (days != null && days > 0) {
             heroDays.setText("متبقي " + days + " يوم");
