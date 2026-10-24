@@ -165,13 +165,12 @@ import AlertMessage from '@/components/AlertMessage.vue'
 const auth = useAuthStore()
 const canWriteSettings = computed(() => auth.can('settings', 'write'))
 const tabs = [
-  { key: 'giftSend', label: 'إرسال الهدايا والعداد X' },
   { key: 'luckyWinNormal', label: 'أرباح المحظوظ العادية' },
   { key: 'luckyReturn', label: 'الهدايا المردودة' },
   { key: 'luckyWinHigh', label: 'الأرباح العالية' },
   { key: 'luckyButton', label: 'زر هدية المحظوظ' },
 ]
-const activeTab = ref('giftSend')
+const activeTab = ref('luckyWinNormal')
 const form = reactive({
   giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
