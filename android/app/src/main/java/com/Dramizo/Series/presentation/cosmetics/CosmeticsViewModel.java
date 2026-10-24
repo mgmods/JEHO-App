@@ -72,6 +72,20 @@ public class CosmeticsViewModel extends ViewModel {
 
     public void setBagMode(boolean bagMode) { this.bagMode = bagMode; }
 
+    /** Per-item validity configured by the dashboard; defaults to the legacy 30 days. */
+    public int leaseDays(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (item == null || item.meta == null) return LEASE_DAYS;
+        Object raw = item.meta.get("leaseDays");
+        try {
+            int days = raw instanceof Number
+                    ? ((Number) raw).intValue()
+                    : Integer.parseInt(String.valueOf(raw));
+            return days >= 1 && days <= 3650 ? days : LEASE_DAYS;
+        } catch (Exception ignored) {
+            return LEASE_DAYS;
+        }
+    }
+
     public boolean isOwned(String cosmeticId) {
         if (cosmeticId == null) return false;
         synchronized (ownedIds) {
