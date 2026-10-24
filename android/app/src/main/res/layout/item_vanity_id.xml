@@ -99,8 +99,6 @@
         android:clickable="true"
         android:focusable="true"
         android:background="@drawable/bg_cosmetic_btn_buy"
-        android:clickable="true"
-        android:focusable="true"
         android:gravity="center"
         android:paddingHorizontal="2dp"
         android:text="@string/vanity_buy"
