@@ -149,7 +149,8 @@ public class CosmeticsActivity extends ThemedActivity {
 
         vm = new ViewModelProvider(this,
                 new ViewModelFactory(ContainerProvider.from(this))).get(CosmeticsViewModel.class);
-        vm.setBagMode(bagMode);\n        vm.setCurrentRoomId(roomId);
+        vm.setBagMode(bagMode);
+        vm.setCurrentRoomId(roomId);
         pager.setOffscreenPageLimit(1);
         pager.setAdapter(new FragmentStateAdapter(this) {
             @Override public int getItemCount() { return TYPES.length; }
@@ -202,7 +203,11 @@ public class CosmeticsActivity extends ThemedActivity {
         });
     }
 
-    private int dp(int value) {\n        return Math.round(value * getResources().getDisplayMetrics().density);\n    }\n\n    private void refreshWalletBalance() {
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void refreshWalletBalance() {
         if (balanceView == null) return;
         balanceView.setText("…");
         ContainerProvider.from(this).getIoExecutor().execute(() -> {
