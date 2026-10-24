@@ -218,6 +218,11 @@
                   <input v-model.number="form.coinPrice" type="number" min="0" class="form-control" />
                 </div>
                 <div class="col-md-3">
+                  <label class="form-label">مدة الصلاحية (يوم)</label>
+                  <input v-model.number="form.leaseDays" type="number" min="1" max="3650" class="form-control" required />
+                  <div class="form-text">تُطبّق على المشتريات الجديدة لهذا العنصر فقط.</div>
+                </div>
+                <div class="col-md-3">
                   <label class="form-label">{{ t('cosmetics.minVip') }}</label>
                   <input v-model.number="form.minVipLevel" type="number" min="0" max="100" class="form-control" />
                   <div class="form-text">خطة VIP (1–100). الإطارات البصرية 1–7؛ VIP أعلى من 7 يبقى على أقصى إطار.</div>
@@ -540,6 +545,7 @@ function emptyForm() {
     type: 'vip_badge',
     description: '',
     coinPrice: 0,
+    leaseDays: 30,
     minVipLevel: 0,
     minUserLevel: 0,
     sortOrder: 0,
@@ -628,6 +634,7 @@ function openEdit(item) {
     type: item.type || tab.value,
     description: item.description || '',
     coinPrice: item.coinPrice || 0,
+    leaseDays: Math.max(1, Number(item.meta?.leaseDays) || 30),
     minVipLevel: item.minVipLevel || 0,
     minUserLevel: item.minUserLevel || 0,
     sortOrder: item.sortOrder || 0,
@@ -715,6 +722,10 @@ async function save() {
         throw new Error(t('cosmetics.metaInvalid'))
       }
     }
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)) meta = {}
+    const leaseDays = Math.floor(Number(form.value.leaseDays) || 30)
+    if (leaseDays < 1 || leaseDays > 3650) throw new Error('مدة الصلاحية يجب أن تكون بين يوم واحد و3650 يوماً')
+    meta.leaseDays = leaseDays
     const payload = {
       code: form.value.code,
       name: form.value.name,
