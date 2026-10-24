@@ -322,13 +322,16 @@ export class BadgesService {
       }
     }
 
-    await Promise.all(notifications.map(({ userId }) => this.notifications.notifyUser(
-      userId,
-      NotificationType.SYSTEM,
-      'تم إهداؤك ميدالية جديدة! 🏅',
-      `مبروك! تمت إضافة ميدالية ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
-      { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
-    )));
+    // Limit notification concurrency to keep bulk gifting gentle on the API/database.
+    for (let offset = 0; offset < notifications.length; offset += 25) {
+      await Promise.all(notifications.slice(offset, offset + 25).map(({ userId }) => this.notifications.notifyUser(
+        userId,
+        NotificationType.SYSTEM,
+        'تم إهداؤك ميدالية جديدة! 🏅',
+        `مبروك! تمت إضافة ميدالية ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
+        { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
+      )));
+    }
     return { success: true, badge, totalUsers: users.length, granted, skipped, durationDays };
   }
 
