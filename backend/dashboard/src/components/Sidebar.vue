@@ -87,6 +87,7 @@ const sections = computed(() => [
     label: t('nav.community'),
     items: [
       { name: 'users', icon: 'bi-people', label: t('nav.users'), also: ['user-detail'] },
+      { name: 'medals', icon: 'bi-award-fill', label: 'المداليات' },
       { name: 'conversations', icon: 'bi-chat-left-text', label: t('nav.conversations') },
       { name: 'paid-messages', icon: 'bi-chat-square-text', label: 'الرسائل المدفوعة' },
       { name: 'agencies', icon: 'bi-building', label: t('nav.agencies') },
