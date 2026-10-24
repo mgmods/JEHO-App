@@ -347,6 +347,17 @@
                             android:layout_weight="1" />
                     </LinearLayout>
                 </LinearLayout>
+                <!-- Kept as hidden compatibility targets for existing view binding; these sections stay outside the store. -->
+                <LinearLayout
+                    android:id="@+id/rowBadges"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+                <LinearLayout
+                    android:id="@+id/rowLevel"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </LinearLayout>
