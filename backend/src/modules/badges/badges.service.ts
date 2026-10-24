@@ -280,6 +280,7 @@ export class BadgesService {
     let granted = 0;
     let renewed = 0;
     let skipped = 0;
+    const notifyIds = new Set<string>();
     const now = Date.now();
     const userIds = users.map((user) => user.id);
 
@@ -299,6 +300,7 @@ export class BadgesService {
           .whereInIds(toRenew.map((row) => row.id))
           .execute();
         renewed += toRenew.length;
+        toRenew.forEach((row) => notifyIds.add(row.userId));
       }
 
       const missing = batchIds
@@ -317,20 +319,22 @@ export class BadgesService {
           .map((row: { userId?: string; user_id?: string }) => String(row.userId || row.user_id || ''))
           .filter(Boolean));
         granted += insertedIds.size;
+        insertedIds.forEach((userId) => notifyIds.add(userId));
         skipped += missing.length - insertedIds.size;
       }
     }
 
-    // Notify in small batches so a mass gift doesn't create a burst of unbounded work.
-    const toNotify = users.length ? users.map((u) => u.id) : [];
+    // Notify only accounts that received a new or renewed grant.
+    const toNotify = [...notifyIds];
     for (let offset = 0; offset < toNotify.length; offset += 50) {
       const batch = toNotify.slice(offset, offset + 50);
-      await Promise.all(batch.map(async (userId) => {
-        const owned = await this.userBadges.findOne({ where: { badgeId, userId } });
-        if (!owned) return;
-        // Notify only if the grant is new or was renewed in this operation.
-        const wasExistingActive = false;
-      }));
+      await Promise.all(batch.map((userId) => this.notifications.notifyUser(
+        userId,
+        NotificationType.SYSTEM,
+        'تم إهداؤك شارة جديدة! 🏅',
+        `مبروك! تمت إضافة شارة ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
+        { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
+      )));
     }
 
     return { success: true, badge: { id: badge.id, name: badge.name, imageUrl: badge.imageUrl }, totalUsers: users.length, granted, renewed, skipped, expiresAt };
