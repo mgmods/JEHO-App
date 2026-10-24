@@ -46,7 +46,9 @@
                 android:layout_weight="1"
                 android:text="@string/appearance_store"
                 android:textColor="@color/text_primary"
-                android:textSize="21sp"
+                android:textSize="18sp"
+                android:maxLines="1"
+                android:ellipsize="end"
                 android:letterSpacing="-0.02"
                 android:textStyle="bold" />
 
