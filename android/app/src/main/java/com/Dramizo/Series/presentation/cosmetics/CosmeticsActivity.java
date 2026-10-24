@@ -222,7 +222,7 @@ public class CosmeticsActivity extends ThemedActivity {
         VanityIdStyle.bind(storeUserPublicId, ContainerProvider.from(this).getVanityApi(),
                 publicId, me.vipLevel);
         if (storeUserFrame != null) {
-            storeUserFrame.bind(me.vipBadgeUrl, me.avatarUrl, me.hostBadgeMeta, 1);
+            storeUserFrame.bind(me.hostBadgeUrl, me.avatarUrl, me.hostBadgeMeta, 1);
         }
     }
 
