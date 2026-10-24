@@ -11,7 +11,8 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@drawable/bg_home_full_gradient" />
+        android:background="#F5F6FB"
+        android:src="@color/ios_grouped_bg" />
 
     <LinearLayout
         android:id="@+id/contentRoot"
@@ -22,10 +23,11 @@
         <LinearLayout
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="54dp"
+            android:layout_height="60dp"
+            android:background="#F5F6FB"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="12dp">
+            android:paddingHorizontal="14dp">
 
             <ImageView
                 android:id="@+id/btnBack"
@@ -44,7 +46,8 @@
                 android:layout_weight="1"
                 android:text="@string/appearance_store"
                 android:textColor="@color/text_primary"
-                android:textSize="19sp"
+                android:textSize="21sp"
+                android:letterSpacing="-0.02"
                 android:textStyle="bold" />
 
             <TextView
@@ -77,10 +80,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="14dp"
-            android:layout_marginTop="2dp"
-            android:layout_marginBottom="4dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_mall_wallet_card"
+            android:elevation="2dp"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
 
             <TextView
                 android:id="@+id/tvStoreBalanceLabel"
@@ -88,7 +94,7 @@
                 android:layout_height="34dp"
                 android:gravity="center_vertical"
                 android:text="رصيدك"
-                android:textColor="@color/text_secondary"
+                android:textColor="#FF656B7B"
                 android:textSize="12sp" />
 
             <TextView
@@ -96,14 +102,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="34dp"
                 android:layout_marginStart="8dp"
-                android:background="@drawable/bg_cosmetic_price_chip"
+                android:background="@drawable/bg_mall_balance_pill"
                 android:drawableStart="@drawable/icon_coin"
                 android:drawablePadding="5dp"
                 android:gravity="center"
                 android:paddingHorizontal="12dp"
                 android:text="—"
-                android:textColor="#FF8A4B08"
-                android:textSize="13sp"
+                android:textColor="#FF5B35B5"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <View
@@ -116,8 +122,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="34dp"
                 android:gravity="center_vertical"
-                android:text="جدّد إطلالتك ✦"
-                android:textColor="@color/text_secondary"
+                android:text="اكتشف إطلالتك الجديدة  ✦"
+                android:textColor="#FF656B7B"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -126,16 +132,17 @@
             android:id="@+id/nativeHeroWrap"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="12dp"
+            android:layout_marginHorizontal="14dp"
             android:layout_marginTop="8dp"
             android:background="@drawable/bg_mall_native_hero"
+            android:elevation="5dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="12dp">
+            android:padding="14dp">
 
             <FrameLayout
-                android:layout_width="120dp"
-                android:layout_height="120dp">
+                android:layout_width="116dp"
+                android:layout_height="116dp">
 
                 <com.Dramizo.Series.util.HostSignalView
                     android:id="@+id/nativeHeroFrame"
@@ -165,8 +172,8 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="2"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="17sp"
                     android:textStyle="bold"
                     tools:text="إطار ذهبي" />
 
@@ -176,7 +183,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="@string/mall_preview_hint"
-                    android:textColor="@color/text_secondary"
+                    android:textColor="#E8FFFFFF"
                     android:textSize="12sp" />
 
                 <TextView
@@ -184,10 +191,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_cosmetic_price_chip"
+                    android:background="@drawable/bg_mall_hero_chip"
                     android:paddingHorizontal="10dp"
                     android:paddingVertical="3dp"
-                    android:textColor="#FF8A4B08"
+                    android:textColor="#FFFFFFFF"
                     android:textSize="12sp"
                     android:textStyle="bold"
                     android:visibility="gone"
@@ -200,15 +207,16 @@
             android:id="@+id/tabs"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
+            android:background="#F5F6FB"
             app:tabGravity="center"
-            app:tabIndicatorColor="@color/aurora_gold"
+            app:tabIndicatorColor="#FF7755D9"
             app:tabIndicatorHeight="3dp"
-            app:tabRippleColor="#1A0E7490"
+            app:tabRippleColor="#227755D9"
             app:tabIndicatorFullWidth="false"
             app:tabMode="scrollable"
-            app:tabSelectedTextColor="@color/text_primary"
-            app:tabTextColor="@color/text_hint" />
+            app:tabSelectedTextColor="#FF5B35B5"
+            app:tabTextColor="#FF7D8293" />
 
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/pager"
