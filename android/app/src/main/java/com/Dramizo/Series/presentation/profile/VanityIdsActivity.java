@@ -84,7 +84,7 @@ public class VanityIdsActivity extends ThemedActivity {
         etSearch = findViewById(R.id.etVanitySearch);
 
         adapter = new CatalogAdapter();
-        recycler.setLayoutManager(new GridLayoutManager(this, 3));
+        recycler.setLayoutManager(new GridLayoutManager(this, 2));
         recycler.setItemAnimator(null);
         recycler.setAdapter(adapter);
         recycler.setNestedScrollingEnabled(false);
