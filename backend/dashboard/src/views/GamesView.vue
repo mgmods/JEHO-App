@@ -578,10 +578,10 @@ function normalizeGame(g) {
   const normalizeGameUrl = (value) => {
     const raw = String(value || '').trim()
     if (!raw) return ''
-    // Old saved catalog rows still contain the retired API host; keep their game
-    // IDs/settings but resolve bundled cover/play assets through the current backend.
-    if (/^https?:\/\/api\.adnova\.bbs\.tr(?=\/|$)/i.test(raw)) {
-      return raw.replace(/^https?:\/\/api\.adnova\.bbs\.tr/i, ORIGIN)
+    // Old saved catalog rows may contain retired API/provider hosts; keep their
+    // IDs/settings but always resolve bundled game assets through the current backend.
+    if (/^https?:\/\/(?:api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com)(?=\/|$)/i.test(raw)) {
+      return raw.replace(/^https?:\/\/(?:api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com)/i, ORIGIN)
     }
     if (raw.startsWith('/')) return `${ORIGIN}${raw}`
     if (!/^https?:\/\//i.test(raw) && !raw.startsWith('data:')) {
