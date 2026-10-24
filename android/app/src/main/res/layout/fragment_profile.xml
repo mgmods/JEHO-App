@@ -213,21 +213,32 @@
                     android:src="@drawable/ic_me_setting" />
             </LinearLayout>
 
-            <!-- Earned dashboard/achievement badges sit directly below the main profile avatar. -->
+            <!-- Gifted medals sit directly below the profile identity in a compact premium strip. -->
             <LinearLayout
                 android:id="@+id/rowProfileBadges"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:paddingHorizontal="20dp"
-                android:gravity="start|center_vertical"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="6dp"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="5dp"
+                android:background="@drawable/bg_mikoo_card"
+                android:gravity="center"
                 android:orientation="horizontal"
                 android:layoutDirection="rtl"
                 android:foreground="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
-                android:visibility="gone"
-                android:contentDescription="عرض الشارات المكتسبة">
+                android:contentDescription="عرض الميداليات المكتسبة">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="7dp"
+                    android:text="@string/badges"
+                    android:textColor="#FFFFD479"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
 
                 <LinearLayout
                     android:id="@+id/earnedBadgesContainer"
