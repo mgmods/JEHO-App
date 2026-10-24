@@ -138,7 +138,6 @@ public class CosmeticsActivity extends ThemedActivity {
         vm = new ViewModelProvider(this,
                 new ViewModelFactory(ContainerProvider.from(this))).get(CosmeticsViewModel.class);
         vm.setBagMode(bagMode);
-        refreshWalletBalance();
         pager.setOffscreenPageLimit(1);
         pager.setAdapter(new FragmentStateAdapter(this) {
             @Override public int getItemCount() { return TYPES.length; }
