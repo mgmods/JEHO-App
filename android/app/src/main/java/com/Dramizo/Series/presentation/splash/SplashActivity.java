@@ -232,7 +232,8 @@ public class SplashActivity extends ThemedActivity {
                             && config.enabled
                             && config.latestVersionCode > installedCode
                             && config.storeUrl != null
-                            && config.storeUrl.trim().startsWith("https://")) {
+                            && !config.storeUrl.trim().isEmpty()
+                            && (config.storeUrl.trim().startsWith("https://") || config.storeUrl.trim().startsWith("http://"))) {
                         boolean mandatory = config.forceUpdate || config.minVersionCode > installedCode;
                         boolean arabic = java.util.Locale.getDefault().getLanguage().toLowerCase(java.util.Locale.ROOT).startsWith("ar");
                         String title = arabic ? config.titleAr : config.titleEn;
@@ -242,6 +243,7 @@ public class SplashActivity extends ThemedActivity {
                         updateIntent.putExtra(UpdateActivity.EXTRA_VERSION_CODE, config.latestVersionCode);
                         updateIntent.putExtra(UpdateActivity.EXTRA_VERSION_NAME, config.latestVersionName);
                         updateIntent.putExtra(UpdateActivity.EXTRA_URL, config.storeUrl);
+                        updateIntent.putExtra(UpdateActivity.EXTRA_LINK_TYPE, config.linkType);
                         updateIntent.putExtra(UpdateActivity.EXTRA_TITLE, title);
                         updateIntent.putExtra(UpdateActivity.EXTRA_MESSAGE, message);
                         startActivity(updateIntent);
