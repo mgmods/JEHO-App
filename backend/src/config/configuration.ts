@@ -146,13 +146,18 @@ export default registerAs('app', () => {
   google: {
     // Web client ID from Firebase google-services.json (client_type 3).
     // Must match Android requestIdToken(default_web_client_id).
-    // JEHO Firebase Web OAuth client ID. Environment variable overrides this fallback.
-    // This must match Android default_web_client_id used by requestIdToken().
+    // The Web OAuth client from android/app/google-services.json (client_type 3).
+    // Keep the configured server client as primary, but always accept the current
+    // Firebase project's Web client as an audience too. This prevents an older
+    // Blitz GOOGLE_CLIENT_ID from rejecting ID tokens issued by the current app.
     clientId:
       process.env.GOOGLE_CLIENT_ID ||
-      '807697628126-sc7hj3pccrkt4p0b8ilji91mqb9ojs53.apps.googleusercontent.com',
-    // Optional comma-separated extra audiences (Android OAuth clients).
-    clientIds: process.env.GOOGLE_CLIENT_IDS || '',
+      '1085967276199-c58dro18a44qocpeme8868sudnqv8kte.apps.googleusercontent.com',
+    // Optional extra audiences, plus the Web client bundled with the Android app.
+    clientIds: Array.from(new Set([
+      ...(process.env.GOOGLE_CLIENT_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
+      '1085967276199-c58dro18a44qocpeme8868sudnqv8kte.apps.googleusercontent.com',
+    ])).join(','),
   },
   admin: {
     email: process.env.ADMIN_EMAIL || 'admin@auralive.com',
