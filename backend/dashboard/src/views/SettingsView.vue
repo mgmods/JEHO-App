@@ -390,7 +390,7 @@
                 </div>
                 <div class="col-12">
                   <label class="form-label">رابط تحميل APK المباشر</label>
-                  <input v-model.trim="appUpdateForm.storeUrl" class="form-control" type="url" dir="ltr" placeholder="https://example.com/releases/JEHO.apk" required />
+                  <input v-model.trim="appUpdateForm.storeUrl" class="form-control" type="url" dir="ltr" placeholder="https://example.com/releases/JEHO.apk" :required="appUpdateForm.enabled" />
                   <div class="form-text">استخدم رابط HTTPS مباشر لملف APK، وليس رابط صفحة ويب. يجب أن يكون الملف موقّعاً بنفس شهادة التطبيق الحالي وبالحزمة com.Dramizo.Series حتى يثبت كتحديث فوق النسخة الموجودة دون حذف بيانات المستخدم.</div>
                 </div>
                 <div class="col-md-6">
@@ -1361,8 +1361,12 @@ async function saveAppUpdate() {
     toast().danger('أدنى إصدار لا يمكن أن يكون أكبر من الإصدار الجديد')
     return
   }
-  if (!/^https:\/\//i.test(apkUrl)) {
-    toast().danger('أدخل رابط HTTPS مباشر لملف APK')
+  if (appUpdateForm.enabled && !/^https:\/\//i.test(apkUrl)) {
+    toast().danger('أدخل رابط HTTPS مباشر لملف APK قبل نشر التحديث')
+    return
+  }
+  if (apkUrl && !/^https:\/\//i.test(apkUrl)) {
+    toast().danger('يجب أن يبدأ رابط التحميل بـ HTTPS')
     return
   }
   appUpdateSaving.value = true
