@@ -113,22 +113,28 @@ public final class UpdateActivity extends Activity {
                 new int[]{Color.rgb(16, 18, 55), bg, Color.rgb(8, 20, 43)}));
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.CENTER_HORIZONTAL);
-        content.setPadding(dp(22), dp(20), dp(22), dp(24));
+        content.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
+        content.setPadding(dp(22), dp(24), dp(22), dp(28));
         scroll.addView(content, new ScrollView.LayoutParams(-1, -1));
         setContentView(scroll);
 
-        TextView brand = text("JEHO  ✦", 30, Color.WHITE, true);
-        brand.setLetterSpacing(0.16f);
+        TextView badge = text(isArabic() ? "✦  تحديث رسمي من JEHO  ✦" : "✦  OFFICIAL JEHO UPDATE  ✦", 11, Color.rgb(220, 208, 255), true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setPadding(dp(16), dp(9), dp(16), dp(9));
+        badge.setBackground(rounded(Color.rgb(30, 24, 72), Color.rgb(91, 67, 158), dp(24)));
+        content.addView(badge, params(-2, -2, 0, 0, 0, 18));
+
+        TextView brand = text("JEHO", 34, Color.WHITE, true);
+        brand.setLetterSpacing(0.20f);
         brand.setGravity(Gravity.CENTER);
-        content.addView(brand, params(-1, -2, 0, 8, 0, 0));
+        content.addView(brand, params(-1, -2, 0, 0, 0, 0));
 
         TextView icon = text("🚀", 54, Color.WHITE, true);
         icon.setGravity(Gravity.CENTER);
         GradientDrawable iconBg = rounded(Color.rgb(37, 28, 103), Color.rgb(115, 70, 255), dp(28));
         iconBg.setStroke(dp(1), Color.rgb(115, 91, 255));
         icon.setBackground(iconBg);
-        content.addView(icon, params(dp(116), dp(116), 0, 24, 0, 22));
+        content.addView(icon, params(dp(116), dp(116), 0, 20, 0, 22));
 
         TextView heading = text(title, 24, Color.WHITE, true);
         heading.setGravity(Gravity.CENTER);
@@ -144,8 +150,8 @@ public final class UpdateActivity extends Activity {
         LinearLayout versionCard = new LinearLayout(this);
         versionCard.setOrientation(LinearLayout.VERTICAL);
         versionCard.setPadding(dp(20), dp(18), dp(20), dp(18));
-        versionCard.setBackground(rounded(Color.rgb(18, 27, 68), Color.rgb(91, 76, 181), dp(24)));
-        TextView eyebrow = text(isArabic() ? "تجربة JEHO الجديدة" : "THE NEW JEHO EXPERIENCE", 12, Color.rgb(190, 174, 255), true);
+        versionCard.setBackground(rounded(Color.rgb(18, 27, 68), Color.rgb(122, 91, 231), dp(24)));
+        TextView eyebrow = text(isArabic() ? "الإصدار الجديد جاهز" : "YOUR NEXT JEHO EXPERIENCE", 12, Color.rgb(190, 174, 255), true);
         versionCard.addView(eyebrow, params(-1, -2, 0, 0, 0, 6));
         TextView version = text(targetVersionName.isEmpty() ? "JEHO" : targetVersionName, 25, Color.WHITE, true);
         version.setGravity(Gravity.CENTER_VERTICAL);
@@ -156,7 +162,7 @@ public final class UpdateActivity extends Activity {
                 13, Color.rgb(213, 220, 246), false);
         notes.setLineSpacing(dp(4), 1f);
         versionCard.addView(notes, params(-1, -2, 0, 0, 0, 0));
-        content.addView(versionCard, params(-1, -2, 0, 0, 0, 26));
+        content.addView(versionCard, params(-1, -2, 0, 0, 0, 22));
 
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setMax(100);
@@ -172,7 +178,7 @@ public final class UpdateActivity extends Activity {
         statusText.setGravity(Gravity.CENTER);
         content.addView(statusText, params(-1, -2, 0, 0, 0, 16));
 
-        updateButton = button(isArabic() ? "تحديث الآن" : "Update now", true);
+        updateButton = button(isArabic() ? "تحديث الآن   ✦" : "Update now   ✦", true);
         updateButton.setOnClickListener(v -> beginUpdate());
         content.addView(updateButton, params(-1, dp(54), 0, 0, 0, 12));
 
@@ -411,12 +417,16 @@ public final class UpdateActivity extends Activity {
     private Button button(String label, boolean primary) {
         Button b = new Button(this);
         b.setText(label);
-        b.setTextSize(15);
+        b.setTextSize(primary ? 16 : 14);
         b.setAllCaps(false);
         b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         b.setTextColor(Color.WHITE);
-        b.setBackground(rounded(primary ? Color.rgb(119, 50, 255) : Color.rgb(10, 20, 44),
-                primary ? Color.rgb(167, 76, 255) : Color.rgb(63, 87, 153), dp(28)));
+        b.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                primary ? new int[]{Color.rgb(104, 53, 255), Color.rgb(158, 69, 255)}
+                        : new int[]{Color.rgb(15, 22, 49), Color.rgb(20, 29, 60)}));
+        GradientDrawable buttonBg = (GradientDrawable) b.getBackground();
+        buttonBg.setCornerRadius(dp(28));
+        buttonBg.setStroke(dp(1), primary ? Color.rgb(188, 142, 255) : Color.rgb(63, 87, 153));
         return b;
     }
 
