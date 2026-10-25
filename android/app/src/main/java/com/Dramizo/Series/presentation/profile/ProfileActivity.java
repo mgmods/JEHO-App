@@ -120,15 +120,23 @@ public class ProfileActivity extends ThemedActivity {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
-        // Achievement badges/medals are intentionally hidden from profile pages.
-        if (binding.rowBadges != null) {
-            binding.rowBadges.setVisibility(View.GONE);
-            binding.rowBadges.setOnClickListener(null);
-        }
+        // Keep the medal cabinet visible on every public profile. The resolved target
+        // UUID is held in targetUserIdHold so custom/public IDs open the right account.
+        if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
         if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
-        // Also hide the separate VIP medal/rank strip; otherwise medals remain visible
-        // even though the achievement badge cabinet is hidden.
-        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.GONE);
+        if (binding.rowProfileMedals != null) {
+            binding.rowProfileMedals.setVisibility(View.VISIBLE);
+            binding.rowProfileMedals.setOnClickListener(v -> {
+                String profileId = targetUserIdHold[0];
+                if (profileId == null || profileId.trim().isEmpty()) {
+                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الميداليات", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Intent medals = new Intent(this, MedalActivity.class);
+                medals.putExtra(EXTRA_USER_ID, profileId);
+                startActivity(medals);
+            });
+        }
 
         if (binding.rowMoments != null) {
             binding.rowMoments.setOnClickListener(v -> {
