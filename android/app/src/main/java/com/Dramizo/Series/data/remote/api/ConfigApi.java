@@ -45,6 +45,7 @@ public interface ConfigApi {
     @GET("config/features")
     Call<ApiResponse<MiscDtos.FeaturesDto>> features();
 
+    @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
     @GET("config/app-update")
     Call<ApiResponse<MiscDtos.AppUpdateDto>> appUpdate();
 
