@@ -3068,8 +3068,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           agencyMemberCanSit = membership.length > 0;
         }
       }
-      const freeMic = (room.micRequestEnabled === true && canBypassMicRequest)
-        || agencyMemberCanSit || await this.micWithoutHostApproval();
+      // The room owner's request gate overrides agency membership and the global
+      // free-mic setting. Only the host and explicitly authorized mic managers bypass it.
+      const freeMic = room.micRequestEnabled === true
+        ? canBypassMicRequest
+        : (agencyMemberCanSit || await this.micWithoutHostApproval());
       if (!freeMic) {
         throw new ForbiddenException('Request mic access and wait for host approval');
       }
