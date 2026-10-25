@@ -18,6 +18,7 @@ import android.view.View;
 import androidx.appcompat.app.AppCompatDelegate;
 
 import com.Dramizo.Series.R;
+import com.Dramizo.Series.BuildConfig;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ActivitySplashBinding;
@@ -43,12 +44,15 @@ import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 
 @SuppressLint("CustomSplashScreen")
 public class SplashActivity extends ThemedActivity {
+    public static final String EXTRA_SKIP_UPDATE_CHECK_ONCE = "skip_update_check_once";
     private static final String TAG = "SplashActivity";
     /** Show the branded fallback briefly, then bypass a slow/unavailable ad request. */
     private static final long SPLASH_MIN_MS = 350L;
     private static final long SPLASH_MAX_MS = 15000L;
 
     private boolean navigated;
+    private boolean updateCheckResolved;
+    private boolean startupFlowStarted;
     private boolean profileCheckInProgress;
     private boolean splashDecisionResolved;
     private boolean splashAdShowing;
@@ -115,9 +119,7 @@ public class SplashActivity extends ThemedActivity {
                 binding.tvSplashTagline.startAnimation(tagFade);
             }
 
-            startSplashAdLoad();
-            mainHandler.postDelayed(this::prepareSession, SPLASH_MIN_MS);
-            mainHandler.postDelayed(hardTimeout, SPLASH_MAX_MS);
+            checkAppUpdateThenStart();
         } catch (Throwable t) {
             Log.e(TAG, "Splash failed", t);
             if (!tryResumeLoggedInSession()) openLogin();
@@ -195,6 +197,74 @@ public class SplashActivity extends ThemedActivity {
         } else if ("home".equals(pendingSplashTarget)) {
             i.putExtra(MainActivity.EXTRA_OPEN_HOME, true);
         }
+    }
+
+    /**
+     * Check the dashboard-published release before routing into the app.
+     * A network failure fails open so a temporary outage cannot trap existing users.
+     */
+    private void checkAppUpdateThenStart() {
+        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_SKIP_UPDATE_CHECK_ONCE, false)) {
+            beginRegularSplashFlow();
+            return;
+        }
+        mainHandler.postDelayed(() -> {
+            if (updateCheckResolved || isFinishing()) return;
+            updateCheckResolved = true;
+            beginRegularSplashFlow();
+        }, 4500L);
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                MiscDtos.AppUpdateDto update = null;
+                try {
+                    Result<MiscDtos.AppUpdateDto> result = ApiCall.execute(c.getConfigApi().appUpdate());
+                    if (result != null && result.success) update = result.data;
+                } catch (Throwable error) {
+                    Log.w(TAG, "App update check failed; continuing with normal startup", error);
+                }
+                final MiscDtos.AppUpdateDto config = update;
+                runOnUiThread(() -> {
+                    if (updateCheckResolved || isFinishing()) return;
+                    updateCheckResolved = true;
+                    int installedCode = BuildConfig.VERSION_CODE;
+                    if (config != null
+                            && config.latestVersionCode > installedCode
+                            && config.storeUrl != null
+                            && config.storeUrl.trim().startsWith("https://")) {
+                        boolean mandatory = config.forceUpdate || config.minVersionCode > installedCode;
+                        boolean arabic = java.util.Locale.getDefault().getLanguage().toLowerCase(java.util.Locale.ROOT).startsWith("ar");
+                        String title = arabic ? config.titleAr : config.titleEn;
+                        String message = arabic ? config.messageAr : config.messageEn;
+                        Intent updateIntent = new Intent(this, UpdateActivity.class);
+                        updateIntent.putExtra(UpdateActivity.EXTRA_FORCE, mandatory);
+                        updateIntent.putExtra(UpdateActivity.EXTRA_VERSION_CODE, config.latestVersionCode);
+                        updateIntent.putExtra(UpdateActivity.EXTRA_VERSION_NAME, config.latestVersionName);
+                        updateIntent.putExtra(UpdateActivity.EXTRA_URL, config.storeUrl);
+                        updateIntent.putExtra(UpdateActivity.EXTRA_TITLE, title);
+                        updateIntent.putExtra(UpdateActivity.EXTRA_MESSAGE, message);
+                        startActivity(updateIntent);
+                        finish();
+                        return;
+                    }
+                    beginRegularSplashFlow();
+                });
+            });
+        } catch (Throwable error) {
+            Log.w(TAG, "App update check unavailable; continuing with normal startup", error);
+            if (!updateCheckResolved) {
+                updateCheckResolved = true;
+                beginRegularSplashFlow();
+            }
+        }
+    }
+
+    private void beginRegularSplashFlow() {
+        if (startupFlowStarted || isFinishing()) return;
+        startupFlowStarted = true;
+        startSplashAdLoad();
+        mainHandler.postDelayed(this::prepareSession, SPLASH_MIN_MS);
+        mainHandler.postDelayed(hardTimeout, SPLASH_MAX_MS);
     }
 
     private void prepareSession() {
