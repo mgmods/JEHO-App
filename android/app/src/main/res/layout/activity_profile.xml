@@ -377,6 +377,37 @@
                         android:visibility="gone" />
                 </LinearLayout>
 
+                <!-- User moments shortcut: profile-specific, server-backed posts. -->
+                <LinearLayout
+                    android:id="@+id/rowMoments"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="14dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_user_card_stat_cell"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="12dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="لحظاتي"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="عرض المنشورات  ›"
+                        android:textColor="#FFB8C9C9"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
                 <!-- Achievement badges: shown below identity, separate from VIP medals. -->
                 <LinearLayout
                     android:id="@+id/rowBadges"
@@ -451,37 +482,6 @@
                         android:textColor="#FF9BA8A8"
                         android:textSize="12sp"
                         android:visibility="gone" />
-                </LinearLayout>
-
-                <!-- User moments shortcut: profile-specific, server-backed posts. -->
-                <LinearLayout
-                    android:id="@+id/rowMoments"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="14dp"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_user_card_stat_cell"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="12dp">
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="لحظاتي"
-                        android:textColor="#FFFFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="عرض المنشورات  ›"
-                        android:textColor="#FFB8C9C9"
-                        android:textSize="12sp" />
                 </LinearLayout>
 
                 <!-- Stats: متابعون · مشجع · زائر -->
