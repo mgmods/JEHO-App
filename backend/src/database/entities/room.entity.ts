@@ -190,6 +190,10 @@ export class Room {
   @Column({ type: 'boolean', default: true })
   micInteractEnabled: boolean;
 
+  /** When enabled, ordinary users must receive host/mod approval before taking an open mic. */
+  @Column({ type: 'boolean', default: false })
+  micRequestEnabled: boolean;
+
   /** Mikoo room-more (effect): entry / VIP ride effects for others. */
   @Column({ type: 'boolean', default: true })
   entryEffectsEnabled: boolean;

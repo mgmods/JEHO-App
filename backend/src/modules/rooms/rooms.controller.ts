@@ -389,6 +389,16 @@ export class RoomsController {
     return this.roomsService.listSeatRequests(id, userId);
   }
 
+  @Post(':id/seats/assign')
+  @ApiOperation({ summary: 'Room owner/moderator directly assigns a room member to a mic seat' })
+  assignSeat(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() body: { userId: string; seatIndex?: number },
+  ) {
+    return this.roomsService.assignSeat(id, userId, body.userId, body?.seatIndex ?? null);
+  }
+
   @Post(':id/seat-requests/approve')
   @ApiOperation({ summary: 'Approve guest mic/seat request' })
   approveSeat(
@@ -430,6 +440,7 @@ export class RoomsController {
       charmEnabled?: boolean;
       bannerEnabled?: boolean;
       micInteractEnabled?: boolean;
+      micRequestEnabled?: boolean;
       entryEffectsEnabled?: boolean;
       lowGiftEffectsEnabled?: boolean;
     },

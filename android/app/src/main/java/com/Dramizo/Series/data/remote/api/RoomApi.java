@@ -102,6 +102,9 @@ public interface RoomApi {
     @GET("rooms/{id}/seat-requests")
     Call<ApiResponse<RoomDtos.SeatRequestsResult>> seatRequests(@Path("id") String id);
 
+    @POST("rooms/{id}/seats/assign")
+    Call<ApiResponse<RoomDtos.RoomDto>> assignSeat(@Path("id") String id, @Body Map<String, Object> body);
+
     @POST("rooms/{id}/seat-requests/approve")
     Call<ApiResponse<RoomDtos.RoomDto>> approveSeat(@Path("id") String id, @Body Map<String, Object> body);
 
