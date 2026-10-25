@@ -678,39 +678,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         unreadCount: p.userId === senderId ? 0 : Number(p.unreadCount || 0),
         at: new Date().toISOString(),
       });
-      if (p.userId !== senderId && this.notifications && !viewing) {
-        const preview =
-          (content && content.slice(0, 80)) ||
-          (type === MessageType.IMAGE
-            ? '📷 صورة'
-            : type === MessageType.AUDIO
-              ? '🎤 رسالة صوتية'
-              : type === MessageType.GIFT
-                ? '🎁 هدية'
-                : 'رسالة جديدة');
-        const senderName =
-          (full?.sender as any)?.displayName ||
-          (full?.sender as any)?.username ||
-          'صديق';
-        const senderAvatar =
-          (full?.sender as any)?.avatarUrl ||
-          mapped?.sender?.avatarUrl ||
-          null;
-        void this.notifications.notifyUser(
-          p.userId,
-          NotificationType.CHAT,
-          senderName,
-          preview,
-          {
-            type: 'chat',
-            conversationId,
-            messageId: message.id,
-            avatarUrl: senderAvatar,
-            senderAvatarUrl: senderAvatar,
-            senderName,
-          },
-        );
-      }
+
     }
 
     // New-male ↔ female host chat task progress (≥2 min rounds).
