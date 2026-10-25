@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Optional,
   OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -35,7 +36,8 @@ const CONTEST_BADGE_DAYS = 7;
 const FAT_PRIZE_CEILING = 10000;
 
 @Injectable()
-export class ContestsService implements OnModuleInit {
+export class ContestsService implements OnModuleInit, OnModuleDestroy {
+  private roomPkExpiryTimer: ReturnType<typeof setInterval> | null = null;
   constructor(
     @InjectRepository(Contest) private readonly contestsRepo: Repository<Contest>,
     @InjectRepository(ContestEntry) private readonly entriesRepo: Repository<ContestEntry>,
@@ -135,6 +137,39 @@ export class ContestsService implements OnModuleInit {
         ADD COLUMN IF NOT EXISTS "rules" jsonb,
         ADD COLUMN IF NOT EXISTS "isInteractive" boolean NOT NULL DEFAULT false
     `);
+    // Lightweight server-side expiry: scoring is already bounded by endAt, but this
+    // finalizes the PK state and broadcasts the winner even if the room host disconnects.
+    this.roomPkExpiryTimer = setInterval(() => {
+      void this.expireTimedRoomPkChallenges().catch(() => undefined);
+    }, 15_000);
+    this.roomPkExpiryTimer.unref?.();
+  }
+
+  async onModuleDestroy() {
+    if (this.roomPkExpiryTimer) clearInterval(this.roomPkExpiryTimer);
+    this.roomPkExpiryTimer = null;
+  }
+
+  private async expireTimedRoomPkChallenges() {
+    const now = new Date();
+    const expired = await this.contestsRepo.createQueryBuilder('contest')
+      .where('contest.challengeType IN (:...types)', { types: ['person_vs_person', 'team_vs_team'] })
+      .andWhere('contest.status = :active', { active: 'active' })
+      .andWhere('contest.endAt <= :now', { now })
+      .getMany();
+    for (const contest of expired) {
+      const result = await this.contestsRepo.createQueryBuilder()
+        .update(Contest)
+        .set({ status: 'ended' })
+        .where('id = :id', { id: contest.id })
+        .andWhere('status = :active', { active: 'active' })
+        .execute();
+      if (!result.affected) continue;
+      const finalized = await this.contestsRepo.findOne({ where: { id: contest.id } });
+      if (finalized && this.isTeamChallenge(finalized) && await this.isRoomPkEnabled(true)) {
+        this.emitTeamChallengeEnded(finalized);
+      }
+    }
   }
 
   async ensureDefaults() {
