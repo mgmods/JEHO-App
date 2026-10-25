@@ -2540,29 +2540,30 @@ export class GiftsService implements OnModuleInit {
           const luckyMultiplier = Number(result.luckyMultiplier || 0);
           const luckyCoinsWon = Math.max(0, Number(result.luckyCoinsWon || 0));
           const luckyEventId = `lucky:${senderId}:${animationPayload.at}`;
-          // Broadcast every lucky outcome, including a no-payout loss, so each client
-          // renders the configured normal/return toast consistently.
-          this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-            roomId: dto.roomId,
-            event: 'lucky:hit',
-            payload: {
-              eventId: luckyEventId,
-              senderId,
-              senderName: animationPayload.senderName,
-              senderAvatarUrl: animationPayload.senderAvatarUrl,
-              giftName: gift.name,
-              giftIconUrl: gift.iconUrl,
-              coinPrice: gift.coinPrice,
-              quantity: qty,
-              luckyMultiplier,
-              luckyCoinsWon,
-              formula: luckyMultiplier > 0
-                ? `${gift.coinPrice * qty} × ${luckyMultiplier}`
-                : 'no_payout',
-            },
-            from: { userId: senderId },
-            at: animationPayload.at,
-          });
+          // Losses are silent; only positive payouts and partial returns produce a room message.
+          if (luckyCoinsWon > 0) {
+            this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+              roomId: dto.roomId,
+              event: 'lucky:hit',
+              payload: {
+                eventId: luckyEventId,
+                senderId,
+                senderName: animationPayload.senderName,
+                senderAvatarUrl: animationPayload.senderAvatarUrl,
+                giftName: gift.name,
+                giftIconUrl: gift.iconUrl,
+                coinPrice: gift.coinPrice,
+                quantity: qty,
+                luckyMultiplier,
+                luckyCoinsWon,
+                formula: luckyMultiplier > 0
+                  ? `${gift.coinPrice * qty} × ${luckyMultiplier}`
+                  : 'no_payout',
+              },
+              from: { userId: senderId },
+              at: animationPayload.at,
+            });
+          }
           this.broadcastLuckyCelebration({
             roomId: dto.roomId,
             senderId,
