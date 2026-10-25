@@ -10749,7 +10749,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String dedupeKey
     ) {
         onGlobalCelebration(kind, title, body, displayName, avatarUrl, badgeUrl, dedupeKey,
-                0L, null, null);
+                0L, 0d, null, null);
     }
 
     public void onGlobalCelebration(
@@ -10764,7 +10764,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String gameTitle
     ) {
         onGlobalCelebration(kind, title, body, displayName, avatarUrl, badgeUrl, dedupeKey,
-                coinsWon, gameTitle, null);
+                coinsWon, 0d, gameTitle, null);
     }
 
     public void onGlobalCelebration(
@@ -10776,6 +10776,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String badgeUrl,
             @Nullable String dedupeKey,
             long coinsWon,
+            double multiplier,
             @Nullable String gameTitle,
             @Nullable String targetRoomId
     ) {
@@ -10838,18 +10839,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String chat;
         if (isLucky) {
             long coins = coinsWon > 0 ? coinsWon : extractCoinsFromBody(line);
-            toastMsg = coins > 0
-                    ? ("أرسل هدايا حظ وفاز بـ " + coins)
-                    : "أرسل هدايا حظ وفاز";
+            toastMsg = line;
             chat = coins > 0
-                    ? ("مبروك " + who + " فاز بـ " + coins + " عملة · حظ")
+                    ? ("مبروك " + who + " فاز بـ " + coins + " عملة · حظ"
+                        + (multiplier >= 2d ? (" · ×" + String.format(java.util.Locale.US, "%.0f", multiplier)) : ""))
                     : ("مبروك " + who + " · حظ");
-            // Use the dashboard-controlled top toast for lucky wins; never the legacy
-            // animated card in the center of the room.
+            // Preserve the server's outcome wording (especially partial returns) and the real X count.
             GlobalCelebrationToast.show(
-                    this, who, chat, avatarUrl, badgeUrl,
+                    this, who, toastMsg, avatarUrl, badgeUrl,
                     dedupeKey != null ? dedupeKey : ("lucky-room-" + System.currentTimeMillis()),
-                    28, 1d, Math.max(0L, coins), who, "lucky_hit", null);
+                    28, multiplier, Math.max(0L, coins), who, "lucky_hit", null);
             // The dashboard-controlled top toast is the only lucky-win toast.
             // Do not add the legacy moving center-screen bubble for lucky wins.
             if (roomBannerEnabled()) {
