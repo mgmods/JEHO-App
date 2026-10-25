@@ -136,19 +136,15 @@ public final class AppUpdateChecker {
     }
 
     private static void openStore(@NonNull Activity activity, @Nullable String storeUrl) {
-        String url = storeUrl != null && !storeUrl.trim().isEmpty()
-                ? storeUrl.trim()
-                : "https://play.google.com/store/apps/details?id=" + BuildConfig.APPLICATION_ID;
+        String url = storeUrl == null ? "" : storeUrl.trim();
+        if (url.isEmpty()) return;
         try {
-            Intent market = new Intent(Intent.ACTION_VIEW,
-                    Uri.parse("market://details?id=" + BuildConfig.APPLICATION_ID));
-            market.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            activity.startActivity(market);
-        } catch (Exception e) {
-            try {
-                activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-            } catch (Exception ignored) {
-            }
+            Uri uri = Uri.parse(url);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!"https".equalsIgnoreCase(scheme) && !"http".equalsIgnoreCase(scheme))) return;
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, uri));
+        } catch (Exception ignored) {
+            // Never substitute Google Play: the dashboard URL is the source of truth.
         }
     }
 
