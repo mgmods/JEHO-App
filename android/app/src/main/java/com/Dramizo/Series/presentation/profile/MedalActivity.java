@@ -102,8 +102,23 @@ public class MedalActivity extends ThemedActivity {
                 c.getUserRepository().getMe();
             } catch (Exception ignored) {
             }
+            String requestedUserId = getIntent().getStringExtra(ProfileActivity.EXTRA_USER_ID);
             AuthDtos.UserDto me = c.getSessionManager().getUser();
-            int myVip = me != null ? Math.max(0, Math.min(MAX_VIP, me.vipLevel)) : 0;
+            AuthDtos.UserDto profileUser = me;
+            if (requestedUserId != null && !requestedUserId.trim().isEmpty()) {
+                try {
+                    Response<ApiResponse<AuthDtos.UserDto>> profileResponse =
+                            c.getUserApi().getUser(requestedUserId.trim()).execute();
+                    if (profileResponse.isSuccessful() && profileResponse.body() != null
+                            && profileResponse.body().data != null) {
+                        profileUser = profileResponse.body().data;
+                    }
+                } catch (Exception ignored) {
+                    // Fall back to the signed-in user's profile only if this is their own cabinet.
+                }
+            }
+            final String profileUserId = profileUser != null ? profileUser.id : null;
+            int myVip = profileUser != null ? Math.max(0, Math.min(MAX_VIP, profileUser.vipLevel)) : 0;
 
             Result<MiscDtos.VipPlanList> plans = c.getVipPlansUseCase.execute();
             List<MedalRow> all = new ArrayList<>();
@@ -129,10 +144,10 @@ public class MedalActivity extends ThemedActivity {
             // Dashboard-awarded achievement badges are also medals, not just VIP cosmetics.
             // Keep the VIP rows intact and merge real badge ownership from the same API
             // used by the profile page and badge notification.
-            if (me != null && me.id != null && !me.id.trim().isEmpty()) {
+            if (profileUserId != null && !profileUserId.trim().isEmpty()) {
                 try {
                     Response<ApiResponse<List<BadgeDto>>> response =
-                            c.getUserApi().badges(me.id).execute();
+                            c.getUserApi().badges(profileUserId).execute();
                     if (response.isSuccessful() && response.body() != null
                             && response.body().data != null) {
                         int badgeIndex = 0;
@@ -151,7 +166,7 @@ public class MedalActivity extends ThemedActivity {
                 }
             }
 
-            // خاصتي = current VIP badge only (not every lower tier).
+            // Keep the VIP badge and dashboard-awarded medals belonging to the viewed profile.
             if (myVip >= 1) {
                 MedalRow current = null;
                 for (MedalRow row : all) {
