@@ -190,6 +190,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private TextView roomPkEndButton;
     @Nullable private TextView roomPkMinimizeButton;
     private boolean roomPkOverlayMinimized;
+    private boolean roomPkCanEndChallenge;
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -2808,9 +2809,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (canInviteMic && canTarget && anotherUser && isHost) {
             menu.getMenu().add(0, i++, 0, "دعوة مهمة (+40 ماسة)");
         }
-        if (canMuteUsers && canTarget && seatRef != null) {
-            menu.getMenu().add(0, i++, 0,
-                    (seatRef.isMuted || seatRef.isModeratorMuted) ? "فك كتم المايك" : "كتم المايك");
+        if (canMuteUsers && canTarget && seatRef != null
+                && !seatRef.isMuted && !seatRef.isModeratorMuted) {
+            // Moderators may mute another user, but only that user controls reopening their mic.
+            menu.getMenu().add(0, i++, 0, "كتم المايك");
         }
         boolean canRemoveFromMic = canManageSeats || canKickUsers || (myUserId != null && roomModeratorIds.contains(myUserId)) || isPlatformManager() || isPlatformSuper();
         if (canRemoveFromMic && canTarget && seatRef != null) {
@@ -8296,14 +8298,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         TextView actMute = sheet.findViewById(R.id.actMute);
         if (actMute != null) {
-            boolean showMute = canMuteUsers && canTarget && targetSeat != null;
+            boolean showMute = canMuteUsers && canTarget && targetSeat != null
+                    && !targetSeat.isMuted && !targetSeat.isModeratorMuted;
             actMute.setVisibility(showMute ? View.VISIBLE : View.GONE);
             if (showMute) {
-                final boolean currentlyMuted = targetSeat.isMuted || targetSeat.isModeratorMuted;
-                actMute.setText(currentlyMuted ? "فك كتم المايك" : "كتم المايك");
+                actMute.setText("كتم المايك");
                 actMute.setOnClickListener(v -> {
                     dialog.dismiss();
-                    viewModel.setMic(roomId, !currentlyMuted, userId);
+                    viewModel.setMic(roomId, true, userId);
                 });
             }
         }
@@ -10090,7 +10092,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             btnRoomPk.setAlpha(roomPkFeatureEnabled && !challengeRunning ? 1.0f : 0.65f);
             btnRoomPk.setText(challengeRunning
                     ? "⚔ تحدّي PK — المواجهة جارية"
-                    : (roomPkFeatureEnabled ? "⚔ تحدّي PK بين الغرف" : "⚔ تحدّي PK (غير متاح حالياً)"));
+                    : (roomPkFeatureEnabled ? "⚔ تحديات PK" : "⚔ تحدّي PK (غير متاح حالياً)"));
             btnRoomPk.setOnClickListener(v -> {
                 if (!isOwner) {
                     Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
@@ -13080,7 +13082,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 new int[]{0xFFEF315B, 0xFF8B36C9, 0xFFD9A62E}));
         ((GradientDrawable) hero.getBackground()).setCornerRadius(dp(18));
         TextView heroTitle = new TextView(this);
-        heroTitle.setText("⚔  تحدّي روم ضد روم");
+        heroTitle.setText("⚔  تحديات PK");
         heroTitle.setTextColor(Color.WHITE);
         heroTitle.setTextSize(19f);
         heroTitle.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
@@ -13380,7 +13382,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         icon.setTextColor(Color.WHITE);
         hero.addView(icon);
         TextView title = new TextView(this);
-        title.setText("دعوة تحدّي روم ضد روم");
+        title.setText("دعوة تحديات PK");
         title.setTextSize(18f);
         title.setTextColor(Color.WHITE);
         title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
@@ -13686,7 +13688,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void confirmEndInRoomPk() {
-        if (!isOwner || roomPkCurrentContestId == null || roomPkCurrentContestId.trim().isEmpty()
+        if (!isOwner || !roomPkCanEndChallenge || roomPkCurrentContestId == null || roomPkCurrentContestId.trim().isEmpty()
                 || "pending".equals(roomPkCurrentContestId)) {
             Toast.makeText(this, "إنهاء التحدّي متاح لمضيف أحد الرومين أثناء جولة نشطة فقط", Toast.LENGTH_SHORT).show();
             return;
@@ -13783,6 +13785,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    private boolean roomPkSideContainsUser(@Nullable JsonObject side, @Nullable String userId) {
+        if (side == null || userId == null || userId.trim().isEmpty()
+                || !side.has("participantIds") || !side.get("participantIds").isJsonArray()) return false;
+        for (com.google.gson.JsonElement item : side.getAsJsonArray("participantIds")) {
+            if (item != null && !item.isJsonNull() && userId.equals(item.getAsString())) return true;
+        }
+        return false;
+    }
+
     private void showRoomPkScoreBanner(String event, @Nullable JsonObject payload) {
         if (payload == null || binding == null) return;
         JsonObject sideA = payload.has("sideA") && payload.get("sideA").isJsonObject()
@@ -13791,6 +13802,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ? payload.getAsJsonObject("sideB") : new JsonObject();
         String nameA = firstNonEmpty(memberStr(sideA, "name"), "الروم الأحمر");
         String nameB = firstNonEmpty(memberStr(sideB, "name"), "الروم الأزرق");
+        boolean inRoomBattle = "person_vs_person".equals(memberStr(payload, "challengeType"))
+                || "team_vs_team".equals(memberStr(payload, "challengeType"));
+        boolean participantListsPresent = sideA.has("participantIds") || sideB.has("participantIds");
+        boolean currentUserIsParticipant = roomPkSideContainsUser(sideA, myUserId)
+                || roomPkSideContainsUser(sideB, myUserId);
+        // Nonparticipants receive a read-only live scoreboard; only a participating host
+        // may see the end/cancel control. Room-vs-room keeps host control as before.
+        roomPkCanEndChallenge = isOwner && (!inRoomBattle || !participantListsPresent || currentUserIsParticipant);
         long scoreA = Math.max(0L, memberLong(sideA, "score", memberLong(payload, "scoreA", 0L)));
         long scoreB = Math.max(0L, memberLong(sideB, "score", memberLong(payload, "scoreB", 0L)));
         boolean ended = "contest:team-ended".equals(event);
@@ -13840,7 +13859,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomPkOverlayMinimized = !roomPkOverlayMinimized;
                 roomPkMinimizeButton.setText(roomPkOverlayMinimized ? "▣ توسيع" : "— تصغير");
                 for (int i = 2; i < panel.getChildCount(); i++) panel.getChildAt(i).setVisibility(roomPkOverlayMinimized ? View.GONE : View.VISIBLE);
-                if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!roomPkBannerEnded && isOwner && roomPkCurrentContestId != null
+                if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!roomPkBannerEnded && roomPkCanEndChallenge && roomPkCurrentContestId != null
                         && !roomPkCurrentContestId.trim().isEmpty() && !"pending".equals(roomPkCurrentContestId) ? View.VISIBLE : View.GONE);
                 updateRoomPkBannerClock.run();
             });
@@ -13979,8 +13998,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             });
         }
 
-        boolean inRoomBattle = "person_vs_person".equals(memberStr(payload, "challengeType"))
-                || "team_vs_team".equals(memberStr(payload, "challengeType"));
         if (inRoomBattle) hideRoomPkSeatSplit();
         else if (!ended) showRoomPkSeatSplit(nameA, nameB);
         else hideRoomPkSeatSplit();
@@ -14193,6 +14210,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if ("contest:team-ended".equals(event)) {
                 roomPkCurrentContestId = null;
                 roomPkInRoomChallenge = false;
+                roomPkCanEndChallenge = false;
                 roomPkAutoEndRequested = false;
                 handler.postDelayed(this::ensureRoomPkActionButton, 12000L);
             }
