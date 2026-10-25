@@ -120,13 +120,11 @@ public class ProfileActivity extends ThemedActivity {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
-        // Keep the medal cabinet visible on every public profile. The resolved target
-        // UUID is held in targetUserIdHold so custom/public IDs open the right account.
-        if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
-        if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
-        if (binding.rowProfileMedals != null) {
-            binding.rowProfileMedals.setVisibility(View.VISIBLE);
-            binding.rowProfileMedals.setOnClickListener(v -> {
+        // Medal cabinet is shown on the profile itself, beneath the identity and moments rows.
+        // Public/custom IDs are resolved to the actual UUID by ProfileViewModel before loading.
+        if (binding.rowBadges != null) {
+            binding.rowBadges.setVisibility(View.GONE);
+            binding.rowBadges.setOnClickListener(v -> {
                 String profileId = targetUserIdHold[0];
                 if (profileId == null || profileId.trim().isEmpty()) {
                     Toast.makeText(this, "تعذر تحديد الحساب لعرض الميداليات", Toast.LENGTH_SHORT).show();
@@ -137,6 +135,8 @@ public class ProfileActivity extends ThemedActivity {
                 startActivity(medals);
             });
         }
+        if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
+        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.GONE);
 
         if (binding.rowMoments != null) {
             binding.rowMoments.setOnClickListener(v -> {
@@ -364,6 +364,7 @@ public class ProfileActivity extends ThemedActivity {
             int friends = Math.max(0, user.friendsCount);
             if (user.id != null && !user.id.isEmpty()) {
                 targetUserIdHold[0] = user.id;
+                loadProfileMedals(user.id);
             }
             if (binding.tvStatFriends != null) binding.tvStatFriends.setText(formatScore(followers));
             if (binding.tvStatFollowing != null) binding.tvStatFollowing.setText(formatScore(following));
@@ -1085,7 +1086,46 @@ public class ProfileActivity extends ThemedActivity {
         }
     }
 
-    /** Badge/medal cabinet is disabled platform-wide; no async loader may reveal it. */
+    /** Load real, persisted medals for the viewed profile and render a compact preview. */
+    private void loadProfileMedals(String profileId) {
+        if (profileId == null || profileId.trim().isEmpty() || binding == null) return;
+        AppContainer c = container != null ? container : ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<List<com.Dramizo.Series.data.remote.dto.BadgeDto>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(c.getUserApi().earnedBadges(profileId));
+            if (isFinishing()) return;
+            runOnUiThread(() -> {
+                if (binding == null) return;
+                List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned =
+                        result != null && result.success && result.data != null ? result.data : java.util.Collections.emptyList();
+                binding.rowBadges.setVisibility(View.VISIBLE);
+                binding.tvBadgeCount.setText(earned.size() + " مكتسبة");
+                binding.rowEarnedBadges.removeAllViews();
+                if (earned.isEmpty()) {
+                    binding.rowEarnedBadges.setVisibility(View.GONE);
+                    binding.tvBadgesEmpty.setVisibility(View.VISIBLE);
+                    binding.tvBadgesEmpty.setText("لا توجد ميداليات مكتسبة بعد");
+                } else {
+                    binding.tvBadgesEmpty.setVisibility(View.GONE);
+                    binding.rowEarnedBadges.setVisibility(View.VISIBLE);
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
+                        if (badge == null || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
+                        ImageView image = new ImageView(this);
+                        int size = Math.round(34 * getResources().getDisplayMetrics().density);
+                        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+                        lp.setMargins(0, 0, Math.round(8 * getResources().getDisplayMetrics().density), 0);
+                        image.setLayoutParams(lp);
+                        image.setContentDescription(badge.name == null ? "ميدالية" : badge.name);
+                        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        binding.rowEarnedBadges.addView(image);
+                        Glide.with(this).load(AssetCatalog.absoluteUrl(badge.imageUrl))
+                                .placeholder(R.drawable.ic_medal_default)
+                                .error(R.drawable.ic_medal_default).into(image);
+                    }
+                }
+            });
+        });
+    }
 
     private void sendSocialRequest(String targetId, String type, String labelAr) {
         AppContainer container = ContainerProvider.from(this);
