@@ -291,6 +291,7 @@ export class ConfigController {
       'app.update_title_en',
       'app.update_message_en',
       'app.update_store_url',
+      'app.update_link_type',
       'app.update_force',
     ];
     const rows = await this.settingsRepo
@@ -318,9 +319,10 @@ export class ConfigController {
       messageEn:
         map.get('app.update_message_en') ||
         'A newer version of JEHO CHAT is available on the store. Update now for improvements and fixes.',
-      storeUrl:
-        map.get('app.update_store_url') ||
-        'https://play.google.com/store/apps/details?id=com.Dramizo.Series',
+      storeUrl: map.get('app.update_store_url') || '',
+      linkType: ['apk', 'external', 'auto'].includes((map.get('app.update_link_type') || 'auto').toLowerCase())
+        ? (map.get('app.update_link_type') || 'auto').toLowerCase()
+        : 'auto',
     };
   }
 

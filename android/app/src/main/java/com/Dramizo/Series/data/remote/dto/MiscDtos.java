@@ -357,6 +357,8 @@ public final class MiscDtos {
         @SerializedName("titleEn") public String titleEn;
         @SerializedName("messageEn") public String messageEn;
         @SerializedName("storeUrl") public String storeUrl;
+        /** apk = download/install APK, external = open configured URL, auto = infer from URL. */
+        @SerializedName("linkType") public String linkType;
     }
 
     /** Public ZEGOCLOUD client config from GET /config/zego (AppID only — AppSign never sent). */
