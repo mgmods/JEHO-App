@@ -3514,11 +3514,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Mute own mic while minimized (notification / mini player can unmute).
             micOn = false;
             RoomRtcEngine.getInstance().setMicEnabled(false);
-            if (roomId != null && !roomId.isEmpty()) {
-                final String rid = roomId;
-                ContainerProvider.from(this).getIoExecutor().execute(() ->
-                        ContainerProvider.from(this).getRoomRepository().setMic(rid, true));
-            }
+            // Minimize is a presentation/background transition, not a seat leave or
+            // server-side mic moderation action. Do not send setMic(rid, true) here:
+            // the room backend must retain this participant's occupied seat and seat index.
+            // Local capture is muted above; the existing room/seat session remains active.
         } catch (Exception ignored) {
         }
     }
