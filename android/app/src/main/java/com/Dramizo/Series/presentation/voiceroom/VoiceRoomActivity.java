@@ -12995,7 +12995,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ContainerProvider.from(this).getContestsApi().createInRoomPk(body).enqueue(new retrofit2.Callback<ApiResponse<Object>>(){
                     @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,retrofit2.Response<ApiResponse<Object>> res){
                         if(!res.isSuccessful()||res.body()==null||!res.body().success){Toast.makeText(VoiceRoomActivity.this,res.body()!=null&&res.body().message!=null?res.body().message:"تعذّر بدء تحدّي PK",Toast.LENGTH_LONG).show();return;}
-                        Toast.makeText(VoiceRoomActivity.this,"بدأ تحدّي PK!",Toast.LENGTH_SHORT).show();
+                        Toast.makeText(VoiceRoomActivity.this, "تم إرسال الدعوة؛ يبدأ التحدّي بعد قبول الطرف الثاني", Toast.LENGTH_LONG).show();
                         // Socket delivery is realtime-first; refresh from the API as a safe
                         // fallback so the host still sees the banner after reconnects.
                         handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 350L);
@@ -14113,6 +14113,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private void respondToPersonPkInvite(String id, boolean accept) {
+        Map<String,Object> body = new HashMap<>(); body.put("accept", accept);
+        ContainerProvider.from(this).getContestsApi().respondInRoomPk(id, body).enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+            @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call, retrofit2.Response<ApiResponse<Object>> res) {
+                if (!res.isSuccessful() || res.body() == null || !res.body().success) {
+                    Toast.makeText(VoiceRoomActivity.this, res.body()!=null && res.body().message!=null ? res.body().message : "تعذّر معالجة دعوة PK", Toast.LENGTH_LONG).show(); return;
+                }
+                Toast.makeText(VoiceRoomActivity.this, accept ? "تم قبول الدعوة" : "تم رفض الدعوة", Toast.LENGTH_SHORT).show();
+            }
+            @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable e) {
+                Toast.makeText(VoiceRoomActivity.this, "تعذّر الاتصال لمعالجة دعوة PK", Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
     @SuppressLint("NewApi")
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
@@ -14133,6 +14148,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomPkAutoEndRequested = false;
                 handler.postDelayed(this::ensureRoomPkActionButton, 12000L);
             }
+            return;
+        }
+        if ("contest:person-pk-invite".equals(event)) {
+            String target = memberStr(payload, "targetUserId"), inviteId = memberStr(payload, "contestId");
+            if (myUserId == null || !myUserId.equals(target) || inviteId == null || inviteId.isEmpty()) return;
+            String inviter = memberStr(payload, "inviterName"); int duration = memberInt(payload, "durationMinutes", 5);
+            new AlertDialog.Builder(this).setTitle("دعوة تحدّي PK")
+                .setMessage((inviter == null ? "مستخدم" : inviter) + " يدعوك إلى تحدّي شخص ضد شخص لمدة " + duration + " دقائق. لن يبدأ التحدّي إلا إذا قبلت.")
+                .setNegativeButton("رفض", (dialog, which) -> respondToPersonPkInvite(inviteId, false))
+                .setPositiveButton("قبول", (dialog, which) -> respondToPersonPkInvite(inviteId, true))
+                .setOnCancelListener(dialog -> respondToPersonPkInvite(inviteId, false)).show();
             return;
         }
         if ("contest:pk-invite".equals(event)) {
