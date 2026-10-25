@@ -2231,6 +2231,15 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       room.lowGiftEffectsEnabled = patch.lowGiftEffectsEnabled;
     }
     await this.roomsRepo.save(room);
+    if (patch.micRequestEnabled === false) {
+      await this.seatSignalsRepo.delete({ roomId, kind: RoomSeatSignalKind.REQUEST });
+      this.realtimeGateway.emitToRoom(roomId, 'room:event', {
+        roomId,
+        event: 'room:seat_requests_cleared',
+        payload: { roomId, reason: 'mic_request_disabled' },
+        at: new Date().toISOString(),
+      });
+    }
     const payload = {
       roomId,
       chatZoneEnabled: room.chatZoneEnabled !== false,
@@ -2998,9 +3007,16 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
     const isHost = room.hostId === userId;
     const alreadySeated = await this.seatsRepo.findOne({ where: { roomId, userId } });
-    const roomModerator = await this.modsRepo.findOne({ where: { roomId, userId } });
-    const canBypassMicRequest = isHost || room.cohostId === userId || room.activeHostId === userId
-      || roomModerator?.canInvite === true || roomModerator?.canManageSeats === true;
+    const viewerMicPermissions = room.micRequestEnabled === true
+      ? await this.getViewerRoomPermissions(room, userId)
+      : null;
+    const canBypassMicRequest = isHost || (
+      room.micRequestEnabled === true && (
+        room.cohostId === userId || room.activeHostId === userId
+        || viewerMicPermissions?.canInvite === true
+        || viewerMicPermissions?.canManageSeats === true
+      )
+    );
     if (room.micRequestEnabled === true && !alreadySeated && !canBypassMicRequest) {
       throw new ForbiddenException('This room requires approval before taking a mic seat');
     }
@@ -3022,7 +3038,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           agencyMemberCanSit = membership.length > 0;
         }
       }
-      const freeMic = canBypassMicRequest || agencyMemberCanSit || await this.micWithoutHostApproval();
+      const freeMic = (room.micRequestEnabled === true && canBypassMicRequest)
+        || agencyMemberCanSit || await this.micWithoutHostApproval();
       if (!freeMic) {
         throw new ForbiddenException('Request mic access and wait for host approval');
       }
