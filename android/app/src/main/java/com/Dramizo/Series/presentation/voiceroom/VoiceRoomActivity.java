@@ -188,6 +188,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     };
     @Nullable private TextView roomPkActionButton;
     @Nullable private TextView roomPkEndButton;
+    @Nullable private TextView roomPkMinimizeButton;
+    private boolean roomPkOverlayMinimized;
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -217,8 +219,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             long remaining = roomPkEndsAtMs > 0L ? roomPkEndsAtMs - System.currentTimeMillis() : -1L;
             String clock = remaining > 0L
                     ? String.format(java.util.Locale.US, "%02d:%02d", remaining / 60000L, (remaining / 1000L) % 60L)
-                    : (roomPkEndsAtMs > 0L ? "بانتظار تثبيت النتيجة" : "مباشر");
-            roomPkScoreBanner.setText(roomPkBannerBaseText + "   •   ⏱ " + clock);
+                    : (roomPkEndsAtMs > 0L ? "00:00" : "مباشر");
+            if (roomPkOverlayMinimized && roomPkTeamAScore != null && roomPkTeamBScore != null) roomPkScoreBanner.setText("🔴 " + roomPkTeamAScore.getText() + " • ⏱ " + clock + " • " + roomPkTeamBScore.getText() + " 🔵");
+            else roomPkScoreBanner.setText(roomPkBannerBaseText + " • ⏱ " + clock);
             if (remaining > 0L) {
                 handler.postDelayed(this, 1000L);
             } else if (roomPkEndsAtMs > 0L && roomPkInRoomChallenge && isOwner
@@ -13677,22 +13680,55 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         android.view.Window window = dialog.getWindow();
         int width = Math.max(dp(260), Math.min(getResources().getDisplayMetrics().widthPixels - dp(32), dp(440)));
         window.setLayout(width, android.view.WindowManager.LayoutParams.WRAP_CONTENT);
-        window.setBackgroundDrawableResource(android.R.color.transparent);
+        // An opaque panel is essential: transparent dialog windows make challenge choices
+        // unreadable over the room background on multiple Android themes.
+        window.setBackgroundDrawable(roundRoomPkDrawable(0xFFF8FAFF, 0xFFD7DCE8, 18));
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        window.setDimAmount(0.42f);
         window.setGravity(Gravity.TOP | Gravity.START);
-        android.view.WindowManager.LayoutParams attrs = window.getAttributes(); attrs.x = dp(16); attrs.y = dp(72); window.setAttributes(attrs);
+        android.content.SharedPreferences prefs = getSharedPreferences("room_pk_ui", MODE_PRIVATE);
+        android.view.WindowManager.LayoutParams attrs = window.getAttributes();
+        attrs.x = prefs.getInt("dialog_x", dp(16));
+        attrs.y = prefs.getInt("dialog_y", dp(72));
+        window.setAttributes(attrs);
+        if (dialog instanceof androidx.appcompat.app.AlertDialog) {
+            androidx.appcompat.app.AlertDialog alert = (androidx.appcompat.app.AlertDialog) dialog;
+            TextView title = alert.findViewById(androidx.appcompat.R.id.alertTitle);
+            if (title != null) title.setTextColor(0xFF172033);
+            android.widget.ListView list = alert.getListView();
+            if (list != null) {
+                list.setBackgroundColor(0xFFF8FAFF);
+                list.setCacheColorHint(0xFFF8FAFF);
+                list.setDivider(new android.graphics.drawable.ColorDrawable(0xFFE2E7F0));
+                list.setDividerHeight(dp(1));
+                for (int i = 0; i < list.getChildCount(); i++) {
+                    View child = list.getChildAt(i);
+                    if (child instanceof TextView) ((TextView) child).setTextColor(0xFF172033);
+                }
+            }
+            android.widget.Button positive = alert.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE);
+            android.widget.Button negative = alert.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE);
+            if (positive != null) positive.setTextColor(0xFFC52250);
+            if (negative != null) negative.setTextColor(0xFF596477);
+        }
         if (dragHandle == null) return;
         dragHandle.setOnTouchListener(new View.OnTouchListener() {
             private float downX, downY; private int startX, startY;
             @Override public boolean onTouch(View v, android.view.MotionEvent event) {
                 switch (event.getActionMasked()) {
                     case android.view.MotionEvent.ACTION_DOWN:
-                        android.view.WindowManager.LayoutParams p = window.getAttributes(); downX = event.getRawX(); downY = event.getRawY(); startX = p.x; startY = p.y; return true;
+                        android.view.WindowManager.LayoutParams p = window.getAttributes();
+                        downX = event.getRawX(); downY = event.getRawY(); startX = p.x; startY = p.y; return true;
                     case android.view.MotionEvent.ACTION_MOVE:
                         android.view.WindowManager.LayoutParams move = window.getAttributes();
                         move.x = Math.max(0, Math.min(Math.max(0, getResources().getDisplayMetrics().widthPixels - width), startX + Math.round(event.getRawX() - downX)));
                         move.y = Math.max(dp(24), Math.min(Math.max(dp(24), getResources().getDisplayMetrics().heightPixels - dp(100)), startY + Math.round(event.getRawY() - downY)));
                         window.setAttributes(move); return true;
-                    case android.view.MotionEvent.ACTION_UP: case android.view.MotionEvent.ACTION_CANCEL: return true;
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        android.view.WindowManager.LayoutParams saved = window.getAttributes();
+                        prefs.edit().putInt("dialog_x", saved.x).putInt("dialog_y", saved.y).apply();
+                        return true;
                     default: return false;
                 }
             }
@@ -13726,7 +13762,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (roomPkSplitContainer == null) {
             android.widget.LinearLayout panel = new android.widget.LinearLayout(this);
             panel.setOrientation(android.widget.LinearLayout.VERTICAL);
-            panel.setPadding(dp(10), dp(8), dp(10), dp(10));
+            panel.setPadding(dp(6), dp(5), dp(6), dp(6));
             panel.setElevation(dp(18));
             panel.setBackground(roundRoomPkDrawable(0xF0181B2B, 0xFFFFD166, 18));
             panel.setClickable(false);
@@ -13734,24 +13770,42 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
             roomPkScoreBanner = new TextView(this);
             roomPkScoreBanner.setTextColor(Color.WHITE);
-            roomPkScoreBanner.setTextSize(13f);
+            roomPkScoreBanner.setTextSize(11f);
             roomPkScoreBanner.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
             roomPkScoreBanner.setGravity(Gravity.CENTER);
-            roomPkScoreBanner.setPadding(dp(4), dp(2), dp(4), dp(8));
+            roomPkScoreBanner.setPadding(dp(3), dp(1), dp(3), dp(2));
             panel.addView(roomPkScoreBanner, new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                     android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            roomPkMinimizeButton = new TextView(this);
+            roomPkMinimizeButton.setText("— تصغير");
+            roomPkMinimizeButton.setTextColor(0xFFE8EDF7);
+            roomPkMinimizeButton.setTextSize(10f);
+            roomPkMinimizeButton.setGravity(Gravity.CENTER);
+            roomPkMinimizeButton.setPadding(dp(8), dp(2), dp(8), dp(2));
+            roomPkMinimizeButton.setBackground(roundRoomPkDrawable(0xFF30394B, 0xFF58657B, 10));
+            android.widget.LinearLayout.LayoutParams minimizeLp = new android.widget.LinearLayout.LayoutParams(-2, -2);
+            minimizeLp.gravity = Gravity.CENTER;
+            minimizeLp.bottomMargin = dp(3);
+            panel.addView(roomPkMinimizeButton, minimizeLp);
+            roomPkMinimizeButton.setOnClickListener(v -> {
+                roomPkOverlayMinimized = !roomPkOverlayMinimized;
+                roomPkMinimizeButton.setText(roomPkOverlayMinimized ? "▣ توسيع" : "— تصغير");
+                for (int i = 2; i < panel.getChildCount(); i++) panel.getChildAt(i).setVisibility(roomPkOverlayMinimized ? View.GONE : View.VISIBLE);
+                if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!roomPkBannerEnded && roomPkInRoomChallenge && isOwner ? View.VISIBLE : View.GONE);
+                updateRoomPkBannerClock.run();
+            });
             roomPkEndButton = new TextView(this);
             roomPkEndButton.setText("إنهاء التحدّي  ×");
             roomPkEndButton.setTextColor(Color.WHITE);
-            roomPkEndButton.setTextSize(11f);
+            roomPkEndButton.setTextSize(10f);
             roomPkEndButton.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
             roomPkEndButton.setGravity(Gravity.CENTER);
-            roomPkEndButton.setPadding(dp(12), dp(7), dp(12), dp(7));
+            roomPkEndButton.setPadding(dp(8), dp(4), dp(8), dp(4));
             roomPkEndButton.setBackground(roundRoomPkDrawable(0xFFB91C3B, 0xFFFF8297, 18));
             android.widget.LinearLayout.LayoutParams endButtonLp = new android.widget.LinearLayout.LayoutParams(-2, -2);
             endButtonLp.gravity = Gravity.CENTER;
-            endButtonLp.bottomMargin = dp(7);
+            endButtonLp.bottomMargin = dp(4);
             panel.addView(roomPkEndButton, endButtonLp);
             roomPkEndButton.setOnClickListener(v -> confirmEndInRoomPk());
 
@@ -13761,18 +13815,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             android.widget.LinearLayout.LayoutParams teamsLp = new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                     android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            teamsLp.bottomMargin = dp(8);
+            teamsLp.bottomMargin = dp(4);
             panel.addView(teams, teamsLp);
 
             android.widget.LinearLayout cardA = new android.widget.LinearLayout(this);
             cardA.setOrientation(android.widget.LinearLayout.VERTICAL);
             cardA.setGravity(Gravity.CENTER);
-            cardA.setPadding(dp(8), dp(10), dp(8), dp(10));
+            cardA.setPadding(dp(5), dp(4), dp(5), dp(4));
             cardA.setBackground(roundRoomPkDrawable(0xFF5A1725, 0xFFFF5268, 14));
             android.widget.LinearLayout cardB = new android.widget.LinearLayout(this);
             cardB.setOrientation(android.widget.LinearLayout.VERTICAL);
             cardB.setGravity(Gravity.CENTER);
-            cardB.setPadding(dp(8), dp(10), dp(8), dp(10));
+            cardB.setPadding(dp(5), dp(4), dp(5), dp(4));
             cardB.setBackground(roundRoomPkDrawable(0xFF142D5A, 0xFF54A8FF, 14));
             android.widget.LinearLayout.LayoutParams cardLp = new android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
@@ -13784,13 +13838,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
             roomPkTeamAName = new TextView(this);
             roomPkTeamAName.setTextColor(Color.WHITE);
-            roomPkTeamAName.setTextSize(12f);
+            roomPkTeamAName.setTextSize(10f);
             roomPkTeamAName.setGravity(Gravity.CENTER);
             roomPkTeamAName.setMaxLines(1);
             roomPkTeamAName.setEllipsize(android.text.TextUtils.TruncateAt.END);
             roomPkTeamAScore = new TextView(this);
             roomPkTeamAScore.setTextColor(Color.WHITE);
-            roomPkTeamAScore.setTextSize(23f);
+            roomPkTeamAScore.setTextSize(18f);
             roomPkTeamAScore.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
             roomPkTeamAScore.setGravity(Gravity.CENTER);
             cardA.addView(roomPkTeamAName);
@@ -13798,13 +13852,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
             roomPkTeamBName = new TextView(this);
             roomPkTeamBName.setTextColor(Color.WHITE);
-            roomPkTeamBName.setTextSize(12f);
+            roomPkTeamBName.setTextSize(10f);
             roomPkTeamBName.setGravity(Gravity.CENTER);
             roomPkTeamBName.setMaxLines(1);
             roomPkTeamBName.setEllipsize(android.text.TextUtils.TruncateAt.END);
             roomPkTeamBScore = new TextView(this);
             roomPkTeamBScore.setTextColor(Color.WHITE);
-            roomPkTeamBScore.setTextSize(23f);
+            roomPkTeamBScore.setTextSize(18f);
             roomPkTeamBScore.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
             roomPkTeamBScore.setGravity(Gravity.CENTER);
             cardB.addView(roomPkTeamBName);
@@ -13838,17 +13892,42 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             membersRow.addView(roomPkTeamAMembers, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
             membersRow.addView(roomPkTeamBMembers, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
             panel.addView(membersRow, new android.widget.LinearLayout.LayoutParams(-1, -2));
+            membersRow.setVisibility(View.GONE);
 
-            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
-                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
-                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.MATCH_PARENT,
-                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
+            androidx.constraintlayout.widget.ConstraintLayout root = (androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot();
+            android.content.SharedPreferences pkPrefs = getSharedPreferences("room_pk_ui", MODE_PRIVATE);
+            int overlayWidth = Math.min(Math.max(dp(280), getResources().getDisplayMetrics().widthPixels - dp(24)), dp(360));
+            int initialX = pkPrefs.getInt("overlay_x", dp(12));
+            int initialY = pkPrefs.getInt("overlay_y", dp(64));
+            initialX = Math.max(0, Math.min(initialX, Math.max(0, getResources().getDisplayMetrics().widthPixels - overlayWidth)));
+            initialY = Math.max(dp(24), Math.min(initialY, Math.max(dp(24), getResources().getDisplayMetrics().heightPixels - dp(150))));
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp = new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
+                    overlayWidth, androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
             lp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
             lp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
-            lp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
-            lp.setMargins(dp(12), dp(64), dp(12), 0);
-            ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(panel, lp);
+            lp.setMarginStart(initialX); lp.topMargin = initialY;
+            root.addView(panel, lp);
             roomPkSplitContainer = panel;
+            final int[] savedX = {initialX}; final int[] savedY = {initialY};
+            roomPkScoreBanner.setOnTouchListener(new View.OnTouchListener() {
+                private float downRawX, downRawY; private int startX, startY;
+                @Override public boolean onTouch(View v, android.view.MotionEvent event) {
+                    switch (event.getActionMasked()) {
+                        case android.view.MotionEvent.ACTION_DOWN:
+                            downRawX = event.getRawX(); downRawY = event.getRawY(); startX = savedX[0]; startY = savedY[0]; return true;
+                        case android.view.MotionEvent.ACTION_MOVE:
+                            int maxX = Math.max(0, getResources().getDisplayMetrics().widthPixels - panel.getWidth());
+                            int maxY = Math.max(dp(24), getResources().getDisplayMetrics().heightPixels - dp(150));
+                            savedX[0] = Math.max(0, Math.min(maxX, startX + Math.round(event.getRawX() - downRawX)));
+                            savedY[0] = Math.max(dp(24), Math.min(maxY, startY + Math.round(event.getRawY() - downRawY)));
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams moved = (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) panel.getLayoutParams();
+                            moved.setMarginStart(savedX[0]); moved.topMargin = savedY[0]; panel.setLayoutParams(moved); return true;
+                        case android.view.MotionEvent.ACTION_UP: case android.view.MotionEvent.ACTION_CANCEL:
+                            pkPrefs.edit().putInt("overlay_x", savedX[0]).putInt("overlay_y", savedY[0]).apply(); return true;
+                        default: return false;
+                    }
+                }
+            });
         }
 
         boolean inRoomBattle = "person_vs_person".equals(memberStr(payload, "challengeType"))
@@ -13878,6 +13957,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (roomPkEndButton != null) {
             roomPkEndButton.setVisibility(!ended && inRoomBattle && isOwner ? View.VISIBLE : View.GONE);
             roomPkEndButton.setEnabled(!roomPkAutoEndRequested);
+        }
+        if (roomPkMinimizeButton != null) {
+            roomPkMinimizeButton.setText(roomPkOverlayMinimized ? "▣ توسيع" : "— تصغير");
+            for (int i = 2; i < roomPkSplitContainer.getChildCount(); i++) roomPkSplitContainer.getChildAt(i).setVisibility(roomPkOverlayMinimized ? View.GONE : View.VISIBLE);
+            if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!ended && inRoomBattle && isOwner ? View.VISIBLE : View.GONE);
         }
         roomPkSplitContainer.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideRoomPkScoreBanner);
