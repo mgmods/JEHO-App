@@ -952,7 +952,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.hostStage.setOnClickListener(null);
         }
         binding.btnPlus.setOnClickListener(v -> {
-            if (canInviteMic) {
+            if ((canInviteMic || canManageSeats || isHost || isOwner)
+                    && (!isFreeMicEnabled() || isMicRequestEnabled())) {
                 // Primary host action: approve/reject pending mic join requests.
                 showSeatRequestsDialog();
             } else if (Boolean.TRUE.equals(viewModel.getHandRaised().getValue())) {
@@ -966,7 +967,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 showHostTools();
                 return true;
             }
-            if (canInviteMic) {
+            if ((canInviteMic || canManageSeats || isHost || isOwner)
+                    && (!isFreeMicEnabled() || isMicRequestEnabled())) {
                 showSeatRequestsDialog();
                 return true;
             }
@@ -14719,7 +14721,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Toast.makeText(this, name + " يطلب المايك — اضغط الجرس للموافقة", Toast.LENGTH_LONG).show();
             }
         } else if ("room:hand_lowered".equals(event)) {
-            if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
+            if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) viewModel.loadSeatRequests(roomId);
             requestRoomRefresh(false);
         } else if ("room:seat_approved".equals(event) || "room:seat_taken".equals(event)) {
             String approvedId = memberStr(payload, "userId");
@@ -14742,14 +14744,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (roomId != null) viewModel.setMic(roomId, false);
                 handler.postDelayed(() -> activateSeatAudio(currentSeats), 400);
             }
-            if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
+            if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) viewModel.loadSeatRequests(roomId);
             requestRoomRefresh(true);
         } else if ("room:seat_rejected".equals(event)) {
             String rejectedId = memberStr(payload, "userId");
             if (myUserId != null && sameUser(myUserId, rejectedId)) {
                 Toast.makeText(this, R.string.mic_request_rejected, Toast.LENGTH_SHORT).show();
             }
-            if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
+            if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) viewModel.loadSeatRequests(roomId);
         } else if ("room:seat_left".equals(event)) {
             String leftId = payload.has("userId") ? payload.get("userId").getAsString() : null;
             boolean forced = payload.has("forced")
