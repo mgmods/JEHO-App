@@ -56,6 +56,7 @@ final class RoomMoreOperatorSheet {
         boolean charmOn();
         boolean chatZoneOn();
         boolean micInteractOn();
+        boolean micRequestOn();
         boolean roomSpeakerMuted();
         boolean canControlMusic();
         /** Host/manager: adjust number of guest mics (was header home button). */
@@ -239,6 +240,12 @@ final class RoomMoreOperatorSheet {
                         : R.drawable.icon_room_seat_interaction_close,
                 withStateNl(host, R.string.room_more_mic_interact, host.micInteractOn()),
                 "mic_interact"));
+        if (host.isOwner()) {
+            list.add(item(
+                    host.micRequestOn() ? R.drawable.icon_room_seat_interaction_open : R.drawable.icon_room_seat_interaction_close,
+                    withStateNl(host, R.string.room_more_mic_request, host.micRequestOn()),
+                    "mic_request"));
+        }
         list.add(item(R.drawable.icon_room_send_photo, R.string.room_more_photo, "photo"));
         return list;
     }
