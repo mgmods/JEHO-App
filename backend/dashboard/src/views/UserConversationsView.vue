@@ -93,17 +93,54 @@ function base(){
   const raw=import.meta.env.VITE_API_URL || '/api/v1'
   return new URL(raw,window.location.origin).href.replace(/\/$/,'')
 }
+function unwrapPayload(value){
+  let data=value
+  for(let i=0;i<5;i++){
+    if(data && typeof data==='object' && 'data' in data &&
+      (data.success===true || (!('items' in data) && !('meta' in data) && !('participants' in data) && !('id' in data)))) {
+      data=data.data
+    } else break
+  }
+  return data
+}
+function normalizeMedia(raw,m){
+  let media=raw
+  if(typeof media==='string'){
+    const value=media.trim()
+    if(value.startsWith('{') || value.startsWith('[')){
+      try{media=JSON.parse(value)}catch{media={url:value}}
+    }else media={url:value}
+  }
+  if(!media || typeof media!=='object') media={}
+  const url=media.url || media.mediaUrl || media.fileUrl || media.path || media.imageUrl || media.audioUrl || media.videoUrl || m?.mediaUrl || m?.attachmentUrl || m?.imageUrl || m?.audioUrl || m?.videoUrl
+  const mimeType=media.mimeType || media.mime_type || media.contentType || m?.mimeType || m?.mime_type || ''
+  return url ? {...media,url:String(url),mimeType:String(mimeType)} : null
+}
+function normalizeMessage(raw){
+  const m=raw && typeof raw==='object'?raw:{}
+  const media=normalizeMedia(m.media ?? m.attachment ?? m.file,m)
+  let type=String(m.type || m.messageType || m.kind || '').toLowerCase()
+  const mime=String(media?.mimeType||'').toLowerCase()
+  if(!type || type==='message'){
+    if(mime.startsWith('image/') || m.imageUrl) type='image'
+    else if(mime.startsWith('audio/') || m.audioUrl) type='audio'
+    else if(mime.startsWith('video/') || m.videoUrl) type='video'
+    else if(media) type='file'
+    else type='text'
+  }
+  return {...m,type,content:m.content ?? m.messageText ?? m.text ?? m.body ?? '',media,
+    sender:m.sender || m.user || m.author || null,
+    createdAt:m.createdAt || m.created_at || m.sentAt || m.timestamp || null}
+}
 async function request(path,params={}){
   const res=await axios.get(base()+path,{params,headers:auth.token?{Authorization:'Bearer '+auth.token}:{}})
-  let data=res.data
-  if(data?.success===true && 'data' in data) data=data.data
-  return data
+  return unwrapPayload(res.data)
 }
 async function load(p=1){
   loadingList.value=true
   try{
     const d=await request('/admin/conversations',{page:p,limit:20,search:filters.value.search||undefined,type:filters.value.type||undefined,from:filters.value.from||undefined,to:filters.value.to||undefined})
-    items.value=d?.items||[]; page.value=d?.meta?.page||p; pages.value=d?.meta?.totalPages||0; total.value=d?.meta?.total||0
+    const payload=unwrapPayload(d); const rows=Array.isArray(payload)?payload:(payload?.items||payload?.data?.items||[]); items.value=rows.map(c=>({...c,participants:c.participants||c.members||[],lastMessage:c.lastMessage?normalizeMessage(c.lastMessage):null})); const meta=payload?.meta||payload?.pagination||{}; page.value=meta.page||p; pages.value=meta.totalPages||meta.pages||0; total.value=meta.total||payload?.total||0
   }finally{loadingList.value=false}
 }
 async function open(id){
@@ -112,7 +149,7 @@ async function open(id){
   try{
     const [c,m]=await Promise.all([request('/admin/conversations/'+id),request('/admin/conversations/'+id+'/messages',{page:1,limit:50})])
     if(selectedId.value!==id) return
-    selected.value=c; messages.value=m?.items||[]; messagePages.value=m?.meta?.totalPages||0
+    selected.value=unwrapPayload(c); const messagePayload=unwrapPayload(m); messages.value=(Array.isArray(messagePayload)?messagePayload:(messagePayload?.items||messagePayload?.messages||[])).map(normalizeMessage); messagePages.value=messagePayload?.meta?.totalPages||messagePayload?.pagination?.totalPages||0
     await nextTick(); if(viewport.value) viewport.value.scrollTop=viewport.value.scrollHeight
   }catch(error){
     if(selectedId.value===id) detailError.value=error?.response?.data?.message || 'تعذّر تحميل الرسائل أو المرفقات. تحقق من الاتصال والصلاحيات ثم أعد المحاولة.'
@@ -126,7 +163,7 @@ async function older(){
   const el=viewport.value, h=el?.scrollHeight||0, t=el?.scrollTop||0
   try{
     const p=messagePage.value+1, d=await request('/admin/conversations/'+selectedId.value+'/messages',{page:p,limit:50})
-    messagePage.value=p; messages.value=[...(d?.items||[]),...messages.value]; messagePages.value=d?.meta?.totalPages||messagePages.value
+    const payload=unwrapPayload(d); const olderRows=Array.isArray(payload)?payload:(payload?.items||payload?.messages||[]); messagePage.value=p; messages.value=[...olderRows.map(normalizeMessage),...messages.value]; messagePages.value=payload?.meta?.totalPages||payload?.pagination?.totalPages||messagePages.value
     await nextTick(); if(el) el.scrollTop=t+(el.scrollHeight-h)
   }finally{loadingOlder.value=false}
 }
