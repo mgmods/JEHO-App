@@ -282,6 +282,7 @@ export class ConfigController {
   @ApiOperation({ summary: 'Store update prompt config for Android clients' })
   async appUpdate() {
     const keys = [
+      'app.update_enabled',
       'app.latest_version_code',
       'app.latest_version_name',
       'app.min_version_code',
@@ -304,6 +305,7 @@ export class ConfigController {
     const latestCode = num('app.latest_version_code', 0);
     const minCode = num('app.min_version_code', 0);
     return {
+      enabled: map.get('app.update_enabled') === 'true',
       latestVersionCode: latestCode,
       latestVersionName: map.get('app.latest_version_name') || '',
       minVersionCode: minCode,
