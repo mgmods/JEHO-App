@@ -54,6 +54,7 @@ public final class UpdateActivity extends Activity {
     private long downloadId = -1L;
     private boolean downloadRunning;
     private boolean waitingForInstallPermission;
+    private boolean installerLaunched;
     private TextView statusText;
     private TextView progressLabel;
     private ProgressBar progressBar;
@@ -297,12 +298,14 @@ public final class UpdateActivity extends Activity {
     }
 
     private void launchInstaller(Uri uri) {
+        if (installerLaunched) return;
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, "application/vnd.android.package-archive");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
+            installerLaunched = true;
             statusText.setText(isArabic()
                     ? "أكّد التثبيت في نافذة Android. لن تُحذف بيانات حسابك إذا كان توقيع النسخة مطابقاً."
                     : "Confirm installation in Android. Your account data stays if the signing certificate matches.");
