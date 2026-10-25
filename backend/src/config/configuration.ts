@@ -144,20 +144,17 @@ export default registerAs('app', () => {
     credentialsPath: process.env.FIREBASE_CREDENTIALS_PATH || '',
   },
   google: {
-    // Web client ID from Firebase google-services.json (client_type 3).
-    // Must match Android requestIdToken(default_web_client_id).
-    // The Web OAuth client from android/app/google-services.json (client_type 3).
-    // Keep the configured server client as primary, but always accept the current
-    // Firebase project's Web client as an audience too. This prevents an older
-    // Blitz GOOGLE_CLIENT_ID from rejecting ID tokens issued by the current app.
+    // The Android app requests an ID token using default_web_client_id from
+    // android/app/google-services.json. Keep that exact Firebase Web OAuth ID
+    // as the primary verifier audience; older Blitz env values remain accepted
+    // as additional audiences to avoid breaking existing deployments.
     clientId:
-      process.env.GOOGLE_CLIENT_ID ||
       '1085967276199-c58dro18a44qocpeme8868sudnqv8kte.apps.googleusercontent.com',
-    // Optional extra audiences, plus the Web client bundled with the Android app.
     clientIds: Array.from(new Set([
+      process.env.GOOGLE_CLIENT_ID || '',
       ...(process.env.GOOGLE_CLIENT_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
       '1085967276199-c58dro18a44qocpeme8868sudnqv8kte.apps.googleusercontent.com',
-    ])).join(','),
+    ].filter(Boolean))).join(','),
   },
   admin: {
     email: process.env.ADMIN_EMAIL || 'admin@auralive.com',
