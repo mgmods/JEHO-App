@@ -130,6 +130,19 @@ public class VoiceRoomViewModel extends ViewModel {
         });
     }
 
+    public void assignSeat(String roomId, String userId, Integer seatIndex) {
+        c.getIoExecutor().execute(() -> {
+            Result<RoomDtos.RoomDto> r = c.getRoomRepository().assignSeat(roomId, userId, seatIndex);
+            if (r.success) {
+                room.postValue(r.data);
+                loadSeatRequests(roomId);
+                info.postValue("تم رفع المستخدم إلى المايك مباشرة");
+            } else {
+                error.postValue(r.error != null ? r.error : "تعذر رفع المستخدم إلى المايك");
+            }
+        });
+    }
+
     public void rejectSeat(String roomId, String userId) {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getRoomRepository().rejectSeat(roomId, userId);
