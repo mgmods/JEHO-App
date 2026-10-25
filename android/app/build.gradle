@@ -30,8 +30,8 @@ android {
         applicationId "com.Dramizo.Series"
         minSdk 24
         targetSdk 36
-        versionCode 48
-        versionName "2.0.50"
+        versionCode 49
+        versionName "2.0.51"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Never bake ZEGO AppSign into the APK. AppID comes from the server (/config/zego + join token).
         buildConfigField "long", "ZEGO_APP_ID", "0L"
