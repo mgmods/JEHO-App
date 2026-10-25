@@ -2527,11 +2527,19 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }));
   }
 
+  private async assertMicRequestPermission(roomId: string, actorId: string, message: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    const permissions = await this.getViewerRoomPermissions(room, actorId);
+    if (!permissions.canInvite && !permissions.canManageSeats) {
+      throw new ForbiddenException(message);
+    }
+  }
+
   async listSeatRequests(roomId: string, actorId: string) {
-    await this.assertModeratorPermission(
+    await this.assertMicRequestPermission(
       roomId,
       actorId,
-      'canInvite',
       'Mic invitation permission is required',
     );
     return { items: await this.seatRequestItems(roomId) };
@@ -2728,10 +2736,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     seatIndex?: number | null,
     invited = false,
   ) {
-    await this.assertModeratorPermission(
+    await this.assertMicRequestPermission(
       roomId,
       actorId,
-      'canInvite',
       'Mic request approval permission is required',
     );
     const pending = await this.seatSignalsRepo.findOne({
@@ -2817,10 +2824,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async rejectSeat(roomId: string, actorId: string, targetUserId: string) {
-    await this.assertModeratorPermission(
+    await this.assertMicRequestPermission(
       roomId,
       actorId,
-      'canInvite',
       'Mic request approval permission is required',
     );
     await this.seatSignalsRepo.delete({
