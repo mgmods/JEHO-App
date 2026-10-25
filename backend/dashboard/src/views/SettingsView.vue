@@ -355,8 +355,8 @@
               <div class="d-flex align-items-center gap-3 mb-3">
                 <div class="app-update-admin-icon"><i class="bi bi-cloud-arrow-down-fill" /></div>
                 <div>
-                  <h3 class="settings-card-title mb-1">تحديث JEHO الإجباري</h3>
-                  <p class="form-text mb-0">انشر رابط APK جديداً، وحدد الإصدار الأدنى. عند تفعيل الإلزام لن يستطيع المستخدم متابعة الدخول قبل تثبيت النسخة الجديدة.</p>
+                  <h3 class="settings-card-title mb-1">تحديث JEHO الذكي</h3>
+                  <p class="form-text mb-0">ضع الرابط الذي تريده بالضبط: صفحة موقع تُفتح كما هي، أو ملف APK يُنزّل داخل التطبيق. لن يتم تحويل المستخدم تلقائياً إلى Google Play.</p>
                 </div>
               </div>
               <label class="settings-switch mb-3">
@@ -389,9 +389,15 @@
                   <div class="form-text">أي نسخة أقدم من هذا الرقم ستُجبر على التحديث.</div>
                 </div>
                 <div class="col-12">
-                  <label class="form-label">رابط تحميل APK المباشر</label>
-                  <input v-model.trim="appUpdateForm.storeUrl" class="form-control" type="url" dir="ltr" placeholder="https://example.com/releases/JEHO.apk" :required="appUpdateForm.enabled" />
-                  <div class="form-text">استخدم رابط HTTPS مباشر لملف APK، وليس رابط صفحة ويب. يجب أن يكون الملف موقّعاً بنفس شهادة التطبيق الحالي وبالحزمة com.Dramizo.Series حتى يثبت كتحديث فوق النسخة الموجودة دون حذف بيانات المستخدم.</div>
+                  <label class="form-label">نوع الرابط عند الضغط على «تحديث الآن»</label>
+                  <select v-model="appUpdateForm.linkType" class="form-select mb-3">
+                    <option value="external">فتح الرابط كما هو (موقع / صفحة ويب / رابط خارجي)</option>
+                    <option value="apk">تنزيل ملف APK داخل التطبيق ثم التثبيت</option>
+                    <option value="auto">تلقائي: ملف ينتهي بـ .apk يُنزّل، وما عداه يُفتح كرابط خارجي</option>
+                  </select>
+                  <label class="form-label">رابط التحديث الذي سيستخدمه التطبيق</label>
+                  <input v-model.trim="appUpdateForm.storeUrl" class="form-control" type="url" dir="ltr" placeholder="https://example.com/update أو https://example.com/JEHO.apk" :required="appUpdateForm.enabled" />
+                  <div class="form-text">سيتم استخدام هذا الرابط نفسه دون استبداله برابط Google Play. عند اختيار APK يجب أن يكون رابط الملف قابلاً للتنزيل مباشرة، وأن يكون الملف موقّعاً بنفس شهادة التطبيق وبالحزمة com.Dramizo.Series حتى يثبت فوق النسخة الحالية دون حذف بيانات المستخدم.</div>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">عنوان التحديث بالعربية</label>
@@ -1171,6 +1177,7 @@ const appUpdateForm = reactive({
   minVersionCode: 0,
   forceUpdate: false,
   storeUrl: '',
+  linkType: 'auto',
   titleAr: 'يوجد تحديث جديد',
   messageAr: 'حدّث تطبيق JEHO للاستمتاع بالتحسينات والإصلاحات الجديدة.',
   titleEn: 'A new update is available',
@@ -1247,6 +1254,7 @@ async function load() {
     minVersionCode: Number(map['app.min_version_code'] ?? appUpdateForm.minVersionCode) || 0,
     forceUpdate: ['true', '1', 'yes'].includes(String(map['app.update_force'] ?? appUpdateForm.forceUpdate).toLowerCase()),
     storeUrl: String(map['app.update_store_url'] ?? appUpdateForm.storeUrl),
+    linkType: ['apk', 'external', 'auto'].includes(String(map['app.update_link_type'] ?? appUpdateForm.linkType).toLowerCase()) ? String(map['app.update_link_type'] ?? appUpdateForm.linkType).toLowerCase() : 'auto',
     titleAr: String(map['app.update_title_ar'] ?? appUpdateForm.titleAr),
     messageAr: String(map['app.update_message_ar'] ?? appUpdateForm.messageAr),
     titleEn: String(map['app.update_title_en'] ?? appUpdateForm.titleEn),
@@ -1362,7 +1370,7 @@ async function saveAppUpdate() {
     return
   }
   if (appUpdateForm.enabled && !/^https:\/\//i.test(apkUrl)) {
-    toast().danger('أدخل رابط HTTPS مباشر لملف APK قبل نشر التحديث')
+    toast().danger('أدخل رابط HTTPS للصفحة أو ملف APK قبل نشر التحديث')
     return
   }
   if (apkUrl && !/^https:\/\//i.test(apkUrl)) {
@@ -1377,6 +1385,7 @@ async function saveAppUpdate() {
     'app.min_version_code': String(minVersionCode),
     'app.update_force': String(!!appUpdateForm.forceUpdate),
     'app.update_store_url': apkUrl,
+    'app.update_link_type': ['apk', 'external', 'auto'].includes(appUpdateForm.linkType) ? appUpdateForm.linkType : 'auto',
     'app.update_title_ar': String(appUpdateForm.titleAr || 'يوجد تحديث جديد').trim(),
     'app.update_message_ar': String(appUpdateForm.messageAr || '').trim(),
     'app.update_title_en': String(appUpdateForm.titleEn || 'Update available').trim(),
