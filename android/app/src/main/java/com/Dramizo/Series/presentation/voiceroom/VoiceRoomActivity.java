@@ -13998,8 +13998,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             });
         }
 
-        boolean inRoomBattle = "person_vs_person".equals(memberStr(payload, "challengeType"))
-                || "team_vs_team".equals(memberStr(payload, "challengeType"));
         if (inRoomBattle) hideRoomPkSeatSplit();
         else if (!ended) showRoomPkSeatSplit(nameA, nameB);
         else hideRoomPkSeatSplit();
