@@ -12146,7 +12146,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Show only current room members who are not seated; each row has its own invite action. */
     private void showSeatInvitePickerDialog(int seatIndex) {
-        if (isFinishing() || roomId == null || !canInviteMic) return;
+        if (isFinishing() || roomId == null || !(canInviteMic || canManageSeats)) return;
         java.util.ArrayList<JsonObject> eligible = new java.util.ArrayList<>();
         java.util.HashSet<String> seen = new java.util.HashSet<>();
         List<JsonObject> source = !roomMembersAll.isEmpty() ? roomMembersAll : roomAudience;
@@ -12232,20 +12232,45 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             nameLp.setMargins(0, 0, dp(4), 0);
             row.addView(nameView, nameLp);
 
-            android.widget.Button invite = new android.widget.Button(this);
-            invite.setText("دعوة");
-            invite.setAllCaps(false);
-            invite.setTextColor(0xFFFFFFFF);
-            invite.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFDE4D91));
-            invite.setMinWidth(dp(72));
-            invite.setEnabled(targetId != null && !targetId.isEmpty());
-            invite.setOnClickListener(v -> {
-                if (targetId == null || targetId.isEmpty()) return;
-                viewModel.inviteSeat(roomId, targetId, seatIndex);
-                dialog.dismiss();
-            });
-            row.addView(invite, new android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, dp(44)));
+            if (canManageSeats || canManageRoom || isHost || isOwner) {
+                android.widget.Button assign = new android.widget.Button(this);
+                assign.setText("رفع");
+                assign.setContentDescription("رفع المستخدم مباشرة إلى المايك");
+                assign.setAllCaps(false);
+                assign.setTextColor(0xFFFFFFFF);
+                assign.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF6D3BE8));
+                assign.setMinWidth(dp(56));
+                assign.setEnabled(targetId != null && !targetId.isEmpty());
+                assign.setOnClickListener(v -> {
+                    if (targetId == null || targetId.isEmpty()) return;
+                    viewModel.assignSeat(roomId, targetId, seatIndex);
+                    dialog.dismiss();
+                });
+                android.widget.LinearLayout.LayoutParams assignLp =
+                        new android.widget.LinearLayout.LayoutParams(
+                                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, dp(44));
+                assignLp.setMargins(dp(4), 0, 0, 0);
+                row.addView(assign, assignLp);
+            }
+            if (canInviteMic) {
+                android.widget.Button invite = new android.widget.Button(this);
+                invite.setText("دعوة");
+                invite.setAllCaps(false);
+                invite.setTextColor(0xFFFFFFFF);
+                invite.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFDE4D91));
+                invite.setMinWidth(dp(64));
+                invite.setEnabled(targetId != null && !targetId.isEmpty());
+                invite.setOnClickListener(v -> {
+                    if (targetId == null || targetId.isEmpty()) return;
+                    viewModel.inviteSeat(roomId, targetId, seatIndex);
+                    dialog.dismiss();
+                });
+                android.widget.LinearLayout.LayoutParams inviteLp =
+                        new android.widget.LinearLayout.LayoutParams(
+                                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, dp(44));
+                inviteLp.setMargins(dp(4), 0, 0, 0);
+                row.addView(invite, inviteLp);
+            }
             rows.addView(row, new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
             android.view.View divider = new android.view.View(this);
@@ -12288,8 +12313,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         java.util.ArrayList<Integer> actions = new java.util.ArrayList<>();
         labels.add("انتقال");
         actions.add(0);
-        if (canInviteMic) {
-            labels.add("دعوة");
+        if (canInviteMic || canManageSeats) {
+            labels.add("اختيار مستخدم للمايك");
             actions.add(1);
         }
         if (canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff()) {
