@@ -224,7 +224,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             else roomPkScoreBanner.setText(roomPkBannerBaseText + " • ⏱ " + clock);
             if (remaining > 0L) {
                 handler.postDelayed(this, 1000L);
-            } else if (roomPkEndsAtMs > 0L && roomPkInRoomChallenge && isOwner
+            } else if (roomPkEndsAtMs > 0L && isOwner
                     && !roomPkAutoEndRequested && roomPkCurrentContestId != null
                     && !roomPkCurrentContestId.isEmpty()) {
                 roomPkAutoEndRequested = true;
@@ -13639,8 +13639,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void confirmEndInRoomPk() {
         if (!isOwner || roomPkCurrentContestId == null || roomPkCurrentContestId.trim().isEmpty()
-                || "pending".equals(roomPkCurrentContestId) || !roomPkInRoomChallenge) {
-            Toast.makeText(this, "إنهاء التحدّي متاح لمضيف الروم أثناء تحدّي نشط فقط", Toast.LENGTH_SHORT).show();
+                || "pending".equals(roomPkCurrentContestId)) {
+            Toast.makeText(this, "إنهاء التحدّي متاح لمضيف أحد الرومين أثناء جولة نشطة فقط", Toast.LENGTH_SHORT).show();
             return;
         }
         new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("إنهاء تحدّي PK")
@@ -13792,7 +13792,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomPkOverlayMinimized = !roomPkOverlayMinimized;
                 roomPkMinimizeButton.setText(roomPkOverlayMinimized ? "▣ توسيع" : "— تصغير");
                 for (int i = 2; i < panel.getChildCount(); i++) panel.getChildAt(i).setVisibility(roomPkOverlayMinimized ? View.GONE : View.VISIBLE);
-                if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!roomPkBannerEnded && roomPkInRoomChallenge && isOwner ? View.VISIBLE : View.GONE);
+                if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!roomPkBannerEnded && isOwner && roomPkCurrentContestId != null
+                        && !roomPkCurrentContestId.trim().isEmpty() && !"pending".equals(roomPkCurrentContestId) ? View.VISIBLE : View.GONE);
                 updateRoomPkBannerClock.run();
             });
             roomPkEndButton = new TextView(this);
@@ -13955,13 +13956,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         roomPkScoreBanner.setVisibility(View.VISIBLE);
         if (roomPkEndButton != null) {
-            roomPkEndButton.setVisibility(!ended && inRoomBattle && isOwner ? View.VISIBLE : View.GONE);
+            roomPkEndButton.setVisibility(!ended && isOwner && roomPkCurrentContestId != null
+                    && !roomPkCurrentContestId.trim().isEmpty() && !"pending".equals(roomPkCurrentContestId)
+                    ? View.VISIBLE : View.GONE);
             roomPkEndButton.setEnabled(!roomPkAutoEndRequested);
         }
         if (roomPkMinimizeButton != null) {
             roomPkMinimizeButton.setText(roomPkOverlayMinimized ? "▣ توسيع" : "— تصغير");
             for (int i = 2; i < roomPkSplitContainer.getChildCount(); i++) roomPkSplitContainer.getChildAt(i).setVisibility(roomPkOverlayMinimized ? View.GONE : View.VISIBLE);
-            if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!ended && inRoomBattle && isOwner ? View.VISIBLE : View.GONE);
+            if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!ended && isOwner && roomPkCurrentContestId != null
+                    && !roomPkCurrentContestId.trim().isEmpty() && !"pending".equals(roomPkCurrentContestId)
+                    ? View.VISIBLE : View.GONE);
         }
         roomPkSplitContainer.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideRoomPkScoreBanner);
