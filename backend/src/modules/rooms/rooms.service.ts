@@ -2851,6 +2851,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const effectiveUserId =
       targetUserId && String(targetUserId).trim() ? String(targetUserId).trim() : actorId;
     const moderatingOther = effectiveUserId !== actorId;
+    if (moderatingOther && !muted) {
+      throw new ForbiddenException('لا يمكن للمشرف فتح المايك نيابةً عن المستخدم؛ المستخدم يتحكم بفتح مايكه');
+    }
     if (moderatingOther) {
       await this.assertModeratorPermission(
         roomId,
@@ -2874,14 +2877,13 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     ) {
       throw new ForbiddenException('يحتاج المضيف أو المشرف لفك كتم المايك أولاً');
     }
-    seat.isMuted = !!muted;
     if (moderatingOther) {
-      seat.isModeratorMuted = !!muted;
-      // Unmute by host/mod clears both flags so the guest can speak again.
-      if (!muted) {
-        seat.isMuted = false;
-        seat.isModeratorMuted = false;
-      }
+      // A moderator can close another user's mic, but cannot open it on their behalf.
+      // Keep self-unmute under the user's control.
+      seat.isMuted = true;
+      seat.isModeratorMuted = false;
+    } else {
+      seat.isMuted = !!muted;
     }
     await this.seatsRepo.save(seat);
     // Admin mute is flag-only — do not eject from Zego (kick/ban still eject).
