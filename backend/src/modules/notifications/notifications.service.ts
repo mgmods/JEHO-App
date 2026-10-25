@@ -23,6 +23,13 @@ import { FirebaseAdminService } from './firebase-admin.service';
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
+
+/** Direct-message alerts belong to the conversation unread badge, never notification inboxes. */
+function isDirectMessageNotification(notification: Notification): boolean {
+  const data = (notification.data || {}) as Record<string, unknown>;
+  return notification.type === NotificationType.CHAT && data.type === 'chat' && typeof data.conversationId === 'string';
+}
+
 export class CreateNotificationDto {
   @ApiProperty()
   @IsUUID()
@@ -185,13 +192,13 @@ export class NotificationsService {
   }
 
   async list(userId: string, query: PaginationDto) {
-    const [items, total] = await this.notifRepo.findAndCount({
-      where: { userId },
-      skip: query.skip,
-      take: query.limit || 20,
-      order: { createdAt: 'DESC' },
-    });
-    return paginate(items, total, query.page || 1, query.limit || 20);
+    // Legacy direct-message alerts are hidden here too; only the conversation thread owns them.
+    const rows = await this.notifRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+    const items = rows.filter((notification) => !isDirectMessageNotification(notification));
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(200, Math.max(1, query.limit || 20));
+    const pageItems = items.slice((page - 1) * limit, page * limit);
+    return paginate(pageItems, items.length, page, limit);
   }
 
   /** Super-admin messages are stored separately from dashboard Official News. */
@@ -284,7 +291,9 @@ export class NotificationsService {
   }
 
   async markAllRead(userId: string) {
-    await this.notifRepo.update({ userId, isRead: false }, { isRead: true });
+    const unread = await this.notifRepo.find({ where: { userId, isRead: false } });
+    const ids = unread.filter((notification) => !isDirectMessageNotification(notification)).map((notification) => notification.id);
+    if (ids.length) await this.notifRepo.update({ id: In(ids), userId }, { isRead: true });
     return { success: true };
   }
 
@@ -297,7 +306,8 @@ export class NotificationsService {
   }
 
   async unreadCount(userId: string) {
-    const count = await this.notifRepo.count({ where: { userId, isRead: false } });
+    const unread = await this.notifRepo.find({ where: { userId, isRead: false } });
+    const count = unread.filter((notification) => !isDirectMessageNotification(notification)).length;
     return { count };
   }
 
