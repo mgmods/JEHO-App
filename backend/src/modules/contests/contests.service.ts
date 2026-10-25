@@ -454,9 +454,16 @@ export class ContestsService implements OnModuleInit, OnModuleDestroy {
       authorized = rooms.some((room) => !!room && (room.hostId === userId || room.activeHostId === userId));
     }
     if (!authorized) throw new BadRequestException('إنهاء التحدّي متاح لمضيف أحد الرومين فقط');
-    contest.status = 'ended';
-    contest.endAt = new Date();
-    const saved = await this.contestsRepo.save(contest);
+    // Atomic transition guarantees only one concurrent host/expiry request broadcasts the result.
+    const result = await this.contestsRepo.createQueryBuilder()
+      .update(Contest)
+      .set({ status: 'ended', endAt: new Date() })
+      .where('id = :id', { id: contestId })
+      .andWhere('status = :active', { active: 'active' })
+      .execute();
+    if (!result.affected) throw new ConflictException('انتهى تحدّي PK بالفعل');
+    const saved = await this.contestsRepo.findOne({ where: { id: contestId } });
+    if (!saved) throw new NotFoundException('تحدّي PK النشط غير موجود');
     this.emitTeamChallengeEnded(saved);
     return { contest: saved, message: 'انتهى تحدّي PK' };
   }
