@@ -3462,10 +3462,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         captureActiveRoomSession();
         ActiveRoomSession.get().setMinimized(true);
         ensuringRoomKeepAlive(true);
+        // Minimizing is only a UI transition: preserve the exact microphone/seat state.
+        // Do not mute or rewrite the session mic flag here; the room and all occupied seats
+        // must remain unchanged while the Activity is hidden and recreated.
         ensureMinimizedListeningState();
-        // Snapshot after background mute: keep the occupied seat/session while restoring muted state.
         captureActiveRoomSession();
-        ActiveRoomSession.get().setMicOn(false);
         // Handoff: fade Exo to FGS, keep Zego local music alive, then leave UI.
         try {
             if (roomMusicPlayer != null
@@ -3503,9 +3504,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     /**
-     * While UI is gone but room session stays: hear the room, own mic off.
-     * Never call setSpeakerMuted(true) here — that stops remote play streams.
-     * Never stop YouTube/room music here — FGS continues playback.
+     * While the room UI is hidden, keep the live RTC session and every occupied seat intact.
+     * Minimize is not a leave/mute action: changing local mic state here can make the RTC
+     * seat UI desynchronize from the room roster when the Activity is recreated.
      */
     private void ensureMinimizedListeningState() {
         try {
@@ -3514,13 +3515,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             speakerMutedBeforeBackground = false;
             RoomSoundFx.setMuted(false);
             RoomRtcEngine.getInstance().setSpeakerMuted(false);
-            // Mute own mic while minimized (notification / mini player can unmute).
-            micOn = false;
-            RoomRtcEngine.getInstance().setMicEnabled(false);
-            // Minimize is a presentation/background transition, not a seat leave or
-            // server-side mic moderation action. Do not send setMic(rid, true) here:
-            // the room backend must retain this participant's occupied seat and seat index.
-            // Local capture is muted above; the existing room/seat session remains active.
+            // Deliberately preserve micOn and RTC microphone state. Only an explicit user
+            // mute, room moderation, or actual room exit may change it.
         } catch (Exception ignored) {
         }
     }
