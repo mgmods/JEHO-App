@@ -87,7 +87,9 @@ export class AdminConversationsService {
       const m = c.lastMessageId ? lastById.get(c.lastMessageId) : null;
       return {
         id: c.id, type: c.type,
-        title: c.title || participants.map((p) => p.displayName).filter(Boolean).join('، ') || 'محادثة',
+        title: c.type === ConversationType.DIRECT
+          ? (participants.map((p) => p.displayName).filter(Boolean).join(' ↔ ') || c.title || 'محادثة مباشرة')
+          : (c.title || participants.map((p) => p.displayName).filter(Boolean).join('، ') || 'محادثة جماعية'),
         participants,
         lastMessage: m ? { id: m.id, senderId: m.senderId, type: m.type, content: m.content, media: m.media || null, createdAt: m.createdAt } : null,
         lastMessageAt: c.lastMessageAt,
@@ -113,7 +115,10 @@ export class AdminConversationsService {
     ]);
 
     return {
-      id: c.id, type: c.type, title: c.title,
+      id: c.id, type: c.type,
+      title: c.type === ConversationType.DIRECT
+        ? ((c.participants || []).map((p) => p.user?.displayName || p.user?.username).filter(Boolean).join(' ↔ ') || c.title || 'محادثة مباشرة')
+        : (c.title || 'محادثة جماعية'),
       participants: (c.participants || []).map((p) => ({
         id: p.userId, username: p.user?.username || null,
         displayName: p.user?.displayName || p.user?.username || null,
