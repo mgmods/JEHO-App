@@ -112,8 +112,17 @@ function normalizeMedia(raw,m){
     }else media={url:value}
   }
   if(!media || typeof media!=='object') media={}
-  const url=media.url || media.mediaUrl || media.fileUrl || media.path || media.imageUrl || media.audioUrl || media.videoUrl || m?.mediaUrl || m?.attachmentUrl || m?.imageUrl || m?.audioUrl || m?.videoUrl
-  const mimeType=media.mimeType || media.mime_type || media.contentType || m?.mimeType || m?.mime_type || ''
+  // Accept legacy/API variants where media metadata is nested or the URL is
+  // exposed on the message itself; otherwise valid attachments rendered blank.
+  const nested=media.media && typeof media.media==='object' ? media.media : {}
+  const url=media.url || media.mediaUrl || media.media_url || media.fileUrl || media.file_url || media.path || media.imageUrl || media.image_url || media.audioUrl || media.audio_url || media.videoUrl || media.video_url || nested.url || nested.mediaUrl || m?.mediaUrl || m?.media_url || m?.attachmentUrl || m?.attachment_url || m?.fileUrl || m?.file_url || m?.imageUrl || m?.image_url || m?.audioUrl || m?.audio_url || m?.videoUrl || m?.video_url
+  let mimeType=media.mimeType || media.mime_type || media.contentType || media.content_type || nested.mimeType || nested.mime_type || m?.mimeType || m?.mime_type || ''
+  if(!mimeType && url){
+    const clean=String(url).split('?')[0].split('#')[0].toLowerCase()
+    if(/\\.(png|jpe?g|gif|webp|bmp|svg)$/.test(clean)) mimeType='image/*'
+    else if(/\\.(mp3|m4a|aac|ogg|opus|wav|webm)$/.test(clean)) mimeType='audio/*'
+    else if(/\\.(mp4|m4v|mov|ogv|3gp)$/.test(clean)) mimeType='video/*'
+  }
   return url ? {...media,url:String(url),mimeType:String(mimeType)} : null
 }
 function normalizeMessage(raw){
