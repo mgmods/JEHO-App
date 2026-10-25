@@ -19,6 +19,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   checks:
@@ -68,3 +69,29 @@ jobs:
 
       - name: Build combined API and dashboard image
         run: docker build --tag jeho-own-api:ci ./backend
+
+      # Publish the hosting image from the same checked commit on MG-JEHO.
+      # Pull requests only run checks; they never publish an image.
+      - name: Log in to GitHub Container Registry
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/MG-JEHO' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish current MG-JEHO hosting image
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/MG-JEHO' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho
+            ghcr.io/mgmods/jeho-own-backend:badge-fix-8f26b6dc33d198fc5ce695be7bc638658b8693e8
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/mgmods/JEHO-App
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=JEHO-OWN backend and dashboard
