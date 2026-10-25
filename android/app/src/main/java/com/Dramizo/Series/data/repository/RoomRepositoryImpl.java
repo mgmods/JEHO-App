@@ -109,6 +109,14 @@ public class RoomRepositoryImpl implements RoomRepository {
     }
 
     @Override
+    public Result<RoomDtos.RoomDto> assignSeat(String id, String userId, Integer seatIndex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("userId", userId);
+        if (seatIndex != null) body.put("seatIndex", seatIndex);
+        return ApiCall.execute(api.assignSeat(id, body));
+    }
+
+    @Override
     public Result<RoomDtos.RoomDto> approveSeat(String id, String userId, Integer seatIndex) {
         Map<String, Object> body = new HashMap<>();
         body.put("userId", userId);
