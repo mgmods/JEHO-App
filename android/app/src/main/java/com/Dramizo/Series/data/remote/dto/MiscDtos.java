@@ -347,6 +347,7 @@ public final class MiscDtos {
 
     /** Store update prompt from GET /config/app-update. */
     public static class AppUpdateDto {
+        @SerializedName("enabled") public boolean enabled;
         @SerializedName("latestVersionCode") public int latestVersionCode;
         @SerializedName("latestVersionName") public String latestVersionName;
         @SerializedName("minVersionCode") public int minVersionCode;
