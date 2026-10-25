@@ -11,6 +11,7 @@ permissions:
   contents: read
   packages: write
 
+# Manual rebuild fallback: a branch push runs checks, then workflow_run publishes the exact checked commit.
 # Let an active image publish finish; newer queued pushes can then publish next.
 # Cancelling during Docker push can leave Blitz's mutable tag pointing at an older image.
 concurrency:
