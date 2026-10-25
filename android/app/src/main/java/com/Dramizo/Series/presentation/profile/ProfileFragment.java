@@ -89,12 +89,14 @@ public class ProfileFragment extends Fragment {
         };
         binding.headerProfile.setOnClickListener(openProfile);
         binding.imgAvatar.setOnClickListener(openProfile);
-        // Keep the badges/medals section hidden in the Me tab as well as public profiles.
+        // Keep the medals entry available from the Me tab; MedalActivity loads
+        // the signed-in user's persisted medals from the backend.
         if (binding.rowProfileBadges != null) {
-            binding.rowProfileBadges.setVisibility(View.GONE);
-            binding.rowProfileBadges.setOnClickListener(null);
+            binding.rowProfileBadges.setVisibility(View.VISIBLE);
+            binding.rowProfileBadges.setOnClickListener(v ->
+                    startActivity(new Intent(requireContext(), MedalActivity.class)));
         }
-        if (binding.earnedBadgesContainer != null) binding.earnedBadgesContainer.setVisibility(View.GONE);
+        // The inline container is not used by this screen; the dedicated cabinet renders medals.
 
         // Bind only views that exist in fragment_profile.xml. The former action*/icon* IDs
         // belonged to a removed shortcut grid and caused FragmentProfileBinding compilation errors.
@@ -577,16 +579,12 @@ public class ProfileFragment extends Fragment {
         } catch (Exception ignored) {
             applyTasksFeatureVisibility();
         }
-        // Refresh earned badges on returning to the app so dashboard grants appear without
-        // requiring the user to sign out or reinstall.
-        // Badge cabinet is disabled; do not fetch it when returning to the app.
         // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
         if (viewModel != null) viewModel.loadMe(false);
         loadAgencyAction();
-        // Prevent any stale observer or retained view from resurrecting the retired cabinet.
-        if (binding != null) {
-            if (binding.rowProfileBadges != null) binding.rowProfileBadges.setVisibility(View.GONE);
-            if (binding.earnedBadgesContainer != null) binding.earnedBadgesContainer.setVisibility(View.GONE);
+        // Keep the medals entry visible after returning from other screens.
+        if (binding != null && binding.rowProfileBadges != null) {
+            binding.rowProfileBadges.setVisibility(View.VISIBLE);
         }
         refreshWalletBalances(false);
     }
