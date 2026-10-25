@@ -481,6 +481,7 @@
 <string name="room_more_blacklist">القائمه السوداء</string>
 <string name="room_more_admin">ادمن</string>
 <string name="room_more_mic_interact">التفاعل مع الميكروفون</string>
+<string name="room_more_mic_request">طلب صعود المايك</string>
 <string name="room_more_photo">صوره</string>
 <string name="room_more_theme">سمه</string>
 <string name="room_more_mute_on">تشغيل كتم الصوت</string>
