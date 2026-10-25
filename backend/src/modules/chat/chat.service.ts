@@ -23,8 +23,6 @@ import { UserVip } from '../../database/entities/user-vip.entity';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
 import { StartConversationDto, SendMessageDto, EditMessageDto } from './dto/chat.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '../../database/entities/notification.entity';
 import { MediaCleanupService } from '../uploads/media-cleanup.service';
 import { TasksService } from '../tasks/tasks.service';
 import { GiftSend } from '../../database/entities/gift-send.entity';
@@ -78,7 +76,6 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     private readonly mediaCleanup: MediaCleanupService,
     private readonly moderation: ContentModerationService,
     @Optional() private readonly realtime?: RealtimeGateway,
-    @Optional() private readonly notifications?: NotificationsService,
     @Optional() private readonly tasks?: TasksService,
   ) {}
 
