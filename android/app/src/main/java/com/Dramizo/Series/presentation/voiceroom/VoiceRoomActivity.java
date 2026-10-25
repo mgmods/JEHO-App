@@ -3632,7 +3632,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 return canManageRoom || isHost || isOwner;
             }
             @Override public boolean canReviewSeatRequests() {
-                return canInviteMic && (!isFreeMicEnabled() || isMicRequestEnabled());
+                return (canInviteMic || canManageSeats || isHost || isOwner)
+                        && (!isFreeMicEnabled() || isMicRequestEnabled());
             }
             @Override public int chatAutoClearMinutes() {
                 RoomDtos.RoomDto room = viewModel.getRoom().getValue();
@@ -3661,7 +3662,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "seat_requests":
-                if (canInviteMic && (!isFreeMicEnabled() || isMicRequestEnabled())) showSeatRequestsDialog();
+                if ((canInviteMic || canManageSeats || isHost || isOwner)
+                        && (!isFreeMicEnabled() || isMicRequestEnabled())) showSeatRequestsDialog();
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "lock":
@@ -8731,7 +8733,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.llMusicLibraryChip.setVisibility(View.GONE);
         }
         // Keep request list warm so tools / host dialogs stay current.
-        if (canInviteMic && (!isFreeMicEnabled() || isMicRequestEnabled()) && roomId != null) {
+        if ((canInviteMic || canManageSeats || isHost || isOwner)
+                && (!isFreeMicEnabled() || isMicRequestEnabled()) && roomId != null) {
             viewModel.loadSeatRequests(roomId);
         } else {
             updateSeatRequestBadge(null);
@@ -14711,7 +14714,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String name = memberStr(payload, "displayName");
             if (name == null) name = "ضيف";
             appendChatLine("النظام", name + " يطلب الانضمام للمايك ✋", 0, 1);
-            if (canInviteMic && roomId != null) {
+            if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) {
                 viewModel.loadSeatRequests(roomId);
                 Toast.makeText(this, name + " يطلب المايك — اضغط الجرس للموافقة", Toast.LENGTH_LONG).show();
             }
@@ -16320,7 +16323,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void showSeatRequestsDialog() {
         if (roomId == null) return;
-        if (!canInviteMic) {
+        if (!(canInviteMic || canManageSeats || isHost || isOwner)) {
             Toast.makeText(this, R.string.host_mod_only_mic_requests, Toast.LENGTH_SHORT).show();
             return;
         }
