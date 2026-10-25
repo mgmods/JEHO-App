@@ -149,11 +149,11 @@ export default registerAs('app', () => {
     // as the primary verifier audience; older Blitz env values remain accepted
     // as additional audiences to avoid breaking existing deployments.
     clientId:
-      '1085967276199-c58dro18a44qocpeme8868sudnqv8kte.apps.googleusercontent.com',
+      '807697628126-sc7hj3pccrkt4p0b8ilji91mqb9ojs53.apps.googleusercontent.com',
     clientIds: Array.from(new Set([
       process.env.GOOGLE_CLIENT_ID || '',
       ...(process.env.GOOGLE_CLIENT_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
-      '1085967276199-c58dro18a44qocpeme8868sudnqv8kte.apps.googleusercontent.com',
+      '807697628126-sc7hj3pccrkt4p0b8ilji91mqb9ojs53.apps.googleusercontent.com',
     ].filter(Boolean))).join(','),
   },
   admin: {
