@@ -11337,29 +11337,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
     public void showLuckyHitBanner(@Nullable String displayName, @Nullable String avatarUrl,
                                    long wonCoins, double multiplier, @Nullable String eventKey) {
+        // Losses must be silent: no room chat line, toast, or top banner.
+        // Positive payouts include full wins and partial returns.
+        if (wonCoins <= 0) return;
+
         String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
         String line;
-        if (wonCoins <= 0) {
-            line = "لم يحالف الحظ " + who + " هذه المرة";
-        } else if (multiplier > 0d && multiplier < 1d) {
+        if (multiplier > 0d && multiplier < 1d) {
             line = "مردود ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
         } else if (multiplier <= 0d) {
             line = "مردود +" + Math.max(0L, wonCoins);
         } else {
             line = "ضرب حظه وربح ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
         }
-        // Use the same dashboard-controlled toast as every other lucky outcome.
-        // Do not route this through ComingMsgView: that legacy sliding toast ignored the design controls.
         GlobalCelebrationToast.show(
                 this, who, line, avatarUrl, null,
                 eventKey == null || eventKey.trim().isEmpty()
                         ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim(),
                 28, Math.max(0d, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
-        // Positive outcomes also arrive through the global celebration event, which owns
-        // the chat line. No-payout outcomes are room-scoped, so announce those here.
-        if (wonCoins <= 0 && roomBannerEnabled()) {
-            appendChatLine(who, line, 0, 1, null, null, avatarUrl, null);
-        }
     }
 
     private static String formatLuckyMultiplier(double multiplier) {
@@ -14355,8 +14350,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String senderAvatar = firstNonEmpty(
                     memberStr(payload, "senderAvatarUrl"),
                     memberStr(payload, "avatarUrl"));
-            GlobalCelebrationToast.showGiftCount(
-                    this, sender, name, senderAvatar, icon, qtyRemote);
+            // Gift-send top toast removed by request. Keep the in-room gift animation.
 
             // A single-recipient gift must name the receiver in the room chat. Group gifts
             // intentionally stay anonymous as a group, without listing all recipients.
@@ -14624,23 +14618,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             // Stacked in-room bubble only — no ComingMsg strip / no personal portrait.
         } else if ("room:slot_lose".equals(event)) {
-            String who = firstNonEmpty(memberStr(payload, "displayName"),
-                    shortUserId(memberStr(payload, "userId")));
-            String gameTitle = firstNonEmpty(memberStr(payload, "gameTitle"),
-                    memberStr(payload, "gameId"), "لعبة");
-            long bet = Math.max(0L, memberLong(payload, "betCoins", 0L));
-            if (bet <= 0) return;
-            String gameIcon = firstNonEmpty(memberStr(payload, "gameCoverUrl"),
-                    memberStr(payload, "gameIconUrl"));
-            appendGameCelebrationLine(who + " خسر " + bet + " · " + gameTitle, gameIcon);
-            RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
-            if (bubbleFx != null) {
-                bubbleFx.showSlotLoseBubble(who, null, bet, gameTitle, gameIcon);
-            }
-            if (binding != null && binding.giftChatEffects != null) {
-                binding.giftChatEffects.setVisibility(View.VISIBLE);
-                binding.giftChatEffects.bringToFront();
-            }
+            // Losses are intentionally silent: no chat line, toast, or loss bubble.
+            return;
         } else if ("room:slot_ended".equals(event)) {
             String who = firstNonEmpty(memberStr(payload, "displayName"),
                     shortUserId(memberStr(payload, "userId")));
