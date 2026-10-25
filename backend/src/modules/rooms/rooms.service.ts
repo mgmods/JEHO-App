@@ -169,6 +169,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "micInteractEnabled" boolean NOT NULL DEFAULT true`,
       );
       await this.dataSource.query(
+        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "micRequestEnabled" boolean NOT NULL DEFAULT false`,
+      );
+      await this.dataSource.query(
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "entryEffectsEnabled" boolean NOT NULL DEFAULT true`,
       );
       await this.dataSource.query(
@@ -2190,6 +2193,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       charmEnabled?: boolean;
       bannerEnabled?: boolean;
       micInteractEnabled?: boolean;
+      micRequestEnabled?: boolean;
       entryEffectsEnabled?: boolean;
       lowGiftEffectsEnabled?: boolean;
     },
@@ -2202,6 +2206,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     );
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
+    if (typeof patch.micRequestEnabled === 'boolean' && room.hostId !== actorId) {
+      throw new ForbiddenException('Only the room owner can change mic request mode');
+    }
     if (typeof patch.chatZoneEnabled === 'boolean') {
       room.chatZoneEnabled = patch.chatZoneEnabled;
     }
@@ -2213,6 +2220,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     if (typeof patch.micInteractEnabled === 'boolean') {
       room.micInteractEnabled = patch.micInteractEnabled;
+    }
+    if (typeof patch.micRequestEnabled === 'boolean') {
+      room.micRequestEnabled = patch.micRequestEnabled;
     }
     if (typeof patch.entryEffectsEnabled === 'boolean') {
       room.entryEffectsEnabled = patch.entryEffectsEnabled;
@@ -2227,6 +2237,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       charmEnabled: room.charmEnabled !== false,
       bannerEnabled: room.bannerEnabled !== false,
       micInteractEnabled: room.micInteractEnabled !== false,
+      micRequestEnabled: room.micRequestEnabled === true,
       entryEffectsEnabled: room.entryEffectsEnabled !== false,
       lowGiftEffectsEnabled: room.lowGiftEffectsEnabled !== false,
     };
@@ -2987,6 +2998,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
     const isHost = room.hostId === userId;
     const alreadySeated = await this.seatsRepo.findOne({ where: { roomId, userId } });
+    const roomModerator = await this.modsRepo.findOne({ where: { roomId, userId } });
+    const canBypassMicRequest = isHost || room.cohostId === userId || room.activeHostId === userId
+      || roomModerator?.canInvite === true || roomModerator?.canManageSeats === true;
+    if (room.micRequestEnabled === true && !alreadySeated && !canBypassMicRequest) {
+      throw new ForbiddenException('This room requires approval before taking a mic seat');
+    }
     // Guests may only switch seats if already on mic; first seat requires host approval
     // unless the dashboard enables free mic (rooms.mic_without_host_approval).
     if (!isHost && !alreadySeated) {
@@ -3005,7 +3022,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           agencyMemberCanSit = membership.length > 0;
         }
       }
-      const freeMic = agencyMemberCanSit || await this.micWithoutHostApproval();
+      const freeMic = canBypassMicRequest || agencyMemberCanSit || await this.micWithoutHostApproval();
       if (!freeMic) {
         throw new ForbiddenException('Request mic access and wait for host approval');
       }
