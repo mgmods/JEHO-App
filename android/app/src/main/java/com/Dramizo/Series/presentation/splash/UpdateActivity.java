@@ -10,6 +10,7 @@ import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -98,7 +99,19 @@ public final class UpdateActivity extends Activity {
             window.setStatusBarColor(Color.rgb(5, 9, 24));
             window.setNavigationBarColor(Color.rgb(5, 9, 24));
             window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            // Blur and dim the JEHO screen beneath this mandatory update gate.
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams windowParams = window.getAttributes();
+            windowParams.dimAmount = 0.80f;
+            if (Build.VERSION.SDK_INT >= 31) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
+                window.setBackgroundBlurRadius(dp(30));
+            }
+            window.setAttributes(windowParams);
         }
+        if (forceUpdate) persistMandatoryGate(title, message);
         buildUi(title, message);
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
@@ -110,7 +123,7 @@ public final class UpdateActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(16, 18, 55), bg, Color.rgb(8, 20, 43)}));
+                new int[]{Color.argb(236, 16, 18, 55), Color.argb(242, 5, 9, 24), Color.argb(236, 8, 20, 43)}));
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
@@ -124,17 +137,20 @@ public final class UpdateActivity extends Activity {
         badge.setBackground(rounded(Color.rgb(30, 24, 72), Color.rgb(91, 67, 158), dp(24)));
         content.addView(badge, params(-2, -2, 0, 0, 0, 18));
 
-        TextView brand = text("JEHO", 34, Color.WHITE, true);
-        brand.setLetterSpacing(0.20f);
+        TextView brand = text("JEHO", 38, Color.WHITE, true);
+        brand.setLetterSpacing(0.24f);
         brand.setGravity(Gravity.CENTER);
         content.addView(brand, params(-1, -2, 0, 0, 0, 0));
 
-        TextView icon = text("🚀", 54, Color.WHITE, true);
+        TextView icon = text("✦", 58, Color.WHITE, true);
         icon.setGravity(Gravity.CENTER);
-        GradientDrawable iconBg = rounded(Color.rgb(37, 28, 103), Color.rgb(115, 70, 255), dp(28));
-        iconBg.setStroke(dp(1), Color.rgb(115, 91, 255));
+        GradientDrawable iconBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(139, 83, 255), Color.rgb(69, 44, 178), Color.rgb(26, 31, 88)});
+        iconBg.setCornerRadius(dp(34));
+        iconBg.setStroke(dp(1), Color.rgb(185, 148, 255));
+        icon.setElevation(dp(12));
         icon.setBackground(iconBg);
-        content.addView(icon, params(dp(116), dp(116), 0, 20, 0, 22));
+        content.addView(icon, params(dp(104), dp(104), 0, 20, 0, 22));
 
         TextView heading = text(title, 24, Color.WHITE, true);
         heading.setGravity(Gravity.CENTER);
@@ -150,7 +166,8 @@ public final class UpdateActivity extends Activity {
         LinearLayout versionCard = new LinearLayout(this);
         versionCard.setOrientation(LinearLayout.VERTICAL);
         versionCard.setPadding(dp(20), dp(18), dp(20), dp(18));
-        versionCard.setBackground(rounded(Color.rgb(18, 27, 68), Color.rgb(122, 91, 231), dp(24)));
+        versionCard.setBackground(rounded(Color.argb(245, 18, 27, 68), Color.rgb(155, 118, 255), dp(24)));
+        versionCard.setElevation(dp(8));
         TextView eyebrow = text(isArabic() ? "الإصدار الجديد جاهز" : "YOUR NEXT JEHO EXPERIENCE", 12, Color.rgb(190, 174, 255), true);
         versionCard.addView(eyebrow, params(-1, -2, 0, 0, 0, 6));
         TextView version = text(targetVersionName.isEmpty() ? "JEHO" : targetVersionName, 25, Color.WHITE, true);
@@ -347,6 +364,7 @@ public final class UpdateActivity extends Activity {
             return;
         }
         if (targetVersionCode > 0 && installedVersionCode() >= targetVersionCode) {
+            clearMandatoryGate();
             Intent next = new Intent(this, SplashActivity.class);
             next.putExtra(SplashActivity.EXTRA_SKIP_UPDATE_CHECK_ONCE, true);
             next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -380,6 +398,22 @@ public final class UpdateActivity extends Activity {
             if (Build.VERSION.SDK_INT >= 28) return (int) getPackageManager().getPackageInfo(getPackageName(), 0).getLongVersionCode();
             return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
         } catch (Exception ignored) { return 0; }
+    }
+
+    private void persistMandatoryGate(String title, String message) {
+        getSharedPreferences("jeho_mandatory_update_gate", MODE_PRIVATE).edit()
+                .putBoolean("active", true)
+                .putInt("version_code", targetVersionCode)
+                .putString("version_name", targetVersionName)
+                .putString("url", downloadUrl)
+                .putString("link_type", linkType)
+                .putString("title", title)
+                .putString("message", message)
+                .apply();
+    }
+
+    private void clearMandatoryGate() {
+        getSharedPreferences("jeho_mandatory_update_gate", MODE_PRIVATE).edit().clear().apply();
     }
 
     private void continueWithoutUpdate() {
