@@ -361,6 +361,13 @@
               </div>
               <label class="settings-switch mb-3">
                 <div>
+                  <div class="settings-switch-title">نشر التحديث للمستخدمين</div>
+                  <div class="settings-switch-hint">اتركه مغلقاً أثناء تجهيز ملف APK. عند التفعيل يبدأ التطبيق بفحص هذا الإصدار عند التشغيل.</div>
+                </div>
+                <input v-model="appUpdateForm.enabled" class="form-check-input" type="checkbox" role="switch" />
+              </label>
+              <label class="settings-switch mb-3">
+                <div>
                   <div class="settings-switch-title">فرض التحديث على الجميع</div>
                   <div class="settings-switch-hint">عند التفعيل تظهر صفحة التحديث كاملة الشاشة، ولا يوجد زر «لاحقاً». سيحتاج المستخدم إلى تأكيد التثبيت من Android.</div>
                 </div>
@@ -1158,6 +1165,7 @@ const form = reactive({
 
 const appUpdateSaving = ref(false)
 const appUpdateForm = reactive({
+  enabled: false,
   latestVersionCode: 49,
   latestVersionName: '2.0.51',
   minVersionCode: 0,
@@ -1233,6 +1241,7 @@ async function load() {
     Object.assign(map, raw)
   }
   Object.assign(appUpdateForm, {
+    enabled: ['true', '1', 'yes'].includes(String(map['app.update_enabled'] ?? appUpdateForm.enabled).toLowerCase()),
     latestVersionCode: Number(map['app.latest_version_code'] ?? appUpdateForm.latestVersionCode) || appUpdateForm.latestVersionCode,
     latestVersionName: String(map['app.latest_version_name'] ?? appUpdateForm.latestVersionName),
     minVersionCode: Number(map['app.min_version_code'] ?? appUpdateForm.minVersionCode) || 0,
@@ -1358,6 +1367,7 @@ async function saveAppUpdate() {
   }
   appUpdateSaving.value = true
   const payload = {
+    'app.update_enabled': String(!!appUpdateForm.enabled),
     'app.latest_version_code': String(versionCode),
     'app.latest_version_name': String(appUpdateForm.latestVersionName || '').trim(),
     'app.min_version_code': String(minVersionCode),
