@@ -3000,6 +3000,30 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /** Room owner/moderator directly assigns an in-room audience member to a mic. */
+  async assignSeat(roomId: string, actorId: string, targetUserId: string, seatIndex?: number | null) {
+    await this.assertMicRequestPermission(
+      roomId,
+      actorId,
+      'Mic seat management permission is required',
+    );
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    const [access, existingSeat, ban] = await Promise.all([
+      this.accessRepo.findOne({ where: { roomId, userId: targetUserId } }),
+      this.seatsRepo.findOne({ where: { roomId, userId: targetUserId } }),
+      this.bansRepo.findOne({ where: { roomId, userId: targetUserId } }),
+    ]);
+    if (ban && (!ban.expiresAt || ban.expiresAt > new Date())) {
+      throw new ForbiddenException('المستخدم محظور من هذه الغرفة');
+    }
+    if (!this.hasActiveAccess(access) && !existingSeat && room.hostId !== targetUserId) {
+      throw new ForbiddenException('يجب أن يكون المستخدم داخل الغرفة أولاً');
+    }
+    // Reuse the same transactional seat assignment and realtime event path as approval.
+    return this.approveSeat(roomId, actorId, targetUserId, seatIndex ?? null, true);
+  }
+
   async takeSeat(roomId: string, userId: string, dto: TakeSeatDto) {
     // Already joined via /join — do not re-require password (that blocked seat switches).
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
