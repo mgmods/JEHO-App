@@ -22,6 +22,7 @@ public interface RoomRepository {
     Result<Object> raiseHand(String id, boolean raised, Integer seatIndex);
     Result<RoomDtos.SeatRequestsResult> seatRequests(String id);
     Result<RoomDtos.RoomDto> approveSeat(String id, String userId, Integer seatIndex);
+    Result<RoomDtos.RoomDto> assignSeat(String id, String userId, Integer seatIndex);
     Result<Object> rejectSeat(String id, String userId);
     Result<Object> inviteSeat(String id, String userId, Integer seatIndex);
     Result<java.util.Map<String, Object>> inviteTaskGuest(String id, String userId);
