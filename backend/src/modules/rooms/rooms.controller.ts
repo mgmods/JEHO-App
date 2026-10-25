@@ -430,6 +430,7 @@ export class RoomsController {
       charmEnabled?: boolean;
       bannerEnabled?: boolean;
       micInteractEnabled?: boolean;
+      micRequestEnabled?: boolean;
       entryEffectsEnabled?: boolean;
       lowGiftEffectsEnabled?: boolean;
     },
