@@ -349,8 +349,72 @@
         </template>
 
         <form v-else class="settings-form" @submit.prevent="save">
+          <!-- APP UPDATE -->
+          <template v-if="settingsTab === 'app-update'">
+            <section class="settings-card app-update-admin-card">
+              <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="app-update-admin-icon"><i class="bi bi-cloud-arrow-down-fill" /></div>
+                <div>
+                  <h3 class="settings-card-title mb-1">تحديث JEHO الإجباري</h3>
+                  <p class="form-text mb-0">انشر رابط APK جديداً، وحدد الإصدار الأدنى. عند تفعيل الإلزام لن يستطيع المستخدم متابعة الدخول قبل تثبيت النسخة الجديدة.</p>
+                </div>
+              </div>
+              <label class="settings-switch mb-3">
+                <div>
+                  <div class="settings-switch-title">فرض التحديث على الجميع</div>
+                  <div class="settings-switch-hint">عند التفعيل تظهر صفحة التحديث كاملة الشاشة، ولا يوجد زر «لاحقاً». سيحتاج المستخدم إلى تأكيد التثبيت من Android.</div>
+                </div>
+                <input v-model="appUpdateForm.forceUpdate" class="form-check-input" type="checkbox" role="switch" />
+              </label>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">رقم الإصدار (versionCode)</label>
+                  <input v-model.number="appUpdateForm.latestVersionCode" class="form-control" type="number" min="1" required />
+                  <div class="form-text">رقم صحيح أكبر من رقم النسخة المثبتة حالياً.</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">اسم الإصدار</label>
+                  <input v-model.trim="appUpdateForm.latestVersionName" class="form-control" placeholder="2.0.51" required />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">أدنى إصدار مسموح</label>
+                  <input v-model.number="appUpdateForm.minVersionCode" class="form-control" type="number" min="0" />
+                  <div class="form-text">أي نسخة أقدم من هذا الرقم ستُجبر على التحديث.</div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">رابط تحميل APK المباشر</label>
+                  <input v-model.trim="appUpdateForm.storeUrl" class="form-control" type="url" dir="ltr" placeholder="https://example.com/releases/JEHO.apk" required />
+                  <div class="form-text">استخدم رابط HTTPS مباشر لملف APK، وليس رابط صفحة ويب. يجب أن يكون الملف موقّعاً بنفس شهادة التطبيق الحالي وبالحزمة com.Dramizo.Series حتى يثبت كتحديث فوق النسخة الموجودة دون حذف بيانات المستخدم.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">عنوان التحديث بالعربية</label>
+                  <input v-model.trim="appUpdateForm.titleAr" class="form-control" maxlength="120" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">عنوان التحديث بالإنجليزية</label>
+                  <input v-model.trim="appUpdateForm.titleEn" class="form-control" maxlength="120" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">تفاصيل التحديث بالعربية</label>
+                  <textarea v-model.trim="appUpdateForm.messageAr" class="form-control" rows="3" maxlength="600" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">تفاصيل التحديث بالإنجليزية</label>
+                  <textarea v-model.trim="appUpdateForm.messageEn" class="form-control" rows="3" maxlength="600" />
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
+                <span class="small text-secondary">التطبيق الحالي: versionCode 48 · 2.0.50</span>
+                <button type="button" class="btn btn-aurora" :disabled="appUpdateSaving || !canWriteSettings" @click="saveAppUpdate">
+                  <span v-if="appUpdateSaving" class="spinner-border spinner-border-sm me-1" />
+                  حفظ إعدادات التحديث
+                </button>
+              </div>
+            </section>
+          </template>
+
           <!-- GENERAL -->
-          <template v-if="settingsTab === 'general'">
+          <template v-else-if="settingsTab === 'general'">
             <section class="settings-card">
               <h3 class="settings-card-title">{{ t('settings.general') }}</h3>
               <div class="row g-3">
@@ -718,6 +782,7 @@ const settingTabs = computed(() => {
   // remain Super-Admin-only and are not merely disabled for limited staff.
   const tabs = [
     { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders', permission: 'settings' },
+    { id: 'app-update', label: 'تحديث التطبيق', icon: 'bi-cloud-arrow-down', permission: 'settings' },
     { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin', permission: 'settings' },
     { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected', superOnly: true },
     { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image', permission: 'settings' },
@@ -1091,6 +1156,19 @@ const form = reactive({
   liveNsfwPermBanStrikes: 5,
 })
 
+const appUpdateSaving = ref(false)
+const appUpdateForm = reactive({
+  latestVersionCode: 49,
+  latestVersionName: '2.0.51',
+  minVersionCode: 0,
+  forceUpdate: false,
+  storeUrl: '',
+  titleAr: 'يوجد تحديث جديد',
+  messageAr: 'حدّث تطبيق JEHO للاستمتاع بالتحسينات والإصلاحات الجديدة.',
+  titleEn: 'A new update is available',
+  messageEn: 'Update JEHO to enjoy the latest improvements and fixes.',
+})
+
 function normalizeAppName(raw) {
   const name = String(raw ?? '').trim()
   if (!name) return 'JEHO CHAT'
@@ -1154,6 +1232,17 @@ async function load() {
   } else if (raw && typeof raw === 'object') {
     Object.assign(map, raw)
   }
+  Object.assign(appUpdateForm, {
+    latestVersionCode: Number(map['app.latest_version_code'] ?? appUpdateForm.latestVersionCode) || appUpdateForm.latestVersionCode,
+    latestVersionName: String(map['app.latest_version_name'] ?? appUpdateForm.latestVersionName),
+    minVersionCode: Number(map['app.min_version_code'] ?? appUpdateForm.minVersionCode) || 0,
+    forceUpdate: ['true', '1', 'yes'].includes(String(map['app.update_force'] ?? appUpdateForm.forceUpdate).toLowerCase()),
+    storeUrl: String(map['app.update_store_url'] ?? appUpdateForm.storeUrl),
+    titleAr: String(map['app.update_title_ar'] ?? appUpdateForm.titleAr),
+    messageAr: String(map['app.update_message_ar'] ?? appUpdateForm.messageAr),
+    titleEn: String(map['app.update_title_en'] ?? appUpdateForm.titleEn),
+    messageEn: String(map['app.update_message_en'] ?? appUpdateForm.messageEn),
+  })
   const bool = (v, fallback) => {
     if (v === undefined || v === null || v === '') return fallback
     if (typeof v === 'boolean') return v
@@ -1241,10 +1330,53 @@ async function load() {
 }
 
 function reloadActive() {
-  if (isCoreTab.value) load()
+  if (isCoreTab.value || settingsTab.value === 'app-update') load()
   else if (settingsTab.value === 'staff-identity') loadStaffIdentity()
   else if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
   else if (settingsTab.value === 'admins') loadOperators()
+}
+
+async function saveAppUpdate() {
+  if (!auth.can('settings', 'write')) {
+    toast().danger(t('settings.readOnly'))
+    return
+  }
+  const versionCode = Number(appUpdateForm.latestVersionCode)
+  const minVersionCode = Number(appUpdateForm.minVersionCode) || 0
+  const apkUrl = String(appUpdateForm.storeUrl || '').trim()
+  if (!Number.isInteger(versionCode) || versionCode < 1) {
+    toast().danger('رقم الإصدار يجب أن يكون رقماً صحيحاً أكبر من صفر')
+    return
+  }
+  if (minVersionCode > versionCode) {
+    toast().danger('أدنى إصدار لا يمكن أن يكون أكبر من الإصدار الجديد')
+    return
+  }
+  if (!/^https:\/\//i.test(apkUrl)) {
+    toast().danger('أدخل رابط HTTPS مباشر لملف APK')
+    return
+  }
+  appUpdateSaving.value = true
+  const payload = {
+    'app.latest_version_code': String(versionCode),
+    'app.latest_version_name': String(appUpdateForm.latestVersionName || '').trim(),
+    'app.min_version_code': String(minVersionCode),
+    'app.update_force': String(!!appUpdateForm.forceUpdate),
+    'app.update_store_url': apkUrl,
+    'app.update_title_ar': String(appUpdateForm.titleAr || 'يوجد تحديث جديد').trim(),
+    'app.update_message_ar': String(appUpdateForm.messageAr || '').trim(),
+    'app.update_title_en': String(appUpdateForm.titleEn || 'Update available').trim(),
+    'app.update_message_en': String(appUpdateForm.messageEn || '').trim(),
+  }
+  const { error: err } = await settingsApi.update(payload)
+  appUpdateSaving.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  success.value = 'تم حفظ إعدادات تحديث JEHO'
+  toast().success(success.value)
 }
 
 async function save() {
