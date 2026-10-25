@@ -31,6 +31,9 @@ public interface ContestsApi {
     @POST("contests/room-pk/in-room")
     Call<ApiResponse<Object>> createInRoomPk(@Body Map<String, Object> body);
 
+    @POST("contests/{id}/room-pk/in-room-response")
+    Call<ApiResponse<Object>> respondInRoomPk(@Path("id") String id, @Body Map<String, Object> body);
+
     @POST("contests/{id}/room-pk/end")
     Call<ApiResponse<Object>> endInRoomPk(@Path("id") String id);
 

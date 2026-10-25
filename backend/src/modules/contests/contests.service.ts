@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Optional,
   OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -35,7 +36,8 @@ const CONTEST_BADGE_DAYS = 7;
 const FAT_PRIZE_CEILING = 10000;
 
 @Injectable()
-export class ContestsService implements OnModuleInit {
+export class ContestsService implements OnModuleInit, OnModuleDestroy {
+  private roomPkExpiryTimer: ReturnType<typeof setInterval> | null = null;
   constructor(
     @InjectRepository(Contest) private readonly contestsRepo: Repository<Contest>,
     @InjectRepository(ContestEntry) private readonly entriesRepo: Repository<ContestEntry>,
@@ -135,6 +137,39 @@ export class ContestsService implements OnModuleInit {
         ADD COLUMN IF NOT EXISTS "rules" jsonb,
         ADD COLUMN IF NOT EXISTS "isInteractive" boolean NOT NULL DEFAULT false
     `);
+    // Lightweight server-side expiry: scoring is already bounded by endAt, but this
+    // finalizes the PK state and broadcasts the winner even if the room host disconnects.
+    this.roomPkExpiryTimer = setInterval(() => {
+      void this.expireTimedRoomPkChallenges().catch(() => undefined);
+    }, 15_000);
+    this.roomPkExpiryTimer.unref?.();
+  }
+
+  async onModuleDestroy() {
+    if (this.roomPkExpiryTimer) clearInterval(this.roomPkExpiryTimer);
+    this.roomPkExpiryTimer = null;
+  }
+
+  private async expireTimedRoomPkChallenges() {
+    const now = new Date();
+    const expired = await this.contestsRepo.createQueryBuilder('contest')
+      .where('contest.challengeType IN (:...types)', { types: ['person_vs_person', 'team_vs_team', 'room_vs_room'] })
+      .andWhere('contest.status = :active', { active: 'active' })
+      .andWhere('contest.endAt <= :now', { now })
+      .getMany();
+    for (const contest of expired) {
+      const result = await this.contestsRepo.createQueryBuilder()
+        .update(Contest)
+        .set({ status: 'ended' })
+        .where('id = :id', { id: contest.id })
+        .andWhere('status = :active', { active: 'active' })
+        .execute();
+      if (!result.affected) continue;
+      const finalized = await this.contestsRepo.findOne({ where: { id: contest.id } });
+      if (finalized && this.isTeamChallenge(finalized) && await this.isRoomPkEnabled(true)) {
+        this.emitTeamChallengeEnded(finalized);
+      }
+    }
   }
 
   async ensureDefaults() {
@@ -320,100 +355,88 @@ export class ContestsService implements OnModuleInit {
   }
 
 
-  /** Start an in-room duel/team PK without moving users or changing their voice seats. */
-  async createInRoomPkChallenge(userId: string, input: {
-    roomId: string;
-    challengeType: 'person_vs_person' | 'team_vs_team';
-    durationMinutes: number;
-    participantIdsA: string[];
-    participantIdsB: string[];
-    scoringMode?: string;
-  }) {
+  /** Person-vs-person PK must remain pending until the invited user accepts. */
+  async createInRoomPkChallenge(userId: string, input: { roomId: string; challengeType: 'person_vs_person' | 'team_vs_team'; durationMinutes: number; participantIdsA: string[]; participantIdsB: string[]; scoringMode?: string }) {
     if (!(await this.isRoomPkEnabled(true))) throw new BadRequestException('تحديات PK متوقفة حالياً من الإدارة');
     const room = await this.findRoomByPkReference(input.roomId);
-    if (room.hostId !== userId && room.activeHostId !== userId) {
-      throw new BadRequestException('بدء تحدّي PK متاح لمضيف الروم فقط');
-    }
-    const type = input.challengeType;
-    if (type !== 'person_vs_person' && type !== 'team_vs_team') {
-      throw new BadRequestException('نوع تحدّي PK غير صالح');
-    }
-    const durationMinutes = Number(input.durationMinutes);
-    if (![5, 10, 20].includes(durationMinutes)) {
-      throw new BadRequestException('مدة التحدّي يجب أن تكون 5 أو 10 أو 20 دقيقة');
-    }
-    const clean = (ids: unknown) => Array.isArray(ids)
-      ? [...new Set(ids.map((v) => String(v || '').trim()).filter(Boolean))]
-      : [];
-    const aIds = clean(input.participantIdsA);
-    const bIds = clean(input.participantIdsB);
-    if (type === 'person_vs_person' && (aIds.length !== 1 || bIds.length !== 1)) {
-      throw new BadRequestException('تحدّي شخص ضد شخص يتطلب مشاركاً واحداً في كل فريق');
-    }
-    if (!aIds.length || !bIds.length || aIds.some((id) => bIds.includes(id))) {
-      throw new BadRequestException('اختر مشاركين مختلفين للفريقين');
-    }
-    if (aIds.length + bIds.length > 20) throw new BadRequestException('الحد الأقصى للمشاركين هو 20');
-    const seatRows = await this.roomSeatsRepo.find({ where: { roomId: room.id } });
-    const occupied = new Set(seatRows.filter((seat) => !!seat.userId).map((seat) => String(seat.userId)));
-    if ([...aIds, ...bIds].some((id) => !occupied.has(id))) {
-      throw new BadRequestException('يجب اختيار مشاركين موجودين حالياً على مقاعد الروم');
-    }
-    const active = await this.contestsRepo.find({
-      where: { roomId: room.id, challengeType: In(['person_vs_person', 'team_vs_team']), status: 'active' },
-      take: 5,
-    });
-    if (active.length) throw new ConflictException('يوجد تحدّي PK نشط في هذا الروم');
-    const now = new Date();
-    const endAt = new Date(now.getTime() + durationMinutes * 60_000);
-    const scoringMode = ['coins', 'diamonds', 'gifts', 'points'].includes(String(input.scoringMode))
-      ? String(input.scoringMode) : 'coins';
-    const saved = await this.contestsRepo.save(this.contestsRepo.create({
-      title: type === 'person_vs_person' ? 'PK شخص ضد شخص' : 'PK فريق ضد فريق',
-      description: 'تحدّي مباشر داخل الروم',
-      category: 'gifts',
-      status: 'active',
-      entryFeeCoins: 0,
-      prizeCoins: 0,
-      prizeLabel: null,
-      startAt: now,
-      endAt,
-      entrantsCount: aIds.length + bIds.length,
-      scope: 'room',
-      roomId: room.id,
-      agencyId: null,
-      kind: 'challenge',
-      bannerUrl: null,
-      goalDiamonds: 0,
-      scoringMode,
-      challengeType: type,
-      allowedGiftIds: null,
-      milestones: null,
-      prizes: null,
-      sideA: { name: 'الفريق الأحمر', participantIds: aIds, score: 0 },
-      sideB: { name: 'الفريق الأزرق', participantIds: bIds, score: 0 },
-      rules: { durationMinutes, scoringMode, createdBy: userId, originalSeatPositionsPreserved: true },
-      isInteractive: true,
+    if (room.hostId !== userId && room.activeHostId !== userId) throw new BadRequestException('إرسال تحدّي PK متاح لمضيف الروم فقط');
+    const type = input.challengeType, durationMinutes = Number(input.durationMinutes);
+    if (type !== 'person_vs_person' && type !== 'team_vs_team') throw new BadRequestException('نوع تحدّي PK غير صالح');
+    if (![5,10,20].includes(durationMinutes)) throw new BadRequestException('مدة التحدّي يجب أن تكون 5 أو 10 أو 20 دقيقة');
+    const clean=(ids:unknown)=>Array.isArray(ids)?[...new Set(ids.map(v=>String(v||'').trim()).filter(Boolean))]:[];
+    const aIds=clean(input.participantIdsA), bIds=clean(input.participantIdsB);
+    if(type==='person_vs_person'&&(aIds.length!==1||bIds.length!==1)) throw new BadRequestException('تحدّي شخص ضد شخص يتطلب مشاركاً واحداً في كل طرف');
+    if(!aIds.length||!bIds.length||aIds.some(id=>bIds.includes(id))) throw new BadRequestException('اختر مشاركين مختلفين');
+    if(aIds.length+bIds.length>20) throw new BadRequestException('الحد الأقصى للمشاركين هو 20');
+    const seats=await this.roomSeatsRepo.find({where:{roomId:room.id}});
+    const occupied=new Set(seats.filter(x=>!!x.userId).map(x=>String(x.userId)));
+    if([...aIds,...bIds].some(id=>!occupied.has(id))) throw new BadRequestException('يجب اختيار مشاركين موجودين حالياً على مقاعد الروم');
+    const prior=await this.contestsRepo.find({where:{roomId:room.id,challengeType:In(['person_vs_person','team_vs_team']),status:In(['active','upcoming'])},take:20});
+    if(prior.some(x=>x.status==='active'||(x.rules as any)?.invitationStatus==='pending')) throw new ConflictException('يوجد تحدّي نشط أو دعوة معلّقة في هذا الروم');
+    const now=new Date(), isInvite=type==='person_vs_person';
+    const scoringMode=['coins','diamonds','gifts','points'].includes(String(input.scoringMode))?String(input.scoringMode):'coins';
+    const rules:Record<string,unknown>={durationMinutes,scoringMode,createdBy:userId,originalSeatPositionsPreserved:true};
+    if(isInvite) Object.assign(rules,{invitationStatus:'pending',invitedUserId:bIds[0],invitedByUserId:userId,createdAt:now.toISOString(),expiresAt:new Date(now.getTime()+60000).toISOString()});
+    const saved=await this.contestsRepo.save(this.contestsRepo.create({
+      title:isInvite?'دعوة PK شخص ضد شخص':'PK فريق ضد فريق',description:isInvite?'بانتظار موافقة الطرف الثاني':'تحدّي مباشر داخل الروم',
+      category:'gifts',status:isInvite?'upcoming':'active',entryFeeCoins:0,prizeCoins:0,prizeLabel:null,
+      startAt:isInvite?new Date('2099-01-01T00:00:00.000Z'):now,endAt:isInvite?new Date('2099-01-02T00:00:00.000Z'):new Date(now.getTime()+durationMinutes*60000),
+      entrantsCount:aIds.length+bIds.length,scope:'room',roomId:room.id,agencyId:null,kind:'challenge',bannerUrl:null,goalDiamonds:0,scoringMode,challengeType:type,
+      allowedGiftIds:null,milestones:null,prizes:null,sideA:{name:'الفريق الأحمر',participantIds:aIds,score:0},sideB:{name:'الفريق الأزرق',participantIds:bIds,score:0},rules,isInteractive:true
     }));
-    this.emitRoomPkEvent([room.id], 'contest:pk-started', {
-      contestId: saved.id, challengeType: type, roomId: room.id, sideA: saved.sideA, sideB: saved.sideB,
-      durationMinutes, startAt: now.toISOString(), endAt: endAt.toISOString(), scoringMode,
-    });
-    return { contest: saved, message: 'بدأ تحدّي PK داخل الروم' };
+    if(isInvite){
+      const [from,to]=await Promise.all([this.usersRepo.findOne({where:{id:userId}}),this.usersRepo.findOne({where:{id:bIds[0]}})]);
+      const inviterName=from?.displayName||from?.username||'مستخدم';
+      this.emitRoomPkEvent([room.id],'contest:person-pk-invite',{contestId:saved.id,challengeType:type,roomId:room.id,targetUserId:bIds[0],invitedByUserId:userId,inviterName,durationMinutes,scoringMode,status:'pending'});
+      this.notifications.notifyUser(bIds[0],NotificationType.ROOM,'⚔ دعوة تحدّي PK',inviterName+' يدعوك إلى تحدّي شخص ضد شخص لمدة '+durationMinutes+' دقائق. اقبل الدعوة للبدء.',{kind:'person_pk_invitation',contestId:saved.id,roomId:room.id,invitedByUserId:userId,durationMinutes,scoringMode});
+      return {contest:saved,message:'تم إرسال الدعوة؛ لن يبدأ التحدّي إلا بعد قبول الطرف الثاني'};
+    }
+    this.emitRoomPkEvent([room.id],'contest:pk-started',{contestId:saved.id,challengeType:type,roomId:room.id,sideA:saved.sideA,sideB:saved.sideB,durationMinutes,startAt:now.toISOString(),endAt:saved.endAt.toISOString(),scoringMode});
+    return {contest:saved,message:'بدأ تحدّي الفريقين'};
+  }
+
+  async respondInRoomPkChallenge(userId:string, contestId:string, accept:boolean) {
+    if(!(await this.isRoomPkEnabled(true))) throw new BadRequestException('تحديات PK متوقفة حالياً من الإدارة');
+    const contest=await this.contestsRepo.findOne({where:{id:contestId}});
+    if(!contest||contest.challengeType!=='person_vs_person'||contest.status!=='upcoming') throw new NotFoundException('دعوة تحدّي PK غير موجودة أو تمت معالجتها');
+    const rules={...((contest.rules||{}) as Record<string,unknown>)};
+    if(rules.invitationStatus!=='pending'||String(rules.invitedUserId||'')!==userId) throw new BadRequestException('الرد على الدعوة متاح للطرف المدعو فقط');
+    const expires=Date.parse(String(rules.expiresAt||''));
+    if(!Number.isFinite(expires)||Date.now()>=expires){rules.invitationStatus='expired';contest.rules=rules;contest.status='ended';contest.endAt=new Date();await this.contestsRepo.save(contest);this.emitRoomPkEvent([String(contest.roomId)],'contest:pk-rejected',{contestId,reason:'expired'});throw new ConflictException('انتهت مهلة الدعوة');}
+    const now=new Date(), mins=Math.max(5,Math.min(20,Math.floor(Number(rules.durationMinutes)||5)));
+    rules.invitationStatus=accept?'accepted':'rejected';rules.respondedAt=now.toISOString();contest.rules=rules;contest.status=accept?'active':'ended';contest.startAt=accept?now:contest.startAt;contest.endAt=accept?new Date(now.getTime()+mins*60000):now;
+    const saved=await this.contestsRepo.save(contest);
+    this.emitRoomPkEvent([String(saved.roomId)],accept?'contest:pk-started':'contest:pk-rejected',{contestId:saved.id,challengeType:saved.challengeType,roomId:saved.roomId,sideA:saved.sideA,sideB:saved.sideB,durationMinutes:mins,startAt:accept?now.toISOString():null,endAt:saved.endAt.toISOString(),scoringMode:saved.scoringMode,status:accept?'active':'rejected'});
+    return {contest:saved,message:accept?'تم قبول الدعوة وبدأ التحدّي الآن':'تم رفض دعوة التحدّي'};
   }
 
   async endInRoomPkChallenge(userId: string, contestId: string) {
     const contest = await this.contestsRepo.findOne({ where: { id: contestId } });
-    if (!contest || !['person_vs_person', 'team_vs_team'].includes(String(contest.challengeType)) || contest.status !== 'active') {
+    const type = String(contest?.challengeType || '');
+    if (!contest || !['person_vs_person', 'team_vs_team', 'room_vs_room'].includes(type) || contest.status !== 'active') {
       throw new NotFoundException('تحدّي PK النشط غير موجود');
     }
-    const room = contest.roomId ? await this.roomsRepo.findOne({ where: { id: contest.roomId } }) : null;
-    if (!room || (room.hostId !== userId && room.activeHostId !== userId)) {
-      throw new BadRequestException('إنهاء التحدّي متاح لمضيف الروم فقط');
+    let authorized = false;
+    if (type === 'person_vs_person' || type === 'team_vs_team') {
+      const room = contest.roomId ? await this.roomsRepo.findOne({ where: { id: contest.roomId } }) : null;
+      authorized = !!room && (room.hostId === userId || room.activeHostId === userId);
+    } else {
+      // Either participating room's host may end a room-vs-room PK; enforce this on the server.
+      const roomIds = this.roomPkRoomIds(contest);
+      const rooms = await Promise.all(roomIds.map((id) => this.roomsRepo.findOne({ where: { id } })));
+      authorized = rooms.some((room) => !!room && (room.hostId === userId || room.activeHostId === userId));
     }
-    contest.status = 'ended';
-    contest.endAt = new Date();
-    const saved = await this.contestsRepo.save(contest);
+    if (!authorized) throw new BadRequestException('إنهاء التحدّي متاح لمضيف أحد الرومين فقط');
+    // Atomic transition guarantees only one concurrent host/expiry request broadcasts the result.
+    const result = await this.contestsRepo.createQueryBuilder()
+      .update(Contest)
+      .set({ status: 'ended', endAt: new Date() })
+      .where('id = :id', { id: contestId })
+      .andWhere('status = :active', { active: 'active' })
+      .execute();
+    if (!result.affected) throw new ConflictException('انتهى تحدّي PK بالفعل');
+    const saved = await this.contestsRepo.findOne({ where: { id: contestId } });
+    if (!saved) throw new NotFoundException('تحدّي PK النشط غير موجود');
     this.emitTeamChallengeEnded(saved);
     return { contest: saved, message: 'انتهى تحدّي PK' };
   }

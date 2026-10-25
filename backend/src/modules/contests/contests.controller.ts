@@ -63,6 +63,12 @@ export class ContestsController {
     return this.contests.createInRoomPkChallenge(userId, dto);
   }
 
+  @Post(':id/room-pk/in-room-response')
+  @ApiOperation({ summary: 'Accept or reject a person-vs-person PK invitation' })
+  respondInRoomPk(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string, @Body() dto: { accept: boolean }) {
+    return this.contests.respondInRoomPkChallenge(userId, id, dto.accept === true);
+  }
+
   @Post(':id/room-pk/end')
   @ApiOperation({ summary: 'End an in-room PK challenge and restore its visual seat layout' })
   endInRoomPk(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
