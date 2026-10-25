@@ -144,11 +144,12 @@ export default registerAs('app', () => {
     credentialsPath: process.env.FIREBASE_CREDENTIALS_PATH || '',
   },
   google: {
-    // Web client ID from Firebase google-services.json (client_type 3).
-    // Must match Android requestIdToken(default_web_client_id).
-    // Intentionally no legacy-project fallback; configure a JEHO-OWN OAuth client explicitly.
-    clientId: process.env.GOOGLE_CLIENT_ID || '',
-    // Optional comma-separated extra audiences (Android OAuth clients).
+    // Must match Android default_web_client_id from the same JEHO Firebase project.
+    // Explicit deployment config takes precedence; this fallback keeps new builds and
+    // the Blitz backend aligned when GOOGLE_CLIENT_ID has not been set.
+    clientId:
+      process.env.GOOGLE_CLIENT_ID ||
+      '807697628126-sc7hj3pccrkt4p0b8ilji91mqb9ojs53.apps.googleusercontent.com',
     clientIds: process.env.GOOGLE_CLIENT_IDS || '',
   },
   admin: {
