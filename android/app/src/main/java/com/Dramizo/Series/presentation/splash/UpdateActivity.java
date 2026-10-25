@@ -328,6 +328,14 @@ public final class UpdateActivity extends Activity {
             next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(next);
             finish();
+            return;
+        }
+        // If the user cancels Android's installer, allow reopening the downloaded APK.
+        if (installerLaunched) {
+            installerLaunched = false;
+            updateButton.setEnabled(true);
+            updateButton.setText(isArabic() ? "إعادة فتح التثبيت" : "Open installer again");
+            updateButton.setOnClickListener(v -> handleDownloadComplete());
         }
     }
 
