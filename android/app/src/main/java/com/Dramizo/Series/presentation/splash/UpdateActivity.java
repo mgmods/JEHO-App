@@ -42,6 +42,7 @@ public final class UpdateActivity extends Activity {
     public static final String EXTRA_VERSION_CODE = "update_version_code";
     public static final String EXTRA_VERSION_NAME = "update_version_name";
     public static final String EXTRA_URL = "update_url";
+    public static final String EXTRA_LINK_TYPE = "update_link_type";
     public static final String EXTRA_TITLE = "update_title";
     public static final String EXTRA_MESSAGE = "update_message";
 
@@ -51,6 +52,7 @@ public final class UpdateActivity extends Activity {
     private int targetVersionCode;
     private String targetVersionName = "";
     private String downloadUrl = "";
+    private String linkType = "auto";
     private long downloadId = -1L;
     private boolean downloadRunning;
     private boolean waitingForInstallPermission;
@@ -82,6 +84,8 @@ public final class UpdateActivity extends Activity {
         targetVersionCode = getIntent().getIntExtra(EXTRA_VERSION_CODE, 0);
         targetVersionName = safe(getIntent().getStringExtra(EXTRA_VERSION_NAME));
         downloadUrl = safe(getIntent().getStringExtra(EXTRA_URL));
+        linkType = safe(getIntent().getStringExtra(EXTRA_LINK_TYPE)).toLowerCase(Locale.ROOT);
+        if (!"apk".equals(linkType) && !"external".equals(linkType) && !"auto".equals(linkType)) linkType = "auto";
         String title = safe(getIntent().getStringExtra(EXTRA_TITLE));
         String message = safe(getIntent().getStringExtra(EXTRA_MESSAGE));
         if (title.isEmpty()) title = isArabic() ? "يوجد تحديث جديد" : "A new update is available";
@@ -110,12 +114,12 @@ public final class UpdateActivity extends Activity {
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER_HORIZONTAL);
-        content.setPadding(dp(24), dp(28), dp(24), dp(28));
+        content.setPadding(dp(22), dp(20), dp(22), dp(24));
         scroll.addView(content, new ScrollView.LayoutParams(-1, -1));
         setContentView(scroll);
 
-        TextView brand = text("JEHO", 30, Color.WHITE, true);
-        brand.setLetterSpacing(0.12f);
+        TextView brand = text("JEHO  ✦", 30, Color.WHITE, true);
+        brand.setLetterSpacing(0.16f);
         brand.setGravity(Gravity.CENTER);
         content.addView(brand, params(-1, -2, 0, 8, 0, 0));
 
@@ -124,7 +128,7 @@ public final class UpdateActivity extends Activity {
         GradientDrawable iconBg = rounded(Color.rgb(37, 28, 103), Color.rgb(115, 70, 255), dp(28));
         iconBg.setStroke(dp(1), Color.rgb(115, 91, 255));
         icon.setBackground(iconBg);
-        content.addView(icon, params(dp(116), dp(116), 0, 30, 0, 22));
+        content.addView(icon, params(dp(116), dp(116), 0, 24, 0, 22));
 
         TextView heading = text(title, 24, Color.WHITE, true);
         heading.setGravity(Gravity.CENTER);
@@ -139,9 +143,9 @@ public final class UpdateActivity extends Activity {
 
         LinearLayout versionCard = new LinearLayout(this);
         versionCard.setOrientation(LinearLayout.VERTICAL);
-        versionCard.setPadding(dp(18), dp(16), dp(18), dp(16));
-        versionCard.setBackground(rounded(Color.rgb(14, 28, 62), Color.rgb(48, 68, 132), dp(20)));
-        TextView eyebrow = text(isArabic() ? "الإصدار الجديد" : "NEW VERSION", 12, Color.rgb(155, 166, 215), true);
+        versionCard.setPadding(dp(20), dp(18), dp(20), dp(18));
+        versionCard.setBackground(rounded(Color.rgb(18, 27, 68), Color.rgb(91, 76, 181), dp(24)));
+        TextView eyebrow = text(isArabic() ? "تجربة JEHO الجديدة" : "THE NEW JEHO EXPERIENCE", 12, Color.rgb(190, 174, 255), true);
         versionCard.addView(eyebrow, params(-1, -2, 0, 0, 0, 6));
         TextView version = text(targetVersionName.isEmpty() ? "JEHO" : targetVersionName, 25, Color.WHITE, true);
         version.setGravity(Gravity.CENTER_VERTICAL);
@@ -152,7 +156,7 @@ public final class UpdateActivity extends Activity {
                 13, Color.rgb(213, 220, 246), false);
         notes.setLineSpacing(dp(4), 1f);
         versionCard.addView(notes, params(-1, -2, 0, 0, 0, 0));
-        content.addView(versionCard, params(-1, -2, 0, 0, 0, 24));
+        content.addView(versionCard, params(-1, -2, 0, 0, 0, 26));
 
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setMax(100);
@@ -180,19 +184,33 @@ public final class UpdateActivity extends Activity {
 
     private void beginUpdate() {
         if (downloadRunning) return;
-        if (downloadUrl.isEmpty() || !downloadUrl.toLowerCase(Locale.ROOT).startsWith("https://")) {
-            showFailure(isArabic() ? "رابط التحديث غير صالح. حاول لاحقاً أو تواصل مع الدعم." : "The update link is invalid. Please try again later.");
+        if (downloadUrl.isEmpty()) {
+            showFailure(isArabic() ? "رابط التحديث غير موجود في إعدادات الداشبورد." : "No update URL is configured in the dashboard.");
             return;
         }
         Uri uri;
         try { uri = Uri.parse(downloadUrl); } catch (Exception error) {
-            showFailure(isArabic() ? "تعذّر فتح رابط التحديث." : "Could not open the update link.");
+            showFailure(isArabic() ? "تعذّر قراءة رابط التحديث." : "Could not read the update URL.");
             return;
         }
-        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-        if (host.contains("play.google.com") || "market".equalsIgnoreCase(uri.getScheme())) {
-            try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
-            catch (Exception error) { showFailure(isArabic() ? "تعذّر فتح صفحة التحديث." : "Could not open the update page."); }
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        if (!"https".equals(scheme) && !"http".equals(scheme)) {
+            showFailure(isArabic() ? "الرابط يجب أن يبدأ بـ http:// أو https://" : "The URL must start with http:// or https://");
+            return;
+        }
+        String path = uri.getPath() == null ? "" : uri.getPath().toLowerCase(Locale.ROOT);
+        boolean directApk = "apk".equals(linkType)
+                || ("auto".equals(linkType) && path.endsWith(".apk"));
+        if (!directApk) {
+            try {
+                // Open exactly the URL configured by the administrator; never substitute Play Store.
+                startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                statusText.setText(isArabic()
+                        ? "فتحنا الرابط الذي حدده الأدمن. ارجع إلى JEHO بعد إكمال التحديث."
+                        : "Opened the administrator-configured link. Return to JEHO when finished.");
+            } catch (Exception error) {
+                showFailure(isArabic() ? "لا يوجد تطبيق مناسب لفتح هذا الرابط." : "No app is available to open this link.");
+            }
             return;
         }
         DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
