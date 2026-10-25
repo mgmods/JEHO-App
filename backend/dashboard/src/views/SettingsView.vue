@@ -404,7 +404,7 @@
                 </div>
               </div>
               <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
-                <span class="small text-secondary">التطبيق الحالي: versionCode 48 · 2.0.50</span>
+                <span class="small text-secondary">نسخة البناء الحالية: versionCode 49 · 2.0.51</span>
                 <button type="button" class="btn btn-aurora" :disabled="appUpdateSaving || !canWriteSettings" @click="saveAppUpdate">
                   <span v-if="appUpdateSaving" class="spinner-border spinner-border-sm me-1" />
                   حفظ إعدادات التحديث
