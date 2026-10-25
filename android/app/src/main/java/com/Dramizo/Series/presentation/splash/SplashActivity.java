@@ -229,6 +229,7 @@ public class SplashActivity extends ThemedActivity {
                     updateCheckResolved = true;
                     int installedCode = BuildConfig.VERSION_CODE;
                     if (config != null
+                            && config.enabled
                             && config.latestVersionCode > installedCode
                             && config.storeUrl != null
                             && config.storeUrl.trim().startsWith("https://")) {
