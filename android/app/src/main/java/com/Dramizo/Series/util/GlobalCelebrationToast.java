@@ -119,11 +119,7 @@ public final class GlobalCelebrationToast {
                                      @Nullable String avatarUrl,
                                      @Nullable String giftIconUrl,
                                      int quantity) {
-        int count = Math.max(1, quantity);
-        String body = (giftName == null || giftName.trim().isEmpty() ? "هدية" : giftName.trim()) + " · تم الإرسال";
-        show(activity, senderName, body, avatarUrl, giftIconUrl,
-                "gift-send-" + System.currentTimeMillis(), 28, count, 0L,
-                senderName, "gift_send", null);
+        // Gift-send top toasts are retired globally. The gift animation remains in-room.
     }
 
     private static void applyRemoteStyleToActiveToast() {
@@ -403,6 +399,8 @@ public final class GlobalCelebrationToast {
             @Nullable String kind,
             @Nullable String roomId
     ) {
+        // Never render the retired gift-send confirmation toast, regardless of caller.
+        if ("gift_send".equalsIgnoreCase(kind)) return;
         if (activity == null || activity.isFinishing()) return;
         try {
             android.content.Context app = activity.getApplicationContext();
