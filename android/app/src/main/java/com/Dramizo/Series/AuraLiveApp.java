@@ -160,6 +160,42 @@ public class AuraLiveApp extends Application {
             }
             @Override public void onActivityResumed(Activity activity) {
                 foregroundActivity = activity;
+                // Keep mandatory updates as a global gate, not a disposable screen.
+                if (!(activity instanceof com.Dramizo.Series.presentation.splash.UpdateActivity)) {
+                    android.content.SharedPreferences gate = getSharedPreferences(
+                            "jeho_mandatory_update_gate", MODE_PRIVATE);
+                    if (gate.getBoolean("active", false)) {
+                        int target = gate.getInt("version_code", 0);
+                        int installed = 0;
+                        try {
+                            if (Build.VERSION.SDK_INT >= 28) {
+                                installed = (int) getPackageManager().getPackageInfo(getPackageName(), 0).getLongVersionCode();
+                            } else {
+                                installed = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+                            }
+                        } catch (Exception ignored) {}
+                        if (target > 0 && installed >= target) {
+                            gate.edit().clear().apply();
+                        } else {
+                            Intent updateGate = new Intent(activity,
+                                    com.Dramizo.Series.presentation.splash.UpdateActivity.class);
+                            updateGate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_FORCE, true);
+                            updateGate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_VERSION_CODE, target);
+                            updateGate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_VERSION_NAME,
+                                    gate.getString("version_name", ""));
+                            updateGate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_URL,
+                                    gate.getString("url", ""));
+                            updateGate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_LINK_TYPE,
+                                    gate.getString("link_type", "auto"));
+                            updateGate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_TITLE,
+                                    gate.getString("title", ""));
+                            updateGate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_MESSAGE,
+                                    gate.getString("message", ""));
+                            updateGate.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                            activity.startActivity(updateGate);
+                        }
+                    }
+                }
                 View decor = activity.getWindow() != null
                         ? activity.getWindow().getDecorView()
                         : null;
