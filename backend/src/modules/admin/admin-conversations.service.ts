@@ -20,8 +20,7 @@ export class AdminConversationsService {
       .leftJoinAndSelect('p.user', 'u')
       .leftJoinAndSelect('u.profile', 'profile')
       .orderBy('c.lastMessageAt', 'DESC', 'NULLS LAST')
-      .addOrderBy('c.updatedAt', 'DESC')
-      .skip(query.skip).take(query.limit || 20);
+      .addOrderBy('c.updatedAt', 'DESC');
 
     const search = String(query.search || query.q || '').trim();
     if (search) {
@@ -48,8 +47,8 @@ export class AdminConversationsService {
       if (!Number.isNaN(d.getTime())) qb.andWhere('c.lastMessageAt <= :to', { to: d });
     }
 
-    const [rows, total] = await qb.getManyAndCount();
-    if (!rows.length) return paginate([], total, query.page || 1, query.limit || 20);
+    const rows = await qb.getMany();
+    if (!rows.length) return paginate([], 0, query.page || 1, query.limit || 20);
 
     const ids = rows.map((c) => c.id);
     const lastIds = rows.map((c) => c.lastMessageId).filter(Boolean) as string[];
@@ -76,7 +75,7 @@ export class AdminConversationsService {
     const unreadById = new Map<string, number>();
     for (const r of unread) unreadById.set(r.conversationId, Number(r.unreadCount || 0));
 
-    return paginate(rows.map((c) => {
+    const mapped = rows.map((c) => {
       const participants = (c.participants || []).map((p) => ({
         id: p.userId,
         username: p.user?.username || null,
@@ -96,8 +95,57 @@ export class AdminConversationsService {
         messageCount: countById.get(c.id) || 0,
         unreadCount: unreadById.get(c.id) || 0,
         createdAt: c.createdAt, updatedAt: c.updatedAt,
+        _sortAt: c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0,
       };
-    }), total, query.page || 1, query.limit || 20);
+    });
+
+    // Legacy duplicate direct threads for the same pair appear as one stable dashboard row.
+    const grouped = new Map<string, any>();
+    for (const item of mapped) {
+      const key = item.type === ConversationType.DIRECT
+        ? 'direct:' + item.participants.map((p: any) => p.id).sort().join(':')
+        : 'group:' + item.id;
+      const prior = grouped.get(key);
+      if (!prior) {
+        grouped.set(key, { ...item, conversationIds: [item.id] });
+        continue;
+      }
+      prior.conversationIds.push(item.id);
+      prior.messageCount += item.messageCount;
+      prior.unreadCount += item.unreadCount;
+      if (item._sortAt > prior._sortAt) {
+        prior.id = item.id;
+        prior.lastMessage = item.lastMessage;
+        prior.lastMessageAt = item.lastMessageAt;
+        prior.updatedAt = item.updatedAt;
+        prior._sortAt = item._sortAt;
+      }
+    }
+    const unique = [...grouped.values()].sort((a, b) => b._sortAt - a._sortAt)
+      .map(({ _sortAt, ...item }) => item);
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(200, Math.max(1, query.limit || 20));
+    return paginate(unique.slice((page - 1) * limit, page * limit), unique.length, page, limit);
+  }
+
+  private async relatedDirectConversationIds(id: string): Promise<string[]> {
+    const conversation = await this.conversations.findOne({
+      where: { id },
+      relations: ['participants'],
+    });
+    if (!conversation) throw new NotFoundException('Conversation not found');
+    if (conversation.type !== ConversationType.DIRECT) return [id];
+    const userIds = [...new Set((conversation.participants || []).map((p) => p.userId))];
+    if (userIds.length !== 2) return [id];
+    const matches = await this.conversations.createQueryBuilder('c')
+      .innerJoin('c.participants', 'p')
+      .where('c.type = :type', { type: ConversationType.DIRECT })
+      .andWhere('p.userId IN (:...userIds)', { userIds })
+      .groupBy('c.id')
+      .having('COUNT(DISTINCT p.userId) = 2')
+      .getMany();
+    const ids = matches.map((item) => item.id);
+    return ids.includes(id) ? ids : [id];
   }
 
   async get(id: string) {
@@ -106,16 +154,18 @@ export class AdminConversationsService {
       relations: ['participants', 'participants.user', 'participants.user.profile'],
     });
     if (!c) throw new NotFoundException('Conversation not found');
+    const conversationIds = await this.relatedDirectConversationIds(id);
 
     const [messageCount, unreadRow] = await Promise.all([
-      this.messages.count({ where: { conversationId: id, isUnsent: false } }),
+      this.messages.createQueryBuilder('m').where('m.conversationId IN (:...conversationIds)', { conversationIds })
+        .andWhere('m.isUnsent = false').getCount(),
       this.participants.createQueryBuilder('p')
         .select('COALESCE(SUM(p.unreadCount), 0)', 'unreadCount')
-        .where('p.conversationId = :id', { id }).getRawOne<{ unreadCount: string }>(),
+        .where('p.conversationId IN (:...conversationIds)', { conversationIds }).getRawOne<{ unreadCount: string }>(),
     ]);
 
     return {
-      id: c.id, type: c.type,
+      id: c.id, conversationIds, type: c.type,
       title: c.type === ConversationType.DIRECT
         ? ((c.participants || []).map((p) => p.user?.displayName || p.user?.username).filter(Boolean).join(' ↔ ') || c.title || 'محادثة مباشرة')
         : (c.title || 'محادثة جماعية'),
@@ -132,13 +182,12 @@ export class AdminConversationsService {
   }
 
   async messagesFor(id: string, query: PaginationDto) {
-    const exists = await this.conversations.exists({ where: { id } });
-    if (!exists) throw new NotFoundException('Conversation not found');
+    const conversationIds = await this.relatedDirectConversationIds(id);
 
     const limit = Math.min(Math.max(query.limit || 50, 1), 100);
     const page = query.page || 1;
     const [newestFirst, total] = await this.messages.findAndCount({
-      where: { conversationId: id, isUnsent: false },
+      where: conversationIds.flatMap((conversationId) => [{ conversationId, isUnsent: false }]),
       relations: ['sender', 'replyTo'],
       skip: (page - 1) * limit,
       take: limit,
