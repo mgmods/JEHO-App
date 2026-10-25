@@ -153,7 +153,7 @@ export class ContestsService implements OnModuleInit, OnModuleDestroy {
   private async expireTimedRoomPkChallenges() {
     const now = new Date();
     const expired = await this.contestsRepo.createQueryBuilder('contest')
-      .where('contest.challengeType IN (:...types)', { types: ['person_vs_person', 'team_vs_team'] })
+      .where('contest.challengeType IN (:...types)', { types: ['person_vs_person', 'team_vs_team', 'room_vs_room'] })
       .andWhere('contest.status = :active', { active: 'active' })
       .andWhere('contest.endAt <= :now', { now })
       .getMany();
@@ -439,13 +439,21 @@ export class ContestsService implements OnModuleInit, OnModuleDestroy {
 
   async endInRoomPkChallenge(userId: string, contestId: string) {
     const contest = await this.contestsRepo.findOne({ where: { id: contestId } });
-    if (!contest || !['person_vs_person', 'team_vs_team'].includes(String(contest.challengeType)) || contest.status !== 'active') {
+    const type = String(contest?.challengeType || '');
+    if (!contest || !['person_vs_person', 'team_vs_team', 'room_vs_room'].includes(type) || contest.status !== 'active') {
       throw new NotFoundException('تحدّي PK النشط غير موجود');
     }
-    const room = contest.roomId ? await this.roomsRepo.findOne({ where: { id: contest.roomId } }) : null;
-    if (!room || (room.hostId !== userId && room.activeHostId !== userId)) {
-      throw new BadRequestException('إنهاء التحدّي متاح لمضيف الروم فقط');
+    let authorized = false;
+    if (type === 'person_vs_person' || type === 'team_vs_team') {
+      const room = contest.roomId ? await this.roomsRepo.findOne({ where: { id: contest.roomId } }) : null;
+      authorized = !!room && (room.hostId === userId || room.activeHostId === userId);
+    } else {
+      // Either participating room's host may end a room-vs-room PK; enforce this on the server.
+      const roomIds = this.roomPkRoomIds(contest);
+      const rooms = await Promise.all(roomIds.map((id) => this.roomsRepo.findOne({ where: { id } })));
+      authorized = rooms.some((room) => !!room && (room.hostId === userId || room.activeHostId === userId));
     }
+    if (!authorized) throw new BadRequestException('إنهاء التحدّي متاح لمضيف أحد الرومين فقط');
     contest.status = 'ended';
     contest.endAt = new Date();
     const saved = await this.contestsRepo.save(contest);
