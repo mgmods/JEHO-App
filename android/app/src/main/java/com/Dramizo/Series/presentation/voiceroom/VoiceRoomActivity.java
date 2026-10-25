@@ -187,6 +187,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     };
     @Nullable private TextView roomPkActionButton;
+    @Nullable private TextView roomPkEndButton;
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -3456,6 +3457,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         ActiveRoomSession.get().setMinimized(true);
         ensuringRoomKeepAlive(true);
         ensureMinimizedListeningState();
+        // Snapshot after background mute: keep the occupied seat/session while restoring muted state.
+        captureActiveRoomSession();
+        ActiveRoomSession.get().setMicOn(false);
         // Handoff: fade Exo to FGS, keep Zego local music alive, then leave UI.
         try {
             if (roomMusicPlayer != null
@@ -12945,11 +12949,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (roomId == null || roomId.isEmpty() || !isOwner) {
             Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show(); return;
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("اختيار نوع تحدّي PK")
+        androidx.appcompat.app.AlertDialog chooser = new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("اختيار نوع تحدّي PK")
             .setItems(new String[]{"🔴 شخص ضد شخص", "⚔ فريق ضد فريق", "🏠 روم ضد روم"}, (d, which) -> {
                 if (which == 2) showRoomVsRoomPkChallengeDialog();
                 else showInRoomPkSetup(which == 0 ? "person_vs_person" : "team_vs_team");
-            }).setNegativeButton("إلغاء", null).show();
+            }).setNegativeButton("إلغاء", null).create();
+        chooser.show();
+        makeRoomPkDialogCompactDraggable(chooser);
     }
 
     private void showInRoomPkSetup(String type) {
@@ -12981,7 +12987,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             cb.setOnCheckedChangeListener((v,on)->{ if(on){ if(aIds.contains(uid)||bIds.contains(uid)||("person_vs_person".equals(type)&&!bIds.isEmpty())){v.setChecked(false);return;} bIds.add(uid);ca.setEnabled(false);}else{bIds.remove(uid);ca.setEnabled(true);} });
             la.addView(ca); lb.addView(cb);
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("إعداد تحدّي PK").setView(scroll)
+        scroll.setLayoutParams(new android.view.ViewGroup.LayoutParams(-1,
+                Math.min(dp(420), Math.max(dp(260), getResources().getDisplayMetrics().heightPixels * 2 / 3))));
+        androidx.appcompat.app.AlertDialog setupDialog = new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("إعداد تحدّي PK").setView(scroll)
             .setNegativeButton("إلغاء",null).setPositiveButton("بدء التحدّي",(d,w)->{
                 if(aIds.isEmpty()||bIds.isEmpty()){Toast.makeText(this,"اختر مشاركاً لكل فريق",Toast.LENGTH_LONG).show();return;}
                 java.util.Map<String,Object> body=new java.util.HashMap<>(); body.put("roomId",roomId);body.put("challengeType",type);
@@ -12996,7 +13004,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                     @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call,Throwable e){Toast.makeText(VoiceRoomActivity.this,"تعذّر الاتصال لبدء التحدّي",Toast.LENGTH_LONG).show();}
                 });
-            }).show();
+            }).create();
+        setupDialog.show();
+        makeRoomPkDialogCompactDraggable(setupDialog);
     }
 
     private void showRoomVsRoomPkChallengeDialog() {
@@ -13231,6 +13241,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             });
         });
         dialog.show();
+        makeRoomPkDialogCompactDraggable(dialog, hero);
     }
 
     private GradientDrawable roomPkRoundedBackground(int fill, int stroke, int radiusDp) {
@@ -13628,6 +13639,71 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return android.text.TextUtils.join(" · ", names);
     }
 
+    private void confirmEndInRoomPk() {
+        if (!isOwner || roomPkCurrentContestId == null || roomPkCurrentContestId.trim().isEmpty()
+                || "pending".equals(roomPkCurrentContestId) || !roomPkInRoomChallenge) {
+            Toast.makeText(this, "إنهاء التحدّي متاح لمضيف الروم أثناء تحدّي نشط فقط", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("إنهاء تحدّي PK")
+                .setMessage("سيتم إيقاف احتساب النقاط وتثبيت النتيجة الحالية وإظهار الفائز. هل تريد الإنهاء الآن؟")
+                .setNegativeButton("متابعة التحدّي", null)
+                .setPositiveButton("إنهاء وتثبيت النتيجة", (d, w) -> {
+                    final String contestId = roomPkCurrentContestId;
+                    roomPkAutoEndRequested = true;
+                    if (roomPkEndButton != null) { roomPkEndButton.setEnabled(false); roomPkEndButton.setText("جارٍ الإنهاء…"); }
+                    ContainerProvider.from(VoiceRoomActivity.this).getContestsApi().endInRoomPk(contestId)
+                            .enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+                                @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call, retrofit2.Response<ApiResponse<Object>> response) {
+                                    if (!response.isSuccessful() || response.body() == null || !response.body().success) {
+                                        roomPkAutoEndRequested = false;
+                                        if (roomPkEndButton != null) { roomPkEndButton.setEnabled(true); roomPkEndButton.setText("إنهاء التحدّي  ×"); }
+                                        Toast.makeText(VoiceRoomActivity.this, response.body() != null && response.body().message != null ? response.body().message : "تعذّر إنهاء التحدّي", Toast.LENGTH_LONG).show();
+                                        return;
+                                    }
+                                    Toast.makeText(VoiceRoomActivity.this, "تم إنهاء التحدّي وتثبيت النتيجة", Toast.LENGTH_SHORT).show();
+                                    handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 250L);
+                                }
+                                @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                                    roomPkAutoEndRequested = false;
+                                    if (roomPkEndButton != null) { roomPkEndButton.setEnabled(true); roomPkEndButton.setText("إنهاء التحدّي  ×"); }
+                                    Toast.makeText(VoiceRoomActivity.this, "تعذّر الاتصال لإنهاء التحدّي", Toast.LENGTH_LONG).show();
+                                }
+                            });
+                }).show();
+    }
+
+    private void makeRoomPkDialogCompactDraggable(android.app.Dialog dialog) {
+        makeRoomPkDialogCompactDraggable(dialog, dialog != null ? dialog.findViewById(androidx.appcompat.R.id.alertTitle) : null);
+    }
+
+    private void makeRoomPkDialogCompactDraggable(android.app.Dialog dialog, @Nullable View dragHandle) {
+        if (dialog == null || dialog.getWindow() == null) return;
+        android.view.Window window = dialog.getWindow();
+        int width = Math.max(dp(260), Math.min(getResources().getDisplayMetrics().widthPixels - dp(32), dp(440)));
+        window.setLayout(width, android.view.WindowManager.LayoutParams.WRAP_CONTENT);
+        window.setBackgroundDrawableResource(android.R.color.transparent);
+        window.setGravity(Gravity.TOP | Gravity.START);
+        android.view.WindowManager.LayoutParams attrs = window.getAttributes(); attrs.x = dp(16); attrs.y = dp(72); window.setAttributes(attrs);
+        if (dragHandle == null) return;
+        dragHandle.setOnTouchListener(new View.OnTouchListener() {
+            private float downX, downY; private int startX, startY;
+            @Override public boolean onTouch(View v, android.view.MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        android.view.WindowManager.LayoutParams p = window.getAttributes(); downX = event.getRawX(); downY = event.getRawY(); startX = p.x; startY = p.y; return true;
+                    case android.view.MotionEvent.ACTION_MOVE:
+                        android.view.WindowManager.LayoutParams move = window.getAttributes();
+                        move.x = Math.max(0, Math.min(Math.max(0, getResources().getDisplayMetrics().widthPixels - width), startX + Math.round(event.getRawX() - downX)));
+                        move.y = Math.max(dp(24), Math.min(Math.max(dp(24), getResources().getDisplayMetrics().heightPixels - dp(100)), startY + Math.round(event.getRawY() - downY)));
+                        window.setAttributes(move); return true;
+                    case android.view.MotionEvent.ACTION_UP: case android.view.MotionEvent.ACTION_CANCEL: return true;
+                    default: return false;
+                }
+            }
+        });
+    }
+
     private void showRoomPkScoreBanner(String event, @Nullable JsonObject payload) {
         if (payload == null || binding == null) return;
         JsonObject sideA = payload.has("sideA") && payload.get("sideA").isJsonObject()
@@ -13670,6 +13746,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             panel.addView(roomPkScoreBanner, new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                     android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            roomPkEndButton = new TextView(this);
+            roomPkEndButton.setText("إنهاء التحدّي  ×");
+            roomPkEndButton.setTextColor(Color.WHITE);
+            roomPkEndButton.setTextSize(11f);
+            roomPkEndButton.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            roomPkEndButton.setGravity(Gravity.CENTER);
+            roomPkEndButton.setPadding(dp(12), dp(7), dp(12), dp(7));
+            roomPkEndButton.setBackground(roundRoomPkDrawable(0xFFB91C3B, 0xFFFF8297, 18));
+            android.widget.LinearLayout.LayoutParams endButtonLp = new android.widget.LinearLayout.LayoutParams(-2, -2);
+            endButtonLp.gravity = Gravity.CENTER;
+            endButtonLp.bottomMargin = dp(7);
+            panel.addView(roomPkEndButton, endButtonLp);
+            roomPkEndButton.setOnClickListener(v -> confirmEndInRoomPk());
 
             android.widget.LinearLayout teams = new android.widget.LinearLayout(this);
             teams.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -13791,6 +13880,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         roomPkProgressB.setLayoutParams(progressB);
 
         roomPkScoreBanner.setVisibility(View.VISIBLE);
+        if (roomPkEndButton != null) {
+            roomPkEndButton.setVisibility(!ended && inRoomBattle && isOwner ? View.VISIBLE : View.GONE);
+            roomPkEndButton.setEnabled(!roomPkAutoEndRequested);
+        }
         roomPkSplitContainer.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideRoomPkScoreBanner);
         handler.removeCallbacks(updateRoomPkBannerClock);
