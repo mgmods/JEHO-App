@@ -52,6 +52,7 @@ public final class RoomDtos {
         @SerializedName("charmEnabled") public boolean charmEnabled = true;
         @SerializedName("bannerEnabled") public boolean bannerEnabled = true;
         @SerializedName("micInteractEnabled") public boolean micInteractEnabled = true;
+        @SerializedName("micRequestEnabled") public boolean micRequestEnabled = false;
         @SerializedName("entryEffectsEnabled") public boolean entryEffectsEnabled = true;
         @SerializedName("lowGiftEffectsEnabled") public boolean lowGiftEffectsEnabled = true;
         /** Server stamp of last full public-chat wipe (ISO-8601). */
