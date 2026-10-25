@@ -801,7 +801,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Host / owner can sit freely and hop seats. Guests already on mic can hop;
                 // first seat requires host approval unless dashboard enables free mic.
                 boolean freeMic = isFreeMicEnabled();
-                boolean canHop = isHost || isOwner || isOnSeat(currentSeats) || freeMic;
+                boolean canHop = isHost || isOwner || canInviteMic || canManageSeats || isOnSeat(currentSeats)
+                        || (freeMic && !isMicRequestEnabled());
                 if (!PermissionHelper.hasAudioPermission(VoiceRoomActivity.this)) {
                     PermissionHelper.ensureMediaPermissions(VoiceRoomActivity.this, false);
                     Toast.makeText(VoiceRoomActivity.this, "فعّل إذن الميكروفون أولاً", Toast.LENGTH_LONG).show();
@@ -3619,6 +3620,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 RoomDtos.RoomDto room = viewModel.getRoom().getValue();
                 return room == null || room.micInteractEnabled;
             }
+            @Override public boolean micRequestOn() {
+                RoomDtos.RoomDto room = viewModel.getRoom().getValue();
+                return room != null && room.micRequestEnabled;
+            }
             @Override public boolean roomSpeakerMuted() { return roomSpeakerMuted; }
             @Override public boolean canControlMusic() {
                 return canManageMusic || isHost || isOwner || isRoomStaff();
@@ -3627,7 +3632,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 return canManageRoom || isHost || isOwner;
             }
             @Override public boolean canReviewSeatRequests() {
-                return canInviteMic && !isFreeMicEnabled();
+                return canInviteMic && (!isFreeMicEnabled() || isMicRequestEnabled());
             }
             @Override public int chatAutoClearMinutes() {
                 RoomDtos.RoomDto room = viewModel.getRoom().getValue();
@@ -3656,7 +3661,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "seat_requests":
-                if (canInviteMic && !isFreeMicEnabled()) showSeatRequestsDialog();
+                if (canInviteMic && (!isFreeMicEnabled() || isMicRequestEnabled())) showSeatRequestsDialog();
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "lock":
@@ -3749,6 +3754,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (isOwner || isHost) showModeratorTools();
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
+            case "mic_request": {
+                if (!isOwner) {
+                    Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                RoomDtos.RoomDto r = viewModel.getRoom().getValue();
+                boolean next = !(r != null && r.micRequestEnabled);
+                if (r != null) r.micRequestEnabled = next;
+                patchDisplaySetting("micRequestEnabled", next);
+                Toast.makeText(this, withOnOff(R.string.room_more_mic_request, next), Toast.LENGTH_SHORT).show();
+                break;
+            }
             case "mic_interact": {
                 if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
@@ -4279,6 +4296,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean roomMicInteractEnabled() {
         RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
         return room == null || room.micInteractEnabled;
+    }
+
+    private boolean isMicRequestEnabled() {
+        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
+        return room != null && room.micRequestEnabled;
     }
 
     private boolean roomEntryEffectsEnabled() {
@@ -8709,7 +8731,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.llMusicLibraryChip.setVisibility(View.GONE);
         }
         // Keep request list warm so tools / host dialogs stay current.
-        if (canInviteMic && !isFreeMicEnabled() && roomId != null) {
+        if (canInviteMic && (!isFreeMicEnabled() || isMicRequestEnabled()) && roomId != null) {
             viewModel.loadSeatRequests(roomId);
         } else {
             updateSeatRequestBadge(null);
@@ -12235,7 +12257,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void takeEmptySeat(int seatIndex) {
         // Authorized staff can move seats even while already seated.
         boolean freeMic = isFreeMicEnabled();
-        boolean canHop = isHost || isOwner || isOnSeat(currentSeats) || freeMic;
+        boolean canHop = isHost || isOwner || canInviteMic || canManageSeats || isOnSeat(currentSeats)
+                        || (freeMic && !isMicRequestEnabled());
         if (!PermissionHelper.hasAudioPermission(VoiceRoomActivity.this)) {
             PermissionHelper.ensureMediaPermissions(VoiceRoomActivity.this, false);
             Toast.makeText(VoiceRoomActivity.this, "فعّل إذن الميكروفون أولاً", Toast.LENGTH_LONG).show();
@@ -14513,6 +14536,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 cur.charmEnabled = memberBool(payload, "charmEnabled", cur.charmEnabled);
                 cur.bannerEnabled = memberBool(payload, "bannerEnabled", cur.bannerEnabled);
                 cur.micInteractEnabled = memberBool(payload, "micInteractEnabled", cur.micInteractEnabled);
+                cur.micRequestEnabled = memberBool(payload, "micRequestEnabled", cur.micRequestEnabled);
                 cur.entryEffectsEnabled = memberBool(payload, "entryEffectsEnabled", cur.entryEffectsEnabled);
                 cur.lowGiftEffectsEnabled = memberBool(payload, "lowGiftEffectsEnabled", cur.lowGiftEffectsEnabled);
                 applyRoomDisplaySettings(cur);
@@ -14680,8 +14704,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 hopToNextRoomOrExit("تم إغلاق الغرفة");
             }
         } else if ("room:hand_raised".equals(event)) {
-            if (isFreeMicEnabled()) {
-                // Free mic: ignore raise-hand queue noise.
+            if (isFreeMicEnabled() && !isMicRequestEnabled()) {
+                // Free mic only ignores requests when the owner has not enabled the request gate.
                 return;
             }
             String name = memberStr(payload, "displayName");
