@@ -114,27 +114,106 @@
             android:layout_centerVertical="true" />
     </RelativeLayout>
 
-    <RelativeLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="55dp"
-        android:layout_marginTop="1dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
         android:background="@color/white"
-        android:paddingHorizontal="16dp">
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="استقبال الرسائل الخاصة"
+                    android:textColor="#FF222222"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="أوقفه لمنع استقبال أي رسالة خاصة"
+                    android:textColor="#FF777777"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchDmEnabled"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="12dp"
-            android:text="@string/setting_only_recv_friend_msg"
-            android:textColor="#FF333333"
-            android:textSize="16sp" />
+            android:layout_marginTop="18dp"
+            android:text="من يمكنه مراسلتك؟"
+            android:textColor="#FF222222"
+            android:textSize="15sp"
+            android:textStyle="bold" />
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/switchFriendsOnly"
-            android:layout_width="wrap_content"
+        <RadioGroup
+            android:id="@+id/radioDmAudience"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true" />
-    </RelativeLayout>
+            android:layout_marginTop="6dp"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/radioDmEveryone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:buttonTint="#FF168A62"
+                android:text="الكل"
+                android:textColor="#FF333333" />
+
+            <RadioButton
+                android:id="@+id/radioDmFollowers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:buttonTint="#FF168A62"
+                android:text="المتابعون لك"
+                android:textColor="#FF333333" />
+
+            <RadioButton
+                android:id="@+id/radioDmFriends"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:buttonTint="#FF168A62"
+                android:text="الأصدقاء الذين تتابعهم"
+                android:textColor="#FF333333" />
+
+            <RadioButton
+                android:id="@+id/radioDmNobody"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:buttonTint="#FF168A62"
+                android:text="لا أحد"
+                android:textColor="#FF333333" />
+        </RadioGroup>
+
+        <TextView
+            android:id="@+id/textDmPrivacyStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="يتم حفظ الإعداد على حسابك"
+            android:textColor="#FF168A62"
+            android:textSize="12sp" />
+    </LinearLayout>
 </LinearLayout>
