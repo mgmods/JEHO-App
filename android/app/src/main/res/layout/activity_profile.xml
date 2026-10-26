@@ -140,9 +140,11 @@
 
                     <LinearLayout
                         android:id="@+id/rowProfileCp"
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="120dp"
-                        android:gravity="center"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="12dp"
+                        android:gravity="start|center_vertical"
                         android:orientation="horizontal"
                         android:layoutDirection="rtl"
                         android:padding="0dp"
@@ -166,8 +168,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpSelfFrame"
-                                android:layout_width="116dp"
-                                android:layout_height="116dp"
+                                android:layout_width="108dp"
+                                android:layout_height="108dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
