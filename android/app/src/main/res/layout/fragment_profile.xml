@@ -1463,7 +1463,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="🕵️ الرجل الغامض"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="#FF22243A"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                         <TextView
@@ -1472,7 +1472,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="3dp"
                             android:text="إخفاء هويتك داخل الغرف"
-                            android:textColor="#B3FFFFFF"
+                            android:textColor="#FF777487"
                             android:textSize="11sp" />
                     </LinearLayout>
                     <Switch
