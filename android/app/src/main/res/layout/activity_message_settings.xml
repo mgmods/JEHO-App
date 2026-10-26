@@ -4,16 +4,17 @@
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_home_full_gradient"
+    android:background="#FFFFFFFF"
     android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="#FFFFF0D1"
+        android:layout_height="58dp"
+        android:background="#FFFFFFFF"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="4dp">
+        android:paddingHorizontal="8dp"
+        android:elevation="2dp">
 
         <ImageView
             android:id="@+id/btnBack"
@@ -43,7 +44,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingHorizontal="16dp"
-        android:paddingTop="16dp"
+        android:paddingTop="18dp"
         android:paddingBottom="8dp"
         android:text="@string/consult_message_setting"
         android:textColor="#FF333333"
@@ -53,7 +54,9 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="55dp"
-        android:background="@color/white"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:background="@drawable/bg_settings_row"
         android:paddingHorizontal="16dp">
 
         <TextView
@@ -76,8 +79,10 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="1dp"
-        android:background="@color/white"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_settings_row"
         android:minHeight="55dp"
         android:paddingHorizontal="16dp"
         android:paddingVertical="8dp">
@@ -117,8 +122,10 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
         android:layout_marginTop="12dp"
-        android:background="@color/white"
+        android:background="@drawable/bg_settings_row"
         android:orientation="vertical"
         android:paddingHorizontal="16dp"
         android:paddingVertical="14dp">
