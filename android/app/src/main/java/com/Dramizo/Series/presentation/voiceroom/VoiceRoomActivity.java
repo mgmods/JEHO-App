@@ -393,6 +393,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int realtimeJoinAttempts;
     /** True when this Activity instance restored UI from {@link ActiveRoomSession}. */
     private boolean resumedFromActiveSession;
+    /** Seat roster captured before restore; protects the live mic from a transient empty refresh. */
+    @Nullable private List<RoomDtos.SeatDto> restoreSeatSnapshot;
     private final Runnable retryRealtimeJoinRunnable = () -> {
         if (exiting || isFinishing() || roomId == null) return;
         connectRealtimeRoom();
@@ -1342,6 +1344,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // remains live. Do not interpret an omitted field as an authoritative empty roster:
             // that made restore treat everyone as off-mic and hide the original seat positions.
             List<RoomDtos.SeatDto> seats = room.seats;
+            if (resumedFromActiveSession && seats != null && seats.isEmpty()
+                    && restoreSeatSnapshot != null && isOnSeat(restoreSeatSnapshot)) {
+                // A refresh immediately after restoring can return an empty array while the
+                // server/session is catching up. Do not turn that transient snapshot into a
+                // local leave: doing so stops publishing and drops the user from the saved seats.
+                seats = new ArrayList<>(restoreSeatSnapshot);
+                room.seats = seats;
+            } else if (resumedFromActiveSession && seats != null && !seats.isEmpty()) {
+                // A non-empty server roster is authoritative, including a roster without us.
+                restoreSeatSnapshot = null;
+            }
             if (seats == null && resumedFromActiveSession) {
                 RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
                 if (cachedRoom != null && cachedRoom.seats != null) {
@@ -1703,6 +1716,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             micOn = ars.isMicOn();
         }
         roomSpeakerMuted = ars.isSpeakerMuted();
+        // Preserve the pre-restore roster separately: the next HTTP refresh must not erase
+        // the only good copy before we can decide whether an empty response is transient.
+        RoomDtos.RoomDto cachedRoom = ars.latestRoom();
+        restoreSeatSnapshot = cachedRoom != null && cachedRoom.seats != null
+                && isOnSeat(cachedRoom.seats)
+                ? new ArrayList<>(cachedRoom.seats) : null;
         // Zego already logged in — do not call loginRoom again.
         zegoLoggedIn = true;
         realtimeJoined = RealtimeClient.getInstance().isJoinedRoom(roomId);
@@ -14936,6 +14955,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     && !payload.get("forced").isJsonNull()
                     && payload.get("forced").getAsBoolean();
             if (myUserId != null && sameUser(myUserId, leftId)) {
+                // This is an explicit server seat-left event, unlike an empty refresh snapshot.
+                restoreSeatSnapshot = null;
                 micOn = false;
                 userChoseMute = false;
                 RoomRtcEngine.getInstance().setMicEnabled(false);
