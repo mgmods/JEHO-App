@@ -685,6 +685,7 @@ export class UsersService {
         : user.profile?.vipBadgeUrl ?? null,
       levelBadgeUrl: user.profile?.levelBadgeUrl ?? null,
       hostBadgeUrl: user.profile?.hostBadgeUrl ?? null,
+      displayedMedalIds: user.profile?.displayedMedalIds ?? [],
       country: user.profile?.country ?? null,
       followersCount: user.profile?.followersCount ?? 0,
       followingCount: user.profile?.followingCount ?? 0,
