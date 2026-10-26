@@ -28,6 +28,7 @@ import { TasksService } from '../tasks/tasks.service';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
 import { Follow } from '../../database/entities/follow.entity';
+import { SocialRequest, SocialRequestStatus, SocialRequestType } from '../../database/entities/social-request.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
@@ -81,6 +82,37 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
   private directKey(a: string, b: string) {
     return [a, b].sort().join(':');
+  }
+
+  /** Enforce the recipient's persisted DM privacy policy on every entry/send. */
+  private async assertDirectMessageAllowed(senderId: string, recipientId: string) {
+    const profile = await this.profilesRepo.findOne({ where: { userId: recipientId } });
+    if (!profile) return; // Preserve access for legacy accounts without a profile row.
+    const audience = String(profile.dmAudience || 'everyone').toLowerCase();
+    if (profile.dmEnabled === false || audience === 'nobody') {
+      throw new ForbiddenException({
+        code: 'DM_PRIVACY_CLOSED',
+        message: 'هذا المستخدم لا يستقبل رسائل خاصة حالياً',
+      });
+    }
+    if (audience === 'everyone') return;
+
+    const follows = await this.dataSource.query(
+      'SELECT 1 FROM follows WHERE "followerId" = $1 AND "followingId" = $2 LIMIT 1',
+      [senderId, recipientId],
+    );
+    if (audience === 'followers') {
+      if (Array.isArray(follows) && follows.length) return;
+      throw new ForbiddenException({ code: 'DM_PRIVACY_FOLLOWERS', message: 'يمكن لمتابعي هذا المستخدم فقط مراسلته' });
+    }
+    if (audience === 'friends') {
+      const friendship = await this.dataSource.query(
+        'SELECT 1 FROM social_requests WHERE type = $3 AND status = $4 AND (("fromUserId" = $1 AND "toUserId" = $2) OR ("fromUserId" = $2 AND "toUserId" = $1)) LIMIT 1',
+        [senderId, recipientId, SocialRequestType.FRIEND, SocialRequestStatus.ACCEPTED],
+      );
+      if (Array.isArray(friendship) && friendship.length && Array.isArray(follows) && follows.length) return;
+      throw new ForbiddenException({ code: 'DM_PRIVACY_FRIENDS', message: 'يمكن للأصدقاء الذين تتابعهم فقط مراسلة هذا المستخدم' });
+    }
   }
 
   private async paidMessageConfig() {
@@ -291,6 +323,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       ],
     });
     if (blocked) throw new ForbiddenException('Unable to message this user');
+    await this.assertDirectMessageAllowed(userId, dto.peerId);
 
     const key = this.directKey(userId, dto.peerId);
     let conv = await this.convRepo.findOne({
@@ -476,6 +509,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
   async send(conversationId: string, senderId: string, dto: SendMessageDto) {
     await this.getConversation(conversationId, senderId);
+    const dmConversation = await this.convRepo.findOne({ where: { id: conversationId } });
+    if (dmConversation?.type === ConversationType.DIRECT) {
+      const participants = await this.partRepo.find({ where: { conversationId } });
+      const recipient = participants.find((participant) => participant.userId !== senderId);
+      if (recipient?.userId) await this.assertDirectMessageAllowed(senderId, recipient.userId);
+    }
     if (!dto.content && !dto.media && !dto.forwardFromId) {
       throw new BadRequestException('Message content required');
     }
