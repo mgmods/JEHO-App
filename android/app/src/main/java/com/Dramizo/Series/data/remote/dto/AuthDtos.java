@@ -168,6 +168,8 @@ public final class AuthDtos {
         @SerializedName("albumUrls") public java.util.List<String> albumUrls;
         @SerializedName("showOnlineStatus") public Boolean showOnlineStatus;
         @SerializedName("allowDmFromStrangers") public Boolean allowDmFromStrangers;
+        @SerializedName("dmEnabled") public Boolean dmEnabled;
+        @SerializedName("dmAudience") public String dmAudience;
         @SerializedName("dmGiftGateEnabled") public Boolean dmGiftGateEnabled;
         @SerializedName("dmRequiredGiftId") public String dmRequiredGiftId;
         @SerializedName("lastSeenAt") public String lastSeenAt;
