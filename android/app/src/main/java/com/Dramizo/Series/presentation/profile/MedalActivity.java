@@ -25,6 +25,9 @@ import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import android.widget.Toast;
 
 import retrofit2.Response;
 
@@ -40,6 +43,9 @@ public class MedalActivity extends ThemedActivity {
     private final List<MedalRow> catalog = new ArrayList<>();
     private final List<MedalRow> mine = new ArrayList<>();
     private boolean showingMine;
+    private String profileUserId;
+    private boolean ownCabinet;
+    private final Set<String> selectedKeys = new HashSet<>();
 
     @Override
     protected boolean wantsRemoteThemeChrome() {
@@ -117,7 +123,9 @@ public class MedalActivity extends ThemedActivity {
                     // Fall back to the signed-in user's profile only if this is their own cabinet.
                 }
             }
-            final String profileUserId = profileUser != null ? profileUser.id : null;
+            final String resolvedProfileUserId = profileUser != null ? profileUser.id : null;
+            final List<String> savedSelection = profileUser != null && profileUser.displayedMedalIds != null ? new ArrayList<>(profileUser.displayedMedalIds) : new ArrayList<>();
+            final boolean canEdit = me != null && me.id != null && me.id.equals(resolvedProfileUserId);
             int myVip = profileUser != null ? Math.max(0, Math.min(MAX_VIP, profileUser.vipLevel)) : 0;
 
             Result<MiscDtos.VipPlanList> plans = c.getVipPlansUseCase.execute();
@@ -144,19 +152,19 @@ public class MedalActivity extends ThemedActivity {
             // Dashboard-awarded achievement badges are also medals, not just VIP cosmetics.
             // Keep the VIP rows intact and merge real badge ownership from the same API
             // used by the profile page and badge notification.
-            if (profileUserId != null && !profileUserId.trim().isEmpty()) {
+            if (resolvedProfileUserId != null && !resolvedProfileUserId.trim().isEmpty()) {
                 try {
                     Response<ApiResponse<List<BadgeDto>>> response =
-                            c.getUserApi().badges(profileUserId).execute();
+                            c.getUserApi().badges(resolvedProfileUserId).execute();
                     if (response.isSuccessful() && response.body() != null
                             && response.body().data != null) {
-                        int badgeIndex = 0;
                         for (BadgeDto badge : response.body().data) {
                             if (badge == null || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
                             MedalRow row = toRow(
                                     badge.name,
-                                    1000 + badgeIndex++,
+                                    1000,
                                     badge.imageUrl);
+                            row.key = badge.id != null && !badge.id.trim().isEmpty() ? badge.id : "badge:" + row.title;
                             all.add(row);
                             if (badge.earned) owned.add(row);
                         }
@@ -176,11 +184,16 @@ public class MedalActivity extends ThemedActivity {
                     }
                 }
                 if (current == null) current = toRow(null, myVip, null);
+                current.key = "vip:" + myVip;
                 owned.add(current);
             }
 
             runOnUiThread(() -> {
                 if (isFinishing()) return;
+                profileUserId = resolvedProfileUserId;
+                ownCabinet = canEdit;
+                selectedKeys.clear();
+                selectedKeys.addAll(savedSelection);
                 catalog.clear();
                 catalog.addAll(all);
                 mine.clear();
@@ -193,6 +206,7 @@ public class MedalActivity extends ThemedActivity {
     private MedalRow toRow(String name, int level, String badgeUrl) {
         MedalRow row = new MedalRow();
         row.level = level;
+        row.key = "vip:" + level;
         row.title = name != null && !name.isEmpty()
                 ? name : getString(R.string.medal_vip_tier, level);
         if (badgeUrl != null && !badgeUrl.isEmpty()) {
@@ -203,6 +217,35 @@ public class MedalActivity extends ThemedActivity {
         return row;
     }
 
+
+    private void saveSelection() {
+        if (!ownCabinet || profileUserId == null) return;
+        List<String> snapshot = new ArrayList<>(selectedKeys);
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                MiscDtos.UpdateProfileRequest request = new MiscDtos.UpdateProfileRequest();
+                request.displayedMedalIds = snapshot;
+                Response<ApiResponse<AuthDtos.UserDto>> response = c.getUserApi().updateProfile(request).execute();
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (response.isSuccessful() && response.body() != null && response.body().data != null) {
+                        Toast.makeText(this, "تم حفظ الميداليات المختارة", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, "تعذر حفظ الاختيار، حاول مجدداً", Toast.LENGTH_SHORT).show();
+                        loadMedals();
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    Toast.makeText(this, "تعذر الاتصال لحفظ الميداليات", Toast.LENGTH_SHORT).show();
+                    loadMedals();
+                });
+            }
+        });
+    }
+
     private List<MedalRow> currentRows() {
         return showingMine ? mine : catalog;
     }
@@ -211,6 +254,7 @@ public class MedalActivity extends ThemedActivity {
         int level;
         String title;
         String iconUrl;
+        String key;
     }
 
     private final class Adapter extends RecyclerView.Adapter<Adapter.VH> {
@@ -232,6 +276,25 @@ public class MedalActivity extends ThemedActivity {
                     .placeholder(R.drawable.ic_medal_default)
                     .error(R.drawable.ic_medal_default)
                     .into(h.icon);
+            boolean selected = selectedKeys.contains(row.key);
+            h.itemView.setAlpha(selected ? 1f : 0.92f);
+            h.itemView.setOnClickListener(v -> {
+                if (!showingMine || !ownCabinet) {
+                    if (!ownCabinet) Toast.makeText(MedalActivity.this, "يمكن لصاحب الحساب اختيار ميدالياته فقط", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (row.key == null || row.key.trim().isEmpty()) return;
+                if (selectedKeys.contains(row.key)) selectedKeys.remove(row.key);
+                else {
+                    if (selectedKeys.size() >= 5) {
+                        Toast.makeText(MedalActivity.this, "يمكنك عرض 5 ميداليات كحد أقصى", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    selectedKeys.add(row.key);
+                }
+                saveSelection();
+                notifyDataSetChanged();
+            });
         }
 
         @Override
