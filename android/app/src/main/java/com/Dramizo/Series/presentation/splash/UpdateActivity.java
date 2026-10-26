@@ -172,7 +172,6 @@ public final class UpdateActivity extends Activity {
         GradientDrawable arrowBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{Color.rgb(38, 207, 160), mint});
         arrowBg.setShape(GradientDrawable.OVAL);
-        arrowBg.setShadowLayer(dp(12), 0, dp(5), 0x3032B995);
         arrow.setBackground(arrowBg);
         android.widget.FrameLayout.LayoutParams arrowParams =
                 new android.widget.FrameLayout.LayoutParams(dp(68), dp(68), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
