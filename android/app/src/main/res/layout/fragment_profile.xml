@@ -901,10 +901,10 @@
                     <TextView
                         android:layout_width="42dp"
                         android:layout_height="42dp"
-                        android:background="#FF251B3A"
+                        android:background="#FFF1ECFF"
                         android:gravity="center"
                         android:text="Lv"
-                        android:textColor="#FFC7A0FF"
+                        android:textColor="#FF6B4CC2"
                         android:textSize="16sp"
                         android:textStyle="bold" />
                     <LinearLayout
