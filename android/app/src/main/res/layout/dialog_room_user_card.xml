@@ -55,7 +55,7 @@
             android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:elevation="4dp"
             android:scaleType="centerCrop" android:src="@drawable/ic_tab_me"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
-            app:strokeColor="#FFFFFFFF" app:strokeWidth="3dp" />
+            app:strokeColor="#FFF7F3FFFF" app:strokeWidth="3dp" />
         <ImageView android:id="@+id/imgUserFrame" android:layout_width="92dp" android:layout_height="92dp"
             android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:scaleType="fitCenter" android:visibility="gone" />
         <com.Dramizo.Series.util.HostSignalView android:id="@+id/userCardHostSignal" android:layout_width="92dp"
@@ -70,7 +70,7 @@
             <com.google.android.material.imageview.ShapeableImageView android:id="@+id/imgCpPartnerTop"
                 android:layout_width="match_parent" android:layout_height="match_parent" android:elevation="3dp"
                 android:scaleType="centerCrop" app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
-                app:strokeColor="#FFFFFFFF" app:strokeWidth="2dp" />
+                app:strokeColor="#FFF7F3FFFF" app:strokeWidth="2dp" />
             <ImageView android:id="@+id/imgCpPartnerTopFrame" android:layout_width="match_parent" android:layout_height="match_parent"
                 android:contentDescription="@null" android:scaleType="fitXY" android:visibility="gone" />
         </FrameLayout>
@@ -100,7 +100,7 @@
             android:ellipsize="end"
             android:maxWidth="180dp"
             android:maxLines="1"
-            android:textColor="#292344"
+            android:textColor="#FFF7F3FF"
             android:textSize="18sp"
             android:textStyle="bold"
             tools:text="عمار" />
@@ -148,7 +148,7 @@
             android:id="@+id/tvUserId"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#77738C"
+            android:textColor="#FFBDB5D2"
             android:textSize="14sp"
             android:visibility="gone"
             tools:text="ID:5764421"
@@ -182,7 +182,7 @@
             android:background="@drawable/bg_user_card_id_chip"
             android:paddingHorizontal="10dp"
             android:paddingVertical="3dp"
-            android:textColor="#5C43A5"
+            android:textColor="#FFD5B0FF"
             android:textSize="11sp"
             android:textStyle="bold"
             tools:text="30" />
@@ -218,7 +218,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#292344"
+                android:textColor="#FFF7F3FF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -227,7 +227,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_stat_following"
-                android:textColor="#77738C"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -247,7 +247,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#292344"
+                android:textColor="#FFF7F3FF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -256,7 +256,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_stat_fans"
-                android:textColor="#77738C"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -276,7 +276,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#292344"
+                android:textColor="#FFF7F3FF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -285,7 +285,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_stat_visitors"
-                android:textColor="#77738C"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
@@ -480,7 +480,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="#FFFFFF"
+                android:textColor="#FFF7F3FF"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 tools:text="الوكالة" />
@@ -491,7 +491,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="#77738C"
+                android:textColor="#FFBDB5D2"
                 android:textSize="12sp"
                 tools:text="GID:1895" />
         </LinearLayout>
@@ -511,7 +511,7 @@
         android:layout_marginHorizontal="16dp"
         android:layout_marginTop="12dp"
         android:text="@string/user_card_property_title"
-        android:textColor="#77738C"
+        android:textColor="#FFBDB5D2"
         android:textSize="12sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
@@ -554,7 +554,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="@string/user_card_prop_family"
-                android:textColor="#5F5874"
+                android:textColor="#FFD5B0FF"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -573,7 +573,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#292344"
+                android:textColor="#FFF7F3FF"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -582,7 +582,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_prop_supporters"
-                android:textColor="#77738C"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -600,7 +600,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#292344"
+                android:textColor="#FFF7F3FF"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -609,7 +609,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_prop_friends"
-                android:textColor="#77738C"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
@@ -765,7 +765,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"
                 android:layout_weight="1"
-                android:textColor="#292344"
+                android:textColor="#FFF7F3FF"
                 android:textSize="13sp"
                 android:textStyle="bold"
                 tools:text="♥ علاقة حب مع سارة" />
@@ -777,7 +777,7 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="المزيد"
-            android:textColor="#77738C"
+            android:textColor="#FFBDB5D2"
             android:textSize="12sp" />
 
         <LinearLayout
