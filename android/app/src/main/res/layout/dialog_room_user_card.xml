@@ -55,7 +55,7 @@
             android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:elevation="4dp"
             android:scaleType="centerCrop" android:src="@drawable/ic_tab_me"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
-            app:strokeColor="#FFF7F3FFFF" app:strokeWidth="3dp" />
+            app:strokeColor="#F7F3FF" app:strokeWidth="3dp" />
         <ImageView android:id="@+id/imgUserFrame" android:layout_width="92dp" android:layout_height="92dp"
             android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:scaleType="fitCenter" android:visibility="gone" />
         <com.Dramizo.Series.util.HostSignalView android:id="@+id/userCardHostSignal" android:layout_width="92dp"
@@ -70,7 +70,7 @@
             <com.google.android.material.imageview.ShapeableImageView android:id="@+id/imgCpPartnerTop"
                 android:layout_width="match_parent" android:layout_height="match_parent" android:elevation="3dp"
                 android:scaleType="centerCrop" app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
-                app:strokeColor="#FFF7F3FFFF" app:strokeWidth="2dp" />
+                app:strokeColor="#F7F3FF" app:strokeWidth="2dp" />
             <ImageView android:id="@+id/imgCpPartnerTopFrame" android:layout_width="match_parent" android:layout_height="match_parent"
                 android:contentDescription="@null" android:scaleType="fitXY" android:visibility="gone" />
         </FrameLayout>
