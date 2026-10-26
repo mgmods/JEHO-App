@@ -52,6 +52,7 @@ import { ensureBadgeTables } from './database/badges-bootstrap';
 import { ensureCpTables } from './database/cp-bootstrap';
 import { ensureVanityIdStyleColumns } from './database/vanity-id-style-bootstrap';
 import { ensureMomentsTables } from './database/moments-bootstrap';
+import { ensureUserProfileColumns } from './database/user-profile-bootstrap';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -155,6 +156,16 @@ const entityList = Object.values(entities).filter(
         } catch (error) {
           console.error(
             '[MomentsBootstrap] Could not initialize moments tables; API startup continues.',
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+
+        // Repair profile columns missing from older production schemas before serving requests.
+        try {
+          await ensureUserProfileColumns(appDataSource);
+        } catch (error) {
+          console.error(
+            '[UserProfileBootstrap] Could not initialize profile columns; API startup continues.',
             error instanceof Error ? error.message : String(error),
           );
         }
