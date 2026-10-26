@@ -260,7 +260,6 @@
 
     <TextView
         android:id="@+id/btnRoomPkChallenge"
-        android:visibility="gone"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_marginTop="12dp"
@@ -270,7 +269,7 @@
         android:gravity="center_vertical"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
-        android:text="⚔ تحدّي PK بين الغرف"
+        android:text="تحديات PK"
         android:textColor="@color/aurora_gold"
         android:textSize="14sp"
         android:textStyle="bold"
