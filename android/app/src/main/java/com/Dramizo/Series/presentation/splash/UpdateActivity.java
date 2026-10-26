@@ -519,11 +519,12 @@ public final class UpdateActivity extends Activity {
         b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         b.setTextColor(Color.WHITE);
         b.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                primary ? new int[]{Color.rgb(104, 53, 255), Color.rgb(158, 69, 255)}
-                        : new int[]{Color.rgb(15, 22, 49), Color.rgb(20, 29, 60)}));
+                primary ? new int[]{Color.rgb(32, 204, 160), Color.rgb(10, 181, 143)}
+                        : new int[]{Color.rgb(229, 249, 242), Color.rgb(214, 245, 234)}));
         GradientDrawable buttonBg = (GradientDrawable) b.getBackground();
         buttonBg.setCornerRadius(dp(28));
-        buttonBg.setStroke(dp(1), primary ? Color.rgb(188, 142, 255) : Color.rgb(63, 87, 153));
+        buttonBg.setStroke(dp(1), primary ? Color.rgb(10, 181, 143) : Color.rgb(177, 235, 220));
+        if (!primary) b.setTextColor(Color.rgb(14, 91, 70));
         return b;
     }
 
