@@ -11948,6 +11948,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         handler.removeCallbacks(roomPkInvitationPoll);
         if (isOwner && roomId != null && !roomId.isEmpty()) handler.postDelayed(roomPkInvitationPoll, 900L);
         minimizing = false;
+        // A resumed room UI must clear the session's minimized marker as well.
+        // This is lifecycle-only: never call seat leave/join or change server seat indices.
+        ActiveRoomSession.get().setMinimized(false);
         // UI is back — stop FGS owner and restore intended mic (never force open).
         try {
             VoiceRoomForegroundService.attachUi(this);
