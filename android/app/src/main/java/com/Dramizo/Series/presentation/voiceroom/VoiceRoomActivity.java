@@ -1084,6 +1084,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             .setDuration(900L).start()).start();
         }
         View sideSettings = findViewById(R.id.btnRoomSideSettings);
+        View sidePkChallenges = findViewById(R.id.btnRoomSidePkChallenge);
         if (sideMusic != null) {
             sideMusic.setOnClickListener(v -> showSavedMusicLibrary());
         }
@@ -1092,6 +1093,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (sideSettings != null) {
             sideSettings.setOnClickListener(v -> showOtherTools());
+        }
+        if (sidePkChallenges != null) {
+            sidePkChallenges.setVisibility(isOwner ? View.VISIBLE : View.GONE);
+            sidePkChallenges.setOnClickListener(v -> {
+                if (!isOwner) {
+                    Toast.makeText(this, "تحديات PK متاحة لمضيف الغرفة فقط", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!roomPkFeatureEnabled) {
+                    Toast.makeText(this, "تحديات PK معطّلة من لوحة التحكم", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (roomPkCurrentContestId != null && !roomPkCurrentContestId.isEmpty()
+                        && !"pending".equals(roomPkCurrentContestId)) {
+                    Toast.makeText(this, "يوجد تحدّي PK جارٍ في هذه الغرفة", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showRoomPkChallengeDialog();
+            });
         }
 
         binding.btnSendChat.setOnClickListener(v -> appendChatFromInput());
@@ -1217,6 +1237,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     && (sameUser(myUserId, room.hostId)
                     || sameUser(myUserId, room.activeHostId));
             isOwner = myUserId != null && sameUser(myUserId, room.hostId);
+            View sidePk = findViewById(R.id.btnRoomSidePkChallenge);
+            if (sidePk != null) sidePk.setVisibility(isOwner ? View.VISIBLE : View.GONE);
             handler.post(() -> { ensureRoomPkActionButton(); loadRoomPkInvitations(); });
             boolean fullStaff = isHost || (myUserId != null && sameUser(myUserId, room.cohostId));
             canManageMusic = fullStaff;
@@ -10053,6 +10075,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         TextView btnChangePhoto = sheet.findViewById(R.id.btnChangeRoomPhoto);
         if (btnChangePhoto != null) {
+            btnChangePhoto.setText("خلفية الغرفة");
             btnChangePhoto.setVisibility(canManageRoom ? View.VISIBLE : View.GONE);
             btnChangePhoto.setOnClickListener(v -> {
                 dialog.dismiss();
@@ -10105,7 +10128,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         View pickBg = sheet.findViewById(R.id.btnPickRoomBackground);
         if (pickBg != null) {
-            pickBg.setVisibility(canChangeFrames ? View.VISIBLE : View.GONE);
+            // The duplicate theme/background action is intentionally hidden; use the single
+            // clearly named "خلفية الغرفة" entry above.
+            pickBg.setVisibility(View.GONE);
             pickBg.setOnClickListener(v -> {
                 dialog.dismiss();
                 showRoomBackgroundPicker();
@@ -10130,6 +10155,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         TextView btnRoomPk = sheet.findViewById(R.id.btnRoomPkChallenge);
         if (btnRoomPk != null) {
+            // PK has its own shortcut below the games button, not inside Settings.
+            btnRoomPk.setVisibility(View.GONE);
+            btnRoomPk.setOnClickListener(null);
+            /* Keep legacy handler below unreachable so older layouts remain compatible. */
+            if (false) {
             // Keep PK discoverable for the room host; validate availability when tapped.
             boolean challengeRunning = roomPkCurrentContestId != null
                     && !roomPkCurrentContestId.isEmpty()
@@ -10155,6 +10185,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 dialog.dismiss();
                 showRoomPkChallengeDialog();
             });
+            }
         }
         wireGiftSoundsSwitch(sheet);
         dialog.show();
