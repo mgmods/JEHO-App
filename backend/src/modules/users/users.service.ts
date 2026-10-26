@@ -569,6 +569,12 @@ export class UsersService {
       }
       profile.dmAudience = dto.dmAudience;
     }
+    if (dto.displayedMedalIds !== undefined) {
+      const keys = [...new Set(dto.displayedMedalIds.map((value) => value.trim()).filter(Boolean))];
+      if (keys.length > 5) throw new BadRequestException('يمكن عرض خمس ميداليات كحد أقصى');
+      // Keys are only presentation preferences; ownership is still determined by the badges/VIP records.
+      profile.displayedMedalIds = keys;
+    }
     if (dto.dmGiftGateEnabled !== undefined) {
       profile.dmGiftGateEnabled = !!dto.dmGiftGateEnabled;
     }
