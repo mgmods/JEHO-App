@@ -92,7 +92,7 @@
                 <LinearLayout
                     android:id="@+id/profileIdentityAndCp"
                     android:layout_width="match_parent"
-                    android:layout_height="140dp"
+                    android:layout_height="148dp"
                     android:gravity="start|center_vertical"
                     android:orientation="horizontal"
                     android:layoutDirection="rtl"
@@ -101,8 +101,8 @@
 
                     <FrameLayout
                         android:id="@+id/profileAvatarWrap"
-                        android:layout_width="148dp"
-                        android:layout_height="140dp"
+                        android:layout_width="156dp"
+                        android:layout_height="148dp"
                         android:layout_marginStart="12dp"
                         android:layout_marginTop="0dp"
                         android:clipChildren="false"
@@ -110,8 +110,8 @@
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/imgAvatar"
-                            android:layout_width="116dp"
-                            android:layout_height="116dp"
+                            android:layout_width="124dp"
+                            android:layout_height="124dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/nav_profile"
                             android:elevation="4dp"
@@ -273,7 +273,7 @@
                         android:background="@drawable/bg_profile_stat_light"
                         android:paddingHorizontal="8dp"
                         android:paddingVertical="2dp"
-                        android:textColor="#FF7CFFB2"
+                        android:textColor="#FF16865B"
                         android:textSize="11sp"
                         android:visibility="gone"
                         tools:text="متصل الآن"
@@ -324,7 +324,7 @@
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:contentDescription="@string/copy_user_id"
                         android:src="@drawable/icon_copy"
-                        app:tint="#99FFFFFF" />
+                        app:tint="#FF7B8196" />
 
                     <ImageView
                         android:id="@+id/imgCountryFlag"
@@ -1339,7 +1339,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#99FFFFFF" />
+                        app:tint="#FF7B8196" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
