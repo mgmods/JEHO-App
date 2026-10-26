@@ -1224,7 +1224,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     || sameUser(myUserId, room.activeHostId));
             isOwner = myUserId != null && sameUser(myUserId, room.hostId);
             View sidePk = findViewById(R.id.btnRoomSidePkChallenge);
-            if (sidePk != null) sidePk.setVisibility(isOwner ? View.VISIBLE : View.GONE);
+            // PK is available only from Room Settings > Room; never show the floating shortcut.
+            if (sidePk != null) {
+                sidePk.setVisibility(View.GONE);
+                sidePk.setOnClickListener(null);
+            }
             handler.post(() -> { ensureRoomPkActionButton(); loadRoomPkInvitations(); });
             boolean fullStaff = isHost || (myUserId != null && sameUser(myUserId, room.cohostId));
             canManageMusic = fullStaff;
