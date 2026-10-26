@@ -8,6 +8,8 @@ import {
   IsArray,
   IsNumber,
   IsIn,
+  ArrayMaxSize,
+  IsString,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -104,6 +106,13 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsIn(['everyone', 'followers', 'friends', 'nobody'])
   dmAudience?: 'everyone' | 'followers' | 'friends' | 'nobody';
+
+  @ApiPropertyOptional({ description: 'Up to five owned medal keys shown publicly on profile' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  displayedMedalIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()
