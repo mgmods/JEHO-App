@@ -12,7 +12,7 @@ export async function ensureUserProfileColumns(dataSource: DataSource): Promise<
      LIMIT 1`,
   );
   if (!rows.length) {
-    console.warn('[UserProfileBootstrap] jeito_own.user_profiles table not found; skipping additive profile migration.');
+    console.warn('[UserProfileBootstrap] jeho_own.user_profiles table not found; skipping additive profile migration.');
     return;
   }
 
