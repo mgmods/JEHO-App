@@ -77,6 +77,10 @@ export class UserProfile {
   @Column({ type: 'varchar', length: 64, nullable: true })
   nameColor: string | null;
 
+  /** Stable keys for up to five earned medals displayed publicly below the profile ID. */
+  @Column({ type: 'simple-array', nullable: true })
+  displayedMedalIds: string[] | null;
+
   @Column({ type: 'int', default: 0 })
   followersCount: number;
 
