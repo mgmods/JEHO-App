@@ -43,14 +43,14 @@
                 <ImageView
                     android:id="@+id/imgCover"
                     android:layout_width="match_parent"
-                    android:layout_height="200dp"
+                    android:layout_height="220dp"
                     android:contentDescription="@null"
                     android:scaleType="centerCrop"
                     android:src="@color/black" />
 
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="200dp"
+                    android:layout_height="220dp"
                     android:background="@drawable/bg_profile_cover_scrim" />
 
                 <ImageView
@@ -101,17 +101,17 @@
 
                     <FrameLayout
                         android:id="@+id/profileAvatarWrap"
-                        android:layout_width="120dp"
-                        android:layout_height="120dp"
-                        android:layout_marginStart="16dp"
+                        android:layout_width="132dp"
+                        android:layout_height="132dp"
+                        android:layout_marginStart="12dp"
                         android:layout_marginTop="-24dp"
                         android:clipChildren="false"
                         android:clipToPadding="false">
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/imgAvatar"
-                            android:layout_width="76dp"
-                            android:layout_height="76dp"
+                            android:layout_width="94dp"
+                            android:layout_height="94dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/nav_profile"
                             android:elevation="4dp"
@@ -150,13 +150,13 @@
 
                         <!-- Larger primary portrait for the profile owner. -->
                         <FrameLayout
-                            android:layout_width="76dp"
-                            android:layout_height="76dp"
+                            android:layout_width="92dp"
+                            android:layout_height="92dp"
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpSelf"
-                                android:layout_width="76dp"
-                                android:layout_height="76dp"
+                                android:layout_width="92dp"
+                                android:layout_height="92dp"
                                 android:contentDescription="@null"
                                 android:elevation="4dp"
                                 android:scaleType="centerCrop"
@@ -166,8 +166,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpSelfFrame"
-                                android:layout_width="76dp"
-                                android:layout_height="76dp"
+                                android:layout_width="92dp"
+                                android:layout_height="92dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
@@ -191,13 +191,13 @@
                             android:textStyle="bold" />
 
                         <FrameLayout
-                            android:layout_width="56dp"
-                            android:layout_height="56dp"
+                            android:layout_width="82dp"
+                            android:layout_height="82dp"
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpPartner"
-                                android:layout_width="56dp"
-                                android:layout_height="56dp"
+                                android:layout_width="82dp"
+                                android:layout_height="82dp"
                                 android:contentDescription="@null"
                                 android:elevation="4dp"
                                 android:scaleType="centerCrop"
@@ -207,8 +207,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpPartnerFrame"
-                                android:layout_width="56dp"
-                                android:layout_height="56dp"
+                                android:layout_width="82dp"
+                                android:layout_height="82dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
