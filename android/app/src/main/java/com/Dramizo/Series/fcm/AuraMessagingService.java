@@ -1,5 +1,6 @@
 package com.Dramizo.Series.fcm;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.util.Log;
 
@@ -10,6 +11,7 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.chat.ChatConversationActivity;
 import com.Dramizo.Series.util.ActiveChatTracker;
+import com.Dramizo.Series.util.InAppNotificationBanner;
 import com.Dramizo.Series.util.AuraNotificationHelper;
 import com.Dramizo.Series.util.NotificationRouter;
 import com.google.firebase.messaging.FirebaseMessagingService;
@@ -90,8 +92,20 @@ public class AuraMessagingService extends FirebaseMessagingService {
         }
 
         int notificationId = stableNotificationId(type, conversationId, data);
-        // Always use custom system notification when outside that chat —
-        // chat list, party room, background, and other destinations.
+
+        // Foreground FCM callbacks do not display Android's system notification banner
+        // automatically. Show an in-app banner too, using the same routed Intent so a
+        // tap opens the exact conversation instead of merely opening the inbox.
+        Activity active = AuraLiveApp.getForegroundActivity();
+        if (active != null && !active.isFinishing() && !active.isDestroyed()) {
+            String dedupeKey = conversationId != null && !conversationId.isEmpty()
+                    ? "chat:" + conversationId + ":" + firstNonEmpty(data, "messageId", "message_id", "notificationId")
+                    : (data != null ? firstNonEmpty(data, "notificationId", "messageId", "message_id") : null);
+            InAppNotificationBanner.show(active, title, body, type, intent, dedupeKey, avatar);
+        }
+
+        // Keep the system notification for the shade/lock screen; taps use the same
+        // deep link. Active-chat notifications were filtered above to avoid duplicates.
         AuraNotificationHelper.show(
                 this, CHANNEL_ID, title, body, type, intent, notificationId, avatar);
         // Refresh Official News badge on Messages tab when a general notice arrives.
