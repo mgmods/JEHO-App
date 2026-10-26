@@ -207,6 +207,8 @@ public final class MiscDtos {
         @SerializedName("country") public String country;
         @SerializedName("showOnlineStatus") public Boolean showOnlineStatus;
         @SerializedName("allowDmFromStrangers") public Boolean allowDmFromStrangers;
+        @SerializedName("dmEnabled") public Boolean dmEnabled;
+        @SerializedName("dmAudience") public String dmAudience;
         @SerializedName("dmGiftGateEnabled") public Boolean dmGiftGateEnabled;
         @SerializedName("dmRequiredGiftId") public String dmRequiredGiftId;
         @SerializedName("albumUrls") public java.util.List<String> albumUrls;
