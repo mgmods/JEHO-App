@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFF5F6FB">
+    android:background="#FFF7F8FC">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -270,7 +270,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
-                        android:background="@drawable/bg_user_card_stat_cell"
+                        android:background="@drawable/bg_profile_stat_light"
                         android:paddingHorizontal="8dp"
                         android:paddingVertical="2dp"
                         android:textColor="#FF7CFFB2"
@@ -289,7 +289,7 @@
                     android:includeFontPadding="false"
                     android:paddingHorizontal="12dp"
                     android:paddingVertical="4dp"
-                    android:textColor="@android:color/white"
+                    android:textColor="#FF283047"
                     android:textSize="11sp"
                     android:textStyle="bold"
                     android:visibility="gone"
@@ -342,11 +342,11 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="10dp"
-                        android:background="@drawable/bg_user_card_id_chip"
+                        android:background="@drawable/bg_profile_id_light"
                         android:paddingHorizontal="10dp"
                         android:paddingVertical="3dp"
                         android:text="1"
-                        android:textColor="#E0F7FA"
+                        android:textColor="#FF4F3C91"
                         android:textSize="11sp"
                         android:textStyle="bold" />
 
@@ -383,7 +383,7 @@
                     android:layout_marginStart="14dp"
                     android:layout_marginTop="8dp"
                     android:layout_marginEnd="14dp"
-                    android:background="@drawable/bg_user_card_sheet"
+                    android:background="@drawable/bg_profile_section_light"
                     android:orientation="vertical"
                     android:padding="10dp"
                     android:visibility="gone">
@@ -431,14 +431,14 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="لحظاتي"
-                        android:textColor="#FFFFFFFF"
+                        android:textColor="#FF283047"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="عرض المنشورات  ›"
-                        android:textColor="#FFB8C9C9"
+                        android:textColor="#FF697187"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -469,7 +469,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="الشارات والمداليات"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="#FF283047"
                             android:textSize="14sp"
                             android:textStyle="bold" />
 
@@ -486,7 +486,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
                             android:text="عرض الكل  ›"
-                            android:textColor="#FFB8C9C9"
+                            android:textColor="#FF697187"
                             android:textSize="11sp" />
                     </LinearLayout>
 
@@ -513,7 +513,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
                         android:text="لم تحصل على شارات بعد"
-                        android:textColor="#FF9BA8A8"
+                        android:textColor="#FF697187"
                         android:textSize="12sp"
                         android:visibility="gone" />
                 </LinearLayout>
@@ -544,7 +544,7 @@
                             android:id="@+id/tvStatFriends"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="#FF283047"
                             android:textSize="15sp"
                             android:textStyle="bold"
                             tools:text="12" />
@@ -554,7 +554,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="@string/user_card_stat_following"
-                            android:textColor="#99FFFFFF"
+                            android:textColor="#FF73798D"
                             android:textSize="11sp" />
                     </LinearLayout>
 
@@ -573,7 +573,7 @@
                             android:id="@+id/tvStatFollowing"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="#FF283047"
                             android:textSize="15sp"
                             android:textStyle="bold"
                             tools:text="48" />
@@ -583,7 +583,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="@string/user_card_stat_fans"
-                            android:textColor="#99FFFFFF"
+                            android:textColor="#FF73798D"
                             android:textSize="11sp" />
                     </LinearLayout>
 
@@ -602,7 +602,7 @@
                             android:id="@+id/tvStatFans"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="#FF283047"
                             android:textSize="15sp"
                             android:textStyle="bold"
                             tools:text="320" />
@@ -612,7 +612,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="@string/user_card_stat_visitors"
-                            android:textColor="#99FFFFFF"
+                            android:textColor="#FF73798D"
                             android:textSize="11sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -662,7 +662,7 @@
                             android:paddingHorizontal="10dp"
                             android:paddingVertical="4dp"
                             android:text="VIP 0"
-                            android:textColor="@color/white"
+                            android:textColor="#FF283047"
                             android:textSize="11sp"
                             android:textStyle="bold"
                             android:visibility="gone" />
@@ -676,7 +676,7 @@
                             android:paddingHorizontal="10dp"
                             android:paddingVertical="4dp"
                             android:text="0"
-                            android:textColor="@color/white"
+                            android:textColor="#FF283047"
                             android:textSize="11sp"
                             android:textStyle="bold" />
 
@@ -689,7 +689,7 @@
                             android:paddingHorizontal="10dp"
                             android:paddingVertical="4dp"
                             android:text="0"
-                            android:textColor="@color/white"
+                            android:textColor="#FF283047"
                             android:textSize="11sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -752,7 +752,7 @@
                             android:minWidth="36dp"
                             android:paddingHorizontal="5dp"
                             android:paddingVertical="1dp"
-                            android:textColor="#FFFFCE00"
+                            android:textColor="#FF8A5A00"
                             android:textSize="10sp"
                             android:textStyle="bold"
                             android:visibility="visible"
@@ -776,7 +776,7 @@
                             android:layout_height="wrap_content"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:textColor="#FFFFFF"
+                            android:textColor="#FF283047"
                             android:textSize="14sp"
                             android:textStyle="bold"
                             tools:text="الوكالة" />
@@ -787,7 +787,7 @@
                             android:layout_height="wrap_content"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:textColor="#99FFFFFF"
+                            android:textColor="#FF73798D"
                             android:textSize="12sp"
                             tools:text="GID:1895" />
                     </LinearLayout>
@@ -799,7 +799,7 @@
                     android:layout_marginHorizontal="16dp"
                     android:layout_marginTop="14dp"
                     android:text="@string/user_card_property_title"
-                    android:textColor="#B3FFFFFF"
+                    android:textColor="#FF697187"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
@@ -839,7 +839,7 @@
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:text="@string/user_card_prop_family"
-                            android:textColor="#E6FFFFFF"
+                            android:textColor="#FF283047"
                             android:textSize="11sp" />
                     </LinearLayout>
 
@@ -861,7 +861,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="#FF283047"
                             android:textSize="14sp"
                             android:textStyle="bold" />
 
@@ -870,7 +870,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="@string/user_card_prop_supporters"
-                            android:textColor="#99FFFFFF"
+                            android:textColor="#FF73798D"
                             android:textSize="11sp" />
                     </LinearLayout>
 
@@ -891,7 +891,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="#FF283047"
                             android:textSize="14sp"
                             android:textStyle="bold" />
 
@@ -900,7 +900,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="@string/user_card_prop_friends"
-                            android:textColor="#99FFFFFF"
+                            android:textColor="#FF73798D"
                             android:textSize="11sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -928,7 +928,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="🕵️ الرجل الغامض"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="#FF283047"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                         <TextView
@@ -937,7 +937,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="3dp"
                             android:text="إخفاء هويتك داخل الغرف"
-                            android:textColor="#B3FFFFFF"
+                            android:textColor="#FF697187"
                             android:textSize="11sp" />
                     </LinearLayout>
                     <Switch
@@ -991,7 +991,7 @@
                                 android:layout_height="wrap_content"
                                 android:ellipsize="end"
                                 android:maxLines="1"
-                                android:textColor="#FFFFF0D0"
+                                android:textColor="#FF8A5A00"
                                 android:textSize="12sp"
                                 android:textStyle="bold"
                                 android:shadowColor="#CC5A102E"
@@ -1007,7 +1007,7 @@
                                 android:background="@drawable/bg_cp_cv_chip"
                                 android:paddingHorizontal="10dp"
                                 android:paddingVertical="5dp"
-                                android:textColor="#FFFFD66E"
+                                android:textColor="#FF8A5A00"
                                 android:textSize="13sp"
                                 android:textStyle="bold"
                                 android:shadowColor="#AA55102D"
@@ -1023,7 +1023,7 @@
                                 android:background="@drawable/bg_cp_cv_chip"
                                 android:paddingHorizontal="10dp"
                                 android:paddingVertical="5dp"
-                                android:textColor="#FFFFD66E"
+                                android:textColor="#FF8A5A00"
                                 android:textSize="12sp"
                                 android:textStyle="bold"
                                 android:shadowColor="#AA55102D"
@@ -1067,7 +1067,7 @@
                                 android:layout_height="44dp"
                                 android:gravity="center"
                                 android:text="♥"
-                                android:textColor="#FFFFE7F1"
+                                android:textColor="#FF9F315E"
                                 android:textSize="24sp"
                                 android:textStyle="bold"
                                 android:shadowColor="#FFFFA8C8"
@@ -1110,7 +1110,7 @@
                         android:includeFontPadding="false"
                         android:letterSpacing="0.12"
                         android:text="CP"
-                        android:textColor="#FFFFF2D1"
+                        android:textColor="#FF8A5A00"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:elevation="8dp" />
@@ -1121,7 +1121,7 @@
                         android:layout_gravity="top|center_horizontal"
                         android:layout_marginTop="1dp"
                         android:text="✦"
-                        android:textColor="#FFFFFFFF"
+                        android:textColor="#FF283047"
                         android:textSize="11sp"
                         android:elevation="9dp" />
                 </FrameLayout>
@@ -1139,7 +1139,7 @@
                     android:lineSpacingExtra="3dp"
                     android:padding="14dp"
                     android:text="@string/lazy_no_signature"
-                    android:textColor="#B3FFFFFF"
+                    android:textColor="#FF697187"
                     android:textSize="13sp" />
 
                 <TextView
@@ -1164,12 +1164,12 @@
                         android:layout_height="46dp"
                         android:layout_marginEnd="6dp"
                         android:layout_weight="1"
-                        android:background="@drawable/bg_user_card_action"
+                        android:background="@drawable/bg_profile_action_light"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:text="@string/follow"
                         android:textAllCaps="false"
-                        android:textColor="#FFFFFFFF"
+                        android:textColor="#FF283047"
                         android:textSize="13sp"
                         android:textStyle="bold"
                         app:backgroundTint="@null"
@@ -1187,7 +1187,7 @@
                         android:insetBottom="0dp"
                         android:text="طلب صداقة"
                         android:textAllCaps="false"
-                        android:textColor="#FFFFFFFF"
+                        android:textColor="#FF283047"
                         android:textSize="13sp"
                         android:textStyle="bold"
                         app:backgroundTint="@null"
@@ -1205,7 +1205,7 @@
                         android:insetBottom="0dp"
                         android:text="@string/chat"
                         android:textAllCaps="false"
-                        android:textColor="#FFFBBF24"
+                        android:textColor="#FF8A5A00"
                         android:textSize="13sp"
                         android:textStyle="bold"
                         app:backgroundTint="@null"
@@ -1222,7 +1222,7 @@
                     android:background="@drawable/bg_user_card_action"
                     android:text="طلب علاقة CP"
                     android:textAllCaps="false"
-                    android:textColor="#FFFFFFFF"
+                    android:textColor="#FF283047"
                     app:backgroundTint="@null"
                     app:cornerRadius="12dp" />
 
@@ -1239,7 +1239,7 @@
                 android:layout_marginHorizontal="18dp"
                 android:layout_marginTop="18dp"
                 android:text="سجل الهدايا"
-                android:textColor="#E6FFFFFF"
+                android:textColor="#FF283047"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -1273,7 +1273,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:text="@string/gift_seat"
-                        android:textColor="#E6FFFFFF"
+                        android:textColor="#FF283047"
                         android:textSize="14sp" />
                 </LinearLayout>
 
@@ -1283,7 +1283,7 @@
                     android:layout_height="48dp"
                     android:gravity="center_vertical"
                     android:text="@string/guardian"
-                    android:textColor="#E6FFFFFF"
+                    android:textColor="#FF283047"
                     android:textSize="14sp"
                     android:visibility="gone" />
 
@@ -1295,7 +1295,7 @@
                     android:layout_height="48dp"
                     android:gravity="center_vertical"
                     android:text="@string/cars_mall"
-                    android:textColor="#E6FFFFFF"
+                    android:textColor="#FF283047"
                     android:textSize="14sp"
                     android:visibility="gone" />
 
@@ -1305,7 +1305,7 @@
                     android:layout_height="48dp"
                     android:gravity="center_vertical"
                     android:text="@string/head_mall"
-                    android:textColor="#E6FFFFFF"
+                    android:textColor="#FF283047"
                     android:textSize="14sp"
                     android:visibility="gone" />
 
@@ -1330,7 +1330,7 @@
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
                         android:text="@string/gift_history"
-                        android:textColor="#FFFFFFFF"
+                        android:textColor="#FF283047"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
