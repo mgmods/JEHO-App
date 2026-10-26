@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFF7F8FC">
+    android:background="#FF080810">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -27,7 +27,7 @@
         android:elevation="4dp"
         android:padding="9dp"
         android:src="@drawable/ic_event_edit"
-        app:tint="@color/text_primary" />
+        app:tint="#FFF7F3FF" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -119,7 +119,7 @@
                             android:layout_height="wrap_content"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:textColor="@color/text_primary"
+                            android:textColor="#FFF7F3FF"
                             android:textSize="18sp"
                             android:textStyle="bold" />
                         <TextView
@@ -147,7 +147,7 @@
                             android:id="@+id/tvUsername"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/text_secondary"
+                            android:textColor="#FFC7C0D9"
                             android:textSize="12sp" />
 
                         <ImageView
@@ -159,7 +159,7 @@
                             android:contentDescription="@string/copy_user_id"
                             android:padding="4dp"
                             android:src="@drawable/ic_copy"
-                            app:tint="@color/text_hint" />
+                            app:tint="#FF9B92B5" />
                     </LinearLayout>
 
                     <TextView
@@ -196,7 +196,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
                             android:includeFontPadding="false"
-                            android:textColor="@color/text_secondary"
+                            android:textColor="#FFC7C0D9"
                             android:textSize="11sp"
                             android:visibility="gone" />
 
@@ -244,7 +244,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="14dp"
                 android:layout_marginTop="8dp"
-                android:background="@drawable/bg_mikoo_card"
+                android:background="@drawable/bg_profile_dark_card"
                 android:elevation="3dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -278,7 +278,7 @@
                     android:gravity="center"
                     android:includeFontPadding="false"
                     android:text="♥"
-                    android:textColor="#FFFF5277"
+                    android:textColor="#FFFF4FC8"
                     android:textSize="27sp"
                     android:textStyle="bold" />
                 <FrameLayout
@@ -311,7 +311,7 @@
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                     <TextView
@@ -321,7 +321,7 @@
                         android:layout_marginTop="2dp"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="@color/text_secondary"
+                        android:textColor="#FFC7C0D9"
                         android:textSize="11sp" />
                 </LinearLayout>
             </LinearLayout>
@@ -333,7 +333,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="14dp"
                     android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_cp_cv_card"
+                    android:background="@drawable/bg_profile_dark_card"
                     android:orientation="vertical"
                     android:padding="12dp"
                     android:visibility="gone">
@@ -342,7 +342,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:textColor="#FF9D4778"
+                        android:textColor="#FFD8A4FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                     <LinearLayout
@@ -376,7 +376,7 @@
                             android:layout_height="60dp"
                             android:gravity="center"
                             android:text="♥"
-                            android:textColor="#FFE64F86"
+                            android:textColor="#FFFFC857"
                             android:textSize="38sp"
                             android:textStyle="bold" />
                         <FrameLayout
@@ -413,7 +413,7 @@
                             android:background="@drawable/bg_cp_cv_chip"
                             android:paddingHorizontal="12dp"
                             android:paddingVertical="5dp"
-                            android:textColor="#FF9D4778"
+                            android:textColor="#FFD8A4FF"
                             android:textSize="12sp"
                             android:textStyle="bold" />
                         <TextView
@@ -424,7 +424,7 @@
                             android:background="@drawable/bg_cp_cv_chip"
                             android:paddingHorizontal="12dp"
                             android:paddingVertical="5dp"
-                            android:textColor="#FF9D4778"
+                            android:textColor="#FFD8A4FF"
                             android:textSize="12sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -552,7 +552,7 @@
                 android:gravity="center"
                 android:orientation="horizontal"
                 android:paddingVertical="12dp"
-                android:background="@drawable/bg_mikoo_card"
+                android:background="@drawable/bg_profile_dark_card"
                 android:elevation="3dp">
 
                 <LinearLayout
@@ -568,7 +568,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -577,7 +577,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="@string/following"
-                        android:textColor="@color/text_hint"
+                        android:textColor="#FF9B92B5"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -595,7 +595,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -604,7 +604,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="@string/fans"
-                        android:textColor="@color/text_hint"
+                        android:textColor="#FF9B92B5"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -622,7 +622,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -631,7 +631,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="@string/visitors"
-                        android:textColor="@color/text_hint"
+                        android:textColor="#FF9B92B5"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -654,7 +654,7 @@
                     android:id="@+id/tvStaffPanelTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text_primary"
+                    android:textColor="#FFF7F3FF"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
@@ -664,7 +664,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:lineSpacingExtra="2dp"
-                    android:textColor="@color/text_secondary"
+                    android:textColor="#FFC7C0D9"
                     android:textSize="12sp" />
 
                 <TextView
@@ -673,7 +673,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:text="استخدم: اضغط مطوّلاً على أي شخص داخل الغرفة لإدارة (كتم / طرد / حظر)."
-                    android:textColor="@color/text_hint"
+                    android:textColor="#FF9B92B5"
                     android:textSize="11sp" />
 
                 <TextView
@@ -688,7 +688,7 @@
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="12dp"
                     android:text="لوحة سوبر أدمن"
-                    android:textColor="@color/text_primary"
+                    android:textColor="#FFF7F3FF"
                     android:textSize="13sp"
                     android:textStyle="bold"
                     android:visibility="gone" />
@@ -704,7 +704,7 @@
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="12dp"
                     android:text="معاينة لوحة الإدارة الجديدة"
-                    android:textColor="@color/text_primary"
+                    android:textColor="#FFF7F3FF"
                     android:textSize="13sp"
                     android:textStyle="bold"
                     android:visibility="gone" />
@@ -719,7 +719,7 @@
                 android:layout_marginTop="10dp"
                 android:orientation="horizontal"
                 android:gravity="center"
-                android:background="@drawable/bg_mikoo_card"
+                android:background="@drawable/bg_profile_dark_card"
                 android:foreground="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
@@ -755,7 +755,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="كوينز"
-                            android:textColor="@color/text_hint"
+                            android:textColor="#FF9B92B5"
                             android:textSize="12sp" />
 
                         <TextView
@@ -766,7 +766,7 @@
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:text="—"
-                            android:textColor="#B8860B"
+                            android:textColor="#FFFFD36A"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -799,7 +799,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="ألماس"
-                            android:textColor="@color/text_hint"
+                            android:textColor="#FF9B92B5"
                             android:textSize="12sp" />
 
                         <TextView
@@ -810,7 +810,7 @@
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:text="—"
-                            android:textColor="#8B5CF6"
+                            android:textColor="#FFB56BFF"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -824,7 +824,7 @@
                 android:layout_height="72dp"
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="12dp"
-                android:background="@drawable/bg_mikoo_card"
+                android:background="@drawable/bg_profile_dark_card"
                 android:clipToOutline="true"
                 android:visibility="gone">
                 <ImageView
@@ -850,7 +850,7 @@
                     android:layout_height="82dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_mikoo_card"
+                    android:background="@drawable/bg_profile_dark_card"
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
@@ -873,7 +873,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/vip"
-                            android:textColor="@color/text_primary"
+                            android:textColor="#FFF7F3FF"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                         <TextView
@@ -881,7 +881,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="3dp"
                             android:text="امتيازات VIP"
-                            android:textColor="@color/text_secondary"
+                            android:textColor="#FFC7C0D9"
                             android:textSize="11sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -891,7 +891,7 @@
                     android:layout_height="82dp"
                     android:layout_weight="1"
                     android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_mikoo_card"
+                    android:background="@drawable/bg_profile_dark_card"
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
@@ -901,10 +901,10 @@
                     <TextView
                         android:layout_width="42dp"
                         android:layout_height="42dp"
-                        android:background="#FFDDF1FF"
+                        android:background="#FF251B3A"
                         android:gravity="center"
                         android:text="Lv"
-                        android:textColor="#FF3197D4"
+                        android:textColor="#FFC7A0FF"
                         android:textSize="16sp"
                         android:textStyle="bold" />
                     <LinearLayout
@@ -917,7 +917,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/user_level"
-                            android:textColor="@color/text_primary"
+                            android:textColor="#FFF7F3FF"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                         <TextView
@@ -925,7 +925,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="3dp"
                             android:text="مستواك الحالي"
-                            android:textColor="@color/text_secondary"
+                            android:textColor="#FFC7C0D9"
                             android:textSize="11sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -949,7 +949,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="12dp"
-                android:background="@drawable/bg_mikoo_card"
+                android:background="@drawable/bg_profile_dark_card"
                 android:elevation="3dp"
                 android:orientation="horizontal"
                 android:paddingVertical="15dp">
@@ -976,7 +976,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
                         android:text="@string/store_title"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -1004,7 +1004,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
                         android:text="@string/room_short"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -1034,7 +1034,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
                         android:text="@string/agency"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -1054,7 +1054,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="10dp"
-                android:background="@drawable/bg_mikoo_card"
+                android:background="@drawable/bg_profile_dark_card"
                 android:elevation="3dp"
                 android:orientation="vertical"
                 android:paddingHorizontal="12dp"
@@ -1082,7 +1082,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/visitors"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1091,7 +1091,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1116,7 +1116,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/gift_history"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1125,7 +1125,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1149,7 +1149,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/my_events"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1158,7 +1158,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1182,7 +1182,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/open_agency"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1191,7 +1191,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1216,7 +1216,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/recharge_agent"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1225,7 +1225,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1257,7 +1257,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="رمز دعوتي"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1266,7 +1266,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1291,7 +1291,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/my_relations"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1300,7 +1300,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1317,7 +1317,7 @@
                         android:layout_height="28dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_me_task"
-                        app:tint="#444444" />
+                        app:tint="#FFE8D8FF" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -1325,7 +1325,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/task_center"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1334,7 +1334,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1359,7 +1359,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/ranking"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1368,7 +1368,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1393,7 +1393,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/edit_profile"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1402,7 +1402,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 
@@ -1422,7 +1422,7 @@
                         android:layout_height="28dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_me_notice"
-                        app:tint="#444444" />
+                        app:tint="#FFE8D8FF" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -1430,7 +1430,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/notifications"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1439,7 +1439,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1447,7 +1447,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_profile_panel"
+                    android:background="@drawable/bg_profile_dark_card"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:paddingHorizontal="14dp"
@@ -1504,7 +1504,7 @@
                         android:layout_marginStart="11dp"
                         android:layout_weight="1"
                         android:text="@string/settings"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFF7F3FF"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -1513,7 +1513,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#8A8A8A" />
+                        app:tint="#FFB5AFC8" />
                 </LinearLayout>
             </LinearLayout>
 
