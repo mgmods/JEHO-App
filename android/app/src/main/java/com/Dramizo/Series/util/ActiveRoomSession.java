@@ -52,7 +52,14 @@ public final class ActiveRoomSession {
     }
 
     public synchronized void updateRoom(@Nullable RoomDtos.RoomDto room) {
-        if (room != null) latestRoom = room;
+        if (room != null) {
+            // A partial room refresh may omit the seats field (null). Keep the last known
+            // roster in that case; an explicit empty list remains authoritative.
+            if (room.seats == null && latestRoom != null && latestRoom.seats != null) {
+                room.seats = latestRoom.seats;
+            }
+            latestRoom = room;
+        }
     }
 
     public synchronized void setMinimized(boolean value) {
