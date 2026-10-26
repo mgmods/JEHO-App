@@ -4,6 +4,13 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.net.Uri;
+import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.provider.OpenableColumns;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import com.yalantis.ucrop.UCrop;
 import android.os.Bundle;
 import android.view.MotionEvent;
 import android.view.View;
@@ -54,9 +61,22 @@ public class EditProfileActivity extends ThemedActivity {
     private static final String[] GENDER_VALUES = {"", "male", "female"};
 
     private final ActivityResultLauncher<String> pickImage = registerForActivityResult(
-            new ActivityResultContracts.GetContent(),
-            this::onImagePicked
-    );
+            new ActivityResultContracts.GetContent(), this::onImagePicked);
+
+    private final ActivityResultLauncher<Intent> cropImage = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() != RESULT_OK || result.getData() == null) {
+                    if (result.getResultCode() == UCrop.RESULT_ERROR && result.getData() != null) {
+                        Throwable error = UCrop.getError(result.getData());
+                        Toast.makeText(this, error != null && error.getMessage() != null
+                                ? error.getMessage() : "تعذر قص الصورة، حاول بصورة أخرى",
+                                Toast.LENGTH_LONG).show();
+                    }
+                    return;
+                }
+                Uri cropped = UCrop.getOutput(result.getData());
+                if (cropped != null) uploadPickedImage(cropped);
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -397,9 +417,87 @@ public class EditProfileActivity extends ThemedActivity {
     }
 
     private void onImagePicked(Uri uri) {
-        if (uri == null) return;
+        if (uri == null || binding == null) return;
+        final boolean cover = pickingCover;
         binding.progress.setVisibility(View.VISIBLE);
-        boolean cover = pickingCover;
+        c.getIoExecutor().execute(() -> {
+            boolean animated = isAnimatedImage(uri);
+            runOnUiThread(() -> {
+                if (isFinishing() || binding == null) return;
+                binding.progress.setVisibility(View.GONE);
+                if (animated) {
+                    // Do not pass animated GIF/WebP through a bitmap cropper: that would flatten it.
+                    Toast.makeText(this, "تم الحفاظ على حركة الصورة. القص متاح للصور الثابتة",
+                            Toast.LENGTH_LONG).show();
+                    uploadPickedImage(uri);
+                } else {
+                    try {
+                        File destination = new File(getCacheDir(),
+                                (cover ? "profile_cover_" : "profile_avatar_")
+                                + System.currentTimeMillis() + ".jpg");
+                        UCrop.Options options = new UCrop.Options();
+                        options.setToolbarTitle(cover ? "قص غلاف الملف الشخصي" : "قص الصورة الشخصية");
+                        options.setToolbarColor(Color.rgb(38, 25, 66));
+                        options.setStatusBarColor(Color.rgb(28, 18, 49));
+                        options.setActiveControlsWidgetColor(Color.rgb(151, 94, 235));
+                        options.setToolbarWidgetColor(Color.WHITE);
+                        options.setCompressionFormat(Bitmap.CompressFormat.JPEG);
+                        options.setCompressionQuality(92);
+                        options.setFreeStyleCropEnabled(false);
+                        options.setHideBottomControls(false);
+                        UCrop crop = UCrop.of(uri, Uri.fromFile(destination))
+                                .withAspectRatio(cover ? 16f : 1f, cover ? 6f : 1f)
+                                .withMaxResultSize(2048, cover ? 768 : 2048)
+                                .withOptions(options);
+                        cropImage.launch(crop.getIntent(this));
+                    } catch (Exception ex) {
+                        Toast.makeText(this, "تعذر فتح أداة القص: "
+                                + (ex.getMessage() == null ? "خطأ غير معروف" : ex.getMessage()),
+                                Toast.LENGTH_LONG).show();
+                    }
+                }
+            });
+        });
+    }
+
+    /**
+     * Detect GIF by MIME/signature and animated WebP by its RIFF animation chunks.
+     * This avoids flattening animation by routing animated files through UCrop.
+     */
+    private boolean isAnimatedImage(Uri uri) {
+        String mime = getContentResolver().getType(uri);
+        if (mime != null && mime.toLowerCase(Locale.ROOT).contains("gif")) return true;
+        try (InputStream in = getContentResolver().openInputStream(uri);
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            if (in == null) return false;
+            byte[] buffer = new byte[4096];
+            int count, total = 0;
+            while ((count = in.read(buffer)) != -1 && total < 8 * 1024 * 1024) {
+                out.write(buffer, 0, count);
+                total += count;
+            }
+            byte[] data = out.toByteArray();
+            if (data.length >= 6 && data[0] == 'G' && data[1] == 'I'
+                    && data[2] == 'F' && data[3] == '8') return true;
+            if (data.length >= 12 && data[0] == 'R' && data[1] == 'I'
+                    && data[2] == 'F' && data[3] == 'F'
+                    && data[8] == 'W' && data[9] == 'E'
+                    && data[10] == 'B' && data[11] == 'P') {
+                for (int i = 12; i + 4 <= data.length; i++) {
+                    if ((data[i] == 'A' && data[i+1] == 'N'
+                            && data[i+2] == 'I' && data[i+3] == 'M')
+                            || (data[i] == 'A' && data[i+1] == 'N'
+                            && data[i+2] == 'M' && data[i+3] == 'F')) return true;
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    private void uploadPickedImage(Uri uri) {
+        if (uri == null || binding == null) return;
+        binding.progress.setVisibility(View.VISIBLE);
+        final boolean cover = pickingCover;
         if (cover) {
             Glide.with(this).load(uri).centerCrop().into(binding.imgCoverPreview);
         } else {
