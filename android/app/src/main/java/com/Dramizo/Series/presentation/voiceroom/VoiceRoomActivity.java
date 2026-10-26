@@ -1352,8 +1352,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 seats = new ArrayList<>(restoreSeatSnapshot);
                 room.seats = seats;
             } else if (resumedFromActiveSession && seats != null && !seats.isEmpty()) {
-                // A non-empty server roster is authoritative, including a roster without us.
-                restoreSeatSnapshot = null;
+                // Refresh the saved snapshot only when the server roster still contains us.
+                // A stale non-empty roster that omits the local user must not erase the last
+                // known seat: repeated minimize/restore cycles otherwise lose the snapshot
+                // after the first successful return and eject the user on the next one.
+                if (isOnSeat(seats)) {
+                    restoreSeatSnapshot = new ArrayList<>(seats);
+                }
             }
             if (seats == null && resumedFromActiveSession) {
                 RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
@@ -11971,6 +11976,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && roomId != null && !roomId.isEmpty()
                 && pendingSession != null;
         if (keepAlive) {
+            // Keep a durable copy of our seat roster before the UI/session can be refreshed
+            // by a partial server response while minimized. Never send a seat leave here.
+            if (isOnSeat(currentSeats)) {
+                restoreSeatSnapshot = new ArrayList<>(currentSeats);
+                RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
+                if (cachedRoom != null) {
+                    cachedRoom.seats = new ArrayList<>(currentSeats);
+                    ActiveRoomSession.get().updateRoom(cachedRoom);
+                }
+            }
             // Mikoo minimize / leave-UI: keep hearing others; mute only own mic.
             ensuringRoomKeepAlive(true);
             ensureMinimizedListeningState();
