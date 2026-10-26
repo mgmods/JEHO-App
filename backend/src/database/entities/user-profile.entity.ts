@@ -98,6 +98,12 @@ export class UserProfile {
   @Column({ type: 'boolean', default: true })
   allowDmFromStrangers: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  dmEnabled: boolean;
+
+  @Column({ type: 'varchar', length: 16, default: 'everyone' })
+  dmAudience: 'everyone' | 'followers' | 'friends' | 'nobody';
+
   /** When true (and global setting on), strangers must gift before first DM. */
   @Column({ type: 'boolean', default: false })
   dmGiftGateEnabled: boolean;
