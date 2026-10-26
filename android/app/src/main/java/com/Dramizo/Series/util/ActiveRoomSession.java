@@ -43,8 +43,20 @@ public final class ActiveRoomSession {
         this.session = session;
         this.zegoRoomId = session.zegoRoomId != null && !session.zegoRoomId.isEmpty()
                 ? session.zegoRoomId : roomId;
-        if (room != null) this.latestRoom = room;
-        else if (session.room != null) this.latestRoom = session.room;
+        if (room != null) {
+            // Capture can run during lifecycle transitions while the latest DTO is partial.
+            // Never replace a known seat roster with an omitted (null) seats field.
+            if (room.seats == null && this.latestRoom != null && this.latestRoom.seats != null) {
+                room.seats = this.latestRoom.seats;
+            }
+            this.latestRoom = room;
+        } else if (session.room != null) {
+            if (session.room.seats == null && this.latestRoom != null
+                    && this.latestRoom.seats != null) {
+                session.room.seats = this.latestRoom.seats;
+            }
+            this.latestRoom = session.room;
+        }
         this.host = host;
         this.agencyRoom = agencyRoom;
         this.micOn = micOn;
