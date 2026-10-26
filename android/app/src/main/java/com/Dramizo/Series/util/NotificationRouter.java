@@ -27,7 +27,9 @@ public final class NotificationRouter {
             String n = nested.toLowerCase();
             // Push/inbox may wrap room-open as LIVE with data.type=room
             if ("room".equals(n) || "voice".equals(n) || "party".equals(n)) t = "room";
-            else if ("chat".equals(n) || "message".equals(n)) t = "chat";
+            else if ("chat".equals(n) || "message".equals(n) || "new_message".equals(n)
+                    || "chat_message".equals(n) || "direct_message".equals(n)
+                    || "message_received".equals(n)) t = "chat";
         }
         String conversationId = first(data, "conversation_id", "conversationId");
         String roomId = first(data, "room_id", "roomId");
@@ -53,7 +55,7 @@ public final class NotificationRouter {
             return i;
         }
 
-        if (("chat".equals(t) || "message".equals(t)) && !TextUtils.isEmpty(conversationId)) {
+        if (isChatType(t) && !TextUtils.isEmpty(conversationId)) {
             Intent i = new Intent(context, ChatConversationActivity.class);
             i.putExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID, conversationId);
             put(i, ChatConversationActivity.EXTRA_PEER_ID,
@@ -97,6 +99,17 @@ public final class NotificationRouter {
             return new Intent(context, OfficialNewsActivity.class);
         }
         return new Intent(context, MainActivity.class);
+    }
+
+    private static boolean isChatType(String type) {
+        if (type == null) return false;
+        String normalized = type.toLowerCase(java.util.Locale.ROOT);
+        return "chat".equals(normalized)
+                || "message".equals(normalized)
+                || "new_message".equals(normalized)
+                || "chat_message".equals(normalized)
+                || "direct_message".equals(normalized)
+                || "message_received".equals(normalized);
     }
 
     private static void put(Intent intent, String key, String value) {
