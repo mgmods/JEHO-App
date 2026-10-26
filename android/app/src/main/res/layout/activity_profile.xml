@@ -93,7 +93,7 @@
                     android:id="@+id/profileIdentityAndCp"
                     android:layout_width="match_parent"
                     android:layout_height="140dp"
-                    android:gravity="center_vertical"
+                    android:gravity="start|center_vertical"
                     android:orientation="horizontal"
                     android:layoutDirection="rtl"
                     android:clipChildren="false"
@@ -209,8 +209,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpPartnerFrame"
-                                android:layout_width="98dp"
-                                android:layout_height="98dp"
+                                android:layout_width="96dp"
+                                android:layout_height="96dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
