@@ -136,7 +136,8 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
         if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
-        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.GONE);
+        // Keep the VIP, charm and wealth chips visible on the light profile card.
+        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.VISIBLE);
 
         if (binding.rowMoments != null) {
             binding.rowMoments.setOnClickListener(v -> {
@@ -385,7 +386,7 @@ public class ProfileActivity extends ThemedActivity {
             // Level chip (same pill as card member chip).
             binding.tvLevelChip.setText(String.valueOf(level));
             binding.tvLevelChip.setBackgroundResource(R.drawable.bg_user_card_id_chip);
-            binding.tvLevelChip.setTextColor(0xFFE0F7FA);
+            binding.tvLevelChip.setTextColor(0xFF4F3C91);
             binding.tvLevelChip.setCompoundDrawablesRelative(null, null, null, null);
 
             if (binding.imgCountryFlag != null) {
@@ -456,11 +457,11 @@ public class ProfileActivity extends ThemedActivity {
             if (Boolean.TRUE.equals(user.isOnline)) {
                 binding.tvLastSeen.setVisibility(View.VISIBLE);
                 binding.tvLastSeen.setText(R.string.online_now);
-                binding.tvLastSeen.setTextColor(0xFF7CFFB2);
+                binding.tvLastSeen.setTextColor(0xFF16865B);
             } else if (user.lastSeenAt != null && !user.lastSeenAt.isEmpty()) {
                 binding.tvLastSeen.setVisibility(View.VISIBLE);
                 binding.tvLastSeen.setText(DeviceTimeFormat.lastSeen(this, user.lastSeenAt));
-                binding.tvLastSeen.setTextColor(0x99FFFFFF);
+                binding.tvLastSeen.setTextColor(0xFF73798D);
             } else {
                 binding.tvLastSeen.setVisibility(View.GONE);
             }
@@ -1166,7 +1167,7 @@ public class ProfileActivity extends ThemedActivity {
                         item.addView(image);
                         TextView caption = new TextView(this);
                         caption.setText(label);
-                        caption.setTextColor(0xFFE9D9B0);
+                        caption.setTextColor(0xFF697187);
                         caption.setTextSize(9);
                         caption.setGravity(Gravity.CENTER);
                         caption.setMaxLines(1);
