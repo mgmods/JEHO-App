@@ -204,7 +204,7 @@ final class RoomMoreOperatorSheet {
                 withState(host, R.string.lock, locked),
                 "lock"));
         list.add(item(R.drawable.more_btn_mic, R.string.room_more_mic_mode, "mic_mode"));
-        list.add(item(R.drawable.more_btn_theme, R.string.room_more_theme, "theme"));
+        // Room theme action is intentionally removed from this sheet; use the dedicated room background entry.
         list.add(item(
                 host.chatZoneOn()
                         ? R.drawable.icon_room_opera_public_screen_open
@@ -246,7 +246,7 @@ final class RoomMoreOperatorSheet {
                     withStateNl(host, R.string.room_more_mic_request, host.micRequestOn()),
                     "mic_request"));
         }
-        list.add(item(R.drawable.icon_room_send_photo, R.string.room_more_photo, "photo"));
+        list.add(item(R.drawable.icon_room_send_photo, "خلفية الغرفة", "photo"));
         return list;
     }
 
