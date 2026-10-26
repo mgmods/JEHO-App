@@ -324,9 +324,9 @@ public class ProfileActivity extends ThemedActivity {
             int vip = Math.max(0, user.vipLevel);
             int level = Math.max(1, user.level);
 
-            // Same dark VIP sheet wash as room user card.
+            // Public profiles use the app's light settings palette, independent of room VIP-card styling.
             if (binding.userCardBg != null) {
-                AgencyUi.applyUserCardSheet(binding.userCardBg, null, vip);
+                binding.userCardBg.setBackgroundResource(R.drawable.bg_profile_panel);
             }
 
             String profileDisplayName = user.displayName != null && !user.displayName.isEmpty()
