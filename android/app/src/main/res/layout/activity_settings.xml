@@ -5,7 +5,7 @@
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F7FA"
+    android:background="#FFFFFFFF"
     android:orientation="vertical">
 
     <LinearLayout
@@ -62,12 +62,12 @@
         android:layout_marginEnd="14dp"
         android:orientation="vertical"
         android:padding="18dp"
-        android:background="@drawable/bg_settings_hero">
+        android:background="@drawable/bg_settings_row">
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="مساحتك الخاصة"
-            android:textColor="#FFFFFFFF"
+            android:textColor="#FF182230"
             android:textSize="20sp"
             android:textStyle="bold" />
         <TextView
@@ -75,13 +75,13 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:text="تحكّم بتفضيلاتك وخصوصيتك وإشعاراتك بكل سهولة."
-            android:textColor="#FFE5F5EF"
+            android:textColor="#FF667085"
             android:textSize="13sp" />
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:background="#2FFFFFFF"
+            android:background="#FFEAF7F2"
             android:paddingStart="10dp"
             android:paddingTop="5dp"
             android:paddingEnd="10dp"
@@ -131,7 +131,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="9dp"
                     android:text="التفضيلات العامة"
-                    android:textColor="#FF344054"
+                    android:textColor="#FF263445"
                     android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
