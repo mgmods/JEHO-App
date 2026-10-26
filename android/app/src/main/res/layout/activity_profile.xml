@@ -374,6 +374,41 @@
                         android:visibility="gone" />
                 </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/medalShowcase"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginEnd="14dp"
+                    android:background="@drawable/bg_user_card_sheet"
+                    android:orientation="vertical"
+                    android:padding="10dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ميدالياتي"
+                        android:textColor="#FFF4D2"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:scrollbars="none">
+
+                        <LinearLayout
+                            android:id="@+id/medalShowcaseItems"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal" />
+                    </HorizontalScrollView>
+                </LinearLayout>
+
                 <!-- User moments shortcut: profile-specific, server-backed posts. -->
                 <LinearLayout
                     android:id="@+id/rowMoments"
