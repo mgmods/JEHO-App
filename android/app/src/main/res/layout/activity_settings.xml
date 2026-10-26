@@ -74,25 +74,29 @@
                 android:id="@+id/rowTheme"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowLanguage"
                 layout="@layout/include_setting_row_value"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowNotifications"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowMessages"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -109,13 +113,15 @@
                 android:id="@+id/rowBindAccount"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowPassword"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -132,49 +138,57 @@
                 android:id="@+id/rowFeedback"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowChildSafety"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowAbout"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowNetwork"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowUserAgreement"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowChildPolicy"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowShare"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <RelativeLayout
                 android:id="@+id/rowVersion"
                 android:layout_width="match_parent"
-                android:layout_height="55dp"
-                android:background="@color/white"
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp"
+                android:background="@drawable/bg_settings_row"
                 android:foreground="?attr/selectableItemBackground">
 
                 <TextView
@@ -213,8 +227,9 @@
             <TextView
                 android:id="@+id/btnLogout"
                 android:layout_width="match_parent"
-                android:layout_height="55dp"
-                android:background="@color/white"
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp"
+                android:background="@drawable/bg_settings_row"
                 android:foreground="?attr/selectableItemBackground"
                 android:gravity="center"
                 android:text="@string/logout"
