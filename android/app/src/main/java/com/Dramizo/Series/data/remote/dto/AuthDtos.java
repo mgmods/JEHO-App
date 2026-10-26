@@ -136,6 +136,7 @@ public final class AuthDtos {
         @SerializedName("chatBubbleUrl") public String chatBubbleUrl;
         @SerializedName("nameplateUrl") public String nameplateUrl;
         @SerializedName("bio") public String bio;
+        @SerializedName("displayedMedalIds") public java.util.List<String> displayedMedalIds;
         @SerializedName("gender") public String gender;
         @SerializedName("level") public int level;
         @SerializedName("experience") public long experience;
