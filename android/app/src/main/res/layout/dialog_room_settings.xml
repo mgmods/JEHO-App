@@ -79,7 +79,7 @@
         android:gravity="center_vertical"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
-        android:text="@string/room_change_photo"
+        android:text="خلفية الغرفة"
         android:textColor="@color/text_primary"
         android:textSize="14sp"
         android:textStyle="bold" />
@@ -212,6 +212,7 @@
 
     <TextView
         android:id="@+id/btnPickRoomBackground"
+        android:visibility="gone"
         android:layout_width="match_parent"
         android:layout_height="46dp"
         android:layout_marginTop="8dp"
@@ -259,6 +260,7 @@
 
     <TextView
         android:id="@+id/btnRoomPkChallenge"
+        android:visibility="gone"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_marginTop="12dp"
