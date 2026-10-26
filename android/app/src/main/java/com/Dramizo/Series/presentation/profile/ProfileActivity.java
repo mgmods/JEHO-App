@@ -412,10 +412,11 @@ public class ProfileActivity extends ThemedActivity {
             binding.tvWealthChip.setBackgroundResource(R.drawable.bg_chip_wealth);
             binding.tvWealthChip.setTextColor(0xFFFFFFFF);
 
-            bindVipHead(
-                    binding.imgVipHead,
-                    vip,
-                    user.vipHeadUrl != null ? user.vipHeadUrl : VipStyle.fixedHeadPath(vip));
+            // Do not overlay VIP head artwork on the cover: it was stretching across the banner.
+            if (binding.imgVipHead != null) {
+                binding.imgVipHead.setVisibility(View.GONE);
+                binding.imgVipHead.setImageDrawable(null);
+            }
             bindVipMedal(binding.imgVipMedal, vip, user.levelBadgeUrl);
             bindEntryRide(
                     binding.imgEntryRide,
