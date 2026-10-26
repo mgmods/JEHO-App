@@ -1340,6 +1340,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // First paint: seats only. Heavy cover/kenar/host wear/bg staged after.
             List<RoomDtos.SeatDto> seats = room.seats != null ? room.seats : new ArrayList<>();
             boolean wasOnSeat = isOnSeat(currentSeats);
+            // On minimize/restore the new Activity starts with an empty in-memory seat list.
+            // Compare against the cached room roster before deciding this is a brand-new seat;
+            // otherwise the restore path can wrongly re-run new-seat mic activation and overwrite
+            // the user's saved mic intent while everyone is simply returning to the same room.
+            if (!wasOnSeat && resumedFromActiveSession) {
+                RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
+                if (cachedRoom != null && cachedRoom.seats != null) {
+                    wasOnSeat = isOnSeat(cachedRoom.seats);
+                }
+            }
             currentSeats = seats;
             try {
                 List<RoomDtos.SeatDto> gridSeats = prepareGuestSeatsForGrid(seats);
