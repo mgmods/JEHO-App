@@ -106,86 +106,184 @@ public final class UpdateActivity extends Activity {
     }
 
     private void buildUi(String title, String message) {
-        int bg = Color.rgb(5, 9, 24);
+        final int ink = Color.rgb(14, 55, 44);
+        final int muted = Color.rgb(94, 119, 111);
+        final int mint = Color.rgb(18, 190, 151);
+        final int paleMint = Color.rgb(211, 247, 235);
+        final int lineMint = Color.rgb(177, 235, 220);
+
+        // Edge-to-edge update gate: the same blocking screen is shown before any app area.
+        Window window = getWindow();
+        if (window != null) {
+            window.setStatusBarColor(Color.rgb(220, 249, 239));
+            window.setNavigationBarColor(Color.WHITE);
+            window.getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.rgb(248, 253, 251));
+        root.setPadding(dp(22), dp(8), dp(22), dp(12));
+        setContentView(root);
+
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(16, 18, 55), bg, Color.rgb(8, 20, 43)}));
-        content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
-        content.setPadding(dp(22), dp(24), dp(22), dp(28));
-        scroll.addView(content, new ScrollView.LayoutParams(-1, -1));
-        setContentView(scroll);
+        scroll.setClipToPadding(false);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        TextView badge = text(isArabic() ? "✦  تحديث رسمي من JEHO  ✦" : "✦  OFFICIAL JEHO UPDATE  ✦", 11, Color.rgb(220, 208, 255), true);
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setGravity(Gravity.CENTER_HORIZONTAL);
+        body.setPadding(dp(2), dp(12), dp(2), dp(18));
+        scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
+
+        // Orbital-style illustration inspired by the supplied update-screen reference.
+        android.widget.FrameLayout hero = new android.widget.FrameLayout(this);
+        hero.setLayoutParams(params(-1, dp(330), 0, 0, 0, 4));
+        android.widget.FrameLayout orbitOuter = new android.widget.FrameLayout(this);
+        GradientDrawable outerCircle = new GradientDrawable();
+        outerCircle.setShape(GradientDrawable.OVAL);
+        outerCircle.setColor(Color.TRANSPARENT);
+        outerCircle.setStroke(dp(2), Color.rgb(207, 243, 231));
+        android.widget.FrameLayout.LayoutParams orbitParams =
+                new android.widget.FrameLayout.LayoutParams(dp(270), dp(270), Gravity.CENTER);
+        orbitOuter.setBackground(outerCircle);
+        hero.addView(orbitOuter, orbitParams);
+
+        android.widget.FrameLayout orbitInner = new android.widget.FrameLayout(this);
+        GradientDrawable innerCircle = new GradientDrawable();
+        innerCircle.setShape(GradientDrawable.OVAL);
+        innerCircle.setColor(Color.TRANSPARENT);
+        innerCircle.setStroke(dp(2), Color.rgb(171, 235, 216));
+        orbitInner.setBackground(innerCircle);
+        android.widget.FrameLayout.LayoutParams innerParams =
+                new android.widget.FrameLayout.LayoutParams(dp(222), dp(222), Gravity.CENTER);
+        hero.addView(orbitInner, innerParams);
+
+        addOrbitDot(hero, Gravity.TOP | Gravity.CENTER_HORIZONTAL, mint, 14, 0, 0, 0, 18);
+        addOrbitDot(hero, Gravity.LEFT | Gravity.CENTER_VERTICAL, mint, 14, 0, 0, 0, 0);
+        addOrbitDot(hero, Gravity.RIGHT | Gravity.CENTER_VERTICAL, mint, 14, 0, 0, 0, 0);
+        addOrbitDot(hero, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, Color.rgb(247, 205, 83), 10, 0, 0, 0, 18);
+
+        TextView arrow = text("↑", 34, Color.WHITE, true);
+        arrow.setGravity(Gravity.CENTER);
+        GradientDrawable arrowBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(38, 207, 160), mint});
+        arrowBg.setShape(GradientDrawable.OVAL);
+        arrowBg.setShadowLayer(dp(12), 0, dp(5), 0x3032B995);
+        arrow.setBackground(arrowBg);
+        android.widget.FrameLayout.LayoutParams arrowParams =
+                new android.widget.FrameLayout.LayoutParams(dp(68), dp(68), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        arrowParams.topMargin = dp(22);
+        hero.addView(arrow, arrowParams);
+
+        android.widget.FrameLayout logoHalo = new android.widget.FrameLayout(this);
+        GradientDrawable haloBg = new GradientDrawable();
+        haloBg.setShape(GradientDrawable.OVAL);
+        haloBg.setColor(Color.WHITE);
+        logoHalo.setBackground(haloBg);
+        android.widget.FrameLayout.LayoutParams haloParams =
+                new android.widget.FrameLayout.LayoutParams(dp(174), dp(174), Gravity.CENTER);
+        logoHalo.setElevation(dp(5));
+        hero.addView(logoHalo, haloParams);
+
+        TextView appIcon = text("JEHO", 28, Color.WHITE, true);
+        appIcon.setGravity(Gravity.CENTER);
+        GradientDrawable appIconBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(39, 198, 139), Color.rgb(0, 135, 103)});
+        appIconBg.setCornerRadius(dp(38));
+        appIcon.setBackground(appIconBg);
+        android.widget.FrameLayout.LayoutParams appIconParams =
+                new android.widget.FrameLayout.LayoutParams(dp(126), dp(126), Gravity.CENTER);
+        logoHalo.addView(appIcon, appIconParams);
+
+        TextView badge = text(isArabic() ? "إصدار جديد" : "NEW VERSION", 13, ink, true);
         badge.setGravity(Gravity.CENTER);
-        badge.setPadding(dp(16), dp(9), dp(16), dp(9));
-        badge.setBackground(rounded(Color.rgb(30, 24, 72), Color.rgb(91, 67, 158), dp(24)));
-        content.addView(badge, params(-2, -2, 0, 0, 0, 18));
+        badge.setPadding(dp(16), dp(8), dp(16), dp(8));
+        badge.setBackground(rounded(paleMint, lineMint, dp(22)));
+        body.addView(badge, params(-2, -2, 0, 0, 0, 18));
 
-        TextView brand = text("JEHO", 34, Color.WHITE, true);
-        brand.setLetterSpacing(0.20f);
-        brand.setGravity(Gravity.CENTER);
-        content.addView(brand, params(-1, -2, 0, 0, 0, 0));
-
-        TextView icon = text("🚀", 54, Color.WHITE, true);
-        icon.setGravity(Gravity.CENTER);
-        GradientDrawable iconBg = rounded(Color.rgb(37, 28, 103), Color.rgb(115, 70, 255), dp(28));
-        iconBg.setStroke(dp(1), Color.rgb(115, 91, 255));
-        icon.setBackground(iconBg);
-        content.addView(icon, params(dp(116), dp(116), 0, 20, 0, 22));
-
-        TextView heading = text(title, 24, Color.WHITE, true);
+        TextView heading = text(isArabic() ? "هذا الإصدار أصبح قديماً" : "This version is outdated", 27, ink, true);
         heading.setGravity(Gravity.CENTER);
         heading.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        content.addView(heading, params(-1, -2, 0, 0, 0, 10));
+        body.addView(heading, params(-1, -2, 0, 0, 0, 12));
 
-        TextView copy = text(message, 15, Color.rgb(204, 212, 237), false);
+        TextView copy = text(isArabic()
+                ? "يرجى تحديث التطبيق إلى الإصدار الجديد للتمكن من المتابعة."
+                : "Please update JEHO to the latest version to continue.",
+                16, muted, false);
         copy.setGravity(Gravity.CENTER);
         copy.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        copy.setLineSpacing(dp(4), 1.0f);
-        content.addView(copy, params(-1, -2, 0, 0, 0, 22));
+        copy.setLineSpacing(dp(5), 1f);
+        body.addView(copy, params(-1, -2, 0, 0, 0, 24));
 
-        LinearLayout versionCard = new LinearLayout(this);
-        versionCard.setOrientation(LinearLayout.VERTICAL);
-        versionCard.setPadding(dp(20), dp(18), dp(20), dp(18));
-        versionCard.setBackground(rounded(Color.rgb(18, 27, 68), Color.rgb(122, 91, 231), dp(24)));
-        TextView eyebrow = text(isArabic() ? "الإصدار الجديد جاهز" : "YOUR NEXT JEHO EXPERIENCE", 12, Color.rgb(190, 174, 255), true);
-        versionCard.addView(eyebrow, params(-1, -2, 0, 0, 0, 6));
-        TextView version = text(targetVersionName.isEmpty() ? "JEHO" : targetVersionName, 25, Color.WHITE, true);
-        version.setGravity(Gravity.CENTER_VERTICAL);
-        versionCard.addView(version, params(-1, -2, 0, 0, 0, 4));
-        TextView notes = text(isArabic()
-                ? "✦ تحسينات في الأداء\n✦ إصلاحات واستقرار أفضل\n✦ تجربة أحدث وأكثر سلاسة"
-                : "✦ Performance improvements\n✦ Fixes and stability updates\n✦ A smoother, newer experience",
-                13, Color.rgb(213, 220, 246), false);
-        notes.setLineSpacing(dp(4), 1f);
-        versionCard.addView(notes, params(-1, -2, 0, 0, 0, 0));
-        content.addView(versionCard, params(-1, -2, 0, 0, 0, 22));
+        TextView version = text(isArabic()
+                ? "إصدارك الحالي  " + installedVersionName()
+                : "Your current version  " + installedVersionName(), 15, Color.rgb(39, 119, 91), true);
+        version.setGravity(Gravity.CENTER);
+        version.setPadding(dp(18), dp(12), dp(18), dp(12));
+        version.setBackground(rounded(Color.WHITE, lineMint, dp(28)));
+        body.addView(version, params(-2, -2, 0, 0, 0, 14));
+
+        TextView nextVersion = text((isArabic() ? "الإصدار الجديد  " : "Latest version  ")
+                + (targetVersionName.isEmpty() ? "JEHO" : targetVersionName),
+                13, muted, false);
+        nextVersion.setGravity(Gravity.CENTER);
+        body.addView(nextVersion, params(-1, -2, 0, 0, 0, 14));
 
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setMax(100);
         progressBar.setProgress(0);
+        progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(mint));
         progressBar.setVisibility(View.GONE);
-        content.addView(progressBar, params(-1, dp(6), 0, 0, 0, 8));
-        progressLabel = text("", 12, Color.rgb(195, 205, 236), false);
+        body.addView(progressBar, params(-1, dp(6), 0, 0, 0, 7));
+
+        progressLabel = text("", 12, muted, false);
         progressLabel.setGravity(Gravity.CENTER);
         progressLabel.setVisibility(View.GONE);
-        content.addView(progressLabel, params(-1, -2, 0, 0, 0, 8));
-        statusText = text(isArabic() ? "حمّل التحديث لتتابع استخدام JEHO" : "Install the update to continue using JEHO",
-                12, Color.rgb(157, 170, 214), false);
-        statusText.setGravity(Gravity.CENTER);
-        content.addView(statusText, params(-1, -2, 0, 0, 0, 16));
+        body.addView(progressLabel, params(-1, -2, 0, 0, 0, 8));
 
-        updateButton = button(isArabic() ? "تحديث الآن   ✦" : "Update now   ✦", true);
+        statusText = text(isArabic() ? "حدّث التطبيق للمتابعة" : "Update the app to continue", 12, muted, false);
+        statusText.setGravity(Gravity.CENTER);
+        body.addView(statusText, params(-1, -2, 0, 0, 0, 12));
+
+        // Fixed bottom action remains visible even on short displays or large font settings.
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setOrientation(LinearLayout.VERTICAL);
+        bottom.setPadding(0, dp(10), 0, dp(4));
+        root.addView(bottom, new LinearLayout.LayoutParams(-1, -2));
+
+        updateButton = button(isArabic() ? "تحديث من المتجر   ▣" : "Update now   ▣", true);
         updateButton.setOnClickListener(v -> beginUpdate());
-        content.addView(updateButton, params(-1, dp(54), 0, 0, 0, 12));
+        bottom.addView(updateButton, params(-1, dp(64), 0, 0, 0, 0));
 
         laterButton = button(isArabic() ? "لاحقاً" : "Later", false);
         laterButton.setVisibility(forceUpdate ? View.GONE : View.VISIBLE);
         laterButton.setOnClickListener(v -> continueWithoutUpdate());
-        content.addView(laterButton, params(-1, dp(48), 0, 0, 0, 0));
+        bottom.addView(laterButton, params(-1, dp(46), 0, 8, 0, 0));
+    }
+
+    private void addOrbitDot(android.widget.FrameLayout parent, int gravity, int color, int size,
+                             int left, int top, int right, int bottom) {
+        View dot = new View(this);
+        GradientDrawable shape = new GradientDrawable();
+        shape.setShape(GradientDrawable.OVAL);
+        shape.setColor(color);
+        dot.setBackground(shape);
+        android.widget.FrameLayout.LayoutParams p =
+                new android.widget.FrameLayout.LayoutParams(dp(size), dp(size), gravity);
+        p.setMargins(dp(left), dp(top), dp(right), dp(bottom));
+        parent.addView(dot, p);
+    }
+
+    private String installedVersionName() {
+        try {
+            return safe(getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
+        } catch (Exception ignored) {
+            return String.valueOf(BuildConfig.VERSION_CODE);
+        }
     }
 
     private void beginUpdate() {
