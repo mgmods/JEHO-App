@@ -427,7 +427,6 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       .leftJoinAndSelect('u.profile', 'up')
       .leftJoin('c.participants', 'peerPart', 'peerPart.userId <> :userId', { userId })
       .leftJoin('peerPart.user', 'peer')
-      .leftJoin('peer.profile', 'peerProfile')
       .leftJoin('c.messages', 'matchedMessage', 'matchedMessage.isUnsent = false')
       .where('p.userId = :userId', { userId })
       .andWhere('p.isDeleted = false')
