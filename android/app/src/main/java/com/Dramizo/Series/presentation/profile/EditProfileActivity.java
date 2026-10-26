@@ -446,8 +446,8 @@ public class EditProfileActivity extends ThemedActivity {
                         options.setFreeStyleCropEnabled(false);
                         options.setHideBottomControls(false);
                         UCrop crop = UCrop.of(uri, Uri.fromFile(destination))
-                                .withAspectRatio(cover ? 16f : 1f, cover ? 6f : 1f)
-                                .withMaxResultSize(2048, cover ? 768 : 2048)
+                                .withAspectRatio(cover ? 16f : 1f, cover ? 9f : 1f)
+                                .withMaxResultSize(2048, cover ? 1152 : 2048)
                                 .withOptions(options);
                         cropImage.launch(crop.getIntent(this));
                     } catch (Exception ex) {
