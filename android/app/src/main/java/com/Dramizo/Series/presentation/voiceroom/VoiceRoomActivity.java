@@ -1094,24 +1094,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (sideSettings != null) {
             sideSettings.setOnClickListener(v -> showOtherTools());
         }
+        // PK must live inside Room Settings (Room section), not as a separate room shortcut.
         if (sidePkChallenges != null) {
-            sidePkChallenges.setVisibility(isOwner ? View.VISIBLE : View.GONE);
-            sidePkChallenges.setOnClickListener(v -> {
-                if (!isOwner) {
-                    Toast.makeText(this, "تحديات PK متاحة لمضيف الغرفة فقط", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (!roomPkFeatureEnabled) {
-                    Toast.makeText(this, "تحديات PK معطّلة من لوحة التحكم", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (roomPkCurrentContestId != null && !roomPkCurrentContestId.isEmpty()
-                        && !"pending".equals(roomPkCurrentContestId)) {
-                    Toast.makeText(this, "يوجد تحدّي PK جارٍ في هذه الغرفة", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                showRoomPkChallengeDialog();
-            });
+            sidePkChallenges.setVisibility(View.GONE);
+            sidePkChallenges.setOnClickListener(null);
         }
 
         binding.btnSendChat.setOnClickListener(v -> appendChatFromInput());
@@ -10153,12 +10139,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 showModeratorTools();
             });
         }
-        // PK challenges are launched from the dedicated room shortcut below Games,
-        // so the duplicate action is hidden from the Settings sheet.
+        // Keep PK challenges in the Room Settings section beside room/seat controls.
+        // Respect both the dashboard feature switch and the existing host-only permission.
         TextView btnRoomPk = sheet.findViewById(R.id.btnRoomPkChallenge);
         if (btnRoomPk != null) {
-            btnRoomPk.setVisibility(View.GONE);
-            btnRoomPk.setOnClickListener(null);
+            boolean canStartRoomPk = isOwner && roomPkFeatureEnabled
+                    && (roomPkCurrentContestId == null || roomPkCurrentContestId.isEmpty()
+                    || "pending".equals(roomPkCurrentContestId));
+            btnRoomPk.setVisibility(canManageRoom || isOwner ? View.VISIBLE : View.GONE);
+            btnRoomPk.setEnabled(canStartRoomPk);
+            btnRoomPk.setAlpha(canStartRoomPk ? 1f : 0.55f);
+            btnRoomPk.setText(!roomPkFeatureEnabled
+                    ? "تحديات PK (معطّلة من لوحة التحكم)"
+                    : (roomPkCurrentContestId != null && !roomPkCurrentContestId.isEmpty()
+                    && !"pending".equals(roomPkCurrentContestId)
+                    ? "تحديات PK (يوجد تحدٍّ جارٍ)" : "تحديات PK"));
+            btnRoomPk.setOnClickListener(v -> {
+                if (!isOwner) {
+                    Toast.makeText(this, "تحديات PK متاحة لمضيف الغرفة فقط", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!roomPkFeatureEnabled) {
+                    Toast.makeText(this, "تحديات PK معطّلة من لوحة التحكم", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (roomPkCurrentContestId != null && !roomPkCurrentContestId.isEmpty()
+                        && !"pending".equals(roomPkCurrentContestId)) {
+                    Toast.makeText(this, "يوجد تحدّي PK جارٍ في هذه الغرفة", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                dialog.dismiss();
+                showRoomPkChallengeDialog();
+            });
         }
         wireGiftSoundsSwitch(sheet);
         dialog.show();
