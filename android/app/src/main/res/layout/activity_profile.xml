@@ -92,7 +92,7 @@
                 <LinearLayout
                     android:id="@+id/profileIdentityAndCp"
                     android:layout_width="match_parent"
-                    android:layout_height="120dp"
+                    android:layout_height="140dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:layoutDirection="rtl"
@@ -101,17 +101,17 @@
 
                     <FrameLayout
                         android:id="@+id/profileAvatarWrap"
-                        android:layout_width="132dp"
-                        android:layout_height="132dp"
+                        android:layout_width="148dp"
+                        android:layout_height="140dp"
                         android:layout_marginStart="12dp"
-                        android:layout_marginTop="-24dp"
+                        android:layout_marginTop="0dp"
                         android:clipChildren="false"
                         android:clipToPadding="false">
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/imgAvatar"
-                            android:layout_width="94dp"
-                            android:layout_height="94dp"
+                            android:layout_width="116dp"
+                            android:layout_height="116dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/nav_profile"
                             android:elevation="4dp"
@@ -141,8 +141,8 @@
                     <LinearLayout
                         android:id="@+id/rowProfileCp"
                         android:layout_width="match_parent"
-                        android:layout_height="84dp"
-                                                android:gravity="center"
+                        android:layout_height="120dp"
+                        android:gravity="center"
                         android:orientation="horizontal"
                         android:layoutDirection="rtl"
                         android:padding="0dp"
@@ -150,13 +150,13 @@
 
                         <!-- Larger primary portrait for the profile owner. -->
                         <FrameLayout
-                            android:layout_width="92dp"
-                            android:layout_height="92dp"
+                            android:layout_width="108dp"
+                            android:layout_height="108dp"
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpSelf"
-                                android:layout_width="92dp"
-                                android:layout_height="92dp"
+                                android:layout_width="108dp"
+                                android:layout_height="108dp"
                                 android:contentDescription="@null"
                                 android:elevation="4dp"
                                 android:scaleType="centerCrop"
@@ -175,10 +175,10 @@
 
                         <TextView
                             android:id="@+id/tvProfileCpHeart"
-                            android:layout_width="34dp"
-                            android:layout_height="42dp"
-                            android:layout_marginStart="-5dp"
-                            android:layout_marginEnd="-5dp"
+                            android:layout_width="42dp"
+                            android:layout_height="48dp"
+                            android:layout_marginStart="6dp"
+                            android:layout_marginEnd="6dp"
                             android:gravity="center"
                             android:includeFontPadding="false"
                             android:shadowColor="#FFFF8EB4"
@@ -187,17 +187,17 @@
                             android:shadowRadius="7"
                             android:text="♥"
                             android:textColor="#FFFF5277"
-                            android:textSize="30sp"
+                            android:textSize="34sp"
                             android:textStyle="bold" />
 
                         <FrameLayout
-                            android:layout_width="82dp"
-                            android:layout_height="82dp"
+                            android:layout_width="96dp"
+                            android:layout_height="96dp"
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpPartner"
-                                android:layout_width="82dp"
-                                android:layout_height="82dp"
+                                android:layout_width="96dp"
+                                android:layout_height="96dp"
                                 android:contentDescription="@null"
                                 android:elevation="4dp"
                                 android:scaleType="centerCrop"
