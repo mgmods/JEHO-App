@@ -342,7 +342,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:textColor="#FFD8A4FF"
+                        android:textColor="#FF7A3D70"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                     <LinearLayout
@@ -413,7 +413,7 @@
                             android:background="@drawable/bg_cp_cv_chip"
                             android:paddingHorizontal="12dp"
                             android:paddingVertical="5dp"
-                            android:textColor="#FFD8A4FF"
+                            android:textColor="#FF7A3D70"
                             android:textSize="12sp"
                             android:textStyle="bold" />
                         <TextView
@@ -424,7 +424,7 @@
                             android:background="@drawable/bg_cp_cv_chip"
                             android:paddingHorizontal="12dp"
                             android:paddingVertical="5dp"
-                            android:textColor="#FFD8A4FF"
+                            android:textColor="#FF7A3D70"
                             android:textSize="12sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -577,7 +577,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="@string/following"
-                        android:textColor="#FF9B92B5"
+                        android:textColor="#FF73758A"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -604,7 +604,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="@string/fans"
-                        android:textColor="#FF9B92B5"
+                        android:textColor="#FF73758A"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -631,7 +631,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="@string/visitors"
-                        android:textColor="#FF9B92B5"
+                        android:textColor="#FF73758A"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -673,7 +673,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:text="استخدم: اضغط مطوّلاً على أي شخص داخل الغرفة لإدارة (كتم / طرد / حظر)."
-                    android:textColor="#FF9B92B5"
+                    android:textColor="#FF73758A"
                     android:textSize="11sp" />
 
                 <TextView
@@ -755,7 +755,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="كوينز"
-                            android:textColor="#FF9B92B5"
+                            android:textColor="#FF73758A"
                             android:textSize="12sp" />
 
                         <TextView
@@ -799,7 +799,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="ألماس"
-                            android:textColor="#FF9B92B5"
+                            android:textColor="#FF73758A"
                             android:textSize="12sp" />
 
                         <TextView
