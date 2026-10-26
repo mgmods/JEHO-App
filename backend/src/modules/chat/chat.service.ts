@@ -433,7 +433,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       .andWhere('p.isDeleted = false')
       .andWhere('p.isArchived = false')
       .andWhere(
-        "(LOWER(COALESCE(c.title, '')) LIKE :needle OR LOWER(COALESCE(peer.username, '')) LIKE :needle OR LOWER(COALESCE(peerProfile.displayName, '')) LIKE :needle OR LOWER(CAST(peer.id AS text)) LIKE :needle OR LOWER(COALESCE(matchedMessage.content, '')) LIKE :needle)",
+        "(LOWER(COALESCE(c.title, '')) LIKE :needle OR LOWER(COALESCE(peer.username, '')) LIKE :needle OR LOWER(COALESCE("peerProfile"."displayName", '')) LIKE :needle OR LOWER(CAST(peer.id AS text)) LIKE :needle OR LOWER(COALESCE(matchedMessage.content, '')) LIKE :needle)",
         { needle },
       )
       .distinct(true)
