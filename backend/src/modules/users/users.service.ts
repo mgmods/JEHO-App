@@ -330,6 +330,8 @@ export class UsersService {
       ...newbie,
       showOnlineStatus: p?.showOnlineStatus ?? true,
       allowDmFromStrangers: p?.allowDmFromStrangers ?? true,
+      dmEnabled: p?.dmEnabled ?? true,
+      dmAudience: p?.dmAudience ?? 'everyone',
       dmGiftGateEnabled: p?.dmGiftGateEnabled ?? false,
       dmRequiredGiftId: p?.dmRequiredGiftId ?? null,
       lastSeenAt: user.updatedAt,
@@ -558,6 +560,14 @@ export class UsersService {
     if (dto.showOnlineStatus !== undefined) profile.showOnlineStatus = dto.showOnlineStatus;
     if (dto.allowDmFromStrangers !== undefined) {
       profile.allowDmFromStrangers = dto.allowDmFromStrangers;
+    }
+    if (dto.dmEnabled !== undefined) profile.dmEnabled = dto.dmEnabled;
+    if (dto.dmAudience !== undefined) {
+      const validAudiences = ['everyone', 'followers', 'friends', 'nobody'];
+      if (!validAudiences.includes(dto.dmAudience)) {
+        throw new BadRequestException('إعداد خصوصية الرسائل غير صالح');
+      }
+      profile.dmAudience = dto.dmAudience;
     }
     if (dto.dmGiftGateEnabled !== undefined) {
       profile.dmGiftGateEnabled = !!dto.dmGiftGateEnabled;
