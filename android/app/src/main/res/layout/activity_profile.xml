@@ -166,8 +166,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpSelfFrame"
-                                android:layout_width="92dp"
-                                android:layout_height="92dp"
+                                android:layout_width="116dp"
+                                android:layout_height="116dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
@@ -207,8 +207,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpPartnerFrame"
-                                android:layout_width="82dp"
-                                android:layout_height="82dp"
+                                android:layout_width="98dp"
+                                android:layout_height="98dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
