@@ -1114,9 +1114,10 @@ public class ProfileActivity extends ThemedActivity {
                 strip.removeAllViews();
                 List<String> selected = profile != null && profile.displayedMedalIds != null
                         ? profile.displayedMedalIds : java.util.Collections.emptyList();
-                if (selected.isEmpty()) {
-                    showcase.setVisibility(View.GONE);
-                } else {
+                // Always refresh the showcase after profile data arrives; an empty selection
+                // must not leave a stale hidden row when switching between profile owners.
+                showcase.setVisibility(View.GONE);
+                if (!selected.isEmpty()) {
                     for (String key : selected) {
                         if (key == null) continue;
                         String imageUrl = null;
