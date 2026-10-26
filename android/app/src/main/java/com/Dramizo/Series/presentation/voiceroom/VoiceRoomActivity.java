@@ -1338,7 +1338,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             applyRoomDisplaySettings(room);
 
             // First paint: seats only. Heavy cover/kenar/host wear/bg staged after.
-            List<RoomDtos.SeatDto> seats = room.seats != null ? room.seats : new ArrayList<>();
+            // Some refresh payloads omit "seats" entirely (null) while the room session
+            // remains live. Do not interpret an omitted field as an authoritative empty roster:
+            // that made restore treat everyone as off-mic and hide the original seat positions.
+            List<RoomDtos.SeatDto> seats = room.seats;
+            if (seats == null && resumedFromActiveSession) {
+                RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
+                if (cachedRoom != null && cachedRoom.seats != null) {
+                    seats = cachedRoom.seats;
+                } else if (currentSeats != null && !currentSeats.isEmpty()) {
+                    seats = currentSeats;
+                }
+            }
+            if (seats == null) seats = new ArrayList<>();
             boolean wasOnSeat = isOnSeat(currentSeats);
             // On minimize/restore the new Activity starts with an empty in-memory seat list.
             // Compare against the cached room roster before deciding this is a brand-new seat;
