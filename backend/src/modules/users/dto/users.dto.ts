@@ -94,6 +94,16 @@ export class UpdateProfileDto {
   @IsBoolean()
   allowDmFromStrangers?: boolean;
 
+  @ApiPropertyOptional({ description: 'Allow direct messages at all' })
+  @IsOptional()
+  @IsBoolean()
+  dmEnabled?: boolean;
+
+  @ApiPropertyOptional({ enum: ['everyone', 'followers', 'friends', 'nobody'] })
+  @IsOptional()
+  @IsEnum(['everyone', 'followers', 'friends', 'nobody'])
+  dmAudience?: 'everyone' | 'followers' | 'friends' | 'nobody';
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
