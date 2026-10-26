@@ -1635,6 +1635,20 @@
             android:src="@drawable/ic_asset_games"
             android:background="@android:color/transparent" />
 
+        <TextView
+            android:id="@+id/btnRoomSidePkChallenge"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="2dp"
+            android:contentDescription="تحديات PK"
+            android:gravity="center"
+            android:text="⚔"
+            android:textColor="#FFFFD76A"
+            android:textSize="27sp"
+            android:textStyle="bold"
+            android:background="@android:color/transparent"
+            android:visibility="gone" />
+
         <ImageView
             android:id="@+id/btnRoomSideSettings"
             android:layout_width="50dp"
