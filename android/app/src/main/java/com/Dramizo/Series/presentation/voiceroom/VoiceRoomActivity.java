@@ -10153,39 +10153,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 showModeratorTools();
             });
         }
+        // PK challenges are launched from the dedicated room shortcut below Games,
+        // so the duplicate action is hidden from the Settings sheet.
         TextView btnRoomPk = sheet.findViewById(R.id.btnRoomPkChallenge);
         if (btnRoomPk != null) {
-            // PK has its own shortcut below the games button, not inside Settings.
             btnRoomPk.setVisibility(View.GONE);
             btnRoomPk.setOnClickListener(null);
-            /* Keep legacy handler below unreachable so older layouts remain compatible. */
-            if (false) {
-            // Keep PK discoverable for the room host; validate availability when tapped.
-            boolean challengeRunning = roomPkCurrentContestId != null
-                    && !roomPkCurrentContestId.isEmpty()
-                    && !"pending".equals(roomPkCurrentContestId);
-            btnRoomPk.setVisibility(isOwner ? View.VISIBLE : View.GONE);
-            btnRoomPk.setAlpha(roomPkFeatureEnabled && !challengeRunning ? 1.0f : 0.65f);
-            btnRoomPk.setText(challengeRunning
-                    ? "⚔ تحدّي PK — المواجهة جارية"
-                    : (roomPkFeatureEnabled ? "⚔ تحديات PK" : "⚔ تحدّي PK (غير متاح حالياً)"));
-            btnRoomPk.setOnClickListener(v -> {
-                if (!isOwner) {
-                    Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (!roomPkFeatureEnabled) {
-                    Toast.makeText(this, "تحدّي PK معطّل من لوحة التحكم", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (challengeRunning) {
-                    Toast.makeText(this, "يوجد تحدّي PK جارٍ في هذه الغرفة", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                dialog.dismiss();
-                showRoomPkChallengeDialog();
-            });
-            }
         }
         wireGiftSoundsSwitch(sheet);
         dialog.show();
