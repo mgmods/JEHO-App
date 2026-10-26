@@ -212,6 +212,7 @@ public final class MiscDtos {
         @SerializedName("dmGiftGateEnabled") public Boolean dmGiftGateEnabled;
         @SerializedName("dmRequiredGiftId") public String dmRequiredGiftId;
         @SerializedName("albumUrls") public java.util.List<String> albumUrls;
+        @SerializedName("displayedMedalIds") public java.util.List<String> displayedMedalIds;
 
         public UpdateProfileRequest() {}
 
