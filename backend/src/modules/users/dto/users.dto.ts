@@ -7,6 +7,7 @@ import {
   IsDateString,
   IsArray,
   IsNumber,
+  IsIn,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -101,7 +102,7 @@ export class UpdateProfileDto {
 
   @ApiPropertyOptional({ enum: ['everyone', 'followers', 'friends', 'nobody'] })
   @IsOptional()
-  @IsEnum(['everyone', 'followers', 'friends', 'nobody'])
+  @IsIn(['everyone', 'followers', 'friends', 'nobody'])
   dmAudience?: 'everyone' | 'followers' | 'friends' | 'nobody';
 
   @ApiPropertyOptional()
