@@ -1087,30 +1087,105 @@ public class ProfileActivity extends ThemedActivity {
         }
     }
 
-    /** Load real, persisted medals for the viewed profile and render a compact preview. */
+    /** Render the server-saved medal showcase under the public ID for every viewer. */
     private void loadProfileMedals(String profileId) {
         if (profileId == null || profileId.trim().isEmpty() || binding == null) return;
         AppContainer c = container != null ? container : ContainerProvider.from(this);
         c.getIoExecutor().execute(() -> {
-            Result<List<com.Dramizo.Series.data.remote.dto.BadgeDto>> result =
-                    com.Dramizo.Series.util.ApiCall.execute(c.getUserApi().earnedBadges(profileId));
-            if (isFinishing()) return;
+            AuthDtos.UserDto viewed = null;
+            List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned = java.util.Collections.emptyList();
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AuthDtos.UserDto>> ur =
+                        c.getUserApi().getUser(profileId).execute();
+                if (ur.isSuccessful() && ur.body() != null) viewed = ur.body().data;
+            } catch (Exception ignored) { }
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> br =
+                        c.getUserApi().earnedBadges(profileId).execute();
+                if (br.isSuccessful() && br.body() != null && br.body().data != null) earned = br.body().data;
+            } catch (Exception ignored) { }
+            final AuthDtos.UserDto profile = viewed;
+            final List<com.Dramizo.Series.data.remote.dto.BadgeDto> owned = earned;
             runOnUiThread(() -> {
-                if (binding == null) return;
-                List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned =
-                        result != null && result.success && result.data != null ? result.data : java.util.Collections.emptyList();
+                if (binding == null || isFinishing()) return;
+                LinearLayout strip = findViewById(R.id.medalShowcaseItems);
+                View showcase = findViewById(R.id.medalShowcase);
+                if (strip == null || showcase == null) return;
+                strip.removeAllViews();
+                List<String> selected = profile != null && profile.displayedMedalIds != null
+                        ? profile.displayedMedalIds : java.util.Collections.emptyList();
+                if (selected.isEmpty()) {
+                    showcase.setVisibility(View.GONE);
+                } else {
+                    for (String key : selected) {
+                        if (key == null) continue;
+                        String imageUrl = null;
+                        String label = "ميدالية";
+                        if (key.startsWith("vip:")) {
+                            int vip = profile != null ? Math.max(0, profile.vipLevel) : 0;
+                            if (vip <= 0) {
+                                try { vip = Integer.parseInt(key.substring(4)); } catch (Exception ignored) { }
+                            }
+                            if (vip <= 0 || vip > 7) continue;
+                            imageUrl = profile != null && profile.levelBadgeUrl != null
+                                    && !profile.levelBadgeUrl.trim().isEmpty()
+                                    ? profile.levelBadgeUrl
+                                    : "/assets/visual-system/vip/vip_medal_mikoo_" + vip + ".png";
+                            label = "VIP " + vip;
+                        } else {
+                            for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : owned) {
+                                if (badge != null && badge.earned && key.equals(badge.id)
+                                        && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) {
+                                    imageUrl = badge.imageUrl;
+                                    label = badge.name == null ? "ميدالية" : badge.name;
+                                    break;
+                                }
+                            }
+                        }
+                        if (imageUrl == null) continue;
+                        LinearLayout item = new LinearLayout(this);
+                        item.setOrientation(LinearLayout.VERTICAL);
+                        item.setGravity(Gravity.CENTER);
+                        int width = Math.round(58 * getResources().getDisplayMetrics().density);
+                        LinearLayout.LayoutParams itemLp = new LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        itemLp.setMargins(0, 0, Math.round(8 * getResources().getDisplayMetrics().density), 0);
+                        item.setLayoutParams(itemLp);
+                        ImageView image = new ImageView(this);
+                        int size = Math.round(44 * getResources().getDisplayMetrics().density);
+                        image.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+                        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        image.setContentDescription(label);
+                        item.addView(image);
+                        TextView caption = new TextView(this);
+                        caption.setText(label);
+                        caption.setTextColor(0xFFE9D9B0);
+                        caption.setTextSize(9);
+                        caption.setGravity(Gravity.CENTER);
+                        caption.setMaxLines(1);
+                        caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        item.addView(caption);
+                        strip.addView(item);
+                        Glide.with(this).load(AssetCatalog.absoluteUrl(imageUrl))
+                                .placeholder(R.drawable.ic_medal_default)
+                                .error(R.drawable.ic_medal_default).into(image);
+                    }
+                    showcase.setVisibility(strip.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+                }
+                // Keep the existing earned-medal cabinet populated for backward compatibility.
+                List<com.Dramizo.Series.data.remote.dto.BadgeDto> badges =
+                        owned == null ? java.util.Collections.emptyList() : owned;
                 binding.rowBadges.setVisibility(View.VISIBLE);
-                binding.tvBadgeCount.setText(earned.size() + " مكتسبة");
+                binding.tvBadgeCount.setText(badges.size() + " مكتسبة");
                 binding.rowEarnedBadges.removeAllViews();
-                if (earned.isEmpty()) {
+                if (badges.isEmpty()) {
                     binding.rowEarnedBadges.setVisibility(View.GONE);
                     binding.tvBadgesEmpty.setVisibility(View.VISIBLE);
                     binding.tvBadgesEmpty.setText("لا توجد ميداليات مكتسبة بعد");
                 } else {
                     binding.tvBadgesEmpty.setVisibility(View.GONE);
                     binding.rowEarnedBadges.setVisibility(View.VISIBLE);
-                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
-                        if (badge == null || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges) {
+                        if (badge == null || !badge.earned || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
                         ImageView image = new ImageView(this);
                         int size = Math.round(34 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
