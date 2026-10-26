@@ -435,6 +435,13 @@ public class ProfileActivity extends ThemedActivity {
                     user.hostBadgeUrl,
                     user.hostBadgeMeta,
                     1);
+            // Secure only the enlarged avatar viewer; the profile screen itself remains screenshot-able.
+            binding.imgAvatar.setOnClickListener(v -> {
+                if (user.avatarUrl == null || user.avatarUrl.trim().isEmpty()) return;
+                Intent secureImage = new Intent(ProfileActivity.this, SecureProfileImageActivity.class);
+                secureImage.putExtra(SecureProfileImageActivity.EXTRA_IMAGE_URL, user.avatarUrl);
+                startActivity(secureImage);
+            });
             com.Dramizo.Series.util.HostSignalView.prefetchWear(this, profileFrame);
             if (binding.imgHostBadge != null) {
                 binding.imgHostBadge.setVisibility(View.GONE);
