@@ -572,7 +572,37 @@ export class UsersService {
     if (dto.displayedMedalIds !== undefined) {
       const keys = [...new Set(dto.displayedMedalIds.map((value) => value.trim()).filter(Boolean))];
       if (keys.length > 5) throw new BadRequestException('يمكن عرض خمس ميداليات كحد أقصى');
-      // Keys are only presentation preferences; ownership is still determined by the badges/VIP records.
+      // Never allow a client to feature a medal that this account has not earned.
+      const badgeKeys = keys.filter((key) => !key.startsWith('vip:'));
+      if (badgeKeys.length) {
+        const ownedBadges: Array<{ id: string }> = await this.dataSource.query(
+          `SELECT b.id
+             FROM user_badges ub
+             JOIN badges b ON b.id = ub."badgeId"
+             WHERE ub."userId" = $1
+               AND b."isActive" = true
+               AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
+               AND b.id = ANY($2::uuid[])`,
+          [userId, badgeKeys],
+        );
+        const ownedIds = new Set(ownedBadges.map((row) => String(row.id)));
+        if (badgeKeys.some((key) => !ownedIds.has(key))) {
+          throw new BadRequestException('يمكن اختيار الميداليات التي حصلت عليها فقط');
+        }
+      }
+      const vipKeys = keys.filter((key) => key.startsWith('vip:'));
+      if (vipKeys.length) {
+        const activeVip = await this.userVipsRepo.findOne({
+          where: { userId, isActive: true },
+          order: { level: 'DESC' },
+        });
+        const allowedVipKey = activeVip && activeVip.level >= 1 && activeVip.level <= 7
+          ? `vip:${activeVip.level}`
+          : null;
+        if (vipKeys.some((key) => key !== allowedVipKey)) {
+          throw new BadRequestException('يمكن اختيار شارة VIP الفعالة لحسابك فقط');
+        }
+      }
       profile.displayedMedalIds = keys;
     }
     if (dto.dmGiftGateEnabled !== undefined) {
