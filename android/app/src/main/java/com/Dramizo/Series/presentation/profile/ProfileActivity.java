@@ -1277,12 +1277,12 @@ public class ProfileActivity extends ThemedActivity {
                         LinearLayout item = new LinearLayout(this);
                         item.setOrientation(LinearLayout.VERTICAL);
                         item.setGravity(Gravity.CENTER);
-                        int width = Math.round(62 * getResources().getDisplayMetrics().density);
+                        int width = Math.round(40 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams itemLp = new LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
                         itemLp.setMargins(0, 0, Math.round(6 * getResources().getDisplayMetrics().density), 0);
                         item.setLayoutParams(itemLp);
                         ImageView image = new ImageView(this);
-                        int size = Math.round(50 * getResources().getDisplayMetrics().density);
+                        int size = Math.round(30 * getResources().getDisplayMetrics().density);
                         image.setLayoutParams(new LinearLayout.LayoutParams(size, size));
                         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
                         image.setContentDescription(label);
