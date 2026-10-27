@@ -64,6 +64,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   private readonly onlineUsers = new Map<string, Set<string>>();
   /** Live-session music gain; defaults to full volume and does not alter mic gain. */
   private readonly roomMusicVolumes = new Map<string, number>();
+  private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
+  private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
 
   constructor(
     private readonly jwtService: JwtService,
@@ -96,6 +98,24 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly zegoTokenService: ZegoTokenService,
   ) {}
 
+  /** Cache the tiny dashboard policy briefly to avoid a database read for every chat message. */
+  private async mysteriousPolicy(): Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }> {
+    const now = Date.now();
+    if (this.mysteriousPolicyCache && this.mysteriousPolicyCache.expiresAt > now) {
+      return this.mysteriousPolicyCache;
+    }
+    if (this.mysteriousPolicyLookup) return this.mysteriousPolicyLookup;
+    this.mysteriousPolicyLookup = this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } })
+      .then((row) => ({ row, failed: false, expiresAt: Date.now() + 5_000 }))
+      .catch(() => ({ row: null, failed: true, expiresAt: Date.now() + 2_000 }))
+      .then((result) => {
+        this.mysteriousPolicyCache = result;
+        return result;
+      })
+      .finally(() => { this.mysteriousPolicyLookup = undefined; });
+    return this.mysteriousPolicyLookup;
+  }
+
   /** Keep realtime identity in lockstep with VIP status and the dashboard's live policy. */
   private async isMysteriousModeEligible(user: User | null | undefined, vip: UserVip | null | undefined): Promise<boolean> {
     if (!user?.mysteriousMode || !vip || !vip.isActive) return false;
@@ -103,12 +123,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     const level = Number(vip.level || 0);
     if (!Number.isInteger(level) || level < 1 || level > 7) return false;
 
-    let policyRow: AppSetting | null = null;
-    try {
-      policyRow = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
-    } catch {
-      return false; // fail closed when eligibility cannot be verified
-    }
+    const currentPolicy = await this.mysteriousPolicy();
+    if (currentPolicy.failed) return false; // fail closed when eligibility cannot be verified
+    const policyRow = currentPolicy.row;
     const benefits = vip.vipPlan?.benefits as any;
     if (policyRow) {
       let policy: any = {};
