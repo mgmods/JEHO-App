@@ -1,12 +1,8 @@
 name: Publish JEHO-OWN backend image
 
+# Production image publishing is manual only. A source push must never move
+# the stable image tag behind a running deployment.
 on:
-  push:
-    branches:
-      - jeho-own
-    paths:
-      - "backend/**"
-      - ".github/workflows/publish-jeho-own-backend.yml"
   workflow_dispatch:
 
 permissions:
