@@ -14,9 +14,14 @@ export async function ensureVanityIdStyleColumns(dataSource: DataSource): Promis
   await dataSource.query(`
     ALTER TABLE "jeho_own"."vanity_ids"
       ADD COLUMN IF NOT EXISTS "styleMode" varchar(16) NOT NULL DEFAULT 'static',
+      ADD COLUMN IF NOT EXISTS "styleVipLevel" integer NOT NULL DEFAULT 1,
       ADD COLUMN IF NOT EXISTS "styleColor1" varchar(7) NOT NULL DEFAULT '#52E8FF',
       ADD COLUMN IF NOT EXISTS "styleColor2" varchar(7) NOT NULL DEFAULT '#C084FC',
       ADD COLUMN IF NOT EXISTS "styleColor3" varchar(7) NOT NULL DEFAULT '#FF7AC8',
-      ADD COLUMN IF NOT EXISTS "styleGlow" boolean NOT NULL DEFAULT true
+      ADD COLUMN IF NOT EXISTS "styleGlow" boolean NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS "styleIconUrl" varchar(512) NULL,
+      ADD COLUMN IF NOT EXISTS "targetType" varchar(16) NULL,
+      ADD COLUMN IF NOT EXISTS "targetId" uuid NULL,
+      ADD COLUMN IF NOT EXISTS "previousTargetPublicId" varchar(32) NULL
   `);
 }
