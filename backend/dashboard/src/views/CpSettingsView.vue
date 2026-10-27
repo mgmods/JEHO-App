@@ -328,7 +328,7 @@ async function loadCpStoreItems() {
   loadingCpStore.value = true
   try {
     const response = await cosmeticsApi.adminList()
-    cpStoreItems.value = extractList(payloadOf(response)).filter(isCpStoreItem)
+    cpStoreItems.value = extractList(payloadOf(response)).filter(isCpStoreItem).map(item => ({ ...item, meta: { ...(item.meta || {}), leaseDays: Number(item.meta?.leaseDays || 30) } }))
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل عناصر متجر CP'
   } finally { loadingCpStore.value = false }
