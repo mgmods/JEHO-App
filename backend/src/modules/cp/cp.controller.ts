@@ -92,12 +92,9 @@ export class CpController {
   }
 
   @Post('profile-requests')
-  @ApiOperation({ summary: 'Send a relationship request directly from a user profile without a room gift' })
-  createProfileRequest(
-    @CurrentUser('sub') userId: string,
-    @Body() body: { recipientId: string; type: CpType; idempotencyKey: string },
-  ) {
-    return this.cp.createProfileRequest(userId, body);
+  @ApiOperation({ summary: 'Disabled: CP initiation must be a gift sent from a shared voice room' })
+  createProfileRequest() {
+    throw new BadRequestException('إرسال طلب الارتباط الشخصي متوقف. أرسل هدية CP من داخل الروم الصوتي.');
   }
 
   @Get('sent-requests')
