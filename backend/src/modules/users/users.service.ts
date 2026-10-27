@@ -162,10 +162,11 @@ export class UsersService {
       publicIdStyleColor2: null,
       publicIdStyleColor3: null,
       publicIdStyleGlow: false,
+      publicIdStyleIconUrl: null,
     } as T;
     try {
       const rows = await this.dataSource.query(
-        `SELECT "styleMode", "styleVipLevel", "styleColor1", "styleColor2", "styleColor3", "styleGlow"
+        `SELECT "styleMode", "styleVipLevel", "styleColor1", "styleColor2", "styleColor3", "styleGlow", "styleIconUrl"
          FROM vanity_ids
          WHERE "publicId" = $1 AND "ownerUserId" = $2 AND status = 'owned'
            AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
@@ -182,6 +183,7 @@ export class UsersService {
         publicIdStyleColor2: row?.styleColor2 || null,
         publicIdStyleColor3: row?.styleColor3 || null,
         publicIdStyleGlow: row?.styleGlow === true,
+        publicIdStyleIconUrl: row?.styleIconUrl || null,
       } as T;
     } catch {
       return {
