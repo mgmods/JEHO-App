@@ -615,6 +615,7 @@ public class CpCenterActivity extends ThemedActivity {
     private void addCpCosmeticCard(LinearLayout row, Map<String, Object> item) {
         LinearLayout card = panel();
         card.setPadding(dp(10), dp(11), dp(10), dp(11));
+        card.setContentDescription("عنصر متجر CP: " + defaultString(item.get("name"), "مظهر CP"));
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(0, -2, 1f);
         cardLp.setMargins(dp(3), 0, dp(3), 0);
         row.addView(card, cardLp);
@@ -632,6 +633,7 @@ public class CpCenterActivity extends ThemedActivity {
         if (preview != null && !preview.isEmpty()) {
             ImageView image = new ImageView(this);
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setContentDescription("معاينة " + title);
             previewFrame.addView(image, new FrameLayout.LayoutParams(-1, -1));
             Glide.with(this).load(preview).into(image);
         } else {
