@@ -21,7 +21,7 @@ async function resetSchemaOnceIfRequested() {
     throw new Error('JEHO_OWN_RESET_ONCE requires DATABASE_URL; refusing to guess which database to reset.');
   }
 
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 8000, query_timeout: 10000 });
   try {
     await client.connect();
     const marker = await client.query(
@@ -41,7 +41,7 @@ async function resetSchemaOnceIfRequested() {
 }
 
 async function markResetCompleted() {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 8000, query_timeout: 10000 });
   try {
     await client.connect();
     await client.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
@@ -125,6 +125,7 @@ async function runProcess(label, command, args) {
 async function main() {
   logDatabaseConfiguration();
 
+  console.log('[JEHO-OWN startup] Runtime:', JSON.stringify({ node: process.version, platform: process.platform, port: process.env.PORT || '3000' }));
   const resetWasRequested = await resetSchemaOnceIfRequested();
   if (resetWasRequested) {
     const seedCode = await runProcess('fresh database seed', process.execPath, ['dist/database/seed.js']);
