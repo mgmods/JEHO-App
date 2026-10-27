@@ -1364,10 +1364,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 seats = new ArrayList<>(restoreSeatSnapshot);
                 room.seats = seats;
             } else if (resumedFromActiveSession && seats != null && !seats.isEmpty()) {
-                // Preserve the whole room roster, not only the local user's seat. The host or
-                // a listener may not occupy a seat themselves; gating this snapshot on isOnSeat
-                // caused the other occupied mics to disappear after repeated minimize/restore.
-                restoreSeatSnapshot = new ArrayList<>(seats);
+                // Preserve the whole room roster, including other occupied mics when the host
+                // or listener is not seated. But if this user was seated in the saved snapshot
+                // and a refresh omits them, keep the prior snapshot until a real seat-left event
+                // clears it; otherwise a stale response can erase the local mic on next minimize.
+                boolean savedLocalSeat = restoreSeatSnapshot != null && isOnSeat(restoreSeatSnapshot);
+                if (!savedLocalSeat || isOnSeat(seats)) {
+                    restoreSeatSnapshot = new ArrayList<>(seats);
+                }
             }
             if (seats == null && resumedFromActiveSession) {
                 RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
