@@ -99,12 +99,13 @@ const entityList = Object.values(entities).filter(
 
         // Create the isolated schema before TypeORM initializes entities.
         // The bootstrap connection never synchronizes tables.
+        console.log('[JEHO-OWN DB] Opening bounded bootstrap connection...');
         const bootstrap = new DataSource({
           ...options,
           schema: 'public',
           entities: [],
           synchronize: false,
-          extra: {},
+          extra: { connectionTimeoutMillis: 8000 },
         } as any);
         await bootstrap.initialize();
         try {
@@ -113,7 +114,12 @@ const entityList = Object.values(entities).filter(
           await bootstrap.destroy();
         }
 
-        const appDataSource = await new DataSource(options).initialize();
+        console.log('[JEHO-OWN DB] Bootstrap connection ready; initializing application schema...');
+        const appDataSource = await new DataSource({
+          ...options,
+          extra: { ...(options.extra || {}), connectionTimeoutMillis: 8000 },
+          connectTimeoutMS: 8000,
+        }).initialize();
 
         // Safe startup diagnostics: identify the connected database/schema without logging credentials.
         const [connectionInfo] = await appDataSource.query(
