@@ -1246,7 +1246,9 @@ public class ProfileActivity extends ThemedActivity {
                 // must not leave a stale hidden row when switching between profile owners.
                 showcase.setVisibility(View.GONE);
                 if (!selected.isEmpty()) {
+                    int displayedMedalCount = 0;
                     for (String key : selected) {
+                        if (displayedMedalCount >= 5) break;
                         if (key == null) continue;
                         String imageUrl = null;
                         String label = "ميدالية";
@@ -1275,12 +1277,12 @@ public class ProfileActivity extends ThemedActivity {
                         LinearLayout item = new LinearLayout(this);
                         item.setOrientation(LinearLayout.VERTICAL);
                         item.setGravity(Gravity.CENTER);
-                        int width = Math.round(58 * getResources().getDisplayMetrics().density);
+                        int width = Math.round(62 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams itemLp = new LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
-                        itemLp.setMargins(0, 0, Math.round(8 * getResources().getDisplayMetrics().density), 0);
+                        itemLp.setMargins(0, 0, Math.round(6 * getResources().getDisplayMetrics().density), 0);
                         item.setLayoutParams(itemLp);
                         ImageView image = new ImageView(this);
-                        int size = Math.round(44 * getResources().getDisplayMetrics().density);
+                        int size = Math.round(50 * getResources().getDisplayMetrics().density);
                         image.setLayoutParams(new LinearLayout.LayoutParams(size, size));
                         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
                         image.setContentDescription(label);
@@ -1288,12 +1290,13 @@ public class ProfileActivity extends ThemedActivity {
                         TextView caption = new TextView(this);
                         caption.setText(label);
                         caption.setTextColor(0xFF697187);
-                        caption.setTextSize(9);
+                        caption.setTextSize(10);
                         caption.setGravity(Gravity.CENTER);
                         caption.setMaxLines(1);
                         caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
                         item.addView(caption);
                         strip.addView(item);
+                        displayedMedalCount++;
                         Glide.with(this).load(AssetCatalog.absoluteUrl(imageUrl))
                                 .placeholder(R.drawable.ic_medal_default)
                                 .error(R.drawable.ic_medal_default).into(image);
