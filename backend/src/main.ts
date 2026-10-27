@@ -30,15 +30,22 @@ async function bootstrap() {
   // Redis is optional for a single running backend. Never let an unavailable
   // Redis service prevent the HTTP API/admin dashboard from opening.
   try {
-    await Promise.race([
-      redisIoAdapter.connect(),
-      new Promise<boolean>((resolve) =>
-        setTimeout(() => {
-          console.warn('[JEHO-OWN boot] Redis connection exceeded 7s; continuing with local Socket.IO adapter.');
-          resolve(false);
-        }, 7000),
-      ),
-    ]);
+    await new Promise<boolean>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.warn('[JEHO-OWN boot] Redis connection exceeded 7s; continuing with local Socket.IO adapter.');
+        resolve(false);
+      }, 7000);
+      redisIoAdapter.connect().then(
+        (connected) => {
+          clearTimeout(timeout);
+          resolve(connected);
+        },
+        (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        },
+      );
+    });
   } catch (error) {
     console.warn('[JEHO-OWN boot] Redis setup failed; continuing without Redis adapter:', error instanceof Error ? error.message : String(error));
   }
