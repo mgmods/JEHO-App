@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Param, Query, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Delete, Param, Query, BadRequestException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Public } from '../../common/decorators';
 import { ParseUUIDPipe } from '@nestjs/common';
@@ -35,6 +35,28 @@ export class CpController {
   @ApiOperation({ summary: 'Real active CP relationships, ranked by points' })
   discover(@Query('type') type?: CpType) {
     return this.cp.discover(type);
+  }
+
+
+  @Get('memories')
+  @ApiOperation({ summary: 'List memories shared within the current active CP relationship' })
+  memories(@CurrentUser('sub') userId: string) {
+    return this.cp.memories(userId);
+  }
+
+  @Post('memories')
+  @ApiOperation({ summary: 'Add a text or image memory to the current active CP relationship' })
+  createMemory(
+    @CurrentUser('sub') userId: string,
+    @Body() body: { text?: string; imageUrl?: string },
+  ) {
+    return this.cp.createMemory(userId, body);
+  }
+
+  @Delete('memories/:id')
+  @ApiOperation({ summary: 'Delete a memory created by the current user' })
+  deleteMemory(@CurrentUser('sub') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.cp.deleteMemory(userId, id);
   }
 
   @Get('me')
