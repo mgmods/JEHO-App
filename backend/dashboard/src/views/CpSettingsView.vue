@@ -134,6 +134,82 @@
         </div>
       </section>
 
+      <section class="settings-card mb-3 cp-store-admin">
+        <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-2">
+          <div>
+            <h3 class="settings-card-title mb-1">متجر CP · العناصر التجميلية</h3>
+            <p class="form-text mb-0">أنشئ عناصر خاصة بعالم CP، وحدد السعر والمدة والصورة. العناصر المحفوظة هنا تظهر في متجر CP داخل تطبيق Android.</p>
+          </div>
+          <span class="badge rounded-pill text-bg-light border">متصل بكتالوج المتجر</span>
+        </div>
+        <div class="alert alert-info small">الشراء وخصم العملات وارتداء العنصر يتم عبر الخادم. لا تضفوا عناصر CP بإعدادات شكلية فقط؛ يجب حفظ صورة معاينة صالحة وسعر واضح.</div>
+        <div class="row g-3">
+          <div class="col-sm-6 col-xl-3">
+            <label class="form-label">رمز العنصر (فريد)</label>
+            <input v-model.trim="cpStoreForm.code" class="form-control" dir="ltr" placeholder="cp_heart_frame">
+          </div>
+          <div class="col-sm-6 col-xl-3">
+            <label class="form-label">اسم العنصر</label>
+            <input v-model.trim="cpStoreForm.name" class="form-control" placeholder="إطار قلبين">
+          </div>
+          <div class="col-sm-6 col-xl-3">
+            <label class="form-label">الفئة</label>
+            <select v-model="cpStoreForm.type" class="form-select">
+              <option value="profile_card">بطاقة الملف الشخصي</option>
+              <option value="entry_effect">تأثير دخول</option>
+              <option value="room_card">بطاقة الروم</option>
+              <option value="nameplate">لوحة الاسم</option>
+              <option value="chat_bubble">فقاعة الدردشة</option>
+            </select>
+          </div>
+          <div class="col-sm-6 col-xl-3">
+            <label class="form-label">السعر بالعملات</label>
+            <input v-model.number="cpStoreForm.coinPrice" class="form-control" type="number" min="0" max="1000000000" step="1">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">رابط صورة المعاينة</label>
+            <input v-model.trim="cpStoreForm.previewUrl" class="form-control" dir="ltr" placeholder="https://…">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">رابط الحركة (اختياري)</label>
+            <input v-model.trim="cpStoreForm.animationUrl" class="form-control" dir="ltr" placeholder="https://…">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">الوصف الذي يظهر للمستخدم</label>
+            <input v-model.trim="cpStoreForm.description" class="form-control" placeholder="لمسة رومانسية تظهر على ملفك">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">مدة الملكية بالأيام</label>
+            <input v-model.number="cpStoreForm.leaseDays" class="form-control" type="number" min="1" max="3650" step="1">
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-aurora w-100" :disabled="savingCpStore" @click="createCpStoreItem">
+              <span v-if="savingCpStore" class="spinner-border spinner-border-sm me-1" />إضافة إلى متجر CP
+            </button>
+          </div>
+        </div>
+        <hr class="my-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+          <h4 class="h6 mb-0">العناصر المنشورة ({{ cpStoreItems.length }})</h4>
+          <button class="btn btn-outline-secondary btn-sm" :disabled="loadingCpStore" @click="loadCpStoreItems">تحديث عناصر المتجر</button>
+        </div>
+        <div v-if="loadingCpStore" class="text-secondary small py-3">جارٍ تحميل عناصر متجر CP…</div>
+        <div v-else-if="!cpStoreItems.length" class="text-secondary small py-3">لا توجد عناصر CP خاصة بعد. أضف أول عنصر من النموذج أعلاه.</div>
+        <div v-for="item in cpStoreItems" :key="item.id" class="d-flex align-items-center gap-3 py-3 border-top flex-wrap">
+          <img :src="item.previewUrl" :alt="item.name" width="58" height="58" class="rounded-3 border" style="object-fit:contain;background:#fff">
+          <div class="flex-grow-1" style="min-width:180px">
+            <div class="fw-semibold">{{ item.name }}</div>
+            <div class="small text-secondary">{{ cosmeticTypeLabel(item.type) }} · {{ format(item.coinPrice) }} عملة · {{ Number(item.meta?.leaseDays || 30) }} يوم</div>
+            <div class="small text-secondary"><code>{{ item.code }}</code></div>
+          </div>
+          <label class="form-check form-switch mb-0">
+            <input v-model="item.isActive" class="form-check-input" type="checkbox" role="switch">
+            <span class="form-check-label">{{ item.isActive ? 'منشور' : 'مخفي' }}</span>
+          </label>
+          <button class="btn btn-outline-primary btn-sm" :disabled="savingCpStore" @click="saveCpStoreItem(item)">حفظ</button>
+        </div>
+      </section>
+
       <section class="settings-card mb-3">
         <h3 class="settings-card-title">سياسة الطلبات</h3>
         <p class="form-text">الرفض والانتهاء والإلغاء من صاحب الطلب يعيد المبلغ الأصلي كاملاً. لا يمكن تعطيل الاسترداد الكامل من لوحة التحكم.</p>
@@ -210,7 +286,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { cpAdminApi, giftsApi, uploadsApi } from '@/api'
+import { cpAdminApi, giftsApi, uploadsApi, cosmeticsApi } from '@/api'
 import { extractList } from '@/composables/useUtils'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -229,11 +305,78 @@ const pointForm = ref({ relationshipId: '', points: 0, eventType: 'admin_adjustm
 const error = ref('')
 const success = ref('')
 const policy = ref({ requestExpiryMinutes: 30, rulesText: '{}' })
+const cpStoreItems = ref([])
+const loadingCpStore = ref(false)
+const savingCpStore = ref(false)
+const cpStoreForm = ref({ code: '', name: '', type: 'profile_card', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 })
 
 function label(type) {
   return ({ friendship: 'الصداقة', brotherhood: 'الأخوّة', love: 'الحب', engagement: 'الخطوبة', marriage: 'الزواج' })[type] || type
 }
 function format(value) { return Number(value || 0).toLocaleString('ar') }
+function cosmeticTypeLabel(type) {
+  return ({ profile_card: 'بطاقة الملف الشخصي', entry_effect: 'تأثير دخول', room_card: 'بطاقة الروم', nameplate: 'لوحة الاسم', chat_bubble: 'فقاعة الدردشة' })[type] || type
+}
+function isCpStoreItem(item) {
+  return item && (item.meta?.cpStore === true || String(item.code || '').startsWith('cp_'))
+}
+async function loadCpStoreItems() {
+  loadingCpStore.value = true
+  try {
+    const response = await cosmeticsApi.adminList()
+    cpStoreItems.value = extractList(payloadOf(response)).filter(isCpStoreItem)
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل عناصر متجر CP'
+  } finally { loadingCpStore.value = false }
+}
+async function createCpStoreItem() {
+  error.value = ''; success.value = ''
+  const form = cpStoreForm.value
+  if (!form.code || !form.name || !form.previewUrl) {
+    error.value = 'أدخل رمز العنصر واسمه ورابط صورة المعاينة.'
+    return
+  }
+  if (!/^[a-zA-Z0-9_-]{2,64}$/.test(form.code)) {
+    error.value = 'رمز العنصر يجب أن يحتوي أحرفاً إنجليزية أو أرقاماً أو _ أو - فقط.'
+    return
+  }
+  if (!/^https?:\/\//i.test(form.previewUrl)) {
+    error.value = 'رابط المعاينة يجب أن يبدأ بـ https:// أو http://.'
+    return
+  }
+  if (!Number.isSafeInteger(Number(form.coinPrice)) || Number(form.coinPrice) < 0 ||
+      !Number.isInteger(Number(form.leaseDays)) || Number(form.leaseDays) < 1 || Number(form.leaseDays) > 3650) {
+    error.value = 'تحقق من السعر ومدة الملكية.'
+    return
+  }
+  savingCpStore.value = true
+  try {
+    const response = await cosmeticsApi.create({
+      type: form.type, code: form.code, name: form.name,
+      description: form.description || '', previewUrl: form.previewUrl,
+      animationUrl: form.animationUrl || null, coinPrice: Number(form.coinPrice),
+      isActive: true, sortOrder: 0,
+      meta: { cpStore: true, leaseDays: Number(form.leaseDays) },
+    })
+    if (response?.error) throw new Error(response.error.message || 'تعذر إضافة العنصر')
+    success.value = 'تمت إضافة العنصر إلى كتالوج متجر CP.'
+    cpStoreForm.value = { code: '', name: '', type: 'profile_card', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 }
+    await loadCpStoreItems()
+  } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر إضافة عنصر متجر CP' }
+  finally { savingCpStore.value = false }
+}
+async function saveCpStoreItem(item) {
+  savingCpStore.value = true; error.value = ''; success.value = ''
+  try {
+    await cosmeticsApi.update(item.id, {
+      isActive: !!item.isActive,
+      meta: { ...(item.meta || {}), cpStore: true, leaseDays: Math.max(1, Math.min(3650, Number(item.meta?.leaseDays || 30))) },
+    })
+    success.value = 'تم حفظ حالة العنصر. سيظهر التغيير في المتجر بعد تحديثه.'
+    await loadCpStoreItems()
+  } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ العنصر' }
+  finally { savingCpStore.value = false }
+}
 function date(value) { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('ar') }
 function selectedGift(item) { return gifts.value.find(g => String(g.id) === String(item.giftId)) || null }
 function payloadOf(response) { return response?.data?.data ?? response?.data ?? response ?? {} }
@@ -265,7 +408,7 @@ async function load() {
       requestExpiryMinutes: Number(config.policy?.requestExpiryMinutes || 30),
       rulesText: JSON.stringify(config.policy?.rules || {}, null, 2),
     }
-    await loadLogs()
+    await Promise.all([loadLogs(), loadCpStoreItems()])
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل إعدادات CP' }
   finally { loading.value = false }
 }
