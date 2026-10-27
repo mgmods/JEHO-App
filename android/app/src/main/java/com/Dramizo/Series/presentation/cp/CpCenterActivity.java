@@ -456,7 +456,7 @@ public class CpCenterActivity extends ThemedActivity {
             LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(-1, -2);
             startLp.topMargin = dp(15);
             welcome.addView(start, startLp);
-            start.setOnClickListener(v -> showView("send"));
+            start.setOnClickListener(v -> showView("gifts"));
         } else for (Map<String, Object> row : active) addRelationshipCard(row, false);
 
         sectionTitle("اختر نوع الرابطة", "كل نوع له طابعه الخاص");
@@ -497,18 +497,18 @@ public class CpCenterActivity extends ThemedActivity {
             detail.setGravity(Gravity.CENTER);
             detail.setPadding(0, dp(4), 0, 0);
             card.addView(detail);
-            card.setOnClickListener(v -> { currentType = type; showView("send"); });
+            card.setOnClickListener(v -> { currentType = type; showView("gifts"); });
         }
         sectionTitle("اكتشف عالم CP", "كل ما تحتاجه لعلاقتكما في مكان واحد");
-        addFeatureCard("tasks", "المهام والتحديات", "إنجازات مشتركة ومكافآت يومية", "✦");
+        addFeatureCard("gifts", "هدايا CP", "أرسل هدية تبدأ بها قصة ارتباط", "🎁");
         addFeatureCard("store", "متجر CP", "مظاهر وإطارات تضيف بصمتكما", "♧");
-        addFeatureCard("leaderboard", "قمة المتصدرين", "شاهد أجمل الروابط في JEHO", "♛");
         addFeatureCard("memories", "ذكرياتنا", "احفظوا لحظاتكم وصوركم", "♡");
-        sectionTitle("طلبات الارتباط", "تابع الدعوات بكل سهولة");
-        addFeatureCard("incoming", "الطلبات الواردة", "قبول أو رفض الدعوات المرسلة إليك", "↓");
-        addFeatureCard("sent", "الطلبات المرسلة", "تابع حالة دعواتك", "↑");
-        addFeatureCard("discover", "العلاقات النشطة", "استكشف الروابط في مجتمع JEHO", "♥");
-        addFeatureCard("settings", "إعدادات العلاقة", "إدارة الروابط الحالية بأمان", "⚙");
+        addFeatureCard("tasks", "المهام المشتركة", "إنجازات ومكافآت يومية", "✦");
+        addFeatureCard("categories", "تصنيفات CP", "الحب والزواج والصداقة والمزيد", "❦");
+        addFeatureCard("stats", "الإحصائيات", "نقاط العلاقة ومدتها وتقدمها", "✧");
+        addFeatureCard("leaderboard", "قمة المتصدرين", "شاهد أجمل الروابط في JEHO", "♛");
+        addFeatureCard("discover", "اكتشف العلاقات", "استكشف الروابط في مجتمع JEHO", "♥");
+        addFeatureCard("settings", "إعدادات العلاقة", "إدارة الرابط الحالي بأمان", "⚙");
     }
 
     private void renderSend() {
