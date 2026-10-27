@@ -10,6 +10,8 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Gravity;
@@ -66,6 +68,15 @@ public class ProfileActivity extends ThemedActivity {
     private ActivityProfileBinding binding;
     private AppContainer container;
     private boolean isFollowingTarget;
+    private boolean isOwnProfile;
+    private final Handler profileHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mysteriousModeRefresh = new Runnable() {
+        @Override public void run() {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            if (isOwnProfile) bindMysteriousMode(true);
+            profileHandler.postDelayed(this, 60_000L);
+        }
+    };
     private AnimatorSet cpHeartAnimator;
 
     @Override
@@ -314,6 +325,7 @@ public class ProfileActivity extends ThemedActivity {
             if (user == null) return;
             binding.btnFollow.setEnabled(true);
             boolean ownProfile = myId != null && myId.equals(user.id);
+            isOwnProfile = ownProfile;
             binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
             // The mysterious-mode activation control belongs only in Me -> Profile.
             // Never expose an activation/cancel switch from a public profile opened from a room.
@@ -1342,10 +1354,25 @@ public class ProfileActivity extends ThemedActivity {
                 && binding.webProfileHostSignal.getVisibility() == android.view.View.VISIBLE) {
             binding.webProfileHostSignal.resumeMotion();
         }
+        if (isOwnProfile) {
+            // Recheck immediately on return and periodically while the screen stays open.
+            // Expiry or a dashboard feature disable hides the switch without requiring
+            // the user to leave/reopen the profile.
+            bindMysteriousMode(true);
+            profileHandler.removeCallbacks(mysteriousModeRefresh);
+            profileHandler.postDelayed(mysteriousModeRefresh, 60_000L);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        profileHandler.removeCallbacks(mysteriousModeRefresh);
+        super.onPause();
     }
 
     @Override
     protected void onDestroy() {
+        profileHandler.removeCallbacks(mysteriousModeRefresh);
         if (cpHeartAnimator != null) {
             cpHeartAnimator.cancel();
             cpHeartAnimator = null;
