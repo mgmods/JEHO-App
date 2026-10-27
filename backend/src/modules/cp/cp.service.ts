@@ -24,6 +24,20 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     // Backward-compatible schema adjustment: profile-origin CP requests have no room/payment.
     await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
     await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "priceCoins" DROP NOT NULL').catch(() => undefined);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS cp_memories (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "relationshipId" uuid NOT NULL REFERENCES cp_relationships(id) ON DELETE CASCADE,
+        "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        text varchar(500) NOT NULL DEFAULT '',
+        "imageUrl" varchar(2048),
+        "createdAt" timestamptz NOT NULL DEFAULT now()
+      )
+    `).catch(() => undefined);
+    await this.dataSource.query(`
+      CREATE INDEX IF NOT EXISTS idx_cp_memories_relationship_created
+      ON cp_memories ("relationshipId", "createdAt" DESC)
+    `).catch(() => undefined);
     // Expiry processing only touches CP requests and their wallet ledger rows.
     this.expiryTimer = setInterval(() => {
       void this.expireDueRequests().catch(() => undefined);
@@ -163,6 +177,62 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       })),
       effects,
     };
+  }
+
+
+  async memories(userId: string) {
+    const relationships = await this.dataSource.query(
+      \`SELECT id FROM cp_relationships
+       WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
+       ORDER BY "startedAt" DESC LIMIT 1\`,
+      [userId],
+    );
+    if (!relationships.length) return [];
+    return this.dataSource.query(
+      \`SELECT m.id,m.text,m."imageUrl",m."createdAt",m."userId",
+        json_build_object('id',u.id,'username',u.username,'displayName',u."displayName",'avatarUrl',u."avatarUrl") AS author
+       FROM cp_memories m JOIN users u ON u.id=m."userId"
+       WHERE m."relationshipId"=$1
+       ORDER BY m."createdAt" DESC LIMIT 100\`,
+      [relationships[0].id],
+    );
+  }
+
+  async createMemory(userId: string, input: { text?: string; imageUrl?: string }) {
+    const text = String(input?.text || '').trim();
+    const imageUrl = String(input?.imageUrl || '').trim();
+    if ((!text && !imageUrl) || text.length > 500 || imageUrl.length > 2048) {
+      throw new BadRequestException('أضف نصاً أو صورة، واجعل النص أقل من 500 حرف');
+    }
+    if (imageUrl && !/^https?:\/\/\S+$/i.test(imageUrl)) {
+      throw new BadRequestException('رابط الصورة غير صالح');
+    }
+    const relationships = await this.dataSource.query(
+      \`SELECT id FROM cp_relationships
+       WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
+       ORDER BY "startedAt" DESC LIMIT 1\`,
+      [userId],
+    );
+    if (!relationships.length) throw new BadRequestException('تحتاج إلى علاقة CP نشطة لإضافة ذكرى');
+    const [memory] = await this.dataSource.query(
+      \`INSERT INTO cp_memories ("relationshipId","userId",text,"imageUrl","createdAt")
+       VALUES ($1,$2,$3,$4,now())
+       RETURNING id,text,"imageUrl","createdAt","userId"\`,
+      [relationships[0].id, userId, text, imageUrl || null],
+    );
+    return memory;
+  }
+
+  async deleteMemory(userId: string, memoryId: string) {
+    const result = await this.dataSource.query(
+      \`DELETE FROM cp_memories m USING cp_relationships r
+       WHERE m.id=$1 AND m."userId"=$2 AND r.id=m."relationshipId"
+         AND r.status='active' AND (r."userAId"=$2 OR r."userBId"=$2)
+       RETURNING m.id\`,
+      [memoryId, userId],
+    );
+    if (!result.length) throw new NotFoundException('الذكرى غير موجودة أو لا تملك صلاحية حذفها');
+    return { id: memoryId, deleted: true };
   }
 
   async profileRelationships(userId: string) {
