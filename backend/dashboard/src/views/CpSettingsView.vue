@@ -335,6 +335,7 @@ async function loadCpStoreItems() {
   loadingCpStore.value = true
   try {
     const response = await cosmeticsApi.adminList()
+    if (response?.error) throw new Error(response.error.message || 'تعذر تحميل عناصر متجر CP')
     cpStoreItems.value = extractList(payloadOf(response)).filter(isCpStoreItem).map(item => ({ ...item, meta: { ...(item.meta || {}), leaseDays: Number(item.meta?.leaseDays || 30) } }))
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل عناصر متجر CP'
@@ -418,12 +419,13 @@ async function saveCpStoreItem(item) {
         !Number.isInteger(leaseDays) || leaseDays < 1 || leaseDays > 3650) {
       throw new Error('تحقق من اسم العنصر والسعر والمدة.')
     }
-    await cosmeticsApi.update(item.id, {
+    const response = await cosmeticsApi.update(item.id, {
       name: item.name.trim(),
       coinPrice: price,
       isActive: !!item.isActive,
       meta: { ...(item.meta || {}), cpStore: true, leaseDays },
     })
+    if (response?.error) throw new Error(response.error.message || 'تعذر حفظ العنصر')
     success.value = 'تم حفظ حالة العنصر. سيظهر التغيير في المتجر بعد تحديثه.'
     await loadCpStoreItems()
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ العنصر' }
