@@ -122,7 +122,7 @@ public class CpCenterActivity extends ThemedActivity {
         renderScreen();
         loadHome();
         loadRequests();
-        if ("discover".equals(currentView)) loadDiscover(discoverType);
+        if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
         if ("store".equals(currentView)) loadCatalog();
     }
 
@@ -300,7 +300,7 @@ public class CpCenterActivity extends ThemedActivity {
         renderScreen();
         if ("home".equals(currentView)) loadHome();
         else if ("incoming".equals(currentView) || "sent".equals(currentView)) loadRequests();
-        else if ("discover".equals(currentView)) loadDiscover(discoverType);
+        else if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
         else if ("store".equals(currentView)) loadCatalog();
     }
 
@@ -315,7 +315,7 @@ public class CpCenterActivity extends ThemedActivity {
             case "discover": renderDiscover(); break;
             case "store": renderStore(); break;
             case "tasks": renderPlannedPage("المهام والتحديات", "تحديات مشتركة وتقدم ومكافآت.", "يلزم ربط المهام وتسجيل التقدم والمكافآت بخدمة الخادم قبل تفعيلها."); break;
-            case "leaderboard": renderPlannedPage("ترتيب عالم CP", "ترتيب إقليمي وعالمي ومواسم.", "يلزم مصدر ترتيب موثوق من الخادم حتى لا تظهر نقاط أو نتائج وهمية."); break;
+            case "leaderboard": renderLeaderboard(); break;
             case "memories": renderPlannedPage("ذكرياتنا", "مكان يجمع لحظات العلاقة والإنجازات.", "يلزم ربط تخزين الذكريات وصلاحيات الخصوصية بالخادم."); break;
             case "settings": renderSettings(); break;
             default: renderHome(); break;
@@ -610,9 +610,12 @@ public class CpCenterActivity extends ThemedActivity {
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1f);
             cp.setMargins(dp(12), 0, 0, 0);
             row.addView(copy, cp);
-            String title = firstValue(item, "name", "title", "displayName", "label");
+            Map<String, Object> gift = map(item.get("gift"));
+            String title = firstValue(item, "name", "title", "displayName", "label", "type");
+            if (title.isEmpty()) title = firstValue(gift, "name");
             String desc = firstValue(item, "description", "subtitle", "details");
-            String price = firstValue(item, "price", "coinPrice", "cost", "coins");
+            String price = firstValue(item, "price", "priceCoins", "coinPrice", "cost", "coins");
+            if ("false".equalsIgnoreCase(str(item.get("enabled")))) price = "غير مفعّل";
             copy.addView(text(title.isEmpty() ? "عنصر CP" : title, 14, INK, true));
             if (!desc.isEmpty()) {
                 TextView sub = text(desc, 11, MUTED, false);
@@ -632,6 +635,60 @@ public class CpCenterActivity extends ThemedActivity {
                             + "\n\n" + (price.isEmpty() ? "لم يحدد الخادم سعراً لهذا العنصر." : "السعر: " + price)
                             + "\n\nالشراء غير مفعّل حتى تتوفر واجهة شراء آمنة على الخادم.")
                     .setPositiveButton("حسناً", (d, w) -> d.dismiss()).show());
+        }
+    }
+
+
+    private void renderLeaderboard() {
+        sectionTitle("ترتيب عالم CP", "علاقات نشطة مرتبة حسب نقاطها الفعلية");
+        TextView intro = text("الترتيب يعرض البيانات التي يرسلها الخادم، ولا يضيف نقاطاً من الهاتف.", 12, MUTED, false);
+        intro.setLineSpacing(dp(3), 1f);
+        intro.setPadding(dp(13), dp(12), dp(13), dp(12));
+        intro.setBackground(round(Color.WHITE, dp(15), LINE));
+        screenContent.addView(intro, matchWrap());
+        if (loadingDiscover) {
+            emptyState("🏆", "جارٍ تحميل الترتيب", "نحدّث قائمة العلاقات النشطة…");
+            return;
+        }
+        if (discoverData.isEmpty()) {
+            emptyState("🏆", "لا توجد نتائج حالياً", "سيظهر هنا ترتيب العلاقات النشطة عندما تتوفر بيانات.");
+            TextView refresh = actionButton("تحديث الترتيب", true);
+            screenContent.addView(refresh, matchWrap());
+            refresh.setOnClickListener(v -> loadDiscover(""));
+            return;
+        }
+        int rank = 1;
+        for (Map<String, Object> row : discoverData) {
+            LinearLayout card = panel();
+            screenContent.addView(card, matchWrap());
+            LinearLayout line = new LinearLayout(this);
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            card.addView(line, matchWrap());
+            TextView place = text(rank <= 3 ? new String[]{"🥇", "🥈", "🥉"}[rank - 1] : String.valueOf(rank), 18, ROSE, true);
+            place.setGravity(Gravity.CENTER);
+            place.setBackground(round(0xFFFFEAF2, dp(13), LINE));
+            line.addView(place, new LinearLayout.LayoutParams(dp(42), dp(42)));
+            Map<String, Object> a = map(row.get("userA"));
+            Map<String, Object> b = map(row.get("userB"));
+            addAvatar(line, a, 42);
+            TextView heart = text("♥", 14, ROSE, true);
+            heart.setGravity(Gravity.CENTER);
+            line.addView(heart, new LinearLayout.LayoutParams(dp(22), dp(35)));
+            addAvatar(line, b, 42);
+            LinearLayout detail = new LinearLayout(this);
+            detail.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(0, -2, 1f);
+            detailLp.setMargins(dp(8), 0, 0, 0);
+            line.addView(detail, detailLp);
+            detail.addView(text(personName(a) + " ♥ " + personName(b), 12, INK, true));
+            TextView meta = text(typeName(str(row.get("type"))) + " · المستوى " + defaultString(row.get("level"), "1"), 10, MUTED, false);
+            meta.setPadding(0, dp(3), 0, 0);
+            detail.addView(meta);
+            TextView points = text(numberString(row.get("points")) + " نقطة", 11, ROSE, true);
+            points.setPadding(0, dp(3), 0, 0);
+            detail.addView(points);
+            rank++;
         }
     }
 
@@ -955,7 +1012,7 @@ public class CpCenterActivity extends ThemedActivity {
     private void refreshAll() {
         loadHome();
         loadRequests();
-        if ("discover".equals(currentView)) loadDiscover(discoverType);
+        if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
         if ("store".equals(currentView)) loadCatalog();
         Toast.makeText(this, "جارٍ تحديث بيانات CP…", Toast.LENGTH_SHORT).show();
     }
@@ -1022,7 +1079,7 @@ public class CpCenterActivity extends ThemedActivity {
     private void loadDiscover(String type) {
         if (loadingDiscover || isFinishing()) return;
         loadingDiscover = true;
-        if ("discover".equals(currentView)) renderScreen();
+        if ("discover".equals(currentView) || "leaderboard".equals(currentView)) renderScreen();
         String safe = safeType(type);
         c.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> result = ApiCall.execute(c.getUserApi().discoverCp(safe.isEmpty() ? null : safe));
@@ -1032,7 +1089,7 @@ public class CpCenterActivity extends ThemedActivity {
                 loadingDiscover = false;
                 discoverData.clear();
                 discoverData.addAll(rows);
-                if ("discover".equals(currentView)) renderScreen();
+                if ("discover".equals(currentView) || "leaderboard".equals(currentView)) renderScreen();
                 if (!result.success) toast(result.error != null ? result.error : "تعذر تحميل العلاقات النشطة");
             });
         });
