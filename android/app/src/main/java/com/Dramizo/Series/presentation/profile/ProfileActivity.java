@@ -320,6 +320,11 @@ public class ProfileActivity extends ThemedActivity {
             if (binding.rowProfileMysteriousMode != null) {
                 binding.rowProfileMysteriousMode.setVisibility(View.GONE);
             }
+            // Fail closed: only the owner can see the control, and it stays hidden until
+            // the server confirms an active VIP that includes Mysterious Man.
+            if (ownProfile) {
+                bindMysteriousMode(true);
+            }
             loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl,
                     user.vipLevel, user.vipTouUrl, user.hostBadgeUrl, user.hostBadgeMeta);
             int vip = Math.max(0, user.vipLevel);
@@ -593,7 +598,7 @@ public class ProfileActivity extends ThemedActivity {
 
     private void bindMysteriousMode(boolean ownProfile) {
         if (binding == null || binding.rowProfileMysteriousMode == null) return;
-        binding.rowProfileMysteriousMode.setVisibility(ownProfile ? View.VISIBLE : View.GONE);
+        binding.rowProfileMysteriousMode.setVisibility(View.GONE);
         if (!ownProfile) return;
 
         binding.switchMysteriousMode.setOnCheckedChangeListener(null);
@@ -604,13 +609,21 @@ public class ProfileActivity extends ThemedActivity {
             runOnUiThread(() -> {
                 if (binding == null || isFinishing()) return;
                 if (result == null || !result.success || result.data == null) {
-                    binding.tvMysteriousModeHint.setText("تعذر تحميل الحالة، حاول مجددًا لاحقًا");
+                    // Do not expose a VIP-only feature when eligibility cannot be verified.
+                    binding.rowProfileMysteriousMode.setVisibility(View.GONE);
                     binding.switchMysteriousMode.setEnabled(false);
                     return;
                 }
                 Map<String, Object> status = result.data;
                 boolean eligible = Boolean.TRUE.equals(status.get("eligible"));
-                boolean enabled = Boolean.TRUE.equals(status.get("enabled"));
+                boolean enabled = eligible && Boolean.TRUE.equals(status.get("enabled"));
+                binding.rowProfileMysteriousMode.setVisibility(eligible ? View.VISIBLE : View.GONE);
+                if (!eligible) {
+                    binding.switchMysteriousMode.setOnCheckedChangeListener(null);
+                    binding.switchMysteriousMode.setChecked(false);
+                    binding.switchMysteriousMode.setEnabled(false);
+                    return;
+                }
                 binding.switchMysteriousMode.setOnCheckedChangeListener(null);
                 binding.switchMysteriousMode.setChecked(enabled);
                 binding.switchMysteriousMode.setEnabled(eligible);
