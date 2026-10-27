@@ -94,7 +94,7 @@ const entityList = Object.values(entities).filter(
           ? { rejectUnauthorized: false }
           : undefined,
         schema: 'jeho_own',
-        extra: { options: '-c search_path=jeho_own' },
+        extra: { options: '-c search_path=jeho_own', connectionTimeoutMillis: 8000 },
         entities: entityList,
         synchronize: config.get<boolean>('app.database.synchronize'),
         logging: config.get<boolean>('app.database.logging'),
@@ -111,7 +111,7 @@ const entityList = Object.values(entities).filter(
           schema: 'public',
           entities: [],
           synchronize: false,
-          extra: {},
+          extra: { connectionTimeoutMillis: 8000 },
         } as any);
         await bootstrap.initialize();
         try {
@@ -120,7 +120,12 @@ const entityList = Object.values(entities).filter(
           await bootstrap.destroy();
         }
 
-        const appDataSource = await new DataSource(options).initialize();
+        console.log('[JEHO-OWN DB] Bootstrap connection ready; initializing application schema...');
+        const appDataSource = await new DataSource({
+          ...options,
+          extra: { ...((options as any).extra || {}), connectionTimeoutMillis: 8000 },
+          connectTimeoutMS: 8000,
+        } as any).initialize();
 
         // Create only the additive badge tables missing from older deployments.
         // This never touches voice, Redis, user records, or existing badge data.
