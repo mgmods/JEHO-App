@@ -337,7 +337,52 @@ export class UsersService {
       dmGiftGateEnabled: p?.dmGiftGateEnabled ?? false,
       dmRequiredGiftId: p?.dmRequiredGiftId ?? null,
       lastSeenAt: user.updatedAt,
+      // Never leak the stored opt-in flag directly. Eligibility is verified against
+      // the current VIP subscription and dashboard policy at response time.
+      mysteriousMode: false,
+      mysteriousMan: false,
     };
+  }
+
+  private async isMysteriousModeAllowed(user: User, vip: UserVip | null | undefined): Promise<boolean> {
+    if (!user?.mysteriousMode || !vip || !vip.isActive) return false;
+    if (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) return false;
+    const level = Number(vip.level || 0);
+    if (!Number.isInteger(level) || level < 1 || level > 7) return false;
+
+    // Fail closed: when the policy cannot be verified, never show the anonymous
+    // identity to other users. This also makes a dashboard disable take effect now,
+    // rather than waiting for the background reconciliation timer.
+    let rows: Array<{ value?: string | Record<string, unknown> }> = [];
+    try {
+      rows = await this.dataSource.query(
+        'SELECT value FROM app_settings WHERE key = $1 LIMIT 1',
+        ['mysterious_man_config'],
+      );
+    } catch {
+      return false;
+    }
+
+    if (Array.isArray(rows) && rows.length > 0) {
+      let policy: any = {};
+      try {
+        policy = typeof rows[0]?.value === 'string'
+          ? JSON.parse(rows[0].value)
+          : (rows[0]?.value || {});
+      } catch {
+        return false;
+      }
+      const allowedLevels = Array.isArray(policy.eligibleVipLevels)
+        ? policy.eligibleVipLevels.map(Number).filter((n: number) =>
+            Number.isInteger(n) && n >= 1 && n <= 7)
+        : [];
+      return policy.enabled === true && allowedLevels.includes(level);
+    }
+
+    // Compatibility for installations before the dashboard policy was first saved.
+    const benefits = vip.vipPlan?.benefits as any;
+    const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
+    return Array.isArray(extra) && extra.includes('mysterious_man');
   }
 
   async getMe(userId: string) {
@@ -373,8 +418,11 @@ export class UsersService {
     // VIP-tier media is controlled from Dashboard > VIP. Apply it at read time
     // so changing a plan updates active members without overwriting their stored profile data.
     const vipVisuals = (vipValid?.vipPlan?.benefits as any)?.visuals || {};
+    const mysteriousMan = await this.isMysteriousModeAllowed(user, vipValid);
     const withVipVisuals = {
       ...flat,
+      mysteriousMode: mysteriousMan,
+      mysteriousMan,
       vipHeadUrl: vipValid?.vipPlan?.badgeUrl || flat.vipHeadUrl,
       vipTouUrl: vipVisuals.vipFrameUrl || flat.vipTouUrl,
       vipCardUrl: vipVisuals.vipCardUrl || null,
@@ -451,8 +499,11 @@ export class UsersService {
     const vipVisuals = vip && (!vip.expiresAt || vip.expiresAt > now)
       ? ((vip.vipPlan?.benefits as any)?.visuals || {})
       : {};
+    const mysteriousMan = await this.isMysteriousModeAllowed(user, vip);
     const withVipVisuals = {
       ...flat,
+      mysteriousMode: mysteriousMan,
+      mysteriousMan,
       vipHeadUrl: (vip && (!vip.expiresAt || vip.expiresAt > now) ? vip.vipPlan?.badgeUrl : null) || flat.vipHeadUrl,
       vipTouUrl: vipVisuals.vipFrameUrl || flat.vipTouUrl,
       vipCardUrl: vipVisuals.vipCardUrl || null,
@@ -472,7 +523,18 @@ export class UsersService {
       relations: ['profile'],
     });
     if (!user) throw new NotFoundException('User not found');
-    return this.withWearMeta(await this.withPublicIdStyle(this.flatten(user), user.id));
+    const vip = await this.userVipsRepo.findOne({
+      where: { userId: user.id, isActive: true },
+      relations: ['vipPlan'],
+      order: { level: 'DESC' },
+    });
+    const mysteriousMan = await this.isMysteriousModeAllowed(user, vip);
+    const safeUser = {
+      ...this.flatten(user),
+      mysteriousMode: mysteriousMan,
+      mysteriousMan,
+    };
+    return this.withWearMeta(await this.withPublicIdStyle(safeUser, user.id));
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
