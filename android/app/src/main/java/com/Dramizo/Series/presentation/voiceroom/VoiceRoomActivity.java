@@ -1357,20 +1357,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // that made restore treat everyone as off-mic and hide the original seat positions.
             List<RoomDtos.SeatDto> seats = room.seats;
             if (resumedFromActiveSession && seats != null && seats.isEmpty()
-                    && restoreSeatSnapshot != null && isOnSeat(restoreSeatSnapshot)) {
+                    && restoreSeatSnapshot != null && !restoreSeatSnapshot.isEmpty()) {
                 // A refresh immediately after restoring can return an empty array while the
                 // server/session is catching up. Do not turn that transient snapshot into a
                 // local leave: doing so stops publishing and drops the user from the saved seats.
                 seats = new ArrayList<>(restoreSeatSnapshot);
                 room.seats = seats;
             } else if (resumedFromActiveSession && seats != null && !seats.isEmpty()) {
-                // Refresh the saved snapshot only when the server roster still contains us.
-                // A stale non-empty roster that omits the local user must not erase the last
-                // known seat: repeated minimize/restore cycles otherwise lose the snapshot
-                // after the first successful return and eject the user on the next one.
-                if (isOnSeat(seats)) {
-                    restoreSeatSnapshot = new ArrayList<>(seats);
-                }
+                // Preserve the whole room roster, not only the local user's seat. The host or
+                // a listener may not occupy a seat themselves; gating this snapshot on isOnSeat
+                // caused the other occupied mics to disappear after repeated minimize/restore.
+                restoreSeatSnapshot = new ArrayList<>(seats);
             }
             if (seats == null && resumedFromActiveSession) {
                 RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
@@ -1742,7 +1739,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // the only good copy before we can decide whether an empty response is transient.
         RoomDtos.RoomDto cachedRoom = ars.latestRoom();
         restoreSeatSnapshot = cachedRoom != null && cachedRoom.seats != null
-                && isOnSeat(cachedRoom.seats)
+                && !cachedRoom.seats.isEmpty()
                 ? new ArrayList<>(cachedRoom.seats) : null;
         // Zego already logged in — do not call loginRoom again.
         zegoLoggedIn = true;
@@ -12026,7 +12023,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (keepAlive) {
             // Keep a durable copy of our seat roster before the UI/session can be refreshed
             // by a partial server response while minimized. Never send a seat leave here.
-            if (isOnSeat(currentSeats)) {
+            if (currentSeats != null && !currentSeats.isEmpty()) {
                 restoreSeatSnapshot = new ArrayList<>(currentSeats);
                 RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
                 if (cachedRoom != null) {
