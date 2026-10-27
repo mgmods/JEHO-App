@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Home rankings: wealth + CP + popularity, equal-width square tiles kept inside screen bounds -->
+<!-- Compact home ranking banners: consistent landscape cards within screen bounds -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/actBannerLayout"
     android:layout_width="match_parent"
@@ -12,7 +12,7 @@
     <ViewFlipper
         android:id="@+id/rankBannerFlip"
         android:layout_width="0dp"
-        android:layout_height="96dp"
+        android:layout_height="64dp"
         android:layout_weight="1"
         android:autoStart="true"
         android:flipInterval="3000"
@@ -26,7 +26,7 @@
     <FrameLayout
         android:id="@+id/cpBannerCard"
         android:layout_width="0dp"
-        android:layout_height="96dp"
+        android:layout_height="64dp"
         android:layout_weight="1"
         android:background="@drawable/home_bg_cp"
         android:clickable="true"
@@ -46,7 +46,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="5dp"
             android:gravity="center"
             android:orientation="horizontal">
 
@@ -85,7 +85,7 @@
     <FrameLayout
         android:id="@+id/activityBannerCard"
         android:layout_width="0dp"
-        android:layout_height="96dp"
+        android:layout_height="64dp"
         android:layout_weight="1"
         android:background="@drawable/home_bg_charm"
         android:clickable="true"
