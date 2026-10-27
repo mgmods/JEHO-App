@@ -124,6 +124,14 @@
         <activity android:name=".presentation.profile.ProfileActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
+        <!-- Required by uCrop: without this explicit activity registration Android throws
+             "Unable to find explicit activity class" when changing avatar or cover. -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
         <activity android:name=".presentation.profile.EditProfileActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
