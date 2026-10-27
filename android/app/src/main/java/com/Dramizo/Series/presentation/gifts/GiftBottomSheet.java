@@ -2,6 +2,7 @@ package com.Dramizo.Series.presentation.gifts;
 
 import android.app.Activity;
 import android.app.Dialog;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -9,6 +10,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.PopupWindow;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -321,7 +324,98 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         vm.load();
         vm.loadWallet();
 
-        return binding.getRoot();
+        View content = binding.getRoot();
+        if (!chatMode && roomId != null && !roomId.trim().isEmpty()) {
+            FrameLayout overlay = new FrameLayout(requireContext());
+            overlay.addView(content, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            Button cpGift = new Button(requireContext());
+            cpGift.setText("♡ هدية ارتباط CP");
+            cpGift.setAllCaps(false);
+            cpGift.setTextSize(12f);
+            cpGift.setTextColor(android.graphics.Color.WHITE);
+            cpGift.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFC52F70));
+            FrameLayout.LayoutParams cpLp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.TOP | android.view.Gravity.END);
+            cpLp.topMargin = dpCp(8);
+            cpLp.setMarginEnd(dpCp(12));
+            overlay.addView(cpGift, cpLp);
+            cpGift.setOnClickListener(v -> showCpGiftRequestDialog(roomId));
+            return overlay;
+        }
+        return content;
+    }
+
+    private int dpCp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void showCpGiftRequestDialog(@NonNull String roomId) {
+        if (getContext() == null) return;
+        final EditText recipient = new EditText(requireContext());
+        recipient.setSingleLine(true);
+        recipient.setHint("معرّف المستخدم الموجود معك في الروم");
+        recipient.setPadding(dpCp(14), dpCp(10), dpCp(14), dpCp(10));
+        final String[] keys = {"love", "marriage", "engagement", "friendship", "brotherhood"};
+        final String[] labels = {"الحب", "الزواج", "الخطوبة", "الصداقة", "الأخوّة"};
+        final int[] selectedType = {0};
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(requireContext());
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = dpCp(20);
+        layout.setPadding(pad, dpCp(8), pad, 0);
+        android.widget.TextView intro = new android.widget.TextView(requireContext());
+        intro.setText("اختر نوع الرابطة وأدخل معرّف الشخص الموجود معك في الغرفة. ستُرسل هدية CP المحددة من لوحة التحكم ويصله طلب قبول أو رفض.");
+        intro.setTextSize(13);
+        intro.setTextColor(0xFF674052);
+        intro.setPadding(0, 0, 0, dpCp(10));
+        layout.addView(intro);
+        layout.addView(recipient, new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        android.widget.RadioGroup types = new android.widget.RadioGroup(requireContext());
+        types.setOrientation(android.widget.RadioGroup.VERTICAL);
+        for (int i = 0; i < labels.length; i++) {
+            android.widget.RadioButton radio = new android.widget.RadioButton(requireContext());
+            radio.setText(labels[i]);
+            radio.setTextColor(0xFF54263C);
+            radio.setId(android.view.View.generateViewId());
+            radio.setTag(i);
+            types.addView(radio);
+            if (i == 0) radio.setChecked(true);
+        }
+        types.setOnCheckedChangeListener((group, checkedId) -> {
+            android.view.View checked = group.findViewById(checkedId);
+            if (checked != null && checked.getTag() instanceof Integer) selectedType[0] = (Integer) checked.getTag();
+        });
+        layout.addView(types);
+        new AlertDialog.Builder(requireContext())
+                .setTitle("هدايا ارتباط CP")
+                .setView(layout)
+                .setNegativeButton("إلغاء", null)
+                .setPositiveButton("إرسال الهدية والطلب", (dialog, which) -> {
+                    String recipientId = recipient.getText() == null ? "" : recipient.getText().toString().trim();
+                    if (recipientId.isEmpty()) {
+                        Toast.makeText(requireContext(), "أدخل معرّف المستخدم أولاً", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Map<String, String> body = new LinkedHashMap<>();
+                    body.put("recipientId", recipientId);
+                    body.put("type", keys[selectedType[0]]);
+                    body.put("roomId", roomId);
+                    body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
+                    AppContainer container = ContainerProvider.from(requireActivity());
+                    container.getIoExecutor().execute(() -> {
+                        Result<Map<String, Object>> result = ApiCall.execute(container.getUserApi().createRoomCpRequest(body));
+                        if (!isAdded()) return;
+                        requireActivity().runOnUiThread(() -> {
+                            if (!isAdded()) return;
+                            Toast.makeText(requireContext(), result.success
+                                    ? "تم إرسال هدية CP وطلب الارتباط. بانتظار موافقة الطرف الآخر."
+                                    : (result.error != null ? result.error : "تعذر إرسال هدية الارتباط"),
+                                    Toast.LENGTH_LONG).show();
+                        });
+                    });
+                }).show();
     }
 
     private void bindIncludedViews() {
