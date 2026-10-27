@@ -625,14 +625,17 @@ public class CpCenterActivity extends ThemedActivity {
             TextView priceView = text(price.isEmpty() ? "السعر حسب العنصر" : price + " 💎", 11, ROSE, true);
             priceView.setPadding(0, dp(5), 0, 0);
             copy.addView(priceView);
+            final String itemTitle = title;
+            final String itemDesc = desc;
+            final String itemPrice = price;
             TextView detail = actionButton("التفاصيل", false);
             LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, -2);
             detailLp.topMargin = dp(10);
             card.addView(detail, detailLp);
             detail.setOnClickListener(v -> new AlertDialog.Builder(this)
-                    .setTitle(title.isEmpty() ? "عنصر CP" : title)
-                    .setMessage((desc.isEmpty() ? "عنصر من كتالوج CP." : desc)
-                            + "\n\n" + (price.isEmpty() ? "لم يحدد الخادم سعراً لهذا العنصر." : "السعر: " + price)
+                     .setTitle(itemTitle.isEmpty() ? "عنصر CP" : itemTitle)
+                    .setMessage((itemDesc.isEmpty() ? "عنصر من كتالوج CP." : itemDesc)
+                            + "\n\n" + (itemPrice.isEmpty() ? "لم يحدد الخادم سعراً لهذا العنصر." : "السعر: " + itemPrice)
                             + "\n\nالشراء غير مفعّل حتى تتوفر واجهة شراء آمنة على الخادم.")
                     .setPositiveButton("حسناً", (d, w) -> d.dismiss()).show());
         }
