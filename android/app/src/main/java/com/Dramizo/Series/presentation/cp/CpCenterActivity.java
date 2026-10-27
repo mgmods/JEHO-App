@@ -624,14 +624,34 @@ public class CpCenterActivity extends ThemedActivity {
         LinearLayout levelCard = new LinearLayout(this);
         levelCard.setOrientation(LinearLayout.VERTICAL);
         levelCard.setGravity(Gravity.CENTER);
-        levelCard.setPadding(dp(8), dp(10), dp(8), dp(10));
-        levelCard.setBackground(round(Color.WHITE, dp(17), 0xFFE8D9F4));
+        levelCard.setPadding(dp(6), dp(10), dp(6), dp(10));
+        levelCard.setBackground(roundGradient(new int[]{0xFFFFF8FF, 0xFFF1E6FF}, dp(17)));
         LinearLayout.LayoutParams levelLp = new LinearLayout.LayoutParams(0, -2, 1f);
-        levelLp.setMargins(dp(8), 0, 0, 0);
+        levelLp.setMargins(dp(6), 0, 0, 0);
         score.addView(levelCard, levelLp);
         levelCard.addView(text("✦", 15, 0xFF8B5AA7, true));
         levelCard.addView(text(defaultString(row.get("level"), "1"), 22, INK, true));
         levelCard.addView(text("مستوى الرابطة", 10, MUTED, false));
+
+        // Relationship age is shown as a first-class stat, not buried in metadata.
+        String duration = firstValue(row, "durationLabel", "duration", "daysTogether", "durationDays", "daysActive");
+        if (duration.isEmpty()) {
+            Object created = row.get("createdAt");
+            if (created == null) created = row.get("startedAt");
+            if (created == null) created = row.get("acceptedAt");
+            duration = created == null ? "—" : String.valueOf(created);
+        }
+        LinearLayout durationCard = new LinearLayout(this);
+        durationCard.setOrientation(LinearLayout.VERTICAL);
+        durationCard.setGravity(Gravity.CENTER);
+        durationCard.setPadding(dp(5), dp(10), dp(5), dp(10));
+        durationCard.setBackground(roundGradient(new int[]{0xFFFFF8E8, 0xFFFFE5C8}, dp(17)));
+        LinearLayout.LayoutParams durationLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        durationLp.setMargins(dp(6), 0, 0, 0);
+        score.addView(durationCard, durationLp);
+        durationCard.addView(text("⌛", 15, 0xFFB77A39, true));
+        durationCard.addView(text(duration, 15, INK, true));
+        durationCard.addView(text("مدة العلاقة", 10, MUTED, false));
 
         String partnerId = str(partner.get("id"));
         if (!partnerId.isEmpty()) {
@@ -1462,7 +1482,10 @@ public class CpCenterActivity extends ThemedActivity {
         FrameLayout frame = new FrameLayout(this);
         // Double jewel frame: rose enamel outside, champagne-gold inner edge.
         frame.setBackground(roundGradient(new int[]{0xFFFFE6F0, 0xFFFFC3DC, 0xFFDDA85D}, dp(sizeDp / 3)));
-        frame.setPadding(dp(2), dp(2), dp(2), dp(2));
+        GradientDrawable jewelRim = roundGradient(new int[]{0xFFFFF7D7, 0xFFE2B45D, 0xFFFFE9B6}, dp(sizeDp / 3));
+        jewelRim.setStroke(dp(1), 0xFFFFF2C8);
+        frame.setForeground(jewelRim);
+        frame.setPadding(dp(3), dp(3), dp(3), dp(3));
         frame.setElevation(dp(5));
         LinearLayout.LayoutParams frameLp = new LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp));
         frameLp.setMargins(dp(2), dp(2), dp(2), dp(2));
@@ -1507,10 +1530,17 @@ public class CpCenterActivity extends ThemedActivity {
         TextView heading = text(title, 19, INK, true);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         headingRow.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView heart = text("❦", 21, 0xFFB77A39, true);
+        FrameLayout ornament = new FrameLayout(this);
+        ornament.setBackground(roundGradient(new int[]{0xFFFFE9B8, 0xFFFFD8E9, 0xFFF0E0FF}, dp(15)));
+        ornament.setElevation(dp(2));
+        headingRow.addView(ornament, new LinearLayout.LayoutParams(dp(38), dp(36)));
+        TextView heart = text("❦", 23, 0xFF9E315E, true);
         heart.setGravity(Gravity.CENTER);
-        heart.setBackground(roundGradient(new int[]{0xFFFFF0C9, 0xFFFFDDEB}, dp(14)));
-        headingRow.addView(heart, new LinearLayout.LayoutParams(dp(34), dp(32)));
+        ornament.addView(heart, new FrameLayout.LayoutParams(-1, -1));
+        TextView glint = text("✦", 9, 0xFFFFF4C7, true);
+        glint.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams glintLp = new FrameLayout.LayoutParams(dp(13), dp(13), Gravity.TOP | Gravity.END);
+        ornament.addView(glint, glintLp);
         if (subtitle != null && !subtitle.isEmpty()) {
             TextView sub = text(subtitle, 12, MUTED, false);
             sub.setPadding(0, dp(5), 0, 0);
