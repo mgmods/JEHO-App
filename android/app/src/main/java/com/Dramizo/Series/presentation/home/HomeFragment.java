@@ -1126,7 +1126,7 @@ public class HomeFragment extends Fragment {
             hideBannerSlider();
             return;
         }
-        List<MiscDtos.BannerDto> slides = ready.size() > 3 ? new ArrayList<>(ready.subList(0, 3)) : ready;
+        List<MiscDtos.BannerDto> slides = ready.size() > 10 ? new ArrayList<>(ready.subList(0, 10)) : ready;
         applyBannerSlider(slides);
     }
 
@@ -1176,7 +1176,7 @@ public class HomeFragment extends Fragment {
                 if (b != null && b.imageUrl != null && !b.imageUrl.trim().isEmpty()) out.add(b);
             }
         }
-        return out.size() > 6 ? out.subList(0, 6) : out;
+        return out.size() > 10 ? out.subList(0, 10) : out;
     }
 
     private void bindBannerDots(int count) {
