@@ -207,10 +207,28 @@ public class CpCenterActivity extends ThemedActivity {
         });
     }
 
+    private void loadCatalog() {
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().cpCatalog());
+            List<Map<String, Object>> rows = r.success && r.data != null ? r.data : new ArrayList<>();
+            js("window.renderCpCatalog && window.renderCpCatalog(" + gson.toJson(normalizeUrls(rows)) + ")");
+        });
+    }
+
+    private void loadTasks() {
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().cpTasks());
+            List<Map<String, Object>> rows = r.success && r.data != null ? r.data : new ArrayList<>();
+            js("window.renderCpTasks && window.renderCpTasks(" + gson.toJson(normalizeUrls(rows)) + ")");
+        });
+    }
+
     private final class CpBridge {
         @JavascriptInterface public void loadHome() { CpCenterActivity.this.loadHome(); }
         @JavascriptInterface public void loadRequests() { CpCenterActivity.this.loadRequests(); }
         @JavascriptInterface public void loadDiscover(String type) { CpCenterActivity.this.loadDiscover(type); }
+        @JavascriptInterface public void loadCatalog() { CpCenterActivity.this.loadCatalog(); }
+        @JavascriptInterface public void loadTasks() { CpCenterActivity.this.loadTasks(); }
 
         @JavascriptInterface public void sendRequest(String recipientId, String type) {
             String recipient = recipientId == null ? "" : recipientId.trim();
