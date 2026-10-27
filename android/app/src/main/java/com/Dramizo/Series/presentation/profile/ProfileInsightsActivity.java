@@ -55,6 +55,14 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         container = ContainerProvider.from(this);
         String requestedMode = getIntent().getStringExtra(EXTRA_MODE);
         mode = MODE_CP.equals(requestedMode) ? MODE_CP : MODE_WEALTH;
+        // The Me > CP entry must always use the native CP center, never the legacy HTML asset.
+        if (MODE_CP.equals(mode)) {
+            Intent cp = new Intent(this, CpCenterActivity.class);
+            cp.putExtra(CpCenterActivity.EXTRA_VIEW, "discover");
+            startActivity(cp);
+            finish();
+            return;
+        }
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.rgb(16, 16, 32));
         webView = new WebView(this);
