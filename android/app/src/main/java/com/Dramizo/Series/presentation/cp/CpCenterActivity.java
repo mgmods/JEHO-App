@@ -292,7 +292,12 @@ public class CpCenterActivity extends ThemedActivity {
 
     @Override protected boolean wantsContentSystemPadding() { return false; }
 
-    @Override public void onBackPressed() { finish(); }
+    @Override public void onBackPressed() {
+        if (web == null || !pageReady) { finish(); return; }
+        web.evaluateJavascript("(window.getCpView && window.getCpView() !== 'home') ? (window.showView('home'), 'handled') : 'finish'", value -> {
+            if ("\\\"finish\\\"".equals(value)) finish();
+        });
+    }
 
     @Override protected void onDestroy() {
         pageReady = false;
