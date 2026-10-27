@@ -7811,19 +7811,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void showRoomCardCpRequest(String recipientId, AppContainer cpContainer) {
         if (recipientId == null || recipientId.isEmpty() || recipientId.equals(myUserId)) return;
+        if (roomId == null || roomId.trim().isEmpty()) {
+            Toast.makeText(this, "تعذر تحديد الروم الحالي", Toast.LENGTH_LONG).show();
+            return;
+        }
         final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
-        final String[] labels = {"الصداقة", "الأخوّة", "الحب", "الخطوبة", "الزواج"};
-        new AlertDialog.Builder(this).setTitle("اختر نوع علاقة CP")
+        final String[] labels = {"🎁 هدية الصداقة", "🎁 هدية الأخوّة", "💗 هدية الحب", "💍 هدية الخطوبة", "💞 هدية الزواج"};
+        new AlertDialog.Builder(this)
+                .setTitle("هدايا الارتباط · CP")
+                .setMessage("اختر هدية CP لإرسالها داخل الروم. ستصل للمستخدم كطلب ارتباط، ولن تبدأ العلاقة إلا بعد موافقته.")
                 .setItems(labels, (d, which) -> {
                     Map<String, String> body = new HashMap<>();
                     body.put("recipientId", recipientId);
                     body.put("type", types[which]);
+                    body.put("roomId", roomId);
                     body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
                     cpContainer.getIoExecutor().execute(() -> {
-                        Result<Map<String, Object>> result = ApiCall.execute(cpContainer.getUserApi().createProfileCpRequest(body));
+                        Result<Map<String, Object>> result = ApiCall.execute(cpContainer.getUserApi().createRoomCpRequest(body));
                         runOnUiThread(() -> Toast.makeText(this,
-                                result.success ? "تم إرسال طلب " + labels[which] + " ✓"
-                                        : (result.error != null ? result.error : "تعذر إرسال الطلب"),
+                                result.success ? "تم إرسال هدية CP وطلب الارتباط داخل الروم ✓"
+                                        : (result.error != null ? result.error : "تعذر إرسال هدية CP"),
                                 Toast.LENGTH_LONG).show());
                     });
                 }).setNegativeButton("إلغاء", null).show();
@@ -8046,7 +8053,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             com.Dramizo.Series.presentation.common.UserSocialNav.wireUserCard(
                     this, sheet, userId, myUserId, dialog::dismiss);
         }
-        // CP requests are profile-level and independent of the room gift request flow.
+        // CP initiation is room-only: the selected CP gift creates a pending request.
         if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
         if (cpTopPartnerWrap != null) cpTopPartnerWrap.setVisibility(View.GONE);
         if (tvCpTopHeart != null) tvCpTopHeart.setVisibility(View.GONE);
