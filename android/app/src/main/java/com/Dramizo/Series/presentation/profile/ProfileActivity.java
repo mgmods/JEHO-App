@@ -336,6 +336,10 @@ public class ProfileActivity extends ThemedActivity {
             // the server confirms an active VIP that includes Mysterious Man.
             if (ownProfile) {
                 bindMysteriousMode(true);
+                profileHandler.removeCallbacks(mysteriousModeRefresh);
+                profileHandler.postDelayed(mysteriousModeRefresh, 60_000L);
+            } else {
+                profileHandler.removeCallbacks(mysteriousModeRefresh);
             }
             loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl,
                     user.vipLevel, user.vipTouUrl, user.hostBadgeUrl, user.hostBadgeMeta);
