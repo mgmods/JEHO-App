@@ -152,6 +152,13 @@ public interface UserApi {
     Call<ApiResponse<List<Map<String, Object>>>> discoverCp(@Query("type") String type);
 
 
+
+    @GET("cp/tasks")
+    Call<ApiResponse<List<Map<String, Object>>>> cpTasks();
+
+    @POST("cp/tasks/{taskId}/claim")
+    Call<ApiResponse<Map<String, Object>>> claimCpTask(@Path("taskId") String taskId);
+
     @GET("cp/memories")
     Call<ApiResponse<List<Map<String, Object>>>> cpMemories();
 
