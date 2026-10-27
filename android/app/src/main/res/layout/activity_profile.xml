@@ -383,8 +383,8 @@
 
                         <ImageView
                             android:id="@+id/imgEntryRide"
-                            android:layout_width="36dp"
-                            android:layout_height="25dp"
+                            android:layout_width="26dp"
+                            android:layout_height="18dp"
                             android:adjustViewBounds="true"
                             android:contentDescription="@null"
                             android:scaleType="fitCenter"
@@ -392,8 +392,8 @@
 
                         <ImageView
                             android:id="@+id/imgVipMedal"
-                            android:layout_width="54dp"
-                            android:layout_height="36dp"
+                            android:layout_width="36dp"
+                            android:layout_height="24dp"
                             android:layout_marginStart="6dp"
                             android:adjustViewBounds="true"
                             android:contentDescription="VIP"
@@ -416,9 +416,9 @@
 
                         <ImageView
                             android:id="@+id/imgRankIcon"
-                            android:layout_width="30dp"
-                            android:layout_height="30dp"
-                            android:layout_marginStart="8dp"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginStart="5dp"
                             android:contentDescription="الترتيب"
                             android:scaleType="fitCenter"
                             android:src="@drawable/ic_me_rank" />
@@ -438,9 +438,9 @@
 
                         <ImageView
                             android:id="@+id/imgWealthIcon"
-                            android:layout_width="30dp"
-                            android:layout_height="30dp"
-                            android:layout_marginStart="8dp"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginStart="5dp"
                             android:contentDescription="الثروة"
                             android:scaleType="fitCenter"
                             android:src="@drawable/ic_asset_diamond" />
@@ -460,9 +460,9 @@
 
                         <ImageView
                             android:id="@+id/imgLevelIcon"
-                            android:layout_width="30dp"
-                            android:layout_height="30dp"
-                            android:layout_marginStart="8dp"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginStart="5dp"
                             android:contentDescription="المستوى"
                             android:scaleType="fitCenter"
                             android:src="@drawable/ic_me_level" />
