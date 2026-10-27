@@ -167,8 +167,14 @@
             <input v-model.number="cpStoreForm.coinPrice" class="form-control" type="number" min="0" max="1000000000" step="1">
           </div>
           <div class="col-md-6">
+            <label class="form-label">رفع صورة معاينة العنصر</label>
+            <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" :disabled="uploadingCpStorePreview" @change="uploadCpStorePreview">
+            <div v-if="uploadingCpStorePreview" class="small text-primary mt-2">جارٍ رفع المعاينة…</div>
+          </div>
+          <div class="col-md-6">
             <label class="form-label">رابط صورة المعاينة</label>
             <input v-model.trim="cpStoreForm.previewUrl" class="form-control" dir="ltr" placeholder="https://…">
+            <div v-if="cpStoreForm.previewUrl" class="mt-2"><img :src="cpStoreForm.previewUrl" alt="معاينة عنصر CP" style="width:72px;height:72px;object-fit:contain;border-radius:12px;border:1px solid #e7c9d8;background:#fff;padding:5px"></div>
           </div>
           <div class="col-md-6">
             <label class="form-label">رابط الحركة (اختياري)</label>
@@ -312,6 +318,7 @@ const policy = ref({ requestExpiryMinutes: 30, rulesText: '{}' })
 const cpStoreItems = ref([])
 const loadingCpStore = ref(false)
 const savingCpStore = ref(false)
+const uploadingCpStorePreview = ref(false)
 const cpStoreForm = ref({ code: '', name: '', type: 'profile_card', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 })
 
 function label(type) {
@@ -333,6 +340,39 @@ async function loadCpStoreItems() {
     error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل عناصر متجر CP'
   } finally { loadingCpStore.value = false }
 }
+async function uploadCpStorePreview(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!/\.(gif|webp|png|jpe?g)$/i.test(file.name)) {
+    error.value = 'اختر صورة GIF أو WebP أو PNG أو JPG.'
+    event.target.value = ''
+    return
+  }
+  if (file.size > 40 * 1024 * 1024) {
+    error.value = 'حجم الصورة يجب ألا يتجاوز 40 ميغابايت.'
+    event.target.value = ''
+    return
+  }
+  uploadingCpStorePreview.value = true
+  error.value = ''
+  try {
+    const response = await uploadsApi.upload(file)
+    if (response?.error) throw new Error(response.error.message || 'تعذر رفع صورة المعاينة')
+    const data = payloadOf(response)
+    const uploadedUrl = data?.url || data?.path
+    if (!uploadedUrl) throw new Error('رد رفع الصورة غير مكتمل.')
+    cpStoreForm.value.previewUrl = /^https?:\/\//i.test(uploadedUrl)
+      ? uploadedUrl
+      : new URL(uploadedUrl, window.location.origin).toString()
+    success.value = 'تم رفع صورة المعاينة. أكمل بيانات العنصر ثم أضفه إلى متجر CP.'
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر رفع صورة المعاينة'
+  } finally {
+    uploadingCpStorePreview.value = false
+    if (event?.target) event.target.value = ''
+  }
+}
+
 async function createCpStoreItem() {
   error.value = ''; success.value = ''
   const form = cpStoreForm.value
