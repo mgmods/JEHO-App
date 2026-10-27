@@ -119,6 +119,10 @@ public interface UserApi {
     @GET("users/me/cp")
     Call<ApiResponse<MiscDtos.CpStatusDto>> myCp();
 
+    /** Public legacy CP fallback for profiles whose pair predates cp_relationships. */
+    @GET("users/{id}/cp")
+    Call<ApiResponse<MiscDtos.CpStatusDto>> publicCp(@Path("id") String id);
+
     @POST("users/me/requests/{id}/accept")
     Call<ApiResponse<Object>> acceptRequest(@Path("id") String id);
 
