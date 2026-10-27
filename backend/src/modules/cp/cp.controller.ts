@@ -38,6 +38,19 @@ export class CpController {
   }
 
 
+
+  @Get('tasks')
+  @ApiOperation({ summary: 'Get daily shared tasks and claim status for the current CP relationship' })
+  tasks(@CurrentUser('sub') userId: string) {
+    return this.cp.tasks(userId);
+  }
+
+  @Post('tasks/:taskId/claim')
+  @ApiOperation({ summary: 'Claim a completed CP task reward once per user and day' })
+  claimTask(@CurrentUser('sub') userId: string, @Param('taskId') taskId: string) {
+    return this.cp.claimTask(userId, taskId);
+  }
+
   @Get('memories')
   @ApiOperation({ summary: 'List memories shared within the current active CP relationship' })
   memories(@CurrentUser('sub') userId: string) {
