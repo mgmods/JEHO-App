@@ -21,14 +21,30 @@ form{display:flex;gap:8px;margin-top:12px}input{min-width:0;flex:1;padding:12px;
 .empty,.state{padding:28px 16px;text-align:center;color:var(--muted);line-height:1.9;background:#fff;border:1px dashed #eacbd7;border-radius:18px;font-size:13px}.hidden{display:none!important}.notice{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:14px;right:14px;z-index:20;max-width:620px;margin:auto;padding:14px 16px;border-radius:16px;background:#34202d;color:#fff;box-shadow:0 10px 35px #32101e40;font-size:13px}.request-actions{display:flex;gap:8px;margin-top:12px}.request-actions button{flex:1}
 .cp-modal-backdrop{position:fixed;inset:0;z-index:50;background:#24101fc9;display:flex;align-items:center;justify-content:center;padding:22px}.cp-modal{width:100%;max-width:390px;background:#fffafc;border:1px solid #f1d1de;border-radius:24px;padding:22px 18px;box-shadow:0 22px 70px #16081266;text-align:center}.cp-modal h3{margin:8px 0;font-size:21px;color:#a63260}.cp-modal p{font-size:14px;line-height:1.9;margin:8px 0;color:var(--ink)}.cp-modal .modal-avatar{display:flex;justify-content:center;margin:8px auto}.cp-modal .modal-avatar .avatar,.cp-modal .modal-avatar .avatar-wrap{width:70px;height:70px}.cp-modal .request-actions{margin-top:18px}.cp-modal .request-actions .btn{min-height:46px}
 @media(min-width:560px){main{padding:20px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+:root{--ink:#38172b;--muted:#9d7186;--rose:#c52f70;--gold:#e5bd73;--paper:#fff8fc;--line:#f3d3e2;--shadow:0 12px 30px #6b294d13}
+body{padding-bottom:calc(82px + env(safe-area-inset-bottom));background:radial-gradient(ellipse at 12% 0%,#ffe0ee 0,transparent 35%),linear-gradient(155deg,#fffafd,#fff0f6 52%,#f5edff)}
+header{background:#fffaf5ed;border-bottom:1px solid #f2c9dc}
+.hero{background:radial-gradient(circle at 12% 12%,#f4b3d0 0,transparent 32%),linear-gradient(125deg,#70133f,#bd2e6b 48%,#ed8aab 78%,#e6bb6d 120%);border:1px solid #e7b7ca;box-shadow:0 18px 40px #8b1c4d26;padding:24px 20px 20px}
+.hero:after{content:"♡";font-size:170px;left:4px;top:-38px;color:#ffe5f0;opacity:.17}
+.hero-kicker{font-size:10px;letter-spacing:2px;font-weight:900;opacity:.85;margin-bottom:10px}.hero h2{font-size:25px;line-height:1.45;max-width:300px}
+.hero-actions{display:flex;gap:8px;margin-top:17px;position:relative;z-index:1}.hero-cta{border-radius:14px;padding:11px 13px;background:#fff;color:#9c2056;font-weight:850;font-size:12px}.hero-cta.outline{background:#ffffff20;border:1px solid #ffffff9c;color:#fff}
+.stat{border-radius:18px;background:linear-gradient(150deg,#fff,#fff4f9);border-color:#f0d0df;box-shadow:0 7px 20px #8b1c4d0c}.stat b{color:#bd2e6b;font-size:21px}
+.panel,.typecard{border-radius:22px;border-color:#f0d0df;box-shadow:0 10px 26px #7e1d4a0c}.typecard{padding:18px 11px;background:linear-gradient(145deg,#fff,#fff7fb 70%,#fff1f6);position:relative;overflow:hidden}
+.typecard:before{content:"";display:block;position:absolute;top:0;right:0;left:0;height:3px;background:linear-gradient(90deg,#e6b866,#e777a5,#c42f70)}
+.typecard .symbol{display:grid;place-items:center;width:52px;height:52px;border-radius:18px;margin:0 auto 9px;background:linear-gradient(145deg,#ffe0ee,#fff0d5,#f0e1ff);color:#b82d68;font-size:27px}
+.bottom-nav{position:fixed;z-index:15;bottom:0;left:0;right:0;padding:9px 8px calc(8px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:#fffaf5f2;border-top:1px solid #f0cfdd;backdrop-filter:blur(16px);box-shadow:0 -8px 28px #681b3a0b}
+.bottom-nav button{display:flex;flex-direction:column;align-items:center;gap:3px;background:transparent;color:#a27a8d;padding:5px 2px;border-radius:13px}.bottom-nav button span{font-size:22px;line-height:1.1}.bottom-nav button small{font-size:10px;font-weight:800}.bottom-nav button.active{background:#fce5ef;color:#b72c68}
+.store-hero{border-radius:24px;padding:20px;text-align:center;background:linear-gradient(135deg,#7c1748,#ca3c77 58%,#f1b9cd);color:white;margin:8px 0 14px;box-shadow:0 14px 28px #9a2d5b24}.store-hero h3{font-size:22px;margin:7px 0}.store-hero p{font-size:12px;margin:0;opacity:.9}.store-orb{margin:auto;width:60px;height:60px;display:grid;place-items:center;border-radius:22px;background:linear-gradient(145deg,#fff4d3,#e9bd70);color:#8d4d20;font-size:32px}
+.room-gift-callout{background:linear-gradient(120deg,#fff0f7,#fff8e9,#f6edff);border:1px solid #e7c17d}main{padding-bottom:24px}
 </style>
 </head>
 <body>
-<header><div class="headtext"><h1 id="pageTitle">مساحة CP</h1><p>العلاقات والطلبات والتواصل بين الطرفين</p></div><button class="iconbtn" id="refresh" aria-label="تحديث">↻</button></header>
+<header><button class="iconbtn" id="backPage" aria-label="رجوع">‹</button><div class="headtext"><h1 id="pageTitle">عالم CP</h1><p id="pageSubtitle">رابطة استثنائية، بتفاصيل تليق بكما</p></div><button class="iconbtn" id="refresh" aria-label="تحديث">↻</button></header>
 <main>
-<section class="hero"><h2 id="heroTitle">روابط تبنى بالقبول المتبادل ♡</h2><p id="heroText">اختر نوع العلاقة، أرسل طلباً مباشراً من دون هدية، وتابع الطلبات الواردة والمرسلة من مكان واحد.</p></section>
+<section class="hero" id="homeHero"><div class="hero-kicker">JEHO · CP UNIVERSE</div><h2 id="heroTitle">حكايتكما تستحق أن تكون استثنائية ♡</h2><p id="heroText">إطلالة فاخرة لعلاقتكما، ذكريات ونقاط وتفاصيل تنمو مع كل لحظة مشتركة.</p><div class="hero-actions"><button class="hero-cta" data-view="categories">اكتشف الروابط</button><button class="hero-cta outline" data-view="insights">إحصائياتكما</button></div></section>
 <div class="stats"><div class="stat"><b id="activeCount">—</b><span>علاقاتك النشطة</span></div><div class="stat"><b id="incomingCount">—</b><span>طلبات واردة</span></div><div class="stat"><b id="sentCount">—</b><span>طلبات مرسلة</span></div></div>
-<nav class="tabs" aria-label="أقسام مساحة CP"><button class="chip active" data-view="home">الرئيسية</button><button class="chip" data-view="send">إرسال طلب</button><button class="chip" data-view="incoming">الطلبات الواردة</button><button class="chip" data-view="sent">الطلبات المرسلة</button><button class="chip" data-view="discover">العلاقات النشطة</button></nav>
+
 <section id="view-home">
 <div class="sectionhead"><h3>اختر نوع العلاقة</h3></div>
 <div class="grid">
