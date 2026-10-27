@@ -1442,8 +1442,10 @@ public class CpCenterActivity extends ThemedActivity {
 
     private void addAvatar(LinearLayout parent, Map<String, Object> person, int sizeDp) {
         FrameLayout frame = new FrameLayout(this);
-        frame.setBackground(round(0xFFFFE8F2, dp(sizeDp / 3), 0xFFF4BBD2));
-        frame.setElevation(dp(2));
+        // Double jewel frame: rose enamel outside, champagne-gold inner edge.
+        frame.setBackground(roundGradient(new int[]{0xFFFFE6F0, 0xFFFFC3DC, 0xFFDDA85D}, dp(sizeDp / 3)));
+        frame.setPadding(dp(2), dp(2), dp(2), dp(2));
+        frame.setElevation(dp(5));
         LinearLayout.LayoutParams frameLp = new LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp));
         frameLp.setMargins(dp(2), dp(2), dp(2), dp(2));
         parent.addView(frame, frameLp);
@@ -1453,8 +1455,15 @@ public class CpCenterActivity extends ThemedActivity {
         HeartImageView image = new HeartImageView(this);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
         FrameLayout.LayoutParams imageLp = new FrameLayout.LayoutParams(-1, -1);
-        imageLp.setMargins(dp(3), dp(3), dp(3), dp(3));
+        imageLp.setMargins(dp(4), dp(4), dp(4), dp(4));
         frame.addView(image, imageLp);
+        // Tiny crown ornament reinforces the paired-profile look without covering faces.
+        TextView crown = text("♛", Math.max(12, sizeDp / 4), 0xFFFFD878, true);
+        crown.setGravity(Gravity.CENTER);
+        crown.setShadowLayer(dp(2), 0, dp(1), 0xFF8C3159);
+        FrameLayout.LayoutParams crownLp = new FrameLayout.LayoutParams(dp(Math.max(24, sizeDp / 2)), dp(Math.max(18, sizeDp / 3)), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        crownLp.topMargin = -dp(4);
+        frame.addView(crown, crownLp);
         String url = avatarUrl(person.get("avatarUrl"));
         if (url != null && !url.trim().isEmpty()) {
             Glide.with(this).load(url).centerCrop()
@@ -1480,9 +1489,9 @@ public class CpCenterActivity extends ThemedActivity {
         TextView heading = text(title, 19, INK, true);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         headingRow.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView heart = text("♥", 15, ROSE, true);
+        TextView heart = text("❦", 21, 0xFFB77A39, true);
         heart.setGravity(Gravity.CENTER);
-        heart.setBackground(round(0xFFFFE5F0, dp(14), 0xFFF5D0E0));
+        heart.setBackground(roundGradient(new int[]{0xFFFFF0C9, 0xFFFFDDEB}, dp(14)));
         headingRow.addView(heart, new LinearLayout.LayoutParams(dp(34), dp(32)));
         if (subtitle != null && !subtitle.isEmpty()) {
             TextView sub = text(subtitle, 12, MUTED, false);
@@ -1496,13 +1505,14 @@ public class CpCenterActivity extends ThemedActivity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER);
-        box.setPadding(dp(18), dp(24), dp(18), dp(24));
-        box.setBackground(round(Color.WHITE, dp(19), LINE));
+        box.setPadding(dp(20), dp(27), dp(20), dp(27));
+        box.setBackground(roundGradient(new int[]{0xFFFFF5FA, 0xFFFFE5F0, 0xFFFFF8E9}, dp(24)));
+        box.setElevation(dp(3));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.topMargin = dp(4);
         lp.bottomMargin = dp(8);
         screenContent.addView(box, lp);
-        TextView icon = text(symbol, 30, ROSE, true);
+        TextView icon = text("❦  " + symbol + "  ❦", 32, 0xFFD94B88, true);
         icon.setGravity(Gravity.CENTER);
         box.addView(icon);
         TextView heading = text(title, 14, INK, true);        heading.setGravity(Gravity.CENTER);
@@ -1517,9 +1527,12 @@ public class CpCenterActivity extends ThemedActivity {
     private LinearLayout panel() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(17), dp(17), dp(17), dp(17));
-        card.setBackground(roundGradient(new int[]{Color.WHITE, 0xFFFFFAFD}, dp(23)));
-        card.setElevation(dp(2));
+        card.setPadding(dp(18), dp(19), dp(18), dp(19));
+        // Shared luxury CP surface: pearl-pink fill, warm gold keyline and soft depth.
+        GradientDrawable outer = roundGradient(new int[]{0xFFFFF8FC, 0xFFFFEAF3, 0xFFFFFDF7}, dp(24));
+        outer.setStroke(dp(1), 0xFFE8BD83);
+        card.setBackground(outer);
+        card.setElevation(dp(4));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(6), 0, dp(8));
         card.setLayoutParams(lp);
@@ -1529,13 +1542,19 @@ public class CpCenterActivity extends ThemedActivity {
     private TextView actionButton(String label, boolean primary) {
         TextView button = text(label, 14, primary ? Color.WHITE : 0xFFB52D69, true);
         button.setGravity(Gravity.CENTER);
-        button.setMinHeight(dp(52));
-        button.setPadding(dp(18), dp(13), dp(18), dp(13));
+        button.setMinHeight(dp(56));
+        button.setPadding(dp(20), dp(14), dp(20), dp(14));
+        button.setLetterSpacing(0.015f);
         if (primary) {
-            button.setBackground(roundGradient(new int[]{0xFFCB3A7A, 0xFF8F2054}, dp(17)));
-            button.setElevation(dp(3));
+            GradientDrawable luxe = roundGradient(new int[]{0xFFE65B98, 0xFFB52D69, 0xFF782044}, dp(19));
+            luxe.setStroke(dp(1), 0xFFFFD68A);
+            button.setBackground(luxe);
+            button.setElevation(dp(5));
         } else {
-            button.setBackground(round(0xFFFFEDF5, dp(17), 0xFFF1C9DC));
+            GradientDrawable soft = roundGradient(new int[]{0xFFFFF7FB, 0xFFFFE5F0}, dp(19));
+            soft.setStroke(dp(1), 0xFFE8B66F);
+            button.setBackground(soft);
+            button.setElevation(dp(2));
         }
         button.setClickable(true);
         button.setFocusable(true);
