@@ -95,6 +95,13 @@ export class UsersController {
     return this.usersService.myCpStatus(userId);
   }
 
+  @Public()
+  @Get(':id/cp')
+  @ApiOperation({ summary: 'Public legacy CP pair for profile compatibility' })
+  publicCp(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.myCpStatus(id);
+  }
+
   @Get('me/requests')
   myRequests(
     @CurrentUser('sub') userId: string,
