@@ -99,7 +99,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         // Navigation is handled by the native device back gesture/button.
         EdgeToEdgeHelper.apply(this);
         EdgeToEdgeHelper.padSystemBars(root);
-        webView.loadUrl("file:///android_asset/" + (MODE_CP.equals(mode) ? "cp-insights.html" : "wealth-insights.html"));
+        webView.loadUrl("file:///android_asset/wealth-insights.html");
     }
 
     @Override protected boolean wantsContentSystemPadding() { return false; }
