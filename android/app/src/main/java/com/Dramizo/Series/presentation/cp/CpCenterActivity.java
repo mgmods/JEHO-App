@@ -447,8 +447,7 @@ public class CpCenterActivity extends ThemedActivity {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.setMargins(0, 0, dp(7), 0);
             chips.addView(chip, lp);
-            chip.setOnClickListener(v -> { currentType = type[0]; renderScreen(); });
-        }
+            chip.setOnClickListener(v -> { currentType = type[0]; renderScreen(); });        }
 
         sectionTitle("معرّف المستخدم", null);
         EditText idInput = new EditText(this);
@@ -897,8 +896,7 @@ public class CpCenterActivity extends ThemedActivity {
             if (iconUrl != null && !iconUrl.trim().isEmpty()) {
                 ImageView giftIcon = new ImageView(this);
                 giftIcon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-                giftFrame.addView(giftIcon, new FrameLayout.LayoutParams(-1, -1));
-                Glide.with(this).load(iconUrl).into(giftIcon);
+                giftFrame.addView(giftIcon, new FrameLayout.LayoutParams(-1, -1));                Glide.with(this).load(iconUrl).into(giftIcon);
             }
             String desc = firstValue(item, "description", "subtitle", "details");
             String price = firstValue(item, "price", "priceCoins", "coinPrice", "cost", "coins");
@@ -930,66 +928,140 @@ public class CpCenterActivity extends ThemedActivity {
 
 
     private void renderLeaderboard() {
-        sectionTitle("ترتيب عالم CP", "روابط تجمع القلوب — الترتيب حسب نقاط الخادم الفعلية");
-        LinearLayout intro = panel();
-        intro.setBackground(roundGradient(new int[]{0xFFFFE5F0, 0xFFFFF8FC}, dp(20)));
-        screenContent.addView(intro, matchWrap());
-        intro.addView(text("♥  كل نقطة تحكي جزءاً من قصتكم", 15, INK, true));
-        TextView introText = text("يعرض الترتيب بيانات الخادم فقط؛ لا تُنشأ نقاط أو مكافآت من الهاتف.", 12, MUTED, false);
-        introText.setPadding(0, dp(5), 0, 0);
-        introText.setLineSpacing(dp(3), 1f);
-        intro.addView(introText);
-        if (loadingDiscover) { emptyState("♥", "جارٍ تحميل الترتيب", "نحدّث قائمة العلاقات النشطة…"); return; }
+        sectionTitle("قمة عالم CP", "المتصدرون • نقاط العلاقات النشطة من الخادم");
+        if (loadingDiscover) { emptyState("♥", "جارٍ تحميل المتصدرين", "نحدّث ترتيب الأزواج…"); return; }
         if (discoverData.isEmpty()) {
-            emptyState("♥", "لا توجد نتائج حالياً", "سيظهر ترتيب الأزواج عند توفر علاقات نشطة.");
-            TextView refresh = actionButton("↻  تحديث الترتيب", true);            screenContent.addView(refresh, matchWrap());
+            emptyState("♥", "العرش بانتظاركم", "سيظهر هنا المتصدرون عند توفر علاقات نشطة.");
+            TextView refresh = actionButton("↻  تحديث الترتيب", true);
+            screenContent.addView(refresh, matchWrap());
             refresh.setOnClickListener(v -> loadDiscover(""));
             return;
         }
-        int rank = 1;
-        for (Map<String, Object> row : discoverData) {
-            LinearLayout card = panel();
-            if (rank == 1) card.setBackground(roundGradient(new int[]{0xFFFFE0ED, 0xFFFFF7FB}, dp(21)));
-            else if (rank <= 3) card.setBackground(roundGradient(new int[]{0xFFFFF0F6, Color.WHITE}, dp(21)));
-            screenContent.addView(card, matchWrap());
-            LinearLayout line = new LinearLayout(this);
-            line.setGravity(Gravity.CENTER_VERTICAL);
-            line.setOrientation(LinearLayout.HORIZONTAL);
-            card.addView(line, matchWrap());
-            TextView place = text(rank <= 3 ? new String[]{"👑", "♡", "♡"}[rank - 1] : String.valueOf(rank), 17, ROSE, true);
-            place.setGravity(Gravity.CENTER);
-            place.setBackground(roundGradient(rank == 1 ? new int[]{0xFFFFC9DE, 0xFFFFEAF3} : new int[]{0xFFFFEAF2, Color.WHITE}, dp(15)));
-            line.addView(place, new LinearLayout.LayoutParams(dp(40), dp(42)));
-            Map<String, Object> a = map(row.get("userA"));
-            Map<String, Object> b = map(row.get("userB"));
-            LinearLayout couple = new LinearLayout(this);
-            couple.setGravity(Gravity.CENTER);
-            couple.setOrientation(LinearLayout.HORIZONTAL);
-            LinearLayout.LayoutParams coupleLp = new LinearLayout.LayoutParams(-2, -2);
-            coupleLp.setMargins(dp(5), 0, dp(4), 0);
-            line.addView(couple, coupleLp);
-            addAvatar(couple, a, 39);
-            TextView heart = text("♥", 13, ROSE, true);
-            heart.setGravity(Gravity.CENTER);
-            couple.addView(heart, new LinearLayout.LayoutParams(dp(18), dp(34)));
-            addAvatar(couple, b, 39);
-            LinearLayout detail = new LinearLayout(this);
-            detail.setOrientation(LinearLayout.VERTICAL);
-            LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(0, -2, 1f);
-            detailLp.setMargins(dp(5), 0, 0, 0);
-            line.addView(detail, detailLp);
-            detail.addView(text(personName(a) + " ♥ " + personName(b), 12, INK, true));
-            TextView meta = text(typeName(str(row.get("type"))) + " · المستوى " + defaultString(row.get("level"), "1"), 10, MUTED, false);
-            meta.setPadding(0, dp(3), 0, 0);
-            detail.addView(meta);
-            TextView points = text("♥  " + numberString(row.get("points")) + " نقطة", 11, ROSE, true);
-            points.setGravity(Gravity.CENTER);
-            points.setPadding(dp(8), dp(5), dp(8), dp(5));
-            points.setBackground(round(0xFFFFEAF2, dp(12), 0xFFF8D7E5));
-            LinearLayout.LayoutParams pointsLp = new LinearLayout.LayoutParams(-2, -2);
-            pointsLp.topMargin = dp(6);
-            detail.addView(points, pointsLp);
-            rank++;
+        int count = discoverData.size();
+        Map<String, Object> champion = discoverData.get(0);
+        Map<String, Object> a = map(champion.get("userA"));
+        Map<String, Object> b = map(champion.get("userB"));
+        LinearLayout crownCard = panel();
+        crownCard.setPadding(dp(18), dp(20), dp(18), dp(20));
+        crownCard.setBackground(roundGradient(new int[]{0xFF6D1745, 0xFFB92F70, 0xFFE86FA2}, dp(28)));
+        crownCard.setElevation(dp(4));
+        screenContent.addView(crownCard, matchWrap());
+        TextView crown = text("♛  #1  متصدرو عالم CP", 14, 0xFFFFE1ED, true);
+        crown.setGravity(Gravity.CENTER);
+        crownCard.addView(crown);
+        LinearLayout pair = new LinearLayout(this);
+        pair.setGravity(Gravity.CENTER);
+        pair.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams pairLp = new LinearLayout.LayoutParams(-1, -2);
+        pairLp.topMargin = dp(12);
+        crownCard.addView(pair, pairLp);
+        addAvatar(pair, a, 112);
+        FrameLayout centerHeart = new FrameLayout(this);
+        centerHeart.setBackground(roundGradient(new int[]{0xFFFFE1ED, 0xFFFF9EC4}, dp(28)));
+        LinearLayout.LayoutParams centerLp = new LinearLayout.LayoutParams(dp(56), dp(56));
+        centerLp.setMargins(dp(7), 0, dp(7), 0);
+        pair.addView(centerHeart, centerLp);
+        TextView heart = text("♥", 34, 0xFF9F245B, true);
+        heart.setGravity(Gravity.CENTER);
+        centerHeart.addView(heart, new FrameLayout.LayoutParams(-1, -1));
+        addAvatar(pair, b, 112);
+        TextView names = text(personName(a) + "  ♥  " + personName(b), 18, Color.WHITE, true);
+        names.setGravity(Gravity.CENTER);
+        names.setPadding(0, dp(12), 0, dp(3));
+        crownCard.addView(names);
+        TextView kind = text(typeName(str(champion.get("type"))) + "  ·  المستوى " + defaultString(champion.get("level"), "1"), 12, 0xFFFFE4EF, false);
+        kind.setGravity(Gravity.CENTER);
+        crownCard.addView(kind);
+        TextView score = text("♥  " + numberString(champion.get("points")) + " نقطة", 22, Color.WHITE, true);
+        score.setGravity(Gravity.CENTER);
+        score.setPadding(dp(16), dp(10), dp(16), dp(10));
+        score.setBackground(round(0x30FFFFFF, dp(20), 0x55FFFFFF));
+        LinearLayout.LayoutParams scoreLp = new LinearLayout.LayoutParams(-1, -2);
+        scoreLp.topMargin = dp(14);
+        crownCard.addView(score, scoreLp);
+
+        if (count > 1) {
+            sectionTitle("أقرب المنافسين", "المركزان الثاني والثالث");
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.bottomMargin = dp(8);
+            screenContent.addView(row, rowLp);
+            for (int index = 1; index < Math.min(3, count); index++) {
+                Map<String, Object> entry = discoverData.get(index);
+                Map<String, Object> p1 = map(entry.get("userA"));
+                Map<String, Object> p2 = map(entry.get("userB"));
+                LinearLayout card = new LinearLayout(this);
+                card.setOrientation(LinearLayout.VERTICAL);
+                card.setGravity(Gravity.CENTER);
+                card.setPadding(dp(8), dp(14), dp(8), dp(14));
+                card.setBackground(roundGradient(index == 1
+                        ? new int[]{0xFFF0E7FA, Color.WHITE}
+                        : new int[]{0xFFFFEAF2, Color.WHITE}, dp(23)));
+                card.setElevation(dp(2));
+                LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1f);
+                cp.setMargins(dp(3), 0, dp(3), 0);
+                row.addView(card, cp);
+                TextView rank = text(index == 1 ? "♛  #2" : "♡  #3", 13, index == 1 ? 0xFF8152A2 : ROSE, true);
+                rank.setGravity(Gravity.CENTER);
+                card.addView(rank);
+                LinearLayout faces = new LinearLayout(this);
+                faces.setGravity(Gravity.CENTER);
+                faces.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams facesLp = new LinearLayout.LayoutParams(-1, -2);
+                facesLp.topMargin = dp(8);
+                card.addView(faces, facesLp);
+                addAvatar(faces, p1, 66);
+                TextView miniHeart = text("♥", 14, ROSE, true);
+                miniHeart.setGravity(Gravity.CENTER);
+                faces.addView(miniHeart, new LinearLayout.LayoutParams(dp(18), dp(30)));
+                addAvatar(faces, p2, 66);
+                TextView coupleName = text(personName(p1) + " ♥ " + personName(p2), 12, INK, true);
+                coupleName.setGravity(Gravity.CENTER);
+                coupleName.setMaxLines(2);
+                coupleName.setPadding(0, dp(8), 0, dp(3));
+                card.addView(coupleName);
+                TextView points = text(numberString(entry.get("points")) + " نقطة", 14, ROSE, true);
+                points.setGravity(Gravity.CENTER);
+                points.setPadding(0, dp(5), 0, 0);
+                card.addView(points);
+            }
+        }
+        if (count > 3) {
+            sectionTitle("قائمة المتصدرين", "ترتيب بقية العلاقات");
+            for (int index = 3; index < count; index++) {
+                Map<String, Object> entry = discoverData.get(index);
+                Map<String, Object> p1 = map(entry.get("userA"));
+                Map<String, Object> p2 = map(entry.get("userB"));
+                LinearLayout card = panel();
+                screenContent.addView(card, matchWrap());
+                LinearLayout line = new LinearLayout(this);
+                line.setGravity(Gravity.CENTER_VERTICAL);
+                line.setOrientation(LinearLayout.HORIZONTAL);
+                card.addView(line, matchWrap());
+                TextView rank = text("#" + (index + 1), 15, ROSE, true);
+                rank.setGravity(Gravity.CENTER);
+                rank.setBackground(round(0xFFFFE8F2, dp(14), 0xFFF7D6E4));
+                line.addView(rank, new LinearLayout.LayoutParams(dp(48), dp(42)));
+                LinearLayout faces = new LinearLayout(this);
+                faces.setGravity(Gravity.CENTER);
+                faces.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams facesLp = new LinearLayout.LayoutParams(-2, -2);
+                facesLp.setMargins(dp(5), 0, dp(5), 0);
+                line.addView(faces, facesLp);
+                addAvatar(faces, p1, 54);
+                TextView mini = text("♥", 12, ROSE, true);
+                mini.setGravity(Gravity.CENTER);
+                faces.addView(mini, new LinearLayout.LayoutParams(dp(16), dp(24)));
+                addAvatar(faces, p2, 54);
+                LinearLayout detail = new LinearLayout(this);
+                detail.setOrientation(LinearLayout.VERTICAL);
+                line.addView(detail, new LinearLayout.LayoutParams(0, -2, 1f));
+                detail.addView(text(personName(p1) + " ♥ " + personName(p2), 12, INK, true));
+                TextView meta = text(typeName(str(entry.get("type"))) + " · " + numberString(entry.get("points")) + " نقطة", 11, MUTED, false);
+                meta.setPadding(0, dp(4), 0, 0);
+                detail.addView(meta);
+            }
         }
     }
 
@@ -1347,7 +1419,6 @@ public class CpCenterActivity extends ThemedActivity {
         row.addView(action);
         card.setOnClickListener(v -> showView(targetView));
     }
-
     private void addPersonRow(LinearLayout card, Map<String, Object> person, String subtitle, String status) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
