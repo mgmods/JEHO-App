@@ -545,7 +545,10 @@ public class CpCenterActivity extends ThemedActivity {
             TextView chip = text(type[1], 12, discoverType.equals(type[0]) ? Color.WHITE : INK, true);
             chip.setGravity(Gravity.CENTER);
             chip.setPadding(dp(13), dp(9), dp(13), dp(9));
-            chip.setBackground(round(discoverType.equals(type[0]) ? ROSE : Color.WHITE, dp(20), LINE));
+            chip.setBackground(roundGradient(discoverType.equals(type[0])
+                    ? new int[]{0xFFE84F91, 0xFF9B245A}
+                    : new int[]{0xFFFFF9FC, 0xFFFFE8F2}, dp(20)));
+            if (!discoverType.equals(type[0])) chip.setBackground(roundGradient(new int[]{0xFFFFF9FC, 0xFFFFE8F2}, dp(20)));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.setMargins(0, 0, dp(7), 0);
             chips.addView(chip, lp);
@@ -563,8 +566,10 @@ public class CpCenterActivity extends ThemedActivity {
     private void addRelationshipCard(Map<String, Object> row, boolean publicList) {
         LinearLayout card = panel();
         card.setPadding(dp(17), dp(18), dp(17), dp(18));
-        card.setBackground(roundGradient(new int[]{Color.WHITE, 0xFFFFF2F8, 0xFFF9F2FF}, dp(26)));
-        card.setElevation(dp(3));
+        GradientDrawable relationshipFrame = roundGradient(new int[]{0xFFFFF9FC, 0xFFFFE8F2, 0xFFFFF4DF}, dp(26));
+        relationshipFrame.setStroke(dp(2), 0xFFE4B66D);
+        card.setBackground(relationshipFrame);
+        card.setElevation(dp(5));
         screenContent.addView(card, matchWrap());
         TextView ribbon = text("♥  " + (publicList ? "علاقة نشطة" : "رابطكما الخاص"), 11, ROSE, true);
         ribbon.setGravity(Gravity.CENTER);
@@ -592,7 +597,7 @@ public class CpCenterActivity extends ThemedActivity {
         bigHeart.setGravity(Gravity.CENTER);
         heartBadge.addView(bigHeart, new FrameLayout.LayoutParams(-1, -1));
         addAvatar(pair, partner, 92);
-        TextView names = text(personName(self) + "  ♥  " + personName(partner), 17, INK, true);
+        TextView names = text("❦  " + personName(self) + "  ♥  " + personName(partner) + "  ❦", 17, INK, true);
         names.setGravity(Gravity.CENTER);
         names.setPadding(0, dp(12), 0, dp(3));
         card.addView(names);
@@ -856,7 +861,9 @@ public class CpCenterActivity extends ThemedActivity {
     private void renderStore() {
         sectionTitle("متجر CP", "مظاهر وهدايا تضيف لمسة خاصة إلى رابطكما");
         LinearLayout banner = panel();
-        banner.setBackground(roundGradient(new int[]{0xFFFFE1EE, 0xFFFFF5FA, 0xFFF0E4FF}, dp(20)));
+        GradientDrawable storeBanner = roundGradient(new int[]{0xFFFFE6F1, 0xFFFFF8E8, 0xFFEDE0FF}, dp(24));
+        storeBanner.setStroke(dp(2), 0xFFE4B66D);
+        banner.setBackground(storeBanner);
         screenContent.addView(banner, matchWrap());
         banner.addView(text("💗  اجعلوا رابطكم مميزاً", 17, INK, true));
         TextView blurb = text("إطارات مشتركة، تأثيرات دخول، بطاقات أسماء وهدايا مخصصة.", 12, MUTED, false);
@@ -883,7 +890,9 @@ public class CpCenterActivity extends ThemedActivity {
             row.setOrientation(LinearLayout.HORIZONTAL);
             card.addView(row, matchWrap());
             FrameLayout giftFrame = new FrameLayout(this);
-            giftFrame.setBackground(round(0xFFFFEAF2, dp(15), LINE));
+            GradientDrawable giftJewel = roundGradient(new int[]{0xFFFFF1C8, 0xFFFFD4E6, 0xFFE6D8FF}, dp(18));
+            giftJewel.setStroke(dp(1), 0xFFE2B56D);
+            giftFrame.setBackground(giftJewel);
             row.addView(giftFrame, new LinearLayout.LayoutParams(dp(54), dp(54)));
             TextView symbol = text("💝", 25, ROSE, true);
             symbol.setGravity(Gravity.CENTER);
@@ -948,10 +957,12 @@ public class CpCenterActivity extends ThemedActivity {
         Map<String, Object> b = map(champion.get("userB"));
         LinearLayout crownCard = panel();
         crownCard.setPadding(dp(18), dp(20), dp(18), dp(20));
-        crownCard.setBackground(roundGradient(new int[]{0xFF6D1745, 0xFFB92F70, 0xFFE86FA2}, dp(28)));
-        crownCard.setElevation(dp(4));
+        GradientDrawable crownFrame = roundGradient(new int[]{0xFF6D1745, 0xFFB92F70, 0xFFE86FA2}, dp(28));
+        crownFrame.setStroke(dp(2), 0xFFFFD78B);
+        crownCard.setBackground(crownFrame);
+        crownCard.setElevation(dp(7));
         screenContent.addView(crownCard, matchWrap());
-        TextView crown = text("♛  #1  متصدرو عالم CP", 14, 0xFFFFE1ED, true);
+        TextView crown = text("✦  ♛  TOP 1  ♛  ✦\nمتصدرو عالم CP", 17, 0xFFFFE8A8, true);
         crown.setGravity(Gravity.CENTER);
         crownCard.addView(crown);
         LinearLayout pair = new LinearLayout(this);
@@ -962,7 +973,9 @@ public class CpCenterActivity extends ThemedActivity {
         crownCard.addView(pair, pairLp);
         addAvatar(pair, a, 112);
         FrameLayout centerHeart = new FrameLayout(this);
-        centerHeart.setBackground(roundGradient(new int[]{0xFFFFE1ED, 0xFFFF9EC4}, dp(28)));
+        GradientDrawable heartFrame = roundGradient(new int[]{0xFFFFF2C9, 0xFFFFB9D5, 0xFFEF6C9E}, dp(28));
+        heartFrame.setStroke(dp(2), 0xFFFFE8A8);
+        centerHeart.setBackground(heartFrame);
         LinearLayout.LayoutParams centerLp = new LinearLayout.LayoutParams(dp(56), dp(56));
         centerLp.setMargins(dp(7), 0, dp(7), 0);
         pair.addView(centerHeart, centerLp);
@@ -970,14 +983,15 @@ public class CpCenterActivity extends ThemedActivity {
         heart.setGravity(Gravity.CENTER);
         centerHeart.addView(heart, new FrameLayout.LayoutParams(-1, -1));
         addAvatar(pair, b, 112);
-        TextView names = text(personName(a) + "  ♥  " + personName(b), 18, Color.WHITE, true);
+        TextView names = text("❦  " + personName(a) + "  ♥  " + personName(b) + "  ❦", 18, Color.WHITE, true);
         names.setGravity(Gravity.CENTER);
         names.setPadding(0, dp(12), 0, dp(3));
         crownCard.addView(names);
-        TextView kind = text(typeName(str(champion.get("type"))) + "  ·  المستوى " + defaultString(champion.get("level"), "1"), 12, 0xFFFFE4EF, false);
+        TextView kind = text("✧  " + typeName(str(champion.get("type"))) + "  ·  المستوى " + defaultString(champion.get("level"), "1") + "  ✧", 13, 0xFFFFE4EF, true);
         kind.setGravity(Gravity.CENTER);
         crownCard.addView(kind);
-        TextView score = text("♥  " + numberString(champion.get("points")) + " نقطة", 22, Color.WHITE, true);
+        String championDuration = firstValue(champion, "durationLabel", "duration", "daysTogether", "durationDays", "daysActive");
+        TextView score = text("♥  " + numberString(champion.get("points")) + " نقطة" + (championDuration.isEmpty() ? "" : "   │   ♡  " + championDuration), 19, Color.WHITE, true);
         score.setGravity(Gravity.CENTER);
         score.setPadding(dp(16), dp(10), dp(16), dp(10));
         score.setBackground(round(0x30FFFFFF, dp(20), 0x55FFFFFF));
@@ -1000,9 +1014,11 @@ public class CpCenterActivity extends ThemedActivity {
                 card.setOrientation(LinearLayout.VERTICAL);
                 card.setGravity(Gravity.CENTER);
                 card.setPadding(dp(8), dp(14), dp(8), dp(14));
-                card.setBackground(roundGradient(index == 1
-                        ? new int[]{0xFFF0E7FA, Color.WHITE}
-                        : new int[]{0xFFFFEAF2, Color.WHITE}, dp(23)));
+                GradientDrawable podiumFrame = roundGradient(index == 1
+                        ? new int[]{0xFFFFE9B5, 0xFFFFF8E8, 0xFFFFD7E9}
+                        : new int[]{0xFFE7DDF5, 0xFFFFF8FC, 0xFFFFDDEB}, dp(23));
+                podiumFrame.setStroke(dp(2), index == 1 ? 0xFFD8A64F : 0xFFD8AFCB);
+                card.setBackground(podiumFrame);
                 card.setElevation(dp(2));
                 LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1f);
                 cp.setMargins(dp(3), 0, dp(3), 0);
@@ -1176,7 +1192,9 @@ public class CpCenterActivity extends ThemedActivity {
     private void renderMemories() {
         sectionTitle("ذكرياتنا", "لحظات مشتركة تبقى محفوظة داخل علاقتكما");
         LinearLayout banner = panel();
-        banner.setBackground(roundGradient(new int[]{0xFFFFE1EE, 0xFFFFF5FA}, dp(20)));
+        GradientDrawable memoryBanner = roundGradient(new int[]{0xFFFFE5F0, 0xFFFFF8E8, 0xFFFFD5E8}, dp(24));
+        memoryBanner.setStroke(dp(1), 0xFFE6B96F);
+        banner.setBackground(memoryBanner);
         screenContent.addView(banner, matchWrap());
         banner.addView(text("♡  قصتكم تستحق أن تُحفظ", 17, INK, true));
         TextView description = text("أضيفوا كلمات وصوراً لتوثيق لحظاتكما. الذكريات متاحة فقط لأطراف العلاقة النشطة.", 12, MUTED, false);
