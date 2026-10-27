@@ -97,6 +97,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(RoomsService.name);
   private personalEmptySweepTimer: ReturnType<typeof setInterval> | null = null;
   private chatAutoClearTimer: ReturnType<typeof setInterval> | null = null;
+  private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
+  private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
   /** Default list/cover art when a room has no custom cover (backgrounds pack on disk). */
   private readonly roomCoverCards = [
     'backgrounds/bg_aurora_night',
@@ -1453,6 +1455,24 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return map;
   }
 
+  /** Cache the dashboard policy briefly; room rosters can contain many users. */
+  private async mysteriousPolicy(): Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }> {
+    const now = Date.now();
+    if (this.mysteriousPolicyCache && this.mysteriousPolicyCache.expiresAt > now) {
+      return this.mysteriousPolicyCache;
+    }
+    if (this.mysteriousPolicyLookup) return this.mysteriousPolicyLookup;
+    this.mysteriousPolicyLookup = this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } })
+      .then((row) => ({ row, failed: false, expiresAt: Date.now() + 5_000 }))
+      .catch(() => ({ row: null, failed: true, expiresAt: Date.now() + 2_000 }))
+      .then((result) => {
+        this.mysteriousPolicyCache = result;
+        return result;
+      })
+      .finally(() => { this.mysteriousPolicyLookup = undefined; });
+    return this.mysteriousPolicyLookup;
+  }
+
   /** Dashboard policy is authoritative; legacy plan benefits are only a pre-policy fallback. */
   private async isMysteriousModeEligible(user: User | null | undefined, vip: UserVip | null | undefined): Promise<boolean> {
     if (!user?.mysteriousMode || !vip || !vip.isActive) return false;
@@ -1460,12 +1480,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const level = Number(vip.level || 0);
     if (!Number.isInteger(level) || level < 1 || level > 7) return false;
 
-    let policyRow: AppSetting | null = null;
-    try {
-      policyRow = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
-    } catch {
-      return false; // fail closed if current eligibility cannot be verified
-    }
+    const currentPolicy = await this.mysteriousPolicy();
+    if (currentPolicy.failed) return false;
+    const policyRow = currentPolicy.row;
     const benefits = vip.vipPlan?.benefits as any;
     if (policyRow) {
       let policy: any = {};
