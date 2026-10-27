@@ -70,6 +70,7 @@ public class CpCenterActivity extends ThemedActivity {
     private final List<Map<String, Object>> discoverData = new ArrayList<>();
     private final List<Map<String, Object>> catalogData = new ArrayList<>();
     private final List<Map<String, Object>> memoriesData = new ArrayList<>();
+    private final List<Map<String, Object>> tasksData = new ArrayList<>();
     private String currentView = "home";
     private String currentType = "love";
     private String discoverType = "";
@@ -78,6 +79,7 @@ public class CpCenterActivity extends ThemedActivity {
     private boolean loadingDiscover;
     private boolean loadingCatalog;
     private boolean loadingMemories;
+    private boolean loadingTasks;
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -127,6 +129,7 @@ public class CpCenterActivity extends ThemedActivity {
         if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
         if ("store".equals(currentView)) loadCatalog();
         if ("memories".equals(currentView)) loadMemories();
+        if ("tasks".equals(currentView)) loadTasks();
     }
 
     private void buildHeader() {
@@ -306,6 +309,7 @@ public class CpCenterActivity extends ThemedActivity {
         else if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
         else if ("store".equals(currentView)) loadCatalog();
         else if ("memories".equals(currentView)) loadMemories();
+        else if ("tasks".equals(currentView)) loadTasks();
     }
 
     private void renderScreen() {
@@ -318,7 +322,7 @@ public class CpCenterActivity extends ThemedActivity {
             case "sent": renderSent(); break;
             case "discover": renderDiscover(); break;
             case "store": renderStore(); break;
-            case "tasks": renderPlannedPage("المهام والتحديات", "تحديات مشتركة وتقدم ومكافآت.", "يلزم ربط المهام وتسجيل التقدم والمكافآت بخدمة الخادم قبل تفعيلها."); break;
+            case "tasks": renderTasks(); break;
             case "leaderboard": renderLeaderboard(); break;
             case "memories": renderMemories(); break;
             case "settings": renderSettings(); break;
@@ -699,6 +703,108 @@ public class CpCenterActivity extends ThemedActivity {
         }
     }
 
+
+
+    private void renderTasks() {
+        sectionTitle("المهام والتحديات", "إنجازات يومية مشتركة ومكافآت نقاط CP");
+        LinearLayout hero = panel();
+        hero.setBackground(roundGradient(new int[]{0xFFFFE1EE, 0xFFFFF5FA}, dp(20)));
+        screenContent.addView(hero, matchWrap());
+        hero.addView(text("🎯  كل خطوة تقرّبكم أكثر", 17, INK, true));
+        TextView note = text("أكملوا شروط المهمة ثم استلموا المكافأة. يتحقق الخادم من الإنجاز ويمنع استلام المكافأة أكثر من مرة يومياً.", 12, MUTED, false);
+        note.setPadding(0, dp(5), 0, 0);
+        note.setLineSpacing(dp(3), 1f);
+        hero.addView(note);
+        if (loadingTasks) {
+            emptyState("🎯", "جارٍ تحميل المهام", "نحدّث تقدم العلاقة…");
+            return;
+        }
+        if (tasksData.isEmpty()) {
+            emptyState("♡", "اربط حسابك بعلاقة CP", "تظهر المهام اليومية بعد تفعيل علاقة وقبول الطلب.");
+            TextView send = actionButton("إرسال طلب ارتباط", true);
+            screenContent.addView(send, matchWrap());
+            send.setOnClickListener(v -> showView("send"));
+            return;
+        }
+        for (Map<String, Object> task : tasksData) {
+            LinearLayout card = panel();
+            screenContent.addView(card, matchWrap());
+            String title = defaultString(task.get("title"), "مهمة CP");
+            String description = str(task.get("description"));
+            card.addView(text(title, 15, INK, true));
+            if (!description.isEmpty()) {
+                TextView sub = text(description, 12, MUTED, false);
+                sub.setPadding(0, dp(4), 0, 0);
+                card.addView(sub);
+            }
+            int progress = Math.max(0, (int) numberLong(task.get("progress")));
+            int target = Math.max(1, (int) numberLong(task.get("target")));
+            int percent = Math.min(100, (progress * 100) / target);
+            TextView progressText = text(progress + " / " + target + "  ·  " + percent + "%", 11, ROSE, true);
+            progressText.setPadding(0, dp(10), 0, dp(5));
+            card.addView(progressText);
+            FrameLayout track = new FrameLayout(this);
+            track.setBackground(round(0xFFFFEAF2, dp(8), LINE));
+            card.addView(track, new LinearLayout.LayoutParams(-1, dp(8)));
+            View fill = new View(this);
+            fill.setBackground(round(ROSE, dp(8), Color.TRANSPARENT));
+            FrameLayout.LayoutParams fillLp = new FrameLayout.LayoutParams(Math.max(dp(4), dp(260) * percent / 100), -1, Gravity.RIGHT);
+            track.addView(fill, fillLp);
+            TextView reward = text("المكافأة: +" + numberString(task.get("rewardPoints")) + " نقطة CP", 12, ROSE, true);
+            reward.setPadding(0, dp(9), 0, dp(8));
+            card.addView(reward);
+            boolean claimed = Boolean.TRUE.equals(task.get("claimed"));
+            boolean canClaim = Boolean.TRUE.equals(task.get("canClaim"));
+            TextView claim = actionButton(claimed ? "تم الاستلام ✓" : canClaim ? "استلام المكافأة" : "أكمل المهمة أولاً", canClaim);
+            card.addView(claim, matchWrap());
+            claim.setOnClickListener(v -> {
+                if (claimed) {
+                    toast("استلمت مكافأة هذه المهمة اليوم.");
+                } else if (canClaim) {
+                    claimTask(str(task.get("id")));
+                } else {
+                    toast("أكمل شرط المهمة أولاً لتحصل على المكافأة.");
+                }
+            });
+        }
+    }
+
+    private long numberLong(Object value) {
+        try { return (long) Double.parseDouble(str(value)); }
+        catch (Exception ignored) { return 0L; }
+    }
+
+    private void loadTasks() {
+        if (loadingTasks || isFinishing()) return;
+        loadingTasks = true;
+        if ("tasks".equals(currentView)) renderScreen();
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = ApiCall.execute(c.getUserApi().cpTasks());
+            List<Map<String, Object>> rows = result.success && result.data != null
+                    ? new ArrayList<>(result.data) : new ArrayList<>();
+            runOnUiThread(() -> {
+                loadingTasks = false;
+                tasksData.clear();
+                tasksData.addAll(rows);
+                if ("tasks".equals(currentView)) renderScreen();
+                if (!result.success) toast(result.error != null ? result.error : "تعذر تحميل مهام CP");
+            });
+        });
+    }
+
+    private void claimTask(String taskId) {
+        if (taskId == null || taskId.trim().isEmpty()) return;
+        c.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().claimCpTask(taskId));
+            runOnUiThread(() -> {
+                if (result.success) {
+                    toast("تم استلام مكافأة المهمة وإضافة النقاط إلى العلاقة ❤️");
+                    loadTasks();
+                    loadHome();
+                } else toast(result.error != null ? result.error : "تعذر استلام مكافأة المهمة");
+            });
+        });
+    }
 
     private void renderMemories() {
         sectionTitle("ذكرياتنا", "لحظات مشتركة تبقى محفوظة داخل علاقتكما");
@@ -1165,6 +1271,7 @@ public class CpCenterActivity extends ThemedActivity {
         if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
         if ("store".equals(currentView)) loadCatalog();
         if ("memories".equals(currentView)) loadMemories();
+        if ("tasks".equals(currentView)) loadTasks();
         Toast.makeText(this, "جارٍ تحديث بيانات CP…", Toast.LENGTH_SHORT).show();
     }
 
