@@ -448,7 +448,7 @@ public class CpCenterActivity extends ThemedActivity {
             heading.setGravity(Gravity.CENTER);
             heading.setPadding(0, dp(5), 0, dp(4));
             welcome.addView(heading);
-            TextView body = text("اختَر نوع الرابطة وأرسل دعوة. تبقى العلاقة بانتظار موافقة الطرف الآخر.", 13, MUTED, false);
+            TextView body = text("ابدأ من داخل الروم بإرسال هدية CP. تبقى العلاقة بانتظار موافقة الطرف الآخر.", 13, MUTED, false);
             body.setGravity(Gravity.CENTER);
             body.setLineSpacing(dp(4), 1f);
             welcome.addView(body);
@@ -500,11 +500,11 @@ public class CpCenterActivity extends ThemedActivity {
             card.setOnClickListener(v -> { currentType = type; showView("gifts"); });
         }
         sectionTitle("اكتشف عالم CP", "كل ما تحتاجه لعلاقتكما في مكان واحد");
-        addFeatureCard("gifts", "هدايا CP", "أرسل هدية تبدأ بها قصة ارتباط", "🎁");
+        addFeatureCard("gifts", "هدايا CP", "استعرض الهدايا وأرسلها من داخل الروم", "🎁");
         addFeatureCard("store", "متجر CP", "مظاهر وإطارات تضيف بصمتكما", "♧");
         addFeatureCard("memories", "ذكرياتنا", "احفظوا لحظاتكم وصوركم", "♡");
         addFeatureCard("tasks", "المهام المشتركة", "إنجازات ومكافآت يومية", "✦");
-        addFeatureCard("gifts", "هدايا CP", "أرسل هدية واطلب الارتباط بموافقة الطرف الآخر", "🎁");
+
         addFeatureCard("categories", "تصنيفات CP", "الحب والزواج والصداقة والمزيد", "❦");
         addFeatureCard("stats", "الإحصائيات", "نقاط العلاقة ومدتها وتقدمها", "✧");
         addFeatureCard("leaderboard", "قمة المتصدرين", "شاهد أجمل الروابط في JEHO", "♛");
@@ -513,54 +513,42 @@ public class CpCenterActivity extends ThemedActivity {
     }
 
     private void renderSend() {
-        sectionTitle("هدايا CP", "أرسل هدية مخصصة؛ الارتباط لا يبدأ إلا بموافقة المستلم");
-        TextView explainer = text("اختر نوع الرابطة وأرسل هدية CP. ستصل للمستلم رسالة طلب ارتباط، ولن تصبح العلاقة نشطة إلا إذا وافق عليها.", 13, MUTED, false);
-        explainer.setLineSpacing(dp(4), 1f);
-        explainer.setPadding(dp(14), dp(13), dp(14), dp(13));
-        explainer.setBackground(round(Color.WHITE, dp(17), LINE));
-        screenContent.addView(explainer, matchWrap());
-
-        sectionTitle("نوع العلاقة", null);
-        HorizontalScrollView horizontal = new HorizontalScrollView(this);
-        horizontal.setHorizontalScrollBarEnabled(false);
-        screenContent.addView(horizontal, matchWrap());
-        LinearLayout chips = new LinearLayout(this);
-        chips.setOrientation(LinearLayout.HORIZONTAL);
-        horizontal.addView(chips, new HorizontalScrollView.LayoutParams(-2, -2));
-        String[][] types = {{"love","الحب"}, {"marriage","الزواج"}, {"engagement","الخطوبة"}, {"friendship","الصداقة"}, {"brotherhood","الأخوّة"}};
-        for (String[] type : types) {
-            TextView chip = text(type[1], 12, currentType.equals(type[0]) ? Color.WHITE : INK, true);
-            chip.setGravity(Gravity.CENTER);
-            chip.setPadding(dp(14), dp(10), dp(14), dp(10));
-            chip.setBackground(round(currentType.equals(type[0]) ? ROSE : Color.WHITE, dp(20), LINE));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-            lp.setMargins(0, 0, dp(7), 0);
-            chips.addView(chip, lp);
-            chip.setOnClickListener(v -> { currentType = type[0]; renderScreen(); });        }
-        sectionTitle("معرّف المستخدم", null);
-        EditText idInput = new EditText(this);
-        idInput.setSingleLine(true);
-        idInput.setTextSize(14);
-        idInput.setTextColor(INK);
-        idInput.setHintTextColor(MUTED);
-        idInput.setHint("أدخل ID المستخدم");        idInput.setInputType(InputType.TYPE_CLASS_TEXT);
-        idInput.setPadding(dp(15), dp(12), dp(15), dp(12));
-        idInput.setBackground(round(Color.WHITE, dp(15), LINE));
-        screenContent.addView(idInput, matchWrap());
-
-        TextView send = actionButton("🎁  إرسال هدية " + typeName(currentType), true);
-        LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(-1, -2);
-        sendLp.topMargin = dp(12);
-        screenContent.addView(send, sendLp);        send.setOnClickListener(v -> sendRequest(idInput.getText().toString()));
-        TextView sentLink = actionButton("متابعة حالة هدايا الارتباط", false);
-        LinearLayout.LayoutParams sentLp = new LinearLayout.LayoutParams(-1, -2);
-        sentLp.topMargin = dp(8);
-        screenContent.addView(sentLink, sentLp);
-        sentLink.setOnClickListener(v -> showView("sent"));
+        sectionTitle("هدايا CP", "الهدايا تُرسل داخل الرومات فقط");
+        LinearLayout hero = panel();
+        hero.setPadding(dp(18),dp(20),dp(18),dp(20));
+        hero.setBackground(roundGradient(new int[]{0xFF3A1535,0xFF7B244F,0xFFD85C91},dp(26)));
+        screenContent.addView(hero,matchWrap());
+        TextView heart = text("💗",42,Color.WHITE,true); heart.setGravity(Gravity.CENTER);
+        hero.addView(heart,matchWrap());
+        TextView title = text("هدية صغيرة… وبداية حكاية",19,Color.WHITE,true); title.setGravity(Gravity.CENTER);
+        title.setPadding(0,dp(8),0,dp(5)); hero.addView(title,matchWrap());
+        TextView desc = text("اختَر نوع الهدية من هنا للتعرّف عليه. لإرسالها فعلياً افتح روم صوتي، اضغط على صورة المستخدم، ثم اختر هدايا الارتباط · CP.",13,0xFFFFE8F1,false);
+        desc.setGravity(Gravity.CENTER); desc.setLineSpacing(dp(4),1f); hero.addView(desc,matchWrap());
+        TextView categories = actionButton("استعراض تصنيفات الهدايا",true);
+        LinearLayout.LayoutParams categoryLp=new LinearLayout.LayoutParams(-1,-2); categoryLp.topMargin=dp(14); hero.addView(categories,categoryLp);
+        categories.setOnClickListener(v->showView("categories"));
+        sectionTitle("هدايا الارتباط", "الهدية تُخصم وتُرسل من الخادم، والطلب ينتظر موافقة المستلم");
+        String[][] types = {{"love","♥","الحب"},{"marriage","💞","الزواج"},{"engagement","💍","الخطوبة"},{"friendship","✦","الصداقة"},{"brotherhood","♛","الأخوّة"}};
+        for (String[] item : types) {
+            LinearLayout card=panel(); card.setOrientation(LinearLayout.HORIZONTAL); card.setGravity(Gravity.CENTER_VERTICAL);
+            screenContent.addView(card,matchWrap());
+            FrameLayout iconFrame=new FrameLayout(this);
+            iconFrame.setBackground(roundGradient(new int[]{0xFFFFD1E3,0xFFFFF0D2,0xFFE7D9FF},dp(19)));
+            LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(62),dp(62)); iconLp.setMargins(0,0,dp(12),0); card.addView(iconFrame,iconLp);
+            TextView glyph=text(item[1],29,ROSE,true); glyph.setGravity(Gravity.CENTER); iconFrame.addView(glyph,new FrameLayout.LayoutParams(-1,-1));
+            LinearLayout info=new LinearLayout(this); info.setOrientation(LinearLayout.VERTICAL); card.addView(info,new LinearLayout.LayoutParams(0,-2,1f));
+            info.addView(text("هدية "+item[2],15,INK,true));
+            info.addView(text("تُرسل من داخل الروم وتصل كطلب ارتباط",11,MUTED,false));
+            TextView choose=actionButton("التفاصيل",false); LinearLayout.LayoutParams chooseLp=new LinearLayout.LayoutParams(-1,-2); chooseLp.topMargin=dp(8); info.addView(choose,chooseLp);
+            choose.setOnClickListener(v->{currentType=item[0]; new AlertDialog.Builder(this).setTitle("هدية "+item[2]+" · CP").setMessage("لإرسال هذه الهدية: ادخل روم صوتي، افتح بطاقة المستخدم المستهدف، ثم اختر «هدايا الارتباط · CP». لا يتم إنشاء ارتباط إلا بعد قبول الطرف الآخر.").setPositiveButton("حسناً",(d,w)->d.dismiss()).show();});
+            LinearLayout.LayoutParams cardLp=(LinearLayout.LayoutParams)card.getLayoutParams(); cardLp.bottomMargin=dp(10); card.setLayoutParams(cardLp);
+        }
+        TextView pending=actionButton("متابعة طلبات الهدايا",false);
+        screenContent.addView(pending,matchWrap()); pending.setOnClickListener(v->showView("incoming"));
     }
 
     private void renderIncoming() {
-        sectionTitle("الطلبات الواردة", "اختر القبول أو الرفض لكل طلب");
+        sectionTitle("طلبات هدايا الارتباط", "وافق على الهدية لبدء العلاقة أو ارفضها");
         List<Map<String, Object>> pending = new ArrayList<>();
         for (Map<String, Object> row : incomingData) if ("pending".equals(str(row.get("status")))) pending.add(row);
         if (pending.isEmpty()) {
@@ -590,12 +578,12 @@ public class CpCenterActivity extends ThemedActivity {
     }
 
     private void renderSent() {
-        sectionTitle("الطلبات المرسلة", "تابع حالة طلباتك وألغِ الطلب المعلّق عند الحاجة");
+        sectionTitle("متابعة هدايا الارتباط", "تابع حالة الطلبات التي أرسلتها من داخل الرومات");
         if (sentData.isEmpty()) {
-            emptyState("↗", "ما أرسلت طلبات بعد", "ابدأ بإرسال طلب ارتباط إلى مستخدم آخر.");
-            TextView send = actionButton("إرسال طلب", true);
+            emptyState("🎁", "لا توجد هدايا ارتباط مرسلة", "يمكنك إرسال هدية CP من بطاقة المستخدم داخل الروم.");
+            TextView send = actionButton("عرض هدايا CP", true);
             screenContent.addView(send, matchWrap());
-            send.setOnClickListener(v -> showView("send"));
+            send.setOnClickListener(v -> showView("gifts"));
             return;
         }
         for (Map<String, Object> request : sentData) {
