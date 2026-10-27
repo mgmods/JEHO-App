@@ -7,7 +7,7 @@ import androidx.annotation.Nullable;
 
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
-/** Compatibility entry point: all CP discovery/categories are rendered in cp-center.html. */
+/** Compatibility entry point: all CP discovery/categories are rendered in the native Android CP center. */
 public class CpDiscoveryActivity extends ThemedActivity {
     public static final String EXTRA_CP_TYPE = "cp_type";
 
