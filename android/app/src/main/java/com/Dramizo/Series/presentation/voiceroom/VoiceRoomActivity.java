@@ -395,6 +395,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean resumedFromActiveSession;
     /** Seat roster captured before restore; protects the live mic from a transient empty refresh. */
     @Nullable private List<RoomDtos.SeatDto> restoreSeatSnapshot;
+    /** Ignore transient empty seat refreshes only during the short post-restore window. */
+    private long restoreSeatSnapshotUntilMs;
     private final Runnable retryRealtimeJoinRunnable = () -> {
         if (exiting || isFinishing() || roomId == null) return;
         connectRealtimeRoom();
@@ -1357,7 +1359,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // that made restore treat everyone as off-mic and hide the original seat positions.
             List<RoomDtos.SeatDto> seats = room.seats;
             if (resumedFromActiveSession && seats != null && seats.isEmpty()
-                    && restoreSeatSnapshot != null && !restoreSeatSnapshot.isEmpty()) {
+                    && restoreSeatSnapshot != null && !restoreSeatSnapshot.isEmpty()
+                    && System.currentTimeMillis() <= restoreSeatSnapshotUntilMs) {
                 // A refresh immediately after restoring can return an empty array while the
                 // server/session is catching up. Do not turn that transient snapshot into a
                 // local leave: doing so stops publishing and drops the user from the saved seats.
@@ -1745,6 +1748,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         restoreSeatSnapshot = cachedRoom != null && cachedRoom.seats != null
                 && !cachedRoom.seats.isEmpty()
                 ? new ArrayList<>(cachedRoom.seats) : null;
+        restoreSeatSnapshotUntilMs = restoreSeatSnapshot != null
+                ? System.currentTimeMillis() + 20_000L : 0L;
         // Zego already logged in — do not call loginRoom again.
         zegoLoggedIn = true;
         realtimeJoined = RealtimeClient.getInstance().isJoinedRoom(roomId);
@@ -12211,6 +12216,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         realtimeJoined = false;
         realtimeJoinInFlight = false;
         resumedFromActiveSession = false;
+        restoreSeatSnapshot = null;
+        restoreSeatSnapshotUntilMs = 0L;
         currentMusicUrl = null;
         currentMusicStatus = "stopped";
         preparedMusicUrl = null;
@@ -15021,6 +15028,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (myUserId != null && sameUser(myUserId, leftId)) {
                 // This is an explicit server seat-left event, unlike an empty refresh snapshot.
                 restoreSeatSnapshot = null;
+                restoreSeatSnapshotUntilMs = 0L;
                 micOn = false;
                 userChoseMute = false;
                 RoomRtcEngine.getInstance().setMicEnabled(false);
