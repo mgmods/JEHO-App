@@ -992,13 +992,47 @@ public class ProfileActivity extends ThemedActivity {
      * on older servers that do not yet expose the public route.
      */
     private void loadLegacyCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl) {
-        if (targetId == null || targetId.trim().isEmpty()) {
+        if (targetId == null || targetId.trim().isEmpty() || container == null) {
             hideProfileCpRelationship();
             return;
         }
-        String myId = container != null ? container.getSessionManager().getUserId() : null;
+        String myId = container.getSessionManager().getUserId();
         boolean ownProfile = myId != null && myId.equals(targetId);
         container.getIoExecutor().execute(() -> {
+            // The pinned JEHO-OWN API exposes /cp/me (list payload), while newer builds also
+            // expose /users/me/cp (single status payload). Read the established route first.
+            if (ownProfile) {
+                Result<List<Map<String, Object>>> ownRelations =
+                        com.Dramizo.Series.util.ApiCall.execute(container.getUserApi().myCpRelationships());
+                if (ownRelations.success && ownRelations.data != null) {
+                    for (Map<String, Object> relation : ownRelations.data) {
+                        if (relation == null) continue;
+                        Object statusValue = relation.get("status");
+                        String status = statusValue == null ? "active"
+                                : String.valueOf(statusValue).trim().toLowerCase(java.util.Locale.ROOT);
+                        if (!status.isEmpty() && !status.equals("active")) continue;
+                        Object partnerValue = relation.get("partner");
+                        if (!(partnerValue instanceof Map)) partnerValue = relation.get("partnerUser");
+                        if (!(partnerValue instanceof Map)) partnerValue = relation.get("linkedUser");
+                        if (!(partnerValue instanceof Map)) continue;
+                        Map<?, ?> partnerMap = (Map<?, ?>) partnerValue;
+                        String partnerAvatar = partnerMap.get("avatarUrl") == null ? null
+                                : String.valueOf(partnerMap.get("avatarUrl"));
+                        String partnerFrame = partnerMap.get("vipBadgeUrl") == null ? null
+                                : String.valueOf(partnerMap.get("vipBadgeUrl"));
+                        Object levelValue = relation.get("level");
+                        int level = levelValue instanceof Number
+                                ? Math.max(1, ((Number) levelValue).intValue()) : 1;
+                        final String finalPartnerAvatar = partnerAvatar;
+                        final String finalPartnerFrame = partnerFrame;
+                        final int finalLevel = level;
+                        runOnUiThread(() -> bindLegacyCpRelationshipUi(
+                                ownAvatarUrl, ownFrameUrl, finalPartnerAvatar, finalPartnerFrame, finalLevel));
+                        return;
+                    }
+                }
+            }
+
             Result<com.Dramizo.Series.data.remote.dto.MiscDtos.CpStatusDto> resolved =
                     com.Dramizo.Series.util.ApiCall.execute(container.getUserApi().publicCp(targetId));
             if ((!resolved.success || resolved.data == null || !resolved.data.hasCp
@@ -1014,25 +1048,30 @@ public class ProfileActivity extends ThemedActivity {
                     return;
                 }
                 AuthDtos.UserDto partner = legacy.data.partner;
-                bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
-                bindRealCpAvatar(binding.imgProfileCpPartner, partner.avatarUrl);
-                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(
-                        binding.imgProfileCpSelfFrame, ownFrameUrl);
-                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(
-                        binding.imgProfileCpPartnerFrame, partner.vipBadgeUrl);
-                binding.tvProfileCpLabel.setVisibility(View.GONE);
-                binding.tvProfileCpCvType.setText("♥ علاقة CP");
-                binding.tvProfileCpCvHeart.setText("♥");
-                binding.tvProfileCpCvLevel.setText("Lv." + Math.max(1, legacy.data.level));
-                binding.tvProfileCpCvDays.setText("علاقة نشطة");
-                applyCpCardBackground("");
-                binding.rowProfileCpCv.setVisibility(View.VISIBLE);
-                if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
-                binding.rowProfileCp.setVisibility(View.VISIBLE);
-                binding.btnCpRequest.setVisibility(View.GONE);
-                startProfileCpHeartAnimation();
+                bindLegacyCpRelationshipUi(ownAvatarUrl, ownFrameUrl, partner.avatarUrl,
+                        partner.vipBadgeUrl, legacy.data.level);
             });
         });
+    }
+
+    private void bindLegacyCpRelationshipUi(String ownAvatarUrl, String ownFrameUrl,
+            String partnerAvatarUrl, String partnerFrameUrl, int level) {
+        if (isFinishing() || binding == null) return;
+        bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
+        bindRealCpAvatar(binding.imgProfileCpPartner, partnerAvatarUrl);
+        com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpSelfFrame, ownFrameUrl);
+        com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpPartnerFrame, partnerFrameUrl);
+        binding.tvProfileCpLabel.setVisibility(View.GONE);
+        binding.tvProfileCpCvType.setText("♥ علاقة CP");
+        binding.tvProfileCpCvHeart.setText("♥");
+        binding.tvProfileCpCvLevel.setText("Lv." + Math.max(1, level));
+        binding.tvProfileCpCvDays.setText("علاقة نشطة");
+        applyCpCardBackground("");
+        binding.rowProfileCpCv.setVisibility(View.VISIBLE);
+        if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
+        binding.rowProfileCp.setVisibility(View.VISIBLE);
+        binding.btnCpRequest.setVisibility(View.GONE);
+        startProfileCpHeartAnimation();
     }
 
     private void applyCpCardBackground(String url) {
