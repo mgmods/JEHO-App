@@ -42,4 +42,5 @@ jobs:
           push: true
           tags: |
             ghcr.io/mgmods/jeho-own-backend:jeho-own
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho
             ghcr.io/mgmods/jeho-own-backend:sha-${{ github.sha }}
