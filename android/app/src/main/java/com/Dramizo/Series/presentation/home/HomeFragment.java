@@ -435,8 +435,13 @@ public class HomeFragment extends Fragment {
             wealth.setOnClickListener(v -> openInsights(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_WEALTH));
             act.rankBannerFlip.addView(wealth);
         }
-        act.cpBannerCard.setOnClickListener(v ->
-                openInsights(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_CP));
+        // The CP promo under the home banners opens the native CP center directly.
+        act.cpBannerCard.setOnClickListener(v -> {
+            Intent cp = new Intent(requireContext(),
+                    com.Dramizo.Series.presentation.cp.CpCenterActivity.class);
+            cp.putExtra(com.Dramizo.Series.presentation.cp.CpCenterActivity.EXTRA_VIEW, "home");
+            startActivity(cp);
+        });
         applyTasksFeatureVisibility();
     }
 
