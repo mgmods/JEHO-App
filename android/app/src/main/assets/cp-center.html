@@ -104,6 +104,7 @@ document.querySelectorAll("[data-discover-type]").forEach(b=>b.addEventListener(
 const sendForm=$("sendForm");if(sendForm)sendForm.addEventListener("submit",e=>{e.preventDefault();toast("طلبات الارتباط تُرسل كهدية من داخل الروم الصوتي.");});
 $("refresh").addEventListener("click",()=>{if(currentView==="incoming"||currentView==="sent")JehoCP.loadRequests();else if(currentView==="discover")JehoCP.loadDiscover(discoverType);else JehoCP.loadHome();});$("backPage").addEventListener("click",()=>{if(currentView!=="home")showView("home");else if(window.JehoCP)JehoCP.back();});window.addEventListener("keydown",e=>{if(e.key==="Escape"&&currentView!=="home")showView("home");});
 $("reloadIncoming").addEventListener("click",()=>JehoCP.loadRequests());$("reloadSent").addEventListener("click",()=>JehoCP.loadRequests());
+window.getCpView=()=>currentView;
 window.setCpView=(view,type)=>{if(TYPES[type]){sendType=type;discoverType=type;document.querySelectorAll("[data-send-type]").forEach(b=>b.classList.toggle("active",b.dataset.sendType===type));document.querySelectorAll("[data-discover-type]").forEach(b=>b.classList.toggle("active",b.dataset.discoverType===type));}showView(view||"home");if((view||"home")==="discover")JehoCP.loadDiscover(discoverType);};
 window.addEventListener("load",()=>{if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();}});
 </script></body></html>
