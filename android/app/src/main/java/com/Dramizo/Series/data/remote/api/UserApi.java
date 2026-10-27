@@ -195,6 +195,9 @@ public interface UserApi {
     @POST("cp/profile-requests")
     Call<ApiResponse<Map<String, Object>>> createProfileCpRequest(@Body Map<String, String> body);
 
+    @POST("cp/requests")
+    Call<ApiResponse<Map<String, Object>>> createRoomCpRequest(@Body Map<String, String> body);
+
     @GET("cp/requests")
     Call<ApiResponse<List<Map<String, Object>>>> cpRequests();
 
