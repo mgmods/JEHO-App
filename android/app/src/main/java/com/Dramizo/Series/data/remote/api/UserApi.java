@@ -141,6 +141,21 @@ public interface UserApi {
     @DELETE("users/{id}/bond")
     Call<ApiResponse<Object>> endBond(@Path("id") String id, @Query("type") String type);
 
+    @GET("cosmetics")
+    Call<ApiResponse<List<Map<String, Object>>>> cosmeticsCatalog();
+
+    @GET("cosmetics/inventory")
+    Call<ApiResponse<List<Map<String, Object>>>> cosmeticsInventory();
+
+    @POST("cosmetics/purchase")
+    Call<ApiResponse<Map<String, Object>>> purchaseCosmetic(@Body Map<String, String> body);
+
+    @POST("cosmetics/equip")
+    Call<ApiResponse<Map<String, Object>>> equipCosmetic(@Body Map<String, String> body);
+
+    @POST("cosmetics/unequip")
+    Call<ApiResponse<Map<String, Object>>> unequipCosmetic(@Body Map<String, String> body);
+
     @GET("cp/catalog")
     Call<ApiResponse<List<Map<String, Object>>>> cpCatalog();
 
