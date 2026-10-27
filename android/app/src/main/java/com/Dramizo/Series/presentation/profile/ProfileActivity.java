@@ -823,7 +823,7 @@ public class ProfileActivity extends ThemedActivity {
                     // Older accounts may still have their active CP stored in the legacy
                     // social-bond ledger. Preserve that relationship instead of hiding it
                     // just because the newer cp_relationships table has no row yet.
-                    loadLegacyOwnCpRelationship(targetId, ownAvatarUrl, ownFrameUrl);
+                    loadLegacyCpRelationship(targetId, ownAvatarUrl, ownFrameUrl);
                     return;
                 }
                 Map<String, Object> relation = result.data.get(0);
@@ -987,18 +987,25 @@ public class ProfileActivity extends ThemedActivity {
     }
 
     /**
-     * Backward-compatible display for the signed-in user's CP from the legacy social-bond API.
-     * This is read-only: it does not create, migrate, or change any relationship data.
+     * Read-only compatibility path for relationships created by the legacy social-bond system.
+     * It prefers the public profile endpoint; for the signed-in user it also falls back to /me/cp
+     * on older servers that do not yet expose the public route.
      */
-    private void loadLegacyOwnCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl) {
-        String myId = container != null ? container.getSessionManager().getUserId() : null;
-        if (myId == null || targetId == null || !myId.equals(targetId)) {
+    private void loadLegacyCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl) {
+        if (targetId == null || targetId.trim().isEmpty()) {
             hideProfileCpRelationship();
             return;
         }
+        String myId = container != null ? container.getSessionManager().getUserId() : null;
+        boolean ownProfile = myId != null && myId.equals(targetId);
         container.getIoExecutor().execute(() -> {
-            Result<com.Dramizo.Series.data.remote.dto.MiscDtos.CpStatusDto> legacy =
-                    com.Dramizo.Series.util.ApiCall.execute(container.getUserApi().myCp());
+            Result<com.Dramizo.Series.data.remote.dto.MiscDtos.CpStatusDto> resolved =
+                    com.Dramizo.Series.util.ApiCall.execute(container.getUserApi().publicCp(targetId));
+            if ((!resolved.success || resolved.data == null || !resolved.data.hasCp
+                    || resolved.data.partner == null) && ownProfile) {
+                resolved = com.Dramizo.Series.util.ApiCall.execute(container.getUserApi().myCp());
+            }
+            final Result<com.Dramizo.Series.data.remote.dto.MiscDtos.CpStatusDto> legacy = resolved;
             runOnUiThread(() -> {
                 if (isFinishing() || binding == null) return;
                 if (!legacy.success || legacy.data == null || !legacy.data.hasCp
