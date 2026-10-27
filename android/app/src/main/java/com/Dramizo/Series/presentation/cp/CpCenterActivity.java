@@ -69,6 +69,7 @@ public class CpCenterActivity extends ThemedActivity {
     private final List<Map<String, Object>> sentData = new ArrayList<>();
     private final List<Map<String, Object>> discoverData = new ArrayList<>();
     private final List<Map<String, Object>> catalogData = new ArrayList<>();
+    private final List<Map<String, Object>> memoriesData = new ArrayList<>();
     private String currentView = "home";
     private String currentType = "love";
     private String discoverType = "";
@@ -76,6 +77,7 @@ public class CpCenterActivity extends ThemedActivity {
     private boolean loadingRequests;
     private boolean loadingDiscover;
     private boolean loadingCatalog;
+    private boolean loadingMemories;
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -124,6 +126,7 @@ public class CpCenterActivity extends ThemedActivity {
         loadRequests();
         if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
         if ("store".equals(currentView)) loadCatalog();
+        if ("memories".equals(currentView)) loadMemories();
     }
 
     private void buildHeader() {
@@ -302,6 +305,7 @@ public class CpCenterActivity extends ThemedActivity {
         else if ("incoming".equals(currentView) || "sent".equals(currentView)) loadRequests();
         else if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
         else if ("store".equals(currentView)) loadCatalog();
+        else if ("memories".equals(currentView)) loadMemories();
     }
 
     private void renderScreen() {
@@ -316,7 +320,7 @@ public class CpCenterActivity extends ThemedActivity {
             case "store": renderStore(); break;
             case "tasks": renderPlannedPage("المهام والتحديات", "تحديات مشتركة وتقدم ومكافآت.", "يلزم ربط المهام وتسجيل التقدم والمكافآت بخدمة الخادم قبل تفعيلها."); break;
             case "leaderboard": renderLeaderboard(); break;
-            case "memories": renderPlannedPage("ذكرياتنا", "مكان يجمع لحظات العلاقة والإنجازات.", "يلزم ربط تخزين الذكريات وصلاحيات الخصوصية بالخادم."); break;
+            case "memories": renderMemories(); break;
             case "settings": renderSettings(); break;
             default: renderHome(); break;
         }
@@ -695,6 +699,149 @@ public class CpCenterActivity extends ThemedActivity {
         }
     }
 
+
+    private void renderMemories() {
+        sectionTitle("ذكرياتنا", "لحظات مشتركة تبقى محفوظة داخل علاقتكما");
+        LinearLayout banner = panel();
+        banner.setBackground(roundGradient(new int[]{0xFFFFE1EE, 0xFFFFF5FA}, dp(20)));
+        screenContent.addView(banner, matchWrap());
+        banner.addView(text("♡  قصتكم تستحق أن تُحفظ", 17, INK, true));
+        TextView description = text("أضيفوا كلمات وصوراً لتوثيق لحظاتكما. الذكريات متاحة فقط لأطراف العلاقة النشطة.", 12, MUTED, false);
+        description.setPadding(0, dp(5), 0, 0);
+        description.setLineSpacing(dp(3), 1f);
+        banner.addView(description);
+        TextView add = actionButton("＋  إضافة ذكرى", true);
+        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, -2);
+        addLp.topMargin = dp(10);
+        screenContent.addView(add, addLp);
+        add.setOnClickListener(v -> showAddMemoryDialog());
+        if (loadingMemories) {
+            emptyState("📖", "جارٍ تحميل الذكريات", "نحضر ذكريات علاقتكما…");
+            return;
+        }
+        if (memoriesData.isEmpty()) {
+            emptyState("♡", "ابدأوا أول ذكرى", "أول لحظة جميلة يمكن أن تكون بداية قصتكم.");
+            return;
+        }
+        for (Map<String, Object> memory : memoriesData) {
+            LinearLayout card = panel();
+            screenContent.addView(card, matchWrap());
+            Map<String, Object> author = map(memory.get("author"));
+            addPersonRow(card, author, "ذكرى مشتركة", defaultString(memory.get("createdAt"), ""));
+            String body = str(memory.get("text"));
+            if (!body.isEmpty()) {
+                TextView note = text(body, 14, INK, false);
+                note.setPadding(0, dp(12), 0, dp(6));
+                note.setLineSpacing(dp(4), 1f);
+                card.addView(note);
+            }
+            String imageUrl = avatarUrl(memory.get("imageUrl"));
+            if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+                ImageView image = new ImageView(this);
+                image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                image.setBackground(round(0xFFFFEAF2, dp(16), LINE));
+                image.setClipToOutline(true);
+                LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(-1, dp(190));
+                imageLp.topMargin = dp(6);
+                card.addView(image, imageLp);
+                Glide.with(this).load(imageUrl).centerCrop().into(image);
+            }
+            String ownerId = str(memory.get("userId"));
+            if (!ownerId.isEmpty() && ownerId.equals(c.getSessionManager().getUserId())) {
+                TextView delete = actionButton("حذف ذكراي", false);
+                LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(-1, -2);
+                deleteLp.topMargin = dp(10);
+                card.addView(delete, deleteLp);
+                String id = str(memory.get("id"));
+                delete.setOnClickListener(v -> new AlertDialog.Builder(this)
+                        .setTitle("حذف الذكرى")
+                        .setMessage("هل تريد حذف هذه الذكرى نهائياً؟")
+                        .setNegativeButton("إلغاء", (d, w) -> d.dismiss())
+                        .setPositiveButton("حذف", (d, w) -> deleteMemory(id))
+                        .show());
+            }
+        }
+    }
+
+    private void showAddMemoryDialog() {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(8), dp(4), dp(8), dp(4));
+        EditText note = new EditText(this);
+        note.setHint("اكتب ذكرى جميلة (حتى 500 حرف)");
+        note.setTextSize(14);
+        note.setTextColor(INK);
+        note.setHintTextColor(MUTED);
+        note.setMinLines(3);
+        note.setGravity(Gravity.TOP | Gravity.START);
+        note.setBackground(round(Color.WHITE, dp(14), LINE));
+        note.setPadding(dp(12), dp(10), dp(12), dp(10));
+        form.addView(note, matchWrap());
+        EditText image = new EditText(this);
+        image.setHint("رابط صورة اختياري (https://...)");
+        image.setTextSize(13);
+        image.setTextColor(INK);
+        image.setHintTextColor(MUTED);
+        image.setSingleLine(true);
+        image.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        image.setPadding(dp(12), dp(10), dp(12), dp(10));
+        LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(-1, -2);
+        imageLp.topMargin = dp(8);
+        form.addView(image, imageLp);
+        new AlertDialog.Builder(this)
+                .setTitle("إضافة ذكرى جديدة")
+                .setView(form)
+                .setNegativeButton("إلغاء", (d, w) -> d.dismiss())
+                .setPositiveButton("حفظ الذكرى", (d, w) -> createMemory(note.getText().toString(), image.getText().toString()))
+                .show();
+    }
+
+    private void createMemory(String note, String imageUrl) {
+        Map<String, String> body = new HashMap<>();
+        body.put("text", note == null ? "" : note.trim());
+        body.put("imageUrl", imageUrl == null ? "" : imageUrl.trim());
+        c.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().createCpMemory(body));
+            runOnUiThread(() -> {
+                if (result.success) {
+                    toast("تم حفظ الذكرى لكما ❤️");
+                    loadMemories();
+                } else toast(result.error != null ? result.error : "تعذر حفظ الذكرى");
+            });
+        });
+    }
+
+    private void deleteMemory(String id) {
+        if (id == null || id.trim().isEmpty()) return;
+        c.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().deleteCpMemory(id));
+            runOnUiThread(() -> {
+                if (result.success) {
+                    toast("تم حذف الذكرى.");
+                    loadMemories();
+                } else toast(result.error != null ? result.error : "تعذر حذف الذكرى");
+            });
+        });
+    }
+
+    private void loadMemories() {
+        if (loadingMemories || isFinishing()) return;
+        loadingMemories = true;
+        if ("memories".equals(currentView)) renderScreen();
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = ApiCall.execute(c.getUserApi().cpMemories());
+            List<Map<String, Object>> rows = result.success && result.data != null
+                    ? new ArrayList<>(result.data) : new ArrayList<>();
+            runOnUiThread(() -> {
+                loadingMemories = false;
+                memoriesData.clear();
+                memoriesData.addAll(rows);
+                if ("memories".equals(currentView)) renderScreen();
+                if (!result.success) toast(result.error != null ? result.error : "تعذر تحميل الذكريات");
+            });
+        });
+    }
+
     private void renderPlannedPage(String title, String subtitle, String requirement) {
         sectionTitle(title, subtitle);
         LinearLayout hero = panel();
@@ -1017,6 +1164,7 @@ public class CpCenterActivity extends ThemedActivity {
         loadRequests();
         if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
         if ("store".equals(currentView)) loadCatalog();
+        if ("memories".equals(currentView)) loadMemories();
         Toast.makeText(this, "جارٍ تحديث بيانات CP…", Toast.LENGTH_SHORT).show();
     }
 
