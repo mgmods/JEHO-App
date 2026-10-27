@@ -1482,10 +1482,7 @@ public class CpCenterActivity extends ThemedActivity {
         FrameLayout frame = new FrameLayout(this);
         // Double jewel frame: rose enamel outside, champagne-gold inner edge.
         frame.setBackground(roundGradient(new int[]{0xFFFFE6F0, 0xFFFFC3DC, 0xFFDDA85D}, dp(sizeDp / 3)));
-        GradientDrawable jewelRim = roundGradient(new int[]{0xFFFFF7D7, 0xFFE2B45D, 0xFFFFE9B6}, dp(sizeDp / 3));
-        jewelRim.setStroke(dp(1), 0xFFFFF2C8);
-        frame.setForeground(jewelRim);
-        frame.setPadding(dp(3), dp(3), dp(3), dp(3));
+        frame.setPadding(dp(2), dp(2), dp(2), dp(2));
         frame.setElevation(dp(5));
         LinearLayout.LayoutParams frameLp = new LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp));
         frameLp.setMargins(dp(2), dp(2), dp(2), dp(2));
