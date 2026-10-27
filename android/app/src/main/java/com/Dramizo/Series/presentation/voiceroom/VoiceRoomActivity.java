@@ -4255,6 +4255,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 request.requestId = requestId;
                 result = ApiCall.execute(container.getGiftApi().send(request));
             }
+
+            // Backward compatibility: the currently pinned JEHO-OWN server predates the
+            // cannonLaunch DTO field and rejects it at validation time. Retry only this exact
+            // schema mismatch, with the same idempotency key and without cannonLaunch. The
+            // first request is rejected before gift processing, so this fallback cannot double-charge.
+            if (!result.success && result.error != null) {
+                String errorText = result.error.toLowerCase(java.util.Locale.ROOT);
+                if (errorText.contains("cannonlaunch") && errorText.contains("should not exist")) {
+                    if (targets.size() > 1) {
+                        GiftDtos.SendAllMicRequest retry =
+                                new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
+                        retry.cannonLaunch = null;
+                        retry.requestId = requestId;
+                        result = ApiCall.execute(container.getGiftApi().sendAllMic(retry));
+                    } else {
+                        GiftDtos.SendGiftRequest retry =
+                                new GiftDtos.SendGiftRequest(giftId, targets.get(0), quantity, currentRoom, 1);
+                        retry.cannonLaunch = null;
+                        retry.requestId = requestId;
+                        result = ApiCall.execute(container.getGiftApi().send(retry));
+                    }
+                }
+            }
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 luckyCannonSending = false;
