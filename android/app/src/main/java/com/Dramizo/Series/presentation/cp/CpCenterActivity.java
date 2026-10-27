@@ -350,10 +350,15 @@ public class CpCenterActivity extends ThemedActivity {
             for (Map<String, Object> row : active) addRelationshipCard(row, false);
         }
 
-        sectionTitle("اختر نوع الرابطة", "كل علاقة تبدأ بطلب وقبول متبادل");
+        sectionTitle("اختر نوع الرابطة", "تصفّح الأنواع واختر ما يناسبكما");
+        HorizontalScrollView typeScroller = new HorizontalScrollView(this);
+        typeScroller.setHorizontalScrollBarEnabled(false);
+        typeScroller.setClipToPadding(false);
+        typeScroller.setPadding(0, dp(2), 0, dp(8));
+        screenContent.addView(typeScroller, matchWrap());
         LinearLayout firstRow = new LinearLayout(this);
         firstRow.setOrientation(LinearLayout.HORIZONTAL);
-        screenContent.addView(firstRow, matchWrap());
+        typeScroller.addView(firstRow, new HorizontalScrollView.LayoutParams(-2, -2));
         String[][] types = {
                 {"love", "♥", "الحب", "رابطة عاطفية"},
                 {"marriage", "💞", "الزواج", "رابطة مميزة"},
@@ -366,17 +371,23 @@ public class CpCenterActivity extends ThemedActivity {
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setGravity(Gravity.CENTER);
-            card.setPadding(dp(6), dp(14), dp(6), dp(14));
-            card.setBackground(round(Color.WHITE, dp(17), LINE));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(108), 1f);
-            lp.setMargins(dp(3), dp(3), dp(3), dp(3));
+            card.setPadding(dp(12), dp(14), dp(12), dp(14));
+            card.setBackground(roundGradient(new int[]{0xFFFFFFFF, 0xFFFFF5FA}, dp(20)));
+            card.setElevation(dp(2));
+            card.setClickable(true);
+            card.setFocusable(true);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(132), dp(124));
+            lp.setMargins(0, dp(3), dp(9), dp(3));
             firstRow.addView(card, lp);
-            TextView symbol = text(types[i][1], 25, ROSE, true);
+            TextView symbol = text(types[i][1], 24, ROSE, true);
             symbol.setGravity(Gravity.CENTER);
-            card.addView(symbol);
+            symbol.setBackground(round(0xFFFFEAF3, dp(18), 0xFFF9D5E5));
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(46), dp(46));
+            iconLp.bottomMargin = dp(7);
+            card.addView(symbol, iconLp);
             TextView name = text(types[i][2], 13, INK, true);
             name.setGravity(Gravity.CENTER);
-            name.setPadding(0, dp(4), 0, dp(2));
+            name.setPadding(0, dp(1), 0, dp(2));
             card.addView(name);
             TextView detail = text(types[i][3], 10, MUTED, false);
             detail.setGravity(Gravity.CENTER);
