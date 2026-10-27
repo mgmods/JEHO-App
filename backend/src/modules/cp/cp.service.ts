@@ -65,9 +65,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         'SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true',
         [giftId],
       ) : [];
-      // CP types are available automatically; only a valid configured price and active gift
-      // are required for paid room requests. The legacy dashboard enabled flag is not a blocker.
-      const enabled = Number.isSafeInteger(price) && price > 0 && !!gift;
+      const enabled = settings[`cp.enabled.${type}`] !== 'false'
+        && Number.isSafeInteger(price) && price > 0 && !!gift;
       let rules: Record<string, any> = {};
       try { rules = JSON.parse(settings[`cp.rules.${type}`] || '{}'); } catch { rules = {}; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
@@ -363,6 +362,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('بيانات طلب العلاقة غير مكتملة');
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء علاقة مع حسابك');
+    const [typeEnabled] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
+    if (String(typeEnabled?.value || 'true').toLowerCase() === 'false') {
+      throw new BadRequestException('هذا النوع من علاقات CP متوقف حالياً من لوحة التحكم');
+    }
     const outcome = await this.dataSource.transaction(async manager => {
       const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
@@ -493,6 +496,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('بيانات طلب CP غير مكتملة');
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء CP مع حسابك');
+    const [typeEnabled] = await this.dataSource.query('SELECT value FROM app_settings WHERE key = $1', [`cp.enabled.${type}`]);
+    if (String(typeEnabled?.value || 'true').toLowerCase() === 'false') {
+      throw new BadRequestException('هذا النوع من علاقات CP متوقف حالياً من لوحة التحكم');
+    }
     const outcome = await this.dataSource.transaction(async manager => {
       const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
@@ -518,7 +525,6 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (!presentIds.has(userId) || !presentIds.has(recipientId)) {
         throw new BadRequestException('يجب أن يكون الطرفان جالسين داخل الغرفة نفسها عند إرسال طلب CP');
       }
-      // CP types are enabled by default; do not block room requests on a dashboard toggle.
       const [expiryRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', ['cp.policy.request_expiry_minutes']);
       const configuredExpiry = Number(expiryRow?.value);
       const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
