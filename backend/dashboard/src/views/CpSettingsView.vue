@@ -490,6 +490,7 @@ async function saveType(item) {
       enabled: !!item.enabled,
       giftId: item.giftId || '',
       giftPoints: Number(item.giftPoints || 0),
+      giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null || item.maxLevel === '' ? undefined : Number(item.maxLevel),
       levels, rules,
     }
