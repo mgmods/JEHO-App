@@ -4284,15 +4284,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                 }
             }
+            final Result<GiftDtos.SendGiftResult> finalResult = result;
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 luckyCannonSending = false;
                 if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
-                if (!result.success || result.data == null || !result.data.success) {
+                if (!finalResult.success || finalResult.data == null || !finalResult.data.success) {
                     // Do not keep charging/retrying queued taps after a balance or server error.
                     queuedLuckyCannonPresses = 0;
                     BalanceRedirect.handle(VoiceRoomActivity.this,
-                            result.error != null ? result.error : "تعذر إرسال الهدية، حاول مجدداً");
+                            finalResult.error != null ? finalResult.error : "تعذر إرسال الهدية، حاول مجدداً");
                     return;
                 }
                 // Server emits the canonical room gift event; animation is rendered locally by
