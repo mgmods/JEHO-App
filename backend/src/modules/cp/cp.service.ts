@@ -180,6 +180,88 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
 
+
+  async tasks(userId: string) {
+    const [relationship] = await this.dataSource.query(
+      `SELECT id,points::text AS points,level,type FROM cp_relationships
+       WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
+       ORDER BY "startedAt" DESC LIMIT 1`,
+      [userId],
+    );
+    if (!relationship) return [];
+    const [dayRow] = await this.dataSource.query(`SELECT to_char(now(),'YYYY-MM-DD') AS day`);
+    const day = String(dayRow?.day || new Date().toISOString().slice(0, 10));
+    const [memoryCount] = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS count FROM cp_memories
+       WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())`,
+      [relationship.id],
+    );
+    const [pointsRow] = await this.dataSource.query(
+      `SELECT COALESCE(SUM(points::numeric),0)::text AS points
+       FROM cp_point_events WHERE "relationshipId"=$1
+         AND "createdAt">=date_trunc('day',now()) AND "eventType"<>'cp_task_reward'`,
+      [relationship.id],
+    );
+    const claimedRows = await this.dataSource.query(
+      `SELECT "referenceId" FROM cp_point_events
+       WHERE "referenceType"='cp_task_reward' AND "referenceId" LIKE $1`,
+      [`${relationship.id}:${userId}:%:${day}`],
+    );
+    const claimed = new Set(claimedRows.map((row: any) => String(row.referenceId)));
+    const pointsToday = Math.max(0, Number(pointsRow?.points) || 0);
+    const definitions = [
+      { id: 'memory_today', title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', progress: Math.min(1, Number(memoryCount?.count) || 0), target: 1, rewardPoints: 10 },
+      { id: 'earn_points_today', title: 'نشاط مشترك', description: 'اجمعوا 10 نقاط علاقة اليوم', progress: Math.min(10, pointsToday), target: 10, rewardPoints: 15 },
+    ];
+    return definitions.map(task => {
+      const referenceId = `${relationship.id}:${userId}:${task.id}:${day}`;
+      const isClaimed = claimed.has(referenceId);
+      return { ...task, progress: Number(task.progress), claimed: isClaimed, canClaim: !isClaimed && task.progress >= task.target };
+    });
+  }
+
+  async claimTask(userId: string, taskId: string) {
+    if (!['memory_today', 'earn_points_today'].includes(taskId)) {
+      throw new BadRequestException('مهمة CP غير معروفة');
+    }
+    const [relationship] = await this.dataSource.query(
+      `SELECT id,points::text AS points,level,type FROM cp_relationships
+       WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
+       ORDER BY "startedAt" DESC LIMIT 1`,
+      [userId],
+    );
+    if (!relationship) throw new BadRequestException('تحتاج إلى علاقة CP نشطة');
+    const [dayRow] = await this.dataSource.query(`SELECT to_char(now(),'YYYY-MM-DD') AS day`);
+    const day = String(dayRow?.day || new Date().toISOString().slice(0, 10));
+    let eligible = false;
+    let rewardPoints = 0;
+    if (taskId === 'memory_today') {
+      const [row] = await this.dataSource.query(
+        `SELECT COUNT(*)::int AS count FROM cp_memories
+         WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())`,
+        [relationship.id],
+      );
+      eligible = Number(row?.count) >= 1;
+      rewardPoints = 10;
+    } else {
+      const [row] = await this.dataSource.query(
+        `SELECT COALESCE(SUM(points::numeric),0)::text AS points FROM cp_point_events
+         WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())
+           AND "eventType"<>'cp_task_reward'`,
+        [relationship.id],
+      );
+      eligible = Number(row?.points) >= 10;
+      rewardPoints = 15;
+    }
+    if (!eligible) throw new BadRequestException('أكملوا شرط المهمة أولاً');
+    const referenceId = `${relationship.id}:${userId}:${taskId}:${day}`;
+    const result = await this.recordPoints(
+      relationship.id, 'cp_task_reward', 'cp_task_reward', referenceId, rewardPoints,
+      { taskId, userId, day },
+    );
+    return { taskId, claimed: true, duplicate: !!(result as any).duplicate, rewardPoints, points: (result as any).points, level: (result as any).level };
+  }
+
   async memories(userId: string) {
     const relationships = await this.dataSource.query(
       `SELECT id FROM cp_relationships
