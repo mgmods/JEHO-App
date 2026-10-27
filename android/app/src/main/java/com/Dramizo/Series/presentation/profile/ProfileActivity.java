@@ -925,7 +925,7 @@ public class ProfileActivity extends ThemedActivity {
                 // Only the active relationship and its real partner payload are required;
                 // the top pair intentionally shows no partner name or relationship text.
                 if (partner == null) {
-                    hideProfileCpRelationship();
+                    loadLegacyCpRelationship(targetId, ownAvatarUrl, ownFrameUrl);
                     return;
                 }
                 binding.tvProfileCpLabel.setVisibility(View.GONE);
