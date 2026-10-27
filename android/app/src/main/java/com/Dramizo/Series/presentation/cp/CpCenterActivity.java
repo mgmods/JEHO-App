@@ -142,12 +142,38 @@ public class CpCenterActivity extends ThemedActivity {
     private void loadHome() {
         c.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().myCpRelationships());
-            if (r.success && r.data != null) {
+            if (r.success && r.data != null && !r.data.isEmpty()) {
                 js("window.renderCpHome && window.renderCpHome(" + gson.toJson(normalizeUrls(r.data)) + ")");
-            } else {
-                js("window.renderCpHome && window.renderCpHome([])");
-                if (r.error != null) message(r.error);
+                return;
             }
+
+            // Older installations stored accepted CP pairs in social_requests rather than
+            // cp_relationships. Read the legacy endpoint as a fallback; never rewrite or
+            // charge for the existing relationship just to make it visible again.
+            Result<com.Dramizo.Series.data.remote.dto.MiscDtos.CpStatusDto> legacy =
+                    ApiCall.execute(c.getUserApi().myCp());
+            if (legacy.success && legacy.data != null && legacy.data.hasCp
+                    && legacy.data.partner != null) {
+                Map<String, Object> row = new HashMap<>();
+                row.put("id", legacy.data.relationId != null ? legacy.data.relationId : "legacy-cp");
+                row.put("type", "love");
+                row.put("status", "active");
+                row.put("points", legacy.data.bondScore);
+                row.put("level", Math.max(1, legacy.data.level));
+                row.put("legacy", true);
+                row.put("partner", gson.fromJson(gson.toJson(legacy.data.partner), Map.class));
+                com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto self =
+                        c.getSessionManager().getUser();
+                if (self != null) {
+                    row.put("self", gson.fromJson(gson.toJson(self), Map.class));
+                }
+                js("window.renderCpHome && window.renderCpHome(" +
+                        gson.toJson(normalizeUrls(java.util.Collections.singletonList(row))) + ")");
+                return;
+            }
+
+            js("window.renderCpHome && window.renderCpHome([])");
+            if (!r.success && r.error != null) message(r.error);
         });
     }
 
