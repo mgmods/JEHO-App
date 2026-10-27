@@ -197,10 +197,14 @@
         <div v-else-if="!cpStoreItems.length" class="text-secondary small py-3">لا توجد عناصر CP خاصة بعد. أضف أول عنصر من النموذج أعلاه.</div>
         <div v-for="item in cpStoreItems" :key="item.id" class="d-flex align-items-center gap-3 py-3 border-top flex-wrap">
           <img :src="item.previewUrl" :alt="item.name" width="58" height="58" class="rounded-3 border" style="object-fit:contain;background:#fff">
-          <div class="flex-grow-1" style="min-width:180px">
-            <div class="fw-semibold">{{ item.name }}</div>
-            <div class="small text-secondary">{{ cosmeticTypeLabel(item.type) }} · {{ format(item.coinPrice) }} عملة · {{ Number(item.meta?.leaseDays || 30) }} يوم</div>
-            <div class="small text-secondary"><code>{{ item.code }}</code></div>
+          <div class="flex-grow-1" style="min-width:210px">
+            <label class="form-label small mb-1">اسم العنصر</label>
+            <input v-model.trim="item.name" class="form-control form-control-sm mb-2">
+            <div class="small text-secondary mb-1">{{ cosmeticTypeLabel(item.type) }} · <code>{{ item.code }}</code></div>
+            <div class="d-flex gap-2 flex-wrap">
+              <div><label class="form-label small mb-1">السعر</label><input v-model.number="item.coinPrice" class="form-control form-control-sm" type="number" min="0" max="1000000000"></div>
+              <div><label class="form-label small mb-1">المدة بالأيام</label><input v-model.number="item.meta.leaseDays" class="form-control form-control-sm" type="number" min="1" max="3650"></div>
+            </div>
           </div>
           <label class="form-check form-switch mb-0">
             <input v-model="item.isActive" class="form-check-input" type="checkbox" role="switch">
@@ -368,9 +372,17 @@ async function createCpStoreItem() {
 async function saveCpStoreItem(item) {
   savingCpStore.value = true; error.value = ''; success.value = ''
   try {
+    const price = Number(item.coinPrice)
+    const leaseDays = Number(item.meta?.leaseDays || 30)
+    if (!item.name?.trim() || !Number.isSafeInteger(price) || price < 0 ||
+        !Number.isInteger(leaseDays) || leaseDays < 1 || leaseDays > 3650) {
+      throw new Error('تحقق من اسم العنصر والسعر والمدة.')
+    }
     await cosmeticsApi.update(item.id, {
+      name: item.name.trim(),
+      coinPrice: price,
       isActive: !!item.isActive,
-      meta: { ...(item.meta || {}), cpStore: true, leaseDays: Math.max(1, Math.min(3650, Number(item.meta?.leaseDays || 30))) },
+      meta: { ...(item.meta || {}), cpStore: true, leaseDays },
     })
     success.value = 'تم حفظ حالة العنصر. سيظهر التغيير في المتجر بعد تحديثه.'
     await loadCpStoreItems()
