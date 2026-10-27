@@ -504,6 +504,7 @@ public class CpCenterActivity extends ThemedActivity {
         addFeatureCard("store", "متجر CP", "مظاهر وإطارات تضيف بصمتكما", "♧");
         addFeatureCard("memories", "ذكرياتنا", "احفظوا لحظاتكم وصوركم", "♡");
         addFeatureCard("tasks", "المهام المشتركة", "إنجازات ومكافآت يومية", "✦");
+        addFeatureCard("gifts", "هدايا CP", "أرسل هدية واطلب الارتباط بموافقة الطرف الآخر", "🎁");
         addFeatureCard("categories", "تصنيفات CP", "الحب والزواج والصداقة والمزيد", "❦");
         addFeatureCard("stats", "الإحصائيات", "نقاط العلاقة ومدتها وتقدمها", "✧");
         addFeatureCard("leaderboard", "قمة المتصدرين", "شاهد أجمل الروابط في JEHO", "♛");
