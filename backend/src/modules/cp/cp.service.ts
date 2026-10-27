@@ -182,18 +182,18 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
   async memories(userId: string) {
     const relationships = await this.dataSource.query(
-      \`SELECT id FROM cp_relationships
+      `SELECT id FROM cp_relationships
        WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
-       ORDER BY "startedAt" DESC LIMIT 1\`,
+       ORDER BY "startedAt" DESC LIMIT 1`,
       [userId],
     );
     if (!relationships.length) return [];
     return this.dataSource.query(
-      \`SELECT m.id,m.text,m."imageUrl",m."createdAt",m."userId",
+      `SELECT m.id,m.text,m."imageUrl",m."createdAt",m."userId",
         json_build_object('id',u.id,'username',u.username,'displayName',u."displayName",'avatarUrl',u."avatarUrl") AS author
        FROM cp_memories m JOIN users u ON u.id=m."userId"
        WHERE m."relationshipId"=$1
-       ORDER BY m."createdAt" DESC LIMIT 100\`,
+       ORDER BY m."createdAt" DESC LIMIT 100`,
       [relationships[0].id],
     );
   }
@@ -208,16 +208,16 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('رابط الصورة غير صالح');
     }
     const relationships = await this.dataSource.query(
-      \`SELECT id FROM cp_relationships
+      `SELECT id FROM cp_relationships
        WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
-       ORDER BY "startedAt" DESC LIMIT 1\`,
+       ORDER BY "startedAt" DESC LIMIT 1`,
       [userId],
     );
     if (!relationships.length) throw new BadRequestException('تحتاج إلى علاقة CP نشطة لإضافة ذكرى');
     const [memory] = await this.dataSource.query(
-      \`INSERT INTO cp_memories ("relationshipId","userId",text,"imageUrl","createdAt")
+      `INSERT INTO cp_memories ("relationshipId","userId",text,"imageUrl","createdAt")
        VALUES ($1,$2,$3,$4,now())
-       RETURNING id,text,"imageUrl","createdAt","userId"\`,
+       RETURNING id,text,"imageUrl","createdAt","userId"`,
       [relationships[0].id, userId, text, imageUrl || null],
     );
     return memory;
@@ -225,10 +225,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
   async deleteMemory(userId: string, memoryId: string) {
     const result = await this.dataSource.query(
-      \`DELETE FROM cp_memories m USING cp_relationships r
+      `DELETE FROM cp_memories m USING cp_relationships r
        WHERE m.id=$1 AND m."userId"=$2 AND r.id=m."relationshipId"
          AND r.status='active' AND (r."userAId"=$2 OR r."userBId"=$2)
-       RETURNING m.id\`,
+       RETURNING m.id`,
       [memoryId, userId],
     );
     if (!result.length) throw new NotFoundException('الذكرى غير موجودة أو لا تملك صلاحية حذفها');
