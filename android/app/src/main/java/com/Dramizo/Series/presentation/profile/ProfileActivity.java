@@ -1017,7 +1017,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.tvProfileCpCvType.setText("♥ علاقة CP");
                 binding.tvProfileCpCvHeart.setText("♥");
                 binding.tvProfileCpCvLevel.setText("Lv." + Math.max(1, legacy.data.level));
-                binding.tvProfileCpCvDays.setText("الارتباط السابق");
+                binding.tvProfileCpCvDays.setText("علاقة نشطة");
                 applyCpCardBackground("");
                 binding.rowProfileCpCv.setVisibility(View.VISIBLE);
                 if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
