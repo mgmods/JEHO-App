@@ -51,7 +51,8 @@ export class CpAdminController {
         maxLevel: settings[`cp.max_level.${type}`] ?? null,
         levels: settings[`cp.levels.${type}`] ?? [],
         // CP types are enabled automatically; price and an active gift determine purchase readiness.
-        enabled: Number.isSafeInteger(price) && price > 0 && !!gift,
+        enabled: settings[`cp.enabled.${type}`] !== false && settings[`cp.enabled.${type}`] !== 'false'
+          && Number.isSafeInteger(price) && price > 0 && !!gift,
         rules: settings[`cp.rules.${type}`] ?? {},
       });
     }
