@@ -311,7 +311,7 @@ public class CpCenterActivity extends ThemedActivity {
         if ("home".equals(currentView)) loadHome();
         else if ("incoming".equals(currentView) || "sent".equals(currentView)) loadRequests();
         else if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
-        else if ("store".equals(currentView)) loadCatalog();
+        else if ("store".equals(currentView)) { loadCatalog(); loadCpCosmetics(); }
         else if ("memories".equals(currentView)) loadMemories();
         else if ("tasks".equals(currentView)) loadTasks();
     }
@@ -387,11 +387,11 @@ public class CpCenterActivity extends ThemedActivity {
             });
         }
 
-        sectionTitle("مركز عالم CP", "ميزات إضافية ضمن خطة تطوير النظام");
-        addFutureCard("🎯", "المهام والتحديات", "مهام مشتركة ومكافآت", "يتطلب ربط مهام CP ومكافآتها بالخادم والداشبورد.");
-        addFutureCard("💎", "متجر CP", "هدايا وإطارات وتأثيرات", "يتطلب ربط كتالوج CP والمشتريات والمخزون قبل تفعيل الشراء.");
-        addFutureCard("🏆", "ترتيب الأزواج", "عالمي وإقليمي وموسمي", "يتطلب خدمة ترتيب ومواسم موثوقة من الخادم.");
-        addFutureCard("📖", "الذكريات والإنجازات", "رحلة العلاقة المشتركة", "يتطلب واجهة بيانات للذكريات والإنجازات.");
+        sectionTitle("اكتشف المزيد من عالم CP", "افتح كل ميزة من واجهتها الأصلية داخل التطبيق");
+        addFeatureCard("🎯", "المهام والتحديات", "مهام مشتركة ومكافآت CP", "tasks");
+        addFeatureCard("💎", "متجر CP", "إطارات وتأثيرات ومظاهر مشتركة", "store");
+        addFeatureCard("🏆", "ترتيب الأزواج", "استكشف العلاقات حسب نقاطها", "leaderboard");
+        addFeatureCard("📖", "الذكريات والإنجازات", "وثّقوا رحلتكم المشتركة", "memories");
     }
 
     private void renderSend() {
@@ -1240,11 +1240,14 @@ public class CpCenterActivity extends ThemedActivity {
         });
     }
 
-    private void addFutureCard(String icon, String title, String subtitle, String explanation) {
+    private void addFeatureCard(String icon, String title, String subtitle, String targetView) {
         LinearLayout card = panel();
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(4), 0, dp(4));
         screenContent.addView(card, lp);
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setContentDescription(title + "، فتح القسم");
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -1262,16 +1265,12 @@ public class CpCenterActivity extends ThemedActivity {
         TextView sub = text(subtitle, 11, MUTED, false);
         sub.setPadding(0, dp(4), 0, 0);
         copy.addView(sub);
-        TextView badge = text("قريباً", 10, PURPLE, true);
-        badge.setGravity(Gravity.CENTER);
-        badge.setPadding(dp(9), dp(6), dp(9), dp(6));
-        badge.setBackground(round(0xFFF1E8FB, dp(12), 0xFFE3D5F3));
-        row.addView(badge);
-        card.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(explanation)
-                .setPositiveButton("حسناً", (d, w) -> d.dismiss())
-                .show());
+        TextView action = text("فتح  ›", 11, PURPLE, true);
+        action.setGravity(Gravity.CENTER);
+        action.setPadding(dp(10), dp(8), dp(10), dp(8));
+        action.setBackground(round(0xFFF1E8FB, dp(12), 0xFFE3D5F3));
+        row.addView(action);
+        card.setOnClickListener(v -> showView(targetView));
     }
 
     private void addPersonRow(LinearLayout card, Map<String, Object> person, String subtitle, String status) {
