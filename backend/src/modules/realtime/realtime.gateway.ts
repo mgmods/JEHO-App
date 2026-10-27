@@ -96,6 +96,39 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly zegoTokenService: ZegoTokenService,
   ) {}
 
+  /** Keep realtime identity in lockstep with VIP status and the dashboard's live policy. */
+  private async isMysteriousModeEligible(user: User | null | undefined, vip: UserVip | null | undefined): Promise<boolean> {
+    if (!user?.mysteriousMode || !vip || !vip.isActive) return false;
+    if (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) return false;
+    const level = Number(vip.level || 0);
+    if (!Number.isInteger(level) || level < 1 || level > 7) return false;
+
+    let policyRow: AppSetting | null = null;
+    try {
+      policyRow = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+    } catch {
+      return false; // fail closed when eligibility cannot be verified
+    }
+    const benefits = vip.vipPlan?.benefits as any;
+    if (policyRow) {
+      let policy: any = {};
+      try {
+        policy = typeof policyRow.value === 'string'
+          ? JSON.parse(policyRow.value)
+          : (policyRow.value || {});
+      } catch {
+        return false;
+      }
+      const levels = Array.isArray(policy.eligibleVipLevels)
+        ? policy.eligibleVipLevels.map(Number).filter((n: number) =>
+            Number.isInteger(n) && n >= 1 && n <= 7)
+        : [];
+      return policy.enabled === true && levels.includes(level);
+    }
+    const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
+    return Array.isArray(extra) && extra.includes('mysterious_man');
+  }
+
   async handleConnection(client: AuthSocket) {
     try {
       const token =
@@ -341,9 +374,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       Number(profile?.totalSentCoins || 0),
     );
     const benefits = vip?.vipPlan?.benefits as any;
-    const mysteriousMode = !!user?.mysteriousMode
-      && Array.isArray(benefits?.extra)
-      && benefits.extra.includes('mysterious_man');
+    const mysteriousMode = await this.isMysteriousModeEligible(user, vip);
     const visuals = benefits?.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
     const mysteriousFrameUrl = visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null);
     const spent = await this.roomSpendCoins(userId, roomId);
@@ -779,9 +810,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         order: { level: 'DESC' },
       });
       const senderBenefits = senderVip?.vipPlan?.benefits as any;
-      const mysteriousMan = !!senderUser?.mysteriousMode
-        && Array.isArray(senderBenefits?.extra)
-        && senderBenefits.extra.includes('mysterious_man');
+      const mysteriousMan = await this.isMysteriousModeEligible(senderUser, senderVip);
       const roomDisplayName = mysteriousMan
         ? 'الرجل الغامض'
         : (profile.displayName || client.username || 'User');
