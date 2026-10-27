@@ -14,16 +14,41 @@ import { MikooGatewayService } from './modules/games/mikoo-gateway/mikoo-gateway
 import { UploadsService } from './modules/uploads/uploads.service';
 
 async function bootstrap() {
+  // Plain diagnostics survive even when Nest logging is not ready yet.
+  console.log('[JEHO-OWN boot] Starting Nest application initialization...');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
+  console.log('[JEHO-OWN boot] Nest application initialized; configuring HTTP and realtime services.');
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
   const apiPrefix = configService.get<string>('app.apiPrefix') || 'api/v1';
   const corsOrigins = configService.get<string[]>('app.corsOrigins') || ['*'];
   const redisIoAdapter = new RedisIoAdapter(app, configService);
-  await redisIoAdapter.connect();
+  // Redis is optional for a single backend instance. Never let Redis DNS/network
+  // issues prevent the HTTP API, profile, gifts, or dashboard from starting.
+  try {
+    await new Promise<boolean>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.warn('[JEHO-OWN boot] Redis connection exceeded 7s; continuing with local Socket.IO adapter.');
+        resolve(false);
+      }, 7000);
+      redisIoAdapter.connect().then(
+        (connected) => {
+          clearTimeout(timeout);
+          resolve(connected);
+        },
+        (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        },
+      );
+    });
+  } catch (error) {
+    console.warn('[JEHO-OWN boot] Redis setup failed; continuing without Redis adapter:',
+      error instanceof Error ? error.message : String(error));
+  }
   app.useWebSocketAdapter(redisIoAdapter);
 
   app.use(
@@ -328,7 +353,9 @@ const baishunModuleMap: Record<string, string> = {
     res.status(200).json({ ok: true, service: 'jeho-own-api' });
   });
 
-  await app.listen(port);
+  console.log(`[JEHO-OWN boot] Opening HTTP listener on port ${port}...`);
+  await app.listen(port, '0.0.0.0');
+  console.log('[JEHO-OWN boot] HTTP listener is accepting requests.');
   const gateway = app.get(MikooGatewayService);
   gateway.attach(app.getHttpServer());
   // eslint-disable-next-line no-console
@@ -337,4 +364,8 @@ const baishunModuleMap: Record<string, string> = {
   console.log(`Swagger docs at http://localhost:${port}/api/docs`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('[JEHO-OWN boot] Fatal API startup error:',
+    error instanceof Error ? (error.stack || error.message) : String(error));
+  process.exitCode = 1;
+});
