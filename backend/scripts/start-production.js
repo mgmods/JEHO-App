@@ -80,7 +80,7 @@ async function databaseIsReady() {
           database: dbDatabase,
           ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
         };
-    client = new Client(connection);
+    client = new Client({ ...connection, connectionTimeoutMillis: 8000, query_timeout: 10000 });
     await client.connect();
     const result = await client.query(
       "select exists (select 1 from information_schema.tables where table_schema='jeho_own' and table_name='users') as ready",
