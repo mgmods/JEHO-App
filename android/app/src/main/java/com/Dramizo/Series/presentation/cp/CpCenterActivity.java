@@ -1895,4 +1895,34 @@ public class CpCenterActivity extends ThemedActivity {
             });
         });
     }
+    /** Native heart-clipped portrait used by CP couple cards and leaderboard podiums. */
+    private static final class HeartImageView extends ImageView {
+        private final Path heartPath = new Path();
+
+        public HeartImageView(android.content.Context context) {
+            super(context);
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            if (getWidth() <= 0 || getHeight() <= 0) {
+                super.onDraw(canvas);
+                return;
+            }
+            float w = getWidth();
+            float h = getHeight();
+            heartPath.reset();
+            heartPath.moveTo(w * 0.5f, h * 0.91f);
+            heartPath.cubicTo(w * 0.40f, h * 0.82f, w * 0.04f, h * 0.57f, w * 0.04f, h * 0.31f);
+            heartPath.cubicTo(w * 0.04f, h * 0.07f, w * 0.34f, h * 0.02f, w * 0.5f, h * 0.23f);
+            heartPath.cubicTo(w * 0.66f, h * 0.02f, w * 0.96f, h * 0.07f, w * 0.96f, h * 0.31f);
+            heartPath.cubicTo(w * 0.96f, h * 0.57f, w * 0.60f, h * 0.82f, w * 0.5f, h * 0.91f);
+            heartPath.close();
+            int save = canvas.save();
+            canvas.clipPath(heartPath);
+            super.onDraw(canvas);
+            canvas.restoreToCount(save);
+        }
+    }
+
 }
