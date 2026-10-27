@@ -83,7 +83,9 @@ public class CpCenterActivity extends ThemedActivity {
 
     private String safeView(String value) {
         return "send".equals(value) || "incoming".equals(value) || "sent".equals(value)
-                || "discover".equals(value) ? value : "home";
+                || "discover".equals(value) || "categories".equals(value) || "store".equals(value)
+                || "tasks".equals(value) || "insights".equals(value) || "gifts".equals(value)
+                ? value : "home";
     }
     private String safeType(String value) {
         for (String allowed : new String[]{"brotherhood", "friendship", "love", "engagement", "marriage"}) {
