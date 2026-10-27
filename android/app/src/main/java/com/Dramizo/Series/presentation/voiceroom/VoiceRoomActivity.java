@@ -7835,7 +7835,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         Object n = ((Map<?, ?>) giftObject).get("name");
                         if (n != null) giftName = String.valueOf(n);
                     }
-                    String price = String.valueOf(item.get("price") == null ? "" : item.get("price"));
+                    String price = String.valueOf(item.get("priceCoins") == null ? "" : item.get("priceCoins"));
                     String typeLabel = roomCpTypeLabel(type);
                     if (type.isEmpty()) continue;
                     available.add(item);
