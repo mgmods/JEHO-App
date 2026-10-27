@@ -337,18 +337,7 @@
 
                     
 
-                    <TextView
-                        android:id="@+id/tvLevelChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:background="@drawable/bg_profile_id_light"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="3dp"
-                        android:text="1"
-                        android:textColor="#FF4F3C91"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
+
 
                     <!-- Hidden legacy chips kept for binding safety -->
                     <TextView
@@ -403,11 +392,11 @@
 
                         <ImageView
                             android:id="@+id/imgVipMedal"
-                            android:layout_width="43dp"
-                            android:layout_height="25dp"
+                            android:layout_width="54dp"
+                            android:layout_height="36dp"
                             android:layout_marginStart="6dp"
                             android:adjustViewBounds="true"
-                            android:contentDescription="@null"
+                            android:contentDescription="VIP"
                             android:scaleType="fitCenter"
                             android:visibility="gone" />
 
@@ -415,78 +404,100 @@
                             android:id="@+id/tvVipChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
+                            android:layout_marginStart="5dp"
                             android:background="@drawable/bg_chip_vip"
-                            android:paddingHorizontal="10dp"
-                            android:paddingVertical="4dp"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="6dp"
                             android:text="VIP 0"
                             android:textColor="#FF283047"
-                            android:textSize="11sp"
+                            android:textSize="13sp"
                             android:textStyle="bold"
                             android:visibility="gone" />
+
+                        <ImageView
+                            android:id="@+id/imgRankIcon"
+                            android:layout_width="30dp"
+                            android:layout_height="30dp"
+                            android:layout_marginStart="8dp"
+                            android:contentDescription="الترتيب"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_me_rank" />
 
                         <TextView
                             android:id="@+id/tvCharmChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
+                            android:layout_marginStart="4dp"
                             android:background="@drawable/bg_chip_charm"
-                            android:paddingHorizontal="10dp"
-                            android:paddingVertical="4dp"
+                            android:paddingHorizontal="11dp"
+                            android:paddingVertical="6dp"
                             android:text="0"
                             android:textColor="#FF283047"
-                            android:textSize="11sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/imgWealthIcon"
+                            android:layout_width="30dp"
+                            android:layout_height="30dp"
+                            android:layout_marginStart="8dp"
+                            android:contentDescription="الثروة"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_asset_diamond" />
 
                         <TextView
                             android:id="@+id/tvWealthChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
+                            android:layout_marginStart="4dp"
                             android:background="@drawable/bg_chip_wealth"
-                            android:paddingHorizontal="10dp"
-                            android:paddingVertical="4dp"
+                            android:paddingHorizontal="11dp"
+                            android:paddingVertical="6dp"
                             android:text="0"
                             android:textColor="#FF283047"
-                            android:textSize="11sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
-                    </LinearLayout>
-                </HorizontalScrollView>
 
-                <LinearLayout
-                    android:id="@+id/medalShowcase"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="14dp"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginEnd="14dp"
-                    android:background="@drawable/bg_profile_section_light"
-                    android:orientation="vertical"
-                    android:padding="10dp"
-                    android:visibility="gone">
+                        <ImageView
+                            android:id="@+id/imgLevelIcon"
+                            android:layout_width="30dp"
+                            android:layout_height="30dp"
+                            android:layout_marginStart="8dp"
+                            android:contentDescription="المستوى"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_me_level" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="ميدالياتي"
-                        android:textColor="#FF6B4CC2"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <HorizontalScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:scrollbars="none">
-
-                        <LinearLayout
-                            android:id="@+id/medalShowcaseItems"
+                        <TextView
+                            android:id="@+id/tvLevelChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_profile_id_light"
+                            android:paddingHorizontal="11dp"
+                            android:paddingVertical="6dp"
+                            android:text="1"
+                            android:textColor="#FF4F3C91"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:id="@+id/medalShowcase"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
                             android:gravity="center_vertical"
-                            android:orientation="horizontal" />
-                    </HorizontalScrollView>
-                </LinearLayout>
+                            android:orientation="horizontal"
+                            android:visibility="gone">
+
+                            <LinearLayout
+                                android:id="@+id/medalShowcaseItems"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </HorizontalScrollView>
 
                 <!-- User moments shortcut: profile-specific, server-backed posts. -->
                 <LinearLayout
