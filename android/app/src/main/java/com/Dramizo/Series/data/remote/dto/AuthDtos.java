@@ -114,6 +114,7 @@ public final class AuthDtos {
         @SerializedName("publicIdStyleColor2") public String publicIdStyleColor2;
         @SerializedName("publicIdStyleColor3") public String publicIdStyleColor3;
         @SerializedName("publicIdStyleGlow") public boolean publicIdStyleGlow;
+        @SerializedName("publicIdStyleIconUrl") public String publicIdStyleIconUrl;
         @SerializedName("displayName") public String displayName;
         @SerializedName("avatarUrl") public String avatarUrl;
         /** True when the room profile is intentionally anonymized by an eligible VIP. */
