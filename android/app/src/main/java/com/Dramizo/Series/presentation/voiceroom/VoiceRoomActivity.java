@@ -7815,27 +7815,59 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             Toast.makeText(this, "تعذر تحديد الروم الحالي", Toast.LENGTH_LONG).show();
             return;
         }
-        final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
-        final String[] labels = {"🎁 هدية الصداقة", "🎁 هدية الأخوّة", "💗 هدية الحب", "💍 هدية الخطوبة", "💞 هدية الزواج"};
-        new AlertDialog.Builder(this)
-                .setTitle("هدايا الارتباط · CP")
-                .setMessage("اختر هدية CP لإرسالها داخل الروم. ستصل للمستخدم كطلب ارتباط، ولن تبدأ العلاقة إلا بعد موافقته.")
-                .setItems(labels, (d, which) -> {
-                    Map<String, String> body = new HashMap<>();
-                    body.put("recipientId", recipientId);
-                    body.put("type", types[which]);
-                    body.put("roomId", roomId);
-                    body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
-                    cpContainer.getIoExecutor().execute(() -> {
-                        Result<Map<String, Object>> result = ApiCall.execute(cpContainer.getUserApi().createRoomCpRequest(body));
-                        runOnUiThread(() -> Toast.makeText(this,
-                                result.success ? "تم إرسال هدية CP وطلب الارتباط داخل الروم ✓"
-                                        : (result.error != null ? result.error : "تعذر إرسال هدية CP"),
-                                Toast.LENGTH_LONG).show());
-                    });
-                }).setNegativeButton("إلغاء", null).show();
+        Toast.makeText(this, "جارٍ تحميل هدايا CP…", Toast.LENGTH_SHORT).show();
+        cpContainer.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> catalog = ApiCall.execute(cpContainer.getUserApi().cpCatalog());
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (!catalog.success || catalog.data == null || catalog.data.isEmpty()) {
+                    Toast.makeText(this, catalog.error != null ? catalog.error : "لا توجد هدايا CP مفعّلة حالياً", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                List<Map<String, Object>> available = new ArrayList<>();
+                List<String> labels = new ArrayList<>();
+                for (Map<String, Object> item : catalog.data) {
+                    if (Boolean.FALSE.equals(item.get("enabled"))) continue;
+                    String type = String.valueOf(item.get("type") == null ? "" : item.get("type"));
+                    Object giftObject = item.get("gift");
+                    String giftName = "";
+                    if (giftObject instanceof Map) {
+                        Object n = ((Map<?, ?>) giftObject).get("name");
+                        if (n != null) giftName = String.valueOf(n);
+                    }
+                    String price = String.valueOf(item.get("price") == null ? "" : item.get("price"));
+                    String typeLabel = roomCpTypeLabel(type);
+                    if (type.isEmpty()) continue;
+                    available.add(item);
+                    labels.add((giftName.isEmpty() ? typeLabel : "🎁 " + giftName + " · " + typeLabel)
+                            + (price.isEmpty() ? "" : " · " + price + " 💎"));
+                }
+                if (available.isEmpty()) {
+                    Toast.makeText(this, "لا توجد هدايا CP مفعّلة حالياً", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                new AlertDialog.Builder(this)
+                        .setTitle("هدايا الارتباط · CP")
+                        .setMessage("اختر هدية من القائمة. ستصل للمستخدم كطلب ارتباط، ولن تبدأ العلاقة إلا بعد موافقته.")
+                        .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                            Map<String, Object> selected = available.get(which);
+                            String type = String.valueOf(selected.get("type"));
+                            Map<String, String> body = new HashMap<>();
+                            body.put("recipientId", recipientId);
+                            body.put("type", type);
+                            body.put("roomId", roomId);
+                            body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
+                            cpContainer.getIoExecutor().execute(() -> {
+                                Result<Map<String, Object>> result = ApiCall.execute(cpContainer.getUserApi().createRoomCpRequest(body));
+                                runOnUiThread(() -> Toast.makeText(this,
+                                        result.success ? "تم إرسال هدية CP وطلب الارتباط داخل الروم ✓"
+                                                : (result.error != null ? result.error : "تعذر إرسال هدية CP"),
+                                        Toast.LENGTH_LONG).show());
+                            });
+                        }).setNegativeButton("إلغاء", null).show();
+            });
+        });
     }
-
     private String roomCpTypeLabel(String type) {
         switch (type) {
             case "friendship": return "✦ علاقة صداقة";
