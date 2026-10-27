@@ -21,7 +21,7 @@ async function resetSchemaOnceIfRequested() {
     throw new Error('JEHO_OWN_RESET_ONCE requires DATABASE_URL; refusing to guess which database to reset.');
   }
 
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 8000, query_timeout: 10000 });
   try {
     await client.connect();
     const marker = await client.query(
@@ -41,7 +41,7 @@ async function resetSchemaOnceIfRequested() {
 }
 
 async function markResetCompleted() {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 8000, query_timeout: 10000 });
   try {
     await client.connect();
     await client.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
@@ -54,19 +54,40 @@ async function markResetCompleted() {
 }
 
 async function databaseIsReady() {
-  if (!process.env.DATABASE_URL) {
-    console.log('[JEHO-OWN startup] DATABASE_URL is not set; skipping URL-based readiness check and allowing seed to use DB_* settings.');
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const dbHost = process.env.DB_HOST?.trim();
+  const dbUsername = process.env.DB_USERNAME?.trim();
+  const dbPassword = process.env.DB_PASSWORD;
+  const dbDatabase = process.env.DB_DATABASE?.trim();
+
+  // Support both connection styles used by seed.ts and TypeORM. Previously,
+  // when only DB_* variables were configured, this returned false on every
+  // cold start and re-ran the full seed before opening the API port.
+  if (!databaseUrl && !(dbHost && dbUsername && dbPassword && dbDatabase)) {
+    console.log('[JEHO-OWN startup] Database connection settings are incomplete; seed will validate configuration.');
     return false;
   }
 
   let client;
   try {
-    client = new Client({ connectionString: process.env.DATABASE_URL });
+    const connection = databaseUrl
+      ? { connectionString: databaseUrl, ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined }
+      : {
+          host: dbHost,
+          port: Number(process.env.DB_PORT || 5432),
+          user: dbUsername,
+          password: dbPassword,
+          database: dbDatabase,
+          ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+        };
+    client = new Client({ ...connection, connectionTimeoutMillis: 8000, query_timeout: 10000 });
     await client.connect();
     const result = await client.query(
       "select exists (select 1 from information_schema.tables where table_schema='jeho_own' and table_name='users') as ready",
     );
-    return Boolean(result.rows[0]?.ready);
+    const ready = Boolean(result.rows[0]?.ready);
+    console.log(`[JEHO-OWN startup] Database readiness check: ${ready ? 'ready; skipping seed' : 'schema not initialized; seed required'}.`);
+    return ready;
   } catch (error) {
     console.error('[JEHO-OWN startup] Database readiness check failed:', JSON.stringify({
       name: error?.name,
