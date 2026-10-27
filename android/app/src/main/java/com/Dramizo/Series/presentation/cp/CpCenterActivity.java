@@ -138,6 +138,32 @@ public class CpCenterActivity extends ThemedActivity {
         if ("tasks".equals(currentView)) loadTasks();
     }
 
+    private void toast(String message) {
+        if (message == null || message.trim().isEmpty()) return;
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    private void endRelationship(String relationshipId) {
+        if (relationshipId == null || relationshipId.trim().isEmpty()) {
+            toast("تعذر تحديد العلاقة.");
+            return;
+        }
+        c.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().endCpRelationship(relationshipId));
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (result.success) {
+                    toast("تم إنهاء العلاقة.");
+                    loadHome();
+                    loadRequests();
+                    renderScreen();
+                } else {
+                    toast(result.error != null ? result.error : "تعذر إنهاء العلاقة، حاول مجدداً.");
+                }
+            });
+        });
+    }
+
     private void buildHeader() {
         LinearLayout bar = new LinearLayout(this);
         bar.setGravity(Gravity.CENTER_VERTICAL);
