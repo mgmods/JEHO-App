@@ -274,7 +274,7 @@
                     <androidx.viewpager2.widget.ViewPager2
                         android:id="@+id/pagerBanners"
                         android:layout_width="match_parent"
-                        android:layout_height="132dp"
+                        android:layout_height="112dp"
                         android:clipChildren="false"
                         android:clipToPadding="false"
                         android:overScrollMode="never" />
