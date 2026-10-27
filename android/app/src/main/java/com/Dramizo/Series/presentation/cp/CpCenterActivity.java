@@ -121,10 +121,6 @@ public class CpCenterActivity extends ThemedActivity {
         scroll.addView(page, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        buildHero(page);
-        buildStats(page);
-        buildNavigation(page);
-        updateNavigation();
         screenContent = new LinearLayout(this);
         screenContent.setOrientation(LinearLayout.VERTICAL);
         page.addView(screenContent, matchWrap());
@@ -177,7 +173,7 @@ public class CpCenterActivity extends ThemedActivity {
         back.setBackground(round(Color.rgb(252, 231, 241), dp(15), LINE));
         bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
         back.setContentDescription("رجوع");
-        back.setOnClickListener(v -> finish());
+        back.setOnClickListener(v -> { if (!"home".equals(currentView)) showView("home"); else finish(); });
 
         LinearLayout titles = new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
@@ -185,7 +181,7 @@ public class CpCenterActivity extends ThemedActivity {
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, -2, 1f);
         titleLp.setMargins(dp(10), 0, dp(10), 0);
         bar.addView(titles, titleLp);
-        TextView title = text("عالم CP", 19, INK, true);
+        TextView title = text(pageTitle(currentView), 19, INK, true);
         title.setGravity(Gravity.CENTER);
         titles.addView(title);
         TextView subtitle = text("روابط تجمع القلوب", 11, MUTED, false);
@@ -240,7 +236,7 @@ public class CpCenterActivity extends ThemedActivity {
         start.setBackground(round(Color.WHITE, dp(17), 0x55FFFFFF));
         start.setElevation(dp(2));
         actions.addView(start, new LinearLayout.LayoutParams(0, -2, 1f));
-        start.setOnClickListener(v -> showView("send"));
+        start.setOnClickListener(v -> showView("gifts"));
         TextView invite = text("♧  الدعوة", 12, Color.WHITE, true);
         invite.setGravity(Gravity.CENTER);
         invite.setMinHeight(dp(50));
@@ -348,7 +344,7 @@ public class CpCenterActivity extends ThemedActivity {
 
     private void showView(String view) {
         currentView = safeView(view);
-        updateNavigation();
+        updateHeaderTitle();
         renderScreen();
         if ("home".equals(currentView)) loadHome();
         else if ("incoming".equals(currentView) || "sent".equals(currentView)) loadRequests();
@@ -363,7 +359,9 @@ public class CpCenterActivity extends ThemedActivity {
         screenContent.removeAllViews();
         updateStats();
         switch (currentView) {
-            case "send": renderSend(); break;
+            case "send": case "gifts": renderSend(); break;
+            case "stats": renderStatsPage(); break;
+            case "categories": renderCategoriesPage(); break;
             case "incoming": renderIncoming(); break;
             case "sent": renderSent(); break;
             case "discover": renderDiscover(); break;
@@ -376,7 +374,64 @@ public class CpCenterActivity extends ThemedActivity {
         }
     }
 
+
+    private String pageTitle(String view) {
+        switch (view) {
+            case "gifts": case "send": return "هدايا CP";
+            case "store": return "متجر CP";
+            case "memories": return "ذكرياتنا";
+            case "stats": return "الإحصائيات";
+            case "categories": return "تصنيفات CP";
+            case "leaderboard": return "الترتيب";
+            case "discover": return "اكتشف العلاقات";
+            case "tasks": return "المهام المشتركة";
+            case "incoming": return "طلبات الارتباط";
+            case "sent": return "متابعة الطلبات";
+            case "settings": return "إعدادات العلاقة";
+            default: return "عالم CP";
+        }
+    }
+
+    private void updateHeaderTitle() {
+        if (root == null || root.getChildCount() == 0) return;
+        View bar = root.getChildAt(0);
+        if (!(bar instanceof ViewGroup)) return;
+        ViewGroup group = (ViewGroup) bar;
+        if (group.getChildCount() > 1 && group.getChildAt(1) instanceof ViewGroup) {
+            ViewGroup titles = (ViewGroup) group.getChildAt(1);
+            if (titles.getChildCount() > 0 && titles.getChildAt(0) instanceof TextView) ((TextView) titles.getChildAt(0)).setText(pageTitle(currentView));
+        }
+    }
+
+    private void renderStatsPage() {
+        sectionTitle("إحصائيات علاقتكما", "الأرقام والذكريات التي تجمعكما");
+        if (homeData.isEmpty()) { emptyState("♡", "لا توجد إحصائيات بعد", "ابدأوا علاقتكما لتظهر النقاط والمدة هنا."); return; }
+        for (Map<String, Object> row : homeData) if ("active".equals(str(row.get("status")))) addRelationshipCard(row, false);
+        TextView rank = actionButton("عرض ترتيب علاقات CP", true);
+        screenContent.addView(rank, matchWrap());
+        rank.setOnClickListener(v -> showView("leaderboard"));
+    }
+
+    private void renderCategoriesPage() {
+        sectionTitle("اختاروا نوع رابطكم", "كل تصنيف له هديته وطابعه الخاص");
+        String[][] types = {{"love","♥","الحب","رابطة رومانسية بطابع وردي"},{"marriage","♛","الزواج","رابطة فاخرة بلمسات ذهبية"},{"engagement","❦","الخطوبة","بداية قصة جديدة"},{"friendship","✿","الصداقة","رابطة قريبة ومرحة"},{"brotherhood","∞","الأخوّة","رابطة دعم ووفاء"}};
+        for (String[] type : types) {
+            LinearLayout card = panel(); card.setOrientation(LinearLayout.HORIZONTAL); card.setGravity(Gravity.CENTER_VERTICAL); screenContent.addView(card, matchWrap());
+            FrameLayout emblem = new FrameLayout(this); emblem.setBackground(roundGradient(new int[]{0xFFFFD7E8,0xFFFFF0D0,0xFFE8D8FF},dp(20)));
+            LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(dp(60),dp(60)); ep.setMargins(0,0,dp(12),0); card.addView(emblem,ep);
+            TextView glyph = text(type[1],28,ROSE,true); glyph.setGravity(Gravity.CENTER); emblem.addView(glyph,new FrameLayout.LayoutParams(-1,-1));
+            LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL); card.addView(copy,new LinearLayout.LayoutParams(0,-2,1f));
+            copy.addView(text(type[2],16,INK,true)); copy.addView(text(type[3],12,MUTED,false));
+            TextView choose = actionButton("اختيار هدية",true); LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2,-2); cp.topMargin=dp(10); copy.addView(choose,cp);
+            choose.setOnClickListener(v -> { currentType=type[0]; showView("gifts"); });
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) card.getLayoutParams(); lp.bottomMargin=dp(10); card.setLayoutParams(lp);
+        }
+    }
+
+    @Override public void onBackPressed() { if (!"home".equals(currentView)) showView("home"); else super.onBackPressed(); }
+
     private void renderHome() {
+        buildHero(screenContent);
         sectionTitle("روابطك", "مساحتكما الخاصة تبدأ من هنا");
         List<Map<String, Object>> active = new ArrayList<>();
         for (Map<String, Object> row : homeData) if ("active".equals(str(row.get("status")))) active.add(row);
@@ -397,7 +452,7 @@ public class CpCenterActivity extends ThemedActivity {
             body.setGravity(Gravity.CENTER);
             body.setLineSpacing(dp(4), 1f);
             welcome.addView(body);
-            TextView start = actionButton("＋  إرسال طلب ارتباط", true);
+            TextView start = actionButton("🎁  استكشف هدايا CP", true);
             LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(-1, -2);
             startLp.topMargin = dp(15);
             welcome.addView(start, startLp);
@@ -457,8 +512,8 @@ public class CpCenterActivity extends ThemedActivity {
     }
 
     private void renderSend() {
-        sectionTitle("إرسال طلب ارتباط", "اختر النوع وأدخل معرّف المستخدم");
-        TextView explainer = text("سيصل طلبك للطرف الآخر ليقبله أو يرفضه. لا تُفعّل العلاقة تلقائياً، والطلب يخضع لقواعد الخادم.", 13, MUTED, false);
+        sectionTitle("هدايا CP", "أرسل هدية مخصصة؛ الارتباط لا يبدأ إلا بموافقة المستلم");
+        TextView explainer = text("اختر نوع الرابطة وأرسل هدية CP. ستصل للمستلم رسالة طلب ارتباط، ولن تصبح العلاقة نشطة إلا إذا وافق عليها.", 13, MUTED, false);
         explainer.setLineSpacing(dp(4), 1f);
         explainer.setPadding(dp(14), dp(13), dp(14), dp(13));
         explainer.setBackground(round(Color.WHITE, dp(17), LINE));
@@ -492,11 +547,11 @@ public class CpCenterActivity extends ThemedActivity {
         idInput.setBackground(round(Color.WHITE, dp(15), LINE));
         screenContent.addView(idInput, matchWrap());
 
-        TextView send = actionButton("إرسال طلب " + typeName(currentType), true);
+        TextView send = actionButton("🎁  إرسال هدية " + typeName(currentType), true);
         LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(-1, -2);
         sendLp.topMargin = dp(12);
         screenContent.addView(send, sendLp);        send.setOnClickListener(v -> sendRequest(idInput.getText().toString()));
-        TextView sentLink = actionButton("عرض الطلبات المرسلة", false);
+        TextView sentLink = actionButton("متابعة حالة هدايا الارتباط", false);
         LinearLayout.LayoutParams sentLp = new LinearLayout.LayoutParams(-1, -2);
         sentLp.topMargin = dp(8);
         screenContent.addView(sentLink, sentLp);
@@ -1666,9 +1721,10 @@ public class CpCenterActivity extends ThemedActivity {
     }
 
     private String safeView(String value) {
-        return "send".equals(value) || "incoming".equals(value) || "sent".equals(value)
-                || "discover".equals(value) || "store".equals(value) || "tasks".equals(value)
-                || "leaderboard".equals(value) || "memories".equals(value) || "settings".equals(value) ? value : "home";
+        return "send".equals(value) || "gifts".equals(value) || "stats".equals(value) || "categories".equals(value)
+                || "incoming".equals(value) || "sent".equals(value) || "discover".equals(value)
+                || "store".equals(value) || "tasks".equals(value) || "leaderboard".equals(value)
+                || "memories".equals(value) || "settings".equals(value) ? value : "home";
     }
 
     private String safeType(String value) {
