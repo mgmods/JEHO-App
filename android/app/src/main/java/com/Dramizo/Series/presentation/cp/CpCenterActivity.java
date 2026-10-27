@@ -609,18 +609,29 @@ public class CpCenterActivity extends ThemedActivity {
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setOrientation(LinearLayout.HORIZONTAL);
             card.addView(row, matchWrap());
+            FrameLayout giftFrame = new FrameLayout(this);
+            giftFrame.setBackground(round(0xFFFFEAF2, dp(15), LINE));
+            row.addView(giftFrame, new LinearLayout.LayoutParams(dp(54), dp(54)));
             TextView symbol = text("💝", 25, ROSE, true);
             symbol.setGravity(Gravity.CENTER);
-            symbol.setBackground(round(0xFFFFEAF2, dp(15), LINE));
-            row.addView(symbol, new LinearLayout.LayoutParams(dp(54), dp(54)));
+            giftFrame.addView(symbol, new FrameLayout.LayoutParams(-1, -1));
             LinearLayout copy = new LinearLayout(this);
             copy.setOrientation(LinearLayout.VERTICAL);
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1f);
             cp.setMargins(dp(12), 0, 0, 0);
             row.addView(copy, cp);
             Map<String, Object> gift = map(item.get("gift"));
-            String title = firstValue(item, "name", "title", "displayName", "label", "type");
-            if (title.isEmpty()) title = firstValue(gift, "name");
+            String giftName = firstValue(gift, "name");
+            String type = firstValue(item, "type");
+            String title = !type.isEmpty() ? typeName(type) + (giftName.isEmpty() ? "" : " · " + giftName) : firstValue(item, "name", "title", "displayName", "label");
+            if (title.isEmpty()) title = giftName;
+            String iconUrl = avatarUrl(gift.get("iconUrl"));
+            if (iconUrl != null && !iconUrl.trim().isEmpty()) {
+                ImageView giftIcon = new ImageView(this);
+                giftIcon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                giftFrame.addView(giftIcon, new FrameLayout.LayoutParams(-1, -1));
+                Glide.with(this).load(iconUrl).into(giftIcon);
+            }
             String desc = firstValue(item, "description", "subtitle", "details");
             String price = firstValue(item, "price", "priceCoins", "coinPrice", "cost", "coins");
             if ("false".equalsIgnoreCase(str(item.get("enabled")))) price = "غير مفعّل";
@@ -630,7 +641,7 @@ public class CpCenterActivity extends ThemedActivity {
                 sub.setPadding(0, dp(4), 0, 0);
                 copy.addView(sub);
             }
-            TextView priceView = text(price.isEmpty() ? "السعر حسب العنصر" : price + " 💎", 11, ROSE, true);
+            TextView priceView = text(price.isEmpty() ? "السعر حسب العنصر" : ("غير مفعّل".equals(price) ? price : price + " 💎"), 11, ROSE, true);
             priceView.setPadding(0, dp(5), 0, 0);
             copy.addView(priceView);
             final String itemTitle = title;
