@@ -195,7 +195,7 @@
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="14dp"
         android:layout_marginTop="10dp"
-        android:background="@drawable/bg_user_card_stat_cell"
+        android:background="@android:color/transparent"
         android:orientation="horizontal"
         android:paddingVertical="10dp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -218,7 +218,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FF22243A"
+                android:textColor="#FFF7F3FF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -227,7 +227,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_stat_following"
-                android:textColor="#FF777487"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -247,7 +247,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FF22243A"
+                android:textColor="#FFF7F3FF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -256,7 +256,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_stat_fans"
-                android:textColor="#FF777487"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -276,7 +276,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FF22243A"
+                android:textColor="#FFF7F3FF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -285,7 +285,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_stat_visitors"
-                android:textColor="#FF777487"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
