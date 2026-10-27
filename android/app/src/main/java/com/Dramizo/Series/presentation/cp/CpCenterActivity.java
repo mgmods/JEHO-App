@@ -1802,3 +1802,7 @@ public class CpCenterActivity extends ThemedActivity {
                     toast("تم إلغاء الطلب.");
                     loadRequests();
                 } else toast(result.error != null ? result.error : "تعذر إلغاء الطلب");
+            });
+        });
+    }
+}
