@@ -69,6 +69,8 @@ public class CpCenterActivity extends ThemedActivity {
     private final List<Map<String, Object>> sentData = new ArrayList<>();
     private final List<Map<String, Object>> discoverData = new ArrayList<>();
     private final List<Map<String, Object>> catalogData = new ArrayList<>();
+    private final List<Map<String, Object>> cpCosmeticsData = new ArrayList<>();
+    private final List<Map<String, Object>> cpInventoryData = new ArrayList<>();
     private final List<Map<String, Object>> memoriesData = new ArrayList<>();
     private final List<Map<String, Object>> tasksData = new ArrayList<>();
     private String currentView = "home";
@@ -78,6 +80,8 @@ public class CpCenterActivity extends ThemedActivity {
     private boolean loadingRequests;
     private boolean loadingDiscover;
     private boolean loadingCatalog;
+    private boolean loadingCpCosmetics;
+    private String busyCosmeticId = "";
     private boolean loadingMemories;
     private boolean loadingTasks;
 
@@ -127,7 +131,7 @@ public class CpCenterActivity extends ThemedActivity {
         loadHome();
         loadRequests();
         if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
-        if ("store".equals(currentView)) loadCatalog();
+        if ("store".equals(currentView)) { loadCatalog(); loadCpCosmetics(); }
         if ("memories".equals(currentView)) loadMemories();
         if ("tasks".equals(currentView)) loadTasks();
     }
@@ -581,6 +585,203 @@ public class CpCenterActivity extends ThemedActivity {
     }
 
 
+    private void renderCpCosmeticStore() {
+        sectionTitle("مظاهر CP الحصرية", "عناصر مصممة لعلاقتكما · شراء آمن وارتداء من الحقيبة");
+        if (loadingCpCosmetics) {
+            emptyState("💗", "جارٍ تجهيز المظاهر", "نحضر العناصر والأسعار وحالتها من الخادم…");
+            return;
+        }
+        if (cpCosmeticsData.isEmpty()) {
+            LinearLayout empty = panel();
+            screenContent.addView(empty, matchWrap());
+            empty.addView(text("💎  قريباً في متجر CP", 15, INK, true));
+            TextView hint = text("يمكن للإدارة إضافة إطارات وبطاقات دخول ولوحات أسماء خاصة عبر قسم إعدادات CP في الداشبورد.", 12, MUTED, false);
+            hint.setPadding(0, dp(6), 0, 0);
+            hint.setLineSpacing(dp(3), 1f);
+            empty.addView(hint);
+            return;
+        }
+        for (int i = 0; i < cpCosmeticsData.size(); i += 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.bottomMargin = dp(8);
+            screenContent.addView(row, rowLp);
+            addCpCosmeticCard(row, cpCosmeticsData.get(i));
+            if (i + 1 < cpCosmeticsData.size()) addCpCosmeticCard(row, cpCosmeticsData.get(i + 1));
+        }
+    }
+
+    private void addCpCosmeticCard(LinearLayout row, Map<String, Object> item) {
+        LinearLayout card = panel();
+        card.setPadding(dp(10), dp(11), dp(10), dp(11));
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        cardLp.setMargins(dp(3), 0, dp(3), 0);
+        row.addView(card, cardLp);
+        String id = str(item.get("id"));
+        String title = defaultString(item.get("name"), "مظهر CP");
+        String description = str(item.get("description"));
+        boolean owned = hasCpCosmetic(id);
+        boolean equipped = isCpCosmeticEquipped(id);
+        String preview = avatarUrl(item.get("previewUrl"));
+        FrameLayout previewFrame = new FrameLayout(this);
+        previewFrame.setBackground(roundGradient(new int[]{0xFFFFE6F0, 0xFFF4E9FF}, dp(16)));
+        LinearLayout.LayoutParams previewLp = new LinearLayout.LayoutParams(-1, dp(112));
+        previewLp.bottomMargin = dp(9);
+        card.addView(previewFrame, previewLp);
+        if (preview != null && !preview.isEmpty()) {
+            ImageView image = new ImageView(this);
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            previewFrame.addView(image, new FrameLayout.LayoutParams(-1, -1));
+            Glide.with(this).load(preview).into(image);
+        } else {
+            TextView symbol = text("♡", 32, ROSE, true);
+            symbol.setGravity(Gravity.CENTER);
+            previewFrame.addView(symbol, new FrameLayout.LayoutParams(-1, -1));
+        }
+        TextView name = text(title, 13, INK, true);
+        name.setMaxLines(2);
+        card.addView(name);
+        String type = cosmeticTypeName(str(item.get("type")));
+        TextView category = text(type, 10, MUTED, false);
+        category.setPadding(0, dp(3), 0, 0);
+        card.addView(category);
+        if (!description.isEmpty()) {
+            TextView desc = text(description, 11, MUTED, false);
+            desc.setMaxLines(3);
+            desc.setPadding(0, dp(4), 0, 0);
+            card.addView(desc);
+        }
+        TextView price = text(numberString(item.get("coinPrice")) + " 💎", 13, ROSE, true);
+        price.setPadding(0, dp(8), 0, dp(8));
+        card.addView(price);
+        TextView action = actionButton(equipped ? "مرتدٍ ✓" : owned ? "ارتداء العنصر" : "شراء الآن", !busyCosmeticId.equals(id));
+        card.addView(action, new LinearLayout.LayoutParams(-1, -2));
+        action.setOnClickListener(v -> {
+            if (id.isEmpty()) return;
+            if (busyCosmeticId.equals(id)) return;
+            if (owned && equipped) {
+                unequipCpCosmetic(id);
+            } else if (owned) {
+                equipCpCosmetic(id);
+            } else {
+                new AlertDialog.Builder(this)
+                    .setTitle("تأكيد شراء " + title)
+                    .setMessage("السعر: " + numberString(item.get("coinPrice")) + " عملة. ستتم مراجعة الرصيد وخصم العملات من الخادم فقط، وستكون مدة الملكية " + defaultString(map(item.get("meta")).get("leaseDays"), "30") + " يوماً.")
+                    .setNegativeButton("إلغاء", (d, w) -> d.dismiss())
+                    .setPositiveButton("تأكيد الشراء", (d, w) -> purchaseCpCosmetic(id))
+                    .show();
+            }
+        });
+    }
+
+    private String cosmeticTypeName(String type) {
+        switch (type) {
+            case "profile_card": return "بطاقة الملف الشخصي";
+            case "entry_effect": return "تأثير دخول";
+            case "room_card": return "بطاقة الروم";
+            case "nameplate": return "لوحة الاسم";
+            case "chat_bubble": return "فقاعة الدردشة";
+            default: return "مظهر CP";
+        }
+    }
+
+    private boolean hasCpCosmetic(String id) {
+        if (id == null || id.isEmpty()) return false;
+        for (Map<String, Object> owned : cpInventoryData) {
+            String cosmeticId = str(owned.get("cosmeticId"));
+            if (cosmeticId.isEmpty()) cosmeticId = str(map(owned.get("cosmetic")).get("id"));
+            if (id.equals(cosmeticId)) return true;
+        }
+        return false;
+    }
+
+    private boolean isCpCosmeticEquipped(String id) {
+        for (Map<String, Object> owned : cpInventoryData) {
+            String cosmeticId = str(owned.get("cosmeticId"));
+            if (cosmeticId.isEmpty()) cosmeticId = str(map(owned.get("cosmetic")).get("id"));
+            if (id.equals(cosmeticId)) return Boolean.TRUE.equals(owned.get("equipped"));
+        }
+        return false;
+    }
+
+    private void loadCpCosmetics() {
+        if (loadingCpCosmetics || isFinishing()) return;
+        loadingCpCosmetics = true;
+        if ("store".equals(currentView)) renderScreen();
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> catalog = ApiCall.execute(c.getUserApi().cosmeticsCatalog());
+            Result<List<Map<String, Object>>> inventory = ApiCall.execute(c.getUserApi().cosmeticsInventory());
+            List<Map<String, Object>> rows = new ArrayList<>();
+            if (catalog.success && catalog.data != null) {
+                for (Map<String, Object> item : catalog.data) {
+                    Map<String, Object> meta = map(item.get("meta"));
+                    String code = str(item.get("code"));
+                    if (Boolean.TRUE.equals(meta.get("cpStore")) || code.startsWith("cp_")) rows.add(item);
+                }
+            }
+            List<Map<String, Object>> owned = inventory.success && inventory.data != null
+                    ? new ArrayList<>(inventory.data) : new ArrayList<>();
+            runOnUiThread(() -> {
+                loadingCpCosmetics = false;
+                cpCosmeticsData.clear();
+                cpCosmeticsData.addAll(rows);
+                cpInventoryData.clear();
+                cpInventoryData.addAll(owned);
+                if ("store".equals(currentView)) renderScreen();
+                if (!catalog.success) toast(catalog.error != null ? catalog.error : "تعذر تحميل مظاهر CP");
+            });
+        });
+    }
+
+    private void purchaseCpCosmetic(String id) {
+        busyCosmeticId = id;
+        Map<String, String> body = new HashMap<>();
+        body.put("cosmeticId", id);
+        c.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().purchaseCosmetic(body));
+            runOnUiThread(() -> {
+                busyCosmeticId = "";
+                if (result.success) {
+                    toast("تم الشراء بنجاح! ستجد العنصر في الحقيبة ❤️");
+                    loadCpCosmetics();
+                } else toast(result.error != null ? result.error : "لم يكتمل الشراء. تحقق من الرصيد وحاول مجدداً.");
+            });
+        });
+    }
+
+    private void equipCpCosmetic(String id) {
+        busyCosmeticId = id;
+        Map<String, String> body = new HashMap<>();
+        body.put("cosmeticId", id);
+        c.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().equipCosmetic(body));
+            runOnUiThread(() -> {
+                busyCosmeticId = "";
+                if (result.success) {
+                    toast("تم ارتداء العنصر بنجاح ✨");
+                    loadCpCosmetics();
+                } else toast(result.error != null ? result.error : "تعذر ارتداء العنصر");
+            });
+        });
+    }
+
+    private void unequipCpCosmetic(String id) {
+        busyCosmeticId = id;
+        Map<String, String> body = new HashMap<>();
+        body.put("cosmeticId", id);
+        c.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().unequipCosmetic(body));
+            runOnUiThread(() -> {
+                busyCosmeticId = "";
+                if (result.success) {
+                    toast("تمت إزالة ارتداء العنصر");
+                    loadCpCosmetics();
+                } else toast(result.error != null ? result.error : "تعذر إزالة العنصر");
+            });
+        });
+    }
+
     private void renderStore() {
         sectionTitle("متجر CP", "مظاهر وهدايا تضيف لمسة خاصة إلى رابطكما");
         LinearLayout banner = panel();
@@ -590,6 +791,7 @@ public class CpCenterActivity extends ThemedActivity {
         TextView blurb = text("إطارات مشتركة، تأثيرات دخول، بطاقات أسماء وهدايا مخصصة.", 12, MUTED, false);
         blurb.setPadding(0, dp(6), 0, dp(2));
         banner.addView(blurb);
+        renderCpCosmeticStore();
         if (loadingCatalog) {
             emptyState("💎", "جارٍ تحميل المتجر", "نحضر عناصر CP من الخادم…");
             return;
@@ -1280,7 +1482,7 @@ public class CpCenterActivity extends ThemedActivity {
         loadHome();
         loadRequests();
         if ("discover".equals(currentView) || "leaderboard".equals(currentView)) loadDiscover(discoverType);
-        if ("store".equals(currentView)) loadCatalog();
+        if ("store".equals(currentView)) { loadCatalog(); loadCpCosmetics(); }
         if ("memories".equals(currentView)) loadMemories();
         if ("tasks".equals(currentView)) loadTasks();
         Toast.makeText(this, "جارٍ تحديث بيانات CP…", Toast.LENGTH_SHORT).show();
