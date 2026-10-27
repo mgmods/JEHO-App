@@ -215,7 +215,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
     // Dashboard policy takes precedence when configured. It is additive-only and
     // reads the existing settings row; no schema migration or user data reset.
     const rows = await this.dataSource.query(
-      'SELECT value FROM settings WHERE key = $1 LIMIT 1',
+      'SELECT value FROM app_settings WHERE key = $1 LIMIT 1',
       ['mysterious_man_config'],
     );
     if (Array.isArray(rows) && rows.length > 0) {
@@ -244,6 +244,14 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       this.usersRepo.findOne({ where: { id: userId } }),
       this.activeMysteriousVip(userId),
     ]);
+
+    // Expiry or a dashboard-level feature disable takes effect immediately on status
+    // checks, not only when the periodic reconciliation timer next runs.
+    if (user?.mysteriousMode && !vip) {
+      user.mysteriousMode = false;
+      await this.usersRepo.save(user);
+    }
+
     const benefits = vip?.vipPlan?.benefits as any;
     const visuals = benefits?.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
     return {
