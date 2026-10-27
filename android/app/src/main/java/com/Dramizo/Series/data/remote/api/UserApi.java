@@ -151,6 +151,16 @@ public interface UserApi {
     @GET("cp/discover")
     Call<ApiResponse<List<Map<String, Object>>>> discoverCp(@Query("type") String type);
 
+
+    @GET("cp/memories")
+    Call<ApiResponse<List<Map<String, Object>>>> cpMemories();
+
+    @POST("cp/memories")
+    Call<ApiResponse<Map<String, Object>>> createCpMemory(@Body Map<String, String> body);
+
+    @DELETE("cp/memories/{id}")
+    Call<ApiResponse<Map<String, Object>>> deleteCpMemory(@Path("id") String id);
+
     @GET("cp/users/{id}")
     Call<ApiResponse<List<Map<String, Object>>>> cpProfileRelationships(@Path("id") String id);
 
