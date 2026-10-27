@@ -1453,7 +1453,40 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return map;
   }
 
-  /** Return room-only anonymous presentation when the user's current VIP grants it. */
+  /** Dashboard policy is authoritative; legacy plan benefits are only a pre-policy fallback. */
+  private async isMysteriousModeEligible(user: User | null | undefined, vip: UserVip | null | undefined): Promise<boolean> {
+    if (!user?.mysteriousMode || !vip || !vip.isActive) return false;
+    if (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) return false;
+    const level = Number(vip.level || 0);
+    if (!Number.isInteger(level) || level < 1 || level > 7) return false;
+
+    let policyRow: AppSetting | null = null;
+    try {
+      policyRow = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+    } catch {
+      return false; // fail closed if current eligibility cannot be verified
+    }
+    const benefits = vip.vipPlan?.benefits as any;
+    if (policyRow) {
+      let policy: any = {};
+      try {
+        policy = typeof policyRow.value === 'string'
+          ? JSON.parse(policyRow.value)
+          : (policyRow.value || {});
+      } catch {
+        return false;
+      }
+      const levels = Array.isArray(policy.eligibleVipLevels)
+        ? policy.eligibleVipLevels.map(Number).filter((n: number) =>
+            Number.isInteger(n) && n >= 1 && n <= 7)
+        : [];
+      return policy.enabled === true && levels.includes(level);
+    }
+    const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
+    return Array.isArray(extra) && extra.includes('mysterious_man');
+  }
+
+  /** Return room-only anonymous presentation only for an eligible, unexpired VIP. */
   private async mysteriousRoomIdentity(userId: string): Promise<Record<string, unknown> | null> {
     if (!userId) return null;
     const user = await this.usersRepo.findOne({ where: { id: userId } });
@@ -1463,9 +1496,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
+    if (!(await this.isMysteriousModeEligible(user, vip))) return null;
     const benefits = vip?.vipPlan?.benefits as any;
-    if (!Array.isArray(benefits?.extra) || !benefits.extra.includes('mysterious_man')) return null;
-    const visuals = benefits.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
+    const visuals = benefits?.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
     const customFrame = visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null);
     return {
       mysteriousMan: true,
