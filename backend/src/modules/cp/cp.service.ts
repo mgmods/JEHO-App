@@ -359,9 +359,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const key = String(input?.idempotencyKey || '').trim();
     const type = input?.type;
     if (!UUID_REGEX.test(recipientId) || !key || key.length > 128 || !TYPES.has(type)) {
-      throw new BadRequestException('بيانات طلب العلاقة غير مكتملة');
+      throw new BadRequestException('بيانات هدية CP غير مكتملة');
     }
-    if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء علاقة مع حسابك');
+    if (recipientId === userId) throw new BadRequestException('لا يمكنك إرسال هدية ارتباط إلى حسابك');
     const [typeEnabled] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
     if (String(typeEnabled?.value || 'true').toLowerCase() === 'false') {
       throw new BadRequestException('هذا النوع من علاقات CP متوقف حالياً من لوحة التحكم');
@@ -384,57 +384,57 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
          LIMIT 1 FOR UPDATE`,
         [[userId, recipientId]],
       );
-      if (active) throw new ConflictException('يجب إنهاء العلاقة الحالية قبل إرسال طلب ارتباط جديد');
+      if (active) throw new ConflictException('أحد الحسابين مرتبط بالفعل؛ لا يمكن إنشاء ارتباط آخر');
       const [pending] = await manager.query(
         `SELECT id FROM cp_requests WHERE
          (("fromUserId"=$1 AND "toUserId"=$2) OR ("fromUserId"=$2 AND "toUserId"=$1))
          AND type=$3 AND status='pending' AND "expiresAt">now() LIMIT 1 FOR UPDATE`,
         [userId, recipientId, type],
       );
-      if (pending) throw new ConflictException('يوجد طلب معلّق بينكما لهذا النوع');
+      if (pending) throw new ConflictException('يوجد طلب هدية ارتباط معلّق بينكما');
+      const [priceRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.price.${type}`]);
+      const price = Number(priceRow?.value);
+      if (!Number.isSafeInteger(price) || price <= 0) throw new BadRequestException('سعر هدية هذا النوع غير محدد من لوحة التحكم');
+      const [giftSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.gift.${type}`]);
+      const [gift] = giftSetting?.value
+        ? await manager.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true', [giftSetting.value])
+        : [];
+      if (!gift) throw new BadRequestException('يجب تحديد هدية فعلية لهذا النوع من لوحة التحكم');
+      const [wallet] = await manager.query('SELECT id, coins FROM wallets WHERE "userId"=$1 FOR UPDATE', [userId]);
+      if (!wallet) throw new NotFoundException('المحفظة غير موجودة');
+      const balance = Number(wallet.coins);
+      if (balance < price) throw new BadRequestException('رصيد العملات غير كافٍ لإرسال هدية CP');
       const [expiryRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', ['cp.policy.request_expiry_minutes']);
       const configuredExpiry = Number(expiryRow?.value);
       const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
         ? configuredExpiry : EXPIRY_MINUTES;
       const [request] = await manager.query(
-        `INSERT INTO cp_requests ("fromUserId","toUserId",type,status,"roomId","priceCoins","idempotencyKey","expiresAt","createdAt","updatedAt")
-         VALUES ($1,$2,$3,'pending',NULL,0,$4,now()+($5 || ' minutes')::interval,now(),now()) RETURNING *`,
-        [userId, recipientId, type, key, String(expiryMinutes)],
+        `INSERT INTO cp_requests ("fromUserId","toUserId",type,status,"roomId","priceCoins","giftId","giftName","giftIconUrl","giftAnimationUrl","idempotencyKey","expiresAt","createdAt","updatedAt")
+         VALUES ($1,$2,$3,'pending',NULL,$4,$5,$6,$7,$8,$9,now()+($10 || ' minutes')::interval,now(),now()) RETURNING *`,
+        [userId, recipientId, type, String(price), gift.id, gift.name, gift.iconUrl, gift.animationUrl, key, String(expiryMinutes)],
+      );
+      await manager.query('UPDATE wallets SET coins=coins-$1,"updatedAt"=now() WHERE "userId"=$2', [price, userId]);
+      await manager.query(
+        `INSERT INTO wallet_transactions ("userId",type,currency,amount,"balanceAfter","referenceType","referenceId",description,metadata,"createdAt")
+         VALUES ($1,'gift_send','coins',$2,$3,'cp_request',$4,$5,$6,now())`,
+        [userId, -price, balance - price, request.id, `هدية بدء CP - ${type}`, JSON.stringify({ type, recipientId, giftId: gift.id, giftName: gift.name, source: 'cp_gift_page' })],
       );
       return { request, created: true };
     });
-
-    // Notify only after the transaction commits. This stores an inbox notification,
-    // emits notification:new to an online recipient, and sends FCM when available.
     if (outcome.created) {
-      const [sender] = await this.dataSource.query(
-        'SELECT "displayName", username FROM users WHERE id=$1',
-        [userId],
-      );
+      const [sender] = await this.dataSource.query('SELECT "displayName", username FROM users WHERE id=$1', [userId]);
       const senderName = String(sender?.displayName || sender?.username || 'أحد المستخدمين');
       await this.notifications.notifyUser(
-        recipientId,
-        NotificationType.SYSTEM,
-        'طلب ارتباط جديد',
-        `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}. افتح مساحة CP لقبول الطلب أو رفضه.`,
-        {
-          type: 'cp_relationship_request',
-          notificationKind: 'cp_relationship_request',
-          requestId: outcome.request.id,
-          relationshipType: type,
-          senderId: userId,
-          recipientId,
-          route: 'cp',
-          actions: ['accept', 'reject'],
-        },
+        recipientId, NotificationType.SYSTEM, 'طلب ارتباط جديد',
+        `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}. وافق على الطلب لبدء العلاقة أو ارفضه.`,
+        { type: 'cp_relationship_request', notificationKind: 'cp_relationship_request', requestId: outcome.request.id,
+          relationshipType: type, senderId: userId, recipientId, route: 'cp', actions: ['accept', 'reject'], requestSource: 'cp_gift_page',
+          giftId: outcome.request.giftId, giftName: outcome.request.giftName, giftIconUrl: outcome.request.giftIconUrl,
+          priceCoins: outcome.request.priceCoins },
       );
       this.realtime.emitToUser(recipientId, 'cp:request', {
-        requestId: outcome.request.id,
-        senderId: userId,
-        senderName,
-        relationshipType: type,
-        title: 'طلب ارتباط جديد',
-        body: `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}.`,
+        requestId: outcome.request.id, senderId: userId, senderName, relationshipType: type,
+        title: 'هدية وطلب ارتباط جديد', body: `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}.`,
         actions: ['accept', 'reject'],
       });
     }
