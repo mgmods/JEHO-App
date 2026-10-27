@@ -114,6 +114,7 @@ public class CpCenterActivity extends ThemedActivity {
         buildHero(page);
         buildStats(page);
         buildNavigation(page);
+        updateNavigation();
         screenContent = new LinearLayout(this);
         screenContent.setOrientation(LinearLayout.VERTICAL);
         page.addView(screenContent, matchWrap());
@@ -165,7 +166,7 @@ public class CpCenterActivity extends ThemedActivity {
         LinearLayout hero = new LinearLayout(this);
         hero.setOrientation(LinearLayout.VERTICAL);
         hero.setPadding(dp(20), dp(19), dp(20), dp(20));
-        hero.setBackground(roundGradient(new int[]{0xFF8E285E, 0xFFD64E88, 0xFFE5B765}, dp(25)));
+        hero.setBackground(roundGradient(new int[]{0xFF9E245C, 0xFFD94383, 0xFFFF8DB8}, dp(25)));
         hero.setElevation(dp(3));
         page.addView(hero, matchWrap());
 
