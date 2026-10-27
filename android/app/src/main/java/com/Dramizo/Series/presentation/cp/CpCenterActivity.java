@@ -235,24 +235,24 @@ public class CpCenterActivity extends ThemedActivity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
-        card.setPadding(dp(5), dp(10), dp(5), dp(11));
-        card.setBackground(roundGradient(new int[]{Color.WHITE, 0xFFFFF5FA}, dp(18)));
-        card.setElevation(dp(2));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
-        lp.setMargins(dp(3), 0, dp(3), 0);
+        card.setPadding(dp(5), dp(13), dp(5), dp(13));
+        card.setBackground(roundGradient(new int[]{Color.WHITE, 0xFFFFF0F6}, dp(22)));
+        card.setElevation(dp(3));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(116), 1f);
+        lp.setMargins(dp(4), dp(2), dp(4), dp(2));
         row.addView(card, lp);
-        TextView heart = text("♥", 12, 0xFFE66A9C, true);
+        TextView heart = text("♥", 16, 0xFFE05B91, true);
         heart.setGravity(Gravity.CENTER);
-        heart.setBackground(round(0xFFFFE8F2, dp(12), 0xFFF8D4E3));
-        LinearLayout.LayoutParams heartLp = new LinearLayout.LayoutParams(dp(25), dp(22));
-        heartLp.bottomMargin = dp(4);
+        heart.setBackground(roundGradient(new int[]{0xFFFFD8E8, 0xFFFFEFF6}, dp(17)));
+        LinearLayout.LayoutParams heartLp = new LinearLayout.LayoutParams(dp(35), dp(31));
+        heartLp.bottomMargin = dp(6);
         card.addView(heart, heartLp);
-        TextView number = text(value, 20, ROSE, true);
+        TextView number = text(value, 25, 0xFFB82F6C, true);
         number.setGravity(Gravity.CENTER);
         card.addView(number);
-        TextView caption = text(label, 10, MUTED, false);
+        TextView caption = text(label, 11, INK, true);
         caption.setGravity(Gravity.CENTER);
-        caption.setPadding(0, dp(3), 0, 0);
+        caption.setPadding(0, dp(4), 0, 0);
         card.addView(caption);
         return number;
     }
@@ -344,74 +344,83 @@ public class CpCenterActivity extends ThemedActivity {
     }
 
     private void renderHome() {
-        sectionTitle("روابطك", "تابع علاقتك الحالية وتفاصيلها");
+        sectionTitle("روابطك", "مساحتكما الخاصة تبدأ من هنا");
         List<Map<String, Object>> active = new ArrayList<>();
-        for (Map<String, Object> row : homeData) {
-            if ("active".equals(str(row.get("status")))) active.add(row);
-        }
+        for (Map<String, Object> row : homeData) if ("active".equals(str(row.get("status")))) active.add(row);
         if (active.isEmpty()) {
-            emptyState("♡", "ما عندك علاقة نشطة حالياً",
-                    "اختَر نوع العلاقة وأرسل طلباً. لن تتفعّل أي علاقة قبل موافقة الطرف الآخر.");
-            TextView start = actionButton("إرسال طلب ارتباط", true);
-            screenContent.addView(start, matchWrap());
+            LinearLayout welcome = panel();
+            welcome.setGravity(Gravity.CENTER);
+            welcome.setPadding(dp(20), dp(22), dp(20), dp(22));
+            welcome.setBackground(roundGradient(new int[]{0xFFFFE0ED, 0xFFFFF5FA, 0xFFF0E6FA}, dp(26)));
+            screenContent.addView(welcome, matchWrap());
+            TextView bigHeart = text("♥", 56, 0xFFD94B88, true);
+            bigHeart.setGravity(Gravity.CENTER);
+            welcome.addView(bigHeart);
+            TextView heading = text("قصتكم تبدأ بخطوة", 19, INK, true);
+            heading.setGravity(Gravity.CENTER);
+            heading.setPadding(0, dp(5), 0, dp(4));
+            welcome.addView(heading);
+            TextView body = text("اختَر نوع الرابطة وأرسل دعوة. تبقى العلاقة بانتظار موافقة الطرف الآخر.", 13, MUTED, false);
+            body.setGravity(Gravity.CENTER);
+            body.setLineSpacing(dp(4), 1f);
+            welcome.addView(body);
+            TextView start = actionButton("＋  إرسال طلب ارتباط", true);
+            LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(-1, -2);
+            startLp.topMargin = dp(15);
+            welcome.addView(start, startLp);
             start.setOnClickListener(v -> showView("send"));
-        } else {
-            for (Map<String, Object> row : active) addRelationshipCard(row, false);
-        }
+        } else for (Map<String, Object> row : active) addRelationshipCard(row, false);
 
-        sectionTitle("اختر نوع الرابطة", "تصفّح الأنواع واختر ما يناسبكما");
+        sectionTitle("اختر نوع الرابطة", "كل نوع له طابعه الخاص");
         HorizontalScrollView typeScroller = new HorizontalScrollView(this);
         typeScroller.setHorizontalScrollBarEnabled(false);
         typeScroller.setClipToPadding(false);
-        typeScroller.setPadding(0, dp(2), 0, dp(8));
+        typeScroller.setPadding(0, dp(2), 0, dp(9));
         screenContent.addView(typeScroller, matchWrap());
         LinearLayout firstRow = new LinearLayout(this);
         firstRow.setOrientation(LinearLayout.HORIZONTAL);
         typeScroller.addView(firstRow, new HorizontalScrollView.LayoutParams(-2, -2));
-        String[][] types = {
-                {"love", "♥", "الحب", "رابطة عاطفية"},
-                {"marriage", "💞", "الزواج", "رابطة مميزة"},
-                {"engagement", "💍", "الخطوبة", "خطوة رسمية"},
-                {"friendship", "✦", "الصداقة", "رابطة صداقة"},
-                {"brotherhood", "♛", "الأخوّة", "رابطة أخوية"}
-        };
+        String[][] types = {{"love","♥","الحب","رابطة عاطفية"},{"marriage","💞","الزواج","رابطة مميزة"},{"engagement","💍","الخطوبة","خطوة رسمية"},{"friendship","✦","الصداقة","رابطة صداقة"},{"brotherhood","♛","الأخوّة","رابطة أخوية"}};
         for (int i = 0; i < types.length; i++) {
             final String type = types[i][0];
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setGravity(Gravity.CENTER);
-            card.setPadding(dp(12), dp(14), dp(12), dp(14));
-            card.setBackground(roundGradient(new int[]{0xFFFFFFFF, 0xFFFFF5FA}, dp(20)));
-            card.setElevation(dp(2));
+            card.setPadding(dp(13), dp(16), dp(13), dp(16));
+            card.setBackground(roundGradient(new int[]{Color.WHITE, 0xFFFFEDF5, 0xFFF7F0FC}, dp(24)));
+            card.setElevation(dp(3));
             card.setClickable(true);
             card.setFocusable(true);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(132), dp(124));
-            lp.setMargins(0, dp(3), dp(9), dp(3));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(158), dp(158));
+            lp.setMargins(dp(2), dp(4), dp(10), dp(5));
             firstRow.addView(card, lp);
-            TextView symbol = text(types[i][1], 24, ROSE, true);
+            FrameLayout iconFrame = new FrameLayout(this);
+            iconFrame.setBackground(roundGradient(new int[]{0xFFFFCFE2, 0xFFFFEAF3}, dp(25)));
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(60), dp(60));
+            iconLp.bottomMargin = dp(10);
+            card.addView(iconFrame, iconLp);
+            TextView symbol = text(types[i][1], 31, ROSE, true);
             symbol.setGravity(Gravity.CENTER);
-            symbol.setBackground(round(0xFFFFEAF3, dp(18), 0xFFF9D5E5));
-            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(46), dp(46));
-            iconLp.bottomMargin = dp(7);
-            card.addView(symbol, iconLp);
-            TextView name = text(types[i][2], 13, INK, true);
+            iconFrame.addView(symbol, new FrameLayout.LayoutParams(-1, -1));
+            TextView name = text(types[i][2], 15, INK, true);
             name.setGravity(Gravity.CENTER);
-            name.setPadding(0, dp(1), 0, dp(2));
             card.addView(name);
-            TextView detail = text(types[i][3], 10, MUTED, false);
+            TextView detail = text(types[i][3], 11, MUTED, false);
             detail.setGravity(Gravity.CENTER);
+            detail.setPadding(0, dp(4), 0, 0);
             card.addView(detail);
-            card.setOnClickListener(v -> {
-                currentType = type;
-                showView("send");
-            });
+            card.setOnClickListener(v -> { currentType = type; showView("send"); });
         }
-
-        sectionTitle("اكتشف المزيد من عالم CP", "افتح كل ميزة من واجهتها الأصلية داخل التطبيق");
-        addFeatureCard("🎯", "المهام والتحديات", "مهام مشتركة ومكافآت CP", "tasks");
-        addFeatureCard("💎", "متجر CP", "إطارات وتأثيرات ومظاهر مشتركة", "store");
-        addFeatureCard("🏆", "ترتيب الأزواج", "استكشف العلاقات حسب نقاطها", "leaderboard");
-        addFeatureCard("📖", "الذكريات والإنجازات", "وثّقوا رحلتكم المشتركة", "memories");
+        sectionTitle("اكتشف عالم CP", "كل ما تحتاجه لعلاقتكما في مكان واحد");
+        addFeatureCard("tasks", "المهام والتحديات", "إنجازات مشتركة ومكافآت يومية", "✦");
+        addFeatureCard("store", "متجر CP", "مظاهر وإطارات تضيف بصمتكما", "♧");
+        addFeatureCard("leaderboard", "قمة المتصدرين", "شاهد أجمل الروابط في JEHO", "♛");
+        addFeatureCard("memories", "ذكرياتنا", "احفظوا لحظاتكم وصوركم", "♡");
+        sectionTitle("طلبات الارتباط", "تابع الدعوات بكل سهولة");
+        addFeatureCard("incoming", "الطلبات الواردة", "قبول أو رفض الدعوات المرسلة إليك", "↓");
+        addFeatureCard("sent", "الطلبات المرسلة", "تابع حالة دعواتك", "↑");
+        addFeatureCard("discover", "العلاقات النشطة", "استكشف الروابط في مجتمع JEHO", "♥");
+        addFeatureCard("settings", "إعدادات العلاقة", "إدارة الروابط الحالية بأمان", "⚙");
     }
 
     private void renderSend() {
@@ -447,8 +456,7 @@ public class CpCenterActivity extends ThemedActivity {
         idInput.setTextSize(14);
         idInput.setTextColor(INK);
         idInput.setHintTextColor(MUTED);
-        idInput.setHint("أدخل ID المستخدم");
-        idInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        idInput.setHint("أدخل ID المستخدم");        idInput.setInputType(InputType.TYPE_CLASS_TEXT);
         idInput.setPadding(dp(15), dp(12), dp(15), dp(12));
         idInput.setBackground(round(Color.WHITE, dp(15), LINE));
         screenContent.addView(idInput, matchWrap());
@@ -549,49 +557,86 @@ public class CpCenterActivity extends ThemedActivity {
 
     private void addRelationshipCard(Map<String, Object> row, boolean publicList) {
         LinearLayout card = panel();
+        card.setPadding(dp(17), dp(18), dp(17), dp(18));
+        card.setBackground(roundGradient(new int[]{Color.WHITE, 0xFFFFF2F8, 0xFFF9F2FF}, dp(26)));
+        card.setElevation(dp(3));
         screenContent.addView(card, matchWrap());
+        TextView ribbon = text("♥  " + (publicList ? "علاقة نشطة" : "رابطكما الخاص"), 11, ROSE, true);
+        ribbon.setGravity(Gravity.CENTER);
+        ribbon.setPadding(dp(13), dp(7), dp(13), dp(7));
+        ribbon.setBackground(round(0xFFFFE4EF, dp(18), 0xFFF7D0E1));
+        card.addView(ribbon, matchWrap());
+
         Map<String, Object> self = map(row.get("self"));
         Map<String, Object> partner = map(row.get("partner"));
         if (self.isEmpty()) self = map(row.get("userA"));
         if (partner.isEmpty()) partner = map(row.get("userB"));
         LinearLayout pair = new LinearLayout(this);
         pair.setOrientation(LinearLayout.HORIZONTAL);
-        pair.setGravity(Gravity.CENTER_VERTICAL);
-        card.addView(pair, matchWrap());
-        addAvatar(pair, self, 48);
-        TextView heart = text("♥", 18, ROSE, true);
-        heart.setGravity(Gravity.CENTER);
-        pair.addView(heart, new LinearLayout.LayoutParams(dp(28), dp(42)));
-        addAvatar(pair, partner, 48);
+        pair.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams pairLp = new LinearLayout.LayoutParams(-1, -2);
+        pairLp.topMargin = dp(13);
+        card.addView(pair, pairLp);
+        addAvatar(pair, self, 92);
+        FrameLayout heartBadge = new FrameLayout(this);
+        heartBadge.setBackground(roundGradient(new int[]{0xFFFFC4DC, 0xFFFFE9F2}, dp(24)));
+        LinearLayout.LayoutParams heartLp = new LinearLayout.LayoutParams(dp(48), dp(48));
+        heartLp.setMargins(dp(5), 0, dp(5), 0);
+        pair.addView(heartBadge, heartLp);
+        TextView bigHeart = text("♥", 28, 0xFFBF2E70, true);
+        bigHeart.setGravity(Gravity.CENTER);
+        heartBadge.addView(bigHeart, new FrameLayout.LayoutParams(-1, -1));
+        addAvatar(pair, partner, 92);
+        TextView names = text(personName(self) + "  ♥  " + personName(partner), 17, INK, true);
+        names.setGravity(Gravity.CENTER);
+        names.setPadding(0, dp(12), 0, dp(3));
+        card.addView(names);
+        TextView type = text(typeName(str(row.get("type"))) + "  ·  المستوى " + defaultString(row.get("level"), "1"), 12, MUTED, false);
+        type.setGravity(Gravity.CENTER);
+        card.addView(type);
 
-        LinearLayout details = new LinearLayout(this);
-        details.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(0, -2, 1f);
-        detailLp.setMargins(dp(10), 0, 0, 0);
-        pair.addView(details, detailLp);
-        TextView names = text(personName(self) + " ♥ " + personName(partner), 13, INK, true);
-        details.addView(names);
-        TextView meta = text(typeName(str(row.get("type"))) + "  ·  المستوى " + defaultString(row.get("level"), "1"), 11, MUTED, false);
-        meta.setPadding(0, dp(4), 0, 0);
-        details.addView(meta);
-        TextView points = text(numberString(row.get("points")) + " نقطة", 11, ROSE, true);
-        points.setPadding(0, dp(4), 0, 0);
-        details.addView(points);
+        LinearLayout score = new LinearLayout(this);
+        score.setGravity(Gravity.CENTER);
+        score.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams scoreLp = new LinearLayout.LayoutParams(-1, -2);
+        scoreLp.topMargin = dp(14);
+        scoreLp.bottomMargin = dp(3);
+        card.addView(score, scoreLp);
+        LinearLayout pointsCard = new LinearLayout(this);
+        pointsCard.setOrientation(LinearLayout.VERTICAL);
+        pointsCard.setGravity(Gravity.CENTER);
+        pointsCard.setPadding(dp(8), dp(10), dp(8), dp(10));
+        pointsCard.setBackground(round(Color.WHITE, dp(17), 0xFFF4D4E2));
+        score.addView(pointsCard, new LinearLayout.LayoutParams(0, -2, 1f));
+        pointsCard.addView(text("♥", 15, ROSE, true));
+        pointsCard.addView(text(numberString(row.get("points")), 22, INK, true));
+        pointsCard.addView(text("نقاط العلاقة", 10, MUTED, false));
+        LinearLayout levelCard = new LinearLayout(this);
+        levelCard.setOrientation(LinearLayout.VERTICAL);
+        levelCard.setGravity(Gravity.CENTER);
+        levelCard.setPadding(dp(8), dp(10), dp(8), dp(10));
+        levelCard.setBackground(round(Color.WHITE, dp(17), 0xFFE8D9F4));
+        LinearLayout.LayoutParams levelLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        levelLp.setMargins(dp(8), 0, 0, 0);
+        score.addView(levelCard, levelLp);
+        levelCard.addView(text("✦", 15, 0xFF8B5AA7, true));
+        levelCard.addView(text(defaultString(row.get("level"), "1"), 22, INK, true));
+        levelCard.addView(text("مستوى الرابطة", 10, MUTED, false));
 
         String partnerId = str(partner.get("id"));
         if (!partnerId.isEmpty()) {
-            TextView profile = actionButton("عرض الملف الشخصي", false);
+            TextView profile = actionButton("عرض الملف الشخصي  ↗", true);
             LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(-1, -2);
-            plp.topMargin = dp(10);
+            plp.topMargin = dp(14);
             card.addView(profile, plp);
             profile.setOnClickListener(v -> UserProfileCardSheet.show(CpCenterActivity.this, partnerId));
         }
         if (!publicList && !"true".equals(String.valueOf(row.get("legacy")))) {
             TextView end = actionButton("إنهاء العلاقة", false);
             end.setTextColor(Color.rgb(173, 60, 56));
-            end.setBackground(round(0xFFFFEEEE, dp(13), 0xFFF6D7D7));
+            end.setBackground(round(0xFFFFEEEE, dp(16), 0xFFF6D7D7));
             LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(-1, -2);
-            elp.topMargin = dp(8);
+            elp.topMargin = dp(9);
             card.addView(end, elp);
             String relationId = str(row.get("id"));
             end.setOnClickListener(v -> new AlertDialog.Builder(this)
@@ -897,8 +942,7 @@ public class CpCenterActivity extends ThemedActivity {
         if (loadingDiscover) { emptyState("♥", "جارٍ تحميل الترتيب", "نحدّث قائمة العلاقات النشطة…"); return; }
         if (discoverData.isEmpty()) {
             emptyState("♥", "لا توجد نتائج حالياً", "سيظهر ترتيب الأزواج عند توفر علاقات نشطة.");
-            TextView refresh = actionButton("↻  تحديث الترتيب", true);
-            screenContent.addView(refresh, matchWrap());
+            TextView refresh = actionButton("↻  تحديث الترتيب", true);            screenContent.addView(refresh, matchWrap());
             refresh.setOnClickListener(v -> loadDiscover(""));
             return;
         }
@@ -1347,29 +1391,28 @@ public class CpCenterActivity extends ThemedActivity {
             backing.setTextColor(ROSE);
         }
     }
-
     private void sectionTitle(String title, @Nullable String subtitle) {
         LinearLayout block = new LinearLayout(this);
         block.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.topMargin = dp(14);
-        lp.bottomMargin = dp(9);
+        lp.topMargin = dp(17);
+        lp.bottomMargin = dp(11);
         screenContent.addView(block, lp);
         LinearLayout headingRow = new LinearLayout(this);
         headingRow.setOrientation(LinearLayout.HORIZONTAL);
         headingRow.setGravity(Gravity.CENTER_VERTICAL);
         block.addView(headingRow, matchWrap());
-        TextView heading = text(title, 17, INK, true);
+        TextView heading = text(title, 19, INK, true);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         headingRow.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView heart = text("♥", 13, ROSE, true);
+        TextView heart = text("♥", 15, ROSE, true);
         heart.setGravity(Gravity.CENTER);
-        heart.setBackground(round(0xFFFFEAF2, dp(12), 0xFFF7D7E5));
-        headingRow.addView(heart, new LinearLayout.LayoutParams(dp(29), dp(27)));
+        heart.setBackground(round(0xFFFFE5F0, dp(14), 0xFFF5D0E0));
+        headingRow.addView(heart, new LinearLayout.LayoutParams(dp(34), dp(32)));
         if (subtitle != null && !subtitle.isEmpty()) {
-            TextView sub = text(subtitle, 11, MUTED, false);
-            sub.setPadding(0, dp(4), 0, 0);
-            sub.setLineSpacing(dp(2), 1f);
+            TextView sub = text(subtitle, 12, MUTED, false);
+            sub.setPadding(0, dp(5), 0, 0);
+            sub.setLineSpacing(dp(3), 1f);
             block.addView(sub);
         }
     }
@@ -1399,25 +1442,25 @@ public class CpCenterActivity extends ThemedActivity {
     private LinearLayout panel() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(15), dp(15), dp(15), dp(15));
-        card.setBackground(roundGradient(new int[]{Color.WHITE, 0xFFFFFBFD}, dp(20)));
+        card.setPadding(dp(17), dp(17), dp(17), dp(17));
+        card.setBackground(roundGradient(new int[]{Color.WHITE, 0xFFFFFAFD}, dp(23)));
         card.setElevation(dp(2));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.setMargins(0, dp(5), 0, dp(7));
+        lp.setMargins(0, dp(6), 0, dp(8));
         card.setLayoutParams(lp);
         return card;
     }
 
     private TextView actionButton(String label, boolean primary) {
-        TextView button = text(label, 13, primary ? Color.WHITE : ROSE, true);
+        TextView button = text(label, 14, primary ? Color.WHITE : 0xFFB52D69, true);
         button.setGravity(Gravity.CENTER);
-        button.setMinHeight(dp(46));
-        button.setPadding(dp(16), dp(12), dp(16), dp(12));
+        button.setMinHeight(dp(52));
+        button.setPadding(dp(18), dp(13), dp(18), dp(13));
         if (primary) {
-            button.setBackground(roundGradient(new int[]{0xFFD94383, 0xFFAC2C68}, dp(15)));
-            button.setElevation(dp(2));
+            button.setBackground(roundGradient(new int[]{0xFFCB3A7A, 0xFF8F2054}, dp(17)));
+            button.setElevation(dp(3));
         } else {
-            button.setBackground(round(0xFFFFEFF6, dp(15), 0xFFF3D0E0));
+            button.setBackground(round(0xFFFFEDF5, dp(17), 0xFFF1C9DC));
         }
         button.setClickable(true);
         button.setFocusable(true);
