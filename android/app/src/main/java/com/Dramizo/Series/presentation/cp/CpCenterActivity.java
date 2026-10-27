@@ -177,44 +177,51 @@ public class CpCenterActivity extends ThemedActivity {
     private void buildHero(LinearLayout page) {
         LinearLayout hero = new LinearLayout(this);
         hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setPadding(dp(20), dp(19), dp(20), dp(20));
-        hero.setBackground(roundGradient(new int[]{0xFF9E245C, 0xFFD94383, 0xFFFF8DB8}, dp(25)));
-        hero.setElevation(dp(3));
+        hero.setPadding(dp(22), dp(22), dp(22), dp(22));
+        hero.setBackground(roundGradient(new int[]{0xFF701B48, 0xFFB92F70, 0xFFED75A5}, dp(30)));
+        hero.setElevation(dp(5));
         page.addView(hero, matchWrap());
-
-        TextView overline = text("JEHO  •  CP UNIVERSE", 10, 0xFFFFE8F0, true);
-        overline.setLetterSpacing(0.08f);
-        hero.addView(overline);
-
-        TextView heading = text("علاقتك… حكاية تستحق أن تُروى ♡", 21, Color.WHITE, true);
-        heading.setPadding(0, dp(8), 0, dp(3));
+        LinearLayout brand = new LinearLayout(this);
+        brand.setGravity(Gravity.CENTER_VERTICAL);
+        hero.addView(brand, matchWrap());
+        TextView emblem = text("♥", 23, Color.WHITE, true);
+        emblem.setGravity(Gravity.CENTER);
+        emblem.setBackground(roundGradient(new int[]{0x66FFFFFF, 0x22FFFFFF}, dp(20)));
+        brand.addView(emblem, new LinearLayout.LayoutParams(dp(46), dp(46)));
+        LinearLayout brandCopy = new LinearLayout(this);
+        brandCopy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams brandLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        brandLp.setMargins(dp(11), 0, 0, 0);
+        brand.addView(brandCopy, brandLp);
+        brandCopy.addView(text("JEHO  •  CP UNIVERSE", 10, 0xFFFFDCE9, true));
+        brandCopy.addView(text("عالم يجمع القلوب", 14, Color.WHITE, true));
+        TextView heading = text("لكل علاقة حكاية…", 27, Color.WHITE, true);
+        heading.setPadding(0, dp(18), 0, dp(4));
         hero.addView(heading);
-
-        TextView description = text(
-                "تابع روابطك وطلباتك، واصنعوا معاً ذكريات وإنجازات داخل JEHO.",
-                12, 0xFFFFF0F5, false);
-        description.setLineSpacing(dp(3), 1f);
+        TextView description = text("اصنعوا ذكرياتكم، أنجزوا تحدياتكم، وخلّوا رابطكم يحمل بصمتكم الخاصة.", 13, 0xFFFFEDF4, false);
+        description.setLineSpacing(dp(4), 1f);
         hero.addView(description);
-
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, -2);
-        actionsLp.topMargin = dp(14);
+        actionsLp.topMargin = dp(18);
         hero.addView(actions, actionsLp);
-        TextView start = text("＋  ابدأ رابطاً جديداً", 13, ROSE, true);
+        TextView start = text("＋  ابدأ رابطاً جديداً", 14, 0xFF922453, true);
         start.setGravity(Gravity.CENTER);
-        start.setPadding(dp(14), dp(11), dp(14), dp(11));
-        start.setBackground(round(Color.WHITE, dp(14), Color.TRANSPARENT));
+        start.setMinHeight(dp(50));
+        start.setPadding(dp(15), dp(12), dp(15), dp(12));
+        start.setBackground(round(Color.WHITE, dp(17), 0x55FFFFFF));
+        start.setElevation(dp(2));
         actions.addView(start, new LinearLayout.LayoutParams(0, -2, 1f));
         start.setOnClickListener(v -> showView("send"));
-
-        TextView invite = text("رمز الدعوة", 12, Color.WHITE, true);
+        TextView invite = text("♧  الدعوة", 12, Color.WHITE, true);
         invite.setGravity(Gravity.CENTER);
-        invite.setPadding(dp(12), dp(11), dp(12), dp(11));
-        invite.setBackground(round(0x35FFFFFF, dp(14), 0x55FFFFFF));
+        invite.setMinHeight(dp(50));
+        invite.setPadding(dp(13), dp(12), dp(13), dp(12));
+        invite.setBackground(round(0x30FFFFFF, dp(17), 0x77FFFFFF));
         LinearLayout.LayoutParams inviteLp = new LinearLayout.LayoutParams(-2, -2);
-        inviteLp.setMargins(dp(8), 0, 0, 0);
+        inviteLp.setMargins(dp(9), 0, 0, 0);
         actions.addView(invite, inviteLp);
         invite.setOnClickListener(v -> startActivity(new Intent(this, InvitationActivity.class)));
     }
@@ -448,7 +455,6 @@ public class CpCenterActivity extends ThemedActivity {
             lp.setMargins(0, 0, dp(7), 0);
             chips.addView(chip, lp);
             chip.setOnClickListener(v -> { currentType = type[0]; renderScreen(); });        }
-
         sectionTitle("معرّف المستخدم", null);
         EditText idInput = new EditText(this);
         idInput.setSingleLine(true);
@@ -897,8 +903,7 @@ public class CpCenterActivity extends ThemedActivity {
                 ImageView giftIcon = new ImageView(this);
                 giftIcon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
                 giftFrame.addView(giftIcon, new FrameLayout.LayoutParams(-1, -1));                Glide.with(this).load(iconUrl).into(giftIcon);
-            }
-            String desc = firstValue(item, "description", "subtitle", "details");
+            }            String desc = firstValue(item, "description", "subtitle", "details");
             String price = firstValue(item, "price", "priceCoins", "coinPrice", "cost", "coins");
             if ("false".equalsIgnoreCase(str(item.get("enabled")))) price = "غير مفعّل";
             copy.addView(text(title.isEmpty() ? "عنصر CP" : title, 14, INK, true));
@@ -1347,8 +1352,7 @@ public class CpCenterActivity extends ThemedActivity {
             any = true;
             addRelationshipCard(row, false);
         }
-        if (!any) {
-            emptyState("♡", "لا توجد علاقة نشطة", "يمكنك إرسال طلب جديد من الصفحة الرئيسية.");
+        if (!any) {            emptyState("♡", "لا توجد علاقة نشطة", "يمكنك إرسال طلب جديد من الصفحة الرئيسية.");
             TextView go = actionButton("العودة للرئيسية", true);
             screenContent.addView(go, matchWrap());
             go.setOnClickListener(v -> showView("home"));
@@ -1798,56 +1802,3 @@ public class CpCenterActivity extends ThemedActivity {
                     toast("تم إلغاء الطلب.");
                     loadRequests();
                 } else toast(result.error != null ? result.error : "تعذر إلغاء الطلب");
-            });
-        });
-    }
-
-    private void endRelationship(String relationshipId) {
-        if (relationshipId == null || relationshipId.trim().isEmpty()) return;
-        c.getIoExecutor().execute(() -> {
-            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().endCpRelationship(relationshipId));
-            runOnUiThread(() -> {
-                if (result.success) {
-                    toast("تم إنهاء العلاقة.");
-                    loadHome();
-                    loadDiscover("");
-                } else toast(result.error != null ? result.error : "تعذر إنهاء العلاقة");
-            });
-        });
-    }
-
-    private void toast(String message) {
-        if (isFinishing() || isDestroyed()) return;
-        Toast.makeText(this, message == null || message.trim().isEmpty() ? "حدث خطأ غير متوقع" : message,
-                Toast.LENGTH_LONG).show();
-    }
-
-
-    /** Draws portrait photos through a heart-shaped mask for the CP visual identity. */
-    private static class HeartImageView extends ImageView {
-        private final Path heartPath = new Path();
-        HeartImageView(android.content.Context context) {
-            super(context);
-            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-        }
-        @Override protected void onDraw(Canvas canvas) {
-            float w = getWidth(), h = getHeight();
-            if (w <= 0 || h <= 0) { super.onDraw(canvas); return; }
-            heartPath.reset();
-            heartPath.moveTo(w * 0.5f, h * 0.94f);
-            heartPath.cubicTo(w * 0.40f, h * 0.82f, w * 0.04f, h * 0.58f, w * 0.06f, h * 0.31f);
-            heartPath.cubicTo(w * 0.08f, h * 0.04f, w * 0.39f, h * 0.02f, w * 0.50f, h * 0.25f);
-            heartPath.cubicTo(w * 0.61f, h * 0.02f, w * 0.92f, h * 0.04f, w * 0.94f, h * 0.31f);
-            heartPath.cubicTo(w * 0.96f, h * 0.58f, w * 0.60f, h * 0.82f, w * 0.50f, h * 0.94f);
-            heartPath.close();
-            int save = canvas.save();
-            canvas.clipPath(heartPath);
-            super.onDraw(canvas);
-            canvas.restoreToCount(save);
-        }
-    }
-
-    @Override protected boolean wantsContentSystemPadding() { return false; }
-
-    @Override public void onBackPressed() { finish(); }
-}
