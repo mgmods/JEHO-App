@@ -68,12 +68,14 @@ public class CpCenterActivity extends ThemedActivity {
     private final List<Map<String, Object>> incomingData = new ArrayList<>();
     private final List<Map<String, Object>> sentData = new ArrayList<>();
     private final List<Map<String, Object>> discoverData = new ArrayList<>();
+    private final List<Map<String, Object>> catalogData = new ArrayList<>();
     private String currentView = "home";
     private String currentType = "love";
     private String discoverType = "";
     private boolean loadingHome;
     private boolean loadingRequests;
     private boolean loadingDiscover;
+    private boolean loadingCatalog;
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -120,6 +122,7 @@ public class CpCenterActivity extends ThemedActivity {
         loadHome();
         loadRequests();
         if ("discover".equals(currentView)) loadDiscover(discoverType);
+        if ("store".equals(currentView)) loadCatalog();
     }
 
     private void buildHeader() {
@@ -248,6 +251,11 @@ public class CpCenterActivity extends ThemedActivity {
         addNav(tabs, "الواردة", "incoming");
         addNav(tabs, "المرسلة", "sent");
         addNav(tabs, "العلاقات", "discover");
+        addNav(tabs, "المتجر", "store");
+        addNav(tabs, "المهام", "tasks");
+        addNav(tabs, "الترتيب", "leaderboard");
+        addNav(tabs, "الذكريات", "memories");
+        addNav(tabs, "الإعدادات", "settings");
     }
 
     private void addNav(LinearLayout tabs, String label, String view) {
@@ -292,6 +300,7 @@ public class CpCenterActivity extends ThemedActivity {
         if ("home".equals(currentView)) loadHome();
         else if ("incoming".equals(currentView) || "sent".equals(currentView)) loadRequests();
         else if ("discover".equals(currentView)) loadDiscover(discoverType);
+        else if ("store".equals(currentView)) loadCatalog();
     }
 
     private void renderScreen() {
@@ -303,6 +312,11 @@ public class CpCenterActivity extends ThemedActivity {
             case "incoming": renderIncoming(); break;
             case "sent": renderSent(); break;
             case "discover": renderDiscover(); break;
+            case "store": renderStore(); break;
+            case "tasks": renderPlannedPage("المهام والتحديات", "تحديات مشتركة وتقدم ومكافآت.", "يلزم ربط المهام وتسجيل التقدم والمكافآت بخدمة الخادم قبل تفعيلها."); break;
+            case "leaderboard": renderPlannedPage("ترتيب عالم CP", "ترتيب إقليمي وعالمي ومواسم.", "يلزم مصدر ترتيب موثوق من الخادم حتى لا تظهر نقاط أو نتائج وهمية."); break;
+            case "memories": renderPlannedPage("ذكرياتنا", "مكان يجمع لحظات العلاقة والإنجازات.", "يلزم ربط تخزين الذكريات وصلاحيات الخصوصية بالخادم."); break;
+            case "settings": renderSettings(); break;
             default: renderHome(); break;
         }
     }
@@ -557,6 +571,146 @@ public class CpCenterActivity extends ThemedActivity {
         }
     }
 
+
+    private void renderStore() {
+        sectionTitle("متجر CP", "مظاهر وهدايا تضيف لمسة خاصة إلى رابطكما");
+        LinearLayout banner = panel();
+        banner.setBackground(roundGradient(new int[]{0xFFFFE1EE, 0xFFFFF5FA, 0xFFF0E4FF}, dp(20)));
+        screenContent.addView(banner, matchWrap());
+        banner.addView(text("💗  اجعلوا رابطكم مميزاً", 17, INK, true));
+        TextView blurb = text("إطارات مشتركة، تأثيرات دخول، بطاقات أسماء وهدايا مخصصة.", 12, MUTED, false);
+        blurb.setPadding(0, dp(6), 0, dp(2));
+        banner.addView(blurb);
+        if (loadingCatalog) {
+            emptyState("💎", "جارٍ تحميل المتجر", "نحضر عناصر CP من الخادم…");
+            return;
+        }
+        if (catalogData.isEmpty()) {
+            emptyState("💎", "لا توجد عناصر متاحة حالياً", "تحقق من إعداد كتالوج CP في الخادم ثم حدّث الصفحة.");
+            TextView refresh = actionButton("إعادة تحميل المتجر", true);
+            screenContent.addView(refresh, matchWrap());
+            refresh.setOnClickListener(v -> loadCatalog());
+            return;
+        }
+        sectionTitle("العناصر المتاحة", "الأسعار والتوفر حسب الكتالوج");
+        for (Map<String, Object> item : catalogData) {
+            LinearLayout card = panel();
+            screenContent.addView(card, matchWrap());
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            card.addView(row, matchWrap());
+            TextView symbol = text("💝", 25, ROSE, true);
+            symbol.setGravity(Gravity.CENTER);
+            symbol.setBackground(round(0xFFFFEAF2, dp(15), LINE));
+            row.addView(symbol, new LinearLayout.LayoutParams(dp(54), dp(54)));
+            LinearLayout copy = new LinearLayout(this);
+            copy.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1f);
+            cp.setMargins(dp(12), 0, 0, 0);
+            row.addView(copy, cp);
+            String title = firstValue(item, "name", "title", "displayName", "label");
+            String desc = firstValue(item, "description", "subtitle", "details");
+            String price = firstValue(item, "price", "coinPrice", "cost", "coins");
+            copy.addView(text(title.isEmpty() ? "عنصر CP" : title, 14, INK, true));
+            if (!desc.isEmpty()) {
+                TextView sub = text(desc, 11, MUTED, false);
+                sub.setPadding(0, dp(4), 0, 0);
+                copy.addView(sub);
+            }
+            TextView priceView = text(price.isEmpty() ? "السعر حسب العنصر" : price + " 💎", 11, ROSE, true);
+            priceView.setPadding(0, dp(5), 0, 0);
+            copy.addView(priceView);
+            TextView detail = actionButton("التفاصيل", false);
+            LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, -2);
+            detailLp.topMargin = dp(10);
+            card.addView(detail, detailLp);
+            detail.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setTitle(title.isEmpty() ? "عنصر CP" : title)
+                    .setMessage((desc.isEmpty() ? "عنصر من كتالوج CP." : desc)
+                            + "\n\n" + (price.isEmpty() ? "لم يحدد الخادم سعراً لهذا العنصر." : "السعر: " + price)
+                            + "\n\nالشراء غير مفعّل حتى تتوفر واجهة شراء آمنة على الخادم.")
+                    .setPositiveButton("حسناً", (d, w) -> d.dismiss()).show());
+        }
+    }
+
+    private void renderPlannedPage(String title, String subtitle, String requirement) {
+        sectionTitle(title, subtitle);
+        LinearLayout hero = panel();
+        hero.setGravity(Gravity.CENTER);
+        hero.setPadding(dp(22), dp(24), dp(22), dp(24));
+        screenContent.addView(hero, matchWrap());
+        TextView heart = text("♡", 42, ROSE, true);
+        heart.setGravity(Gravity.CENTER);
+        hero.addView(heart);
+        TextView heading = text("مساحة مصممة لعلاقتكما", 16, INK, true);
+        heading.setGravity(Gravity.CENTER);
+        heading.setPadding(0, dp(8), 0, dp(5));
+        hero.addView(heading);
+        TextView body = text(subtitle, 12, MUTED, false);
+        body.setGravity(Gravity.CENTER);
+        body.setLineSpacing(dp(3), 1f);
+        hero.addView(body);
+        LinearLayout note = panel();
+        screenContent.addView(note, matchWrap());
+        note.addView(text("حالة الربط", 14, INK, true));
+        TextView details = text(requirement, 12, MUTED, false);
+        details.setPadding(0, dp(6), 0, 0);
+        details.setLineSpacing(dp(3), 1f);
+        note.addView(details);
+        TextView refresh = actionButton("تحديث بيانات CP", false);
+        screenContent.addView(refresh, matchWrap());
+        refresh.setOnClickListener(v -> refreshAll());
+    }
+
+    private void renderSettings() {
+        sectionTitle("إعدادات العلاقة", "إدارة العلاقة بوضوح وأمان");
+        boolean any = false;
+        for (Map<String, Object> row : homeData) {
+            if (!"active".equals(str(row.get("status")))) continue;
+            any = true;
+            addRelationshipCard(row, false);
+        }
+        if (!any) {
+            emptyState("♡", "لا توجد علاقة نشطة", "يمكنك إرسال طلب جديد من الصفحة الرئيسية.");
+            TextView go = actionButton("العودة للرئيسية", true);
+            screenContent.addView(go, matchWrap());
+            go.setOnClickListener(v -> showView("home"));
+        }
+        LinearLayout help = panel();
+        screenContent.addView(help, matchWrap());
+        help.addView(text("الخصوصية والأمان", 14, INK, true));
+        TextView detail = text("القبول والرفض وإنهاء العلاقة تُرسل إلى الخادم. لا تتغير حالة العلاقة محلياً قبل تأكيد نجاح العملية.", 12, MUTED, false);
+        detail.setPadding(0, dp(5), 0, 0);
+        help.addView(detail);
+    }
+
+    private String firstValue(Map<String, Object> values, String... keys) {
+        for (String key : keys) {
+            String value = str(values.get(key));
+            if (!value.isEmpty() && !"null".equals(value)) return value;
+        }
+        return "";
+    }
+
+    private void loadCatalog() {
+        if (loadingCatalog || isFinishing()) return;
+        loadingCatalog = true;
+        if ("store".equals(currentView)) renderScreen();
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = ApiCall.execute(c.getUserApi().cpCatalog());
+            List<Map<String, Object>> rows = result.success && result.data != null
+                    ? new ArrayList<>(result.data) : new ArrayList<>();
+            runOnUiThread(() -> {
+                loadingCatalog = false;
+                catalogData.clear();
+                catalogData.addAll(rows);
+                if ("store".equals(currentView)) renderScreen();
+                if (!result.success) toast(result.error != null ? result.error : "تعذر تحميل متجر CP");
+            });
+        });
+    }
+
     private void addFutureCard(String icon, String title, String subtitle, String explanation) {
         LinearLayout card = panel();
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
@@ -719,7 +873,8 @@ public class CpCenterActivity extends ThemedActivity {
 
     private String safeView(String value) {
         return "send".equals(value) || "incoming".equals(value) || "sent".equals(value)
-                || "discover".equals(value) ? value : "home";
+                || "discover".equals(value) || "store".equals(value) || "tasks".equals(value)
+                || "leaderboard".equals(value) || "memories".equals(value) || "settings".equals(value) ? value : "home";
     }
 
     private String safeType(String value) {
@@ -800,6 +955,7 @@ public class CpCenterActivity extends ThemedActivity {
         loadHome();
         loadRequests();
         if ("discover".equals(currentView)) loadDiscover(discoverType);
+        if ("store".equals(currentView)) loadCatalog();
         Toast.makeText(this, "جارٍ تحديث بيانات CP…", Toast.LENGTH_SHORT).show();
     }
 
