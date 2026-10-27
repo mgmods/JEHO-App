@@ -820,7 +820,10 @@ public class ProfileActivity extends ThemedActivity {
             runOnUiThread(() -> {
                 if (isFinishing() || binding == null) return;
                 if (!result.success || result.data == null || result.data.isEmpty()) {
-                    hideProfileCpRelationship();
+                    // Older accounts may still have their active CP stored in the legacy
+                    // social-bond ledger. Preserve that relationship instead of hiding it
+                    // just because the newer cp_relationships table has no row yet.
+                    loadLegacyOwnCpRelationship(targetId, ownAvatarUrl, ownFrameUrl);
                     return;
                 }
                 Map<String, Object> relation = result.data.get(0);
@@ -975,6 +978,48 @@ public class ProfileActivity extends ThemedActivity {
 
                 // Show exactly two portraits in the upper profile area: reuse the larger
                 // profile portrait slot for the linked pair instead of leaving a third copy.
+                if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
+                binding.rowProfileCp.setVisibility(View.VISIBLE);
+                binding.btnCpRequest.setVisibility(View.GONE);
+                startProfileCpHeartAnimation();
+            });
+        });
+    }
+
+    /**
+     * Backward-compatible display for the signed-in user's CP from the legacy social-bond API.
+     * This is read-only: it does not create, migrate, or change any relationship data.
+     */
+    private void loadLegacyOwnCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl) {
+        String myId = container != null ? container.getSessionManager().getUserId() : null;
+        if (myId == null || targetId == null || !myId.equals(targetId)) {
+            hideProfileCpRelationship();
+            return;
+        }
+        container.getIoExecutor().execute(() -> {
+            Result<com.Dramizo.Series.data.remote.dto.MiscDtos.CpStatusDto> legacy =
+                    com.Dramizo.Series.util.ApiCall.execute(container.getUserApi().myCp());
+            runOnUiThread(() -> {
+                if (isFinishing() || binding == null) return;
+                if (!legacy.success || legacy.data == null || !legacy.data.hasCp
+                        || legacy.data.partner == null) {
+                    hideProfileCpRelationship();
+                    return;
+                }
+                AuthDtos.UserDto partner = legacy.data.partner;
+                bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
+                bindRealCpAvatar(binding.imgProfileCpPartner, partner.avatarUrl);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(
+                        binding.imgProfileCpSelfFrame, ownFrameUrl);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(
+                        binding.imgProfileCpPartnerFrame, partner.vipBadgeUrl);
+                binding.tvProfileCpLabel.setVisibility(View.GONE);
+                binding.tvProfileCpCvType.setText("♥ علاقة CP");
+                binding.tvProfileCpCvHeart.setText("♥");
+                binding.tvProfileCpCvLevel.setText("Lv." + Math.max(1, legacy.data.level));
+                binding.tvProfileCpCvDays.setText("الارتباط السابق");
+                applyCpCardBackground("");
+                binding.rowProfileCpCv.setVisibility(View.VISIBLE);
                 if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
                 binding.rowProfileCp.setVisibility(View.VISIBLE);
                 binding.btnCpRequest.setVisibility(View.GONE);
