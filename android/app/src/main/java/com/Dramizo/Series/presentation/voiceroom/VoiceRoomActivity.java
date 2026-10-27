@@ -1721,6 +1721,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!ars.canResumeUi(roomId)) return false;
         RoomDtos.JoinRoomResult join = ars.session();
         if (join == null) return false;
+        // Keep the restored join result attached to this Activity. Subsequent minimize /
+        // onStop cycles use pendingSession to preserve the live RTC session and seat roster.
+        // Without this assignment, the second minimize could take the normal background-mute
+        // path even though Zego and the room session were still active.
+        pendingSession = join;
         resumedFromActiveSession = true;
         roomJoinLoadingDismissed = true;
         dismissRoomJoinLoading();
