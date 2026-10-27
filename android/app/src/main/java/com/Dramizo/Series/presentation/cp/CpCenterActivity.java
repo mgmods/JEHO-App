@@ -315,7 +315,7 @@ public class CpCenterActivity extends ThemedActivity {
     @Override public void onBackPressed() {
         if (web == null || !pageReady) { finish(); return; }
         web.evaluateJavascript("(window.getCpView && window.getCpView() !== 'home') ? (window.showView('home'), 'handled') : 'finish'", value -> {
-            if ("\\\"finish\\\"".equals(value)) finish();
+            if ("\"finish\"".equals(value)) finish();
         });
     }
 
