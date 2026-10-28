@@ -7,6 +7,11 @@ import android.content.pm.PackageManager
 import android.graphics.Outline
 import android.graphics.Typeface
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.LinearGradient
+import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.widget.Button
@@ -21,6 +26,8 @@ import android.view.ViewOutlineProvider
 import android.view.animation.Animation
 import android.view.animation.LinearInterpolator
 import android.view.animation.RotateAnimation
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.ScaleAnimation
 import android.widget.ImageView
 import android.widget.HorizontalScrollView
 import android.widget.TextView
@@ -539,13 +546,25 @@ class MainActivity : ThemedActivity() {
             background = roundedBackground(Color.rgb(255, 250, 232), 22, Color.rgb(226, 194, 112))
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = pad }
         }
-        val giftOrb = TextView(this).apply {
-            text = "🎁"
-            textSize = 52f
-            gravity = Gravity.CENTER
-            setPadding(pad, pad / 3, pad, pad / 3)
-            background = roundedBackground(Color.rgb(255, 255, 255), 48, Color.rgb(234, 207, 139))
-            contentDescription = "هدية تسجيل الدخول اليومية"
+        val giftOrb = ThreeDimensionalGiftView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                (126 * resources.displayMetrics.density).toInt(),
+                (112 * resources.displayMetrics.density).toInt(),
+            )
+            contentDescription = "صندوق هدية ثلاثي الأبعاد لمكافآت تسجيل الدخول"
+            elevation = 8 * resources.displayMetrics.density
+            startAnimation(
+                ScaleAnimation(
+                    0.97f, 1.03f, 0.97f, 1.03f,
+                    Animation.RELATIVE_TO_SELF, 0.5f,
+                    Animation.RELATIVE_TO_SELF, 0.5f,
+                ).apply {
+                    duration = 1800L
+                    repeatMode = Animation.REVERSE
+                    repeatCount = Animation.INFINITE
+                    interpolator = AccelerateDecelerateInterpolator()
+                },
+            )
         }
         giftHero.addView(giftOrb)
         giftHero.addView(TextView(this).apply {
@@ -574,13 +593,15 @@ class MainActivity : ThemedActivity() {
                 setPadding(pad / 2, pad / 2, pad / 2, pad / 2)
                 background = roundedBackground(
                     when {
-                        day.claimed -> Color.rgb(239, 249, 242)
-                        day.day == status.currentDay -> Color.rgb(255, 249, 229)
+                        day.claimed -> Color.rgb(237, 249, 241)
+                        day.day == 7 -> Color.rgb(255, 246, 218)
+                        day.day == status.currentDay -> Color.rgb(255, 248, 225)
                         else -> Color.rgb(255, 255, 255)
                     },
-                    16,
+                    if (day.day == 7) 18 else 16,
                     when {
                         day.claimed -> Color.rgb(58, 157, 92)
+                        day.day == 7 -> Color.rgb(188, 139, 32)
                         day.day == status.currentDay -> Color.rgb(210, 169, 58)
                         else -> Color.rgb(232, 224, 205)
                     },
@@ -589,10 +610,15 @@ class MainActivity : ThemedActivity() {
                     marginEnd = pad / 3
                 }
             }
+            tile.elevation = (if (day.day == 7 || day.day == status.currentDay) 3 else 0) * resources.displayMetrics.density
             tile.addView(TextView(this).apply {
-                text = "اليوم ${day.day}"
-                textSize = 11f
-                setTextColor(Color.rgb(57, 49, 34))
+                text = when {
+                    day.day == 7 -> "🏆 اليوم 7"
+                    day.day == status.currentDay -> "اليوم ${day.day} · الحالي"
+                    else -> "اليوم ${day.day}"
+                }
+                textSize = if (day.day == 7) 10f else 11f
+                setTextColor(if (day.day == 7) Color.rgb(143, 99, 13) else Color.rgb(57, 49, 34))
                 typeface = Typeface.DEFAULT_BOLD
             })
             val dayPreview = day.previewUrl ?: day.animationUrl
@@ -612,10 +638,24 @@ class MainActivity : ThemedActivity() {
                 })
             }
             tile.addView(TextView(this).apply {
-                text = if (day.claimed) "✓ تم الاستلام" else if (day.type == "coins") "${day.amount} كوينز" else "جائزة"
+                text = when {
+                    day.claimed -> "✓ تم الاستلام"
+                    day.day == 7 -> "الجائزة الكبرى"
+                    day.day == status.currentDay -> if (day.type == "coins") "${day.amount} كوينز" else (day.name ?: "مكافأة اليوم")
+                    day.type == "coins" -> "${day.amount} كوينز"
+                    else -> "مكافأة قادمة"
+                }
                 textSize = 9f
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(if (day.claimed) Color.rgb(42, 139, 78) else if (day.day == status.currentDay) Color.rgb(151, 111, 22) else Color.rgb(127, 119, 102))
+                setTextColor(
+                    when {
+                        day.claimed -> Color.rgb(42, 139, 78)
+                        day.day == 7 -> Color.rgb(143, 99, 13)
+                        day.day == status.currentDay -> Color.rgb(151, 111, 22)
+                        else -> Color.rgb(127, 119, 102)
+                    },
+                )
+                gravity = Gravity.CENTER
             })
             daysRow.addView(tile)
         }
@@ -652,6 +692,15 @@ class MainActivity : ThemedActivity() {
             }
             rewardPanel.addView(rewardImage)
         }
+        rewardPanel.elevation = 4 * resources.displayMetrics.density
+        rewardPanel.addView(TextView(this).apply {
+            text = if (status.currentDay == 7) "🏆 الجائزة الكبرى · اليوم السابع" else "مكافأة اليوم ${status.currentDay}"
+            textSize = 12f
+            setTextColor(Color.rgb(151, 111, 22))
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, pad / 5)
+        })
         rewardPanel.addView(TextView(this).apply {
             text = reward?.name ?: reward?.label ?: "مكافأة اليوم"
             textSize = 17f
@@ -709,6 +758,86 @@ class MainActivity : ThemedActivity() {
             }
         }
         dialog.show()
+    }
+
+    /** Native Canvas illustration: a softly lit, dimensional gift box (no WebView/assets required). */
+    private inner class ThreeDimensionalGiftView(context: android.content.Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val w = width.toFloat()
+            val h = height.toFloat()
+            if (w <= 0f || h <= 0f) return
+            val cx = w * 0.5f
+            val boxTop = h * 0.39f
+            val boxBottom = h * 0.88f
+            val half = w * 0.31f
+            val depth = w * 0.15f
+            val ribbon = w * 0.085f
+
+            paint.shader = android.graphics.RadialGradient(
+                cx, h * 0.52f, w * 0.47f,
+                intArrayOf(Color.argb(70, 255, 220, 125), Color.argb(0, 255, 220, 125)),
+                null, Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(cx, h * 0.5f, w * 0.47f, paint)
+            paint.shader = null
+            paint.color = Color.argb(45, 92, 62, 13)
+            canvas.drawOval(cx - half * 1.1f, boxBottom - 2, cx + half * 1.1f, boxBottom + h * 0.07f, paint)
+
+            val front = Path().apply {
+                moveTo(cx - half, boxTop)
+                lineTo(cx + half, boxTop)
+                lineTo(cx + half, boxBottom - h * 0.02f)
+                lineTo(cx - half, boxBottom - h * 0.02f)
+                close()
+            }
+            paint.shader = LinearGradient(cx - half, boxTop, cx + half, boxBottom,
+                intArrayOf(Color.rgb(255, 205, 76), Color.rgb(226, 151, 28), Color.rgb(178, 103, 14)),
+                null, Shader.TileMode.CLAMP)
+            canvas.drawPath(front, paint)
+            paint.shader = null
+
+            val side = Path().apply {
+                moveTo(cx + half, boxTop)
+                lineTo(cx + half + depth, boxTop - h * 0.07f)
+                lineTo(cx + half + depth, boxBottom - h * 0.09f)
+                lineTo(cx + half, boxBottom - h * 0.02f)
+                close()
+            }
+            paint.shader = LinearGradient(cx + half, boxTop, cx + half + depth, boxBottom,
+                intArrayOf(Color.rgb(199, 126, 17), Color.rgb(133, 74, 8)), null, Shader.TileMode.CLAMP)
+            canvas.drawPath(side, paint)
+            paint.shader = null
+
+            val lid = Path().apply {
+                moveTo(cx - half - w * 0.06f, boxTop)
+                lineTo(cx + half + w * 0.06f, boxTop)
+                lineTo(cx + half + depth + w * 0.04f, boxTop - h * 0.09f)
+                lineTo(cx - half + w * 0.02f, boxTop - h * 0.09f)
+                close()
+            }
+            paint.shader = LinearGradient(cx, boxTop - h * 0.1f, cx, boxTop,
+                intArrayOf(Color.rgb(255, 244, 190), Color.rgb(255, 211, 91), Color.rgb(204, 139, 30)),
+                null, Shader.TileMode.CLAMP)
+            canvas.drawPath(lid, paint)
+            paint.shader = null
+            paint.color = Color.rgb(255, 246, 204)
+            canvas.drawRect(cx - ribbon * 0.5f, boxTop - h * 0.005f, cx + ribbon * 0.5f, boxBottom, paint)
+            canvas.drawRect(cx - half, boxTop + h * 0.15f, cx + half, boxTop + h * 0.15f + ribbon * 0.55f, paint)
+
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = w * 0.045f
+            paint.color = Color.rgb(255, 238, 165)
+            canvas.drawOval(cx - w * 0.22f, boxTop - h * 0.19f, cx + w * 0.005f, boxTop - h * 0.055f, paint)
+            canvas.drawOval(cx - w * 0.005f, boxTop - h * 0.19f, cx + w * 0.22f, boxTop - h * 0.055f, paint)
+            paint.style = Paint.Style.FILL
+            paint.shader = LinearGradient(cx - ribbon, boxTop - h * 0.08f, cx + ribbon, boxTop,
+                intArrayOf(Color.rgb(255, 249, 213), Color.rgb(238, 177, 49)), null, Shader.TileMode.CLAMP)
+            canvas.drawCircle(cx, boxTop - h * 0.055f, w * 0.055f, paint)
+            paint.shader = null
+        }
     }
 
     private fun cosmeticTypeLabel(type: String): String = when (type.lowercase()) {
