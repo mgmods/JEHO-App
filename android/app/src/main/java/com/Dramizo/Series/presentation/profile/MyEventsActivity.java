@@ -116,19 +116,38 @@ public class MyEventsActivity extends ThemedActivity {
         loading = true;
         AppContainer c = ContainerProvider.from(this);
         c.getIoExecutor().execute(() -> {
-            Result<EventDtos.EventList> r = ApiCall.execute(c.getEventsApi().list("mine"));
+            // Load the public event square as well as the owner's private/ended events.
+            // Previously this screen requested only "mine", so other users never saw
+            // events created by someone else.
+            Result<EventDtos.EventList> publicResult =
+                    ApiCall.execute(c.getEventsApi().list("square"));
+            Result<EventDtos.EventList> mineResult =
+                    ApiCall.execute(c.getEventsApi().list("mine"));
+            java.util.LinkedHashMap<String, EventDtos.EventDto> merged =
+                    new java.util.LinkedHashMap<>();
+            if (publicResult.success && publicResult.data != null
+                    && publicResult.data.items != null) {
+                for (EventDtos.EventDto event : publicResult.data.items) {
+                    if (event != null && event.id != null) merged.put(event.id, event);
+                }
+            }
+            if (mineResult.success && mineResult.data != null
+                    && mineResult.data.items != null) {
+                for (EventDtos.EventDto event : mineResult.data.items) {
+                    if (event != null && event.id != null) merged.put(event.id, event);
+                }
+            }
+            String error = publicResult.error != null ? publicResult.error : mineResult.error;
             runOnUiThread(() -> {
                 loading = false;
                 binding.swipe.setRefreshing(false);
                 items.clear();
-                if (r.success && r.data != null && r.data.items != null) {
-                    items.addAll(r.data.items);
-                }
+                items.addAll(merged.values());
                 adapter.notifyDataSetChanged();
                 boolean empty = items.isEmpty();
                 binding.emptyState.setVisibility(empty ? View.VISIBLE : View.GONE);
                 binding.tvEmpty.setVisibility(View.VISIBLE);
-                if (r.error != null) ErrorToasts.show(this, r.error);
+                if (error != null && items.isEmpty()) ErrorToasts.show(this, error);
             });
         });
     }
@@ -319,6 +338,34 @@ public class MyEventsActivity extends ThemedActivity {
                 }
             });
         });
+    }
+
+    private void openEventRoom(@Nullable EventDtos.EventDto event) {
+        if (event == null) return;
+        if (event.roomId == null || event.roomId.trim().isEmpty()) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle(event.title != null ? event.title : getString(R.string.my_events))
+                    .setMessage(event.description != null && !event.description.trim().isEmpty()
+                            ? event.description : "لا توجد غرفة مرتبطة بهذه الفعالية.")
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+            return;
+        }
+        if ("ended".equalsIgnoreCase(event.status)) {
+            Toast.makeText(this, R.string.event_status_ended, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        com.Dramizo.Series.util.RoomJoinPrefetch.begin(this, event.roomId, null);
+        android.content.Intent intent = new android.content.Intent(
+                this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
+        intent.putExtra(
+                com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID,
+                event.roomId);
+        intent.putExtra(
+                com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY,
+                event.isAgencyRoom || (event.agencyId != null && !event.agencyId.isEmpty()));
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        startActivity(intent);
     }
 
     private void deleteEvent(EventDtos.EventDto event) {
@@ -512,8 +559,12 @@ public class MyEventsActivity extends ThemedActivity {
                 h.b.imgAgency.setVisibility(View.GONE);
             }
 
+            boolean mine = e.isHost;
+            h.b.btnEdit.setVisibility(mine ? View.VISIBLE : View.GONE);
+            h.b.btnDelete.setVisibility(mine ? View.VISIBLE : View.GONE);
             h.b.btnEdit.setOnClickListener(v -> promptCreateOrEdit(e));
             h.b.btnDelete.setOnClickListener(v -> deleteEvent(e));
+            h.itemView.setOnClickListener(v -> openEventRoom(e));
         }
 
         @Override
