@@ -2873,7 +2873,8 @@ export class GiftsService implements OnModuleInit {
     const coinPrice = Math.max(0, Number(gift.coinPrice) || 0);
     const totalCoins = coinPrice * qty * personCount;
     const ratioCap = isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio;
-    const cappedPerUnit = mintDiamondsPerUnit(coinPrice, gift.diamondValue, ratioCap);
+    // All-mic gifts use the same live ratio as regular sends; stale catalog values cannot reduce payouts.
+    const cappedPerUnit = mintDiamondsPerUnit(coinPrice, 0, ratioCap);
     const diamondPool = cappedPerUnit * qty * personCount;
 
     let luckyMultiplier: number | null = null;
