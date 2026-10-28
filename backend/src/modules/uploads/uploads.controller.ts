@@ -60,7 +60,7 @@ export class UploadsController {
           cb(null, `${uuidv4()}${extname(file.originalname).toLowerCase()}`);
         },
       }),
-      limits: { fileSize: 40 * 1024 * 1024 },
+      limits: { fileSize: 50 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         const allowed = /\.(jpg|jpeg|png|gif|webp|svg|svga|mp4|mp3|m4a|aac|wav|pdf|mov|webm|json)$/i;
         if (!allowed.test(extname(file.originalname))) {
