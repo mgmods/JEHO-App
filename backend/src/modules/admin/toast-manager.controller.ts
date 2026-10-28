@@ -16,6 +16,7 @@ const DEFAULT_TOAST_STYLE = {
   luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+  luckyWinHighRoom: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
 };
 
@@ -83,16 +84,19 @@ export class ToastManagerController {
       titleSizeSp: clampTextSize(source?.titleSizeSp, fallback.titleSizeSp || 13),
       bodySizeSp: clampTextSize(source?.bodySizeSp, fallback.bodySizeSp || 12),
       countSizeSp: clampTextSize(source?.countSizeSp, fallback.countSizeSp || 12),
+      placementX: clampPercent(source?.placementX, fallback.placementX ?? 50),
+      placementY: clampPercent(source?.placementY, fallback.placementY ?? 50),
     });
     const luckyWinNormal = winDefaults(parsed.luckyWinNormal, DEFAULT_TOAST_STYLE.luckyWinNormal);
     const luckyReturn = winDefaults(parsed.luckyReturn, DEFAULT_TOAST_STYLE.luckyReturn);
     const luckyWinHigh = winDefaults(parsed.luckyWinHigh, DEFAULT_TOAST_STYLE.luckyWinHigh);
+    const luckyWinHighRoom = winDefaults(parsed.luckyWinHighRoom, DEFAULT_TOAST_STYLE.luckyWinHighRoom);
     const luckyButton = {
       iconUrl: cleanUrl(parsed.luckyButton?.iconUrl),
       durationSeconds: clampSeconds(parsed.luckyButton?.durationSeconds, 5),
       pulseEnabled: parsed.luckyButton?.pulseEnabled !== false,
     };
-    return { ...DEFAULT_TOAST_STYLE, ...parsed, ...giftSend, giftSend, luckyWinNormal, luckyReturn, luckyWinHigh, luckyButton,
+    return { ...DEFAULT_TOAST_STYLE, ...parsed, ...giftSend, giftSend, luckyWinNormal, luckyReturn, luckyWinHigh, luckyWinHighRoom, luckyButton,
       version: Math.max(1, Math.round(Number(parsed.version) || 1)) };
   }
 
@@ -119,7 +123,7 @@ export class ToastManagerController {
       bodySizeSp: clampTextSize(body?.giftSend?.bodySizeSp, oldGift.bodySizeSp || 12),
       countSizeSp: clampTextSize(body?.giftSend?.countSizeSp, oldGift.countSizeSp || 12),
     };
-    const win = (key: 'luckyWinNormal' | 'luckyReturn' | 'luckyWinHigh') => {
+    const win = (key: 'luckyWinNormal' | 'luckyReturn' | 'luckyWinHigh' | 'luckyWinHighRoom') => {
       const old = previous[key] || DEFAULT_TOAST_STYLE[key];
       const input = body?.[key] || {};
       return {
@@ -139,6 +143,8 @@ export class ToastManagerController {
         titleSizeSp: clampTextSize(input.titleSizeSp, old.titleSizeSp || 13),
         bodySizeSp: clampTextSize(input.bodySizeSp, old.bodySizeSp || 12),
         countSizeSp: clampTextSize(input.countSizeSp, old.countSizeSp || 12),
+        placementX: clampPercent(input.placementX, old.placementX ?? 50),
+        placementY: clampPercent(input.placementY, old.placementY ?? 50),
       };
     };
     const luckyButton = {
@@ -151,7 +157,7 @@ export class ToastManagerController {
       shineEnabled: giftSend.shineEnabled,
       frameGlowEnabled: giftSend.frameGlowEnabled,
       durationSeconds: giftSend.durationSeconds,
-      giftSend, luckyWinNormal: win('luckyWinNormal'), luckyReturn: win('luckyReturn'), luckyWinHigh: win('luckyWinHigh'), luckyButton,
+      giftSend, luckyWinNormal: win('luckyWinNormal'), luckyReturn: win('luckyReturn'), luckyWinHigh: win('luckyWinHigh'), luckyWinHighRoom: win('luckyWinHighRoom'), luckyButton,
       version: previous.version + 1,
     };
     const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
@@ -170,9 +176,9 @@ export class ToastManagerController {
     }
     const verifyFields = [
       'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
-      'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
+      'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp', 'placementX', 'placementY',
     ];
-    for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh']) {
+    for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh', 'luckyWinHighRoom']) {
       for (const field of verifyFields) {
         if (Number(stored?.[key]?.[field]) !== Number(next[key]?.[field])) {
           throw new Error(`Toast setting did not persist: ${key}.${field}`);
