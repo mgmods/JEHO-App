@@ -472,22 +472,25 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             diamonds.setTypeface(null, android.graphics.Typeface.BOLD);
             header.addView(diamonds);
 
-            TextView dailySupport = new TextView(this);
-            dailySupport.setText("دعم اليوم: " + formatLong(Math.max(0L, member.dailyDiamonds))
-                    + " ◆  • الأسبوع: " + formatLong(Math.max(0L, member.weeklyDiamonds))
-                    + " ◆  • الشهر: " + formatLong(Math.max(0L, member.monthlyDiamonds)) + " ◆");
-            dailySupport.setTextColor(getColor(R.color.text_secondary));
-            dailySupport.setTextSize(11);
-            dailySupport.setPadding(dp(36), dp(5), 0, 0);
-            card.addView(dailySupport);
+            LinearLayout metrics = new LinearLayout(this);
+            metrics.setOrientation(LinearLayout.HORIZONTAL);
+            metrics.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams metricsParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            metricsParams.setMargins(dp(2), dp(12), dp(2), 0);
+            card.addView(metrics, metricsParams);
+            addHostMetric(metrics, "اليوم", member.dailyDiamonds);
+            addHostMetric(metrics, "الأسبوع", member.weeklyDiamonds);
+            addHostMetric(metrics, "الشهر", member.monthlyDiamonds);
 
             if (member.targetEnabled) {
                 String targetName = member.currentTargetName == null || member.currentTargetName.trim().isEmpty()
                         ? "التارجت الحالي" : member.currentTargetName;
                 TextView targetLine = new TextView(this);
-                targetLine.setText(targetName + " • المنجز " + formatLong(member.targetProgress)
-                        + " / " + formatLong(member.currentTargetThreshold)
-                        + " • المتبقي " + formatLong(member.targetRemaining));
+                targetLine.setText(targetName + "   •   المنجز "
+                        + formatLong(member.targetProgress) + " / "
+                        + formatLong(member.currentTargetThreshold)
+                        + "   •   المتبقي " + formatLong(member.targetRemaining));
                 targetLine.setTextColor(getColor(R.color.text_secondary));
                 targetLine.setTextSize(11);
                 targetLine.setPadding(dp(36), dp(8), 0, dp(4));
@@ -499,7 +502,19 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, dp(5));
                 progressParams.setMargins(dp(36), 0, 0, 0);
+                progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(
+                        getColor(R.color.agency_purple)));
+                progressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFECE7FF));
                 card.addView(progressBar, progressParams);
+
+                TextView forecast = new TextView(this);
+                forecast.setText("المتوقع بنهاية الشهر: "
+                        + formatLong(projectMonthlySupport(member.monthlyDiamonds)) + " ◆"
+                        + "   •   تقدير تقريبي حسب المعدل الحالي");
+                forecast.setTextColor(getColor(R.color.agency_purple));
+                forecast.setTextSize(10);
+                forecast.setPadding(dp(36), dp(7), 0, 0);
+                card.addView(forecast);
             } else {
                 TextView targetLine = new TextView(this);
                 targetLine.setText("التارجت غير مفعّل حالياً");
@@ -522,6 +537,44 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 btnMore.setText("عرض بقية الأعضاء (" + (stats.members.size() - count) + ")");
             }
         }
+    }
+
+    private void addHostMetric(LinearLayout parent, String label, long amount) {
+        LinearLayout metric = new LinearLayout(this);
+        metric.setOrientation(LinearLayout.VERTICAL);
+        metric.setGravity(android.view.Gravity.CENTER);
+        metric.setPadding(dp(3), dp(8), dp(3), dp(8));
+        metric.setBackgroundResource(R.drawable.bg_agency_menu_icon);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        params.setMargins(dp(3), 0, dp(3), 0);
+        parent.addView(metric, params);
+
+        TextView value = new TextView(this);
+        value.setText(formatLong(Math.max(0L, amount)));
+        value.setTextColor(getColor(R.color.agency_purple));
+        value.setTextSize(12);
+        value.setTypeface(null, android.graphics.Typeface.BOLD);
+        value.setGravity(android.view.Gravity.CENTER);
+        metric.addView(value);
+
+        TextView caption = new TextView(this);
+        caption.setText(label + " ◆");
+        caption.setTextColor(getColor(R.color.text_secondary));
+        caption.setTextSize(10);
+        caption.setGravity(android.view.Gravity.CENTER);
+        LinearLayout.LayoutParams captionParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        captionParams.topMargin = dp(2);
+        metric.addView(caption, captionParams);
+    }
+
+    private long projectMonthlySupport(long monthToDate) {
+        java.util.Calendar now = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+        int dayOfMonth = Math.max(1, now.get(java.util.Calendar.DAY_OF_MONTH));
+        int daysInMonth = now.getActualMaximum(java.util.Calendar.DAY_OF_MONTH);
+        if (monthToDate <= 0L) return 0L;
+        return Math.round((double) monthToDate * daysInMonth / dayOfMonth);
     }
 
     private void showAgencyMemberDetails(MiscDtos.AgencyMemberPeriodStatDto member, String roleLabel) {
