@@ -80,6 +80,8 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         tvBalanceDiamonds = findViewById(R.id.tvBalanceDiamonds);
         TextView title = findViewById(R.id.tvTitle);
         if (title != null) title.setText(R.string.agency_owner_dashboard_title);
+        View balanceCard = findViewById(R.id.sectionBalanceCard);
+        if (balanceCard != null) balanceCard.setBackgroundResource(R.drawable.bg_agency_balance_card);
         TextView balLab = findViewById(R.id.tvBalanceLabel);
         if (balLab != null) balLab.setText(R.string.dash_agency_current_balance);
 
@@ -407,7 +409,8 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setPadding(dp(12), dp(10), dp(12), dp(10));
-            card.setBackgroundResource(R.drawable.bg_dash_perf_cell);
+            card.setBackgroundResource(R.drawable.bg_dash_stat_card);
+            card.setElevation(dp(1));
             LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             cardParams.topMargin = dp(7);
