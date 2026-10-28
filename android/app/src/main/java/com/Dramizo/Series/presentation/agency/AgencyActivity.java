@@ -101,13 +101,8 @@ public class AgencyActivity extends ThemedActivity {
             }
         }, 8_000L);
         adapter = new AgencyAdapter(new AgencyAdapter.Listener() {
-            @Override public void onJoin(String agencyId) {
-                // Join is by private activation code only — focus the code field.
-                if (binding.cardJoinByCode.getVisibility() == View.VISIBLE) {
-                    binding.etActivationCode.requestFocus();
-                    Toast.makeText(AgencyActivity.this,
-                            R.string.agency_join_by_code_hint, Toast.LENGTH_SHORT).show();
-                }
+            @Override public void onJoin(MiscDtos.AgencyDto agency) {
+                showAgencyDetails(agency);
             }
             @Override public void onLeave(String agencyId) {
                 boolean pending = isPendingMembership(myAgency);
@@ -1422,6 +1417,178 @@ public class AgencyActivity extends ThemedActivity {
         if (binding.recycler != null) {
             binding.recycler.setVisibility(hasResults ? View.VISIBLE : View.GONE);
         }
+    }
+    
+    /** Premium agency details sheet opened from a search result. */
+    private void showAgencyDetails(MiscDtos.AgencyDto agency) {
+        if (agency == null || isFinishing()) return;
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(20), dp(18), dp(20), dp(22));
+        root.setBackgroundColor(android.graphics.Color.WHITE);
+
+        ImageView cover = new ImageView(this);
+        cover.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(156)));
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        String imageUrl = agency.coverUrl != null && !agency.coverUrl.trim().isEmpty()
+                ? agency.coverUrl : agency.logoUrl;
+        if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+            com.bumptech.glide.Glide.with(this)
+                    .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(imageUrl))
+                    .placeholder(R.drawable.icon_agency)
+                    .error(R.drawable.icon_agency)
+                    .into(cover);
+        } else {
+            cover.setImageResource(R.drawable.icon_agency);
+        }
+        cover.setBackgroundResource(R.drawable.bg_agency_hero);
+        root.addView(cover);
+
+        TextView name = new TextView(this);
+        name.setText(agency.name != null ? agency.name : getString(R.string.agency));
+        name.setTextColor(android.graphics.Color.rgb(39, 35, 62));
+        name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        name.setTypeface(null, android.graphics.Typeface.BOLD);
+        name.setGravity(Gravity.CENTER);
+        name.setPadding(0, dp(14), 0, dp(4));
+        root.addView(name);
+
+        if (agency.isVerified) {
+            TextView verified = new TextView(this);
+            verified.setText("✓ وكالة موثّقة");
+            verified.setTextColor(android.graphics.Color.rgb(105, 75, 190));
+            verified.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            verified.setGravity(Gravity.CENTER);
+            root.addView(verified);
+        }
+
+        TextView meta = new TextView(this);
+        meta.setText("ID " + (agency.publicId != null ? agency.publicId : "—")
+                + "   •   " + Math.max(0, agency.memberCount) + " عضو"
+                + "   •   " + Math.max(0, agency.followerCount) + " متابع");
+        meta.setTextColor(android.graphics.Color.rgb(111, 108, 127));
+        meta.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        meta.setGravity(Gravity.CENTER);
+        meta.setPadding(0, dp(8), 0, dp(12));
+        root.addView(meta);
+
+        TextView description = new TextView(this);
+        String desc = agency.description != null && !agency.description.trim().isEmpty()
+                ? agency.description.trim() : "اكتشف مجتمع الوكالة وتابع أخبارها ونشاطاتها.";
+        description.setText(desc);
+        description.setTextColor(android.graphics.Color.rgb(72, 69, 88));
+        description.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        description.setGravity(Gravity.CENTER);
+        description.setPadding(dp(4), 0, dp(4), dp(16));
+        root.addView(description);
+
+        com.google.android.material.button.MaterialButton follow =
+                new com.google.android.material.button.MaterialButton(this);
+        boolean following = Boolean.TRUE.equals(agency.isFollowing);
+        follow.setText(following ? "✓ تتابع الوكالة" : "متابعة");
+        follow.setTextAllCaps(false);
+        follow.setCornerRadius(dp(22));
+        follow.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                android.graphics.Color.rgb(111, 82, 190)));
+        follow.setTextColor(android.graphics.Color.WHITE);
+        root.addView(follow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+
+        TextView joinTitle = new TextView(this);
+        joinTitle.setText("طلب الانضمام إلى الوكالة");
+        joinTitle.setTextColor(android.graphics.Color.rgb(39, 35, 62));
+        joinTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        joinTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        joinTitle.setPadding(0, dp(20), 0, dp(8));
+        root.addView(joinTitle);
+
+        TextView codeHint = new TextView(this);
+        codeHint.setText("أدخل كود الانضمام الخاص بالوكالة لإرسال طلبك للإدارة.");
+        codeHint.setTextColor(android.graphics.Color.rgb(111, 108, 127));
+        codeHint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        root.addView(codeHint);
+
+        android.widget.EditText codeInput = new android.widget.EditText(this);
+        codeInput.setSingleLine(true);
+        codeInput.setHint("كود الوكالة");
+        codeInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+        codeInput.setPadding(dp(14), 0, dp(14), 0);
+        codeInput.setBackgroundResource(R.drawable.bg_agency_chip_off);
+        LinearLayout.LayoutParams codeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(50));
+        codeParams.topMargin = dp(10);
+        root.addView(codeInput, codeParams);
+
+        com.google.android.material.button.MaterialButton join =
+                new com.google.android.material.button.MaterialButton(this);
+        join.setText("إرسال طلب الانضمام");
+        join.setTextAllCaps(false);
+        join.setCornerRadius(dp(22));
+        join.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                android.graphics.Color.rgb(67, 211, 162)));
+        join.setTextColor(android.graphics.Color.WHITE);
+        LinearLayout.LayoutParams joinParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        joinParams.topMargin = dp(10);
+        root.addView(join, joinParams);
+
+        follow.setOnClickListener(v -> {
+            String id = agency.id;
+            if (id == null || id.trim().isEmpty()) {
+                Toast.makeText(this, "تعذر تحديد الوكالة", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            boolean wasFollowing = Boolean.TRUE.equals(agency.isFollowing);
+            follow.setEnabled(false);
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                Result<java.util.Map<String, Object>> result = ApiCall.execute(
+                        wasFollowing ? c.getAgencyApi().unfollowAgency(id)
+                                : c.getAgencyApi().followAgency(id));
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    follow.setEnabled(true);
+                    if (result.success) {
+                        agency.isFollowing = !wasFollowing;
+                        agency.followerCount = Math.max(0,
+                                agency.followerCount + (wasFollowing ? -1 : 1));
+                        follow.setText(agency.isFollowing ? "✓ تتابع الوكالة" : "متابعة");
+                        meta.setText("ID " + (agency.publicId != null ? agency.publicId : "—")
+                                + "   •   " + Math.max(0, agency.memberCount) + " عضو"
+                                + "   •   " + Math.max(0, agency.followerCount) + " متابع");
+                    } else {
+                        Toast.makeText(this, result.error != null ? result.error
+                                : "تعذرت متابعة الوكالة", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            });
+        });
+        join.setOnClickListener(v -> {
+            String publicId = agency.publicId != null ? agency.publicId.trim() : "";
+            String code = codeInput.getText() != null
+                    ? codeInput.getText().toString().trim() : "";
+            if (publicId.isEmpty()) {
+                Toast.makeText(this, "لا يتوفر معرف عام لهذه الوكالة", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (code.length() < 4) {
+                codeInput.setError("أدخل كود الوكالة الصحيح");
+                codeInput.requestFocus();
+                return;
+            }
+            join.setEnabled(false);
+            vm.joinByCode(publicId, code);
+            sheet.dismiss();
+        });
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void enterLiveAgency(String agencyId, String openRoomId) {
