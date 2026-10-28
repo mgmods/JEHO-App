@@ -3,6 +3,8 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.content.Intent;
 import android.app.Activity;
+import android.app.ProgressDialog;
+import android.content.DialogInterface;
 import android.content.res.AssetFileDescriptor;
 import android.media.MediaMetadataRetriever;
 import android.provider.MediaStore;
@@ -64,12 +66,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
 import okio.BufferedSink;
 import okio.Okio;
+import retrofit2.Call;
 import retrofit2.Response;
 
 public class ChatConversationActivity extends ThemedActivity {
@@ -651,15 +656,30 @@ public class ChatConversationActivity extends ThemedActivity {
 
     private void uploadAndSendVideo(@NonNull Uri uri) {
         if (conversationId == null || conversationId.isEmpty()) return;
-        Toast.makeText(this, "جارٍ رفع الفيديو…", Toast.LENGTH_SHORT).show();
         AppContainer c = ContainerProvider.from(this);
+        final long maxBytes = 50L * 1024L * 1024L;
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        AtomicReference<Call<ApiResponse<UploadApi.UploadResult>>> callRef = new AtomicReference<>();
+        ProgressDialog progress = new ProgressDialog(this);
+        progress.setTitle("إرسال الفيديو");
+        progress.setMessage("جارٍ تجهيز الفيديو ورفعه…");
+        progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        progress.setMax(100);
+        progress.setProgress(0);
+        progress.setCancelable(false);
+        progress.setButton(DialogInterface.BUTTON_NEGATIVE, "إلغاء", (dialog, which) -> {
+            cancelled.set(true);
+            Call<ApiResponse<UploadApi.UploadResult>> active = callRef.get();
+            if (active != null) active.cancel();
+            if (progress.isShowing()) progress.dismiss();
+        });
+        progress.show();
         c.getIoExecutor().execute(() -> {
             try {
                 String mimeType = getContentResolver().getType(uri);
                 if (mimeType == null || !mimeType.toLowerCase(java.util.Locale.US).startsWith("video/")) {
                     throw new IOException("الملف المحدد ليس فيديو صالحاً");
                 }
-                final long maxBytes = 50L * 1024L * 1024L;
                 long size = getVideoSize(uri, maxBytes);
                 if (size <= 0L) throw new IOException("تعذر قراءة حجم الفيديو");
                 if (size > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
@@ -667,31 +687,64 @@ public class ChatConversationActivity extends ThemedActivity {
                 String extension = "video/quicktime".equalsIgnoreCase(mimeType) ? ".mov"
                         : "video/webm".equalsIgnoreCase(mimeType) ? ".webm"
                         : "video/3gpp".equalsIgnoreCase(mimeType) ? ".3gp" : ".mp4";
+                progress.setMessage("جارٍ رفع الفيديو…");
                 RequestBody body = new RequestBody() {
                     @Override public MediaType contentType() { return MediaType.parse(mimeType); }
                     @Override public long contentLength() { return size; }
                     @Override public void writeTo(@NonNull BufferedSink sink) throws IOException {
                         try (InputStream input = getContentResolver().openInputStream(uri)) {
                             if (input == null) throw new IOException("تعذر فتح الفيديو");
-                            sink.writeAll(Okio.source(input));
+                            byte[] buffer = new byte[32 * 1024];
+                            long uploaded = 0L;
+                            int count;
+                            while ((count = input.read(buffer)) != -1) {
+                                if (cancelled.get()) throw new IOException("تم إلغاء رفع الفيديو");
+                                sink.write(buffer, 0, count);
+                                uploaded += count;
+                                final int value = (int) Math.min(100L, uploaded * 100L / size);
+                                runOnUiThread(() -> {
+                                    if (!cancelled.get() && progress.isShowing()) progress.setProgress(value);
+                                });
+                            }
+                            sink.flush();
                         }
                     }
                 };
                 MultipartBody.Part part = MultipartBody.Part.createFormData("file", "chat-video" + extension, body);
-                Response<ApiResponse<UploadApi.UploadResult>> resp = c.getUploadApi().upload(part).execute();
+                Call<ApiResponse<UploadApi.UploadResult>> call = c.getUploadApi().upload(part);
+                callRef.set(call);
+                if (cancelled.get()) {
+                    call.cancel();
+                    return;
+                }
+                Response<ApiResponse<UploadApi.UploadResult>> resp = call.execute();
+                if (cancelled.get()) return;
                 if (resp.isSuccessful() && resp.body() != null && resp.body().success
                         && resp.body().data != null && resp.body().data.url != null) {
                     String url = AssetCatalog.absoluteUrl(resp.body().data.url);
-                    runOnUiThread(() -> viewModel.sendVideo(conversationId, url, mimeType, size, durationSec));
+                    runOnUiThread(() -> {
+                        if (progress.isShowing()) progress.dismiss();
+                        viewModel.sendVideo(conversationId, url, mimeType, size, durationSec);
+                    });
                 } else {
                     String error = UploadApi.errorMessage(resp, "تعذر رفع الفيديو");
-                    runOnUiThread(() -> Toast.makeText(this, error, Toast.LENGTH_LONG).show());
+                    runOnUiThread(() -> {
+                        if (progress.isShowing()) progress.dismiss();
+                        Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+                    });
                 }
             } catch (Exception e) {
+                if (cancelled.get()) {
+                    runOnUiThread(() -> { if (progress.isShowing()) progress.dismiss(); });
+                    return;
+                }
                 String error = e.getMessage();
                 if (error == null || error.trim().isEmpty()) error = "تعذر رفع الفيديو";
                 final String message = error;
-                runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> {
+                    if (progress.isShowing()) progress.dismiss();
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                });
             }
         });
     }
