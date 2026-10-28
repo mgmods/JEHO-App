@@ -859,7 +859,6 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 if (poster != null) poster.setVisibility(View.GONE);
                 if (playButton != null) playButton.setVisibility(View.GONE);
                 video.setVisibility(View.VISIBLE);
-                video.setVideoURI(Uri.parse(fullUrl));
                 MediaController controls = new MediaController(holder.itemView.getContext());
                 controls.setAnchorView(video);
                 video.setMediaController(controls);
@@ -880,6 +879,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                     Toast.makeText(holder.itemView.getContext(), "تعذر تشغيل الفيديو", Toast.LENGTH_SHORT).show();
                     return true;
                 });
+                video.setVideoURI(Uri.parse(fullUrl));
             };
             if (poster != null) poster.setOnClickListener(startVideo);
             if (playButton != null) playButton.setOnClickListener(startVideo);
