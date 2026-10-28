@@ -31,6 +31,18 @@ export class CpController {
     return this.cp.catalog();
   }
 
+  @Get('leaderboard')
+  @ApiOperation({ summary: 'Server-calculated weekly or all-time CP leaderboard' })
+  leaderboard(@Query('period') period?: 'weekly' | 'world') {
+    return this.cp.leaderboard(period === 'world' ? 'world' : 'weekly');
+  }
+
+  @Get('rewards')
+  @ApiOperation({ summary: 'Configured CP level rewards from server settings' })
+  rewards() {
+    return this.cp.rewards();
+  }
+
   @Get('discover')
   @ApiOperation({ summary: 'Real active CP relationships, ranked by points' })
   discover(@Query('type') type?: CpType) {
