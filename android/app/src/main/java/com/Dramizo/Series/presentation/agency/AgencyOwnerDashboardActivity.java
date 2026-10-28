@@ -81,7 +81,14 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         TextView title = findViewById(R.id.tvTitle);
         if (title != null) title.setText(R.string.agency_owner_dashboard_title);
         View balanceCard = findViewById(R.id.sectionBalanceCard);
-        if (balanceCard != null) balanceCard.setBackgroundResource(R.drawable.bg_agency_balance_card);
+        if (balanceCard != null) {
+            android.graphics.drawable.GradientDrawable agencyBalanceBackground =
+                    new android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                            new int[]{0xFF8068F0, 0xFF6547D9, 0xFF4930B5});
+            agencyBalanceBackground.setCornerRadius(dp(22));
+            balanceCard.setBackground(agencyBalanceBackground);
+        }
         TextView balLab = findViewById(R.id.tvBalanceLabel);
         if (balLab != null) balLab.setText(R.string.dash_agency_current_balance);
 
