@@ -25,7 +25,7 @@ export class UploadsService implements OnModuleInit {
     private readonly moderation: ContentModerationService,
   ) {
     this.uploadDir = process.env.UPLOAD_DIR || this.configService.get<string>('app.uploadDir') || './uploads';
-    this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 40;
+    this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 50;
     const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() || ''; // Never fall back to the legacy JEHOO CHAT storage project.
     this.supabaseUrl = rawSupabaseUrl.endsWith('/') ? rawSupabaseUrl.slice(0, -1) : rawSupabaseUrl;
     this.storageKey =
