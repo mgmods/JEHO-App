@@ -1,202 +1,137 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="color-scheme" content="light">
-<title>مساحة CP</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#8d205f">
+<title>علاقات CP ❤️</title>
 <style>
-:root{--ink:#442b35;--muted:#927783;--rose:#c94d78;--gold:#d8a64d;--paper:#fff9f6;--line:#f0dce4;--shadow:0 8px 24px #6b294d12}
-*{box-sizing:border-box}html,body{max-width:100%;overflow-x:hidden}body{margin:0;background:linear-gradient(155deg,#fff9f3,#fff0f5 55%,#f8f0ff);font-family:system-ui,-apple-system,"Noto Sans Arabic",sans-serif;color:var(--ink);min-height:100vh}
-button,input{font:inherit}button{cursor:pointer;border:0;touch-action:manipulation}button:disabled{opacity:.55;cursor:default}
-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:calc(env(safe-area-inset-top) + 10px) 16px 12px;background:#fffaf5f2;backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
-.iconbtn{width:42px;height:42px;border-radius:15px;background:#fbe8ef;color:var(--rose);font-size:24px;flex:none}.headtext{flex:1}.headtext h1{font-size:20px;margin:0;font-weight:850}.headtext p{margin:3px 0 0;color:var(--muted);font-size:12px}
-main{max-width:760px;margin:auto;padding:14px 14px 34px}.hero{border-radius:25px;padding:22px 18px;background:linear-gradient(120deg,#a82f65,#e46b8d 58%,#e8b967);color:#fff;box-shadow:var(--shadow);position:relative;overflow:hidden}.hero:after{content:"♡";position:absolute;left:12px;top:-30px;font-size:130px;opacity:.13}.hero h2{font-size:23px;margin:0 0 8px}.hero p{font-size:13px;line-height:1.8;margin:0;max-width:90%;opacity:.95}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.stat{background:#fff;border:1px solid var(--line);border-radius:17px;text-align:center;padding:12px 5px;box-shadow:var(--shadow)}.stat b{display:block;font-size:19px;color:var(--rose)}.stat span{font-size:11px;color:var(--muted)}
-.tabs{display:flex;gap:7px;overflow:auto;padding:3px 0 12px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.chip{white-space:nowrap;padding:10px 15px;border-radius:22px;background:#fff;border:1px solid var(--line);color:var(--ink);font-size:13px;font-weight:750}.chip.active{background:var(--rose);color:#fff;border-color:var(--rose)}
-.sectionhead{display:flex;align-items:center;justify-content:space-between;margin:16px 2px 10px}.sectionhead h3{font-size:17px;margin:0}.smallbtn{background:#f9e4ec;color:#a63260;padding:8px 12px;border-radius:13px;font-size:12px;font-weight:800}
-.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px;margin:10px 0;box-shadow:var(--shadow)}.row{display:flex;align-items:center;gap:12px}.avatar{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#f6dce6;flex:none}.avatar-wrap{position:relative;display:inline-flex;flex:none;width:48px;height:48px}.avatar-wrap>.avatar{position:absolute;inset:0}.pair-avatars{display:flex;align-items:center;gap:5px;flex:none}.pair-avatars .avatar,.pair-avatars .avatar-wrap{width:42px;height:42px}.avatar-empty{display:grid;place-items:center;background:#fff0f5;border:1px solid #f0dce4;color:#bd3c70;font-weight:900}.info{flex:1;min-width:0}.name{font-weight:850;font-size:14px;overflow-wrap:anywhere}.sub{font-size:12px;color:var(--muted);margin-top:4px}.badge{display:inline-block;background:#fff0d5;color:#96611c;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:800;margin-top:6px}.score{color:#a63260;font-weight:850;font-size:13px;white-space:nowrap}
-.actions{display:flex;gap:8px;margin-top:12px}.btn{border-radius:14px;padding:11px 13px;font-size:13px;font-weight:850;flex:1}.primary{background:linear-gradient(110deg,#bd3c70,#df648c);color:white}.secondary{background:#fbe8ef;color:#a63260}.danger{background:#fcebea;color:#ad3c38}.quiet{background:#f5f1f4;color:#76606c}
-form{display:flex;gap:8px;margin-top:12px}input{min-width:0;flex:1;padding:12px;border:1px solid #e9cdd9;border-radius:14px;background:#fff;color:var(--ink);outline:none}input:focus{border-color:var(--rose);box-shadow:0 0 0 3px #c94d781c}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.typecard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:15px 10px;text-align:center;box-shadow:var(--shadow);color:var(--ink)}.typecard .symbol{font-size:26px;display:block;margin-bottom:6px}.typecard strong{display:block;font-size:14px}.typecard small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
-.empty,.state{padding:28px 16px;text-align:center;color:var(--muted);line-height:1.9;background:#fff;border:1px dashed #eacbd7;border-radius:18px;font-size:13px}.hidden{display:none!important}.notice{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:14px;right:14px;z-index:20;max-width:620px;margin:auto;padding:14px 16px;border-radius:16px;background:#34202d;color:#fff;box-shadow:0 10px 35px #32101e40;font-size:13px}.request-actions{display:flex;gap:8px;margin-top:12px}.request-actions button{flex:1}
-.cp-modal-backdrop{position:fixed;inset:0;z-index:50;background:#24101fc9;display:flex;align-items:center;justify-content:center;padding:22px}.cp-modal{width:100%;max-width:390px;background:#fffafc;border:1px solid #f1d1de;border-radius:24px;padding:22px 18px;box-shadow:0 22px 70px #16081266;text-align:center}.cp-modal h3{margin:8px 0;font-size:21px;color:#a63260}.cp-modal p{font-size:14px;line-height:1.9;margin:8px 0;color:var(--ink)}.cp-modal .modal-avatar{display:flex;justify-content:center;margin:8px auto}.cp-modal .modal-avatar .avatar,.cp-modal .modal-avatar .avatar-wrap{width:70px;height:70px}.cp-modal .request-actions{margin-top:18px}.cp-modal .request-actions .btn{min-height:46px}
-@media(min-width:560px){main{padding:20px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-
-:root{--ink:#38172b;--muted:#9d7186;--rose:#c52f70;--gold:#e5bd73;--paper:#fff8fc;--line:#f3d3e2;--shadow:0 12px 30px #6b294d13}
-body{padding-bottom:calc(82px + env(safe-area-inset-bottom));background:radial-gradient(ellipse at 12% 0%,#ffe0ee 0,transparent 35%),linear-gradient(155deg,#fffafd,#fff0f6 52%,#f5edff)}
-header{background:#fffaf5ed;border-bottom:1px solid #f2c9dc}
-.hero{background:radial-gradient(circle at 12% 12%,#f4b3d0 0,transparent 32%),linear-gradient(125deg,#70133f,#bd2e6b 48%,#ed8aab 78%,#e6bb6d 120%);border:1px solid #e7b7ca;box-shadow:0 18px 40px #8b1c4d26;padding:24px 20px 20px}
-.hero:after{content:"♡";font-size:170px;left:4px;top:-38px;color:#ffe5f0;opacity:.17}
-.hero-kicker{font-size:10px;letter-spacing:2px;font-weight:900;opacity:.85;margin-bottom:10px}.hero h2{font-size:25px;line-height:1.45;max-width:300px}
-.hero-actions{display:flex;gap:8px;margin-top:17px;position:relative;z-index:1}.hero-cta{border-radius:14px;padding:11px 13px;background:#fff;color:#9c2056;font-weight:850;font-size:12px}.hero-cta.outline{background:#ffffff20;border:1px solid #ffffff9c;color:#fff}
-.stat{border-radius:18px;background:linear-gradient(150deg,#fff,#fff4f9);border-color:#f0d0df;box-shadow:0 7px 20px #8b1c4d0c}.stat b{color:#bd2e6b;font-size:21px}
-.panel,.typecard{border-radius:22px;border-color:#f0d0df;box-shadow:0 10px 26px #7e1d4a0c}.typecard{padding:18px 11px;background:linear-gradient(145deg,#fff,#fff7fb 70%,#fff1f6);position:relative;overflow:hidden}
-.typecard:before{content:"";display:block;position:absolute;top:0;right:0;left:0;height:3px;background:linear-gradient(90deg,#e6b866,#e777a5,#c42f70)}
-.typecard .symbol{display:grid;place-items:center;width:52px;height:52px;border-radius:18px;margin:0 auto 9px;background:linear-gradient(145deg,#ffe0ee,#fff0d5,#f0e1ff);color:#b82d68;font-size:27px}
-.bottom-nav{position:fixed;z-index:15;bottom:0;left:0;right:0;padding:9px 8px calc(8px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:#fffaf5f2;border-top:1px solid #f0cfdd;backdrop-filter:blur(16px);box-shadow:0 -8px 28px #681b3a0b}
-.bottom-nav button{display:flex;flex-direction:column;align-items:center;gap:3px;background:transparent;color:#a27a8d;padding:5px 2px;border-radius:13px}.bottom-nav button span{font-size:22px;line-height:1.1}.bottom-nav button small{font-size:10px;font-weight:800}.bottom-nav button.active{background:#fce5ef;color:#b72c68}
-.store-hero{border-radius:24px;padding:20px;text-align:center;background:linear-gradient(135deg,#7c1748,#ca3c77 58%,#f1b9cd);color:white;margin:8px 0 14px;box-shadow:0 14px 28px #9a2d5b24}.store-hero h3{font-size:22px;margin:7px 0}.store-hero p{font-size:12px;margin:0;opacity:.9}.store-orb{margin:auto;width:60px;height:60px;display:grid;place-items:center;border-radius:22px;background:linear-gradient(145deg,#fff4d3,#e9bd70);color:#8d4d20;font-size:32px}
-.room-gift-callout{background:linear-gradient(120deg,#fff0f7,#fff8e9,#f6edff);border:1px solid #e7c17d}main{padding-bottom:24px}
-\n.pulse-heart{display:inline-block;color:#ffb7d2;animation:cpHeartBeat 1.1s ease-in-out infinite;text-shadow:0 0 12px #ff9cc6}.ranking-note{margin:0 0 12px;padding:0 4px;line-height:1.8}.leaderboard-card{position:relative;overflow:hidden;padding-top:26px;border:1px solid #edbfd2;background:linear-gradient(135deg,#fff 0%,#fff6fb 52%,#fff8e9 100%)}.leaderboard-card:before{content:"";position:absolute;inset:5px;border:1px solid #edc87d;border-radius:15px;pointer-events:none}.rank-ribbon{position:absolute;top:0;right:0;z-index:1;padding:5px 12px;border-radius:0 0 0 13px;background:linear-gradient(110deg,#9d2b61,#e4b75c);color:#fff;font-size:11px;font-weight:900;letter-spacing:.3px}.rank-one{border-color:#d7ae4e;box-shadow:0 12px 28px #c89a3826}.rank-one .rank-ribbon{background:linear-gradient(100deg,#7c4c12,#e8c56a,#a97921)}.rank-two .rank-ribbon{background:linear-gradient(100deg,#6f7785,#dce1e9,#737d8e);color:#292d35}.rank-three .rank-ribbon{background:linear-gradient(100deg,#8e5638,#d99b70,#98512d)}.ornate-pair{position:relative;padding:5px;border:2px solid #e3bd68;border-radius:24px;background:linear-gradient(135deg,#fff4f9,#fff8e7);gap:3px}.ornate-pair .avatar{border:2px solid #fff;box-shadow:0 0 0 1px #d99ab6}.pair-heart{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;color:#d72f72;background:#fff;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;box-shadow:0 2px 8px #aa35612b;animation:cpHeartBeat 1.1s ease-in-out infinite}.score small{display:block;font-size:10px;font-weight:700;color:#977184}@keyframes cpHeartBeat{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}@media(prefers-reduced-motion:reduce){.pulse-heart,.pair-heart{animation:none}}\n\n.task-card{border:1px solid #edc7d8;background:linear-gradient(135deg,#fff,#fff7fb)}.task-progress-meta{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#927184}.task-progress-meta strong{margin-inline-start:auto;color:#54233d}.task-progress-meta b{color:#bf3f76}.task-progress-track{height:9px;margin-top:7px;border-radius:20px;overflow:hidden;background:#f4e2eb;border:1px solid #efd3e0}.task-progress-track span{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,#b82f6a,#ed7ba8,#e6bd62);transition:width .35s ease}.task-state{margin-top:9px;font-weight:750}.task-reward{margin-top:8px;padding:8px 10px;border-radius:12px;background:#fff0f6;color:#9d2c61;font-size:12px;font-weight:800}\n
-/* CP luxury motion layer: rose-gold visual language */
-body:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.45;background:radial-gradient(circle at 85% 18%,#ffd0e3 0 2px,transparent 3px),radial-gradient(circle at 12% 38%,#edbed2 0 2px,transparent 3px),radial-gradient(circle at 78% 68%,#e8c982 0 2px,transparent 3px);background-size:170px 190px,230px 240px,280px 260px;animation:cpGlimmer 12s ease-in-out infinite alternate}
-header,main,.bottom-nav{position:relative;z-index:1}
-.hero{isolation:isolate}
-.hero:before{content:"";position:absolute;z-index:-1;width:150px;height:150px;left:-36px;bottom:-68px;border:2px solid #f4d18a;border-radius:50%;box-shadow:0 0 0 8px #ffffff0d,0 0 0 18px #f4d18a22,0 0 35px #ffb9d2;animation:cpRingFloat 5s ease-in-out infinite}
-.hero:after{content:"♡";animation:cpHeroHeart 2.1s ease-in-out infinite}
-.hero-kicker{color:#ffe8b5}
-.hero-actions .hero-cta{box-shadow:0 5px 15px #4e0c2a20;transition:transform .2s ease,box-shadow .2s ease}
-.hero-actions .hero-cta:active,.btn:active,.typecard:active{transform:scale(.98)}
-.panel{position:relative;overflow:hidden}
-#homeRelationships .panel{background:linear-gradient(135deg,#fff 0%,#fff5fa 62%,#fff9e9 100%);border:1px solid #e7c27b;box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 4px #f1d8a5,0 12px 28px #8b1c4d0c}
-#homeRelationships .pair-avatars{padding:5px;border:2px solid #e3bd68;border-radius:24px;background:linear-gradient(135deg,#fff0f7,#fff8e7);position:relative}
-#homeRelationships .pair-avatars:after,.ornate-pair:after{content:"";position:absolute;inset:-4px;border:1px solid #f0d08b;border-radius:28px;pointer-events:none;animation:cpGoldRing 3.4s ease-in-out infinite}
-#homeRelationships .pair-avatars .avatar{border:2px solid white;box-shadow:0 0 0 1px #d99ab6}
-#homeRelationships .pair-avatars .avatar+.avatar{margin-right:-7px}
-.ornate-pair{box-shadow:0 4px 15px #b13c6a18}
-.ornate-pair:before{content:"";position:absolute;inset:-7px;border:1px solid #e5c16e;border-radius:30px;opacity:.72;pointer-events:none;animation:cpGoldRing 3.4s ease-in-out infinite reverse}
-.pair-heart{animation:cpHeartBeat 1.05s ease-in-out infinite,cpHeartGlow 2.2s ease-in-out infinite}
-.leaderboard-card{background:radial-gradient(ellipse at 15% 0%,#ffe7f1 0,transparent 48%),linear-gradient(135deg,#fff 0%,#fff6fb 54%,#fff8e8 100%)}
-.rank-one{background:radial-gradient(ellipse at 50% 0%,#ffe6a8 0,transparent 42%),linear-gradient(135deg,#fffdf7,#fff2f8 58%,#fff8e8)}
-.rank-one .ornate-pair{border-color:#e4b64e;box-shadow:0 0 0 3px #f7e9c7,0 0 24px #e5bd7340}
-.rank-one .pair-heart{background:linear-gradient(145deg,#fff,#fff2d0);color:#c52f70}
-.floating-hearts{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
-.floating-heart{position:absolute;bottom:-36px;color:#d84c83;opacity:0;filter:drop-shadow(0 2px 5px #e88bb033);animation:cpFloatHeart var(--duration,12s) linear infinite;animation-delay:var(--delay,0s);font-size:var(--size,14px)}
-@keyframes cpHeroHeart{0%,100%{transform:scale(1) rotate(-5deg)}50%{transform:scale(1.08) rotate(5deg)}}
-@keyframes cpRingFloat{0%,100%{transform:translateY(0) scale(1);opacity:.72}50%{transform:translateY(-8px) scale(1.04);opacity:1}}
-@keyframes cpGoldRing{0%,100%{transform:scale(1);opacity:.65}50%{transform:scale(1.025);opacity:1}}
-@keyframes cpHeartGlow{0%,100%{box-shadow:0 2px 8px #aa35612b}50%{box-shadow:0 0 15px #ec79ad77}}
-@keyframes cpGlimmer{0%{opacity:.25;transform:translateY(0)}100%{opacity:.55;transform:translateY(-8px)}}
-@keyframes cpFloatHeart{0%{transform:translate3d(0,0,0) rotate(-12deg) scale(.75);opacity:0}12%{opacity:.42}75%{opacity:.28}100%{transform:translate3d(var(--drift,24px),-115vh,0) rotate(20deg) scale(1.15);opacity:0}}
-@media(prefers-reduced-motion:reduce){body:before,.hero:before,.hero:after,#homeRelationships .pair-avatars:after,.ornate-pair:before,.pair-heart,.floating-heart{animation:none!important}}
-
-
-/* Final polish: prominent TOP 1 treatment and live local time */
-.header-live-time{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:62px;padding:6px 8px;border:1px solid #e8c779;border-radius:13px;background:linear-gradient(145deg,#fff9e9,#ffeaf3);color:#8c2854;line-height:1.25;box-shadow:0 4px 12px #8b1c4d0c}
-.header-live-time strong{font-size:12px;font-variant-numeric:tabular-nums;letter-spacing:.2px}
-.header-live-time small{font-size:9px;color:#9c7185;font-weight:800;margin-top:2px}
-.rank-one{isolation:isolate;border:1px solid #e3b64e!important;box-shadow:0 0 0 1px #f7e6b5,0 14px 34px #d3a33d35,inset 0 0 0 3px #fff9e9!important;animation:cpTopOneGlow 3s ease-in-out infinite}
-.rank-one:after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(115deg,transparent 15%,#fff8d866 38%,transparent 56%);transform:translateX(120%);animation:cpTopOneShine 5s ease-in-out infinite}
-.rank-one .rank-ribbon{padding:7px 14px;border-radius:0 0 0 15px;background:linear-gradient(105deg,#75470d,#e7c25f 48%,#9d6c1d);box-shadow:0 4px 12px #7b511c33;color:#fffdf4;text-shadow:0 1px 2px #70400d55;animation:cpCrownFloat 2.6s ease-in-out infinite}
-.rank-one .rank-ribbon:before{content:"♛ ";font-size:13px}
-.rank-one .name{color:#8f2555}
-.rank-one .score{color:#9d6715;text-shadow:0 0 12px #edcf7c55}
-.rank-one .ornate-pair{border-color:#e5bc59;box-shadow:0 0 0 3px #f8edce,0 0 0 6px #e7c56b28,0 0 25px #e5bd7350}
-@keyframes cpTopOneGlow{0%,100%{box-shadow:0 0 0 1px #f7e6b5,0 12px 28px #d3a33d20,inset 0 0 0 3px #fff9e9}50%{box-shadow:0 0 0 2px #e5c56f,0 16px 38px #d3a33d45,inset 0 0 0 3px #fff5d9}}
-@keyframes cpTopOneShine{0%,65%,100%{transform:translateX(120%);opacity:0}72%{opacity:1}88%{transform:translateX(-120%);opacity:.65}}
-@keyframes cpCrownFloat{0%,100%{filter:drop-shadow(0 0 0 #ffe5a0);transform:translateY(0)}50%{filter:drop-shadow(0 2px 5px #ffe5a0);transform:translateY(-2px)}}
-@media(max-width:370px){.header-live-time{min-width:54px;padding:5px 5px}.header-live-time strong{font-size:11px}.headtext h1{font-size:18px}}
-@media(prefers-reduced-motion:reduce){.rank-one,.rank-one:after,.rank-one .rank-ribbon{animation:none!important}}
-
-
-
+:root{--pink:#ff70ad;--gold:#ffda72;--bg:#31072d;--text:#fff4fb;--muted:#dfbdd3}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Tahoma,sans-serif;color:var(--text);background:radial-gradient(ellipse at top,#c14c8b,transparent 55%),linear-gradient(160deg,#a52f70,#641449 50%,#25031f);min-height:100vh}
+button{font:inherit;cursor:pointer;color:inherit}
+.app{max-width:620px;margin:auto;min-height:100vh;padding-bottom:100px}
+header{display:flex;align-items:center;justify-content:space-between;padding:20px}
+header h1{color:var(--gold);font-size:25px;margin:0}
+header button{background:none;border:0;font-size:28px}
+.content{padding:0 16px}
+.panel{border:1px solid #ffffff30;background:#ffffff12;border-radius:25px;padding:17px;margin:12px 0 20px;box-shadow:0 8px 25px #22001d35}
+.title{text-align:center;color:var(--gold);font-size:22px;margin:12px 0 18px}
+.pair{display:grid;grid-template-columns:1fr 70px 1fr;align-items:center;gap:5px;text-align:center;min-height:150px}
+.person{display:flex;flex-direction:column;align-items:center;gap:10px;min-width:0}
+.avatar{width:clamp(78px,23vw,125px);aspect-ratio:1;border-radius:50%;border:5px solid var(--gold);background:linear-gradient(135deg,#ffe5f4,#702050);object-fit:cover}
+.avatar.pink{border-color:var(--pink)}
+.username-btn{max-width:100%;overflow-wrap:anywhere;word-break:break-word;border:1px solid #fff1bd;border-radius:24px;padding:8px 12px;background:linear-gradient(145deg,#fff0c4,#f3c15a 55%,#b96d20);color:#4b1536;font-size:13px;font-weight:900;box-shadow:0 3px 0 #6b321b,0 5px 12px #18001455;transition:.2s}
+.username-btn:active{transform:translateY(2px) scale(.98)}
+.names .username-btn{margin:4px 0}
+.heart{display:flex;align-items:center;justify-content:center}
+.emblem{position:relative;width:70px;height:90px;display:flex;align-items:center;justify-content:center}
+.core{font-size:44px;filter:drop-shadow(0 0 8px #ff2020);animation:pulse 1.5s infinite}
+.ring{font-size:30px;display:inline-block;animation:ring 1.3s ease-in-out infinite;filter:drop-shadow(0 0 5px #ffd76a)}
+.top-symbols{position:absolute;top:0;font-size:13px;white-space:nowrap}
+.no-wings .top-symbols{display:none}
+.no-wings .core{font-size:50px}
+.relation-mark{display:flex;align-items:center;justify-content:center;gap:7px;padding:10px}
+.relation-mark .core{font-size:75px}
+.relation-mark .ring{font-size:42px}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+@keyframes ring{0%,100%{transform:translateY(0) rotate(-12deg)}50%{transform:translateY(-5px) rotate(12deg)}}
+.pills{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.pill{padding:8px 15px;border-radius:30px;background:linear-gradient(100deg,#ffe98a,#f6b83b);color:#5a173d;font-weight:bold}
+.tabs{display:flex;gap:5px;background:#31072d99;padding:6px;border:1px solid #ffffff30;border-radius:35px;margin:18px 0}
+.tabs button{flex:1;border:0;background:transparent;border-radius:30px;padding:12px 4px;font-weight:bold;color:#e4c6da}
+.tabs button.active{background:linear-gradient(110deg,#ff70ad,#c91b75);color:white}
+.row{display:grid;grid-template-columns:50px 1fr 35px;align-items:center;gap:8px;padding:12px;border:1px solid #ffffff25;border-radius:22px;background:#ffffff10;margin:10px 0}
+.rank{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#ffe08a;color:#4a1640;font-weight:bold}
+.score{direction:ltr;color:var(--gold);font-weight:bold;text-align:center;font-size:14px}
+.names{text-align:center;line-height:1.5;overflow-wrap:anywhere}
+.names .username-btn{display:inline-block}
+.name-heart{color:#ffacd2;font-size:20px}
+.action{border:1px solid #ffb1d3;border-radius:30px;background:linear-gradient(110deg,#ff6cab,#c51b72);padding:12px 20px;font-weight:bold}
+.hidden{display:none!important}
+.rule{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #ffffff25;border-radius:20px;background:#ffffff0b;margin:10px 0}
+.rule-num{min-width:32px;height:32px;display:grid;place-items:center;background:linear-gradient(120deg,#ff70ad,#c51b75);border-radius:50%;font-weight:bold}
+.rule p{margin:0;line-height:1.8}
+.empty{text-align:center;padding:25px 10px;color:var(--muted)}
+.bottom{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);width:min(580px,calc(100% - 24px));display:grid;grid-template-columns:repeat(3,1fr);padding:10px;border:1px solid #ffb9dc66;border-radius:35px;background:#510a3fee;box-shadow:0 8px 25px #16001388}
+.bottom button{display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:transparent;font-weight:bold;font-size:13px}
+.navicon{font-size:29px}
+.modal-bg{position:fixed;inset:0;background:#140012cc;z-index:10;display:grid;place-items:center;padding:20px}
+.modal{width:min(420px,100%);border:1px solid var(--gold);border-radius:25px;background:linear-gradient(160deg,#8e205d,#320629);padding:22px;text-align:center;box-shadow:0 15px 45px #13000f}
+.modal h2{color:var(--gold);overflow-wrap:anywhere}
+.close{float:left;background:none;border:0;font-size:26px}
+.toast{position:fixed;top:15px;left:50%;transform:translateX(-50%);z-index:15;background:#3b0c32;border:1px solid var(--gold);border-radius:16px;padding:12px 18px;max-width:90%;text-align:center}
+.note{font-size:12px;color:var(--muted);line-height:1.7}
 </style>
 </head>
 <body>
-<div class="floating-hearts" id="floatingHearts" aria-hidden="true"></div>
-<header><button class="iconbtn" id="backPage" aria-label="رجوع">‹</button><div class="headtext"><h1 id="pageTitle">عالم CP</h1><p id="pageSubtitle">رابطة استثنائية، بتفاصيل تليق بكما</p></div><div class="header-live-time" aria-label="الوقت الحالي"><strong id="cpLiveClock">--:--</strong><small id="cpLiveDate">اليوم</small></div><button class="iconbtn" id="refresh" aria-label="تحديث">↻</button></header>
-<main>
-<section class="hero" id="homeHero"><div class="hero-kicker">JEHO · CP UNIVERSE</div><h2 id="heroTitle">حكايتكما تستحق أن تكون استثنائية ♡</h2><p id="heroText">إطلالة فاخرة لعلاقتكما، ذكريات ونقاط وتفاصيل تنمو مع كل لحظة مشتركة.</p><div class="hero-actions"><button class="hero-cta" data-view="discover">استكشف الشخصيات</button><button class="hero-cta outline" data-view="insights">إحصائياتكما</button></div></section>
-<div class="stats"><div class="stat"><b id="activeCount">—</b><span>علاقاتك النشطة</span></div><div class="stat"><b id="incomingCount">—</b><span>طلبات واردة</span></div><div class="stat"><b id="sentCount">—</b><span>طلبات مرسلة</span></div></div>
-
-<section id="view-home">
-<div class="sectionhead"><h3>علاقتك الحالية</h3><button class="smallbtn" data-view="discover">عرض الكل</button></div><div id="homeRelationships" class="state">جارٍ تحميل بياناتك…</div><div class="actions"><button class="btn secondary" data-invite>رمز دعوتي الترويجي</button><button class="btn quiet" data-view="sent">متابعة طلباتي</button></div>
-</section>
-<section id="view-send" class="hidden"><div class="sectionhead"><h3>طلبات الارتباط</h3></div><div class="panel"><div class="sub" style="font-size:13px;line-height:1.9">لا يوجد إرسال شخصي من هذه الصفحة. هدية الارتباط تُرسل من داخل الغرفة الصوتية عبر زر الهدايا، ولا تنشأ العلاقة إلا بعد موافقة المستلم.</div><div class="actions"><button class="btn primary" data-view="incoming">الطلبات الواردة</button><button class="btn secondary" data-view="sent">متابعة الطلبات</button></div></div></section>
-<section id="view-store" class="hidden"><div class="store-hero"><div class="store-orb">💍</div><h3>متجر CP</h3><p>إطارات وعناصر حصرية لعلاقتكما <span class="pulse-heart">♥</span></p></div><div id="cpCatalogGrid" class="grid"><div class="state">جارٍ تحميل عناصر المتجر…</div></div></section>
-<section id="view-tasks" class="hidden"><div class="sectionhead"><h3>المهام المشتركة</h3><button class="smallbtn" onclick="JehoCP.loadTasks()">تحديث</button></div><div id="cpTasksList" class="state">جارٍ تحميل المهام…</div></section>
-<section id="view-insights" class="hidden"><div class="sectionhead"><h3>تفاصيل علاقتكما</h3></div><div id="insightRelationships" class="state">جارٍ تحميل تفاصيل العلاقة…</div><button class="btn primary" data-view="discover">استكشاف شخصيات CP</button></section>
-<section id="view-gifts" class="hidden"><div class="sectionhead"><h3>هدايا ارتباط CP</h3></div><div class="panel"><div class="symbol">🎁</div><div class="name">الإرسال من داخل الروم فقط</div><div class="sub">افتح الروم الصوتي واضغط زر الهدايا ثم «هدية ارتباط CP». تُرسل الهدية مع إشعار طلب الارتباط للمستلم.</div></div></section>
-<section id="view-incoming" class="hidden"><div class="sectionhead"><h3>الطلبات الواردة</h3><button class="smallbtn" id="reloadIncoming">تحديث</button></div><div id="incomingList" class="state">جارٍ تحميل الطلبات…</div></section>
-<section id="view-sent" class="hidden"><div class="sectionhead"><h3>الطلبات المرسلة</h3><button class="smallbtn" id="reloadSent">تحديث</button></div><div id="sentList" class="state">جارٍ تحميل الطلبات…</div></section>
-<section id="view-discover" class="hidden">
-<div class="sectionhead"><h3>🏆 ترتيب ثنائيات CP</h3><button class="smallbtn" id="refreshRanking">تحديث</button></div>
-<p class="sub ranking-note">الأسماء والصور والنقاط تُحمّل مباشرة من خادم JEHO، ولا توجد نتائج تجريبية داخل التطبيق.</p>
-<div class="tabs cp-ranking-tabs" role="tablist" aria-label="ترتيب CP">
-<button class="chip active" data-cp-rank="weekly" role="tab" aria-selected="true">الأسبوع</button>
-<button class="chip" data-cp-rank="world" role="tab" aria-selected="false">العالمي</button>
-<button class="chip" data-cp-rank="rewards" role="tab" aria-selected="false">المكافآت</button>
+<div class="app">
+<header>
+<button id="back" aria-label="رجوع">‹</button>
+<h1 id="pageTitle">ثنائيات الأسبوع</h1>
+<button id="help" aria-label="القواعد">ⓘ</button>
+</header>
+<main class="content">
+<section id="weekly">
+<div class="panel">
+<h2 class="title">💞 ثنائي الأسبوع المميز 💞</h2>
+<div id="featured"><p class="empty">جارٍ تحميل البيانات…</p></div>
+<div class="pills"><span class="pill" id="featuredScore">🔥 —</span><span class="pill" id="featuredDays">❤️ —</span></div>
 </div>
-<div id="cpLeaderboardList" class="state">جارٍ تحميل ترتيب الثنائيات…</div>
-<div id="cpRewardsList" class="hidden"></div>
-<div id="discoverList" class="hidden"></div>
+<div class="panel">
+<h2 class="title">🏆 ترتيب الثنائيات</h2>
+<div class="tabs"><button class="active" data-tab="ranking">الأسبوع</button><button data-tab="world">العالمي</button><button data-tab="rewards">المكافآت</button></div>
+<div id="rankingView"><p class="empty">جارٍ تحميل الترتيب…</p></div><div id="worldView" class="hidden"></div><div id="rewardsView" class="hidden"></div>
+</div>
 </section>
-<div id="globalState" class="state hidden" role="status"></div></main><nav class="bottom-nav" aria-label="تنقل CP"><button data-view="home"><span>♡</span><small>الرئيسية</small></button><button data-view="discover"><span>🏆</span><small>الشخصيات</small></button><button data-view="store"><span>✧</span><small>المتجر</small></button><button data-view="tasks"><span>♧</span><small>المهام</small></button><button data-view="insights"><span>◈</span><small>الإحصائيات</small></button></nav><div id="cpRequestModal" class="cp-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="cpRequestTitle"><section class="cp-modal"><div style="font-size:32px;color:#c94d78">♡</div><h3 id="cpRequestTitle">طلب علاقة جديد</h3><div id="cpRequestAvatar" class="modal-avatar"></div><p id="cpRequestText">هناك طلب ارتباط بانتظار ردك.</p><div class="request-actions"><button id="cpRequestAccept" class="btn primary">موافق، قبول العلاقة</button><button id="cpRequestReject" class="btn danger">غير موافق، رفض</button></div></section></div><div id="notice" class="notice hidden" role="status"></div>
+<section id="relationship" class="hidden">
+<div class="panel"><h2 class="title">❤️ علاقاتي</h2><div id="mineView"><div class="relation-mark"><span class="core">❤️</span><span class="ring">💍</span></div><p class="empty">جارٍ تحميل علاقاتك…</p><button class="action" id="inviteButton">كيفية إرسال هدية ارتباط CP</button></div></div>
+<div class="panel"><h2 class="title">📩 الدعوات</h2><div id="invites"><p class="empty">جارٍ تحميل الدعوات…</p></div></div>
+</section>
+<section id="rules" class="hidden"><div class="panel"><h2 class="title">💖 قواعد CP</h2><div id="rulesList"></div></div></section>
+</main>
+<nav class="bottom"><button data-page="weekly"><span class="navicon">🏆</span>الثنائيات</button><button data-page="relationship"><span class="navicon">❤️</span>علاقاتي</button><button data-page="rules"><span class="navicon">💖</span>القواعد</button></nav>
+</div>
+<div id="modalRoot"></div><div id="toast" class="toast hidden"></div>
 <script>
-const TYPES={brotherhood:["الأخوّة","♛"],friendship:["الصداقة","✦"],love:["الحب","♥"],engagement:["الخطوبة","💍"],marriage:["الزواج","💞"]};
-let currentView="home",sendType="love",discoverType="",rankingPeriod="weekly",homeData=[],incomingData=[],sentData=[],activeData=[];
+const API_ENDPOINTS={weekly:"/api/cp/weekly",relationship:"/api/cp/relationship",levels:"/api/cp/levels",invites:"/api/cp/invites",rewards:"/api/cp/rewards",rules:"/api/cp/rules"};
+const data={weekly:{featured:null,leaderboard:[],world:[]},relationship:{active:false,invites:[]},rewards:[],rules:["تبدأ علاقة CP بإرسال هدية ارتباط CP من داخل الروم الصوتي.","لا تنشأ العلاقة إلا بعد موافقة المستلم على الطلب.","تظهر العلاقات النشطة والنقاط والأسماء والصور حسب بيانات خادم JEHO.","يمكن لأي طرف إنهاء العلاقة وفق قواعد التطبيق.","تُحدد النقاط والمكافآت من إعدادات خادم JEHO."]};
 const $=id=>document.getElementById(id);
-function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function label(t){return TYPES[t]?.[0]||"علاقة CP";}
-function personName(u){return u?.displayName||u?.username||"عضو";}
-function avatar(u){if(!u?.avatarUrl)return '<span class="avatar avatar-empty" aria-label="لا توجد صورة">♡</span>';return '<span class="avatar-wrap"><img class="avatar" src="'+esc(u.avatarUrl)+'" alt="صورة الحساب" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'grid\'"><span class="avatar avatar-empty" style="display:none" aria-label="تعذر تحميل الصورة">♡</span></span>';}
-function safeStatus(s){return ({pending:"بانتظار الرد",accepted:"تم القبول",rejected:"مرفوض",expired:"انتهت المهلة",cancelled:"ملغي"})[s]||s||"—";}
-function toast(msg){const n=$("notice");n.textContent=msg;n.classList.remove("hidden");clearTimeout(toast.timer);toast.timer=setTimeout(()=>n.classList.add("hidden"),3600);}
-function showView(view){const allowed=["home","send","incoming","sent","discover","store","tasks","insights","gifts"];if(!allowed.includes(view))view="home";currentView=view;document.querySelectorAll("[id^=view-]").forEach(s=>s.classList.toggle("hidden",s.id!=="view-"+view));document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("pageTitle").textContent=({home:"عالم CP",send:"طلبات الارتباط",incoming:"الطلبات الواردة",sent:"الطلبات المرسلة",discover:"شخصيات CP",store:"متجر CP",tasks:"المهام المشتركة",insights:"تفاصيل العلاقة",gifts:"هدايا CP"})[view]||"عالم CP";$("pageSubtitle").textContent=({home:"رابطة استثنائية، بتفاصيل تليق بكما",store:"خواتم نابضة وإطارات حصرية",tasks:"إنجازات مشتركة وتقدم واضح",insights:"المستوى والنقاط وتاريخ الرابط",gifts:"هدايا الارتباط تُرسل من داخل الروم",discover:"ترتيب واحد لجميع الثنائيات"})[view]||"مساحة العلاقة الخاصة";$("homeHero").classList.toggle("hidden",view!=="home");document.querySelector(".stats").classList.toggle("hidden",view!=="home");if(view==="incoming"||view==="sent")JehoCP.loadRequests();if(view==="discover"){if(rankingPeriod==="rewards")JehoCP.loadRewards();else JehoCP.loadLeaderboard(rankingPeriod);}if(view==="store")JehoCP.loadCatalog();if(view==="tasks")JehoCP.loadTasks();if(view==="home"||view==="insights")JehoCP.loadHome();}
-function relationshipCard(r,index){const a=r.userA||{},b=r.userB||{},type=r.type,rank=index+1,created=r.createdAt||r.startedAt||r.acceptedAt;const rankClass=rank===1?"rank-one":rank===2?"rank-two":rank===3?"rank-three":"rank-other";return '<article class="panel leaderboard-card '+rankClass+'"><div class="rank-ribbon">'+(rank===1?"👑 TOP 1":rank===2?"🥈 TOP 2":rank===3?"🥉 TOP 3":"#"+rank)+'</div><div class="row"><div class="pair-avatars ornate-pair">'+avatar(a)+'<span class="pair-heart">♥</span>'+avatar(b)+'</div><div class="info"><div class="name">'+esc(personName(a))+' ♥ '+esc(personName(b))+'</div><div class="sub">'+esc(label(type))+' · المستوى '+esc(r.level||1)+'</div><div class="sub">'+(created?("بدأت العلاقة · "+esc(new Date(created).toLocaleDateString("ar"))):"علاقة نشطة")+'</div></div><div class="score">'+esc(Number(r.points||0).toLocaleString("ar"))+'<small> نقطة</small></div></div></article>';}
-function homeRelationships(rows){homeData=Array.isArray(rows)?rows:[];const active=homeData.filter(x=>x.status==="active");$("activeCount").textContent=active.length.toLocaleString("ar");$("homeRelationships").className=active.length?"":"state";$("homeRelationships").innerHTML=active.length?active.map(r=>{const me=r.self||{},p=r.partner||{};return '<article class="panel"><div class="row"><div class="pair-avatars ornate-pair">'+avatar(me)+'<span class="pair-heart">♥</span>'+avatar(p)+'</div><div class="info"><div class="name">'+esc(personName(me))+' ♥ '+esc(personName(p))+'</div><div class="sub">'+esc(label(r.type))+' · المستوى '+esc(r.level||1)+' · '+esc(Number(r.points||0).toLocaleString("ar"))+' نقطة</div></div><button class="smallbtn" onclick="JehoCP.openProfile(\''+esc(p.id)+'\')">الملف</button></div><div class="actions"><button class="btn danger" onclick="confirmEnd(\''+esc(r.id)+'\')">إنهاء علاقتي</button></div></article>';}).join(""):'<div class="state">ما عندك علاقة نشطة حالياً. اختَر النوع وأرسل طلباً للطرف الآخر.</div>'; }
-function confirmEnd(id){if(confirm("هل تريد إنهاء العلاقة؟"))JehoCP.endRelationship(id);}
-function renderRequests(incoming,sent){incomingData=Array.isArray(incoming)?incoming:[];sentData=Array.isArray(sent)?sent:[];$("incomingCount").textContent=incomingData.length.toLocaleString("ar");$("sentCount").textContent=sentData.filter(r=>r.status==="pending").length.toLocaleString("ar");$("incomingList").className=incomingData.length?"":"state";$("incomingList").innerHTML=incomingData.length?incomingData.map(r=>{const u=r.sender||{};return '<article class="panel"><div class="row">'+avatar(u)+'<div class="info"><div class="name">'+esc(personName(u))+'</div><div class="sub">طلب '+esc(label(r.type))+' · '+esc(safeStatus(r.status))+'</div><span class="badge">هدية ارتباط CP</span></div></div><div class="request-actions"><button class="btn primary" onclick="JehoCP.respondRequest(\''+esc(r.id)+'\',true)">قبول العلاقة</button><button class="btn danger" onclick="JehoCP.respondRequest(\''+esc(r.id)+'\',false)">رفض</button></div></article>';}).join(""):'<div class="state">لا توجد طلبات واردة معلّقة.</div>';$("sentList").className=sentData.length?"":"state";$("sentList").innerHTML=sentData.length?sentData.map(r=>{const u=r.recipient||{};return '<article class="panel"><div class="row">'+avatar(u)+'<div class="info"><div class="name">'+esc(personName(u))+'</div><div class="sub">'+esc(label(r.type))+' · '+esc(safeStatus(r.status))+'</div></div></div>'+(r.status==="pending"?'<div class="actions"><button class="btn secondary" onclick="JehoCP.cancelRequest(\''+esc(r.id)+'\')">إلغاء الطلب</button></div>':"")+'</article>';}).join(""):'<div class="state">لم ترسل طلبات بعد.</div>';showPendingRequestPopup();}
-let activePopupRequestId=null;function showPendingRequestPopup(){if(currentView!=="home"&&currentView!=="incoming")return;const req=incomingData.find(r=>r.status==="pending");if(!req){$("cpRequestModal").classList.add("hidden");activePopupRequestId=null;return;}if(activePopupRequestId===req.id&&!$("cpRequestModal").classList.contains("hidden"))return;activePopupRequestId=req.id;const sender=req.sender||{};$("cpRequestAvatar").innerHTML=avatar(sender);$("cpRequestText").textContent=personName(sender)+" يطلب الارتباط بك ضمن علاقة "+label(req.type)+". اختر موافق لقبول العلاقة أو غير موافق لرفض الطلب. سيبقى الطلب محفوظاً في سجل الإشعارات حتى بعد الرد.";$("cpRequestModal").classList.remove("hidden");$("cpRequestAccept").onclick=()=>respondFromPopup(req.id,true);$("cpRequestReject").onclick=()=>respondFromPopup(req.id,false);}function respondFromPopup(id,accept){const a=$("cpRequestAccept"),r=$("cpRequestReject");a.disabled=true;r.disabled=true;toast("جارٍ معالجة طلب العلاقة…");JehoCP.respondRequest(id,accept);}window.onCpRequestResponse=function(id,accept,success,message){const a=$("cpRequestAccept"),r=$("cpRequestReject");a.disabled=false;r.disabled=false;if(success){$("cpRequestModal").classList.add("hidden");activePopupRequestId=null;toast(message||(accept?"تم قبول طلب العلاقة":"تم رفض طلب العلاقة"));}else{toast(message||"تعذر معالجة الطلب، سيبقى الطلب محفوظاً لتعيد المحاولة.");}};
-function renderDiscover(rows){activeData=(Array.isArray(rows)?rows:[]).slice().sort((a,b)=>Number(b.points||0)-Number(a.points||0));$("discoverList").className=activeData.length?"":"state";$("discoverList").innerHTML=activeData.length?activeData.map((r,i)=>relationshipCard(r,i)).join(""):'<div class="state">لا توجد علاقات نشطة في التصنيف حالياً.</div>';}
-window.renderCpLeaderboard=function(rows,period){
- const host=$("cpLeaderboardList");if(!host)return;
- rows=Array.isArray(rows)?rows:[];
- const weekly=period!=="world";
- const ranked=rows.slice().sort((a,b)=>Number(weekly?b.weeklyPoints:b.points||0)-Number(weekly?a.weeklyPoints:a.points||0));
- host.className=ranked.length?"":"state";
- host.innerHTML=ranked.length?ranked.map((r,i)=>relationshipCard({...r,points:weekly?(r.weeklyPoints||0):(r.points||0)},i)).join(""):'<div class="state">'+(weekly?'本週還沒有已記錄的關係積分。':'目前沒有可顯示的全球 CP 關係。')+'</div>';
- $("cpRewardsList").classList.add("hidden");host.classList.remove("hidden");
-};
-window.renderCpRewards=function(groups){
- const host=$("cpRewardsList");if(!host)return;
- groups=Array.isArray(groups)?groups:[];
- const rows=groups.flatMap(g=>(Array.isArray(g.levels)?g.levels:[]).map(level=>({...level,type:g.type})));
- host.className=rows.length?"":"state";
- host.innerHTML=rows.length?rows.map(r=>'<article class="panel"><div class="row"><div class="avatar avatar-empty">✧</div><div class="info"><div class="name">'+esc(label(r.type))+' · المستوى '+esc(r.level)+'</div><div class="sub">النقاط المطلوبة: '+esc(Number(r.pointsRequired||0).toLocaleString("ar"))+'</div>'+(r.reward?'<div class="badge">🎁 '+esc(r.reward)+'</div>':'<div class="sub">لا توجد مكافأة محددة لهذا المستوى بعد.</div>')+'</div></div></article>').join(""):'<div class="state">لا توجد مكافآت مستويات مضبوطة حالياً من خادم JEHO.</div>';
- $("cpLeaderboardList").classList.add("hidden");host.classList.remove("hidden");
-};
-window.renderCpCatalog=function(rows){const host=$("cpCatalogGrid");if(!host)return;rows=Array.isArray(rows)?rows:[];host.innerHTML=rows.length?rows.map(item=>'<article class="typecard"><span class="symbol">✧</span><strong>'+esc(item.name||item.title||"عنصر CP")+'</strong><small>'+esc(item.description||item.type||"عنصر تجميلي")+'</small><div class="badge">'+esc(item.priceCoins||item.price||item.cost||"—")+' عملة</div></article>').join(""):'<div class="state">لا توجد عناصر متاحة حالياً في كتالوج CP.</div>';};
-window.renderCpTasks=function(rows){const host=$("cpTasksList");if(!host)return;rows=Array.isArray(rows)?rows:[];host.innerHTML=rows.length?rows.map(item=>{const target=Math.max(1,Number(item.target||1)),progress=Math.max(0,Number(item.progress||0)),pct=Math.max(0,Math.min(100,Math.round(progress/target*100))),reward=item.reward||item.rewardItem||null;return '<article class="panel task-card"><div class="row"><div class="symbol">♡</div><div class="info"><div class="name">'+esc(item.title||item.name||"مهمة CP")+'</div><div class="sub">'+esc(item.description||item.details||"مهمة مشتركة")+'</div></div><div class="score">+'+esc(item.points||item.rewardPoints||0)+'<small> نقطة</small></div></div><div class="task-progress-meta"><span>التقدم</span><strong>'+esc(progress)+' / '+esc(target)+'</strong><b>'+pct+'%</b></div><div class="task-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="'+target+'" aria-valuenow="'+Math.min(progress,target)+'"><span style="width:'+pct+'%"></span></div><div class="sub task-state">'+(item.claimed?"تم استلام المكافأة":item.canClaim?"اكتملت المهمة — المكافأة جاهزة":("باقي "+Math.max(0,target-progress)+" لإكمال المهمة"))+'</div>'+(reward?'<div class="task-reward">🎁 المكافأة: '+esc(reward.name||reward.title||reward.type||"هدية تزيينية")+'</div>':"")+'</article>';}).join(""):'<div class="state">لا توجد مهام مفعّلة حالياً.</div>';};
-window.renderCpHome=homeRelationships;window.renderCpRequests=renderRequests;window.renderCpDiscover=renderDiscover;
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function score(n){n=Number(n)||0;if(n>=1000000)return(n/1000000).toFixed(1).replace(/\.0$/,"")+"M";if(n>=1000)return(n/1000).toFixed(1).replace(/\.0$/,"")+"K";return String(n);}
+const fallback="data:image/svg+xml;charset=UTF-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="a"><stop stop-color="#ffe5f4"/><stop offset="1" stop-color="#7c2459"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(#a)"/><circle cx="50" cy="37" r="18" fill="#fff1f9"/><path d="M15 96Q18 60 50 60T85 96" fill="#fff1f9"/></svg>');
+function person(p,pink=false){const name=p?.name||"مستخدم";return '<div class="person"><img class="avatar '+(pink?'pink':'')+'" src="'+esc(p?.avatar||fallback)+'" alt="صورة المستخدم" onerror="this.onerror=null;this.src=\''+fallback+'\'"><button class="username-btn" data-user-id="'+esc(p?.id||"")+'" data-user-name="'+esc(name)+'">'+esc(name)+'</button></div>';}
+function pair(p,noWings=false){const emblem=noWings?'<span class="core">❤️</span><span class="ring">💍</span>':'<div class="top-symbols">❤ 💍 ❤</div><span class="core">❤️</span>';return '<div class="pair">'+person(p.a)+'<div class="heart"><div class="emblem '+(noWings?'no-wings':'')+'">'+emblem+'</div></div>'+person(p.b,true)+'</div>';}
+function row(r,i){const a=r.a?.name||"مستخدم",b=r.b?.name||"مستخدم";return '<div class="row"><div class="score">'+score(r.score)+'</div><div class="names"><button class="username-btn" data-user-id="'+esc(r.a?.id||"")+'" data-user-name="'+esc(a)+'">'+esc(a)+'</button><div class="name-heart">♥</div><button class="username-btn" data-user-id="'+esc(r.b?.id||"")+'" data-user-name="'+esc(b)+'">'+esc(b)+'</button></div><div class="rank">'+i+'</div></div>';}
+function render(){const w=data.weekly;const f=w.featured;if(f){$("featured").innerHTML=pair(f);$("featuredScore").textContent="🔥 "+score(f.score);$("featuredDays").textContent="❤️ "+(f.days||0)+" أيام";}else{$("featured").innerHTML='<p class="empty">لا توجد بيانات لثنائي الأسبوع حالياً</p>';$("featuredScore").textContent="🔥 —";$("featuredDays").textContent="❤️ —";}
+$("rankingView").innerHTML=w.leaderboard.length?w.leaderboard.map((r,i)=>row(r,i+1)).join(""):'<p class="empty">لا توجد نتائج أسبوعية متاحة حالياً</p>';
+$("worldView").innerHTML=w.world.length?w.world.map((r,i)=>row(r,i+1)).join(""):'<p class="empty">لا توجد بيانات عالمية متاحة حالياً</p>';
+$("rewardsView").innerHTML=data.rewards.length?data.rewards.map(r=>'<div class="panel"><h3 style="color:var(--gold)">'+esc(r.title||r.name||"مكافأة CP")+'</h3><p>'+esc(r.description||r.reward||"المكافأة حسب إعدادات الخادم")+'</p></div>').join(""):'<p class="empty">لا توجد مكافآت مضبوطة حالياً من الخادم</p>';
+$("rulesList").innerHTML=data.rules.map((r,i)=>'<div class="rule"><span class="rule-num">'+(i+1)+'</span><p>'+esc(typeof r==="string"?r:(r.text||r.description||r.title||"قاعدة CP"))+'</p></div>').join("");
+const rel=data.relationship;if(rel.active&&rel.partner){$("mineView").innerHTML=pair({a:rel.me||{name:"أنت"},b:rel.partner},true)+'<p class="empty">علاقتك الحالية ❤️</p><button class="action" id="inviteButton">كيفية إرسال هدية ارتباط CP</button>';}else{$("mineView").innerHTML='<div class="relation-mark"><span class="core">❤️</span><span class="ring">💍</span></div><p class="empty">ما عندك علاقة CP حالياً</p><button class="action" id="inviteButton">كيفية إرسال هدية ارتباط CP</button>';}
+$("invites").innerHTML=rel.invites.length?rel.invites.map(v=>'<div class="panel"><strong>'+esc(v.name||v.sender?.name||"طلب ارتباط CP")+'</strong><p>'+esc(v.statusText||v.status||"بانتظار الرد")+'</p>'+(v.id&&v.pending?'<div class="pills"><button class="action" data-response="'+esc(v.id)+'" data-accept="true">قبول</button><button class="action" data-response="'+esc(v.id)+'" data-accept="false">رفض</button></div>':"")+'</div>').join(""):'<p class="empty">لا توجد دعوات حالياً</p>';
+$("inviteButton").onclick=()=>toast("افتح الروم الصوتي ثم الهدايا واختر «هدية ارتباط CP». العلاقة لا تبدأ إلا بعد موافقة المستلم.");
+}
+function page(name){["weekly","relationship","rules"].forEach(id=>$(id).classList.toggle("hidden",id!==name));$("pageTitle").textContent=name==="weekly"?"ثنائيات الأسبوع":name==="relationship"?"علاقاتي":"قواعد CP";if(name==="relationship"&&window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();}}
+function toast(msg){$("toast").textContent=msg;$("toast").classList.remove("hidden");clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$("toast").classList.add("hidden"),2500);}
+function modal(name,id){$("modalRoot").innerHTML='<div class="modal-bg" id="modalBg"><div class="modal"><button class="close" id="closeModal">×</button><h2>'+esc(name)+'</h2><div style="font-size:45px">👤</div><p>ملف المستخدم</p><p class="note">بيانات الملف الشخصي تُفتح من خلال تطبيق JEHO.</p><button class="action" id="openProfile">عرض الملف الشخصي</button></div></div>';$("closeModal").onclick=()=>$("modalRoot").innerHTML="";$("modalBg").onclick=e=>{if(e.target.id==="modalBg")$("modalRoot").innerHTML="";};$("openProfile").onclick=()=>{if(window.JehoCP&&id)JehoCP.openProfile(id);$("modalRoot").innerHTML="";};}
+document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>page(b.dataset.page));
+document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===b));["ranking","world","rewards"].forEach(id=>$(id+"View").classList.toggle("hidden",id!==b.dataset.tab));if(b.dataset.tab==="ranking"&&window.JehoCP)JehoCP.loadLeaderboard("weekly");if(b.dataset.tab==="world"&&window.JehoCP)JehoCP.loadLeaderboard("world");if(b.dataset.tab==="rewards"&&window.JehoCP)JehoCP.loadRewards();});
+$("back").onclick=()=>{if(!$("relationship").classList.contains("hidden"))page("weekly");else if(!$("rules").classList.contains("hidden"))page("weekly");else if(window.JehoCP)JehoCP.back();};
+$("help").onclick=()=>page("rules");
+document.addEventListener("click",e=>{const b=e.target.closest("[data-user-name]");if(b)modal(b.dataset.userName,b.dataset.userId);const r=e.target.closest("[data-response]");if(r&&window.JehoCP)JehoCP.respondRequest(r.dataset.response,r.dataset.accept==="true");});
+window.renderCpHome=function(rows){rows=Array.isArray(rows)?rows:[];const active=rows.filter(r=>r.status==="active");const partner=active[0];data.relationship.active=!!partner;data.relationship.me=partner?.self?{id:partner.self.id,name:partner.self.displayName||partner.self.username,avatar:partner.self.avatarUrl}:null;data.relationship.partner=partner?.partner?{id:partner.partner.id,name:partner.partner.displayName||partner.partner.username,avatar:partner.partner.avatarUrl}:null;data.relationship.points=partner?.points||0;data.weekly.featured=partner?{a:{id:partner.self?.id,name:partner.self?.displayName||partner.self?.username,avatar:partner.self?.avatarUrl},b:{id:partner.partner?.id,name:partner.partner?.displayName||partner.partner?.username,avatar:partner.partner?.avatarUrl},score:partner.points||0,days:partner.days||0}:null;render();};
+window.renderCpRequests=function(incoming,sent){const inc=Array.isArray(incoming)?incoming:[];data.relationship.invites=inc.filter(r=>r.status==="pending").map(r=>({id:r.id,name:r.sender?.displayName||r.sender?.username,sender:r.sender,status:r.status,statusText:"طلب ارتباط بانتظار ردك",pending:true}));render();};
+window.renderCpLeaderboard=function(rows,period){const mapped=(Array.isArray(rows)?rows:[]).map(r=>({a:{id:r.userA?.id,name:r.userA?.displayName||r.userA?.username,avatar:r.userA?.avatarUrl},b:{id:r.userB?.id,name:r.userB?.displayName||r.userB?.username,avatar:r.userB?.avatarUrl},score:period==="world"?(r.points||0):(r.weeklyPoints||0),days:r.days||0}));if(period==="world")data.weekly.world=mapped;else data.weekly.leaderboard=mapped;render();};
+window.renderCpRewards=function(groups){data.rewards=(Array.isArray(groups)?groups:[]).flatMap(g=>(Array.isArray(g.levels)?g.levels:[]).map(l=>({title:(g.type||"CP")+" · المستوى "+(l.level||1),description:"النقاط المطلوبة: "+(l.pointsRequired||0)+(l.reward?" · المكافأة: "+l.reward:"")})));render();};
+window.renderCpDiscover=function(rows){window.renderCpLeaderboard(rows, "world");};
+window.renderCpCatalog=function(){};
+window.renderCpTasks=function(){};
 window.showCpMessage=toast;window.showCpError=m=>toast(m||"حدث خطأ");
-document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
-document.querySelectorAll("[data-cp-rank]").forEach(b=>b.addEventListener("click",()=>{
- rankingPeriod=b.dataset.cpRank;
- document.querySelectorAll("[data-cp-rank]").forEach(x=>{const active=x===b;x.classList.toggle("active",active);x.setAttribute("aria-selected",String(active));});
- if(rankingPeriod==="rewards")JehoCP.loadRewards();else JehoCP.loadLeaderboard(rankingPeriod);
-}));
-$("refreshRanking").addEventListener("click",()=>{if(rankingPeriod==="rewards")JehoCP.loadRewards();else JehoCP.loadLeaderboard(rankingPeriod);});
-document.querySelectorAll("[data-invite]").forEach(b=>b.addEventListener("click",()=>JehoCP.openInvite()));
-document.querySelectorAll("[data-type]").forEach(b=>b.addEventListener("click",()=>{sendType=b.dataset.type;showView("gifts");toast("يمكن إرسال هدية "+label(sendType)+" من داخل الغرفة الصوتية.");}));
-document.querySelectorAll("[data-send-type]").forEach(b=>b.addEventListener("click",()=>{sendType=b.dataset.sendType;document.querySelectorAll("[data-send-type]").forEach(x=>x.classList.toggle("active",x===b));}));
-
-const sendForm=$("sendForm");if(sendForm)sendForm.addEventListener("submit",e=>{e.preventDefault();toast("طلبات الارتباط تُرسل كهدية من داخل الروم الصوتي.");});
-$("refresh").addEventListener("click",()=>{if(currentView==="incoming"||currentView==="sent")JehoCP.loadRequests();else if(currentView==="discover"){if(rankingPeriod==="rewards")JehoCP.loadRewards();else JehoCP.loadLeaderboard(rankingPeriod);}else JehoCP.loadHome();});$("backPage").addEventListener("click",()=>{if(currentView!=="home")showView("home");else if(window.JehoCP)JehoCP.back();});window.addEventListener("keydown",e=>{if(e.key==="Escape"&&currentView!=="home")showView("home");});
-$("reloadIncoming").addEventListener("click",()=>JehoCP.loadRequests());$("reloadSent").addEventListener("click",()=>JehoCP.loadRequests());
-
-(function initCpFloatingHearts(){
- const layer=document.getElementById("floatingHearts");
- if(!layer||(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches))return;
- const symbols=["♡","♥","♡","✧","♥","♡"];
- for(let i=0;i<9;i++){
-  const el=document.createElement("span");el.className="floating-heart";el.textContent=symbols[i%symbols.length];
-  el.style.left=(5+i*11)%97+"%";el.style.setProperty("--duration",(11+(i%4)*2)+"s");
-  el.style.setProperty("--delay",(-1*i*1.7)+"s");el.style.setProperty("--size",(11+(i%4)*4)+"px");
-  el.style.setProperty("--drift",((i%2?1:-1)*(12+(i%3)*10))+"px");
-  layer.appendChild(el);
- }
-})();
-
-
-(function initCpLiveClock(){
- const clock=document.getElementById("cpLiveClock"),date=document.getElementById("cpLiveDate");
- if(!clock||!date)return;
- const update=()=>{const now=new Date();clock.textContent=new Intl.DateTimeFormat("ar",{hour:"2-digit",minute:"2-digit",hour12:true}).format(now);date.textContent=new Intl.DateTimeFormat("ar",{day:"numeric",month:"short"}).format(now);};
- update();window.setInterval(update,15000);
-})();
-
-window.getCpView=()=>currentView;
-window.setCpView=(view,type)=>{if(TYPES[type]){sendType=type;discoverType=type;document.querySelectorAll("[data-send-type]").forEach(b=>b.classList.toggle("active",b.dataset.sendType===type));document.querySelectorAll("[data-discover-type]").forEach(b=>b.classList.toggle("active",b.dataset.discoverType===type));}showView(view||"home");if((view||"home")==="discover"){if(rankingPeriod==="rewards")JehoCP.loadRewards();else JehoCP.loadLeaderboard(rankingPeriod);}};
-window.addEventListener("load",()=>{if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();}});
-</script></body></html>
+window.setCpView=function(view){if(view==="home"||view==="weekly")page("weekly");else if(view==="incoming"||view==="sent"||view==="send")page("relationship");else if(view==="discover"){page("weekly");document.querySelector('[data-tab="world"]').click();}else if(view==="rules")page("rules");else page("relationship");};
+window.CPPage={reload:function(){if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();JehoCP.loadLeaderboard("weekly");JehoCP.loadLeaderboard("world");JehoCP.loadRewards();}},go:page};
+render();
+window.addEventListener("load",()=>{if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();JehoCP.loadLeaderboard("weekly");JehoCP.loadLeaderboard("world");JehoCP.loadRewards();}});
+</script>
+</body>
+</html>
