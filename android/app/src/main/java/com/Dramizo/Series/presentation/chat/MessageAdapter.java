@@ -777,6 +777,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.videoMedia.setVisibility(View.GONE);
         }
         if (holder.b.imgVideoThumbnail != null) {
+            Glide.with(holder.itemView).clear(holder.b.imgVideoThumbnail);
             holder.b.imgVideoThumbnail.setVisibility(View.GONE);
             holder.b.imgVideoThumbnail.setOnClickListener(null);
             holder.b.imgVideoThumbnail.setImageDrawable(null);
