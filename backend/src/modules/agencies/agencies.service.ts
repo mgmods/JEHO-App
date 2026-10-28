@@ -2059,19 +2059,27 @@ export class AgenciesService implements OnModuleInit {
       displayName: string | null;
       publicId: string | number | null;
       giftsReceivedDiamonds: string | number;
+      dailyDiamonds: string | number;
+      lastGiftAt: Date | string | null;
     }> = memberIds.length
       ? await this.dataSource.query(
           `SELECT p."userId", p."joinedAt",
                   COALESCE(u."displayName", u.username, 'مضيف') AS "displayName",
                   u."publicId" AS "publicId",
-                  COALESCE(SUM(g."diamondsAwarded"), 0)::text AS "giftsReceivedDiamonds"
+                  COALESCE(SUM(g."diamondsAwarded"), 0)::text AS "giftsReceivedDiamonds",
+                  COALESCE(SUM(g."diamondsAwarded") FILTER (
+                    WHERE g."createdAt" >= (date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+                  ), 0)::text AS "dailyDiamonds",
+                  MAX(g."createdAt") AS "lastGiftAt"
            FROM agency_membership_periods p
            JOIN users u ON u.id = p."userId"
            LEFT JOIN gift_sends g
              ON g."receiverId" = p."userId" AND g."createdAt" >= p."joinedAt"
            WHERE p."agencyId" = $1 AND p."leftAt" IS NULL AND p."userId" = ANY($2::uuid[])
            GROUP BY p."userId", p."joinedAt", u.id
-           ORDER BY SUM(g."diamondsAwarded") DESC NULLS LAST`,
+           ORDER BY SUM(g."diamondsAwarded") FILTER (
+             WHERE g."createdAt" >= (date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+           ) DESC NULLS LAST, SUM(g."diamondsAwarded") DESC NULLS LAST`,
           [agencyId, memberIds],
         )
       : [];
@@ -2133,6 +2141,8 @@ export class AgenciesService implements OnModuleInit {
         role: roleByUser.get(period.userId) || AgencyRole.HOST,
         membershipStartedAt: period.joinedAt,
         giftsReceivedDiamonds: Number(period.giftsReceivedDiamonds || 0),
+        dailyDiamonds: Number(period.dailyDiamonds || 0),
+        lastGiftAt: period.lastGiftAt || null,
         targetEnabled: !!targetConfig.enabled,
         targetPeriod,
         targetPeriodKey,
@@ -2147,8 +2157,24 @@ export class AgenciesService implements OnModuleInit {
     });
     memberStats.sort((a, b) => b.giftsReceivedDiamonds - a.giftsReceivedDiamonds);
     const received = memberStats.reduce((sum, item) => sum + item.giftsReceivedDiamonds, 0);
+    const dailyReceived = memberStats.reduce((sum, item) => sum + item.dailyDiamonds, 0);
+    const activeHostsToday = memberStats.filter((item) => item.dailyDiamonds > 0).length;
+    const utcDayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const newMembersToday = await this.dataSource.query(
+      `SELECT COUNT(DISTINCT p."userId")::int AS count
+       FROM agency_membership_periods p
+       WHERE p."agencyId" = $1 AND p."joinedAt" >= $2`,
+      [agencyId, utcDayStart],
+    );
+    const lastActivity = memberStats
+      .map((item) => item.lastGiftAt ? new Date(item.lastGiftAt).getTime() : 0)
+      .reduce((latest, value) => Math.max(latest, value), 0);
     return {
       agencyId,
+      dailyDiamonds: dailyReceived,
+      activeHostsToday,
+      newMembersToday: Number(newMembersToday?.[0]?.count || 0),
+      lastGiftActivityAt: lastActivity > 0 ? new Date(lastActivity).toISOString() : null,
       publicId: agency.publicId,
       name: agency.name,
       memberCount: memberIds.length,
