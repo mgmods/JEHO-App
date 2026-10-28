@@ -2199,7 +2199,7 @@ export class GiftsService implements OnModuleInit {
     let luckyCoinsWon = 0;
 
     if (isLucky) {
-      const rolled = this.rollLuckyPayout(totalCoins, gift.id);
+      const rolled = await this.rollLuckyPayout(totalCoins, gift.id);
       luckyMultiplier = rolled.luckyMultiplier;
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
@@ -2855,7 +2855,7 @@ export class GiftsService implements OnModuleInit {
     let luckyMultiplier: number | null = null;
     let luckyCoinsWon = 0;
     if (isLucky) {
-      const rolled = this.rollLuckyPayout(totalCoins, gift.id);
+      const rolled = await this.rollLuckyPayout(totalCoins, gift.id);
       luckyMultiplier = rolled.luckyMultiplier;
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
