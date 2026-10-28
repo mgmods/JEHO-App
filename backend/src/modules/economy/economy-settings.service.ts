@@ -30,10 +30,24 @@ export class EconomySettingsService implements OnModuleInit {
   async onModuleInit() {
     try {
       const row = await this.settingsRepo.findOne({ where: { key: ECONOMY_SETTING_KEY } });
+      const legacyPlatformRow = await this.settingsRepo.findOne({
+        where: { key: 'economy.platform_commission_percent' },
+      });
+      const legacyPlatformPercent = Number(legacyPlatformRow?.value);
       if (row?.value) {
         const parsed = this.safeParse(row.value);
         if (parsed) {
           applyEconomyPatch(parsed);
+          // Preserve an existing private platform percentage from the legacy setting
+          // when migrating an older economy JSON that did not contain this field.
+          if (
+            parsed.platformCommissionPercent === undefined &&
+            legacyPlatformRow &&
+            Number.isFinite(legacyPlatformPercent)
+          ) {
+            applyEconomyPatch({ platformCommissionPercent: legacyPlatformPercent });
+            await this.persistCurrent('Migrate legacy private platform commission');
+          }
           // One-time migration: the new payout contract guarantees that a regular
           // gift mints its full coin value in host diamonds. Preserve the admin's
           // lucky ratio and agency commission while migrating old 70/30 split configs.
@@ -61,6 +75,10 @@ export class EconomySettingsService implements OnModuleInit {
           );
           return;
         }
+      }
+      // Preserve the legacy platform percentage when the main economy row is absent.
+      if (legacyPlatformRow && Number.isFinite(legacyPlatformPercent)) {
+        applyEconomyPatch({ platformCommissionPercent: legacyPlatformPercent });
       }
       // Seed the row with current defaults so admin sees editable values immediately.
       await this.persistCurrent('First boot seed');
