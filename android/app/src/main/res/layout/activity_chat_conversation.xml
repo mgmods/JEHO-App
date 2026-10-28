@@ -753,7 +753,7 @@
             android:layout_height="104dp"
             android:layout_gravity="bottom|end"
             android:layout_marginEnd="18dp"
-            android:layout_marginBottom="86dp"
+            android:layout_marginBottom="118dp"
             android:background="@drawable/bg_chat_reply_quote"
             android:elevation="8dp"
             android:padding="4dp"
