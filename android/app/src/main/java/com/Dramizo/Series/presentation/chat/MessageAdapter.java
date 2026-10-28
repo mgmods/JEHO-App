@@ -20,6 +20,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
+import android.widget.MediaController;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -765,6 +767,12 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         if (holder.b.imageWrap != null) holder.b.imageWrap.setVisibility(View.GONE);
         holder.b.imgMedia.setVisibility(View.GONE);
         holder.b.imgMedia.setOnClickListener(null);
+        if (holder.b.videoMedia != null) {
+            holder.b.videoMedia.stopPlayback();
+            holder.b.videoMedia.setMediaController(null);
+            holder.b.videoMedia.setOnClickListener(null);
+            holder.b.videoMedia.setVisibility(View.GONE);
+        }
         if (holder.b.rowImageReaction != null) holder.b.rowImageReaction.setVisibility(View.GONE);
         if (holder.b.audioRow != null) holder.b.audioRow.setVisibility(View.GONE);
         if (holder.b.agencyInviteRow != null) holder.b.agencyInviteRow.setVisibility(View.GONE);
@@ -803,6 +811,34 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 holder.b.tvContent.setVisibility(View.VISIBLE);
                 holder.b.tvContent.setText(msg.content);
                 bindTranslate(holder, msg);
+            }
+            return;
+        }
+
+        if ("video".equals(type) && mediaUrl != null && !mediaUrl.isEmpty()
+                && holder.b.videoMedia != null) {
+            String fullUrl = AssetCatalog.absoluteUrl(mediaUrl);
+            if (holder.b.imageWrap != null) holder.b.imageWrap.setVisibility(View.VISIBLE);
+            holder.b.imgMedia.setVisibility(View.GONE);
+            if (holder.b.rowImageReaction != null) holder.b.rowImageReaction.setVisibility(View.GONE);
+            if (holder.b.tvImageTime != null) holder.b.tvImageTime.setVisibility(View.GONE);
+            holder.b.videoMedia.setVisibility(View.VISIBLE);
+            holder.b.videoMedia.setBackgroundColor(Color.BLACK);
+            holder.b.videoMedia.setVideoURI(Uri.parse(fullUrl));
+            MediaController controls = new MediaController(holder.itemView.getContext());
+            controls.setAnchorView(holder.b.videoMedia);
+            holder.b.videoMedia.setMediaController(controls);
+            holder.b.videoMedia.setOnPreparedListener(player -> player.setLooping(false));
+            holder.b.videoMedia.setOnErrorListener((player, what, extra) -> {
+                Toast.makeText(holder.itemView.getContext(), "تعذر تشغيل الفيديو", Toast.LENGTH_SHORT).show();
+                return true;
+            });
+            holder.b.videoMedia.setOnClickListener(v -> {
+                if (!holder.b.videoMedia.isPlaying()) holder.b.videoMedia.start();
+            });
+            if (msg.content != null && !msg.content.trim().isEmpty()) {
+                holder.b.tvContent.setVisibility(View.VISIBLE);
+                holder.b.tvContent.setText(msg.content);
             }
             return;
         }
@@ -1456,6 +1492,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         if (msg == null) return "";
         String type = msg.type != null ? msg.type.toLowerCase(Locale.US) : "text";
         if ("image".equals(type)) return "📷 صورة";
+        if ("video".equals(type)) return "🎬 فيديو";
         if ("audio".equals(type)) return "🎤 رسالة صوتية";
         if ("gift".equals(type)) return "🎁 " + (msg.content != null ? msg.content : "هدية");
         if (RoomShareCodec.isRoomShare(msg.content)) return RoomShareCodec.previewLabel(msg.content);
@@ -1583,6 +1620,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final TextView tvReplyBody;
         final View imageWrap;
         final ImageView imgMedia;
+        final VideoView videoMedia;
         final View rowImageReaction;
         final TextView tvImageReaction;
         final TextView tvImageTime;
@@ -1634,6 +1672,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             tvReplyBody = root.findViewById(R.id.tvReplyBody);
             imageWrap = root.findViewById(R.id.imageWrap);
             imgMedia = root.findViewById(R.id.imgMedia);
+            videoMedia = root.findViewById(R.id.videoMedia);
             rowImageReaction = root.findViewById(R.id.rowImageReaction);
             tvImageReaction = root.findViewById(R.id.tvImageReaction);
             tvImageTime = root.findViewById(R.id.tvImageTime);
