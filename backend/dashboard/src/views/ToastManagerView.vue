@@ -328,7 +328,7 @@ async function save() {
   const fieldsToVerify = [
     'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
     'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
-    'durationSeconds', 'shineEnabled', 'frameGlowEnabled', 'backgroundUrl', 'placementX', 'placementY',
+    'durationSeconds', 'shineEnabled', 'frameGlowEnabled', 'backgroundUrl',
   ]
   for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh', 'luckyWinHighRoom']) {
     for (const field of fieldsToVerify) {
@@ -339,6 +339,13 @@ async function save() {
         toast().danger(error.value)
         return
       }
+    }
+  }
+  for (const field of ['placementX', 'placementY']) {
+    if (String(cfg.luckyWinHighRoom?.[field] ?? '') !== String(payload.luckyWinHighRoom?.[field] ?? '')) {
+      error.value = `لم يتم تأكيد حفظ luckyWinHighRoom.${field} من الخادم.`
+      toast().danger(error.value)
+      return
     }
   }
   Object.assign(form.giftSend, cfg.giftSend)
