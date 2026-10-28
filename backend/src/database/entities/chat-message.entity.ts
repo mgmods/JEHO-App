@@ -49,7 +49,7 @@ export class ChatMessage {
   content: string | null;
 
   @Column({ type: 'simple-json', nullable: true })
-  media: { url: string; mimeType: string; size: number; width?: number; height?: number; duration?: number } | null;
+  media: { url: string; thumbnailUrl?: string; mimeType: string; size: number; width?: number; height?: number; duration?: number } | null;
 
   @Column({ type: 'uuid', nullable: true })
   replyToId: string | null;
