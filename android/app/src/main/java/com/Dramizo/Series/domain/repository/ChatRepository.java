@@ -11,6 +11,6 @@ public interface ChatRepository {
     Result<ChatDtos.MessageDto> sendMessage(String conversationId, String content, String replyToId);
     Result<ChatDtos.MessageDto> sendImage(String conversationId, String imageUrl, String replyToId);
     Result<ChatDtos.MessageDto> sendAudio(String conversationId, String audioUrl, int durationSec, String replyToId);
-    Result<ChatDtos.MessageDto> sendVideo(String conversationId, String videoUrl, String mimeType, long size, int durationSec, String replyToId);
+    Result<ChatDtos.MessageDto> sendVideo(String conversationId, String videoUrl, String thumbnailUrl, String mimeType, long size, int durationSec, String replyToId);
     Result<ChatDtos.MessageDto> sendGift(String conversationId, String giftName, String iconUrl, String replyToId);
 }
