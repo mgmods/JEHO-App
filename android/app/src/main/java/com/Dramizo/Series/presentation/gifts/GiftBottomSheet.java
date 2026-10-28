@@ -372,14 +372,13 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 if (noCpLayout != null) noCpLayout.setVisibility(has ? View.GONE : View.VISIBLE);
                 if (hascpLayout != null) hascpLayout.setVisibility(has ? View.VISIBLE : View.GONE);
                 if (!has && noCpLayout != null) {
-                    noCpLayout.setOnClickListener(v ->
-                            startActivity(new android.content.Intent(
-                                    requireContext(),
-                                    com.Dramizo.Series.presentation.cp.CpCenterActivity.class)));
+                    // CP relationship requests are only created by sending a CP gift in-room.
+                    noCpLayout.setOnClickListener(null);
+                    noCpLayout.setClickable(false);
                     View marquee = noCpLayout.findViewById(R.id.marquee_view);
                     if (marquee instanceof android.widget.TextView) {
                         ((android.widget.TextView) marquee).setText(
-                                "لا يوجد CP — اضغط هنا لإرسال طلب CP");
+                                "لا توجد علاقة CP — أرسل هدية ارتباط من تبويب CP داخل الروم لطلب الارتباط");
                     }
                 }
                 if (has) {
