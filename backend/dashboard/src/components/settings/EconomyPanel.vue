@@ -107,33 +107,34 @@
       <section class="settings-card mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <div>
-            <h3 class="settings-card-title mb-1">{{ t('economySettings.splitTitle') }}</h3>
-            <p class="form-text mb-0">{{ t('economySettings.splitSubtitle') }}</p>
+            <h3 class="settings-card-title mb-1">ألماسات المضيف وعمولة الوكالة الإضافية</h3>
+            <p class="form-text mb-0">يحصل المضيف على 100% من قيمة الهدية، وتُضاف عمولة الوكالة فوقها دون خصم أي ألماسة من المضيف.</p>
           </div>
           <span
             class="badge"
             :class="splitSumOk ? 'bg-success-subtle text-success-emphasis' : 'bg-warning-subtle text-warning-emphasis'"
           >
-            {{ t('economySettings.splitSum') }}: {{ splitSum }}%
+            عمولة الوكالة الإضافية: {{ splitSum }}%
           </span>
         </div>
         <div class="row g-3">
           <div class="col-md-6">
-            <label class="form-label">{{ t('economySettings.splitHost') }}</label>
+            <label class="form-label">نسبة ألماسات المضيف (كاملة)</label>
             <div class="input-group">
               <input
                 v-model.number="form.defaultGiftSplit.hostPercent"
                 type="number"
-                step="0.5"
-                min="0"
+                step="1"
+                min="100"
                 max="100"
+                readonly
                 class="form-control"
               />
               <span class="input-group-text">%</span>
             </div>
           </div>
           <div class="col-md-6">
-            <label class="form-label">{{ t('economySettings.splitAgency') }}</label>
+            <label class="form-label">نسبة عمولة الوكالة الإضافية</label>
             <div class="input-group">
               <input
                 v-model.number="form.defaultGiftSplit.agencyOwnerPercent"
@@ -147,7 +148,7 @@
             </div>
           </div>
         </div>
-        <p class="form-text mt-2 mb-0">{{ t('economySettings.splitNormalizeHint') }}</p>
+        <p class="form-text mt-2 mb-0">هذه العمولة مكافأة إضافية مستقلة، ولا تُخصم من ألماسات المضيف. النسبة من 0 إلى 100%.</p>
       </section>
 
       <section class="settings-card mb-3">
@@ -303,7 +304,7 @@ const form = reactive({
   coinsPerUsd: 10000,
   diamondUsd: 0.00005,
   minWithdrawDiamonds: 200000,
-  giftDiamondRatio: 0.8,
+  giftDiamondRatio: 1,
   luckyGiftDiamondRatio: 0.3,
   maxDiamondsPerUnit: 2000000,
   luckyGiftMaxMultiplier: 4,
@@ -311,21 +312,19 @@ const form = reactive({
   showDiamondValueInApp: false,
   defaultGiftSplit: {
     platformPercent: 0,
-    hostPercent: 70,
-    agencyOwnerPercent: 30,
+    hostPercent: 100,
+    agencyOwnerPercent: 20,
   },
 })
 
 const previewPrices = [10, 50, 100, 300, 500, 1000, 2000, 5000, 10000, 25000]
 
 const splitSum = computed(() => {
-  const s =
-    Number(form.defaultGiftSplit.hostPercent || 0) +
-    Number(form.defaultGiftSplit.agencyOwnerPercent || 0)
-  return Math.round(s * 100) / 100
+  const value = Number(form.defaultGiftSplit.agencyOwnerPercent)
+  return Number.isFinite(value) ? Math.round(value * 100) / 100 : 0
 })
 
-const splitSumOk = computed(() => Math.abs(splitSum.value - 100) < 0.01)
+const splitSumOk = computed(() => splitSum.value >= 0 && splitSum.value <= 100)
 
 /** Cost to the platform of one minted diamond ($ paid out on withdraw). */
 const coinUsd = computed(() => {
@@ -395,8 +394,10 @@ function applyToForm(cur) {
   form.showDiamondValueInApp = !!cur.showDiamondValueInApp
   const s = cur.defaultGiftSplit || {}
   form.defaultGiftSplit.platformPercent = 0
-  form.defaultGiftSplit.hostPercent = Number(s.hostPercent) || 70
-  form.defaultGiftSplit.agencyOwnerPercent = Number(s.agencyOwnerPercent) || 30
+  form.defaultGiftSplit.hostPercent = 100
+  form.defaultGiftSplit.agencyOwnerPercent = Number.isFinite(Number(s.agencyOwnerPercent))
+    ? Number(s.agencyOwnerPercent)
+    : 20
 }
 
 async function save(mode) {
@@ -415,7 +416,7 @@ async function save(mode) {
     showDiamondValueInApp: form.showDiamondValueInApp,
     defaultGiftSplit: {
       platformPercent: 0,
-      hostPercent: form.defaultGiftSplit.hostPercent,
+      hostPercent: 100,
       agencyOwnerPercent: form.defaultGiftSplit.agencyOwnerPercent,
     },
   }
