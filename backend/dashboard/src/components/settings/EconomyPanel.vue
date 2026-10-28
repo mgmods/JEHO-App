@@ -106,6 +106,22 @@
       </section>
 
       <section class="settings-card mb-3">
+        <div class="mb-3">
+          <h3 class="settings-card-title mb-1">محاسبة المنصة الداخلية</h3>
+          <p class="form-text mb-0">نسبة داخلية سرّية للإدارة فقط، تُسجّل محاسبيًا كإيراد إضافي ولا تُخصم من ألماسات المضيف أو عمولة الوكالة.</p>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">نسبة محاسبة المنصة (داخلية)</label>
+            <div class="input-group">
+              <input v-model.number="form.platformCommissionPercent" type="number" step="0.5" min="0" max="100" class="form-control" />
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-card mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <div>
             <h3 class="settings-card-title mb-1">ألماسات المضيف وعمولة الوكالة الإضافية</h3>
@@ -307,6 +323,7 @@ const form = reactive({
   minWithdrawDiamonds: 200000,
   giftDiamondRatio: 1,
   luckyGiftDiamondRatio: 0.3,
+  platformCommissionPercent: 0,
   maxDiamondsPerUnit: 2000000,
   luckyGiftMaxMultiplier: 4,
   luckyGiftTargetEv: 0.38,
