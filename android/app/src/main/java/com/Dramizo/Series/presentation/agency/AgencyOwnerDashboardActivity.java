@@ -328,29 +328,11 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             TextView name = new TextView(this);
             String displayName = member.displayName == null || member.displayName.trim().isEmpty()
                     ? "مضيف" : member.displayName;
-            String roleLabel;
-            if ("owner".equalsIgnoreCase(member.role)) roleLabel = "مالك الوكالة";
-            else if ("manager".equalsIgnoreCase(member.role)) roleLabel = "مشرف";
-            else roleLabel = "مضيف";
-            String publicId = member.publicId == null || member.publicId.trim().isEmpty()
-                    ? "—" : member.publicId;
-            String targetLine;
-            if (!member.targetEnabled) {
-                targetLine = "التارجت: غير مفعّل";
-            } else if (member.currentTargetThreshold > 0) {
-                targetLine = "التارجت: " + formatLong(Math.max(0L, member.targetProgress))
-                        + " / " + formatLong(member.currentTargetThreshold)
-                        + " · متبقي " + formatLong(member.targetRemaining)
-                        + " (" + Math.max(0, Math.min(100, member.targetProgressPercent)) + "%)";
-            } else {
-                targetLine = "التارجت: مكتمل";
-            }
-            name.setText(displayName + "\\nID: " + publicId + " · " + roleLabel
-                    + "\\n" + targetLine);
+            name.setText(displayName);
             name.setTextColor(getColor(R.color.text_primary));
-            name.setTextSize(12);
+            name.setTextSize(13);
             name.setTypeface(null, android.graphics.Typeface.BOLD);
-            name.setMaxLines(3);
+            name.setMaxLines(1);
             name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             identity.addView(name);
 
