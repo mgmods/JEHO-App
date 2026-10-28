@@ -68,7 +68,8 @@ public class MedalActivity extends ThemedActivity {
 
         tabBadge.setOnClickListener(v -> showTab(false));
         tabMine.setOnClickListener(v -> showTab(true));
-        showTab(false);
+        // Open directly on the user's received medals so they can equip one immediately.
+        showTab(true);
         loadMedals();
     }
 
@@ -277,15 +278,19 @@ public class MedalActivity extends ThemedActivity {
                     .error(R.drawable.ic_medal_default)
                     .into(h.icon);
             boolean selected = selectedKeys.contains(row.key);
-            h.itemView.setAlpha(selected ? 1f : 0.92f);
-            h.itemView.setOnClickListener(v -> {
-                if (!showingMine || !ownCabinet) {
-                    if (!ownCabinet) Toast.makeText(MedalActivity.this, "يمكن لصاحب الحساب اختيار ميدالياته فقط", Toast.LENGTH_SHORT).show();
-                    return;
-                }
+            h.itemView.setAlpha(selected ? 1f : 0.96f);
+            h.action.setVisibility(showingMine && ownCabinet ? View.VISIBLE : View.GONE);
+            h.action.setText(selected ? "إلغاء التجهيز" : "تجهيز للملف الشخصي");
+            h.action.setBackgroundResource(selected
+                    ? R.drawable.bg_cosmetic_btn_equipped
+                    : R.drawable.bg_cosmetic_btn_equip);
+            h.action.setOnClickListener(v -> {
+                if (!showingMine || !ownCabinet) return;
                 if (row.key == null || row.key.trim().isEmpty()) return;
-                if (selectedKeys.contains(row.key)) selectedKeys.remove(row.key);
-                else {
+                boolean wasSelected = selectedKeys.contains(row.key);
+                if (wasSelected) {
+                    selectedKeys.remove(row.key);
+                } else {
                     if (selectedKeys.size() >= 5) {
                         Toast.makeText(MedalActivity.this, "يمكنك عرض 5 ميداليات كحد أقصى", Toast.LENGTH_SHORT).show();
                         return;
@@ -308,7 +313,7 @@ public class MedalActivity extends ThemedActivity {
             VH(View itemView) {
                 super(itemView);
                 icon = itemView.findViewById(R.id.imgMedal);
-                title = itemView.findViewById(R.id.tvMedalName);
+                title = itemView.findViewById(R.id.tvMedalName);\n                action = itemView.findViewById(R.id.btnMedalAction);
             }
         }
     }
