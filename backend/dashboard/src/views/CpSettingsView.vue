@@ -15,6 +15,50 @@
     <LoadingSpinner v-if="loading" />
 
     <template v-else>
+      <section class="settings-card mb-3 cp-feature-control">
+        <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+          <div>
+            <h3 class="settings-card-title mb-1">تشغيل قسم CB/CP والمهمات</h3>
+            <p class="form-text mb-0">إيقاف القسم يمنع بدء علاقات جديدة ويوقف عرض مهمات CP والمطالبة بمكافآتها. تبقى العلاقات والسجلات السابقة محفوظة.</p>
+          </div>
+          <label class="form-check form-switch mb-0">
+            <input v-model="cpFeatures.globallyEnabled" class="form-check-input" type="checkbox" role="switch">
+            <span class="form-check-label">{{ cpFeatures.globallyEnabled ? 'القسم مفعّل' : 'القسم متوقف' }}</span>
+          </label>
+        </div>
+        <div class="row g-3">
+          <div v-for="task in cpFeatures.tasks" :key="task.id" class="col-12 col-xl-6">
+            <div class="border rounded-3 p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                <h4 class="h6 mb-0">{{ task.id === 'memory_today' ? 'مهمة الذكرى المشتركة' : 'مهمة نشاط العلاقة' }}</h4>
+                <label class="form-check form-switch mb-0">
+                  <input v-model="task.enabled" class="form-check-input" type="checkbox" role="switch">
+                  <span class="form-check-label">{{ task.enabled ? 'مفعّلة' : 'متوقفة' }}</span>
+                </label>
+              </div>
+              <label class="form-label">اسم المهمة</label>
+              <input v-model.trim="task.title" class="form-control mb-3" maxlength="100">
+              <div class="row g-3">
+                <div class="col-6">
+                  <label class="form-label">{{ task.id === 'memory_today' ? 'عدد الذكريات المطلوبة' : 'نقاط العلاقة المطلوبة' }}</label>
+                  <input v-model.number="task.target" class="form-control" type="number" min="1" max="1000000" step="1">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">مكافأة نقاط العلاقة</label>
+                  <input v-model.number="task.rewardPoints" class="form-control" type="number" min="0" max="1000000" step="1">
+                </div>
+              </div>
+              <p class="form-text mt-2 mb-0">تُمنح المكافأة مرة واحدة لكل مستخدم وعلاقة وفي اليوم نفسه.</p>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-aurora" type="button" :disabled="saving" @click="saveFeatures">
+            <span v-if="savingFeatures" class="spinner-border spinner-border-sm me-1" />
+            حفظ إعدادات القسم والمهمات
+          </button>
+        </div>
+      </section>
       <section v-for="item in types" :key="item.type" class="settings-card mb-3">
         <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
           <div>
@@ -315,6 +359,14 @@ const pointForm = ref({ relationshipId: '', points: 0, eventType: 'admin_adjustm
 const error = ref('')
 const success = ref('')
 const policy = ref({ requestExpiryMinutes: 30, rulesText: '{}' })
+const savingFeatures = ref(false)
+const cpFeatures = ref({
+  globallyEnabled: true,
+  tasks: [
+    { id: 'memory_today', enabled: true, title: 'ذكرى جديدة', target: 1, rewardPoints: 10 },
+    { id: 'earn_points_today', enabled: true, title: 'نشاط مشترك', target: 10, rewardPoints: 15 },
+  ],
+})
 const cpStoreItems = ref([])
 const loadingCpStore = ref(false)
 const savingCpStore = ref(false)
@@ -441,6 +493,13 @@ async function load() {
     const [configResponse, giftsResponse] = await Promise.all([cpAdminApi.config(), giftsApi.list({ limit: 500 })])
     const config = payloadOf(configResponse)
     gifts.value = extractList(giftsResponse?.data?.data ?? giftsResponse?.data ?? giftsResponse).filter(gift => gift && gift.isActive !== false)
+    cpFeatures.value = {
+      globallyEnabled: config.globallyEnabled !== false,
+      tasks: [
+        { id: 'memory_today', ...(config.tasks?.memory_today || {}) },
+        { id: 'earn_points_today', ...(config.tasks?.earn_points_today || {}) },
+      ],
+    }
     types.value = (config.types || []).map(item => ({
       ...item,
       priceInput: item.priceCoins == null ? '' : String(item.priceCoins),
@@ -560,6 +619,28 @@ async function saveType(item) {
     await load()
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات النوع' }
   finally { saving.value = false; savingType.value = '' }
+}
+
+async function saveFeatures() {
+  error.value = ''; success.value = ''; savingFeatures.value = true
+  try {
+    const tasks = {}
+    for (const task of cpFeatures.value.tasks) {
+      const target = Number(task.target)
+      const rewardPoints = Number(task.rewardPoints)
+      if (!task.title?.trim() || task.title.trim().length > 100 ||
+          !Number.isSafeInteger(target) || target < 1 || target > 1000000 ||
+          !Number.isSafeInteger(rewardPoints) || rewardPoints < 0 || rewardPoints > 1000000) {
+        throw new Error('تحقق من اسم كل مهمة والهدف والمكافأة.')
+      }
+      tasks[task.id] = { enabled: !!task.enabled, title: task.title.trim(), target, rewardPoints }
+    }
+    await cpAdminApi.updateFeatures({ globallyEnabled: !!cpFeatures.value.globallyEnabled, tasks })
+    success.value = 'تم حفظ تشغيل قسم CP وإعدادات المهمات.'
+    await load()
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات المهمات'
+  } finally { savingFeatures.value = false }
 }
 
 async function savePolicy() {
