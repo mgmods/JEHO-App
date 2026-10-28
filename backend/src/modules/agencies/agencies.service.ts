@@ -2077,15 +2077,27 @@ export class AgenciesService implements OnModuleInit {
       const week = Math.ceil(((iso.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
       targetPeriodKey = `${iso.getUTCFullYear()}W${String(week).padStart(2, '0')}`;
     }
-    const targetRows: Array<{ userId: string; progress: string | number }> =
+    const targetRows: Array<{ userId: string; progress: string | number; withdrawnStageIds?: string[] | string | null }> =
       targetConfig.enabled && memberIds.length
         ? await this.dataSource.query(
-            `SELECT "userId", "progress" FROM host_monthly_progress
+            `SELECT "userId", "progress", "withdrawnStageIds" FROM host_monthly_progress
              WHERE "yearMonth" = $1 AND "userId" = ANY($2::uuid[])`,
             [targetPeriodKey, memberIds],
           )
         : [];
-    const progressByUser = new Map(targetRows.map((row) => [row.userId, Number(row.progress || 0)]));
+    const targetByUser = new Map(targetRows.map((row) => {
+      let withdrawn: string[] = [];
+      if (Array.isArray(row.withdrawnStageIds)) withdrawn = row.withdrawnStageIds;
+      else if (typeof row.withdrawnStageIds === 'string') {
+        try {
+          const parsed = JSON.parse(row.withdrawnStageIds);
+          if (Array.isArray(parsed)) withdrawn = parsed.map(String);
+        } catch {
+          withdrawn = [];
+        }
+      }
+      return [row.userId, { progress: Number(row.progress || 0), withdrawn: new Set(withdrawn) }] as const;
+    }));
     const sortedStages = (Array.isArray(targetConfig.stages) ? targetConfig.stages : [])
       .map((stage) => ({ ...stage, threshold: Math.max(0, Number(stage.threshold) || 0) }))
       .sort((a, b) => a.threshold - b.threshold);
@@ -2094,8 +2106,11 @@ export class AgenciesService implements OnModuleInit {
       const gross = await this.sumGiftsReceived([period.userId], new Date(period.joinedAt));
       const user = await this.usersRepo.findOne({ where: { id: period.userId } });
       const membership = members.find((m) => m.userId === period.userId);
-      const targetProgress = progressByUser.get(period.userId) || 0;
-      const nextStage = sortedStages.find((stage) => targetProgress < stage.threshold) || null;
+      const targetState = targetByUser.get(period.userId);
+      const targetProgress = targetState?.progress || 0;
+      // Match the host's existing target ladder: a stage remains current until its
+      // salary is withdrawn; reaching the threshold means zero remaining, not a jump.
+      const nextStage = sortedStages.find((stage) => !targetState?.withdrawn.has(String(stage.id || ''))) || null;
       const nextThreshold = nextStage?.threshold || 0;
       return {
         userId: period.userId,
