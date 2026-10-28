@@ -57,7 +57,12 @@ export class CpAdminController {
       });
     }
     let taskConfig: Record<string, any> = {};
-    try { taskConfig = JSON.parse(String(settings['cp.tasks.config'] || '{}')); } catch { taskConfig = {}; }
+    try {
+      const configured = settings['cp.tasks.config'];
+      taskConfig = configured && typeof configured === 'object' && !Array.isArray(configured)
+        ? configured
+        : JSON.parse(String(configured || '{}'));
+    } catch { taskConfig = {}; }
     const tasks = { ...taskConfig };
     tasks.memory_today = { enabled: true, title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', condition: 'memory_count', target: 1, rewardPoints: 10, rewardCosmeticCode: '', ...(tasks.memory_today || {}) };
     tasks.earn_points_today = { enabled: true, title: 'نشاط مشترك', description: 'اجمعوا نقاط العلاقة اليوم', condition: 'points_today', target: 10, rewardPoints: 15, rewardCosmeticCode: '', ...(tasks.earn_points_today || {}) };
