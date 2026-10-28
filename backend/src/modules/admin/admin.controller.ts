@@ -292,6 +292,8 @@ export class AdminController {
     if (body.giftDiamondRatio !== undefined) patch.giftDiamondRatio = num(body.giftDiamondRatio);
     if (body.luckyGiftDiamondRatio !== undefined)
       patch.luckyGiftDiamondRatio = num(body.luckyGiftDiamondRatio);
+    if (body.platformCommissionPercent !== undefined)
+      patch.platformCommissionPercent = num(body.platformCommissionPercent);
     if (body.maxDiamondsPerUnit !== undefined) patch.maxDiamondsPerUnit = num(body.maxDiamondsPerUnit);
     if (body.luckyGiftMaxMultiplier !== undefined)
       patch.luckyGiftMaxMultiplier = num(body.luckyGiftMaxMultiplier);
