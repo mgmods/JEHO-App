@@ -57,6 +57,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%' ORDER BY key`,
     );
     const settings: Record<string, string> = Object.fromEntries(rows.map((row: any) => [row.key, String(row.value)]));
+    const globallyEnabled = settings['cp.enabled.global'] !== 'false';
     const catalog: Array<Record<string, unknown>> = [];
     for (const type of Object.values(CpType)) {
       const giftId = settings[`cp.gift.${type}`] || null;
@@ -65,7 +66,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         [giftId],
       ) : [];
       const giftPrice = Number(gift?.coinPrice);
-      const enabled = settings[`cp.enabled.${type}`] !== 'false'
+      const enabled = globallyEnabled && settings[`cp.enabled.${type}`] !== 'false'
         && !!gift && Number.isSafeInteger(giftPrice) && giftPrice > 0;
       let rules: Record<string, any> = {};
       try { rules = JSON.parse(settings[`cp.rules.${type}`] || '{}'); } catch { rules = {}; }
@@ -221,6 +222,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
 
   async tasks(userId: string) {
+    const [globalSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.enabled.global']);
+    if (String(globalSetting?.value || 'true').toLowerCase() === 'false') return [];
     const [relationship] = await this.dataSource.query(
       `SELECT id,points::text AS points,level,type FROM cp_relationships
        WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
@@ -248,10 +251,25 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     );
     const claimed = new Set(claimedRows.map((row: any) => String(row.referenceId)));
     const pointsToday = Math.max(0, Number(pointsRow?.points) || 0);
-    const definitions = [
+    const [taskConfigRow] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
+    let taskConfig: Record<string, any> = {};
+    try { taskConfig = JSON.parse(taskConfigRow?.value || '{}'); } catch { taskConfig = {}; }
+    const defaults = [
       { id: 'memory_today', title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', progress: Math.min(1, Number(memoryCount?.count) || 0), target: 1, rewardPoints: 10 },
       { id: 'earn_points_today', title: 'نشاط مشترك', description: 'اجمعوا 10 نقاط علاقة اليوم', progress: Math.min(10, pointsToday), target: 10, rewardPoints: 15 },
     ];
+    const definitions = defaults
+      .filter(task => taskConfig[task.id]?.enabled !== false)
+      .map(task => ({
+        ...task,
+        title: String(taskConfig[task.id]?.title || task.title).slice(0, 100),
+        description: String(taskConfig[task.id]?.description || task.description).slice(0, 240),
+        target: Math.max(1, Math.min(1000000, Math.floor(Number(taskConfig[task.id]?.target) || task.target))),
+        rewardPoints: Math.max(0, Math.min(1000000, Math.floor(Number(taskConfig[task.id]?.rewardPoints) || task.rewardPoints))),
+        progress: task.id === 'memory_today'
+          ? Math.min(Math.max(1, Math.floor(Number(taskConfig[task.id]?.target) || task.target)), Number(memoryCount?.count) || 0)
+          : Math.min(Math.max(1, Math.floor(Number(taskConfig[task.id]?.target) || task.target)), pointsToday),
+      }));
     return definitions.map(task => {
       const referenceId = `${relationship.id}:${userId}:${task.id}:${day}`;
       const isClaimed = claimed.has(referenceId);
@@ -260,9 +278,17 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
   async claimTask(userId: string, taskId: string) {
+    const [globalSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.enabled.global']);
+    if (String(globalSetting?.value || 'true').toLowerCase() === 'false') {
+      throw new BadRequestException('قسم CP متوقف حالياً من لوحة التحكم');
+    }
     if (!['memory_today', 'earn_points_today'].includes(taskId)) {
       throw new BadRequestException('مهمة CP غير معروفة');
     }
+    const [taskConfigRow] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
+    let taskConfig: Record<string, any> = {};
+    try { taskConfig = JSON.parse(taskConfigRow?.value || '{}'); } catch { taskConfig = {}; }
+    if (taskConfig[taskId]?.enabled === false) throw new BadRequestException('هذه المهمة متوقفة من لوحة التحكم');
     const [relationship] = await this.dataSource.query(
       `SELECT id,points::text AS points,level,type FROM cp_relationships
        WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
@@ -280,8 +306,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
          WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())`,
         [relationship.id],
       );
-      eligible = Number(row?.count) >= 1;
-      rewardPoints = 10;
+      eligible = Number(row?.count) >= Math.max(1, Math.floor(Number(taskConfig[taskId]?.target) || 1));
+      rewardPoints = Math.max(0, Math.min(1000000, Math.floor(Number(taskConfig[taskId]?.rewardPoints) || 10)));
     } else {
       const [row] = await this.dataSource.query(
         `SELECT COALESCE(SUM(points::numeric),0)::text AS points FROM cp_point_events
@@ -289,8 +315,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
            AND "eventType"<>'cp_task_reward'`,
         [relationship.id],
       );
-      eligible = Number(row?.points) >= 10;
-      rewardPoints = 15;
+      eligible = Number(row?.points) >= Math.max(1, Math.floor(Number(taskConfig[taskId]?.target) || 10));
+      rewardPoints = Math.max(0, Math.min(1000000, Math.floor(Number(taskConfig[taskId]?.rewardPoints) || 15)));
     }
     if (!eligible) throw new BadRequestException('أكملوا شرط المهمة أولاً');
     const referenceId = `${relationship.id}:${userId}:${taskId}:${day}`;
