@@ -650,6 +650,23 @@ public final class MiscDtos {
         @SerializedName("diamondUsdRate") public double diamondUsdRate;
     }
 
+    public static class AgencyStatsDto {
+        @SerializedName("agencyId") public String agencyId;
+        @SerializedName("name") public String name;
+        @SerializedName("memberCount") public int memberCount;
+        @SerializedName("totalDiamonds") public long totalDiamonds;
+        @SerializedName("giftsReceivedDiamonds") public long giftsReceivedDiamonds;
+        @SerializedName("commissionPercent") public double commissionPercent;
+        @SerializedName("members") public List<AgencyMemberPeriodStatDto> members;
+    }
+
+    public static class AgencyMemberPeriodStatDto {
+        @SerializedName("userId") public String userId;
+        @SerializedName("displayName") public String displayName;
+        @SerializedName("membershipStartedAt") public String membershipStartedAt;
+        @SerializedName("giftsReceivedDiamonds") public long giftsReceivedDiamonds;
+    }
+
     public static class AgencyMineDto {
         @SerializedName("agency") public AgencyDto agency;
         @SerializedName("role") public String role;
