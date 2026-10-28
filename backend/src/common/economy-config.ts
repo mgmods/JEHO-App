@@ -112,9 +112,10 @@ export function applyEconomyPatch(patch: Partial<EconomyConfigShape>): EconomyCo
   if (patch.diamondUsd !== undefined) {
     ECONOMY.diamondUsd = clamp(patch.diamondUsd, 0.000001, 1, ECONOMY_DEFAULTS.diamondUsd);
   }
-  if (patch.giftDiamondRatio !== undefined) {
-    ECONOMY.giftDiamondRatio = clamp(patch.giftDiamondRatio, 0.01, 1, ECONOMY_DEFAULTS.giftDiamondRatio);
-  }
+  // Regular gifts always pay their full coin face value in diamonds.
+  // Keep the legacy setting field for compatibility, but never let dashboard
+  // payloads lower the regular-gift payout ratio.
+  ECONOMY.giftDiamondRatio = 1;
   if (patch.luckyGiftDiamondRatio !== undefined) {
     ECONOMY.luckyGiftDiamondRatio = clamp(
       patch.luckyGiftDiamondRatio,
