@@ -2323,6 +2323,16 @@ export class AgenciesService implements OnModuleInit {
   }
 
   /** Detailed earnings for agency owner/manager: commission + period dashboard */
+  private publicAgencyPeriod(slice: Record<string, any>) {
+    if (!slice || typeof slice !== 'object') return slice;
+    const {
+      estimatedPlatformCut: _platform,
+      estimatedAgentShare: _agent,
+      ...visible
+    } = slice;
+    return visible;
+  }
+
   async earnings(agencyId: string, viewerId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
@@ -2408,7 +2418,6 @@ export class AgenciesService implements OnModuleInit {
       name: agency.name,
       ownerId: agency.ownerId,
       commissionPercent: commissionPct,
-      platformCutPercent: platformPct,
       hostSharePercent: hostPct,
       memberCount: memberIds.length,
       activeHosts,
@@ -2421,13 +2430,12 @@ export class AgenciesService implements OnModuleInit {
         ownerCommissionUsd: this.diamondsToUsd(allTime.ownerCommissionEarned, rate),
         estimatedHostShare: allTime.estimatedHostShare,
         estimatedHostShareUsd: this.diamondsToUsd(allTime.estimatedHostShare, rate),
-        estimatedPlatformCut: allTime.estimatedPlatformCut,
-        estimatedAgentShare: allTime.estimatedAgentShare,
       },
+      // Keep internal platform/agent split fields out of the owner-facing API.
       periods: {
-        week: weekUsd,
-        month: monthUsd,
-        allTime: allUsd,
+        week: this.publicAgencyPeriod(weekUsd),
+        month: this.publicAgencyPeriod(monthUsd),
+        allTime: this.publicAgencyPeriod(allUsd),
       },
       monthCommissionDeltaPct: this.pctChange(
         month.ownerCommissionEarned,
