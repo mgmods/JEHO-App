@@ -32,9 +32,15 @@ export class CpController {
   }
 
   @Get('leaderboard')
-  @ApiOperation({ summary: 'Server-calculated weekly or all-time CP leaderboard' })
-  leaderboard(@Query('period') period?: 'weekly' | 'world') {
-    return this.cp.leaderboard(period === 'world' ? 'world' : 'weekly');
+  @ApiOperation({ summary: 'Server-calculated weekly or worldwide CP leaderboard' })
+  leaderboard(@Query('period') period?: string) {
+    // Normalize query values from older Android clients and avoid silently
+    // treating whitespace/case variations of "world" as the weekly ranking.
+    const normalizedPeriod = String(period || 'weekly').trim().toLowerCase();
+    const selectedPeriod = ['world', 'global', 'all', 'all-time', 'all_time'].includes(normalizedPeriod)
+      ? 'world'
+      : 'weekly';
+    return this.cp.leaderboard(selectedPeriod);
   }
 
   @Get('rewards')
