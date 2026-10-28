@@ -342,15 +342,59 @@ public class MyEventsActivity extends ThemedActivity {
 
     private void openEventRoom(@Nullable EventDtos.EventDto event) {
         if (event == null) return;
-        if (event.roomId == null || event.roomId.trim().isEmpty()) {
-            new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle(event.title != null ? event.title : getString(R.string.my_events))
-                    .setMessage(event.description != null && !event.description.trim().isEmpty()
-                            ? event.description : "لا توجد غرفة مرتبطة بهذه الفعالية.")
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show();
+        String details = event.description != null && !event.description.trim().isEmpty()
+                ? event.description.trim() : "انضم إلى الفعالية وتابع تفاصيلها هنا.";
+        details += "\\n\\n" + "المشاركون: " + Math.max(0, event.subscribersCount);
+        if (event.roomTitle != null && !event.roomTitle.trim().isEmpty()) {
+            details += "\\nالغرفة: " + event.roomTitle.trim();
+        }
+        androidx.appcompat.app.AlertDialog dialog =
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle(event.title != null ? event.title : getString(R.string.my_events))
+                        .setMessage(details)
+                        .setPositiveButton(Boolean.TRUE.equals(event.subscribed)
+                                        ? "تم الحجز ✓" : "حجز الفعالية",
+                                (d, which) -> subscribeToEvent(event))
+                        .setNeutralButton("دخول الغرفة", (d, which) -> launchEventRoom(event))
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .create();
+        if (event.roomId == null || event.roomId.trim().isEmpty()
+                || "ended".equalsIgnoreCase(event.status)) {
+            dialog.setOnShowListener(d -> dialog.getButton(
+                    androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL).setEnabled(false));
+        }
+        dialog.show();
+    }
+
+    private void subscribeToEvent(@NonNull EventDtos.EventDto event) {
+        if (Boolean.TRUE.equals(event.subscribed)) {
+            Toast.makeText(this, "أنت حاجز هذه الفعالية مسبقاً", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (event.id == null) return;
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<EventDtos.EventDto> result =
+                    ApiCall.execute(c.getEventsApi().subscribe(event.id));
+            runOnUiThread(() -> {
+                if (result.success) {
+                    event.subscribed = true;
+                    if (result.data != null) {
+                        event.subscribersCount = result.data.subscribersCount;
+                    } else {
+                        event.subscribersCount++;
+                    }
+                    adapter.notifyDataSetChanged();
+                    Toast.makeText(this, "تم حجز الفعالية بنجاح ✓", Toast.LENGTH_SHORT).show();
+                } else {
+                    ErrorToasts.show(this, result.error);
+                }
+            });
+        });
+    }
+
+    private void launchEventRoom(@NonNull EventDtos.EventDto event) {
+        if (event.roomId == null || event.roomId.trim().isEmpty()) return;
         if ("ended".equalsIgnoreCase(event.status)) {
             Toast.makeText(this, R.string.event_status_ended, Toast.LENGTH_SHORT).show();
             return;
