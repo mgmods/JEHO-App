@@ -133,8 +133,11 @@ export class AgenciesController {
   }
 
   @Get(':id/stats')
-  stats(@Param('id', ParseUUIDPipe) id: string) {
-    return this.agenciesService.stats(id);
+  stats(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.agenciesService.stats(id, userId);
   }
 
   @Get(':id/earnings')
