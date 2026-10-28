@@ -95,6 +95,16 @@ public class ChatRepositoryImpl implements ChatRepository {
                 new ChatDtos.SendMessageRequest("", "audio", replyToId, media)));
     }
 
+    @Override public Result<ChatDtos.MessageDto> sendVideo(String conversationId, String videoUrl, String mimeType, long size, int durationSec, String replyToId) {
+        ChatDtos.MediaDto media = new ChatDtos.MediaDto();
+        media.url = videoUrl;
+        media.mimeType = mimeType != null && mimeType.startsWith("video/") ? mimeType : "video/mp4";
+        media.size = Math.max(0, size);
+        media.duration = Math.max(0, durationSec);
+        return ApiCall.execute(api.send(conversationId,
+                new ChatDtos.SendMessageRequest("", "video", replyToId, media)));
+    }
+
     @Override public Result<ChatDtos.MessageDto> sendGift(String conversationId, String giftName, String iconUrl, String replyToId) {
         ChatDtos.MediaDto media = null;
         if (iconUrl != null && !iconUrl.isEmpty()) {
