@@ -28,6 +28,7 @@ import com.google.android.material.button.MaterialButton;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Professional agency-owner dashboard — commission balance, hosts, month stats, withdraw log.
@@ -120,6 +121,11 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 agencyStatsVisibleCount = Math.min(latestAgencyStats.members.size(), agencyStatsVisibleCount + 40);
                 renderAgencyStats(latestAgencyStats);
             });
+        }
+        MaterialButton btnAgencyAudit = findViewById(R.id.btnAgencyModerationAudit);
+        if (btnAgencyAudit != null) {
+            btnAgencyAudit.setVisibility(View.VISIBLE);
+            btnAgencyAudit.setOnClickListener(v -> loadAgencyModerationAudit());
         }
 
         RecyclerView recycler = findViewById(R.id.recyclerWithdraws);
@@ -284,6 +290,62 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 if (tvWithdrawEmpty != null) {
                     tvWithdrawEmpty.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
                 }
+            });
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadAgencyModerationAudit() {
+        if (agencyId == null || agencyId.trim().isEmpty()) return;
+        Toast.makeText(this, "جاري تحميل سجل الإشراف…", Toast.LENGTH_SHORT).show();
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(
+                    ContainerProvider.from(this).getAgencyApi().moderationAudit(agencyId, 100));
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (!result.success || result.data == null) {
+                    Toast.makeText(this, result.error != null ? result.error : "تعذر تحميل سجل الإشراف",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                Object rawItems = result.data.get("items");
+                StringBuilder body = new StringBuilder();
+                if (rawItems instanceof List) {
+                    List<?> items = (List<?>) rawItems;
+                    for (Object raw : items) {
+                        if (!(raw instanceof Map)) continue;
+                        Map<String, Object> item = (Map<String, Object>) raw;
+                        String action = String.valueOf(item.get("action"));
+                        String actionLabel = "mute".equals(action) ? "كتم مايك"
+                                : ("remove_mic".equals(action) ? "تنزيل من المايك"
+                                : ("kick".equals(action) ? "طرد من الغرفة"
+                                : ("ban".equals(action) ? "حظر" : action)));
+                        String createdAt = String.valueOf(item.get("createdAt"));
+                        if (createdAt.length() >= 16) createdAt = createdAt.substring(0, 16).replace('T', ' ');
+                        body.append("الإجراء: ").append(actionLabel).append("\n")
+                                .append("المشرف: ").append(String.valueOf(item.get("actorName")))
+                                .append(" (ID ").append(String.valueOf(item.get("actorPublicId"))).append(")\n")
+                                .append("المستخدم: ").append(String.valueOf(item.get("targetName")))
+                                .append(" (ID ").append(String.valueOf(item.get("targetPublicId"))).append(")\n")
+                                .append("الغرفة: ").append(String.valueOf(item.get("roomTitle"))).append("\n")
+                                .append("السبب: ").append(item.get("reason") == null ? "—" : String.valueOf(item.get("reason"))).append("\n")
+                                .append("الوقت: ").append(createdAt).append(" UTC\n")
+                                .append("────────────────────\n");
+                    }
+                }
+                if (body.length() == 0) body.append("لا توجد إجراءات إشراف مسجلة حتى الآن.");
+                android.widget.TextView content = new android.widget.TextView(this);
+                content.setText(body.toString());
+                content.setTextColor(getColor(R.color.text_primary));
+                content.setTextSize(13);
+                content.setPadding(dp(16), dp(12), dp(16), dp(12));
+                android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+                scroll.addView(content);
+                new AlertDialog.Builder(this)
+                        .setTitle("سجل إجراءات مشرفي الوكالة")
+                        .setView(scroll)
+                        .setPositiveButton("إغلاق", null)
+                        .show();
             });
         });
     }
