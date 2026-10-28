@@ -271,10 +271,25 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           ? Math.min(Math.max(1, Math.floor(Number(taskConfig[task.id]?.target) || task.target)), Number(memoryCount?.count) || 0)
           : Math.min(Math.max(1, Math.floor(Number(taskConfig[task.id]?.target) || task.target)), pointsToday),
       }));
+    const rewardCodes = definitions.map(task => String(task.rewardCosmeticCode || '').trim()).filter(Boolean);
+    const rewardRows: Array<{ code: string; name: string; previewUrl: string; type: string }> = rewardCodes.length
+      ? await this.dataSource.query(
+          'SELECT code,name,"previewUrl",type FROM cosmetics WHERE code = ANY($1::text[]) AND code LIKE \'cp_%\' AND "isActive"=true',
+          [rewardCodes],
+        )
+      : [];
+    const rewardByCode = new Map(rewardRows.map(item => [item.code, item]));
     return definitions.map(task => {
       const referenceId = `${relationship.id}:${userId}:${task.id}:${day}`;
       const isClaimed = claimed.has(referenceId);
-      return { ...task, progress: Number(task.progress), claimed: isClaimed, canClaim: !isClaimed && task.progress >= task.target };
+      const code = String(task.rewardCosmeticCode || '').trim();
+      return {
+        ...task,
+        rewardItem: code ? (rewardByCode.get(code) || null) : null,
+        progress: Number(task.progress),
+        claimed: isClaimed,
+        canClaim: !isClaimed && task.progress >= task.target,
+      };
     });
   }
 
