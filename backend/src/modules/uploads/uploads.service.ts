@@ -107,7 +107,7 @@ export class UploadsService implements OnModuleInit {
         file: Express.Multer.File,
         cb: (error: Error | null, accept: boolean) => void,
       ) => {
-        const allowed = /\.(jpg|jpeg|png|gif|webp|svg|svga|mp4|mp3|m4a|aac|wav|pdf|mov|webm|json)$/i;
+        const allowed = /\.(jpg|jpeg|png|gif|webp|svg|svga|mp4|mp3|m4a|aac|wav|pdf|mov|webm|3gp|json)$/i;
         if (!allowed.test(extname(file.originalname))) {
           return cb(new BadRequestException('File type not allowed') as any, false);
         }
@@ -194,6 +194,7 @@ export class UploadsService implements OnModuleInit {
       '.mp4': 'video/mp4',
       '.webm': 'video/webm',
       '.mov': 'video/quicktime',
+      '.3gp': 'video/3gpp',
       '.svga': 'application/octet-stream',
       '.pdf': 'application/pdf',
       '.json': 'application/json',
