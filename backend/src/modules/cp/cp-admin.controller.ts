@@ -58,12 +58,12 @@ export class CpAdminController {
     }
     let taskConfig: Record<string, any> = {};
     try { taskConfig = JSON.parse(String(settings['cp.tasks.config'] || '{}')); } catch { taskConfig = {}; }
+    const tasks = { ...taskConfig };
+    tasks.memory_today = { enabled: true, title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', condition: 'memory_count', target: 1, rewardPoints: 10, rewardCosmeticCode: '', ...(tasks.memory_today || {}) };
+    tasks.earn_points_today = { enabled: true, title: 'نشاط مشترك', description: 'اجمعوا نقاط العلاقة اليوم', condition: 'points_today', target: 10, rewardPoints: 15, rewardCosmeticCode: '', ...(tasks.earn_points_today || {}) };
     return {
       globallyEnabled: settings['cp.enabled.global'] !== false && settings['cp.enabled.global'] !== 'false',
-      tasks: {
-        memory_today: { enabled: taskConfig.memory_today?.enabled !== false, title: String(taskConfig.memory_today?.title || 'ذكرى جديدة'), target: Number(taskConfig.memory_today?.target || 1), rewardPoints: Number(taskConfig.memory_today?.rewardPoints ?? 10), rewardCosmeticCode: String(taskConfig.memory_today?.rewardCosmeticCode || '') },
-        earn_points_today: { enabled: taskConfig.earn_points_today?.enabled !== false, title: String(taskConfig.earn_points_today?.title || 'نشاط مشترك'), target: Number(taskConfig.earn_points_today?.target || 10), rewardPoints: Number(taskConfig.earn_points_today?.rewardPoints ?? 15), rewardCosmeticCode: String(taskConfig.earn_points_today?.rewardCosmeticCode || '') },
-      },
+      tasks,
       types,
       policy: {
         requestExpiryMinutes: settings['cp.policy.request_expiry_minutes'] ?? 30,
@@ -86,19 +86,18 @@ export class CpAdminController {
       tasks?: Record<string, { enabled?: boolean; title?: string; target?: number; rewardPoints?: number; rewardCosmeticCode?: string }>;
     },
   ) {
-    const allowed = ['memory_today', 'earn_points_today'];
-    const [existing] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
     let current: Record<string, any> = {};
-    try { current = JSON.parse(existing?.value || '{}'); } catch { current = {}; }
     if (body.tasks !== undefined) {
-      if (!body.tasks || typeof body.tasks !== 'object' || Array.isArray(body.tasks)) {
+      if (!body.tasks || typeof body.tasks !== 'object' || Array.isArray(body.tasks) || Object.keys(body.tasks).length > 100) {
         throw new BadRequestException('إعدادات مهمات CP غير صالحة');
       }
       for (const id of Object.keys(body.tasks)) {
-        if (!allowed.includes(id)) throw new BadRequestException('معرّف مهمة CP غير مدعوم');
+        if (!/^[a-zA-Z0-9_-]{2,64}$/.test(id)) throw new BadRequestException('معرّف مهمة CP غير صالح');
         const task = body.tasks[id];
         if (!task || typeof task !== 'object' || Array.isArray(task)) throw new BadRequestException('بيانات المهمة غير صالحة');
         if (task.enabled !== undefined && typeof task.enabled !== 'boolean') throw new BadRequestException('حالة المهمة غير صالحة');
+        if (task.condition !== undefined && !['memory_count', 'points_today'].includes(String(task.condition))) throw new BadRequestException('شرط المهمة غير مدعوم');
+        if (task.description !== undefined && (typeof task.description !== 'string' || task.description.length > 240)) throw new BadRequestException('وصف المهمة غير صالح');
         if (task.target !== undefined && (!Number.isSafeInteger(task.target) || task.target < 1 || task.target > 1000000)) throw new BadRequestException('هدف المهمة يجب أن يكون بين 1 و1,000,000');
         if (task.rewardPoints !== undefined && (!Number.isSafeInteger(task.rewardPoints) || task.rewardPoints < 0 || task.rewardPoints > 1000000)) throw new BadRequestException('مكافأة المهمة يجب أن تكون بين 0 و1,000,000 نقطة');
         if (task.title !== undefined && (typeof task.title !== 'string' || !task.title.trim() || task.title.length > 100)) throw new BadRequestException('عنوان المهمة غير صالح');
@@ -114,7 +113,7 @@ export class CpAdminController {
           }
           task.rewardCosmeticCode = code;
         }
-        current[id] = { ...(current[id] || {}), ...task, ...(task.title !== undefined ? { title: task.title.trim() } : {}) };
+        current[id] = { ...task, ...(task.title !== undefined ? { title: task.title.trim() } : {}), ...(task.description !== undefined ? { description: task.description.trim() } : {}) };
       }
     }
     const values: Record<string, string> = {};
