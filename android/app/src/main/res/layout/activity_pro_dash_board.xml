@@ -646,6 +646,16 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:orientation="vertical" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAgencyStatsMore"
+                        style="@style/Widget.AuraLive.Button.Outlined"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="8dp"
+                        android:text="عرض بقية الأعضاء"
+                        android:textAllCaps="false"
+                        android:visibility="gone" />
                 </LinearLayout>
 
                 <!-- Withdraw requests -->
