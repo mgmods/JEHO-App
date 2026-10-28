@@ -68,7 +68,13 @@
             </button>
           </div>
         </div>
-        <div v-if="selectedHasOverride" class="small text-secondary mt-2">النطاقات أعلاه أصبحت خاصة بهذه الهدية. يمكنك تعديلها بشكل مستقل عن الإعدادات العامة.</div>
+        <div v-if="selectedHasOverride" class="mt-3">
+          <div class="form-check form-switch">
+            <input :id="'lucky-gift-enabled-' + selectedGiftId" v-model="config.giftOverrides[selectedGiftId].enabled" class="form-check-input" type="checkbox" role="switch">
+            <label :for="'lucky-gift-enabled-' + selectedGiftId" class="form-check-label">تفعيل مردود الحظ لهذه الهدية</label>
+          </div>
+          <div class="small text-secondary mt-2">النطاقات أعلاه أصبحت خاصة بهذه الهدية. عند إيقاف المردود تبقى الهدية قابلة للإرسال لكن نتيجتها X0.</div>
+        </div>
       </div>
 
       <div class="d-flex flex-wrap gap-2 justify-content-end">
