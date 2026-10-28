@@ -128,11 +128,9 @@ public class AgencyAdapter extends RecyclerView.Adapter<AgencyAdapter.VH> {
         }
 
         boolean mine = myAgencyId != null && myAgencyId.equals(agency.id);
-        holder.itemView.setOnClickListener(v -> {
-            if (live && agency.openRoomId != null && !agency.openRoomId.isEmpty()) {
-                listener.onEnterLive(agency.id, agency.openRoomId);
-            }
-        });
+        // Tapping the agency card opens its details; entering a live room remains
+        // an explicit action on the live/enter button.
+        holder.itemView.setOnClickListener(v -> listener.onJoin(agency));
         if (mine && canManage) {
             holder.b.btnJoin.setText(R.string.agency_manage);
             holder.b.btnJoin.setEnabled(true);
