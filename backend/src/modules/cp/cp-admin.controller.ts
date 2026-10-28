@@ -153,15 +153,6 @@ export class CpAdminController {
     }
     if (body.rules !== undefined) config['cp.policy.rules'] = JSON.stringify(body.rules);
     await this.dataSource.transaction(async manager => {
-      if (body.giftId) {
-        // The selected initiation gift must be visible under the dedicated CP gift tab in Android.
-        await manager.query(
-          `INSERT INTO gift_categories (id,key,"labelAr","labelEn","sortOrder","isActive","createdAt","updatedAt")
-           VALUES (gen_random_uuid(),'cp','هدايا الارتباط','CP Gifts',90,true,now(),now())
-           ON CONFLICT (key) DO UPDATE SET "labelAr"='هدايا الارتباط',"labelEn"='CP Gifts',"isActive"=true,"updatedAt"=now()`,
-        );
-        await manager.query('UPDATE gifts SET category=\'cp\', "updatedAt"=now() WHERE id=$1 AND "isActive"=true', [body.giftId]);
-      }
       for (const [key, value] of Object.entries(config)) {
         await manager.query(
           `INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
