@@ -34,6 +34,28 @@ export class EconomySettingsService implements OnModuleInit {
         const parsed = this.safeParse(row.value);
         if (parsed) {
           applyEconomyPatch(parsed);
+          // One-time migration: the new payout contract guarantees that a regular
+          // gift mints its full coin value in host diamonds. Preserve the admin's
+          // lucky ratio and agency commission while migrating old 70/30 split configs.
+          const modelVersionKey = 'economy.gift_payout_model_version';
+          const modelVersion = await this.settingsRepo.findOne({ where: { key: modelVersionKey } });
+          if (!modelVersion?.value || Number(modelVersion.value) < 2) {
+            ECONOMY.giftDiamondRatio = 1;
+            ECONOMY.defaultGiftSplit = {
+              platformPercent: 0,
+              hostPercent: 100,
+              agencyOwnerPercent: ECONOMY.defaultGiftSplit.agencyOwnerPercent,
+            };
+            await this.persistCurrent('Migrate to full host gift payout v2');
+            const versionRow = modelVersion || this.settingsRepo.create({
+              key: modelVersionKey,
+              value: '2',
+              description: 'Gift payout model migration version',
+            });
+            versionRow.value = '2';
+            await this.settingsRepo.save(versionRow);
+            this.log.log('Migrated gift payout model: full host diamonds + additive agency commission');
+          }
           this.log.log(
             `Loaded economy settings from DB (ratio=${ECONOMY.giftDiamondRatio}, cap=${ECONOMY.maxDiamondsPerUnit})`,
           );
