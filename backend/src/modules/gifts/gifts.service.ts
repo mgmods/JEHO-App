@@ -281,10 +281,9 @@ export class GiftsService implements OnModuleInit {
    * 2) NEVER reassign gift.category — that column is dashboard-owned
    * 3) hard-deactivate duplicates (same art / same name)
    *
-   * If `forceFromRatio` is true, the stored diamondValue is IGNORED and
-   * every gift is re-minted purely from `coinPrice × ratio` (still capped).
-   * This is used when the admin lowers the ratio/cap and wants the whole
-   * board recomputed. Called by the admin economy-settings endpoint.
+   * The stored per-gift diamondValue is ignored: every paid gift is re-minted
+   * from coinPrice × live dashboard ratio (still subject to the absolute safety cap).
+   * This keeps catalog values from silently reducing a host's configured payout.
    */
   async normalizeGiftEconomyCatalog(opts: { forceFromRatio?: boolean } = {}) {
     try {
