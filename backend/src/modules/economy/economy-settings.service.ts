@@ -99,6 +99,7 @@ export class EconomySettingsService implements OnModuleInit {
       diamondUsd: ECONOMY.diamondUsd,
       giftDiamondRatio: ECONOMY.giftDiamondRatio,
       luckyGiftDiamondRatio: ECONOMY.luckyGiftDiamondRatio,
+      platformCommissionPercent: ECONOMY.platformCommissionPercent,
       maxDiamondsPerUnit: ECONOMY.maxDiamondsPerUnit,
       luckyGiftMaxMultiplier: ECONOMY.luckyGiftMaxMultiplier,
       luckyGiftTargetEv: ECONOMY.luckyGiftTargetEv,
