@@ -60,6 +60,9 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
     private String agencyName;
     private long minWithdraw = 10000L;
     private MiscDtos.AgencyMineDto mineSnap;
+    // onCreate performs the first load; skip the immediate first onResume to avoid
+    // duplicate network requests and overlapping dashboard renders.
+    private boolean firstResumeHandled;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -139,7 +142,11 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        load();
+        if (firstResumeHandled) {
+            load();
+        } else {
+            firstResumeHandled = true;
+        }
     }
 
     private void setLabel(int id, int res) {
