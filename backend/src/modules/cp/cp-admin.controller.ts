@@ -61,8 +61,8 @@ export class CpAdminController {
     return {
       globallyEnabled: settings['cp.enabled.global'] !== false && settings['cp.enabled.global'] !== 'false',
       tasks: {
-        memory_today: { enabled: taskConfig.memory_today?.enabled !== false, title: String(taskConfig.memory_today?.title || 'ذكرى جديدة'), target: Number(taskConfig.memory_today?.target || 1), rewardPoints: Number(taskConfig.memory_today?.rewardPoints || 10) },
-        earn_points_today: { enabled: taskConfig.earn_points_today?.enabled !== false, title: String(taskConfig.earn_points_today?.title || 'نشاط مشترك'), target: Number(taskConfig.earn_points_today?.target || 10), rewardPoints: Number(taskConfig.earn_points_today?.rewardPoints || 15) },
+        memory_today: { enabled: taskConfig.memory_today?.enabled !== false, title: String(taskConfig.memory_today?.title || 'ذكرى جديدة'), target: Number(taskConfig.memory_today?.target || 1), rewardPoints: Number(taskConfig.memory_today?.rewardPoints || 10), rewardCosmeticCode: String(taskConfig.memory_today?.rewardCosmeticCode || '') },
+        earn_points_today: { enabled: taskConfig.earn_points_today?.enabled !== false, title: String(taskConfig.earn_points_today?.title || 'نشاط مشترك'), target: Number(taskConfig.earn_points_today?.target || 10), rewardPoints: Number(taskConfig.earn_points_today?.rewardPoints || 15), rewardCosmeticCode: String(taskConfig.earn_points_today?.rewardCosmeticCode || '') },
       },
       types,
       policy: {
@@ -83,7 +83,7 @@ export class CpAdminController {
     @CurrentUser('sub') adminId: string,
     @Body() body: {
       globallyEnabled?: boolean;
-      tasks?: Record<string, { enabled?: boolean; title?: string; target?: number; rewardPoints?: number }>;
+      tasks?: Record<string, { enabled?: boolean; title?: string; target?: number; rewardPoints?: number; rewardCosmeticCode?: string }>;
     },
   ) {
     const allowed = ['memory_today', 'earn_points_today'];
@@ -101,6 +101,18 @@ export class CpAdminController {
         if (task.target !== undefined && (!Number.isSafeInteger(task.target) || task.target < 1 || task.target > 1000000)) throw new BadRequestException('هدف المهمة يجب أن يكون بين 1 و1,000,000');
         if (task.rewardPoints !== undefined && (!Number.isSafeInteger(task.rewardPoints) || task.rewardPoints < 0 || task.rewardPoints > 1000000)) throw new BadRequestException('مكافأة المهمة يجب أن تكون بين 0 و1,000,000 نقطة');
         if (task.title !== undefined && (typeof task.title !== 'string' || !task.title.trim() || task.title.length > 100)) throw new BadRequestException('عنوان المهمة غير صالح');
+        if (task.rewardCosmeticCode !== undefined) {
+          const code = String(task.rewardCosmeticCode || '').trim();
+          if (code && !/^[a-zA-Z0-9_-]{2,64}$/.test(code)) throw new BadRequestException('رمز هدية المهمة غير صالح');
+          if (code) {
+            const [item] = await this.dataSource.query(
+              'SELECT id FROM cosmetics WHERE code=$1 AND code LIKE \'cp_%\' AND "isActive"=true LIMIT 1',
+              [code],
+            );
+            if (!item) throw new BadRequestException('هدية المهمة يجب أن تكون عنصراً مفعّلاً من متجر CP');
+          }
+          task.rewardCosmeticCode = code;
+        }
         current[id] = { ...(current[id] || {}), ...task, ...(task.title !== undefined ? { title: task.title.trim() } : {}) };
       }
     }
