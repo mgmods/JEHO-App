@@ -305,12 +305,9 @@ export class GiftsService implements OnModuleInit {
         }
         const isLucky = g.type === GiftType.LUCKY;
         const ratio = isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio;
-        const catalogSeed = opts.forceFromRatio
-          ? 0 // ignore stored value → recompute purely from ratio
-          : Number(g.diamondValue) > 0
-            ? Number(g.diamondValue)
-            : recommendedGiftDiamonds(price, isLucky);
-        const nextDiamonds = mintDiamondsPerUnit(price, catalogSeed, ratio);
+        // The gift's coin price and live dashboard ratio are authoritative.
+        // Do not let stale catalog diamondValue reduce the host's configured payout.
+        const nextDiamonds = mintDiamondsPerUnit(price, 0, ratio);
         if (Math.max(0, Math.floor(Number(g.diamondValue) || 0)) !== nextDiamonds) {
           g.diamondValue = nextDiamonds;
           diamondFixed++;
@@ -2212,13 +2209,13 @@ export class GiftsService implements OnModuleInit {
     // The optional dashboard platform percentage adjusts the mint ratio itself.
     // It must not be deducted a second time from the already-minted diamond pool:
     // the clean economy model takes platform margin at coin → diamond mint.
-    const platformPercent = await this.platformGiftCommissionPercent();
-    const effectiveRatioCap = Math.max(0, ratioCap * (1 - platformPercent / 100));
-    // Never use Math.min(catalog=0, …) — that wiped diamonds on unpaid catalog rows.
+    // Host diamonds are minted from the dashboard ratio only. The platform's
+    // internal margin is accounted for separately and must never reduce host or agency earnings.
+    // Ignore stale per-gift diamondValue so a 100-coin regular gift at 100% pays 100 diamonds.
     const cappedPerUnit = mintDiamondsPerUnit(
       coinPrice,
-      gift.diamondValue,
-      effectiveRatioCap,
+      0,
+      ratioCap,
     );
     // Receiver diamonds are the final distributable pool. Lucky jackpot returns coins to sender.
     const diamondsAwarded = cappedPerUnit * qty;
@@ -2269,13 +2266,9 @@ export class GiftsService implements OnModuleInit {
         }),
       );
 
-      // ── CLEAN ECONOMY: ONE diamond pool (wallet.diamonds) ──────────────
-      // `diamondsAwarded` = the diamonds this gift mints for the receiver side.
-      //   Personal room → host keeps 100%.
-      //   Agency room   → host keeps (100 − ownerPct)%, agency owner earns
-      //                   ownerPct% commission. BOTH land in wallet.diamonds.
-      // No separate platform cut here: platform margin is the gap between the
-      // coins the sender paid and the diamonds handed out (taken at mint).
+      // ── INDEPENDENT EARNINGS: host receives the full gift value.
+      // Agency commission is an additional credit, never deducted from host diamonds.
+      // Platform share/margin is accounted for separately and never exposed to clients.
       let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
       const distributableDiamonds = diamondsAwarded;
@@ -2319,14 +2312,13 @@ export class GiftsService implements OnModuleInit {
             ),
           );
           const receiverIsOwner = String(agency.ownerId) === String(dto.receiverId);
-          if (receiverIsOwner) {
-            // Owner is also the host → keeps the full distributable pool.
-            agentShare = 0;
-            hostDiamonds = distributableDiamonds;
-          } else {
-            agentShare = Math.floor((distributableDiamonds * ownerPct) / 100);
-            hostDiamonds = Math.max(0, distributableDiamonds - agentShare);
-          }
+          // Host always receives the entire minted gift value.
+          hostDiamonds = distributableDiamonds;
+          // Agency owner receives an extra commission on top of the host's diamonds.
+          // If the receiver is the agency owner, do not pay the same person a duplicate commission.
+          agentShare = receiverIsOwner
+            ? 0
+            : Math.floor((distributableDiamonds * ownerPct) / 100);
           if (agentShare > 0 && agency.ownerId) {
             let agentWallet = await manager.findOne(Wallet, {
               where: { userId: agency.ownerId },
@@ -2356,7 +2348,12 @@ export class GiftsService implements OnModuleInit {
               }),
             );
           }
-          await manager.increment(Agency, { id: agency.id }, 'totalDiamonds', distributableDiamonds);
+          await manager.increment(
+            Agency,
+            { id: agency.id },
+            'totalDiamonds',
+            distributableDiamonds + agentShare,
+          );
         }
       }
 
