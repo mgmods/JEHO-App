@@ -9376,6 +9376,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return room;
     }
 
+    /** True when a celebration belongs to the room currently represented by this activity. */
+    public boolean isSameRoom(@Nullable String candidateRoomId) {
+        return candidateRoomId != null && !candidateRoomId.trim().isEmpty()
+                && roomId != null && roomId.equals(candidateRoomId);
+    }
+
     private void navigateHomeAndFinish() {
         Intent home = new Intent(this,
                 com.Dramizo.Series.presentation.main.MainActivity.class);
@@ -11011,14 +11017,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             chat = coins > 0
                     ? ("مبروك " + who + " فاز بـ " + coins + " عملة · حظ")
                     : ("مبروك " + who + " · حظ");
-            // Use the dashboard-controlled top toast for lucky wins; never the legacy
-            // animated card in the center of the room.
-            GlobalCelebrationToast.show(
-                    this, who, chat, avatarUrl, badgeUrl,
-                    dedupeKey != null ? dedupeKey : ("lucky-room-" + System.currentTimeMillis()),
-                    28, 1d, Math.max(0L, coins), who, "lucky_hit", null);
-            // The dashboard-controlled top toast is the only lucky-win toast.
-            // Do not add the legacy moving center-screen bubble for lucky wins.
+            String toastKey = dedupeKey != null ? dedupeKey
+                    : ("lucky-room-" + System.currentTimeMillis());
+            double eventMultiplier = parseLuckyMultiplierFromText(body != null ? body : line);
+            boolean highWin = coins >= 1000L || eventMultiplier >= 10d;
+            if (isSameRoom(targetRoomId) && highWin) {
+                // Global event for this same room: keep the center-screen room presentation.
+                GlobalCelebrationToast.showRoomCenter(
+                        this, who, body != null && !body.trim().isEmpty() ? body : chat,
+                        avatarUrl, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
+                        who, "lucky_hit_high", targetRoomId);
+            } else {
+                String toastKind = highWin ? "lucky_hit_high"
+                        : (coins >= 1000L ? "lucky_hit_high" : "lucky_hit_normal");
+                GlobalCelebrationToast.show(
+                        this, who, chat, avatarUrl, badgeUrl, toastKey,
+                        28, eventMultiplier, Math.max(0L, coins), who, toastKind, targetRoomId);
+            }
+            // Keep the room's existing chat announcement, but do not add a second visual bubble.
             if (roomBannerEnabled()) {
                 appendGameCelebrationLine(chat, badgeUrl);
             }
@@ -11036,6 +11052,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (roomBannerEnabled()) {
             appendChatLine(who, chat, 0, 1, null, null, avatarUrl, badgeUrl);
+        }
+    }
+
+    private static double parseLuckyMultiplierFromText(@Nullable String text) {
+        if (text == null || text.isEmpty()) return 0d;
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("[×xX]\\s*(\\d+(?:[.,]\\d+)?)")
+                .matcher(text);
+        if (!matcher.find()) return 0d;
+        try {
+            return Double.parseDouble(matcher.group(1).replace(',', '.'));
+        } catch (Exception ignored) {
+            return 0d;
         }
     }
 
@@ -11517,11 +11546,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else {
             line = "ضرب حظه وربح ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
         }
-        GlobalCelebrationToast.show(
-                this, who, line, avatarUrl, null,
-                eventKey == null || eventKey.trim().isEmpty()
-                        ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim(),
-                28, Math.max(0d, multiplier), Math.max(0L, wonCoins), who, "lucky_hit", null);
+        String key = eventKey == null || eventKey.trim().isEmpty()
+                ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim();
+        boolean highWin = multiplier >= 10d || wonCoins >= 1000L;
+        if (highWin) {
+            // The winning room gets the dedicated center-screen presentation.
+            GlobalCelebrationToast.showRoomCenter(
+                    this, who, line, avatarUrl, null, key,
+                    Math.max(0d, multiplier), Math.max(0L, wonCoins), who,
+                    "lucky_hit_high", roomId);
+        } else {
+            // Small wins/returns remain room-only and keep the normal compact toast at the top.
+            String kind = multiplier > 0d && multiplier < 1d
+                    ? "lucky_hit_return" : "lucky_hit_normal";
+            GlobalCelebrationToast.show(
+                    this, who, line, avatarUrl, null, key,
+                    28, Math.max(0d, multiplier), Math.max(0L, wonCoins), who, kind, roomId);
+        }
     }
 
     private static String formatLuckyMultiplier(double multiplier) {
