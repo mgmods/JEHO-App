@@ -2349,8 +2349,7 @@ export class AgenciesService implements OnModuleInit {
       Number(agency.commissionPercent) || ownerCommissionDefault(),
       ownerCommissionDefault(),
     );
-    // Clean economy: host keeps the remainder, no split-time platform cut.
-    const platformPct = 0;
+    // Clean economy: the host receives the remainder after the agency commission.
     const hostPct = clampSharePct(100 - commissionPct, 70);
     const { weekStart, monthStart } = this.periodStarts();
 
