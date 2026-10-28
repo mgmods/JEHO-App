@@ -693,4 +693,8 @@ public class AgencyManageActivity extends ThemedActivity {
         if (type != null) i.putExtra(CosmeticsViewModel.EXTRA_TYPE, type);
         startActivity(i);
     }
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
 }
