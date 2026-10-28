@@ -1156,6 +1156,7 @@ public class ChatConversationActivity extends ThemedActivity {
             if (preview == null || preview.isEmpty()) {
                 String type = msg.type != null ? msg.type.toLowerCase() : "";
                 if ("image".equals(type)) preview = getString(R.string.chat_preview_photo);
+                else if ("video".equals(type)) preview = "🎬 فيديو";
                 else if ("audio".equals(type)) preview = getString(R.string.chat_preview_voice);
                 else if ("gift".equals(type)) preview = getString(R.string.chat_preview_gift,
                         getString(R.string.gift_message));
