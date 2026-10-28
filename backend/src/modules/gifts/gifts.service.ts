@@ -57,6 +57,27 @@ type LuckyRoll = {
   luckyCoinsWon: number;
 };
 
+type LuckyOddsBand = { minMultiplier: number; maxMultiplier: number; probability: number };
+type LuckyGiftOverride = { enabled: boolean; bands: LuckyOddsBand[] };
+type LuckyOddsConfig = {
+  enabled: boolean;
+  maxMultiplier: number;
+  bands: LuckyOddsBand[];
+  giftOverrides: Record<string, LuckyGiftOverride>;
+};
+
+const DEFAULT_LUCKY_ODDS_CONFIG: LuckyOddsConfig = {
+  enabled: true,
+  maxMultiplier: 100,
+  bands: [
+    { minMultiplier: 1, maxMultiplier: 5, probability: 5 },
+    { minMultiplier: 6, maxMultiplier: 14, probability: 10 },
+    { minMultiplier: 15, maxMultiplier: 25, probability: 15 },
+    { minMultiplier: 26, maxMultiplier: 100, probability: 10 },
+  ],
+  giftOverrides: {},
+};
+
 @Injectable()
 export class GiftsService implements OnModuleInit {
   private readonly log = new Logger(GiftsService.name);
@@ -1504,45 +1525,187 @@ export class GiftsService implements OnModuleInit {
   }
 
   /**
-   * House-positive lucky roll with frequent soft rebates (Mikoo-style feel).
-   * Approx EV ≈ 0.52–0.55 of stake — platform keeps the rest + diamond cut every send.
-   * Soft returns are common so users rarely see an empty round (no harsh lose UX).
-   * Tiers:
-   *  - 40% soft 0.30–0.80×
-   *  - 10% medium 1.20–2.50×
-   *  - 2.5% big 3–max× (hard-capped)
+   * Server-authoritative lucky-gift roll. Probabilities are percentages per band;
+   * the unallocated remainder is a complete loss (X0). Multipliers are integers.
+   * Settings are read from the database on every send so dashboard changes apply
+   * to the next operation without a process restart.
    */
-  private rollLuckyPayout(
-    totalCoins: number,
-    cfg?: {
-      winChance?: number;
-      minMultiplier?: number;
-      maxMultiplier?: number;
-    } | null,
-  ): LuckyRoll {
-    const hardMax = Math.max(1, Number(ECONOMY.luckyGiftMaxMultiplier) || 5);
-    const maxMul = Math.min(
-      hardMax,
-      Math.max(3, Number(cfg?.maxMultiplier) || hardMax),
-    );
-    // ≈ EV 0.40–0.42 coin rebate to sender (house keeps majority + diamond cut).
-    const roll = randomInt(0, 1_000_000) / 1_000_000;
-    let luckyMultiplier: number | null = null;
-    if (roll < 0.38) {
-      const frac = randomInt(0, 1_000_000) / 1_000_000;
-      luckyMultiplier = Math.round((0.25 + frac * 0.45) * 100) / 100; // 0.25–0.70
-    } else if (roll < 0.47) {
-      const frac = randomInt(0, 1_000_000) / 1_000_000;
-      luckyMultiplier = Math.round((1.1 + frac * 0.9) * 100) / 100; // 1.10–2.00
-    } else if (roll < 0.485) {
-      const frac = randomInt(0, 1_000_000) / 1_000_000;
-      luckyMultiplier = Math.round((2.5 + frac * (maxMul - 2.5)) * 100) / 100;
+  private async rollLuckyPayout(totalCoins: number, giftId: string): Promise<LuckyRoll> {
+    const config = await this.getLuckyGiftOddsConfig();
+    const override = config.giftOverrides?.[giftId];
+    if (!config.enabled || override?.enabled === false) {
+      return { luckyMultiplier: null, luckyCoinsWon: 0 };
     }
-    const luckyCoinsWon =
-      luckyMultiplier != null
-        ? Math.max(1, Math.floor(Math.max(0, totalCoins) * luckyMultiplier))
-        : 0;
-    return { luckyMultiplier, luckyCoinsWon };
+    const bands = override?.bands?.length ? override.bands : config.bands;
+    const stake = Math.max(0, Math.floor(Number(totalCoins) || 0));
+    const roll = randomInt(0, 100_000) / 1_000;
+    let cumulative = 0;
+    for (const band of bands) {
+      cumulative += band.probability;
+      if (roll < cumulative) {
+        const min = Math.max(1, Math.floor(band.minMultiplier));
+        const max = Math.max(min, Math.floor(band.maxMultiplier));
+        const multiplier = randomInt(min, max + 1);
+        return {
+          luckyMultiplier: multiplier,
+          luckyCoinsWon: Math.max(0, Math.floor(stake * multiplier)),
+        };
+      }
+    }
+    return { luckyMultiplier: null, luckyCoinsWon: 0 };
+  }
+
+  private normalizeLuckyOddsConfig(input: any): LuckyOddsConfig {
+    if (!input || typeof input !== 'object') throw new BadRequestException('إعدادات هدايا الحظ غير صالحة');
+    const maxMultiplier = Math.floor(Number(input.maxMultiplier));
+    if (!Number.isFinite(maxMultiplier) || maxMultiplier < 1 || maxMultiplier > 1_000_000) {
+      throw new BadRequestException('أعلى مضاعف يجب أن يكون بين X1 وX1,000,000');
+    }
+    const normalizeBands = (raw: any, label: string): LuckyOddsBand[] => {
+      if (!Array.isArray(raw) || raw.length < 1 || raw.length > 100) {
+        throw new BadRequestException(label + ': أضف نطاقاً واحداً على الأقل (بحد أقصى 100 نطاق)');
+      }
+      const bands = raw.map((item: any) => {
+        const minMultiplier = Math.floor(Number(item?.minMultiplier));
+        const maxBandMultiplier = Math.floor(Number(item?.maxMultiplier));
+        const probability = Number(item?.probability);
+        if (!Number.isInteger(minMultiplier) || !Number.isInteger(maxBandMultiplier) ||
+            minMultiplier < 1 || maxBandMultiplier < minMultiplier || maxBandMultiplier > 1_000_000 ||
+            !Number.isFinite(probability) || probability < 0 || probability > 100) {
+          throw new BadRequestException(label + ': نطاق مضاعف أو نسبة غير صالحة');
+        }
+        if (maxBandMultiplier > maxMultiplier) throw new BadRequestException(label + ': يوجد نطاق أعلى من الحد الأعلى للمضاعف');
+        return { minMultiplier, maxMultiplier: maxBandMultiplier, probability: Math.round(probability * 10000) / 10000 };
+      }).sort((a, b) => a.minMultiplier - b.minMultiplier);
+      for (let i = 1; i < bands.length; i++) {
+        if (bands[i].minMultiplier <= bands[i - 1].maxMultiplier) {
+          throw new BadRequestException(label + ': نطاقات المضاعفات لا يجوز أن تتداخل');
+        }
+      }
+      if (bands.reduce((sum, band) => sum + band.probability, 0) > 100.000001) {
+        throw new BadRequestException(label + ': مجموع احتمالات الفوز لا يجوز أن يتجاوز 100%');
+      }
+      return bands;
+    };
+    const bands = normalizeBands(input.bands, 'الاحتمالات العامة');
+    const giftOverrides: Record<string, LuckyGiftOverride> = {};
+    const rawOverrides = input.giftOverrides && typeof input.giftOverrides === 'object' ? input.giftOverrides : {};
+    for (const [giftId, raw] of Object.entries(rawOverrides)) {
+      if (!giftId || !raw || typeof raw !== 'object') continue;
+      const entry = raw as any;
+      giftOverrides[giftId] = {
+        enabled: entry.enabled !== false,
+        bands: normalizeBands(entry.bands, 'إعدادات الهدية ' + giftId),
+      };
+    }
+    return { enabled: input.enabled !== false, maxMultiplier, bands, giftOverrides };
+  }
+
+  async getLuckyGiftOddsConfig(): Promise<LuckyOddsConfig> {
+    const row = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_odds_config_v1' } });
+    if (!row) return { ...DEFAULT_LUCKY_ODDS_CONFIG, bands: [...DEFAULT_LUCKY_ODDS_CONFIG.bands], giftOverrides: {} };
+    try { return this.normalizeLuckyOddsConfig(JSON.parse(row.value)); }
+    catch {
+      this.log.error('Invalid lucky gift odds config; using safe defaults');
+      return { ...DEFAULT_LUCKY_ODDS_CONFIG, bands: [...DEFAULT_LUCKY_ODDS_CONFIG.bands], giftOverrides: {} };
+    }
+  }
+
+  async getLuckyGiftOddsDashboard() {
+    const [config, gifts, audit] = await Promise.all([
+      this.getLuckyGiftOddsConfig(),
+      this.giftsRepo.find({ where: { type: GiftType.LUCKY }, order: { sortOrder: 'ASC', coinPrice: 'ASC' } }),
+      this.settingsRepo.findOne({ where: { key: 'lucky_gift_odds_audit_v1' } }),
+    ]);
+    let auditRows: any[] = [];
+    try { auditRows = audit ? JSON.parse(audit.value) : []; } catch {}
+    let recentResults: any[] = [];
+    try {
+      recentResults = await this.dataSource.query(
+        `SELECT gs.id, gs."giftId", gs."giftName", gs."senderId", gs."receiverId",
+                gs.quantity, gs."totalCoins", gs."luckyMultiplier", gs."createdAt"
+         FROM gift_sends gs INNER JOIN gifts g ON g.id = gs."giftId"
+         WHERE g.type = $1 ORDER BY gs."createdAt" DESC LIMIT 100`,
+        [GiftType.LUCKY],
+      );
+    } catch (error) {
+      this.log.warn('Could not read lucky gift result history');
+    }
+    return {
+      config,
+      gifts: gifts.map(g => ({ id: g.id, name: g.name, coinPrice: g.coinPrice, isActive: g.isActive })),
+      audit: auditRows.slice(0, 200),
+      recentResults,
+    };
+  }
+
+  async updateLuckyGiftOddsConfig(input: unknown, actorId: string) {
+    const next = this.normalizeLuckyOddsConfig(input);
+    return this.dataSource.transaction(async manager => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['jeho:lucky-gift-odds-config-v1']);
+      const repo = manager.getRepository(AppSetting);
+      const configKey = 'lucky_gift_odds_config_v1';
+      const auditKey = 'lucky_gift_odds_audit_v1';
+      const oldRow = await repo.findOne({ where: { key: configKey }, lock: { mode: 'pessimistic_write' } });
+      const auditRow = await repo.findOne({ where: { key: auditKey }, lock: { mode: 'pessimistic_write' } });
+      let previous: any = DEFAULT_LUCKY_ODDS_CONFIG;
+      let audit: any[] = [];
+      try { if (oldRow) previous = this.normalizeLuckyOddsConfig(JSON.parse(oldRow.value)); } catch {}
+      try { if (auditRow) audit = JSON.parse(auditRow.value); } catch {}
+      const savedConfig = oldRow ?? repo.create({ key: configKey, description: 'Dashboard-managed lucky gift odds configuration', value: '' });
+      savedConfig.value = JSON.stringify(next);
+      savedConfig.description = 'Dashboard-managed lucky gift odds configuration';
+      await repo.save(savedConfig);
+      audit.unshift({ changedAt: new Date().toISOString(), actorId: String(actorId || 'unknown'), previous, next });
+      audit = audit.slice(0, 500);
+      const savedAudit = auditRow ?? repo.create({ key: auditKey, description: 'Lucky gift odds change audit log', value: '' });
+      savedAudit.value = JSON.stringify(audit);
+      savedAudit.description = 'Lucky gift odds change audit log';
+      await repo.save(savedAudit);
+      return { ok: true, config: next, auditCount: audit.length, appliedAt: new Date().toISOString() };
+    });
+  }
+
+  async simulateLuckyGiftOdds(input: any) {
+    const config = this.normalizeLuckyOddsConfig(input?.config ?? await this.getLuckyGiftOddsConfig());
+    const giftId = String(input?.giftId || '');
+    const override = giftId ? config.giftOverrides[giftId] : undefined;
+    const bands = override?.bands?.length ? override.bands : config.bands;
+    const iterations = Math.max(100, Math.min(100_000, Math.floor(Number(input?.iterations) || 10_000)));
+    const stake = Math.max(1, Math.floor(Number(input?.giftPrice) || 1000));
+    const counts: Record<string, number> = {};
+    let lossCount = 0;
+    let totalPayout = 0;
+    if (!config.enabled || override?.enabled === false) lossCount = iterations;
+    else {
+      for (let i = 0; i < iterations; i++) {
+        const roll = randomInt(0, 100_000) / 1_000;
+        let cumulative = 0;
+        let multiplier = 0;
+        for (const band of bands) {
+          cumulative += band.probability;
+          if (roll < cumulative) {
+            multiplier = randomInt(band.minMultiplier, band.maxMultiplier + 1);
+            break;
+          }
+        }
+        if (multiplier <= 0) lossCount++;
+        else {
+          const key = 'X' + multiplier;
+          counts[key] = (counts[key] || 0) + 1;
+          totalPayout += stake * multiplier;
+        }
+      }
+    }
+    return {
+      iterations, giftPrice: stake, lossCount, winCount: iterations - lossCount,
+      lossPercent: Number((lossCount * 100 / iterations).toFixed(2)),
+      winPercent: Number(((iterations - lossCount) * 100 / iterations).toFixed(2)),
+      totalSimulatedPayout: Math.floor(totalPayout),
+      averagePayoutPerSend: Number((totalPayout / iterations).toFixed(2)),
+      expectedReturnPercent: Number((totalPayout / (stake * iterations) * 100).toFixed(2)),
+      multiplierCounts: counts,
+    };
   }
 
   async catalog() {
@@ -2036,7 +2199,7 @@ export class GiftsService implements OnModuleInit {
     let luckyCoinsWon = 0;
 
     if (isLucky) {
-      const rolled = this.rollLuckyPayout(totalCoins, gift.luckyConfig);
+      const rolled = this.rollLuckyPayout(totalCoins, gift.id);
       luckyMultiplier = rolled.luckyMultiplier;
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
@@ -2692,7 +2855,7 @@ export class GiftsService implements OnModuleInit {
     let luckyMultiplier: number | null = null;
     let luckyCoinsWon = 0;
     if (isLucky) {
-      const rolled = this.rollLuckyPayout(totalCoins, gift.luckyConfig);
+      const rolled = this.rollLuckyPayout(totalCoins, gift.id);
       luckyMultiplier = rolled.luckyMultiplier;
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
