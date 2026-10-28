@@ -514,6 +514,30 @@
                     </LinearLayout>
                 </HorizontalScrollView>
 
+                <!-- Earned medals strip: swipe horizontally and tap to open the medals cabinet. -->
+                <HorizontalScrollView
+                    android:id="@+id/rowProfileAchievementBadges"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="14dp"
+                    android:layout_marginTop="10dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:scrollbars="none"
+                    android:background="@drawable/bg_profile_stat_light"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/boxProfileAchievementBadges"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingVertical="4dp" />
+                </HorizontalScrollView>
+
                 <!-- User moments shortcut: profile-specific, server-backed posts. -->
                 <LinearLayout
                     android:id="@+id/rowMoments"
@@ -545,26 +569,7 @@
                         android:textSize="12sp" />
                 </LinearLayout>
 
-                <!-- Earned/gifted badges are shown as large horizontally swipeable icons directly below ID/VIP/popularity. -->
-                <HorizontalScrollView
-                    android:id="@+id/rowProfileAchievementBadges"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:scrollbars="none"
-                    android:overScrollMode="never"
-                    android:visibility="gone">
 
-                    <LinearLayout
-                        android:id="@+id/boxProfileAchievementBadges"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingVertical="4dp" />
-                </HorizontalScrollView>
 
                 <!-- Achievement badges: shown below identity, separate from VIP medals. -->
                 <LinearLayout
