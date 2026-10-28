@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -43,6 +44,8 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
     private TextView tvPerf3Value;
     private TextView tvPerf4Value;
     private TextView tvWithdrawEmpty;
+    private TextView tvAgencyStatsEmpty;
+    private LinearLayout layoutAgencyMemberStats;
     private final ProDashWithdrawAdapter withdrawAdapter = new ProDashWithdrawAdapter();
 
     private long agencyDiamonds;
@@ -84,6 +87,8 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         tvPerf3Value = findViewById(R.id.tvPerf3Value);
         tvPerf4Value = findViewById(R.id.tvPerf4Value);
         tvWithdrawEmpty = findViewById(R.id.tvWithdrawEmpty);
+        tvAgencyStatsEmpty = findViewById(R.id.tvAgencyStatsEmpty);
+        layoutAgencyMemberStats = findViewById(R.id.layoutAgencyMemberStats);
 
         RecyclerView recycler = findViewById(R.id.recyclerWithdraws);
         if (recycler != null) {
@@ -128,6 +133,12 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         ContainerProvider.from(this).getIoExecutor().execute(() -> {
             Result<MiscDtos.AgencyMineDto> mine =
                     ApiCall.execute(ContainerProvider.from(this).getAgencyApi().mine());
+            Result<MiscDtos.AgencyStatsDto> agencyStats = null;
+            if (mine.success && mine.data != null && mine.data.agency != null
+                    && mine.data.agency.id != null) {
+                agencyStats = ApiCall.execute(
+                        ContainerProvider.from(this).getAgencyApi().stats(mine.data.agency.id));
+            }
             Result<WalletDtos.EconomyConfig> econ =
                     ApiCall.execute(ContainerProvider.from(this).getWalletApi().economyConfig());
             Result<WalletDtos.WalletDto> wallet =
@@ -146,6 +157,11 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 mineSnap = mine.data;
                 agencyId = mine.data.agency.id;
                 agencyName = mine.data.agency.name;
+                TextView dashboardTitle = findViewById(R.id.tvTitle);
+                if (dashboardTitle != null && agencyName != null && !agencyName.trim().isEmpty()) {
+                    dashboardTitle.setText(agencyName + " · " + getString(R.string.agency_owner_dashboard_title));
+                }
+                renderAgencyStats(agencyStats != null && agencyStats.success ? agencyStats.data : null);
                 MiscDtos.AgencyEarningsDto e = mine.data.earnings;
                 if (e == null) {
                     Toast.makeText(this, R.string.agency_earn_owner_only, Toast.LENGTH_LONG).show();
@@ -227,6 +243,64 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 }
             });
         });
+    }
+
+    private void renderAgencyStats(@Nullable MiscDtos.AgencyStatsDto stats) {
+        if (layoutAgencyMemberStats == null) return;
+        layoutAgencyMemberStats.removeAllViews();
+        if (stats == null || stats.members == null || stats.members.isEmpty()) {
+            if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.VISIBLE);
+            return;
+        }
+        if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.GONE);
+        int count = Math.min(stats.members.size(), 8);
+        for (int i = 0; i < count; i++) {
+            MiscDtos.AgencyMemberPeriodStatDto member = stats.members.get(i);
+            if (member == null) continue;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(10), dp(10), dp(10), dp(10));
+            row.setBackgroundResource(R.drawable.bg_dash_perf_cell);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            rowParams.topMargin = dp(6);
+            row.setLayoutParams(rowParams);
+
+            TextView rank = new TextView(this);
+            rank.setText(String.valueOf(i + 1));
+            rank.setTextColor(getColor(R.color.text_secondary));
+            rank.setTextSize(12);
+            rank.setGravity(android.view.Gravity.CENTER);
+            LinearLayout.LayoutParams rankParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+            row.addView(rank, rankParams);
+
+            TextView name = new TextView(this);
+            name.setText(member.displayName == null || member.displayName.trim().isEmpty()
+                    ? "مضيف" : member.displayName);
+            name.setTextColor(getColor(R.color.text_primary));
+            name.setTextSize(13);
+            name.setTypeface(null, android.graphics.Typeface.BOLD);
+            name.setMaxLines(1);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            nameParams.setMargins(dp(8), 0, dp(8), 0);
+            row.addView(name, nameParams);
+
+            TextView diamonds = new TextView(this);
+            diamonds.setText(formatLong(Math.max(0L, member.giftsReceivedDiamonds)) + " ◆");
+            diamonds.setTextColor(getColor(R.color.hiyoo_dark_green));
+            diamonds.setTextSize(12);
+            diamonds.setTypeface(null, android.graphics.Typeface.BOLD);
+            row.addView(diamonds, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            layoutAgencyMemberStats.addView(row);
+        }
+    }
+
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private void openWithdraw() {
