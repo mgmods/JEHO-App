@@ -14395,6 +14395,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @SuppressLint("NewApi")
     private void respondToCpRoomRequest(String requestId, boolean accept) {
         if (requestId == null || requestId.isEmpty()) return;
+        AppContainer c = ContainerProvider.from(this);
         c.getIoExecutor().execute(() -> {
             java.util.Map<String, Boolean> body = new java.util.HashMap<>();
             body.put("accept", accept);
