@@ -56,7 +56,14 @@ export class CpAdminController {
         rules: settings[`cp.rules.${type}`] ?? {},
       });
     }
+    let taskConfig: Record<string, any> = {};
+    try { taskConfig = JSON.parse(String(settings['cp.tasks.config'] || '{}')); } catch { taskConfig = {}; }
     return {
+      globallyEnabled: settings['cp.enabled.global'] !== false && settings['cp.enabled.global'] !== 'false',
+      tasks: {
+        memory_today: { enabled: taskConfig.memory_today?.enabled !== false, title: String(taskConfig.memory_today?.title || 'ذكرى جديدة'), target: Number(taskConfig.memory_today?.target || 1), rewardPoints: Number(taskConfig.memory_today?.rewardPoints || 10) },
+        earn_points_today: { enabled: taskConfig.earn_points_today?.enabled !== false, title: String(taskConfig.earn_points_today?.title || 'نشاط مشترك'), target: Number(taskConfig.earn_points_today?.target || 10), rewardPoints: Number(taskConfig.earn_points_today?.rewardPoints || 15) },
+      },
       types,
       policy: {
         requestExpiryMinutes: settings['cp.policy.request_expiry_minutes'] ?? 30,
@@ -69,6 +76,54 @@ export class CpAdminController {
     };
   }
 
+
+  @Patch('features')
+  @ApiOperation({ summary: 'Enable/disable CP globally and configure the supported daily CP missions' })
+  async updateFeatures(
+    @CurrentUser('sub') adminId: string,
+    @Body() body: {
+      globallyEnabled?: boolean;
+      tasks?: Record<string, { enabled?: boolean; title?: string; target?: number; rewardPoints?: number }>;
+    },
+  ) {
+    const allowed = ['memory_today', 'earn_points_today'];
+    const [existing] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
+    let current: Record<string, any> = {};
+    try { current = JSON.parse(existing?.value || '{}'); } catch { current = {}; }
+    if (body.tasks !== undefined) {
+      if (!body.tasks || typeof body.tasks !== 'object' || Array.isArray(body.tasks)) {
+        throw new BadRequestException('إعدادات مهمات CP غير صالحة');
+      }
+      for (const id of Object.keys(body.tasks)) {
+        if (!allowed.includes(id)) throw new BadRequestException('معرّف مهمة CP غير مدعوم');
+        const task = body.tasks[id];
+        if (task.enabled !== undefined && typeof task.enabled !== 'boolean') throw new BadRequestException('حالة المهمة غير صالحة');
+        if (task.target !== undefined && (!Number.isSafeInteger(task.target) || task.target < 1 || task.target > 1000000)) throw new BadRequestException('هدف المهمة يجب أن يكون بين 1 و1,000,000');
+        if (task.rewardPoints !== undefined && (!Number.isSafeInteger(task.rewardPoints) || task.rewardPoints < 0 || task.rewardPoints > 1000000)) throw new BadRequestException('مكافأة المهمة يجب أن تكون بين 0 و1,000,000 نقطة');
+        if (task.title !== undefined && (typeof task.title !== 'string' || !task.title.trim() || task.title.length > 100)) throw new BadRequestException('عنوان المهمة غير صالح');
+        current[id] = { ...(current[id] || {}), ...task, ...(task.title !== undefined ? { title: task.title.trim() } : {}) };
+      }
+    }
+    const values: Record<string, string> = {};
+    if (body.globallyEnabled !== undefined) values['cp.enabled.global'] = String(body.globallyEnabled);
+    if (body.tasks !== undefined) values['cp.tasks.config'] = JSON.stringify(current);
+    await this.dataSource.transaction(async manager => {
+      for (const [key, value] of Object.entries(values)) {
+        await manager.query(
+          `INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
+           VALUES (gen_random_uuid(),$1,$2,$3,now(),now())
+           ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,description=EXCLUDED.description,"updatedAt"=now()`,
+          [key, value, 'CP features and missions configured by admin'],
+        );
+      }
+      await manager.query(
+        `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+         VALUES ($1,'features_update','cp_features','global',$2::jsonb,now())`,
+        [adminId, JSON.stringify({ keys: Object.keys(values), globallyEnabled: body.globallyEnabled ?? null })],
+      );
+    });
+    return this.getConfig();
+  }
 
   @Patch('policy')
   @ApiOperation({ summary: 'Configure CP request expiry and lifecycle policy without weakening full refunds' })
