@@ -303,9 +303,19 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             String targetLabel = stats.targetEnabled
                     ? (" • التارجت " + ("weekly".equalsIgnoreCase(stats.targetPeriod) ? "الأسبوعي" : "الشهري"))
                     : " • التارجت غير مفعّل";
-            tvAgencyStatsTotal.setText("إجمالي الهدايا خلال العضوية الحالية: "
+            String lastActivityLabel = "";
+            if (stats.lastGiftActivityAt != null && stats.lastGiftActivityAt.length() >= 16) {
+                lastActivityLabel = " • آخر دعم (UTC): "
+                        + stats.lastGiftActivityAt.substring(0, 16).replace('T', ' ');
+            }
+            tvAgencyStatsTotal.setText("نشاط اليوم: دعم "
+                    + formatLong(Math.max(0L, stats.dailyDiamonds)) + " ◆"
+                    + " • مضيفون نشطون بالدعم: " + stats.activeHostsToday
+                    + " • أعضاء جدد اليوم: " + stats.newMembersToday
+                    + lastActivityLabel
+                    + "\\nإجمالي الهدايا خلال العضوية الحالية: "
                     + formatLong(Math.max(0L, stats.giftsReceivedDiamonds)) + " ◆"
-                    + " • الأعضاء: " + stats.memberCount + targetLabel);
+                    + " • الأعضاء الحاليون: " + stats.memberCount + targetLabel);
         }
         if (stats.members == null || stats.members.isEmpty()) {
             if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.VISIBLE);
@@ -374,6 +384,13 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             diamonds.setTextSize(12);
             diamonds.setTypeface(null, android.graphics.Typeface.BOLD);
             header.addView(diamonds);
+
+            TextView dailySupport = new TextView(this);
+            dailySupport.setText("دعم اليوم: " + formatLong(Math.max(0L, member.dailyDiamonds)) + " ◆");
+            dailySupport.setTextColor(getColor(R.color.text_secondary));
+            dailySupport.setTextSize(11);
+            dailySupport.setPadding(dp(36), dp(5), 0, 0);
+            card.addView(dailySupport);
 
             if (member.targetEnabled) {
                 String targetName = member.currentTargetName == null || member.currentTargetName.trim().isEmpty()
