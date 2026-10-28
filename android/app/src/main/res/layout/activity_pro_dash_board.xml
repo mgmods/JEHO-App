@@ -484,6 +484,16 @@
                         android:textSize="11sp" />
 
                     <TextView
+                        android:id="@+id/tvAgencyStatsTotal"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="إجمالي الهدايا: —"
+                        android:textColor="@color/hiyoo_dark_green"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
                         android:id="@+id/tvAgencyStatsEmpty"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
