@@ -30,10 +30,13 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.Dramizo.Series.data.remote.dto.ApiResponse;
+import com.Dramizo.Series.data.remote.dto.BadgeDto;
 import com.Dramizo.Series.databinding.ActivityProfileBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import android.widget.ImageView;
+import android.widget.HorizontalScrollView;
 
 import com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
@@ -147,6 +150,10 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
         if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
+        if (binding.rowProfileAchievementBadges != null) {
+            binding.rowProfileAchievementBadges.setVisibility(View.GONE);
+            binding.rowProfileAchievementBadges.setOnClickListener(v -> openBadgeCabinet(targetUserIdHold[0]));
+        }
         // Keep the VIP, charm and wealth chips visible on the light profile card.
         if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.VISIBLE);
 
@@ -362,6 +369,7 @@ public class ProfileActivity extends ThemedActivity {
 
             final String publicId = user.displayPublicId();
             binding.tvUsername.setText(publicId.isEmpty() ? "—" : publicId);
+            binding.tvUsername.setTag(user.id);
             com.Dramizo.Series.util.VanityIdStyle.bind(binding.tvUsername,
                     container.getVanityApi(), publicId, user.vipLevel);
             binding.btnCopyId.setOnClickListener(v -> {
@@ -387,6 +395,7 @@ public class ProfileActivity extends ThemedActivity {
             if (user.id != null && !user.id.isEmpty()) {
                 targetUserIdHold[0] = user.id;
                 loadProfileMedals(user.id);
+                loadProfileAchievementBadges(user.id);
             }
             if (binding.tvStatFriends != null) binding.tvStatFriends.setText(formatScore(followers));
             if (binding.tvStatFollowing != null) binding.tvStatFollowing.setText(formatScore(following));
@@ -414,7 +423,7 @@ public class ProfileActivity extends ThemedActivity {
             if (binding.imgCountryFlag != null) {
                 FlagImages.bind(binding.imgCountryFlag, user.country);
             }
-            // Profile badge cabinet is disabled platform-wide; skip its extra API request.
+            // Earned/gifted profile badges are loaded into the swipeable strip beneath the ID row.
 
             long charm = user.popularityLevel > 0 ? user.popularityLevel
                     : Math.max(0, Math.max(user.charmScore, user.popularityScore));
@@ -531,6 +540,94 @@ public class ProfileActivity extends ThemedActivity {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
         });
         if (userId != null) vm.loadUser(userId); else vm.loadMe();
+    }
+
+
+    private void openBadgeCabinet(String profileId) {
+        if (profileId == null || profileId.trim().isEmpty()) return;
+        Intent intent = new Intent(this, BadgeActivity.class);
+        intent.putExtra(EXTRA_USER_ID, profileId);
+        startActivity(intent);
+    }
+
+    /** Shows every earned/gifted badge in a large, swipeable strip below the profile identity row. */
+    private void loadProfileAchievementBadges(String profileId) {
+        if (binding == null || binding.boxProfileAchievementBadges == null
+                || profileId == null || profileId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            List<BadgeDto> earned = new java.util.ArrayList<>();
+            try {
+                retrofit2.Response<ApiResponse<List<BadgeDto>>> response =
+                        container.getUserApi().badges(profileId).execute();
+                if (response.isSuccessful() && response.body() != null
+                        && response.body().data != null) {
+                    for (BadgeDto badge : response.body().data) {
+                        if (badge != null && badge.earned
+                                && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) {
+                            earned.add(badge);
+                        }
+                    }
+                }
+            } catch (Exception ignored) { }
+            final List<BadgeDto> badges = earned;
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()
+                        || !profileId.equals(targetLoadedProfileId())) return;
+                LinearLayout strip = binding.boxProfileAchievementBadges;
+                strip.removeAllViews();
+                if (badges.isEmpty()) {
+                    binding.rowProfileAchievementBadges.setVisibility(View.GONE);
+                    return;
+                }
+                binding.rowProfileAchievementBadges.setVisibility(View.VISIBLE);
+                for (BadgeDto badge : badges) {
+                    LinearLayout item = new LinearLayout(this);
+                    item.setOrientation(LinearLayout.VERTICAL);
+                    item.setGravity(Gravity.CENTER);
+                    item.setPadding(dpProfile(5), dpProfile(3), dpProfile(5), dpProfile(3));
+                    item.setContentDescription(badge.name == null ? "شارة" : badge.name);
+                    ImageView icon = new ImageView(this);
+                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(dpProfile(54), dpProfile(54));
+                    item.addView(icon, imageLp);
+                    Glide.with(ProfileActivity.this)
+                            .load(AssetCatalog.absoluteUrl(badge.imageUrl))
+                            .placeholder(R.drawable.ic_medal_default)
+                            .error(R.drawable.ic_medal_default)
+                            .into(icon);
+                    if (badge.isAnimated) {
+                        ObjectAnimator pulse = ObjectAnimator.ofFloat(icon, View.ALPHA, 1f, 0.72f, 1f);
+                        pulse.setDuration(1300L);
+                        pulse.setRepeatCount(ValueAnimator.INFINITE);
+                        pulse.start();
+                        icon.setTag(pulse);
+                    }
+                    TextView name = new TextView(this);
+                    name.setText(badge.name == null ? "شارة" : badge.name);
+                    name.setTextColor(0xFF4B4568);
+                    name.setTextSize(10f);
+                    name.setMaxLines(1);
+                    name.setGravity(Gravity.CENTER);
+                    name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(dpProfile(66), ViewGroup.LayoutParams.WRAP_CONTENT);
+                    nameLp.topMargin = dpProfile(2);
+                    item.addView(name, nameLp);
+                    item.setOnClickListener(v -> openBadgeCabinet(profileId));
+                    strip.addView(item, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                }
+                binding.rowProfileAchievementBadges.setOnClickListener(v -> openBadgeCabinet(profileId));
+            });
+        });
+    }
+
+    private String targetLoadedProfileId() {
+        if (binding == null || binding.tvUsername == null) return "";
+        return binding.tvUsername.getTag() instanceof String ? (String) binding.tvUsername.getTag() : "";
+    }
+
+    private int dpProfile(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private String formatScore(long value) {
