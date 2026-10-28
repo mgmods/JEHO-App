@@ -13,8 +13,8 @@
           <img v-if="currentStyle.backgroundUrl" class="toast-canvas-image" :src="resolveAsset(currentStyle.backgroundUrl)" alt="تصميم التوست" draggable="false" />
           <div class="preview-avatar drag-item" :style="avatarPreviewStyle" @pointerdown.stop="startDrag('avatar', $event)">🧑</div>
           <strong class="preview-title drag-item" :style="titlePreviewStyle" @pointerdown.stop="startDrag('title', $event)">{{ activeTab === 'giftSend' ? 'اسم المرسل' : activeTab === 'luckyReturn' ? 'مردود الهدية' : 'الفائز المحظوظ' }}</strong>
-          <span class="preview-body drag-item" :style="bodyPreviewStyle" @pointerdown.stop="startDrag('body', $event)">{{ activeTab === 'giftSend' ? 'أرسل هدية' : activeTab === 'luckyReturn' ? 'مردود جزئي · +250 كوين' : (activeTab === 'luckyWinHigh' ? 'ربح عالي · +12,500 كوين' : 'مبروك الربح · +250 كوين') }}</span>
-          <span class="preview-count drag-item" :style="countPreviewStyle" @pointerdown.stop="startDrag('count', $event)">{{ activeTab === 'giftSend' ? 'X77' : (activeTab === 'luckyWinHigh' ? '×25' : '×3') }}</span>
+          <span class="preview-body drag-item" :style="bodyPreviewStyle" @pointerdown.stop="startDrag('body', $event)">{{ activeTab === 'giftSend' ? 'أرسل هدية' : activeTab === 'luckyReturn' ? 'مردود جزئي · +250 كوين' : (activeTab.startsWith('luckyWinHigh') ? 'ربح عالي · +12,500 كوين' : 'مبروك الربح · +250 كوين') }}</span>
+          <span class="preview-count drag-item" :style="countPreviewStyle" @pointerdown.stop="startDrag('count', $event)">{{ activeTab === 'giftSend' ? 'X77' : (activeTab.startsWith('luckyWinHigh') ? '×25' : '×3') }}</span>
           <div v-if="currentStyle.shineEnabled" class="preview-shine"></div>
         </div>
         <div v-else class="button-preview-wrap">
@@ -26,7 +26,7 @@
         </div>
       </div>
       <div v-if="activeTab !== 'luckyButton'" class="mb-3">
-        <label class="form-label">{{ activeTab === 'giftSend' ? 'خلفية توست إرسال الهدايا والعداد X' : activeTab === 'luckyReturn' ? 'خلفية توست الهدايا المردودة' : activeTab === 'luckyWinNormal' ? 'خلفية توست الربح العادي' : 'خلفية توست الربح العالي' }}</label>
+        <label class="form-label">{{ activeTab === 'giftSend' ? 'خلفية توست إرسال الهدايا والعداد X' : activeTab === 'luckyReturn' ? 'خلفية توست الهدايا المردودة' : activeTab === 'luckyWinNormal' ? 'خلفية توست الربح العادي' : activeTab === 'luckyWinHighRoom' ? 'خلفية توست الربح العالي داخل الروم (مستقلة)' : 'خلفية توست الربح العالي العام' }}</label>
         <input class="form-control" type="file" accept="image/png,image/jpeg,image/webp" :disabled="uploading || !canWriteSettings" @change="uploadAsset" />
         <div class="form-text">PNG أو JPG أو WEBP حتى 8 ميغابايت. ارفع صورة التوست كاملة كخلفية، ثم اضبط مكان صورة الفائز والكتابة من المعاينة.</div>
         <div v-if="currentStyle.backgroundUrl" class="mt-2 d-flex align-items-center gap-2">
@@ -56,6 +56,13 @@
             <label class="form-label">ارتفاع التوست: {{ currentStyle.heightDp }} dp</label>
             <input v-model.number="currentStyle.heightDp" class="form-range" type="range" min="60" max="180" step="2" />
             <p class="small text-secondary mb-0">يُحفظ الحجم لكل نوع توست ويُطبّق في المعاينة والتطبيق.</p>
+          </div>
+          <div v-if="activeTab === 'luckyWinHighRoom'" class="position-control">
+            <label class="form-label">مكان التوست أفقيًا على الشاشة: {{ currentStyle.placementX }}%</label>
+            <input v-model.number="currentStyle.placementX" class="form-range" type="range" min="0" max="100" step="1" />
+            <label class="form-label">مكان التوست عموديًا على الشاشة: {{ currentStyle.placementY }}%</label>
+            <input v-model.number="currentStyle.placementY" class="form-range" type="range" min="0" max="100" step="1" />
+            <p class="small text-secondary mb-0">تحدد هذه القيم مركز التوست داخل الروم، مع إمكانية ضبط الارتفاع والعرض وحجم الصورة وكل عنصر بشكل مستقل.</p>
           </div>
           <div class="position-control">
             <label class="form-label">حجم صورة المستخدم: {{ currentStyle.avatarSizeDp }} dp</label>
@@ -167,7 +174,8 @@ const canWriteSettings = computed(() => auth.can('settings', 'write'))
 const tabs = [
   { key: 'luckyWinNormal', label: 'أرباح المحظوظ العادية' },
   { key: 'luckyReturn', label: 'الهدايا المردودة' },
-  { key: 'luckyWinHigh', label: 'الأرباح العالية' },
+  { key: 'luckyWinHigh', label: 'الأرباح العالية — التوست العام' },
+  { key: 'luckyWinHighRoom', label: 'الأرباح العالية — داخل الروم' },
   { key: 'luckyButton', label: 'زر هدية المحظوظ' },
 ]
 const activeTab = ref('luckyWinNormal')
@@ -176,6 +184,7 @@ const form = reactive({
   luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+  luckyWinHighRoom: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
   version: 1,
 })
@@ -190,6 +199,7 @@ const canvasStyle = computed(() => ({
   width: Math.max(220, Math.min(360, Number(currentStyle.value.widthDp) || 340)) + 'px',
   height: Math.max(60, Math.min(180, Number(currentStyle.value.heightDp) || 100)) + 'px',
   boxShadow: 'none',
+  ...(activeTab.value === 'luckyWinHighRoom' ? { position: 'absolute', left: (Number(currentStyle.value.placementX) || 50) + '%', top: (Number(currentStyle.value.placementY) || 50) + '%', transform: 'translate(-50%, -50%)' } : { position: 'relative' }),
 }))
 const avatarPreviewStyle = computed(() => ({ left: currentStyle.value.avatarX + '%', top: currentStyle.value.avatarY + '%', width: currentStyle.value.avatarSizeDp + 'px', height: currentStyle.value.avatarSizeDp + 'px' }))
 const titlePreviewStyle = computed(() => ({ left: currentStyle.value.textX + '%', top: currentStyle.value.textY + '%', fontSize: (Number(currentStyle.value.titleSizeSp) || 13) + 'px' }))
@@ -224,7 +234,7 @@ async function load() {
   if (err) { error.value = err.message; return }
   const cfg = data?.data || data || {}
   const gift = cfg.giftSend || cfg
-  for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh']) {
+  for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh', 'luckyWinHighRoom']) {
     const incoming = cfg[key] || {}
     Object.assign(form[key], {
       backgroundUrl: String(incoming.backgroundUrl || ''),
@@ -245,6 +255,8 @@ async function load() {
       titleSizeSp: Math.max(8, Math.min(30, Number(incoming.titleSizeSp) || 13)),
       bodySizeSp: Math.max(8, Math.min(30, Number(incoming.bodySizeSp) || 12)),
       countSizeSp: Math.max(8, Math.min(30, Number(incoming.countSizeSp) || 12)),
+      placementX: Math.max(0, Math.min(100, Number.isFinite(Number(incoming.placementX)) ? Number(incoming.placementX) : 50)),
+      placementY: Math.max(0, Math.min(100, Number.isFinite(Number(incoming.placementY)) ? Number(incoming.placementY) : 50)),
     })
   }
   Object.assign(form.luckyButton, {
@@ -287,6 +299,7 @@ async function save() {
     luckyWinNormal: { ...form.luckyWinNormal },
     luckyReturn: { ...form.luckyReturn },
     luckyWinHigh: { ...form.luckyWinHigh },
+    luckyWinHighRoom: { ...form.luckyWinHighRoom },
     luckyButton: { ...form.luckyButton },
   }
   const { error: saveError } = await toastManagerApi.save(payload)
@@ -307,7 +320,7 @@ async function save() {
     return
   }
   const cfg = readBack?.data || readBack || {}
-  if (!cfg.giftSend || !cfg.luckyWinNormal || !cfg.luckyReturn || !cfg.luckyWinHigh || !cfg.luckyButton) {
+  if (!cfg.giftSend || !cfg.luckyWinNormal || !cfg.luckyReturn || !cfg.luckyWinHigh || !cfg.luckyWinHighRoom || !cfg.luckyButton) {
     error.value = 'الخادم لم يُرجع إعدادات التوست المحفوظة كاملة؛ لم نعرض نجاحاً غير مؤكّد.'
     toast().danger(error.value)
     return
@@ -315,9 +328,9 @@ async function save() {
   const fieldsToVerify = [
     'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
     'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
-    'durationSeconds', 'shineEnabled', 'frameGlowEnabled', 'backgroundUrl',
+    'durationSeconds', 'shineEnabled', 'frameGlowEnabled', 'backgroundUrl', 'placementX', 'placementY',
   ]
-  for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh']) {
+  for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh', 'luckyWinHighRoom']) {
     for (const field of fieldsToVerify) {
       const expected = payload[key]?.[field]
       const actual = cfg[key]?.[field]
@@ -332,6 +345,7 @@ async function save() {
   Object.assign(form.luckyWinNormal, cfg.luckyWinNormal)
   Object.assign(form.luckyReturn, cfg.luckyReturn)
   Object.assign(form.luckyWinHigh, cfg.luckyWinHigh)
+  Object.assign(form.luckyWinHighRoom, cfg.luckyWinHighRoom)
   Object.assign(form.luckyButton, cfg.luckyButton)
   form.version = Number(cfg.version) || form.version
   success.value = 'تم الحفظ والتحقق من القيم بقراءة جديدة من الخادم. الإعدادات التي لم تُحفظ ستظهر كخطأ ولن تُعرض رسالة نجاح.'
@@ -344,7 +358,7 @@ onMounted(load)
 .toast-tabs{display:flex;flex-wrap:wrap;gap:8px}
 .toast-tab{border:1px solid rgba(255,211,111,.28);border-radius:10px;padding:9px 13px;background:rgba(20,18,31,.55);color:inherit;font-size:.92rem}
 .toast-tab.active{border-color:#f5ca69;background:linear-gradient(110deg,rgba(125,22,54,.8),rgba(90,43,103,.7));box-shadow:0 0 12px rgba(255,191,64,.18)}
-.toast-preview-wrap{padding:18px 10px;border-radius:16px;background:linear-gradient(135deg,#191a25,#2b2232);overflow:auto}
+ .toast-preview-wrap{position:relative;min-height:220px;padding:18px 10px;border-radius:16px;background:linear-gradient(135deg,#191a25,#2b2232);overflow:auto}
 .toast-canvas{position:relative;max-width:100%;min-width:220px;margin:0 auto;border:0;border-radius:0;background:transparent;overflow:visible;color:#fff;touch-action:none;isolation:isolate}
 .toast-canvas-image{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;user-select:none}
 .drag-item{touch-action:none;cursor:grab;user-select:none}
