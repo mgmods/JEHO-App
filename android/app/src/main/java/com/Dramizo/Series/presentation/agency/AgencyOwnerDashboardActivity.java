@@ -370,10 +370,18 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 lastActivityLabel = " • آخر دعم (UTC): "
                         + stats.lastGiftActivityAt.substring(0, 16).replace('T', ' ');
             }
-            tvAgencyStatsTotal.setText("نشاط اليوم: دعم "
+            tvAgencyStatsTotal.setText("ملخص اليوم: دعم "
                     + formatLong(Math.max(0L, stats.dailyDiamonds)) + " ◆"
-                    + " • مضيفون نشطون بالدعم: " + stats.activeHostsToday
-                    + " • أعضاء جدد اليوم: " + stats.newMembersToday
+                    + " • مضيفون نشطون: " + stats.activeHostsToday
+                    + " • أعضاء جدد: " + stats.newMembersToday
+                    + "\nملخص الأسبوع: دعم "
+                    + formatLong(Math.max(0L, stats.weeklyDiamonds)) + " ◆"
+                    + " • مضيفون نشطون: " + stats.activeHostsThisWeek
+                    + " • أعضاء جدد: " + stats.newMembersThisWeek
+                    + "\nملخص الشهر: دعم "
+                    + formatLong(Math.max(0L, stats.monthlyDiamonds)) + " ◆"
+                    + " • مضيفون نشطون: " + stats.activeHostsThisMonth
+                    + " • أعضاء جدد: " + stats.newMembersThisMonth
                     + lastActivityLabel
                     + "\nإجمالي الهدايا خلال العضوية الحالية: "
                     + formatLong(Math.max(0L, stats.giftsReceivedDiamonds)) + " ◆"
@@ -448,7 +456,9 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             header.addView(diamonds);
 
             TextView dailySupport = new TextView(this);
-            dailySupport.setText("دعم اليوم: " + formatLong(Math.max(0L, member.dailyDiamonds)) + " ◆");
+            dailySupport.setText("دعم اليوم: " + formatLong(Math.max(0L, member.dailyDiamonds))
+                    + " ◆  • الأسبوع: " + formatLong(Math.max(0L, member.weeklyDiamonds))
+                    + " ◆  • الشهر: " + formatLong(Math.max(0L, member.monthlyDiamonds)) + " ◆");
             dailySupport.setTextColor(getColor(R.color.text_secondary));
             dailySupport.setTextSize(11);
             dailySupport.setPadding(dp(36), dp(5), 0, 0);
