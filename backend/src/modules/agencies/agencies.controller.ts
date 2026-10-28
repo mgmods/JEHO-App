@@ -132,6 +132,16 @@ export class AgenciesController {
     return this.agenciesService.openAgencyRoom(id, userId, dto);
   }
 
+  @Get(':id/audit')
+  @ApiOperation({ summary: 'Recent moderation actions in agency rooms (owner/manager only)' })
+  moderationAudit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.agenciesService.moderationAudit(id, userId, limit ? Number(limit) : 100);
+  }
+
   @Get(':id/stats')
   stats(
     @Param('id', ParseUUIDPipe) id: string,
