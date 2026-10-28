@@ -1277,12 +1277,12 @@ public class ProfileActivity extends ThemedActivity {
                         LinearLayout item = new LinearLayout(this);
                         item.setOrientation(LinearLayout.VERTICAL);
                         item.setGravity(Gravity.CENTER);
-                        int width = Math.round(40 * getResources().getDisplayMetrics().density);
+                        int width = Math.round(66 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams itemLp = new LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
                         itemLp.setMargins(0, 0, Math.round(6 * getResources().getDisplayMetrics().density), 0);
                         item.setLayoutParams(itemLp);
                         ImageView image = new ImageView(this);
-                        int size = Math.round(30 * getResources().getDisplayMetrics().density);
+                        int size = Math.round(52 * getResources().getDisplayMetrics().density);
                         image.setLayoutParams(new LinearLayout.LayoutParams(size, size));
                         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
                         image.setContentDescription(label);
@@ -1290,7 +1290,7 @@ public class ProfileActivity extends ThemedActivity {
                         TextView caption = new TextView(this);
                         caption.setText(label);
                         caption.setTextColor(0xFF697187);
-                        caption.setTextSize(10);
+                        caption.setTextSize(11);
                         caption.setGravity(Gravity.CENTER);
                         caption.setMaxLines(1);
                         caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1319,7 +1319,7 @@ public class ProfileActivity extends ThemedActivity {
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges) {
                         if (badge == null || !badge.earned || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
                         ImageView image = new ImageView(this);
-                        int size = Math.round(34 * getResources().getDisplayMetrics().density);
+                        int size = Math.round(50 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
                         lp.setMargins(0, 0, Math.round(8 * getResources().getDisplayMetrics().density), 0);
                         image.setLayoutParams(lp);
