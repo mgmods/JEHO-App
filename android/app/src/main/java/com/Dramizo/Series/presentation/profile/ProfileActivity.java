@@ -547,12 +547,12 @@ public class ProfileActivity extends ThemedActivity {
 
     private void openBadgeCabinet(String profileId) {
         if (profileId == null || profileId.trim().isEmpty()) return;
-        Intent intent = new Intent(this, BadgeActivity.class);
+        Intent intent = new Intent(this, MedalActivity.class);
         intent.putExtra(EXTRA_USER_ID, profileId);
         startActivity(intent);
     }
 
-    /** Shows every earned/gifted badge in a large, swipeable strip below the profile identity row. */
+    /** Shows earned medals in a horizontally swipeable strip above Moments. */
     private void loadProfileAchievementBadges(String profileId) {
         if (binding == null || binding.boxProfileAchievementBadges == null
                 || profileId == null || profileId.trim().isEmpty()) return;
