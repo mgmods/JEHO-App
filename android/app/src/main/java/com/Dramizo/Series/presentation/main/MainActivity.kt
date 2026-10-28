@@ -500,7 +500,7 @@ class MainActivity : ThemedActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, pad)
             minimumWidth = (320 * resources.displayMetrics.density).toInt()
-            background = roundedBackground(Color.rgb(15, 20, 39), 26, Color.rgb(105, 101, 181))
+            background = roundedBackground(Color.rgb(255, 255, 255), 26, Color.rgb(218, 180, 82))
         }
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -509,14 +509,14 @@ class MainActivity : ThemedActivity() {
         val heading = TextView(this).apply {
             text = "مكافآت تسجيل الدخول"
             textSize = 21f
-            setTextColor(Color.rgb(249, 247, 255))
+            setTextColor(Color.rgb(45, 39, 28))
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         }
         val close = TextView(this).apply {
             text = "×"
             textSize = 28f
-            setTextColor(Color.LTGRAY)
+            setTextColor(Color.rgb(126, 113, 82))
             gravity = Gravity.CENTER
             setPadding(pad / 2, 0, pad / 2, 0)
         }
@@ -527,10 +527,42 @@ class MainActivity : ThemedActivity() {
         val subtitle = TextView(this).apply {
             text = "سجّل دخولك يوميًا وافتح مكافأة جديدة كل يوم"
             textSize = 13f
-            setTextColor(Color.rgb(188, 198, 222))
+            setTextColor(Color.rgb(126, 119, 102))
             setPadding(0, pad / 3, 0, pad)
         }
         root.addView(subtitle)
+
+        val giftHero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(pad, pad / 2, pad, pad)
+            background = roundedBackground(Color.rgb(255, 250, 232), 22, Color.rgb(226, 194, 112))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = pad }
+        }
+        val giftOrb = TextView(this).apply {
+            text = "🎁"
+            textSize = 52f
+            gravity = Gravity.CENTER
+            setPadding(pad, pad / 3, pad, pad / 3)
+            background = roundedBackground(Color.rgb(255, 255, 255), 48, Color.rgb(234, 207, 139))
+            contentDescription = "هدية تسجيل الدخول اليومية"
+        }
+        giftHero.addView(giftOrb)
+        giftHero.addView(TextView(this).apply {
+            text = "هدية اليوم بانتظارك"
+            textSize = 16f
+            setTextColor(Color.rgb(105, 78, 23))
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, pad / 3, 0, pad / 6)
+        })
+        giftHero.addView(TextView(this).apply {
+            text = "تابع دخولك يوميًا وافتح الجائزة الكبرى في اليوم السابع"
+            textSize = 12f
+            setTextColor(Color.rgb(132, 119, 88))
+            gravity = Gravity.CENTER
+        })
+        root.addView(giftHero)
 
         val daysScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val daysRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -542,15 +574,15 @@ class MainActivity : ThemedActivity() {
                 setPadding(pad / 2, pad / 2, pad / 2, pad / 2)
                 background = roundedBackground(
                     when {
-                        day.claimed -> Color.rgb(25, 59, 54)
-                        day.day == status.currentDay -> Color.rgb(55, 47, 83)
-                        else -> Color.rgb(27, 34, 57)
+                        day.claimed -> Color.rgb(239, 249, 242)
+                        day.day == status.currentDay -> Color.rgb(255, 249, 229)
+                        else -> Color.rgb(255, 255, 255)
                     },
                     16,
                     when {
-                        day.claimed -> Color.rgb(72, 190, 151)
-                        day.day == status.currentDay -> Color.rgb(220, 188, 105)
-                        else -> Color.rgb(62, 76, 112)
+                        day.claimed -> Color.rgb(58, 157, 92)
+                        day.day == status.currentDay -> Color.rgb(210, 169, 58)
+                        else -> Color.rgb(232, 224, 205)
                     },
                 )
                 layoutParams = LinearLayout.LayoutParams((76 * resources.displayMetrics.density).toInt(), (100 * resources.displayMetrics.density).toInt()).apply {
@@ -560,7 +592,7 @@ class MainActivity : ThemedActivity() {
             tile.addView(TextView(this).apply {
                 text = "اليوم ${day.day}"
                 textSize = 11f
-                setTextColor(Color.WHITE)
+                setTextColor(Color.rgb(57, 49, 34))
                 typeface = Typeface.DEFAULT_BOLD
             })
             val dayPreview = day.previewUrl ?: day.animationUrl
@@ -583,7 +615,7 @@ class MainActivity : ThemedActivity() {
                 text = if (day.claimed) "✓ تم الاستلام" else if (day.type == "coins") "${day.amount} كوينز" else "جائزة"
                 textSize = 9f
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(if (day.claimed) Color.rgb(112, 232, 183) else if (day.day == status.currentDay) Color.rgb(255, 222, 135) else Color.rgb(185, 195, 218))
+                setTextColor(if (day.claimed) Color.rgb(42, 139, 78) else if (day.day == status.currentDay) Color.rgb(151, 111, 22) else Color.rgb(127, 119, 102))
             })
             daysRow.addView(tile)
         }
@@ -595,7 +627,7 @@ class MainActivity : ThemedActivity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(pad, pad, pad, pad)
-            background = roundedBackground(Color.rgb(26, 32, 56), 22, Color.rgb(112, 104, 179))
+            background = roundedBackground(Color.rgb(255, 252, 243), 22, Color.rgb(218, 180, 82))
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = pad }
         }
         val rewardImage = ImageView(this).apply {
@@ -623,7 +655,7 @@ class MainActivity : ThemedActivity() {
         rewardPanel.addView(TextView(this).apply {
             text = reward?.name ?: reward?.label ?: "مكافأة اليوم"
             textSize = 17f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.rgb(54, 46, 31))
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             setPadding(0, pad / 3, 0, pad / 5)
@@ -632,7 +664,7 @@ class MainActivity : ThemedActivity() {
             text = if (reward?.type == "coins") "${reward.amount} كوينز" else "${reward?.cosmeticType?.let { cosmeticTypeLabel(it) } ?: "عنصر تجميلي"} · ${reward?.durationDays ?: 7} يوم"
             textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.rgb(244, 207, 111))
+            setTextColor(Color.rgb(157, 115, 20))
             gravity = Gravity.CENTER
         })
         root.addView(rewardPanel)
@@ -642,7 +674,7 @@ class MainActivity : ThemedActivity() {
             isAllCaps = false
             textSize = 16f
             setTextColor(Color.WHITE)
-            background = roundedBackground(Color.rgb(194, 145, 43), 16, Color.rgb(230, 190, 83))
+            background = roundedBackground(Color.rgb(35, 157, 83), 16, Color.rgb(26, 130, 67))
             layoutParams = LinearLayout.LayoutParams(-1, (50 * resources.displayMetrics.density).toInt()).apply { topMargin = pad }
         }
         root.addView(claimButton)
