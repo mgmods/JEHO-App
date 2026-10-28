@@ -455,8 +455,8 @@ public class ProfileActivity extends ThemedActivity {
                     binding.imgFrame,
                     user.avatarUrl,
                     profileFrame,
-                    user.hostBadgeUrl,
-                    user.hostBadgeMeta,
+                    null,
+                    null,
                     1);
             // Secure only the enlarged avatar viewer; the profile screen itself remains screenshot-able.
             binding.imgAvatar.setOnClickListener(v -> {
@@ -543,7 +543,13 @@ public class ProfileActivity extends ThemedActivity {
         boolean rechargeAgent = user.isRechargeAgent;
         boolean agencyOwner = user.agency != null
                 && "owner".equalsIgnoreCase(user.agency.role);
-        if (!StaffRoleHelper.isStaff(user) && !rechargeAgent && !agencyOwner) {
+        // Agency identity is rendered by the single dedicated agency-role chip below.
+        // Do not duplicate it here as the old purple "وكالة" badge.
+        if (agencyOwner && !StaffRoleHelper.isStaff(user) && !rechargeAgent) {
+            binding.tvStaffBadge.setVisibility(View.GONE);
+            return;
+        }
+        if (!StaffRoleHelper.isStaff(user) && !rechargeAgent) {
             binding.tvStaffBadge.setVisibility(View.GONE);
             return;
         }
@@ -598,15 +604,15 @@ public class ProfileActivity extends ThemedActivity {
             binding.tvAgencyRoleBadge.setVisibility(View.GONE);
             return;
         }
-        String label = owner ? "♛  صاحب وكالة" : "🎙  موظف";
-        int start = owner ? 0xFFFFF0CC : 0xFFE8E7FF;
-        int end = owner ? 0xFFFFD778 : 0xFFD3CEFF;
-        int textColor = owner ? 0xFF765000 : 0xFF5140A0;
+        // Show exactly one agency identity badge; the separate blue host badge is hidden below.
+        String label = "♛  مضيف وكالة";
+        int start = 0xFFFFF0CC;
+        int end = 0xFFFFD778;
+        int textColor = 0xFF765000;
         GradientDrawable chip = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT, new int[]{start, end});
         chip.setCornerRadius(100f * getResources().getDisplayMetrics().density);
-        chip.setStroke((int) (1 * getResources().getDisplayMetrics().density),
-                owner ? 0xFFE8BD57 : 0xFFB9B0FF);
+        chip.setStroke((int) (1 * getResources().getDisplayMetrics().density), 0xFFE8BD57);
         binding.tvAgencyRoleBadge.setText(label);
         binding.tvAgencyRoleBadge.setTextColor(textColor);
         binding.tvAgencyRoleBadge.setBackground(chip);
