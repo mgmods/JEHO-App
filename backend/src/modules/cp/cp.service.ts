@@ -85,6 +85,46 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     return catalog;
   }
 
+  async leaderboard(period: 'weekly' | 'world' = 'weekly') {
+    if (period === 'world') return this.discover();
+    if (period !== 'weekly') throw new BadRequestException('فترة ترتيب CP غير صالحة');
+    return this.dataSource.query(
+      `SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
+        COALESCE(SUM(e.points::numeric), 0)::text AS "weeklyPoints",
+        json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level) AS "userA",
+        json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level) AS "userB"
+       FROM cp_relationships r
+       JOIN users a ON a.id = r."userAId"
+       JOIN users b ON b.id = r."userBId"
+       LEFT JOIN cp_point_events e ON e."relationshipId" = r.id
+         AND e."createdAt" >= date_trunc('week', now())
+       WHERE r.status = 'active'
+       GROUP BY r.id, a.id, b.id
+       ORDER BY SUM(e.points::numeric) DESC NULLS LAST, r.points DESC, r."startedAt" ASC
+       LIMIT 100`,
+    );
+  }
+
+  async rewards() {
+    const rows = await this.dataSource.query(
+      `SELECT key, value FROM app_settings WHERE key LIKE 'cp.levels.%' ORDER BY key`,
+    );
+    const configs: Array<{ type: string; levels: any[] }> = [];
+    for (const row of rows) {
+      const type = String(row.key).slice('cp.levels.'.length);
+      if (!TYPES.has(type)) continue;
+      let levels: any[] = [];
+      try {
+        const parsed = JSON.parse(String(row.value || '[]'));
+        if (Array.isArray(parsed)) levels = parsed
+          .filter(item => item && Number.isFinite(Number(item.level)) && Number(item.level) >= 1)
+          .sort((a, b) => Number(a.level) - Number(b.level));
+      } catch { levels = []; }
+      configs.push({ type, levels });
+    }
+    return configs;
+  }
+
   async discover(type?: CpType) {
     if (type && !TYPES.has(type)) throw new BadRequestException('نوع CP غير صالح');
     const where = type ? 'AND r.type = $1' : '';
