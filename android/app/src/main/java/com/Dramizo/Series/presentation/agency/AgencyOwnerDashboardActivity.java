@@ -133,12 +133,14 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         ContainerProvider.from(this).getIoExecutor().execute(() -> {
             Result<MiscDtos.AgencyMineDto> mine =
                     ApiCall.execute(ContainerProvider.from(this).getAgencyApi().mine());
-            Result<MiscDtos.AgencyStatsDto> agencyStats = null;
+            Result<MiscDtos.AgencyStatsDto> statsResult = null;
+            Result<MiscDtos.AgencyStatsDto> loadedStats = statsResult;
             if (mine.success && mine.data != null && mine.data.agency != null
                     && mine.data.agency.id != null) {
-                agencyStats = ApiCall.execute(
+                loadedStats = ApiCall.execute(
                         ContainerProvider.from(this).getAgencyApi().stats(mine.data.agency.id));
             }
+            final Result<MiscDtos.AgencyStatsDto> agencyStats = loadedStats;
             Result<WalletDtos.EconomyConfig> econ =
                     ApiCall.execute(ContainerProvider.from(this).getWalletApi().economyConfig());
             Result<WalletDtos.WalletDto> wallet =
