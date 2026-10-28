@@ -313,7 +313,8 @@ public class MedalActivity extends ThemedActivity {
             VH(View itemView) {
                 super(itemView);
                 icon = itemView.findViewById(R.id.imgMedal);
-                title = itemView.findViewById(R.id.tvMedalName);\n                action = itemView.findViewById(R.id.btnMedalAction);
+                title = itemView.findViewById(R.id.tvMedalName);
+                action = itemView.findViewById(R.id.btnMedalAction);
             }
         }
     }
