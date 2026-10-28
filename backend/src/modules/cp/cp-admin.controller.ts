@@ -61,8 +61,8 @@ export class CpAdminController {
     return {
       globallyEnabled: settings['cp.enabled.global'] !== false && settings['cp.enabled.global'] !== 'false',
       tasks: {
-        memory_today: { enabled: taskConfig.memory_today?.enabled !== false, title: String(taskConfig.memory_today?.title || 'ذكرى جديدة'), target: Number(taskConfig.memory_today?.target || 1), rewardPoints: Number(taskConfig.memory_today?.rewardPoints || 10), rewardCosmeticCode: String(taskConfig.memory_today?.rewardCosmeticCode || '') },
-        earn_points_today: { enabled: taskConfig.earn_points_today?.enabled !== false, title: String(taskConfig.earn_points_today?.title || 'نشاط مشترك'), target: Number(taskConfig.earn_points_today?.target || 10), rewardPoints: Number(taskConfig.earn_points_today?.rewardPoints || 15), rewardCosmeticCode: String(taskConfig.earn_points_today?.rewardCosmeticCode || '') },
+        memory_today: { enabled: taskConfig.memory_today?.enabled !== false, title: String(taskConfig.memory_today?.title || 'ذكرى جديدة'), target: Number(taskConfig.memory_today?.target || 1), rewardPoints: Number(taskConfig.memory_today?.rewardPoints ?? 10), rewardCosmeticCode: String(taskConfig.memory_today?.rewardCosmeticCode || '') },
+        earn_points_today: { enabled: taskConfig.earn_points_today?.enabled !== false, title: String(taskConfig.earn_points_today?.title || 'نشاط مشترك'), target: Number(taskConfig.earn_points_today?.target || 10), rewardPoints: Number(taskConfig.earn_points_today?.rewardPoints ?? 15), rewardCosmeticCode: String(taskConfig.earn_points_today?.rewardCosmeticCode || '') },
       },
       types,
       policy: {
@@ -97,6 +97,7 @@ export class CpAdminController {
       for (const id of Object.keys(body.tasks)) {
         if (!allowed.includes(id)) throw new BadRequestException('معرّف مهمة CP غير مدعوم');
         const task = body.tasks[id];
+        if (!task || typeof task !== 'object' || Array.isArray(task)) throw new BadRequestException('بيانات المهمة غير صالحة');
         if (task.enabled !== undefined && typeof task.enabled !== 'boolean') throw new BadRequestException('حالة المهمة غير صالحة');
         if (task.target !== undefined && (!Number.isSafeInteger(task.target) || task.target < 1 || task.target > 1000000)) throw new BadRequestException('هدف المهمة يجب أن يكون بين 1 و1,000,000');
         if (task.rewardPoints !== undefined && (!Number.isSafeInteger(task.rewardPoints) || task.rewardPoints < 0 || task.rewardPoints > 1000000)) throw new BadRequestException('مكافأة المهمة يجب أن تكون بين 0 و1,000,000 نقطة');
