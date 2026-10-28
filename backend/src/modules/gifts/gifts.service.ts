@@ -2264,9 +2264,30 @@ export class GiftsService implements OnModuleInit {
         }),
       );
 
+      // Private platform accounting is an ADDITIONAL ledger total, never a deduction.
+      // The percentage and amount stay server-side and are not included in sender/host/agency responses.
+      const platformDiamonds = Math.floor(
+        (diamondsAwarded * Math.min(100, Math.max(0, Number(ECONOMY.platformCommissionPercent) || 0))) / 100,
+      );
+      if (platformDiamonds > 0) {
+        let platformRevenue = await manager.findOne(AppSetting, {
+          where: { key: 'platform_gift_revenue_diamonds' },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!platformRevenue) {
+          platformRevenue = manager.create(AppSetting, {
+            key: 'platform_gift_revenue_diamonds',
+            value: '0',
+            description: 'Cumulative private platform gift accounting (diamonds)',
+          });
+        }
+        platformRevenue.value = String(Number(platformRevenue.value || 0) + platformDiamonds);
+        await manager.save(platformRevenue);
+      }
+
       // ── INDEPENDENT EARNINGS: host receives the full gift value.
       // Agency commission is an additional credit, never deducted from host diamonds.
-      // Platform share/margin is accounted for separately and never exposed to clients.
+      // Platform accounting is separate, additive and never exposed to clients.
       let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
       const distributableDiamonds = diamondsAwarded;
@@ -2299,15 +2320,10 @@ export class GiftsService implements OnModuleInit {
         if (agency?.status === AgencyStatus.ACTIVE) {
           agencyId = agency.id;
           earningsStream = 'agency';
-          // Owner commission %: per-agency override, else dashboard default.
+          // Dashboard commission is the single live source of truth for gift payouts.
           const ownerPct = Math.min(
             100,
-            Math.max(
-              0,
-              Number(agency.commissionPercent) > 0
-                ? Number(agency.commissionPercent)
-                : ECONOMY.defaultGiftSplit.agencyOwnerPercent,
-            ),
+            Math.max(0, Number(ECONOMY.defaultGiftSplit.agencyOwnerPercent) || 0),
           );
           // Host always receives the entire minted gift value.
           hostDiamonds = distributableDiamonds;
@@ -2481,10 +2497,9 @@ export class GiftsService implements OnModuleInit {
           .catch(() => undefined);
         const spentCoins = gift.coinPrice * qty;
         // Diamonds progress = the receiver's ACTUAL share after platform/agency split.
-        const hostDiamondShare = Number(result.hostDiamonds ?? 0);
-        const diamondProgress = hostDiamondShare > 0
-          ? hostDiamondShare
-          : Number(result.send?.diamondsAwarded ?? 0);
+        // Never fall back to the raw gift pool: target progress is host earnings only.
+        const hostDiamondShare = Math.max(0, Number(result.hostDiamonds ?? 0));
+        const diamondProgress = hostDiamondShare;
         // Coins progress = proportional to the receiver's diamond share.
         // Old behaviour credited the FULL sticker price to the receiver even when
         // the platform (40%) and agency owner (15%) already skimmed most of it,
