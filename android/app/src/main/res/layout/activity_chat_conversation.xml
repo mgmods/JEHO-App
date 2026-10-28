@@ -509,57 +509,6 @@
                 app:tint="@color/text_secondary" />
         </LinearLayout>
 
-        <FrameLayout
-            android:id="@+id/mediaUploadBanner"
-            android:layout_width="104dp"
-            android:layout_height="104dp"
-            android:layout_gravity="bottom|end"
-            android:layout_marginEnd="18dp"
-            android:layout_marginBottom="86dp"
-            android:background="@drawable/bg_chat_reply_quote"
-            android:elevation="8dp"
-            android:padding="4dp"
-            android:visibility="gone">
-
-            <ImageView
-                android:id="@+id/imgMediaUploadPreview"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="معاينة الفيديو الجاري إرساله"
-                android:scaleType="centerCrop" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="#33000000" />
-
-            <TextView
-                android:id="@+id/tvMediaUploadStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom|start"
-                android:layout_margin="5dp"
-                android:background="#99000000"
-                android:paddingHorizontal="5dp"
-                android:paddingVertical="3dp"
-                android:text="جارٍ إرسال الفيديو"
-                android:textColor="#FFFFFF"
-                android:textSize="9sp" />
-
-            <ProgressBar
-                android:id="@+id/progressMediaUpload"
-                style="?android:attr/progressBarStyleSmall"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:layout_gravity="bottom|end"
-                android:layout_margin="5dp"
-                android:indeterminate="true"
-                android:indeterminateTint="#FFFFFF"
-                android:background="@drawable/bg_chat_avatar_ring"
-                android:padding="5dp"
-                android:visibility="visible" />
-        </FrameLayout>
-
         <!-- Composer: + | pill input+emoji | mic/send -->
         <LinearLayout
             android:id="@+id/inputBar"
@@ -798,6 +747,56 @@
             </LinearLayout>
         </LinearLayout>
     </FrameLayout>
+        <FrameLayout
+            android:id="@+id/mediaUploadBanner"
+            android:layout_width="104dp"
+            android:layout_height="104dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="18dp"
+            android:layout_marginBottom="86dp"
+            android:background="@drawable/bg_chat_reply_quote"
+            android:elevation="8dp"
+            android:padding="4dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/imgMediaUploadPreview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="معاينة الفيديو الجاري إرساله"
+                android:scaleType="centerCrop" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#33000000" />
+
+            <TextView
+                android:id="@+id/tvMediaUploadStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:layout_margin="5dp"
+                android:background="#99000000"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="3dp"
+                android:text="جارٍ إرسال الفيديو"
+                android:textColor="#FFFFFF"
+                android:textSize="9sp" />
+
+            <ProgressBar
+                android:id="@+id/progressMediaUpload"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="5dp"
+                android:indeterminate="true"
+                android:indeterminateTint="#FFFFFF"
+                android:background="@drawable/bg_chat_avatar_ring"
+                android:padding="5dp"
+                android:visibility="visible" />
+        </FrameLayout>
 </FrameLayout>
 
 
