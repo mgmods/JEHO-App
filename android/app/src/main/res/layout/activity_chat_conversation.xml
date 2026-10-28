@@ -766,36 +766,25 @@
                 android:contentDescription="معاينة الفيديو الجاري إرساله"
                 android:scaleType="centerCrop" />
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="#33000000" />
-
-            <TextView
-                android:id="@+id/tvMediaUploadStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom|start"
-                android:layout_margin="5dp"
-                android:background="#99000000"
-                android:paddingHorizontal="5dp"
-                android:paddingVertical="3dp"
-                android:text="جارٍ إرسال الفيديو"
-                android:textColor="#FFFFFF"
-                android:textSize="9sp" />
-
             <ProgressBar
                 android:id="@+id/progressMediaUpload"
                 style="?android:attr/progressBarStyleSmall"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
                 android:layout_gravity="bottom|end"
                 android:layout_margin="5dp"
                 android:indeterminate="true"
                 android:indeterminateTint="#FFFFFF"
-                android:background="@drawable/bg_chat_avatar_ring"
+                android:background="#B3000000"
                 android:padding="5dp"
                 android:visibility="visible" />
+
+            <TextView
+                android:id="@+id/tvMediaUploadStatus"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:visibility="gone"
+                android:text="جارٍ إرسال الفيديو" />
         </FrameLayout>
 </FrameLayout>
 
