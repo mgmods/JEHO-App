@@ -219,7 +219,7 @@ export class AgenciesController {
     @CurrentUser('sub') userId: string,
     @Body() dto: JoinByCodeDto,
   ) {
-    return this.agenciesService.joinByCode(userId, dto.code);
+    return this.agenciesService.joinByCode(userId, dto.code, dto.publicId);
   }
 
   @Post(':id/join')
