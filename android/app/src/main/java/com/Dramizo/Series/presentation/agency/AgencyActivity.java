@@ -1488,7 +1488,7 @@ public class AgencyActivity extends ThemedActivity {
                 new com.google.android.material.button.MaterialButton(this);
         boolean following = Boolean.TRUE.equals(agency.isFollowing);
         follow.setText(following ? "✓ تتابع الوكالة" : "متابعة");
-        follow.setTextAllCaps(false);
+        follow.setAllCaps(false);
         follow.setCornerRadius(dp(22));
         follow.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
                 android.graphics.Color.rgb(111, 82, 190)));
@@ -1525,7 +1525,7 @@ public class AgencyActivity extends ThemedActivity {
         com.google.android.material.button.MaterialButton join =
                 new com.google.android.material.button.MaterialButton(this);
         join.setText("إرسال طلب الانضمام");
-        join.setTextAllCaps(false);
+        join.setAllCaps(false);
         join.setCornerRadius(dp(22));
         join.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
                 android.graphics.Color.rgb(67, 211, 162)));
