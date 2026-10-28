@@ -1669,6 +1669,8 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final View imageWrap;
         final ImageView imgMedia;
         final VideoView videoMedia;
+        final ImageView imgVideoThumbnail;
+        final View btnVideoPlay;
         final View rowImageReaction;
         final TextView tvImageReaction;
         final TextView tvImageTime;
@@ -1721,6 +1723,8 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             imageWrap = root.findViewById(R.id.imageWrap);
             imgMedia = root.findViewById(R.id.imgMedia);
             videoMedia = root.findViewById(R.id.videoMedia);
+            imgVideoThumbnail = root.findViewById(R.id.imgVideoThumbnail);
+            btnVideoPlay = root.findViewById(R.id.btnVideoPlay);
             rowImageReaction = root.findViewById(R.id.rowImageReaction);
             tvImageReaction = root.findViewById(R.id.tvImageReaction);
             tvImageTime = root.findViewById(R.id.tvImageTime);
