@@ -375,7 +375,7 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                     + " • مضيفون نشطون بالدعم: " + stats.activeHostsToday
                     + " • أعضاء جدد اليوم: " + stats.newMembersToday
                     + lastActivityLabel
-                    + "\\nإجمالي الهدايا خلال العضوية الحالية: "
+                    + "\nإجمالي الهدايا خلال العضوية الحالية: "
                     + formatLong(Math.max(0L, stats.giftsReceivedDiamonds)) + " ◆"
                     + " • الأعضاء الحاليون: " + stats.memberCount + targetLabel);
         }
