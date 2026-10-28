@@ -1143,9 +1143,11 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     }
                 }
             }
-            cpGiftTypes.clear();
-            cpGiftTypes.putAll(mappings);
-            cpCatalogLoaded = true;
+            if (result.success) {
+                cpGiftTypes.clear();
+                cpGiftTypes.putAll(mappings);
+                cpCatalogLoaded = true;
+            }
         });
     }
 
