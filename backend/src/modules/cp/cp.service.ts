@@ -259,23 +259,31 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const [taskConfigRow] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
     let taskConfig: Record<string, any> = {};
     try { taskConfig = JSON.parse(taskConfigRow?.value || '{}'); } catch { taskConfig = {}; }
-    const defaults = [
-      { id: 'memory_today', title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', progress: Math.min(1, Number(memoryCount?.count) || 0), target: 1, rewardPoints: 10 },
-      { id: 'earn_points_today', title: 'نشاط مشترك', description: 'اجمعوا 10 نقاط علاقة اليوم', progress: Math.min(10, pointsToday), target: 10, rewardPoints: 15 },
-    ];
-    const definitions = defaults
-      .filter(task => taskConfig[task.id]?.enabled !== false)
-      .map(task => ({
-        ...task,
-        title: String(taskConfig[task.id]?.title || task.title).slice(0, 100),
-        description: String(taskConfig[task.id]?.description || task.description).slice(0, 240),
-        target: Math.max(1, Math.min(1000000, Math.floor(Number(taskConfig[task.id]?.target) || task.target))),
-        rewardPoints: Math.max(0, Math.min(1000000, Math.floor(Number(taskConfig[task.id]?.rewardPoints) || task.rewardPoints))),
-        rewardCosmeticCode: typeof taskConfig[task.id]?.rewardCosmeticCode === 'string' ? taskConfig[task.id].rewardCosmeticCode : '',
-        progress: task.id === 'memory_today'
-          ? Math.min(Math.max(1, Math.floor(Number(taskConfig[task.id]?.target) || task.target)), Number(memoryCount?.count) || 0)
-          : Math.min(Math.max(1, Math.floor(Number(taskConfig[task.id]?.target) || task.target)), pointsToday),
-      }));
+    const defaults: Record<string, any> = {
+      memory_today: { title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', condition: 'memory_count', target: 1, rewardPoints: 10 },
+      earn_points_today: { title: 'نشاط مشترك', description: 'اجمعوا نقاط العلاقة اليوم', condition: 'points_today', target: 10, rewardPoints: 15 },
+    };
+    const taskIds = new Set([...Object.keys(defaults), ...Object.keys(taskConfig)]);
+    const definitions = Array.from(taskIds)
+      .filter(id => taskConfig[id]?.enabled !== false)
+      .filter(id => /^[a-zA-Z0-9_-]{2,64}$/.test(id))
+      .map(id => {
+        const base = defaults[id] || { title: 'مهمة CP', description: 'أكملوا شرط المهمة اليوم', condition: 'points_today', target: 10, rewardPoints: 0 };
+        const config = taskConfig[id] || {};
+        const condition = config.condition === 'memory_count' || (!config.condition && id === 'memory_today') ? 'memory_count' : 'points_today';
+        const target = Math.max(1, Math.min(1000000, Math.floor(Number(config.target ?? base.target) || base.target)));
+        const progressValue = condition === 'memory_count' ? Number(memoryCount?.count) || 0 : pointsToday;
+        return {
+          id,
+          title: String(config.title || base.title).slice(0, 100),
+          description: String(config.description || base.description).slice(0, 240),
+          condition,
+          target,
+          rewardPoints: Math.max(0, Math.min(1000000, Math.floor(Number(config.rewardPoints ?? base.rewardPoints) || 0))),
+          rewardCosmeticCode: typeof config.rewardCosmeticCode === 'string' ? config.rewardCosmeticCode : '',
+          progress: Math.min(target, progressValue),
+        };
+      });
     const rewardCodes = definitions.map(task => String(task.rewardCosmeticCode || '').trim()).filter(Boolean);
     const rewardRows: Array<{ code: string; name: string; previewUrl: string; type: string }> = rewardCodes.length
       ? await this.dataSource.query(
@@ -303,13 +311,25 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     if (String(globalSetting?.value || 'true').toLowerCase() === 'false') {
       throw new BadRequestException('قسم CP متوقف حالياً من لوحة التحكم');
     }
-    if (!['memory_today', 'earn_points_today'].includes(taskId)) {
-      throw new BadRequestException('مهمة CP غير معروفة');
-    }
+    if (!/^[a-zA-Z0-9_-]{2,64}$/.test(taskId)) throw new BadRequestException('معرّف مهمة CP غير صالح');
     const [taskConfigRow] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
     let taskConfig: Record<string, any> = {};
     try { taskConfig = JSON.parse(taskConfigRow?.value || '{}'); } catch { taskConfig = {}; }
+    const builtInIds = ['memory_today', 'earn_points_today'];
+    if (!builtInIds.includes(taskId) && !Object.prototype.hasOwnProperty.call(taskConfig, taskId)) {
+      throw new BadRequestException('مهمة CP غير معروفة');
+    }
     if (taskConfig[taskId]?.enabled === false) throw new BadRequestException('هذه المهمة متوقفة من لوحة التحكم');
+    const baseTask = taskId === 'memory_today'
+      ? { condition: 'memory_count', target: 1, rewardPoints: 10 }
+      : taskId === 'earn_points_today'
+        ? { condition: 'points_today', target: 10, rewardPoints: 15 }
+        : { condition: 'points_today', target: 10, rewardPoints: 0 };
+    const taskDefinition = { ...baseTask, ...(taskConfig[taskId] || {}) };
+    const taskCondition = taskDefinition.condition === 'memory_count' || (!taskDefinition.condition && taskId === 'memory_today')
+      ? 'memory_count' : 'points_today';
+    const target = Math.max(1, Math.min(1000000, Math.floor(Number(taskDefinition.target) || baseTask.target)));
+    const configuredRewardPoints = Math.max(0, Math.min(1000000, Math.floor(Number(taskDefinition.rewardPoints ?? baseTask.rewardPoints) || 0)));
     const [relationship] = await this.dataSource.query(
       `SELECT id,points::text AS points,level,type FROM cp_relationships
        WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
@@ -320,15 +340,13 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const [dayRow] = await this.dataSource.query(`SELECT to_char(now(),'YYYY-MM-DD') AS day`);
     const day = String(dayRow?.day || new Date().toISOString().slice(0, 10));
     let eligible = false;
-    let rewardPoints = 0;
-    if (taskId === 'memory_today') {
+    if (taskCondition === 'memory_count') {
       const [row] = await this.dataSource.query(
         `SELECT COUNT(*)::int AS count FROM cp_memories
          WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())`,
         [relationship.id],
       );
-      eligible = Number(row?.count) >= Math.max(1, Math.floor(Number(taskConfig[taskId]?.target) || 1));
-      rewardPoints = Math.max(0, Math.min(1000000, Math.floor(Number(taskConfig[taskId]?.rewardPoints) || 10)));
+      eligible = Number(row?.count) >= target;
     } else {
       const [row] = await this.dataSource.query(
         `SELECT COALESCE(SUM(points::numeric),0)::text AS points FROM cp_point_events
@@ -336,9 +354,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
            AND "eventType"<>'cp_task_reward'`,
         [relationship.id],
       );
-      eligible = Number(row?.points) >= Math.max(1, Math.floor(Number(taskConfig[taskId]?.target) || 10));
-      rewardPoints = Math.max(0, Math.min(1000000, Math.floor(Number(taskConfig[taskId]?.rewardPoints) || 15)));
+      eligible = Number(row?.points) >= target;
     }
+    const rewardPoints = configuredRewardPoints;
     if (!eligible) throw new BadRequestException('أكملوا شرط المهمة أولاً');
     const referenceId = `${relationship.id}:${userId}:${taskId}:${day}`;
     const configuredCode = String(taskConfig[taskId]?.rewardCosmeticCode || '').trim();
