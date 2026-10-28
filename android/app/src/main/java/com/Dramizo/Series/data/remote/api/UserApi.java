@@ -165,6 +165,10 @@ public interface UserApi {
 
     @GET("cp/discover")
     Call<ApiResponse<List<Map<String, Object>>>> discoverCp(@Query("type") String type);
+    @GET("cp/leaderboard")
+    Call<ApiResponse<List<Map<String, Object>>>> cpLeaderboard(@Query("period") String period);
+    @GET("cp/rewards")
+    Call<ApiResponse<List<Map<String, Object>>>> cpRewards();
 
 
 
