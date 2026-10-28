@@ -406,6 +406,7 @@ function applyToForm(cur) {
   form.minWithdrawDiamonds = Number(cur.minWithdrawDiamonds) || 200000
   form.giftDiamondRatio = Number.isFinite(Number(cur.giftDiamondRatio)) ? Number(cur.giftDiamondRatio) : 1
   form.luckyGiftDiamondRatio = Number.isFinite(Number(cur.luckyGiftDiamondRatio)) ? Number(cur.luckyGiftDiamondRatio) : 0.3
+  form.platformCommissionPercent = Number.isFinite(Number(cur.platformCommissionPercent)) ? Number(cur.platformCommissionPercent) : 0
   form.maxDiamondsPerUnit = Number(cur.maxDiamondsPerUnit) || 2000000
   form.luckyGiftMaxMultiplier = Number(cur.luckyGiftMaxMultiplier) || 4
   form.luckyGiftTargetEv = Number(cur.luckyGiftTargetEv) || 0.38
@@ -428,6 +429,7 @@ async function save(mode) {
     minWithdrawDiamonds: form.minWithdrawDiamonds,
     giftDiamondRatio: form.giftDiamondRatio,
     luckyGiftDiamondRatio: form.luckyGiftDiamondRatio,
+    platformCommissionPercent: form.platformCommissionPercent,
     maxDiamondsPerUnit: form.maxDiamondsPerUnit,
     luckyGiftMaxMultiplier: form.luckyGiftMaxMultiplier,
     luckyGiftTargetEv: form.luckyGiftTargetEv,
