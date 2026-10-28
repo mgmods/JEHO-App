@@ -14392,6 +14392,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     @SuppressLint("NewApi")
+    private void respondToCpRoomRequest(String requestId, boolean accept) {
+        if (requestId == null || requestId.isEmpty()) return;
+        c.getIoExecutor().execute(() -> {
+            java.util.Map<String, Boolean> body = new java.util.HashMap<>();
+            body.put("accept", accept);
+            com.Dramizo.Series.domain.model.Result<java.util.Map<String, Object>> result =
+                    ApiCall.execute(c.getUserApi().respondCpRequest(requestId, body));
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (result.success) {
+                    Toast.makeText(this, accept ? "تم قبول الارتباط ❤️" : "تم رفض طلب الارتباط", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, result.error != null ? result.error : "تعذرت معالجة طلب الارتباط", Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+    }
+
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
         if ("contest:team-score".equals(event) || "contest:team-ended".equals(event)
@@ -14455,6 +14473,28 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             handler.removeCallbacks(roomPkPendingTimeout);
             roomPkCurrentContestId = null;
             handler.post(this::ensureRoomPkActionButton);
+            return;
+        }
+        if ("cp:request".equals(event)) {
+            String targetUserId = memberStr(payload, "targetUserId");
+            String requestId = memberStr(payload, "requestId");
+            if (myUserId == null || !myUserId.equals(targetUserId) || requestId == null || requestId.isEmpty()) return;
+            String senderName = memberStr(payload, "senderName");
+            String giftName = memberStr(payload, "giftName");
+            String typeLabel = memberStr(payload, "relationshipType");
+            String title = memberStr(payload, "title");
+            if (title == null || title.isEmpty()) title = "هدية ارتباط";
+            String message = (senderName == null ? "أحد الموجودين" : senderName)
+                    + " أرسل لك " + (giftName == null || giftName.isEmpty() ? "هدية ارتباط" : giftName)
+                    + (typeLabel == null || typeLabel.isEmpty() ? "" : " لبدء علاقة " + typeLabel)
+                    + ". هل توافق على الارتباط؟";
+            new AlertDialog.Builder(this)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setNegativeButton("رفض", (dialog, which) -> respondToCpRoomRequest(requestId, false))
+                    .setPositiveButton("قبول", (dialog, which) -> respondToCpRoomRequest(requestId, true))
+                    .setOnCancelListener(dialog -> respondToCpRoomRequest(requestId, false))
+                    .show();
             return;
         }
         if ("room:music_volume".equals(event)) {
