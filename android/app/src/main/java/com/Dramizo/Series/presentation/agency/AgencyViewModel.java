@@ -107,9 +107,9 @@ public class AgencyViewModel extends ViewModel {
         });
     }
 
-    public void joinByCode(String code) {
+    public void joinByCode(String publicId, String code) {
         c.getIoExecutor().execute(() -> {
-            Result<Object> r = c.getAgencyRepository().joinByCode(code);
+            Result<Object> r = c.getAgencyRepository().joinByCode(publicId, code);
             if (r.success) {
                 message.postValue("تم إرسال طلب الانضمام — بانتظار موافقة إدارة الوكالة");
                 load();
