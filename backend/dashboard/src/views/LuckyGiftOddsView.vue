@@ -89,6 +89,18 @@
     </section>
 
     <section class="glass p-3 mb-3">
+      <h5>الإحصائيات المالية الفعلية</h5>
+      <div class="row g-3">
+        <div class="col-6 col-lg"><div class="border rounded-3 p-3 h-100"><div class="small text-secondary">عمليات الإرسال</div><strong>{{ Number(stats.totalSends || 0).toLocaleString() }}</strong></div></div>
+        <div class="col-6 col-lg"><div class="border rounded-3 p-3 h-100"><div class="small text-secondary">قيمة الهدايا المرسلة</div><strong>{{ Number(stats.totalGiftCoins || 0).toLocaleString() }}</strong></div></div>
+        <div class="col-6 col-lg"><div class="border rounded-3 p-3 h-100"><div class="small text-secondary">مرات الفوز</div><strong>{{ Number(stats.winCount || 0).toLocaleString() }}</strong></div></div>
+        <div class="col-6 col-lg"><div class="border rounded-3 p-3 h-100"><div class="small text-secondary">مرات الخسارة</div><strong>{{ Number(stats.lossCount || 0).toLocaleString() }}</strong></div></div>
+        <div class="col-6 col-lg"><div class="border rounded-3 p-3 h-100"><div class="small text-secondary">المردود الإجمالي المحسوب</div><strong>{{ Number(stats.totalPayout || 0).toLocaleString() }}</strong></div></div>
+      </div>
+      <div class="small text-secondary mt-2">الإحصائيات مستخرجة من سجل الإرسال؛ المردود يُحسب وفق المضاعف المسجّل لكل عملية.</div>
+    </section>
+
+    <section class="glass p-3 mb-3">
       <h5>سجل النتائج الفعلية الأخيرة</h5>
       <div class="table-responsive">
         <table class="table table-sm align-middle">
@@ -143,6 +155,7 @@ const config = ref(defaultConfig())
 const gifts = ref([])
 const audit = ref([])
 const recentResults = ref([])
+const stats = ref({ totalSends: 0, totalGiftCoins: 0, winCount: 0, lossCount: 0, totalPayout: 0 })
 const selectedGiftId = ref('')
 const simulation = ref(null)
 const loading = ref(false)
@@ -180,6 +193,7 @@ async function load() {
   gifts.value = Array.isArray(data.gifts) ? data.gifts : []
   audit.value = Array.isArray(data.audit) ? data.audit : []
   recentResults.value = Array.isArray(data.recentResults) ? data.recentResults : []
+  stats.value = data.stats || { totalSends: 0, totalGiftCoins: 0, winCount: 0, lossCount: 0, totalPayout: 0 }
   if (selectedGiftId.value && !gifts.value.some(g => g.id === selectedGiftId.value)) selectedGiftId.value = ''
 }
 function addBand() {
