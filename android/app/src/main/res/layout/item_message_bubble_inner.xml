@@ -93,6 +93,14 @@
             android:scaleType="centerCrop"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Rounded16" />
 
+        <VideoView
+            android:id="@+id/videoMedia"
+            android:layout_width="238dp"
+            android:layout_height="170dp"
+            android:background="#000000"
+            android:contentDescription="فيديو المحادثة"
+            android:visibility="gone" />
+
         <LinearLayout
             android:id="@+id/rowImageReaction"
             android:layout_width="wrap_content"
