@@ -162,7 +162,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         [roomId, actorId, targetUserId, action, reason || null, JSON.stringify(metadata || {})],
       );
     } catch (err) {
-      this.logger.warn(`record agency moderation action: ${(err as Error).message}`);
+      this.log.warn(`record agency moderation action: ${(err as Error).message}`);
     }
   }
 
@@ -186,7 +186,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         ON agency_moderation_audit ("agencyId", "createdAt" DESC)
       `);
     } catch (err) {
-      this.logger.warn(`ensure agency moderation audit: ${(err as Error).message}`);
+      this.log.warn(`ensure agency moderation audit: ${(err as Error).message}`);
     }
     try {
       await this.dataSource.query(
