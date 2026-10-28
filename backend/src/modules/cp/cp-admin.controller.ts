@@ -88,7 +88,7 @@ export class CpAdminController {
     @CurrentUser('sub') adminId: string,
     @Body() body: {
       globallyEnabled?: boolean;
-      tasks?: Record<string, { enabled?: boolean; title?: string; target?: number; rewardPoints?: number; rewardCosmeticCode?: string }>;
+      tasks?: Record<string, { enabled?: boolean; title?: string; description?: string; condition?: string; target?: number; rewardPoints?: number; rewardCosmeticCode?: string }>;
     },
   ) {
     let current: Record<string, any> = {};
