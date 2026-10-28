@@ -168,6 +168,46 @@ public class ChatConversationActivity extends ThemedActivity {
                 if (bitmap != null) uploadAndSendBitmap(bitmap);
             });
 
+    private final ActivityResultLauncher<String> requestCameraPermission =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted) {
+                    try {
+                        takePicturePreview.launch(null);
+                    } catch (Exception e) {
+                        Toast.makeText(this, "تعذر فتح الكاميرا", Toast.LENGTH_LONG).show();
+                    }
+                } else {
+                    Toast.makeText(this, "اسمح للتطبيق باستخدام الكاميرا حتى تتمكن من التقاط صورة", Toast.LENGTH_LONG).show();
+                }
+            });
+
+    private static final java.util.concurrent.ConcurrentHashMap<String, PendingVideoUpload> PENDING_VIDEO_UPLOADS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final class PendingVideoUpload {
+        final Uri uri;
+        PendingVideoUpload(Uri uri) { this.uri = uri; }
+    }
+
+    private void restorePendingVideoUpload() {
+        if (binding == null || conversationId == null) return;
+        PendingVideoUpload pending = PENDING_VIDEO_UPLOADS.get(conversationId);
+        if (pending == null) {
+            binding.mediaUploadBanner.setVisibility(View.GONE);
+            return;
+        }
+        binding.mediaUploadBanner.setVisibility(View.VISIBLE);
+        binding.progressMediaUpload.setVisibility(View.VISIBLE);
+        binding.tvMediaUploadStatus.setText("جارٍ إرسال الفيديو");
+        Glide.with(this).load(pending.uri).centerCrop().into(binding.imgMediaUploadPreview);
+    }
+
+    private void clearPendingVideoUpload() {
+        if (binding != null && binding.mediaUploadBanner != null) {
+            binding.mediaUploadBanner.setVisibility(View.GONE);
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -673,14 +713,16 @@ public class ChatConversationActivity extends ThemedActivity {
     }
 
     private void launchCameraCapture() {
+        // Request camera permission with a result callback, then launch immediately after approval.
+        // The old one-way permission request returned here without ever opening the camera.
         if (!PermissionHelper.hasCameraPermission(this)) {
-            PermissionHelper.ensureMediaPermissions(this, true);
+            requestCameraPermission.launch(android.Manifest.permission.CAMERA);
             return;
         }
         try {
             takePicturePreview.launch(null);
         } catch (Exception e) {
-            Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "تعذر فتح الكاميرا", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -709,14 +751,8 @@ public class ChatConversationActivity extends ThemedActivity {
         final long maxBytes = 50L * 1024L * 1024L;
         AtomicBoolean cancelled = new AtomicBoolean(false);
         AtomicReference<Call<ApiResponse<UploadApi.UploadResult>>> callRef = new AtomicReference<>();
-        runOnUiThread(() -> {
-            if (binding != null && binding.mediaUploadBanner != null) {
-                binding.mediaUploadBanner.setVisibility(View.VISIBLE);
-                binding.progressMediaUpload.setVisibility(View.VISIBLE);
-                binding.tvMediaUploadStatus.setText("جارٍ إرسال الفيديو");
-                Glide.with(this).load(uri).centerCrop().into(binding.imgMediaUploadPreview);
-            }
-        });
+        PENDING_VIDEO_UPLOADS.put(conversationId, new PendingVideoUpload(uri));
+        runOnUiThread(this::restorePendingVideoUpload);
         c.getIoExecutor().execute(() -> {
             try {
                 String mimeType = getContentResolver().getType(uri);
@@ -773,26 +809,32 @@ public class ChatConversationActivity extends ThemedActivity {
                         && resp.body().data != null && resp.body().data.url != null) {
                     String url = AssetCatalog.absoluteUrl(resp.body().data.url);
                     runOnUiThread(() -> {
-                        if (binding != null && binding.mediaUploadBanner != null) binding.mediaUploadBanner.setVisibility(View.GONE);
+                        PENDING_VIDEO_UPLOADS.remove(conversationId);
+                        clearPendingVideoUpload();
                         viewModel.sendVideo(conversationId, url, mimeType, size, durationSec);
                     });
                 } else {
                     String error = UploadApi.errorMessage(resp, "تعذر رفع الفيديو");
                     runOnUiThread(() -> {
-                        if (binding != null && binding.mediaUploadBanner != null) binding.mediaUploadBanner.setVisibility(View.GONE);
+                        PENDING_VIDEO_UPLOADS.remove(conversationId);
+                        clearPendingVideoUpload();
                         Toast.makeText(this, error, Toast.LENGTH_LONG).show();
                     });
                 }
             } catch (Exception e) {
                 if (cancelled.get()) {
-                    runOnUiThread(() -> { if (binding != null && binding.mediaUploadBanner != null) binding.mediaUploadBanner.setVisibility(View.GONE); });
+                    runOnUiThread(() -> {
+                        PENDING_VIDEO_UPLOADS.remove(conversationId);
+                        clearPendingVideoUpload();
+                    });
                     return;
                 }
                 String error = e.getMessage();
                 if (error == null || error.trim().isEmpty()) error = "تعذر رفع الفيديو";
                 final String message = error;
                 runOnUiThread(() -> {
-                    if (binding != null && binding.mediaUploadBanner != null) binding.mediaUploadBanner.setVisibility(View.GONE);
+                    PENDING_VIDEO_UPLOADS.remove(conversationId);
+                    clearPendingVideoUpload();
                     Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                 });
             }
@@ -1803,6 +1845,7 @@ public class ChatConversationActivity extends ThemedActivity {
         refreshPeerBlockStatus();
         if (conversationId != null && viewModel != null) {
             viewModel.load(conversationId);
+            restorePendingVideoUpload();
         }
     }
 
