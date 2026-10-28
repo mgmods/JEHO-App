@@ -2167,7 +2167,11 @@ export class AgenciesService implements OnModuleInit {
       [agencyId, utcDayStart],
     );
     const lastActivity = memberStats
-      .map((item) => item.lastGiftAt ? new Date(item.lastGiftAt).getTime() : 0)
+      .map((item) => item.lastGiftAt
+        ? (item.lastGiftAt instanceof Date
+          ? item.lastGiftAt.getTime()
+          : new Date(String(item.lastGiftAt)).getTime())
+        : 0)
       .reduce((latest, value) => Math.max(latest, value), 0);
     return {
       agencyId,
