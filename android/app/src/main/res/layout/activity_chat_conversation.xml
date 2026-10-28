@@ -509,6 +509,37 @@
                 app:tint="@color/text_secondary" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/mediaUploadBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="14dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_chat_reply_quote"
+            android:orientation="vertical"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="9dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvMediaUploadStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="جارٍ تجهيز الفيديو ورفعه داخل المحادثة…"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+
+            <ProgressBar
+                android:id="@+id/progressMediaUpload"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="5dp"
+                android:layout_marginTop="7dp"
+                android:max="100"
+                android:progress="0"
+                android:progressTint="#35A86B" />
+        </LinearLayout>
+
         <!-- Composer: + | pill input+emoji | mic/send -->
         <LinearLayout
             android:id="@+id/inputBar"
