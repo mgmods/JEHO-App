@@ -2021,9 +2021,26 @@ export class AgenciesService implements OnModuleInit {
     return { removed: true };
   }
 
-  async stats(agencyId: string) {
+  async stats(agencyId: string, viewerId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
+
+    // Membership names and performance totals are private agency data.
+    // Only the owner and active owner/manager roles may access the roll-up.
+    if (agency.ownerId !== viewerId) {
+      const viewer = await this.membersRepo.findOne({
+        where: {
+          agencyId,
+          userId: viewerId,
+          status: AgencyMemberStatus.ACTIVE,
+          isActive: true,
+        },
+      });
+      if (!viewer || (viewer.role !== AgencyRole.OWNER && viewer.role !== AgencyRole.MANAGER)) {
+        throw new ForbiddenException('Owner/manager only');
+      }
+    }
+
     const members = await this.membersRepo.find({
       where: { agencyId, status: AgencyMemberStatus.ACTIVE, isActive: true },
       select: ['userId'],
