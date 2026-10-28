@@ -403,6 +403,7 @@ public class ProfileActivity extends ThemedActivity {
                         + " · " + getString(R.string.user_card_stat_visitors) + " " + visitors);
             }
             bindStaffBadge(user);
+            bindAgencyRoleBadge(user);
 
             // Level chip (same pill as card member chip).
             binding.tvLevelChip.setText(String.valueOf(level));
@@ -577,6 +578,41 @@ public class ProfileActivity extends ThemedActivity {
         }
     }
 
+    /** Agency identity is separate from platform-staff badges so both can be shown together. */
+    private void bindAgencyRoleBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (binding == null || binding.tvAgencyRoleBadge == null) return;
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency =
+                user == null ? null : user.agency;
+        String agencyRole = agency == null || agency.role == null
+                ? "" : agency.role.trim().toLowerCase(java.util.Locale.US);
+        if (agency == null || agency.id == null || agency.id.trim().isEmpty()
+                || agency.name == null || agency.name.trim().isEmpty()) {
+            binding.tvAgencyRoleBadge.setVisibility(View.GONE);
+            return;
+        }
+
+        boolean owner = "owner".equals(agencyRole);
+        // An active agency membership returned by the profile API is a host unless it is the owner.
+        // Pending requests are never rendered as role badges.
+        if (agencyRole.contains("pending") || agencyRole.contains("request")) {
+            binding.tvAgencyRoleBadge.setVisibility(View.GONE);
+            return;
+        }
+        String label = owner ? "♛  صاحب وكالة" : "🎙  مضيف";
+        int start = owner ? 0xFFFFF0CC : 0xFFD9F5F0;
+        int end = owner ? 0xFFFFD778 : 0xFFB8E9E1;
+        int textColor = owner ? 0xFF765000 : 0xFF08695F;
+        GradientDrawable chip = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT, new int[]{start, end});
+        chip.setCornerRadius(100f * getResources().getDisplayMetrics().density);
+        chip.setStroke((int) (1 * getResources().getDisplayMetrics().density),
+                owner ? 0xFFE8BD57 : 0xFF8BD6CB);
+        binding.tvAgencyRoleBadge.setText(label);
+        binding.tvAgencyRoleBadge.setTextColor(textColor);
+        binding.tvAgencyRoleBadge.setBackground(chip);
+        binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
+    }
+
     private void bindAgencyStrip(
             @androidx.annotation.Nullable
             com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency) {
@@ -592,7 +628,7 @@ public class ProfileActivity extends ThemedActivity {
         if (binding.tvAgencyGid != null) {
             String gid = agency.publicId != null ? agency.publicId.trim() : "";
             binding.tvAgencyGid.setVisibility(View.VISIBLE);
-            binding.tvAgencyGid.setText(gid.isEmpty() ? "GID: —" : ("GID:" + gid));
+            binding.tvAgencyGid.setText(gid.isEmpty() ? "ID الوكالة: غير متاح" : ("ID الوكالة: " + gid));
         }
         int tier = agency.level > 0
                 ? agency.level
