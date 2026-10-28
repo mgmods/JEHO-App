@@ -60,6 +60,7 @@ import com.Dramizo.Series.util.DeviceTimeFormat;
 import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.PermissionHelper;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.bumptech.glide.Glide;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -711,8 +712,9 @@ public class ChatConversationActivity extends ThemedActivity {
         runOnUiThread(() -> {
             if (binding != null && binding.mediaUploadBanner != null) {
                 binding.mediaUploadBanner.setVisibility(View.VISIBLE);
-                binding.tvMediaUploadStatus.setText("جارٍ تجهيز الفيديو ورفعه داخل المحادثة…");
-                binding.progressMediaUpload.setProgress(0);
+                binding.progressMediaUpload.setVisibility(View.VISIBLE);
+                binding.tvMediaUploadStatus.setText("جارٍ إرسال الفيديو");
+                Glide.with(this).load(uri).centerCrop().into(binding.imgMediaUploadPreview);
             }
         });
         c.getIoExecutor().execute(() -> {
@@ -730,7 +732,7 @@ public class ChatConversationActivity extends ThemedActivity {
                         : "video/3gpp".equalsIgnoreCase(mimeType) ? ".3gp" : ".mp4";
                 runOnUiThread(() -> {
                     if (!cancelled.get() && binding != null && binding.mediaUploadBanner != null) {
-                        binding.tvMediaUploadStatus.setText("جارٍ رفع الفيديو…");
+                        binding.tvMediaUploadStatus.setText("جارٍ إرسال الفيديو");
                     }
                 });
                 RequestBody body = new RequestBody() {
@@ -749,8 +751,8 @@ public class ChatConversationActivity extends ThemedActivity {
                                 final int value = (int) Math.min(100L, uploaded * 100L / size);
                                 runOnUiThread(() -> {
                                     if (!cancelled.get() && binding != null && binding.progressMediaUpload != null) {
-                                        binding.progressMediaUpload.setProgress(value);
-                                        binding.tvMediaUploadStatus.setText("جارٍ رفع الفيديو… " + value + "%");
+                                        // Keep a compact indeterminate spinner over the thumbnail corner.
+                                        binding.progressMediaUpload.setVisibility(View.VISIBLE);
                                     }
                                 });
                             }
