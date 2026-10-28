@@ -1538,6 +1538,9 @@ export class GiftsService implements OnModuleInit {
     }
     const bands = override?.bands?.length ? override.bands : config.bands;
     const stake = Math.max(0, Math.floor(Number(totalCoins) || 0));
+    if (bands.some(band => stake * band.maxMultiplier > Number.MAX_SAFE_INTEGER)) {
+      throw new BadRequestException('قيمة الهدية مع أعلى مضاعف تتجاوز دقة الحساب الآمنة؛ خفّض المضاعف أو قيمة الإرسال');
+    }
     const roll = randomInt(0, 100_000) / 1_000;
     let cumulative = 0;
     for (const band of bands) {
