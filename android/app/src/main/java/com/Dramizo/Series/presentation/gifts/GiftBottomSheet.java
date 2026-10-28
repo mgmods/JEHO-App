@@ -79,6 +79,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private final LinkedHashSet<String> selectedRecipientIds = new LinkedHashSet<>();
     private final List<String> lastTargets = new ArrayList<>();
     private final List<GiftDtos.GiftDto> allGifts = new ArrayList<>();
+    private final Map<String, String> cpGiftTypes = new LinkedHashMap<>();
+    private volatile boolean cpCatalogLoaded;
     @Nullable private String giftTypeFilter;
 
     private DialogRoomGiftBinding binding;
@@ -323,99 +325,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         }
         vm.load();
         vm.loadWallet();
+        loadCpGiftMappings();
 
-        View content = binding.getRoot();
-        if (!chatMode && roomId != null && !roomId.trim().isEmpty()) {
-            FrameLayout overlay = new FrameLayout(requireContext());
-            overlay.addView(content, new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            Button cpGift = new Button(requireContext());
-            cpGift.setText("♡ هدية ارتباط CP");
-            cpGift.setAllCaps(false);
-            cpGift.setTextSize(12f);
-            cpGift.setTextColor(android.graphics.Color.WHITE);
-            cpGift.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFC52F70));
-            FrameLayout.LayoutParams cpLp = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                    android.view.Gravity.TOP | android.view.Gravity.END);
-            cpLp.topMargin = dpCp(8);
-            cpLp.setMarginEnd(dpCp(12));
-            overlay.addView(cpGift, cpLp);
-            cpGift.setOnClickListener(v -> showCpGiftRequestDialog(roomId));
-            return overlay;
-        }
-        return content;
-    }
-
-    private int dpCp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
-
-    private void showCpGiftRequestDialog(@NonNull String roomId) {
-        if (getContext() == null) return;
-        final EditText recipient = new EditText(requireContext());
-        recipient.setSingleLine(true);
-        recipient.setHint("معرّف المستخدم الموجود معك في الروم");
-        recipient.setPadding(dpCp(14), dpCp(10), dpCp(14), dpCp(10));
-        final String[] keys = {"love", "marriage", "engagement", "friendship", "brotherhood"};
-        final String[] labels = {"الحب", "الزواج", "الخطوبة", "الصداقة", "الأخوّة"};
-        final int[] selectedType = {0};
-        android.widget.LinearLayout layout = new android.widget.LinearLayout(requireContext());
-        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = dpCp(20);
-        layout.setPadding(pad, dpCp(8), pad, 0);
-        android.widget.TextView intro = new android.widget.TextView(requireContext());
-        intro.setText("اختر نوع الرابطة وأدخل معرّف الشخص الموجود معك في الغرفة. ستُرسل هدية CP المحددة من لوحة التحكم ويصله طلب قبول أو رفض.");
-        intro.setTextSize(13);
-        intro.setTextColor(0xFF674052);
-        intro.setPadding(0, 0, 0, dpCp(10));
-        layout.addView(intro);
-        layout.addView(recipient, new android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        android.widget.RadioGroup types = new android.widget.RadioGroup(requireContext());
-        types.setOrientation(android.widget.RadioGroup.VERTICAL);
-        for (int i = 0; i < labels.length; i++) {
-            android.widget.RadioButton radio = new android.widget.RadioButton(requireContext());
-            radio.setText(labels[i]);
-            radio.setTextColor(0xFF54263C);
-            radio.setId(android.view.View.generateViewId());
-            radio.setTag(i);
-            types.addView(radio);
-            if (i == 0) radio.setChecked(true);
-        }
-        types.setOnCheckedChangeListener((group, checkedId) -> {
-            android.view.View checked = group.findViewById(checkedId);
-            if (checked != null && checked.getTag() instanceof Integer) selectedType[0] = (Integer) checked.getTag();
-        });
-        layout.addView(types);
-        new AlertDialog.Builder(requireContext())
-                .setTitle("هدايا ارتباط CP")
-                .setView(layout)
-                .setNegativeButton("إلغاء", null)
-                .setPositiveButton("إرسال الهدية والطلب", (dialog, which) -> {
-                    String recipientId = recipient.getText() == null ? "" : recipient.getText().toString().trim();
-                    if (recipientId.isEmpty()) {
-                        Toast.makeText(requireContext(), "أدخل معرّف المستخدم أولاً", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    Map<String, String> body = new LinkedHashMap<>();
-                    body.put("recipientId", recipientId);
-                    body.put("type", keys[selectedType[0]]);
-                    body.put("roomId", roomId);
-                    body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
-                    AppContainer container = ContainerProvider.from(requireActivity());
-                    container.getIoExecutor().execute(() -> {
-                        Result<Map<String, Object>> result = ApiCall.execute(container.getUserApi().createRoomCpRequest(body));
-                        if (!isAdded()) return;
-                        requireActivity().runOnUiThread(() -> {
-                            if (!isAdded()) return;
-                            Toast.makeText(requireContext(), result.success
-                                    ? "تم إرسال هدية CP وطلب الارتباط. بانتظار موافقة الطرف الآخر."
-                                    : (result.error != null ? result.error : "تعذر إرسال هدية الارتباط"),
-                                    Toast.LENGTH_LONG).show();
-                        });
-                    });
-                }).show();
+        return binding.getRoot();
     }
 
     private void bindIncludedViews() {
@@ -1168,6 +1080,15 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         }
 
         int qty = effectiveQty();
+        String cpType = selected.id != null ? cpGiftTypes.get(selected.id) : null;
+        if (cpType != null && (chatMode || roomId == null || roomId.isEmpty())) {
+            Toast.makeText(requireContext(), "هدية بدء الارتباط تُرسل من داخل الروم الصوتي فقط", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (cpType != null && (targets.size() != 1 || qty != 1)) {
+            Toast.makeText(requireContext(), "هدية الارتباط تُرسل لشخص واحد وبكمية واحدة", Toast.LENGTH_LONG).show();
+            return;
+        }
         long need = (long) selected.coinPrice * qty * targets.size();
         Long coins = vm.getCoinsBalance().getValue();
         if (coins != null && selected.coinPrice > 0 && coins < need) {
@@ -1178,6 +1099,17 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             return;
         }
 
+        if (cpType != null) {
+            sendCpGiftRequest(cpType, targets.get(0), roomId);
+            return;
+        }
+
+        // CP gift mappings are loaded from the dashboard catalog before sending.
+        if (!cpCatalogLoaded) {
+            Toast.makeText(requireContext(), "جارٍ التحقق من إعدادات هدية الارتباط، أعد الضغط بعد لحظة", Toast.LENGTH_SHORT).show();
+            loadCpGiftMappings();
+            return;
+        }
         sending = true;
         binding.bltvSendGift.setEnabled(false);
         binding.bltvSendGift.setText("جارٍ الإرسال ×" + qty
@@ -1186,6 +1118,73 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         lastTargets.clear();
         lastTargets.addAll(targets);
         vm.sendMany(selected.id, targets, qty, chatMode ? null : roomId);
+    }
+
+    private void loadCpGiftMappings() {
+        AppContainer container;
+        try {
+            if (!isAdded()) return;
+            container = ContainerProvider.from(requireActivity());
+        } catch (Exception ignored) {
+            return;
+        }
+        container.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = ApiCall.execute(container.getUserApi().cpCatalog());
+            Map<String, String> mappings = new LinkedHashMap<>();
+            if (result.success && result.data != null) {
+                for (Map<String, Object> row : result.data) {
+                    if (row == null || Boolean.FALSE.equals(row.get("enabled"))) continue;
+                    Object type = row.get("type");
+                    Object giftObj = row.get("gift");
+                    if (!(type instanceof String) || !(giftObj instanceof Map)) continue;
+                    Object id = ((Map<?, ?>) giftObj).get("id");
+                    if (id instanceof String && !((String) id).isEmpty()) {
+                        mappings.put((String) id, (String) type);
+                    }
+                }
+            }
+            cpGiftTypes.clear();
+            cpGiftTypes.putAll(mappings);
+            cpCatalogLoaded = true;
+        });
+    }
+
+    private void sendCpGiftRequest(@NonNull String cpType, @NonNull String recipientId,
+                                   @NonNull String roomId) {
+        if (sending || !isAdded()) return;
+        sending = true;
+        if (binding != null) {
+            binding.bltvSendGift.setEnabled(false);
+            binding.bltvSendGift.setText("جارٍ إرسال هدية الارتباط…");
+        }
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("recipientId", recipientId);
+        body.put("type", cpType);
+        body.put("roomId", roomId);
+        body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
+        AppContainer container = ContainerProvider.from(requireActivity());
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(container.getUserApi().createRoomCpRequest(body));
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (!isAdded()) return;
+                sending = false;
+                if (binding != null) {
+                    refreshSendBtn();
+                    updateDockText();
+                }
+                if (result.success) {
+                    Toast.makeText(requireContext(),
+                            "تم إرسال هدية الارتباط، بانتظار موافقة الطرف الآخر", Toast.LENGTH_LONG).show();
+                    vm.loadWallet();
+                    dismissAllowingStateLoss();
+                } else {
+                    Toast.makeText(requireContext(),
+                            result.error != null ? result.error : "تعذر إرسال هدية الارتباط",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        });
     }
 
     // ─── Gift sent ────────────────────────────────────────────────────────────
