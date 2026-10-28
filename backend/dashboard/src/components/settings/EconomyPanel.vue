@@ -386,9 +386,9 @@ function applyToForm(cur) {
   form.coinsPerUsd = Number(cur.coinsPerUsd) || 10000
   form.diamondUsd = Number(cur.diamondUsd) || 0.00005
   form.minWithdrawDiamonds = Number(cur.minWithdrawDiamonds) || 200000
-  form.giftDiamondRatio = Number(cur.giftDiamondRatio) || 0.4
-  form.luckyGiftDiamondRatio = Number(cur.luckyGiftDiamondRatio) || 0.15
-  form.maxDiamondsPerUnit = Number(cur.maxDiamondsPerUnit) || 1000
+  form.giftDiamondRatio = Number.isFinite(Number(cur.giftDiamondRatio)) ? Number(cur.giftDiamondRatio) : 1
+  form.luckyGiftDiamondRatio = Number.isFinite(Number(cur.luckyGiftDiamondRatio)) ? Number(cur.luckyGiftDiamondRatio) : 0.3
+  form.maxDiamondsPerUnit = Number(cur.maxDiamondsPerUnit) || 2000000
   form.luckyGiftMaxMultiplier = Number(cur.luckyGiftMaxMultiplier) || 4
   form.luckyGiftTargetEv = Number(cur.luckyGiftTargetEv) || 0.38
   form.showDiamondValueInApp = !!cur.showDiamondValueInApp
