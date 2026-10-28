@@ -45,6 +45,7 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
     private TextView tvPerf4Value;
     private TextView tvWithdrawEmpty;
     private TextView tvAgencyStatsEmpty;
+    private TextView tvAgencyStatsTotal;
     private LinearLayout layoutAgencyMemberStats;
     private final ProDashWithdrawAdapter withdrawAdapter = new ProDashWithdrawAdapter();
 
@@ -88,6 +89,7 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         tvPerf4Value = findViewById(R.id.tvPerf4Value);
         tvWithdrawEmpty = findViewById(R.id.tvWithdrawEmpty);
         tvAgencyStatsEmpty = findViewById(R.id.tvAgencyStatsEmpty);
+        tvAgencyStatsTotal = findViewById(R.id.tvAgencyStatsTotal);
         layoutAgencyMemberStats = findViewById(R.id.layoutAgencyMemberStats);
 
         RecyclerView recycler = findViewById(R.id.recyclerWithdraws);
@@ -250,7 +252,16 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
     private void renderAgencyStats(@Nullable MiscDtos.AgencyStatsDto stats) {
         if (layoutAgencyMemberStats == null) return;
         layoutAgencyMemberStats.removeAllViews();
-        if (stats == null || stats.members == null || stats.members.isEmpty()) {
+        if (stats == null) {
+            if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.VISIBLE);
+            if (tvAgencyStatsTotal != null) tvAgencyStatsTotal.setText("إجمالي الهدايا: —");
+            return;
+        }
+        if (tvAgencyStatsTotal != null) {
+            tvAgencyStatsTotal.setText("إجمالي الهدايا خلال فترات العضوية الحالية: "
+                    + formatLong(Math.max(0L, stats.giftsReceivedDiamonds)) + " ◆");
+        }
+        if (stats.members == null || stats.members.isEmpty()) {
             if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.VISIBLE);
             return;
         }
