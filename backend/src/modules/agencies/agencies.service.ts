@@ -2043,7 +2043,7 @@ export class AgenciesService implements OnModuleInit {
 
     const members = await this.membersRepo.find({
       where: { agencyId, status: AgencyMemberStatus.ACTIVE, isActive: true },
-      select: ['userId'],
+      select: ['userId', 'role'],
     });
     const memberIds = members.map((m) => m.userId);
     const activePeriods: Array<{ userId: string; joinedAt: Date }> = memberIds.length
@@ -2053,22 +2053,74 @@ export class AgenciesService implements OnModuleInit {
           [agencyId, memberIds],
         )
       : [];
+
+    // Reuse the existing host-target source of truth; do not calculate a second target.
+    const targetSetting = await this.settingsRepo.findOne({ where: { key: 'host_monthly_target' } });
+    let targetConfig: { enabled?: boolean; period?: string; stages?: Array<{ id?: string; title?: string; threshold?: number }> } = {};
+    try {
+      targetConfig = targetSetting?.value ? JSON.parse(targetSetting.value) : {};
+    } catch {
+      targetConfig = {};
+    }
+    const targetPeriod = String(targetConfig.period || 'monthly').toLowerCase() === 'weekly' ? 'weekly' : 'monthly';
+    const now = new Date();
+    let targetPeriodKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    if (targetPeriod === 'weekly') {
+      const iso = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      iso.setUTCDate(iso.getUTCDate() + 4 - (iso.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(iso.getUTCFullYear(), 0, 1));
+      const week = Math.ceil(((iso.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+      targetPeriodKey = `${iso.getUTCFullYear()}W${String(week).padStart(2, '0')}`;
+    }
+    const targetRows: Array<{ userId: string; progress: string | number }> =
+      targetConfig.enabled && memberIds.length
+        ? await this.dataSource.query(
+            `SELECT "userId", "progress" FROM host_monthly_progress
+             WHERE "yearMonth" = $1 AND "userId" = ANY($2::uuid[])`,
+            [targetPeriodKey, memberIds],
+          )
+        : [];
+    const progressByUser = new Map(targetRows.map((row) => [row.userId, Number(row.progress || 0)]));
+    const sortedStages = (Array.isArray(targetConfig.stages) ? targetConfig.stages : [])
+      .map((stage) => ({ ...stage, threshold: Math.max(0, Number(stage.threshold) || 0) }))
+      .sort((a, b) => a.threshold - b.threshold);
+
     const memberStats = await Promise.all(activePeriods.map(async (period) => {
       const gross = await this.sumGiftsReceived([period.userId], new Date(period.joinedAt));
       const user = await this.usersRepo.findOne({ where: { id: period.userId } });
+      const membership = members.find((m) => m.userId === period.userId);
+      const targetProgress = progressByUser.get(period.userId) || 0;
+      const nextStage = sortedStages.find((stage) => targetProgress < stage.threshold) || null;
+      const nextThreshold = nextStage?.threshold || 0;
       return {
         userId: period.userId,
         displayName: user?.displayName || user?.username || 'مضيف',
+        publicId: user?.publicId || null,
+        role: membership?.role || AgencyRole.HOST,
         membershipStartedAt: period.joinedAt,
         giftsReceivedDiamonds: gross,
+        targetEnabled: !!targetConfig.enabled,
+        targetPeriod,
+        targetPeriodKey,
+        targetProgress,
+        currentTargetName: nextStage?.title || (nextStage ? nextStage.id : (sortedStages.length ? 'اكتمل التارجت' : null)),
+        currentTargetThreshold: nextThreshold,
+        targetRemaining: nextStage ? Math.max(0, nextThreshold - targetProgress) : 0,
+        targetProgressPercent: nextStage && nextThreshold > 0
+          ? Math.max(0, Math.min(100, Math.floor((targetProgress / nextThreshold) * 100)))
+          : (sortedStages.length ? 100 : 0),
       };
     }));
     memberStats.sort((a, b) => b.giftsReceivedDiamonds - a.giftsReceivedDiamonds);
     const received = memberStats.reduce((sum, item) => sum + item.giftsReceivedDiamonds, 0);
     return {
       agencyId,
+      publicId: agency.publicId,
       name: agency.name,
       memberCount: memberIds.length,
+      targetEnabled: !!targetConfig.enabled,
+      targetPeriod,
+      targetPeriodKey,
       // Current membership statistics restart when a member rejoins.
       totalDiamonds: received,
       giftsReceivedDiamonds: received,
