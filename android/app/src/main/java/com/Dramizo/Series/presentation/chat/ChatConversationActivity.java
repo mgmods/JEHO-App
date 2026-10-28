@@ -1141,11 +1141,21 @@ public class ChatConversationActivity extends ThemedActivity {
             return;
         }
         final String joinCode = code;
+        final String agencyPublicId = invite != null && invite.agencyId != null
+                ? invite.agencyId.trim()
+                : (msg != null && msg.content != null
+                    && com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content) != null
+                    ? com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content).agencyId
+                    : "");
+        if (agencyPublicId.isEmpty()) {
+            Toast.makeText(this, R.string.agency_invite_missing_code, Toast.LENGTH_LONG).show();
+            return;
+        }
         final String messageId = msg != null ? msg.id : null;
         Toast.makeText(this, R.string.loading, Toast.LENGTH_SHORT).show();
         AppContainer c = ContainerProvider.from(this);
         c.getIoExecutor().execute(() -> {
-            Result<Object> r = c.getAgencyRepository().joinByCode(joinCode);
+            Result<Object> r = c.getAgencyRepository().joinByCode(agencyPublicId, joinCode);
             runOnUiThread(() -> {
                 if (r.success) {
                     if (messageId != null && !messageId.isEmpty()) {
