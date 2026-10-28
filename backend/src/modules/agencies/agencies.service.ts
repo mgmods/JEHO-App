@@ -2051,10 +2051,26 @@ export class AgenciesService implements OnModuleInit {
       select: ['userId', 'role'],
     });
     const memberIds = members.map((m) => m.userId);
-    const activePeriods: Array<{ userId: string; joinedAt: Date }> = memberIds.length
+    // Aggregate gift totals in one query rather than issuing two queries per member.
+    const activePeriods: Array<{
+      userId: string;
+      joinedAt: Date;
+      displayName: string | null;
+      publicId: string | number | null;
+      giftsReceivedDiamonds: string | number;
+    }> = memberIds.length
       ? await this.dataSource.query(
-          `SELECT "userId", "joinedAt" FROM agency_membership_periods
-           WHERE "agencyId" = $1 AND "leftAt" IS NULL AND "userId" = ANY($2::uuid[])`,
+          `SELECT p."userId", p."joinedAt",
+                  COALESCE(u."displayName", u.username, 'مضيف') AS "displayName",
+                  u."publicId" AS "publicId",
+                  COALESCE(SUM(g."diamondsAwarded"), 0)::text AS "giftsReceivedDiamonds"
+           FROM agency_membership_periods p
+           JOIN users u ON u.id = p."userId"
+           LEFT JOIN gift_sends g
+             ON g."receiverId" = p."userId" AND g."createdAt" >= p."joinedAt"
+           WHERE p."agencyId" = $1 AND p."leftAt" IS NULL AND p."userId" = ANY($2::uuid[])
+           GROUP BY p."userId", p."joinedAt", u.id
+           ORDER BY SUM(g."diamondsAwarded") DESC NULLS LAST`,
           [agencyId, memberIds],
         )
       : [];
@@ -2102,9 +2118,7 @@ export class AgenciesService implements OnModuleInit {
       .map((stage) => ({ ...stage, threshold: Math.max(0, Number(stage.threshold) || 0) }))
       .sort((a, b) => a.threshold - b.threshold);
 
-    const memberStats = await Promise.all(activePeriods.map(async (period) => {
-      const gross = await this.sumGiftsReceived([period.userId], new Date(period.joinedAt));
-      const user = await this.usersRepo.findOne({ where: { id: period.userId } });
+    const memberStats = activePeriods.map((period) => {
       const membership = members.find((m) => m.userId === period.userId);
       const targetState = targetByUser.get(period.userId);
       const targetProgress = targetState?.progress || 0;
@@ -2114,11 +2128,11 @@ export class AgenciesService implements OnModuleInit {
       const nextThreshold = nextStage?.threshold || 0;
       return {
         userId: period.userId,
-        displayName: user?.displayName || user?.username || 'مضيف',
-        publicId: user?.publicId || null,
+        displayName: period.displayName || 'مضيف',
+        publicId: period.publicId == null ? null : String(period.publicId),
         role: membership?.role || AgencyRole.HOST,
         membershipStartedAt: period.joinedAt,
-        giftsReceivedDiamonds: gross,
+        giftsReceivedDiamonds: Number(period.giftsReceivedDiamonds || 0),
         targetEnabled: !!targetConfig.enabled,
         targetPeriod,
         targetPeriodKey,
@@ -2130,7 +2144,7 @@ export class AgenciesService implements OnModuleInit {
           ? Math.max(0, Math.min(100, Math.floor((targetProgress / nextThreshold) * 100)))
           : (sortedStages.length ? 100 : 0),
       };
-    }));
+    });
     memberStats.sort((a, b) => b.giftsReceivedDiamonds - a.giftsReceivedDiamonds);
     const received = memberStats.reduce((sum, item) => sum + item.giftsReceivedDiamonds, 0);
     return {
