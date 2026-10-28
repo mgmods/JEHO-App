@@ -51,6 +51,8 @@ public final class GiftDtos {
             this.quantity = quantity;
             this.roomId = roomId;
             this.comboCount = Math.max(1, comboCount);
+            // Stable for retries of this same request body; server deduplicates charge/payout.
+            this.requestId = java.util.UUID.randomUUID().toString();
         }
     }
 
@@ -74,6 +76,8 @@ public final class GiftDtos {
             this.quantity = quantity;
             this.roomId = roomId;
             this.comboCount = Math.max(1, comboCount);
+            // Shared key across recipients makes all-mic sends retry-safe.
+            this.requestId = java.util.UUID.randomUUID().toString();
         }
     }
 
