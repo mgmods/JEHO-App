@@ -763,6 +763,8 @@ public class ChatConversationActivity extends ThemedActivity {
                 if (size <= 0L) throw new IOException("تعذر قراءة حجم الفيديو");
                 if (size > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
                 int durationSec = getVideoDurationSeconds(uri);
+                // Upload a small poster separately so the thumbnail remains available in history.
+                String thumbnailUrl = uploadVideoThumbnail(c, uri);
                 String extension = "video/quicktime".equalsIgnoreCase(mimeType) ? ".mov"
                         : "video/webm".equalsIgnoreCase(mimeType) ? ".webm"
                         : "video/3gpp".equalsIgnoreCase(mimeType) ? ".3gp" : ".mp4";
@@ -811,7 +813,7 @@ public class ChatConversationActivity extends ThemedActivity {
                     runOnUiThread(() -> {
                         PENDING_VIDEO_UPLOADS.remove(conversationId);
                         clearPendingVideoUpload();
-                        viewModel.sendVideo(conversationId, url, mimeType, size, durationSec);
+                        viewModel.sendVideo(conversationId, url, thumbnailUrl, mimeType, size, durationSec);
                     });
                 } else {
                     String error = UploadApi.errorMessage(resp, "تعذر رفع الفيديو");
@@ -839,6 +841,36 @@ public class ChatConversationActivity extends ThemedActivity {
                 });
             }
         });
+    }
+
+    @Nullable
+    private String uploadVideoThumbnail(@NonNull AppContainer c, @NonNull Uri uri) {
+        Bitmap frame = null;
+        try {
+            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+            try {
+                retriever.setDataSource(this, uri);
+                frame = retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+            } finally {
+                try { retriever.release(); } catch (Exception ignored) {}
+            }
+            if (frame == null) return null;
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            frame.compress(Bitmap.CompressFormat.JPEG, 82, out);
+            byte[] bytes = out.toByteArray();
+            RequestBody body = RequestBody.create(bytes, MediaType.parse("image/jpeg"));
+            MultipartBody.Part part = MultipartBody.Part.createFormData("file", "chat-video-preview.jpg", body);
+            Response<ApiResponse<UploadApi.UploadResult>> response = c.getUploadApi().upload(part).execute();
+            if (response.isSuccessful() && response.body() != null && response.body().success
+                    && response.body().data != null && response.body().data.url != null) {
+                return AssetCatalog.absoluteUrl(response.body().data.url);
+            }
+        } catch (Exception ignored) {
+            // A poster failure must not discard an otherwise valid video message.
+        } finally {
+            if (frame != null && !frame.isRecycled()) frame.recycle();
+        }
+        return null;
     }
 
     private long getVideoSize(@NonNull Uri uri, long maxBytes) throws Exception {
