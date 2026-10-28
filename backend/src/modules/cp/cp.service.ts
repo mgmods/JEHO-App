@@ -266,6 +266,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         description: String(taskConfig[task.id]?.description || task.description).slice(0, 240),
         target: Math.max(1, Math.min(1000000, Math.floor(Number(taskConfig[task.id]?.target) || task.target))),
         rewardPoints: Math.max(0, Math.min(1000000, Math.floor(Number(taskConfig[task.id]?.rewardPoints) || task.rewardPoints))),
+        rewardCosmeticCode: typeof taskConfig[task.id]?.rewardCosmeticCode === 'string' ? taskConfig[task.id].rewardCosmeticCode : '',
         progress: task.id === 'memory_today'
           ? Math.min(Math.max(1, Math.floor(Number(taskConfig[task.id]?.target) || task.target)), Number(memoryCount?.count) || 0)
           : Math.min(Math.max(1, Math.floor(Number(taskConfig[task.id]?.target) || task.target)), pointsToday),
@@ -320,11 +321,32 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     }
     if (!eligible) throw new BadRequestException('أكملوا شرط المهمة أولاً');
     const referenceId = `${relationship.id}:${userId}:${taskId}:${day}`;
+    const configuredCode = String(taskConfig[taskId]?.rewardCosmeticCode || '').trim();
     const result = await this.recordPoints(
       relationship.id, 'cp_task_reward', 'cp_task_reward', referenceId, rewardPoints,
-      { taskId, userId, day },
+      { taskId, userId, day, rewardCosmeticCode: configuredCode || null },
     );
-    return { taskId, claimed: true, duplicate: !!(result as any).duplicate, rewardPoints, points: (result as any).points, level: (result as any).level };
+    let rewardItem: Record<string, unknown> | null = null;
+    if (!(result as any).duplicate && configuredCode) {
+      const [cosmetic] = await this.dataSource.query(
+        'SELECT id,code,name,type,"previewUrl" FROM cosmetics WHERE code=$1 AND "isActive"=true AND code LIKE \'cp_%\' LIMIT 1',
+        [configuredCode],
+      );
+      if (cosmetic) {
+        const [owned] = await this.dataSource.query(
+          'SELECT id FROM user_cosmetics WHERE "userId"=$1 AND "cosmeticId"=$2 LIMIT 1',
+          [userId, cosmetic.id],
+        );
+        if (!owned) {
+          await this.dataSource.query(
+            'INSERT INTO user_cosmetics (id,"userId","cosmeticId",equipped,"createdAt","updatedAt") VALUES (gen_random_uuid(),$1,$2,false,now(),now())',
+            [userId, cosmetic.id],
+          );
+        }
+        rewardItem = { code: cosmetic.code, name: cosmetic.name, type: cosmetic.type, previewUrl: cosmetic.previewUrl, alreadyOwned: !!owned };
+      }
+    }
+    return { taskId, claimed: true, duplicate: !!(result as any).duplicate, rewardPoints, rewardItem, points: (result as any).points, level: (result as any).level };
   }
 
   async memories(userId: string) {
