@@ -207,6 +207,29 @@ public class CpCenterActivity extends ThemedActivity {
         });
     }
 
+    private void loadLeaderboard(String period) {
+        String safePeriod = "world".equals(period) ? "world" : "weekly";
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().cpLeaderboard(safePeriod));
+            if (r.success && r.data != null) {
+                js("window.renderCpLeaderboard && window.renderCpLeaderboard(" +
+                        gson.toJson(normalizeUrls(r.data)) + "," + gson.toJson(safePeriod) + ")");
+            } else {
+                js("window.renderCpLeaderboard && window.renderCpLeaderboard([]," + gson.toJson(safePeriod) + ")");
+                message(r.error != null ? r.error : "تعذر تحميل ترتيب الثنائيات");
+            }
+        });
+    }
+
+    private void loadRewards() {
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().cpRewards());
+            List<Map<String, Object>> rows = r.success && r.data != null ? r.data : new ArrayList<>();
+            js("window.renderCpRewards && window.renderCpRewards(" + gson.toJson(normalizeUrls(rows)) + ")");
+            if (!r.success && r.error != null) message(r.error);
+        });
+    }
+
     private void loadCatalog() {
         c.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().cpCatalog());
@@ -227,6 +250,8 @@ public class CpCenterActivity extends ThemedActivity {
         @JavascriptInterface public void loadHome() { CpCenterActivity.this.loadHome(); }
         @JavascriptInterface public void loadRequests() { CpCenterActivity.this.loadRequests(); }
         @JavascriptInterface public void loadDiscover(String type) { CpCenterActivity.this.loadDiscover(type); }
+        @JavascriptInterface public void loadLeaderboard(String period) { CpCenterActivity.this.loadLeaderboard(period); }
+        @JavascriptInterface public void loadRewards() { CpCenterActivity.this.loadRewards(); }
         @JavascriptInterface public void loadCatalog() { CpCenterActivity.this.loadCatalog(); }
         @JavascriptInterface public void loadTasks() { CpCenterActivity.this.loadTasks(); }
 
