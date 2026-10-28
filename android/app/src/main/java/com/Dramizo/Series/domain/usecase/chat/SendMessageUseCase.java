@@ -17,6 +17,10 @@ public class SendMessageUseCase {
         return repo.sendAudio(conversationId, audioUrl, durationSec, replyToId);
     }
 
+    public Result<ChatDtos.MessageDto> executeVideo(String conversationId, String videoUrl, String mimeType, long size, int durationSec, String replyToId) {
+        return repo.sendVideo(conversationId, videoUrl, mimeType, size, durationSec, replyToId);
+    }
+
     public Result<ChatDtos.MessageDto> executeGift(String conversationId, String giftName, String iconUrl, String replyToId) {
         return repo.sendGift(conversationId, giftName, iconUrl, replyToId);
     }
