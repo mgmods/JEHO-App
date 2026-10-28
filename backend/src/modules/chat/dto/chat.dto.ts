@@ -32,6 +32,7 @@ export class SendMessageDto {
   @IsObject()
   media?: {
     url: string;
+    thumbnailUrl?: string;
     mimeType: string;
     size: number;
     width?: number;
