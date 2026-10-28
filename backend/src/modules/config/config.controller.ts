@@ -215,8 +215,8 @@ export class ConfigController {
         titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(value.titleSizeSp) || 13))),
         bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(value.bodySizeSp) || 12))),
         countSizeSp: Math.max(8, Math.min(30, Math.round(Number(value.countSizeSp) || 12))),
-        placementX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.placementX)) ? Number(value.placementX) : Number(fallback.placementX ?? 50)))),
-        placementY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.placementY)) ? Number(value.placementY) : Number(fallback.placementY ?? 50)))),
+        placementX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.placementX)) ? Number(value.placementX) : Number((fallback as any).placementX ?? 50)))),
+        placementY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.placementY)) ? Number(value.placementY) : Number((fallback as any).placementY ?? 50)))),
       };
     };
     const button = parsed.luckyButton || {};
