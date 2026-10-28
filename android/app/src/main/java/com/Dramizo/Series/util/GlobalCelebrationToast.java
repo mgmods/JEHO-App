@@ -160,6 +160,23 @@ public final class GlobalCelebrationToast {
             activeParams.width = Math.min(dp(activity, Math.max(220, Math.min(360, requestedWidthDp))), maxWidth);
             activeParams.height = dp(activity, Math.max(60, Math.min(180, requestedHeightDp)));
             active.setLayoutParams(activeParams);
+            if (luckyRoomHigh && active.getParent() instanceof ViewGroup) {
+                ViewGroup parent = (ViewGroup) active.getParent();
+                active.post(() -> {
+                    if (active.getParent() != parent || parent.getWidth() <= 0 || parent.getHeight() <= 0) return;
+                    ViewGroup.LayoutParams currentParams = active.getLayoutParams();
+                    if (!(currentParams instanceof FrameLayout.LayoutParams)) return;
+                    FrameLayout.LayoutParams roomParams = (FrameLayout.LayoutParams) currentParams;
+                    int maxLeft = Math.max(0, parent.getWidth() - active.getWidth());
+                    int maxTop = Math.max(0, parent.getHeight() - active.getHeight());
+                    int left = Math.round(parent.getWidth() * Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementX)) / 100f - active.getWidth() / 2f);
+                    int top = Math.round(parent.getHeight() * Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementY)) / 100f - active.getHeight() / 2f);
+                    roomParams.gravity = Gravity.TOP | Gravity.LEFT;
+                    roomParams.leftMargin = Math.max(0, Math.min(maxLeft, left));
+                    roomParams.topMargin = Math.max(0, Math.min(maxTop, top));
+                    active.setLayoutParams(roomParams);
+                });
+            }
         }
         String imageUrl = toastBackgroundUrl(chosenBackground);
         if (background != null) {
