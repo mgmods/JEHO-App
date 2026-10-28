@@ -2309,14 +2309,10 @@ export class GiftsService implements OnModuleInit {
                 : ECONOMY.defaultGiftSplit.agencyOwnerPercent,
             ),
           );
-          const receiverIsOwner = String(agency.ownerId) === String(dto.receiverId);
           // Host always receives the entire minted gift value.
           hostDiamonds = distributableDiamonds;
-          // Agency owner receives an extra commission on top of the host's diamonds.
-          // If the receiver is the agency owner, do not pay the same person a duplicate commission.
-          agentShare = receiverIsOwner
-            ? 0
-            : Math.floor((distributableDiamonds * ownerPct) / 100);
+          // Agency commission is an independent bonus, even when the host is also the agency owner.
+          agentShare = Math.floor((distributableDiamonds * ownerPct) / 100);
           if (agentShare > 0 && agency.ownerId) {
             let agentWallet = await manager.findOne(Wallet, {
               where: { userId: agency.ownerId },
