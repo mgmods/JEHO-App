@@ -580,13 +580,79 @@ public class ChatConversationActivity extends ThemedActivity {
     }
 
     private void showAttachPicker() {
-        AuraDialogHelper.list(this, "إرسال مرفق",
-                new String[]{"تصوير فيديو", getString(R.string.camera), getString(R.string.gallery), "فيديو من المعرض"}, which -> {
-                    if (which == 0) launchVideoCapture();
-                    else if (which == 1) launchCameraCapture();
-                    else if (which == 2) pickGallery.launch("image/*");
-                    else if (which == 3) pickVideo.launch("video/*");
-                });
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int horizontal = (20 * getResources().getDisplayMetrics().density + 0.5f) > 0
+                ? (int) (20 * getResources().getDisplayMetrics().density + 0.5f) : 20;
+        root.setPadding(horizontal, (int) (18 * getResources().getDisplayMetrics().density),
+                horizontal, (int) (24 * getResources().getDisplayMetrics().density));
+        root.setBackgroundColor(android.graphics.Color.WHITE);
+
+        android.widget.TextView title = new android.widget.TextView(this);
+        title.setText("إرسال مرفق");
+        title.setTextColor(android.graphics.Color.rgb(35, 37, 48));
+        title.setTextSize(17);
+        title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        title.setGravity(android.view.Gravity.CENTER);
+        title.setPadding(0, 0, 0, (int) (18 * getResources().getDisplayMetrics().density));
+        root.addView(title, new android.widget.LinearLayout.LayoutParams(-1, -2));
+
+        android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+        row.setGravity(android.view.Gravity.CENTER);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        root.addView(row, new android.widget.LinearLayout.LayoutParams(-1, -2));
+
+        addAttachmentTile(row, "📷", "الكاميرا", () -> {
+            sheet.dismiss();
+            launchCameraCapture();
+        });
+        addAttachmentTile(row, "🖼️", "الصور", () -> {
+            sheet.dismiss();
+            pickGallery.launch("image/*");
+        });
+        addAttachmentTile(row, "🎥", "تصوير فيديو", () -> {
+            sheet.dismiss();
+            launchVideoCapture();
+        });
+        addAttachmentTile(row, "▶️", "فيديو", () -> {
+            sheet.dismiss();
+            pickVideo.launch("video/*");
+        });
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
+    private void addAttachmentTile(android.widget.LinearLayout row, String icon, String label, Runnable action) {
+        float density = getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout tile = new android.widget.LinearLayout(this);
+        tile.setOrientation(android.widget.LinearLayout.VERTICAL);
+        tile.setGravity(android.view.Gravity.CENTER);
+        tile.setPadding(0, (int) (8 * density), 0, (int) (8 * density));
+        android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(0, -2, 1f);
+        params.setMargins((int) (3 * density), 0, (int) (3 * density), 0);
+        row.addView(tile, params);
+
+        android.widget.TextView glyph = new android.widget.TextView(this);
+        glyph.setText(icon);
+        glyph.setTextSize(25);
+        glyph.setGravity(android.view.Gravity.CENTER);
+        android.graphics.drawable.GradientDrawable circle = new android.graphics.drawable.GradientDrawable();
+        circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        circle.setColor(android.graphics.Color.rgb(243, 239, 255));
+        glyph.setBackground(circle);
+        tile.addView(glyph, new android.widget.LinearLayout.LayoutParams((int) (58 * density), (int) (58 * density)));
+
+        android.widget.TextView text = new android.widget.TextView(this);
+        text.setText(label);
+        text.setTextSize(11);
+        text.setTextColor(android.graphics.Color.rgb(55, 53, 68));
+        text.setGravity(android.view.Gravity.CENTER);
+        text.setPadding(0, (int) (7 * density), 0, 0);
+        tile.addView(text, new android.widget.LinearLayout.LayoutParams(-1, -2));
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setOnClickListener(v -> action.run());
     }
 
     private void launchVideoCapture() {
@@ -601,26 +667,8 @@ public class ChatConversationActivity extends ThemedActivity {
     }
 
     private void previewVideoBeforeSend(@NonNull Uri uri) {
-        VideoView preview = new VideoView(this);
-        int height = (int) (220 * getResources().getDisplayMetrics().density);
-        preview.setLayoutParams(new android.view.ViewGroup.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT, height));
-        preview.setVideoURI(uri);
-        preview.setOnPreparedListener(player -> {
-            player.setLooping(false);
-            preview.start();
-        });
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("معاينة الفيديو")
-                .setView(preview)
-                .setNegativeButton("إلغاء", (d, which) -> preview.stopPlayback())
-                .setPositiveButton("إرسال", (d, which) -> {
-                    preview.stopPlayback();
-                    uploadAndSendVideo(uri);
-                })
-                .create();
-        dialog.setOnDismissListener(d -> preview.stopPlayback());
-        dialog.show();
+        // Send directly from the picker; upload status is shown in the chat composer.
+        uploadAndSendVideo(uri);
     }
 
     private void launchCameraCapture() {
@@ -660,20 +708,13 @@ public class ChatConversationActivity extends ThemedActivity {
         final long maxBytes = 50L * 1024L * 1024L;
         AtomicBoolean cancelled = new AtomicBoolean(false);
         AtomicReference<Call<ApiResponse<UploadApi.UploadResult>>> callRef = new AtomicReference<>();
-        ProgressDialog progress = new ProgressDialog(this);
-        progress.setTitle("إرسال الفيديو");
-        progress.setMessage("جارٍ تجهيز الفيديو ورفعه…");
-        progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        progress.setMax(100);
-        progress.setProgress(0);
-        progress.setCancelable(false);
-        progress.setButton(DialogInterface.BUTTON_NEGATIVE, "إلغاء", (dialog, which) -> {
-            cancelled.set(true);
-            Call<ApiResponse<UploadApi.UploadResult>> active = callRef.get();
-            if (active != null) active.cancel();
-            if (progress.isShowing()) progress.dismiss();
+        runOnUiThread(() -> {
+            if (binding != null && binding.mediaUploadBanner != null) {
+                binding.mediaUploadBanner.setVisibility(View.VISIBLE);
+                binding.tvMediaUploadStatus.setText("جارٍ تجهيز الفيديو ورفعه داخل المحادثة…");
+                binding.progressMediaUpload.setProgress(0);
+            }
         });
-        progress.show();
         c.getIoExecutor().execute(() -> {
             try {
                 String mimeType = getContentResolver().getType(uri);
@@ -687,7 +728,11 @@ public class ChatConversationActivity extends ThemedActivity {
                 String extension = "video/quicktime".equalsIgnoreCase(mimeType) ? ".mov"
                         : "video/webm".equalsIgnoreCase(mimeType) ? ".webm"
                         : "video/3gpp".equalsIgnoreCase(mimeType) ? ".3gp" : ".mp4";
-                runOnUiThread(() -> { if (!cancelled.get() && progress.isShowing()) progress.setMessage("جارٍ رفع الفيديو…"); });
+                runOnUiThread(() -> {
+                    if (!cancelled.get() && binding != null && binding.mediaUploadBanner != null) {
+                        binding.tvMediaUploadStatus.setText("جارٍ رفع الفيديو…");
+                    }
+                });
                 RequestBody body = new RequestBody() {
                     @Override public MediaType contentType() { return MediaType.parse(mimeType); }
                     @Override public long contentLength() { return size; }
@@ -703,7 +748,10 @@ public class ChatConversationActivity extends ThemedActivity {
                                 uploaded += count;
                                 final int value = (int) Math.min(100L, uploaded * 100L / size);
                                 runOnUiThread(() -> {
-                                    if (!cancelled.get() && progress.isShowing()) progress.setProgress(value);
+                                    if (!cancelled.get() && binding != null && binding.progressMediaUpload != null) {
+                                        binding.progressMediaUpload.setProgress(value);
+                                        binding.tvMediaUploadStatus.setText("جارٍ رفع الفيديو… " + value + "%");
+                                    }
                                 });
                             }
                             sink.flush();
@@ -723,26 +771,26 @@ public class ChatConversationActivity extends ThemedActivity {
                         && resp.body().data != null && resp.body().data.url != null) {
                     String url = AssetCatalog.absoluteUrl(resp.body().data.url);
                     runOnUiThread(() -> {
-                        if (progress.isShowing()) progress.dismiss();
+                        if (binding != null && binding.mediaUploadBanner != null) binding.mediaUploadBanner.setVisibility(View.GONE);
                         viewModel.sendVideo(conversationId, url, mimeType, size, durationSec);
                     });
                 } else {
                     String error = UploadApi.errorMessage(resp, "تعذر رفع الفيديو");
                     runOnUiThread(() -> {
-                        if (progress.isShowing()) progress.dismiss();
+                        if (binding != null && binding.mediaUploadBanner != null) binding.mediaUploadBanner.setVisibility(View.GONE);
                         Toast.makeText(this, error, Toast.LENGTH_LONG).show();
                     });
                 }
             } catch (Exception e) {
                 if (cancelled.get()) {
-                    runOnUiThread(() -> { if (progress.isShowing()) progress.dismiss(); });
+                    runOnUiThread(() -> { if (binding != null && binding.mediaUploadBanner != null) binding.mediaUploadBanner.setVisibility(View.GONE); });
                     return;
                 }
                 String error = e.getMessage();
                 if (error == null || error.trim().isEmpty()) error = "تعذر رفع الفيديو";
                 final String message = error;
                 runOnUiThread(() -> {
-                    if (progress.isShowing()) progress.dismiss();
+                    if (binding != null && binding.mediaUploadBanner != null) binding.mediaUploadBanner.setVisibility(View.GONE);
                     Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                 });
             }
