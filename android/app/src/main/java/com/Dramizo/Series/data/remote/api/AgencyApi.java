@@ -40,6 +40,9 @@ public interface AgencyApi {
     @GET("agencies/{id}/earnings")
     Call<ApiResponse<MiscDtos.AgencyEarningsDto>> earnings(@Path("id") String id);
 
+    @GET("agencies/{id}/stats")
+    Call<ApiResponse<MiscDtos.AgencyStatsDto>> stats(@Path("id") String id);
+
     @POST("agencies/{id}/distribute")
     Call<ApiResponse<Map<String, Object>>> distribute(
             @Path("id") String id, @Body() Map<String, Object> body);
