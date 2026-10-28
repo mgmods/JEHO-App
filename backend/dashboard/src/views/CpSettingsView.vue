@@ -27,20 +27,31 @@
           </label>
         </div>
         <div class="row g-3">
-          <div v-for="task in cpFeatures.tasks" :key="task.id" class="col-12 col-xl-6">
+          <div v-for="(task, taskIndex) in cpFeatures.tasks" :key="task.id" class="col-12 col-xl-6">
             <div class="border rounded-3 p-3 h-100">
               <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-                <h4 class="h6 mb-0">{{ task.id === 'memory_today' ? 'مهمة الذكرى المشتركة' : 'مهمة نشاط العلاقة' }}</h4>
-                <label class="form-check form-switch mb-0">
-                  <input v-model="task.enabled" class="form-check-input" type="checkbox" role="switch">
-                  <span class="form-check-label">{{ task.enabled ? 'مفعّلة' : 'متوقفة' }}</span>
-                </label>
+                <h4 class="h6 mb-0">مهمة CP {{ taskIndex + 1 }}</h4>
+                <div class="d-flex align-items-center gap-2">
+                  <label class="form-check form-switch mb-0">
+                    <input v-model="task.enabled" class="form-check-input" type="checkbox" role="switch">
+                    <span class="form-check-label">{{ task.enabled ? 'مفعّلة' : 'متوقفة' }}</span>
+                  </label>
+                  <button v-if="!['memory_today','earn_points_today'].includes(task.id)" class="btn btn-sm btn-outline-danger" type="button" @click="removeCpTask(task.id)">حذف</button>
+                </div>
               </div>
+              <div class="small text-secondary mb-2">معرّف المهمة: <code>{{ task.id }}</code></div>
               <label class="form-label">اسم المهمة</label>
-              <input v-model.trim="task.title" class="form-control mb-3" maxlength="100">
+              <input v-model.trim="task.title" class="form-control mb-2" maxlength="100" placeholder="مثال: اجمعوا نقاطًا معًا">
+              <label class="form-label">وصف المهمة للعضو</label>
+              <input v-model.trim="task.description" class="form-control mb-3" maxlength="240" placeholder="شرح مختصر لما يجب إنجازه">
+              <label class="form-label">شرط إكمال المهمة</label>
+              <select v-model="task.condition" class="form-select mb-3">
+                <option value="points_today">جمع نقاط علاقة خلال اليوم</option>
+                <option value="memory_count">إضافة ذكريات مشتركة خلال اليوم</option>
+              </select>
               <div class="row g-3">
                 <div class="col-6">
-                  <label class="form-label">{{ task.id === 'memory_today' ? 'عدد الذكريات المطلوبة' : 'نقاط العلاقة المطلوبة' }}</label>
+                  <label class="form-label">{{ task.condition === 'memory_count' ? 'عدد الذكريات المطلوبة' : 'نقاط العلاقة المطلوبة' }}</label>
                   <input v-model.number="task.target" class="form-control" type="number" min="1" max="1000000" step="1">
                 </div>
                 <div class="col-6">
@@ -48,10 +59,20 @@
                   <input v-model.number="task.rewardPoints" class="form-control" type="number" min="0" max="1000000" step="1">
                 </div>
               </div>
-              <label class="form-label mt-3">هدية المهمة من متجر CP (رمز العنصر)</label>
-              <input v-model.trim="task.rewardCosmeticCode" class="form-control" dir="ltr" maxlength="64" placeholder="cp_heart_frame">
-              <p class="form-text mt-2 mb-0">اختياري: أدخل رمز عنصر مفعّل من متجر CP ليُضاف إلى حقيبة المستخدم عند المطالبة بالمهمة. تُسجّل المطالبة مرة واحدة يومياً.</p>
+              <label class="form-label mt-3">هدية المكافأة من متجر CP</label>
+              <select v-model="task.rewardCosmeticCode" class="form-select">
+                <option value="">بدون هدية إضافية</option>
+                <option v-for="gift in cpStoreItems.filter(item => item.isActive)" :key="gift.code" :value="gift.code">{{ gift.name }} · {{ format(gift.coinPrice) }} عملة</option>
+              </select>
+              <div v-if="selectedCpReward(task.rewardCosmeticCode)" class="d-flex align-items-center gap-3 mt-2 p-2 rounded-3 bg-light">
+                <img :src="selectedCpReward(task.rewardCosmeticCode).previewUrl" :alt="selectedCpReward(task.rewardCosmeticCode).name" width="64" height="64" style="object-fit:contain">
+                <div class="small"><strong>{{ selectedCpReward(task.rewardCosmeticCode).name }}</strong><div>{{ cosmeticTypeLabel(selectedCpReward(task.rewardCosmeticCode).type) }} · {{ format(selectedCpReward(task.rewardCosmeticCode).coinPrice) }} عملة</div></div>
+              </div>
+              <p class="form-text mt-2 mb-0">تظهر المهمة للأعضاء عند تفعيلها. المكافأة تُطالب مرة واحدة يوميًا لكل مستخدم، وتُضاف الهدية المحددة إلى حقيبته.</p>
             </div>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-outline-primary" type="button" @click="addCpTask">＋ إضافة مهمة جديدة</button>
           </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
@@ -365,8 +386,8 @@ const savingFeatures = ref(false)
 const cpFeatures = ref({
   globallyEnabled: true,
   tasks: [
-    { id: 'memory_today', enabled: true, title: 'ذكرى جديدة', target: 1, rewardPoints: 10, rewardCosmeticCode: '' },
-    { id: 'earn_points_today', enabled: true, title: 'نشاط مشترك', target: 10, rewardPoints: 15, rewardCosmeticCode: '' },
+    { id: 'memory_today', enabled: true, title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', condition: 'memory_count', target: 1, rewardPoints: 10, rewardCosmeticCode: '' },
+    { id: 'earn_points_today', enabled: true, title: 'نشاط مشترك', description: 'اجمعوا نقاط العلاقة اليوم', condition: 'points_today', target: 10, rewardPoints: 15, rewardCosmeticCode: '' },
   ],
 })
 const cpStoreItems = ref([])
@@ -487,6 +508,14 @@ async function saveCpStoreItem(item) {
 }
 function date(value) { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('ar') }
 function selectedGift(item) { return gifts.value.find(g => String(g.id) === String(item.giftId)) || null }
+function selectedCpReward(code) { return cpStoreItems.value.find(item => item.code === code) || null }
+function addCpTask() {
+  const id = 'cp_task_' + Math.random().toString(36).slice(2, 10)
+  cpFeatures.value.tasks.push({ id, enabled: true, title: '', description: '', condition: 'points_today', target: 10, rewardPoints: 0, rewardCosmeticCode: '' })
+}
+function removeCpTask(id) {
+  cpFeatures.value.tasks = cpFeatures.value.tasks.filter(task => task.id !== id)
+}
 function payloadOf(response) { return response?.data?.data ?? response?.data ?? response ?? {} }
 
 async function load() {
@@ -495,13 +524,24 @@ async function load() {
     const [configResponse, giftsResponse] = await Promise.all([cpAdminApi.config(), giftsApi.list({ limit: 500 })])
     const config = payloadOf(configResponse)
     gifts.value = extractList(giftsResponse?.data?.data ?? giftsResponse?.data ?? giftsResponse).filter(gift => gift && gift.isActive !== false)
-    cpFeatures.value = {
-      globallyEnabled: config.globallyEnabled !== false,
-      tasks: [
-        { id: 'memory_today', rewardCosmeticCode: '', ...(config.tasks?.memory_today || {}) },
-        { id: 'earn_points_today', rewardCosmeticCode: '', ...(config.tasks?.earn_points_today || {}) },
-      ],
+    const configuredTasks = config.tasks && typeof config.tasks === 'object' ? config.tasks : {}
+    const taskEntries = Object.entries(configuredTasks).map(([id, task]) => ({
+      id,
+      enabled: task?.enabled !== false,
+      title: String(task?.title || ''),
+      description: String(task?.description || ''),
+      condition: task?.condition || (id === 'memory_today' ? 'memory_count' : 'points_today'),
+      target: Number(task?.target || (id === 'memory_today' ? 1 : 10)),
+      rewardPoints: Number(task?.rewardPoints ?? (id === 'memory_today' ? 10 : 15)),
+      rewardCosmeticCode: String(task?.rewardCosmeticCode || ''),
+    }))
+    for (const [id, defaults] of [
+      ['memory_today', { title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', condition: 'memory_count', target: 1, rewardPoints: 10 }],
+      ['earn_points_today', { title: 'نشاط مشترك', description: 'اجمعوا نقاط العلاقة اليوم', condition: 'points_today', target: 10, rewardPoints: 15 }],
+    ]) {
+      if (!taskEntries.some(task => task.id === id)) taskEntries.unshift({ id, enabled: true, ...defaults, rewardCosmeticCode: '' })
     }
+    cpFeatures.value = { globallyEnabled: config.globallyEnabled !== false, tasks: taskEntries }
     types.value = (config.types || []).map(item => ({
       ...item,
       priceInput: item.priceCoins == null ? '' : String(item.priceCoins),
@@ -627,15 +667,20 @@ async function saveFeatures() {
   error.value = ''; success.value = ''; savingFeatures.value = true
   try {
     const tasks = {}
+    const seen = new Set()
     for (const task of cpFeatures.value.tasks) {
+      const id = String(task.id || '').trim()
       const target = Number(task.target)
       const rewardPoints = Number(task.rewardPoints)
-      if (!task.title?.trim() || task.title.trim().length > 100 ||
+      if (!/^[a-zA-Z0-9_-]{2,64}$/.test(id) || seen.has(id) ||
+          !task.title?.trim() || task.title.trim().length > 100 ||
           !Number.isSafeInteger(target) || target < 1 || target > 1000000 ||
-          !Number.isSafeInteger(rewardPoints) || rewardPoints < 0 || rewardPoints > 1000000) {
-        throw new Error('تحقق من اسم كل مهمة والهدف والمكافأة.')
+          !Number.isSafeInteger(rewardPoints) || rewardPoints < 0 || rewardPoints > 1000000 ||
+          !['memory_count', 'points_today'].includes(task.condition)) {
+        throw new Error('تحقق من معرّف المهمة واسمها وشرطها والهدف والمكافأة.')
       }
-      tasks[task.id] = { enabled: !!task.enabled, title: task.title.trim(), target, rewardPoints, rewardCosmeticCode: String(task.rewardCosmeticCode || '').trim() }
+      seen.add(id)
+      tasks[id] = { enabled: !!task.enabled, title: task.title.trim(), description: String(task.description || '').trim().slice(0, 240), condition: task.condition, target, rewardPoints, rewardCosmeticCode: String(task.rewardCosmeticCode || '').trim() }
     }
     await cpAdminApi.updateFeatures({ globallyEnabled: !!cpFeatures.value.globallyEnabled, tasks })
     success.value = 'تم حفظ تشغيل قسم CP وإعدادات المهمات.'
