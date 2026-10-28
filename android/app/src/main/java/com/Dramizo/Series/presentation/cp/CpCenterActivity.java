@@ -254,6 +254,30 @@ public class CpCenterActivity extends ThemedActivity {
         @JavascriptInterface public void loadRewards() { CpCenterActivity.this.loadRewards(); }
         @JavascriptInterface public void loadCatalog() { CpCenterActivity.this.loadCatalog(); }
         @JavascriptInterface public void loadTasks() { CpCenterActivity.this.loadTasks(); }
+        @JavascriptInterface public void claimTask(String taskId) {
+            String safeId = taskId == null ? "" : taskId.trim();
+            if (!"memory_today".equals(safeId) && !"earn_points_today".equals(safeId)) {
+                message("مهمة CP غير معروفة.");
+                return;
+            }
+            c.getIoExecutor().execute(() -> {
+                Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().claimCpTask(safeId));
+                if (result.success) {
+                    Object reward = result.data == null ? null : result.data.get("rewardItem");
+                    String rewardName = null;
+                    if (reward instanceof Map) {
+                        Object name = ((Map<?, ?>) reward).get("name");
+                        if (name != null) rewardName = String.valueOf(name);
+                    }
+                    message(rewardName == null || rewardName.isEmpty()
+                            ? "تم استلام مكافأة المهمة بنجاح."
+                            : "تم استلام مكافأة المهمة والهدية: " + rewardName);
+                    loadTasks();
+                } else {
+                    message(result.error == null ? "تعذر استلام مكافأة المهمة." : result.error);
+                }
+            });
+        }
 
         @JavascriptInterface public void sendRequest(String recipientId, String type) {
             String recipient = recipientId == null ? "" : recipientId.trim();
@@ -291,6 +315,7 @@ public class CpCenterActivity extends ThemedActivity {
                     message(responseText);
                     loadHome();
                     loadRequests();
+                    loadTasks();
                     js("window.onCpRequestResponse && window.onCpRequestResponse("
                             + gson.toJson(requestId) + "," + accept + ",true," + gson.toJson(responseText) + ")");
                 } else {
