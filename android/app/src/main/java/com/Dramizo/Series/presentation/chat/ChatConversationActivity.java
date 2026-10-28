@@ -665,7 +665,8 @@ public class ChatConversationActivity extends ThemedActivity {
                 if (size > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
                 int durationSec = getVideoDurationSeconds(uri);
                 String extension = "video/quicktime".equalsIgnoreCase(mimeType) ? ".mov"
-                        : "video/webm".equalsIgnoreCase(mimeType) ? ".webm" : ".mp4";
+                        : "video/webm".equalsIgnoreCase(mimeType) ? ".webm"
+                        : "video/3gpp".equalsIgnoreCase(mimeType) ? ".3gp" : ".mp4";
                 RequestBody body = new RequestBody() {
                     @Override public MediaType contentType() { return MediaType.parse(mimeType); }
                     @Override public long contentLength() { return size; }
@@ -696,16 +697,14 @@ public class ChatConversationActivity extends ThemedActivity {
     }
 
     private long getVideoSize(@NonNull Uri uri, long maxBytes) throws Exception {
+        long descriptorLength = -1;
         try (AssetFileDescriptor descriptor = getContentResolver().openAssetFileDescriptor(uri, "r")) {
-            if (descriptor != null && descriptor.getLength() > 0) {
-                if (descriptor.getLength() > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
-                return descriptor.getLength();
-            }
-        } catch (IOException e) {
-            throw e;
+            if (descriptor != null) descriptorLength = descriptor.getLength();
         } catch (Exception ignored) {
             // Some gallery providers do not expose a descriptor length; count the stream below.
         }
+        if (descriptorLength > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
+        if (descriptorLength > 0) return descriptorLength;
         long total = 0;
         try (InputStream input = getContentResolver().openInputStream(uri)) {
             if (input == null) throw new IOException("تعذر فتح الفيديو");
