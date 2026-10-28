@@ -302,7 +302,11 @@ public class AuraLiveApp extends Application {
                     // Lucky wins use one compact global banner on whichever app section is visible,
                     // including Home while a voice room remains alive in the background.
                     if ("lucky_hit".equalsIgnoreCase(kind) && appVisible
-                            && activity != null && !activity.isFinishing()) {
+                            && activity != null && !activity.isFinishing()
+                            // In the winning room, VoiceRoomActivity renders the dedicated center toast.
+                            // Other rooms and app sections keep the standard top toast.
+                            && !(activity instanceof VoiceRoomActivity roomActivity
+                                    && roomActivity.isSameRoom(roomFinal))) {
                         activity.runOnUiThread(() ->
                                 com.Dramizo.Series.util.GlobalCelebrationToast.show(
                                         activity, title, body, avatar, badge, dedupe,
