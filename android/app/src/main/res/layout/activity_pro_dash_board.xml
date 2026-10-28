@@ -458,6 +458,48 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <!-- Current agency membership period performance -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_dash_stat_card"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="أداء أعضاء الوكالة"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="إجمالي هدايا فترة العضوية الحالية فقط؛ إعادة الانضمام تبدأ فترة إحصائية جديدة."
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/tvAgencyStatsEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="لا توجد بيانات أعضاء بعد"
+                        android:textColor="@color/text_hint"
+                        android:textSize="12sp" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutAgencyMemberStats"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="vertical" />
+                </LinearLayout>
+
                 <!-- Withdraw requests -->
                 <LinearLayout
                     android:layout_width="match_parent"
