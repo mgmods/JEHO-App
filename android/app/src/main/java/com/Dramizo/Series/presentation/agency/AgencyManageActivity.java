@@ -79,6 +79,16 @@ public class AgencyManageActivity extends ThemedActivity {
         }
 
         binding.btnBack.setOnClickListener(v -> navigateUp());
+        if (binding.boxAgencyHero != null) {
+            android.graphics.drawable.GradientDrawable heroBackground =
+                    new android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                            new int[]{0xFFF7F4FF, 0xFFFFFFFF, 0xFFF0EBFF});
+            heroBackground.setCornerRadius(dp(24));
+            heroBackground.setStroke(dp(1), 0xFFE2D9FF);
+            binding.boxAgencyHero.setBackground(heroBackground);
+            binding.boxAgencyHero.setElevation(dp(2));
+        }
         vm = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(AgencyViewModel.class);
 
@@ -125,6 +135,18 @@ public class AgencyManageActivity extends ThemedActivity {
     private void setupMenuRow(ItemAgencyMenuRowBinding row, int labelRes, View.OnClickListener click) {
         if (row == null) return;
         row.tvMenuLabel.setText(labelRes);
+        if (row.imgMenuIcon != null) {
+            int icon = android.R.drawable.ic_menu_manage;
+            if (labelRes == R.string.agency_manage_menu_search) icon = android.R.drawable.ic_menu_search;
+            else if (labelRes == R.string.agency_manage_menu_add) icon = android.R.drawable.ic_input_add;
+            else if (labelRes == R.string.agency_manage_menu_pending) icon = android.R.drawable.ic_menu_agenda;
+            else if (labelRes == R.string.agency_manage_menu_code) icon = android.R.drawable.ic_menu_info_details;
+            else if (labelRes == R.string.agency_manage_menu_style) icon = android.R.drawable.ic_menu_edit;
+            else if (labelRes == R.string.agency_manage_menu_branding) icon = android.R.drawable.ic_menu_gallery;
+            else if (labelRes == R.string.agency_manage_menu_mall) icon = android.R.drawable.ic_menu_view;
+            row.imgMenuIcon.setImageResource(icon);
+            row.imgMenuIcon.setColorFilter(getColor(R.color.agency_purple));
+        }
         row.getRoot().setOnClickListener(click);
     }
 
