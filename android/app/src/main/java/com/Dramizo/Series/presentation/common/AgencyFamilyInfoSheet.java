@@ -3,6 +3,7 @@ package com.Dramizo.Series.presentation.common;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -16,9 +17,11 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
+import com.Dramizo.Series.presentation.agency.AgencyManageActivity;
 import com.Dramizo.Series.util.AgencyUi;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AuraDialogHelper;
+import com.Dramizo.Series.util.AvatarCosmetics;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.text.NumberFormat;
@@ -77,8 +80,17 @@ public final class AgencyFamilyInfoSheet {
         final String[] gidHold = {""};
         final boolean[] following = {false};
 
-        // Public agency cards must never route ordinary users into agency management.
-        if (btnOpen != null) btnOpen.setVisibility(View.GONE);
+        if (btnOpen != null) {
+            btnOpen.setOnClickListener(v -> {
+                dialog.dismiss();
+                try {
+                    Intent i = new Intent(activity, AgencyManageActivity.class);
+                    i.putExtra(AgencyManageActivity.EXTRA_AGENCY_ID, id);
+                    activity.startActivity(i);
+                } catch (Exception ignored) {
+                }
+            });
+        }
 
         if (btnCopy != null) {
             btnCopy.setOnClickListener(v -> {
@@ -155,17 +167,18 @@ public final class AgencyFamilyInfoSheet {
                         btnCopy.setVisibility(gid.isEmpty() ? View.GONE : View.VISIBLE);
                     }
                 }
-                // Public agency card intentionally hides member/follower/room/gift statistics.
-                if (tvFollowers != null) tvFollowers.setVisibility(View.GONE);
-                if (tvRooms != null) tvRooms.setVisibility(View.GONE);
-                if (tvMaxOnline != null) tvMaxOnline.setVisibility(View.GONE);
-                if (tvGifts != null) tvGifts.setVisibility(View.GONE);
-                View stats = sheet.findViewById(R.id.rowAgencyStats);
-                if (stats != null) stats.setVisibility(View.GONE);
-                View ownerRow = sheet.findViewById(R.id.rowOwner);
-                if (ownerRow != null) ownerRow.setVisibility(View.GONE);
-                if (imgOwner != null) imgOwner.setVisibility(View.GONE);
-                if (tvOwner != null) tvOwner.setVisibility(View.GONE);
+                if (tvFollowers != null) {
+                    long fc = a.followerCount > 0 ? a.followerCount : Math.max(0, a.memberCount);
+                    tvFollowers.setText(formatCount(fc));
+                }
+                if (tvRooms != null) tvRooms.setText(formatCount(Math.max(0, a.roomCount)));
+                if (tvMaxOnline != null) {
+                    long max = Math.max(a.maxOnline, Math.max(a.liveOnline, a.liveViewerCount));
+                    tvMaxOnline.setText(formatCount(Math.max(0, max)));
+                }
+                if (tvGifts != null) {
+                    tvGifts.setText(formatCount(Math.max(0, a.giftsReceivedDiamonds)));
+                }
                 int tier = a.level > 0 ? a.level : a.medals;
                 if (tier <= 0) {
                     tier = AgencyUi.bannerTierFromDiamonds(a.totalDiamonds);
@@ -178,7 +191,24 @@ public final class AgencyFamilyInfoSheet {
                 following[0] = Boolean.TRUE.equals(a.isFollowing);
                 applyFollowUi(btnFollow, following[0]);
 
-                // Do not expose the agency owner in the public card.
+                if (a.owner != null) {
+                    if (tvOwner != null) {
+                        String n = a.owner.displayName != null && !a.owner.displayName.isEmpty()
+                                ? a.owner.displayName
+                                : (a.owner.username != null ? a.owner.username : "—");
+                        tvOwner.setText(n);
+                    }
+                    AvatarCosmetics.bindAvatar(imgOwner, a.owner.avatarUrl);
+                    final String ownerId = a.owner.id;
+                    if (imgOwner != null && ownerId != null && !ownerId.isEmpty()) {
+                        imgOwner.setOnClickListener(v -> {
+                            dialog.dismiss();
+                            UserProfileCardSheet.show(activity, ownerId, a.owner.displayName, a.owner.avatarUrl);
+                        });
+                    }
+                } else if (tvOwner != null) {
+                    tvOwner.setText("—");
+                }
 
                 AgencyUi.bindLogo(imgLogo, a.logoUrl, a.coverUrl);
             });
