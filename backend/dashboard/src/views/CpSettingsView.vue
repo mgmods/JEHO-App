@@ -48,7 +48,9 @@
                   <input v-model.number="task.rewardPoints" class="form-control" type="number" min="0" max="1000000" step="1">
                 </div>
               </div>
-              <p class="form-text mt-2 mb-0">تُمنح المكافأة مرة واحدة لكل مستخدم وعلاقة وفي اليوم نفسه.</p>
+              <label class="form-label mt-3">هدية المهمة من متجر CP (رمز العنصر)</label>
+              <input v-model.trim="task.rewardCosmeticCode" class="form-control" dir="ltr" maxlength="64" placeholder="cp_heart_frame">
+              <p class="form-text mt-2 mb-0">اختياري: أدخل رمز عنصر مفعّل من متجر CP ليُضاف إلى حقيبة المستخدم عند المطالبة بالمهمة. تُسجّل المطالبة مرة واحدة يومياً.</p>
             </div>
           </div>
         </div>
@@ -363,8 +365,8 @@ const savingFeatures = ref(false)
 const cpFeatures = ref({
   globallyEnabled: true,
   tasks: [
-    { id: 'memory_today', enabled: true, title: 'ذكرى جديدة', target: 1, rewardPoints: 10 },
-    { id: 'earn_points_today', enabled: true, title: 'نشاط مشترك', target: 10, rewardPoints: 15 },
+    { id: 'memory_today', enabled: true, title: 'ذكرى جديدة', target: 1, rewardPoints: 10, rewardCosmeticCode: '' },
+    { id: 'earn_points_today', enabled: true, title: 'نشاط مشترك', target: 10, rewardPoints: 15, rewardCosmeticCode: '' },
   ],
 })
 const cpStoreItems = ref([])
@@ -496,8 +498,8 @@ async function load() {
     cpFeatures.value = {
       globallyEnabled: config.globallyEnabled !== false,
       tasks: [
-        { id: 'memory_today', ...(config.tasks?.memory_today || {}) },
-        { id: 'earn_points_today', ...(config.tasks?.earn_points_today || {}) },
+        { id: 'memory_today', rewardCosmeticCode: '', ...(config.tasks?.memory_today || {}) },
+        { id: 'earn_points_today', rewardCosmeticCode: '', ...(config.tasks?.earn_points_today || {}) },
       ],
     }
     types.value = (config.types || []).map(item => ({
@@ -633,7 +635,7 @@ async function saveFeatures() {
           !Number.isSafeInteger(rewardPoints) || rewardPoints < 0 || rewardPoints > 1000000) {
         throw new Error('تحقق من اسم كل مهمة والهدف والمكافأة.')
       }
-      tasks[task.id] = { enabled: !!task.enabled, title: task.title.trim(), target, rewardPoints }
+      tasks[task.id] = { enabled: !!task.enabled, title: task.title.trim(), target, rewardPoints, rewardCosmeticCode: String(task.rewardCosmeticCode || '').trim() }
     }
     await cpAdminApi.updateFeatures({ globallyEnabled: !!cpFeatures.value.globallyEnabled, tasks })
     success.value = 'تم حفظ تشغيل قسم CP وإعدادات المهمات.'
