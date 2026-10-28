@@ -39,7 +39,7 @@ export default registerAs('app', () => {
   throttleTtl: parseInt(process.env.THROTTLE_TTL || '60', 10),
   throttleLimit: parseInt(process.env.THROTTLE_LIMIT || '400', 10),
   uploadDir: process.env.UPLOAD_DIR || './uploads',
-  uploadMaxSizeMb: parseInt(process.env.UPLOAD_MAX_SIZE_MB || '20', 10),
+  uploadMaxSizeMb: parseInt(process.env.UPLOAD_MAX_SIZE_MB || '50', 10),
   internetMusic: {
     pipedInstances: process.env.PIPED_API_INSTANCES || '',
   },
