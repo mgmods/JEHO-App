@@ -65,9 +65,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id=$1 AND "isActive"=true',
         [giftId],
       ) : [];
-      const giftPrice = Number(gift?.coinPrice);
+      // The CP dashboard price is the live source of truth for the CP store.
+      // Legacy installations without cp.price.<type> continue using the selected gift's price.
+      const configuredPrice = settings[`cp.price.${type}`] === undefined
+        ? Number(gift?.coinPrice)
+        : Number(settings[`cp.price.${type}`]);
+      const giftPrice = Number.isSafeInteger(configuredPrice) && configuredPrice > 0 ? configuredPrice : 0;
       const enabled = globallyEnabled && settings[`cp.enabled.${type}`] !== 'false'
-        && !!gift && Number.isSafeInteger(giftPrice) && giftPrice > 0;
+        && !!gift && giftPrice > 0;
       let rules: Record<string, any> = {};
       try { rules = JSON.parse(settings[`cp.rules.${type}`] || '{}'); } catch { rules = {}; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
@@ -640,10 +645,15 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const [gift] = giftSetting?.value
         ? await manager.query('SELECT id,name,"iconUrl","animationUrl","coinPrice","isActive" FROM gifts WHERE id=$1', [giftSetting.value])
         : [];
-      const price = Number(gift?.coinPrice);
+      const [priceSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.price.${type}`]);
+      // Match the CP store catalog exactly; use gift catalog price only for legacy config.
+      const configuredPrice = priceSetting?.value === undefined
+        ? Number(gift?.coinPrice)
+        : Number(priceSetting.value);
+      const price = Number.isSafeInteger(configuredPrice) && configuredPrice > 0 ? configuredPrice : 0;
       if (!gift || gift.isActive !== true) throw new BadRequestException('يجب تحديد هدية فعلية ومفعّلة لهذا النوع من لوحة التحكم');
-      if (!Number.isSafeInteger(price) || price <= 0) {
-        throw new BadRequestException('حدد سعراً موجباً للهدية من لوحة الهدايا');
+      if (price <= 0) {
+        throw new BadRequestException('سعر هدية CP غير مفعّل. حدّد سعراً موجباً من لوحة CP');
       }
       const [wallet] = await manager.query('SELECT id, coins FROM wallets WHERE "userId" = $1 FOR UPDATE', [userId]);
       if (!wallet) throw new NotFoundException('المحفظة غير موجودة');
