@@ -133,7 +133,7 @@ $("tasksView").innerHTML=list.length?list.map(t=>{
 const id=(t.id==="memory_today"||t.id==="earn_points_today")?t.id:"";
 if(!id)return "";
 const progress=Math.max(0,Number(t.progress)||0),target=Math.max(1,Number(t.target)||1),pct=Math.max(0,Math.min(100,Math.round(progress*100/target)));
-const reward=t.rewardCosmeticCode?'<div class="task-meta">🎁 هدية CP: '+esc(t.rewardCosmeticCode)+'</div>':'';
+const reward=t.rewardItem?'<div class="task-meta" style="display:flex;align-items:center;gap:10px"><img src="'+esc(t.rewardItem.previewUrl||fallback)+'" alt="هدية المهمة" style="width:42px;height:42px;object-fit:contain;border-radius:10px;background:#ffffff16;padding:4px" onerror="this.onerror=null;this.src=\''+fallback+'\'">🎁 هدية CP: '+esc(t.rewardItem.name||t.rewardCosmeticCode||"هدية")+'</div>':(t.rewardCosmeticCode?'<div class="task-meta">🎁 هدية CP: '+esc(t.rewardCosmeticCode)+'</div>':'');
 const button=t.claimed?'<button class="task-action" disabled>تم الاستلام ✓</button>':t.canClaim?'<button class="task-action" data-claim-task="'+id+'">استلام المكافأة</button>':'<button class="task-action" disabled>أكمل المهمة أولاً</button>';
 return '<div class="task-card"><div class="task-head"><div class="task-title">'+esc(t.title||"مهمة CP")+'</div><div class="pill">+'+score(t.rewardPoints||0)+' نقطة</div></div><div class="task-meta">'+esc(t.description||"مهمة مشتركة")+' · '+score(progress)+' / '+score(target)+'</div><div class="task-progress"><span style="width:'+pct+'%"></span></div>'+reward+'<div style="display:flex;justify-content:flex-end;margin-top:10px">'+button+'</div></div>';
 }).join(""):'<p class="empty">لا توجد مهمات متاحة حالياً، أو لا توجد علاقة CP نشطة.</p>';
