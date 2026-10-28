@@ -1,5 +1,7 @@
 package com.Dramizo.Series.presentation.agency;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
@@ -46,6 +48,8 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
     private TextView tvWithdrawEmpty;
     private TextView tvAgencyStatsEmpty;
     private TextView tvAgencyStatsTotal;
+    private TextView tvAgencyPublicId;
+    private TextView tvAgencyActivationCode;
     private LinearLayout layoutAgencyMemberStats;
     private final ProDashWithdrawAdapter withdrawAdapter = new ProDashWithdrawAdapter();
 
@@ -91,6 +95,18 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         tvAgencyStatsEmpty = findViewById(R.id.tvAgencyStatsEmpty);
         tvAgencyStatsTotal = findViewById(R.id.tvAgencyStatsTotal);
         layoutAgencyMemberStats = findViewById(R.id.layoutAgencyMemberStats);
+        tvAgencyPublicId = findViewById(R.id.tvAgencyPublicId);
+        tvAgencyActivationCode = findViewById(R.id.tvAgencyActivationCode);
+        MaterialButton btnCopyAgencyId = findViewById(R.id.btnCopyAgencyId);
+        if (btnCopyAgencyId != null) {
+            btnCopyAgencyId.setOnClickListener(v -> copyToClipboard(
+                    "رقم الوكالة", tvAgencyPublicId == null ? null : tvAgencyPublicId.getText().toString()));
+        }
+        MaterialButton btnCopyAgencyCode = findViewById(R.id.btnCopyAgencyCode);
+        if (btnCopyAgencyCode != null) {
+            btnCopyAgencyCode.setOnClickListener(v -> copyToClipboard(
+                    "كود تفعيل الوكالة", tvAgencyActivationCode == null ? null : tvAgencyActivationCode.getText().toString()));
+        }
 
         RecyclerView recycler = findViewById(R.id.recyclerWithdraws);
         if (recycler != null) {
@@ -161,6 +177,11 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 mineSnap = mine.data;
                 agencyId = mine.data.agency.id;
                 agencyName = mine.data.agency.name;
+                setT(tvAgencyPublicId, mine.data.agency.publicId == null
+                        ? "—" : mine.data.agency.publicId);
+                String activationCode = mine.data.agency.activationCode;
+                setT(tvAgencyActivationCode, activationCode == null || activationCode.trim().isEmpty()
+                        ? "غير متاح" : activationCode);
                 TextView dashboardTitle = findViewById(R.id.tvTitle);
                 if (dashboardTitle != null && agencyName != null && !agencyName.trim().isEmpty()) {
                     dashboardTitle.setText(agencyName + " · " + getString(R.string.agency_owner_dashboard_title));
@@ -360,6 +381,20 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             }
             layoutAgencyMemberStats.addView(card);
         }
+    }
+
+    private void copyToClipboard(String label, @Nullable String value) {
+        if (value == null || value.trim().isEmpty() || "—".equals(value) || "غير متاح".equals(value)) {
+            Toast.makeText(this, "لا توجد قيمة لنسخها حالياً", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            Toast.makeText(this, "تعذر فتح الحافظة", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText(label, value.trim()));
+        Toast.makeText(this, "تم نسخ " + label, Toast.LENGTH_SHORT).show();
     }
 
     private int dp(float value) {
