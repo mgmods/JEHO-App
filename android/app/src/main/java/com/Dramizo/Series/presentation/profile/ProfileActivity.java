@@ -598,15 +598,15 @@ public class ProfileActivity extends ThemedActivity {
             binding.tvAgencyRoleBadge.setVisibility(View.GONE);
             return;
         }
-        String label = owner ? "♛  صاحب وكالة" : "🎙  مضيف";
-        int start = owner ? 0xFFFFF0CC : 0xFFD9F5F0;
-        int end = owner ? 0xFFFFD778 : 0xFFB8E9E1;
-        int textColor = owner ? 0xFF765000 : 0xFF08695F;
+        String label = owner ? "♛  صاحب وكالة" : "🎙  موظف";
+        int start = owner ? 0xFFFFF0CC : 0xFFE8E7FF;
+        int end = owner ? 0xFFFFD778 : 0xFFD3CEFF;
+        int textColor = owner ? 0xFF765000 : 0xFF5140A0;
         GradientDrawable chip = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT, new int[]{start, end});
         chip.setCornerRadius(100f * getResources().getDisplayMetrics().density);
         chip.setStroke((int) (1 * getResources().getDisplayMetrics().density),
-                owner ? 0xFFE8BD57 : 0xFF8BD6CB);
+                owner ? 0xFFE8BD57 : 0xFFB9B0FF);
         binding.tvAgencyRoleBadge.setText(label);
         binding.tvAgencyRoleBadge.setTextColor(textColor);
         binding.tvAgencyRoleBadge.setBackground(chip);
