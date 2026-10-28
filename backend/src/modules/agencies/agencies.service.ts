@@ -179,6 +179,37 @@ export class AgenciesService implements OnModuleInit {
       this.logger.warn(`ensure gift brandAgencyId: ${(err as Error).message}`);
     }
     try {
+      // Preserve each membership period separately so rejoining starts fresh
+      // for agency statistics without deleting financial history.
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS agency_membership_periods (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
+          "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          "joinedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "leftAt" TIMESTAMPTZ,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS "IDX_agency_membership_periods_lookup"
+        ON agency_membership_periods ("agencyId", "userId", "joinedAt")
+      `);
+      await this.dataSource.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_agency_membership_periods_active"
+        ON agency_membership_periods ("agencyId", "userId") WHERE "leftAt" IS NULL
+      `);
+      await this.dataSource.query(`
+        INSERT INTO agency_membership_periods ("agencyId", "userId", "joinedAt")
+        SELECT m."agencyId", m."userId", COALESCE(m."joinedAt", NOW())
+        FROM agency_members m
+        WHERE m."status" = 'active' AND m."isActive" = true
+        ON CONFLICT ("agencyId", "userId") WHERE "leftAt" IS NULL DO NOTHING
+      `);
+    } catch (err) {
+      this.logger.warn(`ensure agency membership periods: ${(err as Error).message}`);
+    }
+    try {
       // Family-card follows (Mikoo guild attention) — independent of membership.
       await this.dataSource.query(`
         CREATE TABLE IF NOT EXISTS agency_follows (
@@ -1601,7 +1632,24 @@ export class AgenciesService implements OnModuleInit {
     return { unsuspended: true };
   }
 
-    async joinSelf(agencyId: string, userId: string) {
+  private async startMembershipPeriod(agencyId: string, userId: string, joinedAt?: Date) {
+    await this.dataSource.query(
+      `INSERT INTO agency_membership_periods ("agencyId", "userId", "joinedAt")
+       VALUES ($1, $2, COALESCE($3::timestamptz, NOW()))
+       ON CONFLICT ("agencyId", "userId") WHERE "leftAt" IS NULL DO NOTHING`,
+      [agencyId, userId, joinedAt || null],
+    );
+  }
+
+  private async endMembershipPeriod(agencyId: string, userId: string) {
+    await this.dataSource.query(
+      `UPDATE agency_membership_periods SET "leftAt" = NOW()
+       WHERE "agencyId" = $1 AND "userId" = $2 AND "leftAt" IS NULL`,
+      [agencyId, userId],
+    );
+  }
+
+  async joinSelf(agencyId: string, userId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
     if (agency.status !== AgencyStatus.ACTIVE) {
@@ -1767,6 +1815,7 @@ export class AgenciesService implements OnModuleInit {
     member.isActive = true;
     await this.membersRepo.save(member);
     if (wasPending) {
+      await this.startMembershipPeriod(agencyId, memberUserId, member.joinedAt);
       await this.agenciesRepo.increment({ id: agencyId }, 'memberCount', 1);
     }
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
@@ -1855,6 +1904,7 @@ export class AgenciesService implements OnModuleInit {
         isActive: true,
       }),
     );
+    await this.startMembershipPeriod(agencyId, targetUserId, member.joinedAt);
     await this.agenciesRepo.increment({ id: agencyId }, 'memberCount', 1);
     return member;
   }
@@ -1935,6 +1985,7 @@ export class AgenciesService implements OnModuleInit {
     }
     const wasActive =
       member.status === AgencyMemberStatus.ACTIVE && member.isActive;
+    if (wasActive) await this.endMembershipPeriod(agencyId, userId);
     await this.membersRepo.delete(member.id);
     if (!wasActive) {
       // Cancel pending join request — no room/moderator cleanup needed.
@@ -1960,6 +2011,7 @@ export class AgenciesService implements OnModuleInit {
     }
     const wasActive =
       member.status === AgencyMemberStatus.ACTIVE && member.isActive;
+    if (wasActive) await this.endMembershipPeriod(agencyId, targetUserId);
     await this.membersRepo.delete(member.id);
     await this.removeAgencyModerator(agencyId, targetUserId);
     await this.roomsService.closeAgencyHostRoom(agencyId, targetUserId);
@@ -1977,13 +2029,32 @@ export class AgenciesService implements OnModuleInit {
       select: ['userId'],
     });
     const memberIds = members.map((m) => m.userId);
-    const received = await this.sumGiftsReceived(memberIds);
+    const activePeriods: Array<{ userId: string; joinedAt: Date }> = memberIds.length
+      ? await this.dataSource.query(
+          `SELECT "userId", "joinedAt" FROM agency_membership_periods
+           WHERE "agencyId" = $1 AND "leftAt" IS NULL AND "userId" = ANY($2::uuid[])`,
+          [agencyId, memberIds],
+        )
+      : [];
+    const memberStats = await Promise.all(activePeriods.map(async (period) => {
+      const gross = await this.sumGiftsReceived([period.userId], new Date(period.joinedAt));
+      const user = await this.usersRepo.findOne({ where: { id: period.userId } });
+      return {
+        userId: period.userId,
+        displayName: user?.displayName || user?.username || 'مضيف',
+        membershipStartedAt: period.joinedAt,
+        giftsReceivedDiamonds: gross,
+      };
+    }));
+    const received = memberStats.reduce((sum, item) => sum + item.giftsReceivedDiamonds, 0);
     return {
       agencyId,
       name: agency.name,
       memberCount: agency.memberCount,
-      totalDiamonds: Number(agency.totalDiamonds),
+      // Current membership statistics restart when a member rejoins.
+      totalDiamonds: received,
       giftsReceivedDiamonds: received,
+      members: memberStats,
       commissionPercent: Number(agency.commissionPercent),
     };
   }
