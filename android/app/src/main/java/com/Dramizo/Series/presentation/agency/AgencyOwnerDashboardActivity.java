@@ -209,10 +209,10 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 setT(tvPerf1Value, formatUsd(monthCommUsd));
                 setT(tvPerf2Value, formatUsd(weekCommUsd));
                 setT(tvPerf3Value, formatLong(monthGross));
-                setT(tvPerf4Value, String.format(Locale.US, "%s/%s/%s",
+                // Platform economics are private: show only the host/agency split.
+                setT(tvPerf4Value, String.format(Locale.US, "%s%% / %s%%",
                         (int) e.hostSharePercent,
-                        (int) e.commissionPercent,
-                        (int) e.platformCutPercent));
+                        (int) e.commissionPercent));
 
                 List<WalletDtos.WithdrawDto> filtered = new ArrayList<>();
                 if (withdraws.success && withdraws.data != null && withdraws.data.items != null) {
