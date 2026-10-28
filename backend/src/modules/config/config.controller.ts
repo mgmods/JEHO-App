@@ -155,6 +155,7 @@ export class ConfigController {
       luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
       luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
       luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+      luckyWinHighRoom: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, placementX: 50, placementY: 50 },
       luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
     };
     let parsed: any = {};
@@ -192,7 +193,7 @@ export class ConfigController {
       bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.bodySizeSp) || 12))),
       countSizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.countSizeSp) || 12))),
     };
-    const win = (key: 'luckyWinNormal' | 'luckyReturn' | 'luckyWinHigh') => {
+    const win = (key: 'luckyWinNormal' | 'luckyReturn' | 'luckyWinHigh' | 'luckyWinHighRoom') => {
       const value = parsed[key] || {};
       const fallback = defaults[key];
       return {
@@ -214,6 +215,8 @@ export class ConfigController {
         titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(value.titleSizeSp) || 13))),
         bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(value.bodySizeSp) || 12))),
         countSizeSp: Math.max(8, Math.min(30, Math.round(Number(value.countSizeSp) || 12))),
+        placementX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.placementX)) ? Number(value.placementX) : Number(fallback.placementX ?? 50)))),
+        placementY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.placementY)) ? Number(value.placementY) : Number(fallback.placementY ?? 50)))),
       };
     };
     const button = parsed.luckyButton || {};
@@ -222,7 +225,7 @@ export class ConfigController {
       durationSeconds: Math.max(1, Math.min(12, Math.round(Number(button.durationSeconds) || 5))),
       pulseEnabled: button.pulseEnabled !== false,
     };
-    return { ...defaults, ...giftSend, giftSend, luckyWinNormal: win('luckyWinNormal'), luckyReturn: win('luckyReturn'), luckyWinHigh: win('luckyWinHigh'), luckyButton,
+    return { ...defaults, ...giftSend, giftSend, luckyWinNormal: win('luckyWinNormal'), luckyReturn: win('luckyReturn'), luckyWinHigh: win('luckyWinHigh'), luckyWinHighRoom: win('luckyWinHighRoom'), luckyButton,
       version: Math.max(1, Math.round(Number(parsed.version) || 1)) };
   }
 
