@@ -12,6 +12,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -380,8 +381,43 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                 targetLine.setPadding(dp(36), dp(6), 0, 0);
                 card.addView(targetLine);
             }
+            card.setClickable(true);
+            card.setFocusable(true);
+            card.setForeground(androidx.core.content.ContextCompat.getDrawable(
+                    this, android.R.drawable.list_selector_background));
+            card.setOnClickListener(v -> showAgencyMemberDetails(member, roleLabel));
             layoutAgencyMemberStats.addView(card);
         }
+    }
+
+    private void showAgencyMemberDetails(MiscDtos.AgencyMemberPeriodStatDto member, String roleLabel) {
+        String id = member.publicId == null || member.publicId.trim().isEmpty()
+                ? member.userId : member.publicId;
+        StringBuilder details = new StringBuilder();
+        details.append("الرتبة: ").append(roleLabel)
+                .append("\nID العضو: ").append(id)
+                .append("\nهدايا فترة العضوية الحالية: ")
+                .append(formatLong(Math.max(0L, member.giftsReceivedDiamonds))).append(" ◆");
+        if (member.targetEnabled) {
+            details.append("\n\nالتارجت: ")
+                    .append(member.currentTargetName == null ? "المستوى الحالي" : member.currentTargetName)
+                    .append("\nالمنجز: ").append(formatLong(member.targetProgress))
+                    .append(" / ").append(formatLong(member.currentTargetThreshold))
+                    .append("\nالمتبقي: ").append(formatLong(member.targetRemaining))
+                    .append("\nنسبة الإنجاز: ")
+                    .append(Math.max(0, Math.min(100, member.targetProgressPercent))).append("%")
+                    .append("\nالفترة: ")
+                    .append("weekly".equalsIgnoreCase(member.targetPeriod) ? "أسبوعية" : "شهرية");
+        } else {
+            details.append("\n\nالتارجت غير مفعّل حالياً.");
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(member.displayName == null || member.displayName.trim().isEmpty()
+                        ? "تفاصيل العضو" : member.displayName)
+                .setMessage(details.toString())
+                .setNegativeButton("إغلاق", null)
+                .setPositiveButton("نسخ ID", (dialog, which) -> copyToClipboard("ID العضو", id))
+                .show();
     }
 
     private void copyToClipboard(String label, @Nullable String value) {
