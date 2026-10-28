@@ -62,17 +62,18 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const price = Number(settings[`cp.price.${type}`]);
       const giftId = settings[`cp.gift.${type}`] || null;
       const [gift] = giftId ? await this.dataSource.query(
-        'SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true',
+        'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id=$1 AND "isActive"=true',
         [giftId],
       ) : [];
+      const giftPrice = Number(gift?.coinPrice);
       const enabled = settings[`cp.enabled.${type}`] !== 'false'
-        && Number.isSafeInteger(price) && price > 0 && !!gift;
+        && !!gift && Number.isSafeInteger(giftPrice) && giftPrice > 0;
       let rules: Record<string, any> = {};
       try { rules = JSON.parse(settings[`cp.rules.${type}`] || '{}'); } catch { rules = {}; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
       catalog.push({
-        type, enabled, priceCoins: enabled ? price : null,
-        gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
+        type, enabled, priceCoins: enabled ? giftPrice : null,
+        gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl, coinPrice: giftPrice } : null,
         giftPoints: Number(settings[`cp.gift_points.${type}`] || 0) || 0,
         seatEffect: {
           enabled: effect.enabled !== false,
@@ -529,16 +530,15 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const configuredExpiry = Number(expiryRow?.value);
       const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
         ? configuredExpiry : EXPIRY_MINUTES;
-      const [priceRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', [`cp.price.${type}`]);
-      const price = Number(priceRow?.value);
-      if (!Number.isSafeInteger(price) || price <= 0) {
-        throw new BadRequestException('سعر هذا النوع غير محدد من لوحة التحكم بعد');
-      }
       const [giftSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.gift.${type}`]);
       const [gift] = giftSetting?.value
-        ? await manager.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1', [giftSetting.value])
+        ? await manager.query('SELECT id,name,"iconUrl","animationUrl","coinPrice","isActive" FROM gifts WHERE id=$1', [giftSetting.value])
         : [];
-      if (!gift) throw new BadRequestException('يجب تحديد هدية فعلية لهذا النوع من لوحة التحكم');
+      const price = Number(gift?.coinPrice);
+      if (!gift || gift.isActive !== true) throw new BadRequestException('يجب تحديد هدية فعلية ومفعّلة لهذا النوع من لوحة التحكم');
+      if (!Number.isSafeInteger(price) || price <= 0) {
+        throw new BadRequestException('حدد سعراً موجباً للهدية من لوحة الهدايا');
+      }
       const [wallet] = await manager.query('SELECT id, coins FROM wallets WHERE "userId" = $1 FOR UPDATE', [userId]);
       if (!wallet) throw new NotFoundException('المحفظة غير موجودة');
       const balance = Number(wallet.coins);
