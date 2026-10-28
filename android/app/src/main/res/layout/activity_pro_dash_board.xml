@@ -500,7 +500,8 @@
                         android:layout_marginTop="10dp"
                         android:text="لا توجد بيانات أعضاء بعد"
                         android:textColor="@color/text_hint"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        android:visibility="gone" />
 
                     <LinearLayout
                         android:id="@+id/layoutAgencyMemberStats"
