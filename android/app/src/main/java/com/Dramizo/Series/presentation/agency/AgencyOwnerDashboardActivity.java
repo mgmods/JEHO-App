@@ -60,6 +60,8 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
     private String agencyName;
     private long minWithdraw = 10000L;
     private MiscDtos.AgencyMineDto mineSnap;
+    private MiscDtos.AgencyStatsDto latestAgencyStats;
+    private int agencyStatsVisibleCount = 40;
     // onCreate performs the first load; skip the immediate first onResume to avoid
     // duplicate network requests and overlapping dashboard renders.
     private boolean firstResumeHandled;
@@ -110,6 +112,14 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         if (btnCopyAgencyCode != null) {
             btnCopyAgencyCode.setOnClickListener(v -> copyToClipboard(
                     "كود تفعيل الوكالة", tvAgencyActivationCode == null ? null : tvAgencyActivationCode.getText().toString()));
+        }
+        MaterialButton btnAgencyStatsMore = findViewById(R.id.btnAgencyStatsMore);
+        if (btnAgencyStatsMore != null) {
+            btnAgencyStatsMore.setOnClickListener(v -> {
+                if (latestAgencyStats == null || latestAgencyStats.members == null) return;
+                agencyStatsVisibleCount = Math.min(latestAgencyStats.members.size(), agencyStatsVisibleCount + 40);
+                renderAgencyStats(latestAgencyStats);
+            });
         }
 
         RecyclerView recycler = findViewById(R.id.recyclerWithdraws);
@@ -279,9 +289,12 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
     }
 
     private void renderAgencyStats(@Nullable MiscDtos.AgencyStatsDto stats) {
+        latestAgencyStats = stats;
         if (layoutAgencyMemberStats == null) return;
         layoutAgencyMemberStats.removeAllViews();
+        MaterialButton btnMore = findViewById(R.id.btnAgencyStatsMore);
         if (stats == null) {
+            if (btnMore != null) btnMore.setVisibility(View.GONE);
             if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.VISIBLE);
             if (tvAgencyStatsTotal != null) tvAgencyStatsTotal.setText("إجمالي الهدايا: —");
             return;
@@ -296,10 +309,11 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         }
         if (stats.members == null || stats.members.isEmpty()) {
             if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.VISIBLE);
+            if (btnMore != null) btnMore.setVisibility(View.GONE);
             return;
         }
         if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.GONE);
-        int count = Math.min(stats.members.size(), 40);
+        int count = Math.min(stats.members.size(), Math.max(40, agencyStatsVisibleCount));
         for (int i = 0; i < count; i++) {
             MiscDtos.AgencyMemberPeriodStatDto member = stats.members.get(i);
             if (member == null) continue;
@@ -394,6 +408,13 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                     this, android.R.drawable.list_selector_background));
             card.setOnClickListener(v -> showAgencyMemberDetails(member, roleLabel));
             layoutAgencyMemberStats.addView(card);
+        }
+        if (btnMore != null) {
+            boolean hasMore = count < stats.members.size();
+            btnMore.setVisibility(hasMore ? View.VISIBLE : View.GONE);
+            if (hasMore) {
+                btnMore.setText("عرض بقية الأعضاء (" + (stats.members.size() - count) + ")");
+            }
         }
     }
 
