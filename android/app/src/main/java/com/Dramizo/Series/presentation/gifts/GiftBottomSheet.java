@@ -1133,7 +1133,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             Map<String, String> mappings = new LinkedHashMap<>();
             if (result.success && result.data != null) {
                 for (Map<String, Object> row : result.data) {
-                    if (row == null || Boolean.FALSE.equals(row.get("enabled"))) continue;
+                    if (row == null) continue;
                     Object type = row.get("type");
                     Object giftObj = row.get("gift");
                     if (!(type instanceof String) || !(giftObj instanceof Map)) continue;
