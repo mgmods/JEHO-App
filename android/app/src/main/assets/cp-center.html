@@ -53,7 +53,7 @@ header button{background:none;border:0;font-size:28px}
 .rule-num{min-width:32px;height:32px;display:grid;place-items:center;background:linear-gradient(120deg,#ff70ad,#c51b75);border-radius:50%;font-weight:bold}
 .rule p{margin:0;line-height:1.8}
 .empty{text-align:center;padding:25px 10px;color:var(--muted)}
-.bottom{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);width:min(580px,calc(100% - 24px));display:grid;grid-template-columns:repeat(3,1fr);padding:10px;border:1px solid #ffb9dc66;border-radius:35px;background:#510a3fee;box-shadow:0 8px 25px #16001388}
+.task-card{border:1px solid #ffffff30;border-radius:20px;padding:14px;background:#ffffff10;margin:10px 0}.task-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.task-title{font-weight:bold;color:var(--gold)}.task-meta{font-size:12px;color:var(--muted);line-height:1.8;margin:8px 0}.task-progress{height:8px;border-radius:10px;background:#ffffff22;overflow:hidden;margin:8px 0}.task-progress span{display:block;height:100%;background:linear-gradient(90deg,#ff70ad,#ffda72);border-radius:10px}.task-action{border:1px solid #ffe6a0;border-radius:25px;background:linear-gradient(100deg,#ffe98a,#f6b83b);color:#5a173d;padding:9px 15px;font-weight:bold}.task-action:disabled{opacity:.55;cursor:default}.bottom{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);width:min(580px,calc(100% - 24px));display:grid;grid-template-columns:repeat(3,1fr);padding:10px;border:1px solid #ffb9dc66;border-radius:35px;background:#510a3fee;box-shadow:0 8px 25px #16001388}
 .bottom button{display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:transparent;font-weight:bold;font-size:13px}
 .navicon{font-size:29px}
 .modal-bg{position:fixed;inset:0;background:#140012cc;z-index:10;display:grid;place-items:center;padding:20px}
@@ -88,9 +88,9 @@ header button{background:none;border:0;font-size:28px}
 <div class="panel"><h2 class="title">❤️ علاقاتي</h2><div id="mineView"><div class="relation-mark"><span class="core">❤️</span><span class="ring">💍</span></div><p class="empty">جارٍ تحميل علاقاتك…</p><button class="action" id="inviteButton">إرسال دعوة CP</button></div></div>
 <div class="panel"><h2 class="title">📩 الدعوات</h2><div id="invites"><p class="empty">جارٍ تحميل الدعوات…</p></div></div>
 </section>
-<section id="rules" class="hidden"><div class="panel"><h2 class="title">💖 قواعد CP</h2><div id="rulesList"></div></div></section>
+<section id="tasks" class="hidden"><div class="panel"><h2 class="title">🎁 مهمات CB/CP ومكافآتها</h2><p class="note">أكمل المهمات لاستلام نقاط العلاقة، وإذا عيّنت الإدارة هدية CP للمهمة فستُضاف إلى حقيبتك عند المطالبة.</p><div id="tasksView"><p class="empty">جارٍ تحميل المهمات…</p></div></div></section>\n<section id="rules" class="hidden"><div class="panel"><h2 class="title">💖 قواعد CP</h2><div id="rulesList"></div></div></section>
 </main>
-<nav class="bottom"><button data-page="weekly"><span class="navicon">🏆</span>الثنائيات</button><button data-page="relationship"><span class="navicon">❤️</span>علاقاتي</button><button data-page="rules"><span class="navicon">💖</span>القواعد</button></nav>
+<nav class="bottom" style="grid-template-columns:repeat(4,1fr)"><button data-page="weekly"><span class="navicon">🏆</span>الثنائيات</button><button data-page="relationship"><span class="navicon">❤️</span>علاقاتي</button><button data-page="tasks"><span class="navicon">🎁</span>المهمات</button><button data-page="rules"><span class="navicon">💖</span>القواعد</button></nav>
 </div>
 <div id="modalRoot"></div><div id="toast" class="toast hidden"></div>
 <script>
@@ -112,7 +112,7 @@ const rel=data.relationship;if(rel.active&&rel.partner){$("mineView").innerHTML=
 $("invites").innerHTML=rel.invites.length?rel.invites.map(v=>'<div class="panel"><strong>'+esc(v.name||v.sender?.name||"طلب ارتباط CP")+'</strong><p>'+esc(v.statusText||v.status||"بانتظار الرد")+'</p>'+(v.id&&v.pending?'<div class="pills"><button class="action" data-response="'+esc(v.id)+'" data-accept="true">قبول</button><button class="action" data-response="'+esc(v.id)+'" data-accept="false">رفض</button></div>':"")+'</div>').join(""):'<p class="empty">لا توجد دعوات حالياً</p>';
 $("inviteButton").onclick=()=>toast("افتح الروم الصوتي ثم الهدايا واختر «هدية ارتباط CP». العلاقة لا تبدأ إلا بعد موافقة المستلم.");
 }
-function page(name){["weekly","relationship","rules"].forEach(id=>$(id).classList.toggle("hidden",id!==name));$("pageTitle").textContent=name==="weekly"?"ثنائيات الأسبوع":name==="relationship"?"علاقاتي":"قواعد CP";if(name==="relationship"&&window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();}}
+function page(name){["weekly","relationship","tasks","rules"].forEach(id=>$(id).classList.toggle("hidden",id!==name));$("pageTitle").textContent=name==="weekly"?"ثنائيات الأسبوع":name==="relationship"?"علاقاتي":name==="tasks"?"مهمات CP":"قواعد CP";if(name==="relationship"&&window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();}if(name==="tasks"&&window.JehoCP){JehoCP.loadTasks();}}
 function toast(msg){$("toast").textContent=msg;$("toast").classList.remove("hidden");clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$("toast").classList.add("hidden"),2500);}
 function modal(name,id){$("modalRoot").innerHTML='<div class="modal-bg" id="modalBg"><div class="modal"><button class="close" id="closeModal">×</button><h2>'+esc(name)+'</h2><div style="font-size:45px">👤</div><p>ملف المستخدم</p><p class="note">بيانات الملف الشخصي تُفتح من خلال تطبيق JEHO.</p><button class="action" id="openProfile">عرض الملف الشخصي</button></div></div>';$("closeModal").onclick=()=>$("modalRoot").innerHTML="";$("modalBg").onclick=e=>{if(e.target.id==="modalBg")$("modalRoot").innerHTML="";};$("openProfile").onclick=()=>{if(window.JehoCP&&id)JehoCP.openProfile(id);$("modalRoot").innerHTML="";};}
 document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>page(b.dataset.page));
@@ -126,9 +126,20 @@ window.renderCpLeaderboard=function(rows,period){const mapped=(Array.isArray(row
 window.renderCpRewards=function(groups){data.rewards=(Array.isArray(groups)?groups:[]).flatMap(g=>(Array.isArray(g.levels)?g.levels:[]).map(l=>({title:(g.type||"CP")+" · المستوى "+(l.level||1),description:"النقاط المطلوبة: "+(l.pointsRequired||0)+(l.reward?" · المكافأة: "+l.reward:"")})));render();};
 window.renderCpDiscover=function(rows){window.renderCpLeaderboard(rows, "world");};
 window.renderCpCatalog=function(){};
-window.renderCpTasks=function(){};
+window.renderCpTasks=function(rows){
+const list=Array.isArray(rows)?rows:[];
+$("tasksView").innerHTML=list.length?list.map(t=>{
+const id=(t.id==="memory_today"||t.id==="earn_points_today")?t.id:"";
+if(!id)return "";
+const progress=Math.max(0,Number(t.progress)||0),target=Math.max(1,Number(t.target)||1),pct=Math.max(0,Math.min(100,Math.round(progress*100/target)));
+const reward=t.rewardCosmeticCode?'<div class="task-meta">🎁 هدية CP: '+esc(t.rewardCosmeticCode)+'</div>':'';
+const button=t.claimed?'<button class="task-action" disabled>تم الاستلام ✓</button>':t.canClaim?'<button class="task-action" data-claim-task="'+id+'">استلام المكافأة</button>':'<button class="task-action" disabled>أكمل المهمة أولاً</button>';
+return '<div class="task-card"><div class="task-head"><div class="task-title">'+esc(t.title||"مهمة CP")+'</div><div class="pill">+'+score(t.rewardPoints||0)+' نقطة</div></div><div class="task-meta">'+esc(t.description||"مهمة مشتركة")+' · '+score(progress)+' / '+score(target)+'</div><div class="task-progress"><span style="width:'+pct+'%"></span></div>'+reward+'<div style="display:flex;justify-content:flex-end;margin-top:10px">'+button+'</div></div>';
+}).join(""):'<p class="empty">لا توجد مهمات متاحة حالياً، أو لا توجد علاقة CP نشطة.</p>';
+document.querySelectorAll("[data-claim-task]").forEach(button=>button.onclick=()=>{button.disabled=true;if(window.JehoCP)JehoCP.claimTask(button.dataset.claimTask);});
+};
 window.showCpMessage=toast;window.showCpError=m=>toast(m||"حدث خطأ");
-window.setCpView=function(view){if(view==="home"||view==="weekly")page("weekly");else if(view==="incoming"||view==="sent"||view==="send")page("relationship");else if(view==="discover"){page("weekly");document.querySelector('[data-tab="world"]').click();}else if(view==="rules")page("rules");else page("relationship");};
+window.setCpView=function(view){if(view==="home"||view==="weekly")page("weekly");else if(view==="incoming"||view==="sent"||view==="send")page("relationship");else if(view==="discover"){page("weekly");document.querySelector('[data-tab="world"]').click();}else if(view==="rules")page("rules");else if(view==="tasks")page("tasks");else page("relationship");};
 window.getCpView=()=> $("weekly").classList.contains("hidden")?(!$("relationship").classList.contains("hidden")?"relationship":"rules"):"home";
 window.CPPage={reload:function(){if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();JehoCP.loadLeaderboard("weekly");JehoCP.loadLeaderboard("world");JehoCP.loadRewards();}},go:page};
 render();
