@@ -656,6 +656,16 @@
                         android:text="عرض بقية الأعضاء"
                         android:textAllCaps="false"
                         android:visibility="gone" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAgencyModerationAudit"
+                        style="@style/Widget.AuraLive.Button.Outlined"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="8dp"
+                        android:text="سجل إجراءات المشرفين"
+                        android:textAllCaps="false"
+                        android:visibility="gone" />
                 </LinearLayout>
 
                 <!-- Withdraw requests -->
