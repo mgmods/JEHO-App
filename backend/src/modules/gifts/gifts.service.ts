@@ -799,18 +799,13 @@ export class GiftsService implements OnModuleInit {
         }
         let dirty = false;
         const isCpInitiationGift = seed.name === 'قلب CP';
-        // The dashboard owns the CP gift artwork and chosen category after creation.
-        // Migrate the legacy dedicated "cp" tab to the regular premium tab only.
+        // The dashboard owns CP gift artwork and category after creation.
+        // Keep the dedicated CP category intact; never silently move relationship gifts to Premium.
         if (!isCpInitiationGift && existing.iconUrl !== seed.iconUrl) {
           existing.iconUrl = seed.iconUrl;
           dirty = true;
         }
-        if (isCpInitiationGift) {
-          if (String((existing as any).category || '').toLowerCase() === 'cp') {
-            (existing as any).category = 'premium';
-            dirty = true;
-          }
-        } else if ((existing as any).category !== seed.category) {
+        if (!isCpInitiationGift && (existing as any).category !== seed.category) {
           (existing as any).category = seed.category;
           dirty = true;
         }
