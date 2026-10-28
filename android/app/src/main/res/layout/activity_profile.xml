@@ -297,6 +297,21 @@
                     tools:text="سوبر أدمن"
                     tools:visibility="visible" />
 
+                <TextView
+                    android:id="@+id/tvAgencyRoleBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginTop="6dp"
+                    android:includeFontPadding="false"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="5dp"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="♛ صاحب وكالة"
+                    tools:visibility="visible" />
+
                 <!-- ID / flag / level -->
                 <LinearLayout
                     android:id="@+id/rowUserId"
