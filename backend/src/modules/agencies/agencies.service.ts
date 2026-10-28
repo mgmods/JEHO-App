@@ -1408,18 +1408,23 @@ export class AgenciesService implements OnModuleInit {
    * Join using the agency's private activation code (chat invite + manual code field).
    * Code only proves the invite — owner/manager must still approve (PENDING).
    */
-  async joinByCode(userId: string, rawCode: string) {
+  async joinByCode(userId: string, rawCode: string, rawPublicId: string) {
     const code = normalizeActivationCode(rawCode);
     if (code.length < 4) {
       throw new BadRequestException('كود التفعيل غير صالح');
     }
+    const publicId = normalizeAgencyPublicId(String(rawPublicId || ''));
+    if (!isValidAgencyPublicId(publicId)) {
+      throw new BadRequestException('أدخل معرف الوكالة الصحيح أولاً');
+    }
     const agency = await this.agenciesRepo.findOne({
-      where: { activationCode: code },
+      where: { activationCode: code, publicId, status: AgencyStatus.ACTIVE },
     });
     if (!agency) {
-      throw new NotFoundException('كود التفعيل غير صحيح');
+      // Avoid disclosing whether a guessed activation code alone is valid.
+      throw new NotFoundException('معرف الوكالة أو كود التفعيل غير صحيح');
     }
-    // Same approval queue as listMembers join-requests (not instant free entry).
+    // Both the public agency ID and private code must match. Approval is still required.
     return this.joinSelf(agency.id, userId);
   }
 
