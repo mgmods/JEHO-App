@@ -687,7 +687,7 @@ public class ChatConversationActivity extends ThemedActivity {
                 String extension = "video/quicktime".equalsIgnoreCase(mimeType) ? ".mov"
                         : "video/webm".equalsIgnoreCase(mimeType) ? ".webm"
                         : "video/3gpp".equalsIgnoreCase(mimeType) ? ".3gp" : ".mp4";
-                progress.setMessage("جارٍ رفع الفيديو…");
+                runOnUiThread(() -> { if (!cancelled.get() && progress.isShowing()) progress.setMessage("جارٍ رفع الفيديو…"); });
                 RequestBody body = new RequestBody() {
                     @Override public MediaType contentType() { return MediaType.parse(mimeType); }
                     @Override public long contentLength() { return size; }
