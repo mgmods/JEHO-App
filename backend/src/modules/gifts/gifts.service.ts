@@ -2227,9 +2227,8 @@ export class GiftsService implements OnModuleInit {
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
 
-    // Platform margin is already applied to the mint ratio; no second
-    // diamond deduction is applied to the receiver/agency pool.
-    const platformCut = 0;
+    // No platform commission fields are returned to gift clients.
+    // The host payout and any agency bonus are independent credits.
 
     return this.dataSource.transaction(async (manager) => {
       const wallet = await manager.findOne(Wallet, {
