@@ -310,6 +310,7 @@ public class MedalActivity extends ThemedActivity {
         final class VH extends RecyclerView.ViewHolder {
             final ImageView icon;
             final TextView title;
+            final TextView action;
             VH(View itemView) {
                 super(itemView);
                 icon = itemView.findViewById(R.id.imgMedal);
