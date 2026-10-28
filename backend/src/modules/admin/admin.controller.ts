@@ -185,6 +185,30 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Get('lucky-gift-odds/config')
+  @ApiOperation({ summary: 'Get dashboard-managed lucky gift odds, audit, and recent results' })
+  getLuckyGiftOddsDashboard() {
+    return this.giftsService.getLuckyGiftOddsDashboard();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('lucky-gift-odds/config')
+  @ApiOperation({ summary: 'Apply lucky gift odds immediately for new sends' })
+  updateLuckyGiftOddsConfig(@Body() body: Record<string, unknown>, @CurrentUser('sub') actorId: string) {
+    return this.giftsService.updateLuckyGiftOddsConfig(body || {}, actorId);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('lucky-gift-odds/simulate')
+  @ApiOperation({ summary: 'Simulate lucky gift win/loss outcomes before applying odds' })
+  simulateLuckyGiftOdds(@Body() body: Record<string, unknown>) {
+    return this.giftsService.simulateLuckyGiftOdds(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Get('lucky-gift-cannon/config')
   @ApiOperation({ summary: 'Get Lucky Gift Cannon configuration' })
   getLuckyCannonConfig() {
