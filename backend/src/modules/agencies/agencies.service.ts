@@ -1815,7 +1815,7 @@ export class AgenciesService implements OnModuleInit {
     member.isActive = true;
     await this.membersRepo.save(member);
     if (wasPending) {
-      await this.startMembershipPeriod(agencyId, memberUserId, member.joinedAt);
+      await this.startMembershipPeriod(agencyId, memberUserId);
       await this.agenciesRepo.increment({ id: agencyId }, 'memberCount', 1);
     }
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
