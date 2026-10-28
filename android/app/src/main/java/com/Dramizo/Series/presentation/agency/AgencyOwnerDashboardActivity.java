@@ -258,27 +258,36 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             return;
         }
         if (tvAgencyStatsTotal != null) {
-            tvAgencyStatsTotal.setText("إجمالي الهدايا خلال فترات العضوية الحالية: "
-                    + formatLong(Math.max(0L, stats.giftsReceivedDiamonds)) + " ◆");
+            String targetLabel = stats.targetEnabled
+                    ? (" • التارجت " + ("weekly".equalsIgnoreCase(stats.targetPeriod) ? "الأسبوعي" : "الشهري"))
+                    : " • التارجت غير مفعّل";
+            tvAgencyStatsTotal.setText("إجمالي الهدايا خلال العضوية الحالية: "
+                    + formatLong(Math.max(0L, stats.giftsReceivedDiamonds)) + " ◆"
+                    + " • الأعضاء: " + stats.memberCount + targetLabel);
         }
         if (stats.members == null || stats.members.isEmpty()) {
             if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.VISIBLE);
             return;
         }
         if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.GONE);
-        int count = Math.min(stats.members.size(), 8);
+        int count = Math.min(stats.members.size(), 40);
         for (int i = 0; i < count; i++) {
             MiscDtos.AgencyMemberPeriodStatDto member = stats.members.get(i);
             if (member == null) continue;
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(10), dp(10), dp(10), dp(10));
-            row.setBackgroundResource(R.drawable.bg_dash_perf_cell);
-            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(12), dp(10), dp(12), dp(10));
+            card.setBackgroundResource(R.drawable.bg_dash_perf_cell);
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            rowParams.topMargin = dp(6);
-            row.setLayoutParams(rowParams);
+            cardParams.topMargin = dp(7);
+            card.setLayoutParams(cardParams);
+
+            LinearLayout header = new LinearLayout(this);
+            header.setOrientation(LinearLayout.HORIZONTAL);
+            header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            card.addView(header, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
             TextView rank = new TextView(this);
             rank.setText(String.valueOf(i + 1));
@@ -286,7 +295,14 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             rank.setTextSize(12);
             rank.setGravity(android.view.Gravity.CENTER);
             LinearLayout.LayoutParams rankParams = new LinearLayout.LayoutParams(dp(28), dp(28));
-            row.addView(rank, rankParams);
+            header.addView(rank, rankParams);
+
+            LinearLayout identity = new LinearLayout(this);
+            identity.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams identityParams = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            identityParams.setMargins(dp(8), 0, dp(8), 0);
+            header.addView(identity, identityParams);
 
             TextView name = new TextView(this);
             name.setText(member.displayName == null || member.displayName.trim().isEmpty()
@@ -296,19 +312,53 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
             name.setTypeface(null, android.graphics.Typeface.BOLD);
             name.setMaxLines(1);
             name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            nameParams.setMargins(dp(8), 0, dp(8), 0);
-            row.addView(name, nameParams);
+            identity.addView(name);
+
+            String role = member.role == null ? "host" : member.role.toLowerCase(Locale.ROOT);
+            String roleLabel = "owner".equals(role) ? "مالك الوكالة"
+                    : ("manager".equals(role) ? "مشرف" : ("host".equals(role) ? "مضيف" : "عضو"));
+            TextView identityMeta = new TextView(this);
+            identityMeta.setText(roleLabel + (member.publicId == null || member.publicId.isEmpty()
+                    ? "" : " • ID " + member.publicId));
+            identityMeta.setTextColor(getColor(R.color.text_secondary));
+            identityMeta.setTextSize(11);
+            identity.addView(identityMeta);
 
             TextView diamonds = new TextView(this);
             diamonds.setText(formatLong(Math.max(0L, member.giftsReceivedDiamonds)) + " ◆");
             diamonds.setTextColor(getColor(R.color.hiyoo_dark_green));
             diamonds.setTextSize(12);
             diamonds.setTypeface(null, android.graphics.Typeface.BOLD);
-            row.addView(diamonds, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            layoutAgencyMemberStats.addView(row);
+            header.addView(diamonds);
+
+            if (member.targetEnabled) {
+                String targetName = member.currentTargetName == null || member.currentTargetName.trim().isEmpty()
+                        ? "التارجت الحالي" : member.currentTargetName;
+                TextView targetLine = new TextView(this);
+                targetLine.setText(targetName + " • المنجز " + formatLong(member.targetProgress)
+                        + " / " + formatLong(member.currentTargetThreshold)
+                        + " • المتبقي " + formatLong(member.targetRemaining));
+                targetLine.setTextColor(getColor(R.color.text_secondary));
+                targetLine.setTextSize(11);
+                targetLine.setPadding(dp(36), dp(8), 0, dp(4));
+                card.addView(targetLine);
+
+                ProgressBar progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+                progressBar.setMax(100);
+                progressBar.setProgress(Math.max(0, Math.min(100, member.targetProgressPercent)));
+                LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, dp(5));
+                progressParams.setMargins(dp(36), 0, 0, 0);
+                card.addView(progressBar, progressParams);
+            } else {
+                TextView targetLine = new TextView(this);
+                targetLine.setText("التارجت غير مفعّل حالياً");
+                targetLine.setTextColor(getColor(R.color.text_secondary));
+                targetLine.setTextSize(11);
+                targetLine.setPadding(dp(36), dp(6), 0, 0);
+                card.addView(targetLine);
+            }
+            layoutAgencyMemberStats.addView(card);
         }
     }
 
