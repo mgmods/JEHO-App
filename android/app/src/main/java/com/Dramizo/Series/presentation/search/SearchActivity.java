@@ -45,10 +45,12 @@ import java.util.List;
 public class SearchActivity extends ThemedActivity {
     private static final int KIND_USER = 1;
     private static final int KIND_ROOM = 2;
+    private static final int KIND_AGENCY = 3;
 
     private static final int FILTER_ALL = 0;
     private static final int FILTER_ROOMS = 1;
     private static final int FILTER_PEOPLE = 2;
+    private static final int FILTER_AGENCIES = 3;
 
     private ActivitySearchBinding binding;
     private final List<Row> allItems = new ArrayList<>();
@@ -118,6 +120,7 @@ public class SearchActivity extends ThemedActivity {
         binding.tabAll.setOnClickListener(v -> setFilter(FILTER_ALL));
         binding.tabRooms.setOnClickListener(v -> setFilter(FILTER_ROOMS));
         binding.tabPeople.setOnClickListener(v -> setFilter(FILTER_PEOPLE));
+        binding.tabAgencies.setOnClickListener(v -> setFilter(FILTER_AGENCIES));
         setFilter(FILTER_ALL);
     }
 
@@ -126,6 +129,7 @@ public class SearchActivity extends ThemedActivity {
         styleTab(binding.tabAll, mode == FILTER_ALL);
         styleTab(binding.tabRooms, mode == FILTER_ROOMS);
         styleTab(binding.tabPeople, mode == FILTER_PEOPLE);
+        styleTab(binding.tabAgencies, mode == FILTER_AGENCIES);
         applyFilter();
     }
 
@@ -141,6 +145,7 @@ public class SearchActivity extends ThemedActivity {
         for (Row row : allItems) {
             if (filterMode == FILTER_ROOMS && row.kind != KIND_ROOM) continue;
             if (filterMode == FILTER_PEOPLE && row.kind != KIND_USER) continue;
+            if (filterMode == FILTER_AGENCIES && row.kind != KIND_AGENCY) continue;
             visibleItems.add(row);
         }
         adapter.notifyDataSetChanged();
@@ -169,6 +174,9 @@ public class SearchActivity extends ThemedActivity {
             Result<MiscDtos.ListResult<AuthDtos.UserDto>> users = ApiCall.execute(c.getUserApi().search(q, 1));
             Result<MiscDtos.ListResult<RoomDtos.RoomDto>> rooms =
                     ApiCall.execute(c.getRoomApi().list(1, q));
+            // Agency directory supports lookup by public agency ID as well as name.
+            Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> agencies =
+                    ApiCall.execute(c.getAgencyApi().list(1, q));
 
             List<Row> next = new ArrayList<>();
             LinkedHashSet<String> seenRooms = new LinkedHashSet<>();
@@ -196,6 +204,21 @@ public class SearchActivity extends ThemedActivity {
                     next.add(row);
                 }
             }
+            if (agencies.success && agencies.data != null && agencies.data.items != null) {
+                LinkedHashSet<String> seenAgencies = new LinkedHashSet<>();
+                for (MiscDtos.AgencyDto a : agencies.data.items) {
+                    if (a == null || a.id == null || !seenAgencies.add(a.id)) continue;
+                    Row row = new Row();
+                    row.kind = KIND_AGENCY;
+                    row.agency = a;
+                    row.title = a.name != null && !a.name.trim().isEmpty() ? a.name.trim() : "وكالة";
+                    String publicId = a.publicId != null ? a.publicId.trim() : "";
+                    row.subtitle = "وكالة · ID: " + (publicId.isEmpty() ? "—" : publicId)
+                            + (a.isLive ? " · بث مباشر" : "");
+                    row.imageUrl = a.logoUrl != null && !a.logoUrl.trim().isEmpty() ? a.logoUrl : a.coverUrl;
+                    next.add(row);
+                }
+            }
             if (users.success && users.data != null && users.data.items != null) {
                 for (AuthDtos.UserDto u : users.data.items) {
                     if (u == null) continue;
@@ -211,7 +234,7 @@ public class SearchActivity extends ThemedActivity {
                 }
             }
 
-            String err = users.error != null ? users.error : rooms.error;
+            String err = users.error != null ? users.error : (rooms.error != null ? rooms.error : agencies.error);
             runOnUiThread(() -> {
                 allItems.clear();
                 allItems.addAll(next);
@@ -235,6 +258,10 @@ public class SearchActivity extends ThemedActivity {
             startActivity(profile);
         } else if (row.kind == KIND_ROOM && row.room != null) {
             openRoom(row.room);
+        } else if (row.kind == KIND_AGENCY && row.agency != null) {
+            MiscDtos.AgencyDto a = row.agency;
+            com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet.show(
+                    this, a.id, a.logoUrl, a.coverUrl);
         }
     }
 
@@ -276,6 +303,7 @@ public class SearchActivity extends ThemedActivity {
         String imageUrl;
         AuthDtos.UserDto user;
         RoomDtos.RoomDto room;
+        MiscDtos.AgencyDto agency;
     }
 
     private class Adapter extends RecyclerView.Adapter<Adapter.VH> {
