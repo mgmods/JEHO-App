@@ -122,16 +122,29 @@
 
             <TextView
                 android:id="@+id/tabPeople"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="36dp"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
                 android:background="@drawable/bg_search_tab"
                 android:gravity="center"
-                android:minWidth="72dp"
-                android:paddingHorizontal="16dp"
+                android:paddingHorizontal="4dp"
                 android:text="@string/search_tab_people"
                 android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tabAgencies"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_search_tab"
+                android:gravity="center"
+                android:paddingHorizontal="4dp"
+                android:text="الوكالات"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <FrameLayout
