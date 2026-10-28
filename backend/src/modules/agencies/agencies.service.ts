@@ -2189,6 +2189,41 @@ export class AgenciesService implements OnModuleInit {
     };
   }
 
+  async moderationAudit(agencyId: string, viewerId: string, limit = 100) {
+    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
+    if (!agency) throw new NotFoundException('Agency not found');
+    if (agency.ownerId !== viewerId) {
+      const viewer = await this.membersRepo.findOne({
+        where: {
+          agencyId,
+          userId: viewerId,
+          status: AgencyMemberStatus.ACTIVE,
+          isActive: true,
+        },
+      });
+      if (!viewer || (viewer.role !== AgencyRole.OWNER && viewer.role !== AgencyRole.MANAGER)) {
+        throw new ForbiddenException('Owner/manager only');
+      }
+    }
+    const safeLimit = Math.max(1, Math.min(200, Math.floor(Number(limit) || 100)));
+    const rows = await this.dataSource.query(
+      `SELECT a.id, a.action, a.reason, a.metadata, a."createdAt",
+              a."roomId", COALESCE(r.title, 'غرفة') AS "roomTitle",
+              a."actorId", COALESCE(actor."displayName", actor.username, 'مشرف سابق') AS "actorName",
+              a."targetUserId", COALESCE(target."displayName", target.username, 'مستخدم سابق') AS "targetName",
+              actor."publicId" AS "actorPublicId", target."publicId" AS "targetPublicId"
+       FROM agency_moderation_audit a
+       LEFT JOIN rooms r ON r.id = a."roomId"
+       LEFT JOIN users actor ON actor.id = a."actorId"
+       LEFT JOIN users target ON target.id = a."targetUserId"
+       WHERE a."agencyId" = $1
+       ORDER BY a."createdAt" DESC
+       LIMIT $2`,
+      [agencyId, safeLimit],
+    );
+    return { agencyId, items: rows };
+  }
+
   private periodStarts() {
     const now = new Date();
     const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
