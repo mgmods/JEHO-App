@@ -562,6 +562,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('بيانات طلب CP غير مكتملة');
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء CP مع حسابك');
+    const [globalEnabled] = await this.dataSource.query('SELECT value FROM app_settings WHERE key = $1', ['cp.enabled.global']);
+    if (String(globalEnabled?.value || 'true').toLowerCase() === 'false') {
+      throw new BadRequestException('قسم CP متوقف حالياً من لوحة التحكم');
+    }
     const [typeEnabled] = await this.dataSource.query('SELECT value FROM app_settings WHERE key = $1', [`cp.enabled.${type}`]);
     if (String(typeEnabled?.value || 'true').toLowerCase() === 'false') {
       throw new BadRequestException('هذا النوع من علاقات CP متوقف حالياً من لوحة التحكم');
