@@ -697,6 +697,24 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         body: `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}.`,
         actions: ['accept', 'reject'],
       });
+      this.realtime.emitToRoom(roomId, 'room:event', {
+        roomId,
+        event: 'cp:request',
+        payload: {
+          requestId: outcome.request.id,
+          targetUserId: recipientId,
+          senderId: userId,
+          senderName,
+          relationshipType: type,
+          giftId: outcome.request.giftId,
+          giftName: outcome.request.giftName,
+          giftIconUrl: outcome.request.giftIconUrl,
+          title: 'هدية ارتباط',
+          body: `أرسل لك ${senderName} ${outcome.request.giftName || 'هدية ارتباط'}؛ وافق أو ارفض لإكمال الطلب.`,
+          actions: ['accept', 'reject'],
+        },
+        at: new Date().toISOString(),
+      });
     }
     return outcome.request;
   }
