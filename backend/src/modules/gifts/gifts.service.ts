@@ -1620,22 +1620,42 @@ export class GiftsService implements OnModuleInit {
     let auditRows: any[] = [];
     try { auditRows = audit ? JSON.parse(audit.value) : []; } catch {}
     let recentResults: any[] = [];
+    let stats: any = { totalSends: 0, totalGiftCoins: 0, winCount: 0, lossCount: 0, totalPayout: 0 };
     try {
-      recentResults = await this.dataSource.query(
+      const rows = await this.dataSource.query(
         `SELECT gs.id, gs."giftId", gs."giftName", gs."senderId", gs."receiverId",
                 gs.quantity, gs."totalCoins", gs."luckyMultiplier", gs."createdAt"
          FROM gift_sends gs INNER JOIN gifts g ON g.id = gs."giftId"
          WHERE g.type = $1 ORDER BY gs."createdAt" DESC LIMIT 100`,
         [GiftType.LUCKY],
       );
+      recentResults = rows;
+      const totals = await this.dataSource.query(
+        `SELECT COUNT(*)::int AS "totalSends",
+                COALESCE(SUM(gs."totalCoins"), 0)::bigint AS "totalGiftCoins",
+                COUNT(*) FILTER (WHERE gs."luckyMultiplier" IS NOT NULL)::int AS "winCount",
+                COUNT(*) FILTER (WHERE gs."luckyMultiplier" IS NULL)::int AS "lossCount",
+                COALESCE(SUM(CASE WHEN gs."luckyMultiplier" IS NOT NULL
+                  THEN FLOOR(gs."totalCoins" * gs."luckyMultiplier") ELSE 0 END), 0)::bigint AS "totalPayout"
+         FROM gift_sends gs INNER JOIN gifts g ON g.id = gs."giftId" WHERE g.type = $1`,
+        [GiftType.LUCKY],
+      );
+      if (totals?.[0]) stats = {
+        totalSends: Number(totals[0].totalSends || 0),
+        totalGiftCoins: Number(totals[0].totalGiftCoins || 0),
+        winCount: Number(totals[0].winCount || 0),
+        lossCount: Number(totals[0].lossCount || 0),
+        totalPayout: Number(totals[0].totalPayout || 0),
+      };
     } catch (error) {
-      this.log.warn('Could not read lucky gift result history');
+      this.log.warn('Could not read lucky gift result history or aggregate stats');
     }
     return {
       config,
       gifts: gifts.map(g => ({ id: g.id, name: g.name, coinPrice: g.coinPrice, isActive: g.isActive })),
       audit: auditRows.slice(0, 200),
       recentResults,
+      stats,
     };
   }
 
