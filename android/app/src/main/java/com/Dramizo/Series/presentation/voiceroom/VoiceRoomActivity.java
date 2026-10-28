@@ -203,6 +203,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     };
     private final Set<String> shownRoomPkInvites = new HashSet<>();
+    private final Set<String> shownCpRoomRequests = new HashSet<>();
     private final Runnable roomPkPendingTimeout = () -> {
         if ("pending".equals(roomPkCurrentContestId)) {
             roomPkCurrentContestId = null;
@@ -14478,7 +14479,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if ("cp:request".equals(event)) {
             String targetUserId = memberStr(payload, "targetUserId");
             String requestId = memberStr(payload, "requestId");
-            if (myUserId == null || !myUserId.equals(targetUserId) || requestId == null || requestId.isEmpty()) return;
+            if (myUserId == null || !myUserId.equals(targetUserId) || requestId == null || requestId.isEmpty()
+                    || !shownCpRoomRequests.add(requestId)) return;
             String senderName = memberStr(payload, "senderName");
             String giftName = memberStr(payload, "giftName");
             String typeLabel = memberStr(payload, "relationshipType");
