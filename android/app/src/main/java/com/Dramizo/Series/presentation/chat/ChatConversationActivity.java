@@ -2,6 +2,10 @@ package com.Dramizo.Series.presentation.chat;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.content.Intent;
+import android.app.Activity;
+import android.content.res.AssetFileDescriptor;
+import android.media.MediaMetadataRetriever;
+import android.provider.MediaStore;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.media.MediaRecorder;
@@ -15,6 +19,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.ImageView;
+import android.widget.VideoView;
 import android.widget.PopupMenu;
 import android.widget.Toast;
 
@@ -58,10 +63,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.io.IOException;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
+import okio.BufferedSink;
+import okio.Okio;
 import retrofit2.Response;
 
 public class ChatConversationActivity extends ThemedActivity {
@@ -134,6 +142,19 @@ public class ChatConversationActivity extends ThemedActivity {
     private final ActivityResultLauncher<String> pickGallery =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
                 if (uri != null) uploadAndSendImage(uri);
+            });
+
+    private final ActivityResultLauncher<String> pickVideo =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null) previewVideoBeforeSend(uri);
+            });
+
+    private final ActivityResultLauncher<Intent> captureVideo =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null
+                        && result.getData().getData() != null) {
+                    previewVideoBeforeSend(result.getData().getData());
+                }
             });
 
     private final ActivityResultLauncher<Void> takePicturePreview =
@@ -554,11 +575,47 @@ public class ChatConversationActivity extends ThemedActivity {
     }
 
     private void showAttachPicker() {
-        AuraDialogHelper.list(this, getString(R.string.pick_gallery_photo),
-                new String[]{getString(R.string.camera), getString(R.string.gallery)}, which -> {
-                    if (which == 0) launchCameraCapture();
-                    else pickGallery.launch("image/*");
+        AuraDialogHelper.list(this, "إرسال مرفق",
+                new String[]{"تصوير فيديو", getString(R.string.camera), getString(R.string.gallery), "فيديو من المعرض"}, which -> {
+                    if (which == 0) launchVideoCapture();
+                    else if (which == 1) launchCameraCapture();
+                    else if (which == 2) pickGallery.launch("image/*");
+                    else if (which == 3) pickVideo.launch("video/*");
                 });
+    }
+
+    private void launchVideoCapture() {
+        try {
+            Intent intent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+            intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
+            if (intent.resolveActivity(getPackageManager()) != null) captureVideo.launch(intent);
+            else Toast.makeText(this, "لا يوجد تطبيق كاميرا لتصوير الفيديو", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "تعذر فتح كاميرا الفيديو", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void previewVideoBeforeSend(@NonNull Uri uri) {
+        VideoView preview = new VideoView(this);
+        int height = (int) (220 * getResources().getDisplayMetrics().density);
+        preview.setLayoutParams(new android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, height));
+        preview.setVideoURI(uri);
+        preview.setOnPreparedListener(player -> {
+            player.setLooping(false);
+            preview.start();
+        });
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("معاينة الفيديو")
+                .setView(preview)
+                .setNegativeButton("إلغاء", (d, which) -> preview.stopPlayback())
+                .setPositiveButton("إرسال", (d, which) -> {
+                    preview.stopPlayback();
+                    uploadAndSendVideo(uri);
+                })
+                .create();
+        dialog.setOnDismissListener(d -> preview.stopPlayback());
+        dialog.show();
     }
 
     private void launchCameraCapture() {
@@ -590,6 +647,89 @@ public class ChatConversationActivity extends ThemedActivity {
                         Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_LONG).show());
             }
         });
+    }
+
+    private void uploadAndSendVideo(@NonNull Uri uri) {
+        if (conversationId == null || conversationId.isEmpty()) return;
+        Toast.makeText(this, "جارٍ رفع الفيديو…", Toast.LENGTH_SHORT).show();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                String mimeType = getContentResolver().getType(uri);
+                if (mimeType == null || !mimeType.toLowerCase(java.util.Locale.US).startsWith("video/")) {
+                    throw new IOException("الملف المحدد ليس فيديو صالحاً");
+                }
+                final long maxBytes = 50L * 1024L * 1024L;
+                long size = getVideoSize(uri, maxBytes);
+                if (size <= 0L) throw new IOException("تعذر قراءة حجم الفيديو");
+                if (size > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
+                int durationSec = getVideoDurationSeconds(uri);
+                String extension = "video/quicktime".equalsIgnoreCase(mimeType) ? ".mov"
+                        : "video/webm".equalsIgnoreCase(mimeType) ? ".webm" : ".mp4";
+                RequestBody body = new RequestBody() {
+                    @Override public MediaType contentType() { return MediaType.parse(mimeType); }
+                    @Override public long contentLength() { return size; }
+                    @Override public void writeTo(@NonNull BufferedSink sink) throws IOException {
+                        try (InputStream input = getContentResolver().openInputStream(uri)) {
+                            if (input == null) throw new IOException("تعذر فتح الفيديو");
+                            sink.writeAll(Okio.source(input));
+                        }
+                    }
+                };
+                MultipartBody.Part part = MultipartBody.Part.createFormData("file", "chat-video" + extension, body);
+                Response<ApiResponse<UploadApi.UploadResult>> resp = c.getUploadApi().upload(part).execute();
+                if (resp.isSuccessful() && resp.body() != null && resp.body().success
+                        && resp.body().data != null && resp.body().data.url != null) {
+                    String url = AssetCatalog.absoluteUrl(resp.body().data.url);
+                    runOnUiThread(() -> viewModel.sendVideo(conversationId, url, mimeType, size, durationSec));
+                } else {
+                    String error = UploadApi.errorMessage(resp, "تعذر رفع الفيديو");
+                    runOnUiThread(() -> Toast.makeText(this, error, Toast.LENGTH_LONG).show());
+                }
+            } catch (Exception e) {
+                String error = e.getMessage();
+                if (error == null || error.trim().isEmpty()) error = "تعذر رفع الفيديو";
+                final String message = error;
+                runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private long getVideoSize(@NonNull Uri uri, long maxBytes) throws Exception {
+        try (AssetFileDescriptor descriptor = getContentResolver().openAssetFileDescriptor(uri, "r")) {
+            if (descriptor != null && descriptor.getLength() > 0) {
+                if (descriptor.getLength() > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
+                return descriptor.getLength();
+            }
+        } catch (IOException e) {
+            throw e;
+        } catch (Exception ignored) {
+            // Some gallery providers do not expose a descriptor length; count the stream below.
+        }
+        long total = 0;
+        try (InputStream input = getContentResolver().openInputStream(uri)) {
+            if (input == null) throw new IOException("تعذر فتح الفيديو");
+            byte[] buffer = new byte[16 * 1024];
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                total += count;
+                if (total > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
+            }
+        }
+        return total;
+    }
+
+    private int getVideoDurationSeconds(@NonNull Uri uri) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(this, uri);
+            String raw = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            return raw == null ? 0 : Math.max(0, (int) (Long.parseLong(raw) / 1000L));
+        } catch (Exception ignored) {
+            return 0;
+        } finally {
+            try { retriever.release(); } catch (Exception ignored) {}
+        }
     }
 
     private void uploadAndSendBitmap(@NonNull Bitmap bitmap) {
