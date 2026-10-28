@@ -771,7 +771,19 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.videoMedia.stopPlayback();
             holder.b.videoMedia.setMediaController(null);
             holder.b.videoMedia.setOnClickListener(null);
+            holder.b.videoMedia.setOnPreparedListener(null);
+            holder.b.videoMedia.setOnCompletionListener(null);
+            holder.b.videoMedia.setOnErrorListener(null);
             holder.b.videoMedia.setVisibility(View.GONE);
+        }
+        if (holder.b.imgVideoThumbnail != null) {
+            holder.b.imgVideoThumbnail.setVisibility(View.GONE);
+            holder.b.imgVideoThumbnail.setOnClickListener(null);
+            holder.b.imgVideoThumbnail.setImageDrawable(null);
+        }
+        if (holder.b.btnVideoPlay != null) {
+            holder.b.btnVideoPlay.setVisibility(View.GONE);
+            holder.b.btnVideoPlay.setOnClickListener(null);
         }
         if (holder.b.rowImageReaction != null) holder.b.rowImageReaction.setVisibility(View.GONE);
         if (holder.b.audioRow != null) holder.b.audioRow.setVisibility(View.GONE);
@@ -822,20 +834,55 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.imgMedia.setVisibility(View.GONE);
             if (holder.b.rowImageReaction != null) holder.b.rowImageReaction.setVisibility(View.GONE);
             if (holder.b.tvImageTime != null) holder.b.tvImageTime.setVisibility(View.GONE);
-            holder.b.videoMedia.setVisibility(View.VISIBLE);
-            holder.b.videoMedia.setBackgroundColor(Color.BLACK);
-            holder.b.videoMedia.setVideoURI(Uri.parse(fullUrl));
-            MediaController controls = new MediaController(holder.itemView.getContext());
-            controls.setAnchorView(holder.b.videoMedia);
-            holder.b.videoMedia.setMediaController(controls);
-            holder.b.videoMedia.setOnPreparedListener(player -> player.setLooping(false));
-            holder.b.videoMedia.setOnErrorListener((player, what, extra) -> {
-                Toast.makeText(holder.itemView.getContext(), "تعذر تشغيل الفيديو", Toast.LENGTH_SHORT).show();
-                return true;
-            });
-            holder.b.videoMedia.setOnClickListener(v -> {
-                if (!holder.b.videoMedia.isPlaying()) holder.b.videoMedia.start();
-            });
+
+            // A durable poster is part of the message media JSON, so history/rebinds can
+            // paint the preview without downloading/starting the full video.
+            ImageView poster = holder.b.imgVideoThumbnail;
+            View playButton = holder.b.btnVideoPlay;
+            VideoView video = holder.b.videoMedia;
+            video.setVisibility(View.GONE);
+            video.setBackgroundColor(Color.BLACK);
+            if (poster != null) {
+                poster.setVisibility(View.VISIBLE);
+                poster.setBackgroundColor(Color.rgb(21, 25, 35));
+                String thumbnailUrl = msg.media != null ? msg.media.thumbnailUrl : null;
+                if (thumbnailUrl != null && !thumbnailUrl.trim().isEmpty()) {
+                    Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(thumbnailUrl))
+                            .centerCrop().dontAnimate().into(poster);
+                } else {
+                    poster.setImageDrawable(null);
+                }
+            }
+            if (playButton != null) playButton.setVisibility(View.VISIBLE);
+
+            View.OnClickListener startVideo = v -> {
+                if (poster != null) poster.setVisibility(View.GONE);
+                if (playButton != null) playButton.setVisibility(View.GONE);
+                video.setVisibility(View.VISIBLE);
+                video.setVideoURI(Uri.parse(fullUrl));
+                MediaController controls = new MediaController(holder.itemView.getContext());
+                controls.setAnchorView(video);
+                video.setMediaController(controls);
+                video.setOnPreparedListener(player -> {
+                    player.setLooping(false);
+                    video.start();
+                });
+                video.setOnCompletionListener(player -> {
+                    video.stopPlayback();
+                    video.setVisibility(View.GONE);
+                    if (poster != null) poster.setVisibility(View.VISIBLE);
+                    if (playButton != null) playButton.setVisibility(View.VISIBLE);
+                });
+                video.setOnErrorListener((player, what, extra) -> {
+                    video.setVisibility(View.GONE);
+                    if (poster != null) poster.setVisibility(View.VISIBLE);
+                    if (playButton != null) playButton.setVisibility(View.VISIBLE);
+                    Toast.makeText(holder.itemView.getContext(), "تعذر تشغيل الفيديو", Toast.LENGTH_SHORT).show();
+                    return true;
+                });
+            };
+            if (poster != null) poster.setOnClickListener(startVideo);
+            if (playButton != null) playButton.setOnClickListener(startVideo);
             if (msg.content != null && !msg.content.trim().isEmpty()) {
                 holder.b.tvContent.setVisibility(View.VISIBLE);
                 holder.b.tvContent.setText(msg.content);
