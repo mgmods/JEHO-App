@@ -652,8 +652,12 @@ public final class MiscDtos {
 
     public static class AgencyStatsDto {
         @SerializedName("agencyId") public String agencyId;
+        @SerializedName("publicId") public String publicId;
         @SerializedName("name") public String name;
         @SerializedName("memberCount") public int memberCount;
+        @SerializedName("targetEnabled") public boolean targetEnabled;
+        @SerializedName("targetPeriod") public String targetPeriod;
+        @SerializedName("targetPeriodKey") public String targetPeriodKey;
         @SerializedName("totalDiamonds") public long totalDiamonds;
         @SerializedName("giftsReceivedDiamonds") public long giftsReceivedDiamonds;
         @SerializedName("commissionPercent") public double commissionPercent;
@@ -662,9 +666,19 @@ public final class MiscDtos {
 
     public static class AgencyMemberPeriodStatDto {
         @SerializedName("userId") public String userId;
+        @SerializedName("publicId") public String publicId;
         @SerializedName("displayName") public String displayName;
+        @SerializedName("role") public String role;
         @SerializedName("membershipStartedAt") public String membershipStartedAt;
         @SerializedName("giftsReceivedDiamonds") public long giftsReceivedDiamonds;
+        @SerializedName("targetEnabled") public boolean targetEnabled;
+        @SerializedName("targetPeriod") public String targetPeriod;
+        @SerializedName("targetPeriodKey") public String targetPeriodKey;
+        @SerializedName("targetProgress") public long targetProgress;
+        @SerializedName("currentTargetName") public String currentTargetName;
+        @SerializedName("currentTargetThreshold") public long currentTargetThreshold;
+        @SerializedName("targetRemaining") public long targetRemaining;
+        @SerializedName("targetProgressPercent") public int targetProgressPercent;
     }
 
     public static class AgencyMineDto {
