@@ -260,6 +260,27 @@ public class ChatViewModel extends ViewModel {
         });
     }
 
+    public void sendVideo(String conversationId, String videoUrl, String mimeType, long size, int durationSec) {
+        typing.postValue(false);
+        RealtimeClient.getInstance().emitTyping(conversationId, false);
+        final String reply = replyToId;
+        clearReply();
+        final String localId = "local:" + System.currentTimeMillis();
+        ChatDtos.MessageDto pending = newOptimistic("video", localId, conversationId, reply);
+        pending.media = new ChatDtos.MediaDto();
+        pending.media.url = videoUrl;
+        pending.media.mimeType = mimeType;
+        pending.media.size = Math.max(0, size);
+        pending.media.duration = Math.max(0, durationSec);
+        appendMessage(pending);
+        c.getIoExecutor().execute(() -> {
+            Result<ChatDtos.MessageDto> r =
+                    c.sendMessageUseCase.executeVideo(conversationId, videoUrl, mimeType, size, durationSec, reply);
+            if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
+            else error.postValue(r.error != null ? r.error : "تعذر إرسال الفيديو");
+        });
+    }
+
     public void sendGiftMessage(String conversationId, String giftName, String iconUrl) {
         typing.postValue(false);
         RealtimeClient.getInstance().emitTyping(conversationId, false);
