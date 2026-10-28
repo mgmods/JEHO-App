@@ -2063,11 +2063,12 @@ export class AgenciesService implements OnModuleInit {
         giftsReceivedDiamonds: gross,
       };
     }));
+    memberStats.sort((a, b) => b.giftsReceivedDiamonds - a.giftsReceivedDiamonds);
     const received = memberStats.reduce((sum, item) => sum + item.giftsReceivedDiamonds, 0);
     return {
       agencyId,
       name: agency.name,
-      memberCount: agency.memberCount,
+      memberCount: memberIds.length,
       // Current membership statistics restart when a member rejoins.
       totalDiamonds: received,
       giftsReceivedDiamonds: received,
