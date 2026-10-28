@@ -199,7 +199,7 @@ const canvasStyle = computed(() => ({
   width: Math.max(220, Math.min(360, Number(currentStyle.value.widthDp) || 340)) + 'px',
   height: Math.max(60, Math.min(180, Number(currentStyle.value.heightDp) || 100)) + 'px',
   boxShadow: 'none',
-  ...(activeTab.value === 'luckyWinHighRoom' ? { position: 'absolute', left: (Number(currentStyle.value.placementX) || 50) + '%', top: (Number(currentStyle.value.placementY) || 50) + '%', transform: 'translate(-50%, -50%)' } : { position: 'relative' }),
+  ...(activeTab.value === 'luckyWinHighRoom' ? { position: 'absolute', left: (Number(currentStyle.value.placementX ?? 50)) + '%', top: (Number(currentStyle.value.placementY ?? 50)) + '%', transform: 'translate(-50%, -50%)' } : { position: 'relative' }),
 }))
 const avatarPreviewStyle = computed(() => ({ left: currentStyle.value.avatarX + '%', top: currentStyle.value.avatarY + '%', width: currentStyle.value.avatarSizeDp + 'px', height: currentStyle.value.avatarSizeDp + 'px' }))
 const titlePreviewStyle = computed(() => ({ left: currentStyle.value.textX + '%', top: currentStyle.value.textY + '%', fontSize: (Number(currentStyle.value.titleSizeSp) || 13) + 'px' }))
