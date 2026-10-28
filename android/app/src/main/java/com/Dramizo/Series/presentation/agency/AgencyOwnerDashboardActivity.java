@@ -50,6 +50,9 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
     private TextView tvWithdrawEmpty;
     private TextView tvAgencyStatsEmpty;
     private TextView tvAgencyStatsTotal;
+    private TextView tvAgencyDailySummary;
+    private TextView tvAgencyWeeklySummary;
+    private TextView tvAgencyMonthlySummary;
     private TextView tvAgencyPublicId;
     private TextView tvAgencyActivationCode;
     private LinearLayout layoutAgencyMemberStats;
@@ -101,6 +104,9 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         tvWithdrawEmpty = findViewById(R.id.tvWithdrawEmpty);
         tvAgencyStatsEmpty = findViewById(R.id.tvAgencyStatsEmpty);
         tvAgencyStatsTotal = findViewById(R.id.tvAgencyStatsTotal);
+        tvAgencyDailySummary = findViewById(R.id.tvAgencyDailySummary);
+        tvAgencyWeeklySummary = findViewById(R.id.tvAgencyWeeklySummary);
+        tvAgencyMonthlySummary = findViewById(R.id.tvAgencyMonthlySummary);
         layoutAgencyMemberStats = findViewById(R.id.layoutAgencyMemberStats);
         tvAgencyPublicId = findViewById(R.id.tvAgencyPublicId);
         tvAgencyActivationCode = findViewById(R.id.tvAgencyActivationCode);
@@ -358,34 +364,35 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
         if (stats == null) {
             if (btnMore != null) btnMore.setVisibility(View.GONE);
             if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.VISIBLE);
-            if (tvAgencyStatsTotal != null) tvAgencyStatsTotal.setText("إجمالي الهدايا: —");
+            if (tvAgencyStatsTotal != null) tvAgencyStatsTotal.setText("إجمالي الهدايا خلال العضوية الحالية: —");
+            setT(tvAgencyDailySummary, "لا توجد بيانات بعد");
+            setT(tvAgencyWeeklySummary, "لا توجد بيانات بعد");
+            setT(tvAgencyMonthlySummary, "لا توجد بيانات بعد");
             return;
         }
+        setT(tvAgencyDailySummary,
+                "الدعم " + formatLong(Math.max(0L, stats.dailyDiamonds)) + " ◆"
+                        + "   •   مضيفون نشطون " + stats.activeHostsToday
+                        + "   •   أعضاء جدد " + stats.newMembersToday);
+        setT(tvAgencyWeeklySummary,
+                "الدعم " + formatLong(Math.max(0L, stats.weeklyDiamonds)) + " ◆"
+                        + "   •   مضيفون نشطون " + stats.activeHostsThisWeek
+                        + "   •   أعضاء جدد " + stats.newMembersThisWeek);
+        String monthlySummary = "الدعم " + formatLong(Math.max(0L, stats.monthlyDiamonds)) + " ◆"
+                + "   •   مضيفون نشطون " + stats.activeHostsThisMonth
+                + "   •   أعضاء جدد " + stats.newMembersThisMonth;
+        if (stats.lastGiftActivityAt != null && stats.lastGiftActivityAt.length() >= 16) {
+            monthlySummary += "\nآخر دعم (UTC): "
+                    + stats.lastGiftActivityAt.substring(0, 16).replace('T', ' ');
+        }
+        setT(tvAgencyMonthlySummary, monthlySummary);
         if (tvAgencyStatsTotal != null) {
             String targetLabel = stats.targetEnabled
                     ? (" • التارجت " + ("weekly".equalsIgnoreCase(stats.targetPeriod) ? "الأسبوعي" : "الشهري"))
                     : " • التارجت غير مفعّل";
-            String lastActivityLabel = "";
-            if (stats.lastGiftActivityAt != null && stats.lastGiftActivityAt.length() >= 16) {
-                lastActivityLabel = " • آخر دعم (UTC): "
-                        + stats.lastGiftActivityAt.substring(0, 16).replace('T', ' ');
-            }
-            tvAgencyStatsTotal.setText("ملخص اليوم: دعم "
-                    + formatLong(Math.max(0L, stats.dailyDiamonds)) + " ◆"
-                    + " • مضيفون نشطون: " + stats.activeHostsToday
-                    + " • أعضاء جدد: " + stats.newMembersToday
-                    + "\nملخص الأسبوع: دعم "
-                    + formatLong(Math.max(0L, stats.weeklyDiamonds)) + " ◆"
-                    + " • مضيفون نشطون: " + stats.activeHostsThisWeek
-                    + " • أعضاء جدد: " + stats.newMembersThisWeek
-                    + "\nملخص الشهر: دعم "
-                    + formatLong(Math.max(0L, stats.monthlyDiamonds)) + " ◆"
-                    + " • مضيفون نشطون: " + stats.activeHostsThisMonth
-                    + " • أعضاء جدد: " + stats.newMembersThisMonth
-                    + lastActivityLabel
-                    + "\nإجمالي الهدايا خلال العضوية الحالية: "
+            tvAgencyStatsTotal.setText("إجمالي الدعم خلال العضوية الحالية: "
                     + formatLong(Math.max(0L, stats.giftsReceivedDiamonds)) + " ◆"
-                    + " • الأعضاء الحاليون: " + stats.memberCount + targetLabel);
+                    + "   •   الأعضاء الحاليون: " + stats.memberCount + targetLabel);
         }
         if (stats.members == null || stats.members.isEmpty()) {
             if (tvAgencyStatsEmpty != null) tvAgencyStatsEmpty.setVisibility(View.VISIBLE);
