@@ -37,6 +37,8 @@ export interface EconomyConfigShape {
   giftDiamondRatio: number;
   /** Coins → diamonds mint ratio for lucky gifts. */
   luckyGiftDiamondRatio: number;
+  /** Private, additive platform accounting rate; never deducted from host/agency. */
+  platformCommissionPercent: number;
   /** Hard ceiling on diamonds minted per single gift unit. */
   maxDiamondsPerUnit: number;
   /** Lucky-box max multiplier (safety cap on the biggest win). */
@@ -62,6 +64,7 @@ export const ECONOMY_DEFAULTS: EconomyConfigShape = Object.freeze({
   // Agency commission is additional and never subtracted from this host payout.
   giftDiamondRatio: 1,
   luckyGiftDiamondRatio: 0.3,
+  platformCommissionPercent: 0,
   // High enough that a proportional ladder holds up to the priciest gift
   // (top gift ≈ 1,000,000 coins × 0.8 = 800,000 ♦). Lower it from the dashboard
   // if you want a hard cap on the biggest gifts.
@@ -88,6 +91,7 @@ export const ECONOMY: EconomyConfigShape = {
   diamondUsd: ECONOMY_DEFAULTS.diamondUsd,
   giftDiamondRatio: ECONOMY_DEFAULTS.giftDiamondRatio,
   luckyGiftDiamondRatio: ECONOMY_DEFAULTS.luckyGiftDiamondRatio,
+  platformCommissionPercent: ECONOMY_DEFAULTS.platformCommissionPercent,
   maxDiamondsPerUnit: ECONOMY_DEFAULTS.maxDiamondsPerUnit,
   luckyGiftMaxMultiplier: ECONOMY_DEFAULTS.luckyGiftMaxMultiplier,
   luckyGiftTargetEv: ECONOMY_DEFAULTS.luckyGiftTargetEv,
@@ -122,6 +126,14 @@ export function applyEconomyPatch(patch: Partial<EconomyConfigShape>): EconomyCo
       0.01,
       1,
       ECONOMY_DEFAULTS.luckyGiftDiamondRatio,
+    );
+  }
+  if (patch.platformCommissionPercent !== undefined) {
+    ECONOMY.platformCommissionPercent = clamp(
+      patch.platformCommissionPercent,
+      0,
+      100,
+      ECONOMY_DEFAULTS.platformCommissionPercent,
     );
   }
   if (patch.maxDiamondsPerUnit !== undefined) {
