@@ -80,6 +80,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private final List<String> lastTargets = new ArrayList<>();
     private final List<GiftDtos.GiftDto> allGifts = new ArrayList<>();
     private final Map<String, String> cpGiftTypes = new LinkedHashMap<>();
+    private final Map<String, Integer> cpGiftPrices = new LinkedHashMap<>();
     private volatile boolean cpCatalogLoaded;
     @Nullable private String giftTypeFilter;
 
@@ -266,6 +267,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (binding == null || giftPageAdapter == null) return;
             allGifts.clear();
             if (gifts != null) allGifts.addAll(dedupeGiftsForBoard(gifts));
+            applyCpGiftPrices();
             applyFilter();
             setLoading(false);
             // Room only: warm gift MP4s. DM chat must not buffer dozens of videos (OOM / process kill).
@@ -318,6 +320,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (warm != null) {
                 allGifts.clear();
                 allGifts.addAll(dedupeGiftsForBoard(warm));
+                applyCpGiftPrices();
                 applyFilter();
             }
             List<GiftDtos.GiftCategoryDto> warmCats = vm.getCategories().getValue();
@@ -1130,24 +1133,50 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         container.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> result = ApiCall.execute(container.getUserApi().cpCatalog());
             Map<String, String> mappings = new LinkedHashMap<>();
+            Map<String, Integer> prices = new LinkedHashMap<>();
             if (result.success && result.data != null) {
                 for (Map<String, Object> row : result.data) {
-                    if (row == null) continue;
+                    if (row == null || !Boolean.TRUE.equals(row.get("enabled"))) continue;
                     Object type = row.get("type");
                     Object giftObj = row.get("gift");
                     if (!(type instanceof String) || !(giftObj instanceof Map)) continue;
                     Object id = ((Map<?, ?>) giftObj).get("id");
-                    if (id instanceof String && !((String) id).isEmpty()) {
+                    Object priceValue = row.get("priceCoins");
+                    if (priceValue == null) priceValue = ((Map<?, ?>) giftObj).get("coinPrice");
+                    int price = 0;
+                    try { price = (int) Math.max(0, Math.min(Integer.MAX_VALUE, Math.round(Double.parseDouble(String.valueOf(priceValue))))); }
+                    catch (Exception ignored) { }
+                    if (id instanceof String && !((String) id).isEmpty() && price > 0) {
                         mappings.put((String) id, (String) type);
+                        prices.put((String) id, price);
                     }
                 }
             }
-            if (result.success) {
-                cpGiftTypes.clear();
-                cpGiftTypes.putAll(mappings);
-                cpCatalogLoaded = true;
+            if (result.success && isAdded()) {
+                requireActivity().runOnUiThread(() -> {
+                    if (!isAdded()) return;
+                    cpGiftTypes.clear();
+                    cpGiftTypes.putAll(mappings);
+                    cpGiftPrices.clear();
+                    cpGiftPrices.putAll(prices);
+                    cpCatalogLoaded = true;
+                    applyCpGiftPrices();
+                    applyFilter();
+                    refreshSendBtn();
+                    updateDockText();
+                });
             }
         });
+    }
+
+    /** CP gift prices are controlled by the dashboard and override the normal gift-card price in this sheet. */
+    private void applyCpGiftPrices() {
+        if (allGifts == null || allGifts.isEmpty() || cpGiftPrices.isEmpty()) return;
+        for (GiftDtos.GiftDto gift : allGifts) {
+            if (gift == null || gift.id == null) continue;
+            Integer configured = cpGiftPrices.get(gift.id);
+            if (configured != null && configured > 0) gift.coinPrice = configured;
+        }
     }
 
     private void sendCpGiftRequest(@NonNull String cpType, @NonNull String recipientId,
