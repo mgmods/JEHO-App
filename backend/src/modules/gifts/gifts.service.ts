@@ -2270,19 +2270,16 @@ export class GiftsService implements OnModuleInit {
         (diamondsAwarded * Math.min(100, Math.max(0, Number(ECONOMY.platformCommissionPercent) || 0))) / 100,
       );
       if (platformDiamonds > 0) {
-        let platformRevenue = await manager.findOne(AppSetting, {
-          where: { key: 'platform_gift_revenue_diamonds' },
-          lock: { mode: 'pessimistic_write' },
-        });
-        if (!platformRevenue) {
-          platformRevenue = manager.create(AppSetting, {
-            key: 'platform_gift_revenue_diamonds',
-            value: '0',
-            description: 'Cumulative private platform gift accounting (diamonds)',
-          });
-        }
-        platformRevenue.value = String(Number(platformRevenue.value || 0) + platformDiamonds);
-        await manager.save(platformRevenue);
+        await manager.query(
+          `INSERT INTO app_settings (id, key, value, description, "createdAt", "updatedAt")
+           VALUES (gen_random_uuid(), 'platform_gift_revenue_diamonds', $1,
+                   'Cumulative private platform gift accounting (diamonds)', now(), now())
+           ON CONFLICT (key) DO UPDATE
+             SET value = (COALESCE(NULLIF(app_settings.value, ''), '0')::numeric + EXCLUDED.value::numeric)::text,
+                 description = EXCLUDED.description,
+                 "updatedAt" = now()`,
+          [String(platformDiamonds)],
+        );
       }
 
       // ── INDEPENDENT EARNINGS: host receives the full gift value.
@@ -2892,9 +2889,10 @@ export class GiftsService implements OnModuleInit {
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
 
-    // CLEAN ECONOMY: no platform cut on all-mic. Room host takes half, the
-    // remaining half is split across the seated mics. All → wallet.diamonds.
-    const platformCut = 0;
+    // Platform accounting is additional and private: it never reduces the host/mic pool.
+    const platformCut = Math.floor(
+      (diamondPool * Math.min(100, Math.max(0, Number(ECONOMY.platformCommissionPercent) || 0))) / 100,
+    );
     const rem = diamondPool;
     const hostDiamonds = Math.floor(rem / 2);
     const micsPool = rem - hostDiamonds;
@@ -2922,18 +2920,16 @@ export class GiftsService implements OnModuleInit {
       await manager.save(wallet);
 
       if (platformCut > 0) {
-        let rev = await manager.findOne(AppSetting, {
-          where: { key: 'platform_gift_revenue_diamonds' },
-        });
-        if (!rev) {
-          rev = manager.create(AppSetting, {
-            key: 'platform_gift_revenue_diamonds',
-            value: '0',
-            description: 'Cumulative platform cut from gifts (diamonds)',
-          });
-        }
-        rev.value = String(Number(rev.value || 0) + platformCut);
-        await manager.save(rev);
+        await manager.query(
+          `INSERT INTO app_settings (id, key, value, description, "createdAt", "updatedAt")
+           VALUES (gen_random_uuid(), 'platform_gift_revenue_diamonds', $1,
+                   'Cumulative private platform gift accounting (diamonds)', now(), now())
+           ON CONFLICT (key) DO UPDATE
+             SET value = (COALESCE(NULLIF(app_settings.value, ''), '0')::numeric + EXCLUDED.value::numeric)::text,
+                 description = EXCLUDED.description,
+                 "updatedAt" = now()`,
+          [String(platformCut)],
+        );
       }
 
       const unitCoins = coinPrice * qty;
