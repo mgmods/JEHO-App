@@ -116,6 +116,7 @@ const sections = computed(() => [
     label: t('nav.money'),
     items: [
       { name: 'gifts', icon: 'bi-gift', label: t('nav.gifts') },
+      { name: 'lucky-gift-odds', icon: 'bi-percent', label: 'احتمالات هدايا الحظ' },
       { name: 'toast-manager', icon: 'bi-stars', label: 'إدارة توستات الهدايا', module: 'settings' },
       { name: 'coins', icon: 'bi-coin', label: t('nav.coins') },
       { name: 'wallet', icon: 'bi-wallet2', label: t('nav.wallet') },
