@@ -144,7 +144,50 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
+  private async recordAgencyModerationAction(
+    roomId: string,
+    actorId: string,
+    targetUserId: string,
+    action: 'mute' | 'remove_mic' | 'kick' | 'ban',
+    reason?: string | null,
+    metadata: Record<string, unknown> = {},
+  ) {
+    try {
+      await this.dataSource.query(
+        `INSERT INTO agency_moderation_audit
+          ("agencyId", "roomId", "actorId", "targetUserId", action, reason, metadata)
+         SELECT r."agencyId", r.id, $2, $3, $4, $5, $6::jsonb
+         FROM rooms r
+         WHERE r.id = $1 AND r."agencyId" IS NOT NULL`,
+        [roomId, actorId, targetUserId, action, reason || null, JSON.stringify(metadata || {})],
+      );
+    } catch (err) {
+      this.logger.warn(`record agency moderation action: ${(err as Error).message}`);
+    }
+  }
+
   async onModuleInit() {
+    try {
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS agency_moderation_audit (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
+          "roomId" uuid NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+          "actorId" uuid REFERENCES users(id) ON DELETE SET NULL,
+          "targetUserId" uuid REFERENCES users(id) ON DELETE SET NULL,
+          action varchar(24) NOT NULL,
+          reason text,
+          metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+          "createdAt" timestamptz NOT NULL DEFAULT NOW()
+        )
+      `);
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS "IDX_agency_moderation_audit_agency_created"
+        ON agency_moderation_audit ("agencyId", "createdAt" DESC)
+      `);
+    } catch (err) {
+      this.logger.warn(`ensure agency moderation audit: ${(err as Error).message}`);
+    }
     try {
       await this.dataSource.query(
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(6)`,
@@ -2936,6 +2979,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       seat.isMuted = !!muted;
     }
     await this.seatsRepo.save(seat);
+    if (moderatingOther && muted) {
+      await this.recordAgencyModerationAction(roomId, actorId, effectiveUserId, 'mute', 'moderator_mute');
+    }
     // Admin mute is flag-only — do not eject from Zego (kick/ban still eject).
     this.notifyRoomUpdated(roomId);
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
@@ -3460,7 +3506,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     if (!seat) {
       throw new BadRequestException('المستخدم ليس على المايك حالياً');
     }
-    return this.forceLeaveSeat(roomId, uid, reason || 'moderator');
+    const result = await this.forceLeaveSeat(roomId, uid, reason || 'moderator');
+    await this.recordAgencyModerationAction(roomId, actorId, uid, 'remove_mic', reason || 'moderator_remove_mic');
+    return result;
   }
 
   private async clearUserSeat(roomId: string, userId: string) {
@@ -3533,6 +3581,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.realtimeGateway.ejectUserFromRoom(roomId, dto.userId);
     void this.ejectRtcUser(roomId, dto.userId, 'Kicked from voice room');
     void this.realtimeGateway.broadcastRoomPresence(roomId).catch(() => undefined);
+    await this.recordAgencyModerationAction(roomId, actorId, dto.userId, 'kick', dto.reason || null);
     return { kicked: true, userId: dto.userId };
   }
 
@@ -3660,6 +3709,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.realtimeGateway.ejectUserFromRoom(roomId, dto.userId);
     void this.ejectRtcUser(roomId, dto.userId, 'Banned from voice room');
     void this.realtimeGateway.broadcastRoomPresence(roomId).catch(() => undefined);
+    await this.recordAgencyModerationAction(roomId, actorId, dto.userId, 'ban', saved.reason || null, {
+      durationMinutes: dto.durationMinutes,
+      expiresAt: saved.expiresAt,
+    });
     return saved;
   }
 
