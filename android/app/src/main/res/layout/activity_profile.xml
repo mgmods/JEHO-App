@@ -545,6 +545,27 @@
                         android:textSize="12sp" />
                 </LinearLayout>
 
+                <!-- Earned/gifted badges are shown as large horizontally swipeable icons directly below ID/VIP/popularity. -->
+                <HorizontalScrollView
+                    android:id="@+id/rowProfileAchievementBadges"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:scrollbars="none"
+                    android:overScrollMode="never"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/boxProfileAchievementBadges"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingVertical="4dp" />
+                </HorizontalScrollView>
+
                 <!-- Achievement badges: shown below identity, separate from VIP medals. -->
                 <LinearLayout
                     android:id="@+id/rowBadges"
