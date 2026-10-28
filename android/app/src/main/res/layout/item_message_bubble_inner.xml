@@ -101,6 +101,36 @@
             android:contentDescription="فيديو المحادثة"
             android:visibility="gone" />
 
+        <ImageView
+            android:id="@+id/imgVideoThumbnail"
+            android:layout_width="238dp"
+            android:layout_height="170dp"
+            android:background="#151923"
+            android:contentDescription="معاينة الفيديو"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+
+        <FrameLayout
+            android:id="@+id/btnVideoPlay"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_chat_header_icon_circle"
+            android:clickable="true"
+            android:contentDescription="تشغيل الفيديو"
+            android:elevation="4dp"
+            android:focusable="true"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_audio_play"
+                app:tint="#FFFFFFFF" />
+        </FrameLayout>
+
         <LinearLayout
             android:id="@+id/rowImageReaction"
             android:layout_width="wrap_content"
