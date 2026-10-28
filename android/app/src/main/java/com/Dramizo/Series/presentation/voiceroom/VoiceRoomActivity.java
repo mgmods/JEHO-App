@@ -11531,7 +11531,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
-    public void showLuckyHitBanner(@Nullable String displayName, @Nullable String avatarUrl,
+    public void showLuckyHitBanner(@Nullable String senderId, @Nullable String displayName, @Nullable String avatarUrl,
                                    long wonCoins, double multiplier, @Nullable String eventKey) {
         // Losses must be silent: no room chat line, toast, or top banner.
         // Positive payouts include full wins and partial returns.
@@ -11549,16 +11549,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String key = eventKey == null || eventKey.trim().isEmpty()
                 ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim();
         boolean highWin = multiplier >= 10d || wonCoins >= 1000L;
-        if (highWin) {
-            // The winning room gets the dedicated center-screen presentation.
+        boolean isWinner = senderId != null && myUserId != null && sameUser(senderId, myUserId);
+        if (highWin && isWinner) {
+            // The winner alone sees their personal dashboard-configured room toast.
             GlobalCelebrationToast.showRoomCenter(
                     this, who, line, avatarUrl, null, key,
                     Math.max(0d, multiplier), Math.max(0L, wonCoins), who,
                     "lucky_hit_high", roomId);
         } else {
-            // Small wins/returns remain room-only and keep the normal compact toast at the top.
-            String kind = multiplier > 0d && multiplier < 1d
-                    ? "lucky_hit_return" : "lucky_hit_normal";
+            // Everyone else in the room sees only the standard shared toast.
+            // Small wins/returns remain room-local and never become app-wide.
+            String kind = highWin ? "lucky_hit_high"
+                    : (multiplier > 0d && multiplier < 1d ? "lucky_hit_return" : "lucky_hit_normal");
             GlobalCelebrationToast.show(
                     this, who, line, avatarUrl, null, key,
                     28, Math.max(0d, multiplier), Math.max(0L, wonCoins), who, kind, roomId);
@@ -14637,7 +14639,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     memberStr(payload, "requestId"),
                     memberStr(payload, "at"));
             if (luckyToastEventKey == null) luckyToastEventKey = String.valueOf(System.currentTimeMillis());
-            showLuckyHitBanner(who, memberStr(payload, "senderAvatarUrl"), won, rawMultiplier, luckyToastEventKey);
+            showLuckyHitBanner(senderId, who, memberStr(payload, "senderAvatarUrl"), won, rawMultiplier, luckyToastEventKey);
             if (won > 0) {
                 GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
                 // Only float/rain on the winner's seat when a payout actually occurred.
