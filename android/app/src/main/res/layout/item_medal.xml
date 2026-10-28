@@ -14,7 +14,7 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="104dp"
+        android:layout_height="136dp"
         android:background="@drawable/bg_withdraw_package"
         android:padding="5dp">
 
@@ -40,4 +40,17 @@
         android:textColor="@color/text_primary"
         android:textSize="12sp"
         android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/btnMedalAction"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_cosmetic_btn_equip"
+        android:gravity="center"
+        android:text="تجهيز للملف الشخصي"
+        android:textColor="@color/white"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 </LinearLayout>
