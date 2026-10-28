@@ -70,6 +70,7 @@ public class CpCenterActivity extends ThemedActivity {
                         gson.toJson(initialView) + "," + gson.toJson(initialType) + ")", null);
                 loadHome();
                 loadRequests();
+                loadTasks();
             }
         });
         web.addJavascriptInterface(new CpBridge(), "JehoCP");
