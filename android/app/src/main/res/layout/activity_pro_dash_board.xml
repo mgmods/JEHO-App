@@ -77,6 +77,7 @@
 
                 <!-- Balance -->
                 <LinearLayout
+                    android:id="@+id/sectionBalanceCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_dash_balance_card"
@@ -522,7 +523,12 @@
                             android:layout_height="40dp"
                             android:text="نسخ الرقم"
                             android:textAllCaps="false"
-                            android:textSize="12sp" />
+                            android:textSize="12sp"
+                            app:backgroundTint="#F0EBFF"
+                            app:strokeColor="#D8CCFF"
+                            app:strokeWidth="1dp"
+                            app:cornerRadius="12dp"
+                            android:textColor="@color/agency_purple" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -563,7 +569,12 @@
                             android:layout_height="40dp"
                             android:text="نسخ الكود"
                             android:textAllCaps="false"
-                            android:textSize="12sp" />
+                            android:textSize="12sp"
+                            app:backgroundTint="#F0EBFF"
+                            app:strokeColor="#D8CCFF"
+                            app:strokeWidth="1dp"
+                            app:cornerRadius="12dp"
+                            android:textColor="@color/agency_purple" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -766,7 +777,12 @@
                         android:layout_marginTop="8dp"
                         android:text="عرض بقية الأعضاء"
                         android:textAllCaps="false"
-                        android:visibility="gone" />
+                        android:visibility="gone"
+                            app:backgroundTint="#F0EBFF"
+                            app:strokeColor="#D8CCFF"
+                            app:strokeWidth="1dp"
+                            app:cornerRadius="12dp"
+                            android:textColor="@color/agency_purple" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnAgencyModerationAudit"
@@ -776,7 +792,12 @@
                         android:layout_marginTop="8dp"
                         android:text="سجل إجراءات المشرفين"
                         android:textAllCaps="false"
-                        android:visibility="gone" />
+                        android:visibility="gone"
+                            app:backgroundTint="#F0EBFF"
+                            app:strokeColor="#D8CCFF"
+                            app:strokeWidth="1dp"
+                            app:cornerRadius="12dp"
+                            android:textColor="@color/agency_purple" />
                 </LinearLayout>
 
                 <!-- Withdraw requests -->
