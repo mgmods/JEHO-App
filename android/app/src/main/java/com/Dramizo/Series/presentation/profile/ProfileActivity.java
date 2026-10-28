@@ -81,6 +81,7 @@ public class ProfileActivity extends ThemedActivity {
         }
     };
     private AnimatorSet cpHeartAnimator;
+    private String loadedProfileId = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -394,6 +395,7 @@ public class ProfileActivity extends ThemedActivity {
             int friends = Math.max(0, user.friendsCount);
             if (user.id != null && !user.id.isEmpty()) {
                 targetUserIdHold[0] = user.id;
+                loadedProfileId = user.id;
                 loadProfileMedals(user.id);
                 loadProfileAchievementBadges(user.id);
             }
@@ -572,7 +574,7 @@ public class ProfileActivity extends ThemedActivity {
             final List<BadgeDto> badges = earned;
             runOnUiThread(() -> {
                 if (binding == null || isFinishing() || isDestroyed()
-                        || !profileId.equals(targetLoadedProfileId())) return;
+                        || !profileId.equals(loadedProfileId)) return;
                 LinearLayout strip = binding.boxProfileAchievementBadges;
                 strip.removeAllViews();
                 if (badges.isEmpty()) {
@@ -619,11 +621,6 @@ public class ProfileActivity extends ThemedActivity {
                 binding.rowProfileAchievementBadges.setOnClickListener(v -> openBadgeCabinet(profileId));
             });
         });
-    }
-
-    private String targetLoadedProfileId() {
-        if (binding == null || binding.tvUsername == null) return "";
-        return binding.tvUsername.getTag() instanceof String ? (String) binding.tvUsername.getTag() : "";
     }
 
     private int dpProfile(float value) {
