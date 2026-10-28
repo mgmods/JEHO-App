@@ -111,6 +111,9 @@ export const giftsApi = {
     safeRequest(() => api.post('/admin/gifts/import-entry-effects')),
   luckyCannonConfig: () => safeRequest(() => api.get('/admin/lucky-gift-cannon/config')),
   saveLuckyCannonConfig: (data) => safeRequest(() => api.patch('/admin/lucky-gift-cannon/config', data)),
+  luckyOddsConfig: () => safeRequest(() => api.get('/admin/lucky-gift-odds/config')),
+  saveLuckyOddsConfig: (data) => safeRequest(() => api.patch('/admin/lucky-gift-odds/config', data)),
+  simulateLuckyOdds: (data) => safeRequest(() => api.post('/admin/lucky-gift-odds/simulate', data)),
 }
 
 export const walletApi = {
