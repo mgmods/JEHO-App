@@ -39,6 +39,7 @@ public final class ChatDtos {
 
     public static class MediaDto {
         @SerializedName("url") public String url;
+        @SerializedName("thumbnailUrl") public String thumbnailUrl;
         @SerializedName("mimeType") public String mimeType;
         @SerializedName("size") public long size;
         @SerializedName("width") public int width;
