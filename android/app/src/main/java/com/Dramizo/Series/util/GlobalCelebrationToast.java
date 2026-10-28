@@ -93,10 +93,11 @@ public final class GlobalCelebrationToast {
         final String displayName;
         final String kind;
         final String roomId;
+        final boolean centerPlacement;
 
         ToastRequest(Activity activity, String title, String body, String avatarUrl,
                      String badgeUrl, int topMarginDp, double multiplier, long coinsWon,
-                     String displayName, String kind, String roomId) {
+                     String displayName, String kind, String roomId, boolean centerPlacement) {
             this.activity = new WeakReference<>(activity);
             this.title = title;
             this.body = body;
@@ -108,6 +109,7 @@ public final class GlobalCelebrationToast {
             this.displayName = displayName;
             this.kind = kind;
             this.roomId = roomId;
+            this.centerPlacement = centerPlacement;
         }
     }
 
@@ -410,7 +412,55 @@ public final class GlobalCelebrationToast {
             }
         } catch (Exception ignored) {
         }
-        if ("gift_send".equalsIgnoreCase(kind) || isLuckyToastKind(kind)) refreshToastStyle(activity);
+        enqueueToast(activity, title, body, avatarUrl, badgeUrl, dedupeKey, topMarginDp,
+                multiplier, coinsWon, displayName, kind, roomId, false);
+    }
+
+    /** Room-only presentation for large lucky wins: same configurable artwork, centered on screen. */
+    public static void showRoomCenter(
+            @Nullable Activity activity,
+            @Nullable String title,
+            @Nullable String body,
+            @Nullable String avatarUrl,
+            @Nullable String badgeUrl,
+            @Nullable String dedupeKey,
+            double multiplier,
+            long coinsWon,
+            @Nullable String displayName,
+            @Nullable String kind,
+            @Nullable String roomId
+    ) {
+        if ("gift_send".equalsIgnoreCase(kind)) return;
+        enqueueToast(activity, title, body, avatarUrl, badgeUrl, dedupeKey, 28,
+                multiplier, coinsWon, displayName, kind, roomId, true);
+    }
+
+    private static void enqueueToast(
+            @Nullable Activity activity,
+            @Nullable String title,
+            @Nullable String body,
+            @Nullable String avatarUrl,
+            @Nullable String badgeUrl,
+            @Nullable String dedupeKey,
+            int topMarginDp,
+            double multiplier,
+            long coinsWon,
+            @Nullable String displayName,
+            @Nullable String kind,
+            @Nullable String roomId,
+            boolean centerPlacement
+    ) {
+        if ("gift_send".equalsIgnoreCase(kind)) return;
+        if (activity == null || activity.isFinishing()) return;
+        try {
+            android.content.Context app = activity.getApplicationContext();
+            if (app instanceof com.Dramizo.Series.AuraLiveApp aura
+                    && aura.getContainer().getSessionManager().isMuteCelebrationPopups()) {
+                return;
+            }
+        } catch (Exception ignored) {
+        }
+        if (isLuckyToastKind(kind)) refreshToastStyle(activity);
         long now = System.currentTimeMillis();
         if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 1_200L) {
             return;
@@ -419,7 +469,7 @@ public final class GlobalCelebrationToast {
         lastShownAt = now;
         final int margin = Math.max(8, topMarginDp);
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
-                margin, multiplier, coinsWon, displayName, kind, roomId);
+                margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
         MAIN.post(() -> {
             PENDING.addLast(request);
             showNext();
@@ -442,7 +492,7 @@ public final class GlobalCelebrationToast {
         try {
             showInternal(activity, request.title, request.body, request.avatarUrl,
                     request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
-                    request.displayName, request.kind, request.roomId);
+                    request.displayName, request.kind, request.roomId, request.centerPlacement);
         } catch (Throwable error) {
             // A single malformed asset/activity must not leave the global toast queue
             // permanently marked as showing and hide every later celebration.
@@ -463,7 +513,8 @@ public final class GlobalCelebrationToast {
             long coinsWon,
             @Nullable String displayName,
             @Nullable String kind,
-            @Nullable String roomId
+            @Nullable String roomId,
+            boolean centerPlacement
     ) {
         if (activity.isFinishing() || activity.isDestroyed()) {
             showing = false;
@@ -676,8 +727,10 @@ public final class GlobalCelebrationToast {
             avatar.setClipToOutline(true);
         }
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(toastWidth, toastHeight);
-        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        lp.topMargin = dp(activity, topMarginDp);
+        lp.gravity = centerPlacement
+                ? (Gravity.CENTER)
+                : (Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        if (!centerPlacement) lp.topMargin = dp(activity, topMarginDp);
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
         banner.setScaleX(0.985f);
