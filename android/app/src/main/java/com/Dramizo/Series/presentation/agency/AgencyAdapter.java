@@ -16,7 +16,7 @@ import java.util.List;
 
 public class AgencyAdapter extends RecyclerView.Adapter<AgencyAdapter.VH> {
     public interface Listener {
-        void onJoin(String agencyId);
+        void onJoin(MiscDtos.AgencyDto agency);
         void onLeave(String agencyId);
         void onManage(String agencyId);
         /** Open live agency room when card is live / user taps enter. */
@@ -157,7 +157,7 @@ public class AgencyAdapter extends RecyclerView.Adapter<AgencyAdapter.VH> {
         } else {
             holder.b.btnJoin.setText(R.string.agency_join);
             holder.b.btnJoin.setEnabled(true);
-            holder.b.btnJoin.setOnClickListener(v -> listener.onJoin(agency.id));
+            holder.b.btnJoin.setOnClickListener(v -> listener.onJoin(agency));
         }
     }
 
