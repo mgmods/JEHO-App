@@ -656,8 +656,14 @@ public final class MiscDtos {
         @SerializedName("name") public String name;
         @SerializedName("memberCount") public int memberCount;
         @SerializedName("dailyDiamonds") public long dailyDiamonds;
+        @SerializedName("weeklyDiamonds") public long weeklyDiamonds;
+        @SerializedName("monthlyDiamonds") public long monthlyDiamonds;
         @SerializedName("activeHostsToday") public int activeHostsToday;
+        @SerializedName("activeHostsThisWeek") public int activeHostsThisWeek;
+        @SerializedName("activeHostsThisMonth") public int activeHostsThisMonth;
         @SerializedName("newMembersToday") public int newMembersToday;
+        @SerializedName("newMembersThisWeek") public int newMembersThisWeek;
+        @SerializedName("newMembersThisMonth") public int newMembersThisMonth;
         @SerializedName("lastGiftActivityAt") public String lastGiftActivityAt;
         @SerializedName("targetEnabled") public boolean targetEnabled;
         @SerializedName("targetPeriod") public String targetPeriod;
@@ -676,6 +682,8 @@ public final class MiscDtos {
         @SerializedName("membershipStartedAt") public String membershipStartedAt;
         @SerializedName("giftsReceivedDiamonds") public long giftsReceivedDiamonds;
         @SerializedName("dailyDiamonds") public long dailyDiamonds;
+        @SerializedName("weeklyDiamonds") public long weeklyDiamonds;
+        @SerializedName("monthlyDiamonds") public long monthlyDiamonds;
         @SerializedName("lastGiftAt") public String lastGiftAt;
         @SerializedName("targetEnabled") public boolean targetEnabled;
         @SerializedName("targetPeriod") public String targetPeriod;
