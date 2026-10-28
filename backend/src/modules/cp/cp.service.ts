@@ -59,7 +59,6 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const settings: Record<string, string> = Object.fromEntries(rows.map((row: any) => [row.key, String(row.value)]));
     const catalog: Array<Record<string, unknown>> = [];
     for (const type of Object.values(CpType)) {
-      const price = Number(settings[`cp.price.${type}`]);
       const giftId = settings[`cp.gift.${type}`] || null;
       const [gift] = giftId ? await this.dataSource.query(
         'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id=$1 AND "isActive"=true',
