@@ -70,11 +70,29 @@ header,main,.bottom-nav{position:relative;z-index:1}
 @keyframes cpFloatHeart{0%{transform:translate3d(0,0,0) rotate(-12deg) scale(.75);opacity:0}12%{opacity:.42}75%{opacity:.28}100%{transform:translate3d(var(--drift,24px),-115vh,0) rotate(20deg) scale(1.15);opacity:0}}
 @media(prefers-reduced-motion:reduce){body:before,.hero:before,.hero:after,#homeRelationships .pair-avatars:after,.ornate-pair:before,.pair-heart,.floating-heart{animation:none!important}}
 
+
+/* Final polish: prominent TOP 1 treatment and live local time */
+.header-live-time{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:62px;padding:6px 8px;border:1px solid #e8c779;border-radius:13px;background:linear-gradient(145deg,#fff9e9,#ffeaf3);color:#8c2854;line-height:1.25;box-shadow:0 4px 12px #8b1c4d0c}
+.header-live-time strong{font-size:12px;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.header-live-time small{font-size:9px;color:#9c7185;font-weight:800;margin-top:2px}
+.rank-one{isolation:isolate;border:1px solid #e3b64e!important;box-shadow:0 0 0 1px #f7e6b5,0 14px 34px #d3a33d35,inset 0 0 0 3px #fff9e9!important;animation:cpTopOneGlow 3s ease-in-out infinite}
+.rank-one:after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(115deg,transparent 15%,#fff8d866 38%,transparent 56%);transform:translateX(120%);animation:cpTopOneShine 5s ease-in-out infinite}
+.rank-one .rank-ribbon{padding:7px 14px;border-radius:0 0 0 15px;background:linear-gradient(105deg,#75470d,#e7c25f 48%,#9d6c1d);box-shadow:0 4px 12px #7b511c33;color:#fffdf4;text-shadow:0 1px 2px #70400d55;animation:cpCrownFloat 2.6s ease-in-out infinite}
+.rank-one .rank-ribbon:before{content:"♛ ";font-size:13px}
+.rank-one .name{color:#8f2555}
+.rank-one .score{color:#9d6715;text-shadow:0 0 12px #edcf7c55}
+.rank-one .ornate-pair{border-color:#e5bc59;box-shadow:0 0 0 3px #f8edce,0 0 0 6px #e7c56b28,0 0 25px #e5bd7350}
+@keyframes cpTopOneGlow{0%,100%{box-shadow:0 0 0 1px #f7e6b5,0 12px 28px #d3a33d20,inset 0 0 0 3px #fff9e9}50%{box-shadow:0 0 0 2px #e5c56f,0 16px 38px #d3a33d45,inset 0 0 0 3px #fff5d9}}
+@keyframes cpTopOneShine{0%,65%,100%{transform:translateX(120%);opacity:0}72%{opacity:1}88%{transform:translateX(-120%);opacity:.65}}
+@keyframes cpCrownFloat{0%,100%{filter:drop-shadow(0 0 0 #ffe5a0);transform:translateY(0)}50%{filter:drop-shadow(0 2px 5px #ffe5a0);transform:translateY(-2px)}}
+@media(max-width:370px){.header-live-time{min-width:54px;padding:5px 5px}.header-live-time strong{font-size:11px}.headtext h1{font-size:18px}}
+@media(prefers-reduced-motion:reduce){.rank-one,.rank-one:after,.rank-one .rank-ribbon{animation:none!important}}
+
 </style>
 </head>
 <body>
 <div class="floating-hearts" id="floatingHearts" aria-hidden="true"></div>
-<header><button class="iconbtn" id="backPage" aria-label="رجوع">‹</button><div class="headtext"><h1 id="pageTitle">عالم CP</h1><p id="pageSubtitle">رابطة استثنائية، بتفاصيل تليق بكما</p></div><button class="iconbtn" id="refresh" aria-label="تحديث">↻</button></header>
+<header><button class="iconbtn" id="backPage" aria-label="رجوع">‹</button><div class="headtext"><h1 id="pageTitle">عالم CP</h1><p id="pageSubtitle">رابطة استثنائية، بتفاصيل تليق بكما</p></div><div class="header-live-time" aria-label="الوقت الحالي"><strong id="cpLiveClock">--:--</strong><small id="cpLiveDate">اليوم</small></div><button class="iconbtn" id="refresh" aria-label="تحديث">↻</button></header>
 <main>
 <section class="hero" id="homeHero"><div class="hero-kicker">JEHO · CP UNIVERSE</div><h2 id="heroTitle">حكايتكما تستحق أن تكون استثنائية ♡</h2><p id="heroText">إطلالة فاخرة لعلاقتكما، ذكريات ونقاط وتفاصيل تنمو مع كل لحظة مشتركة.</p><div class="hero-actions"><button class="hero-cta" data-view="discover">استكشف الشخصيات</button><button class="hero-cta outline" data-view="insights">إحصائياتكما</button></div></section>
 <div class="stats"><div class="stat"><b id="activeCount">—</b><span>علاقاتك النشطة</span></div><div class="stat"><b id="incomingCount">—</b><span>طلبات واردة</span></div><div class="stat"><b id="sentCount">—</b><span>طلبات مرسلة</span></div></div>
@@ -166,6 +184,14 @@ $("reloadIncoming").addEventListener("click",()=>JehoCP.loadRequests());$("reloa
   el.style.setProperty("--drift",((i%2?1:-1)*(12+(i%3)*10))+"px");
   layer.appendChild(el);
  }
+})();
+
+
+(function initCpLiveClock(){
+ const clock=document.getElementById("cpLiveClock"),date=document.getElementById("cpLiveDate");
+ if(!clock||!date)return;
+ const update=()=>{const now=new Date();clock.textContent=new Intl.DateTimeFormat("ar",{hour:"2-digit",minute:"2-digit",hour12:true}).format(now);date.textContent=new Intl.DateTimeFormat("ar",{day:"numeric",month:"short"}).format(now);};
+ update();window.setInterval(update,15000);
 })();
 
 window.getCpView=()=>currentView;
