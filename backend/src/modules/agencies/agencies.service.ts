@@ -2060,6 +2060,8 @@ export class AgenciesService implements OnModuleInit {
       publicId: string | number | null;
       giftsReceivedDiamonds: string | number;
       dailyDiamonds: string | number;
+      weeklyDiamonds: string | number;
+      monthlyDiamonds: string | number;
       lastGiftAt: Date | string | null;
     }> = memberIds.length
       ? await this.dataSource.query(
@@ -2070,6 +2072,12 @@ export class AgenciesService implements OnModuleInit {
                   COALESCE(SUM(g."diamondsAwarded") FILTER (
                     WHERE g."createdAt" >= (date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
                   ), 0)::text AS "dailyDiamonds",
+                  COALESCE(SUM(g."diamondsAwarded") FILTER (
+                    WHERE g."createdAt" >= (date_trunc('week', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+                  ), 0)::text AS "weeklyDiamonds",
+                  COALESCE(SUM(g."diamondsAwarded") FILTER (
+                    WHERE g."createdAt" >= (date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+                  ), 0)::text AS "monthlyDiamonds",
                   MAX(g."createdAt") AS "lastGiftAt"
            FROM agency_membership_periods p
            JOIN users u ON u.id = p."userId"
@@ -2142,6 +2150,8 @@ export class AgenciesService implements OnModuleInit {
         membershipStartedAt: period.joinedAt,
         giftsReceivedDiamonds: Number(period.giftsReceivedDiamonds || 0),
         dailyDiamonds: Number(period.dailyDiamonds || 0),
+        weeklyDiamonds: Number(period.weeklyDiamonds || 0),
+        monthlyDiamonds: Number(period.monthlyDiamonds || 0),
         lastGiftAt: period.lastGiftAt || null,
         targetEnabled: !!targetConfig.enabled,
         targetPeriod,
@@ -2158,14 +2168,26 @@ export class AgenciesService implements OnModuleInit {
     memberStats.sort((a, b) => b.giftsReceivedDiamonds - a.giftsReceivedDiamonds);
     const received = memberStats.reduce((sum, item) => sum + item.giftsReceivedDiamonds, 0);
     const dailyReceived = memberStats.reduce((sum, item) => sum + item.dailyDiamonds, 0);
+    const weeklyReceived = memberStats.reduce((sum, item) => sum + item.weeklyDiamonds, 0);
+    const monthlyReceived = memberStats.reduce((sum, item) => sum + item.monthlyDiamonds, 0);
     const activeHostsToday = memberStats.filter((item) => item.dailyDiamonds > 0).length;
+    const activeHostsThisWeek = memberStats.filter((item) => item.weeklyDiamonds > 0).length;
+    const activeHostsThisMonth = memberStats.filter((item) => item.monthlyDiamonds > 0).length;
     const utcDayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const newMembersToday = await this.dataSource.query(
-      `SELECT COUNT(DISTINCT p."userId")::int AS count
+    const utcWeekStart = new Date(utcDayStart);
+    const daysSinceMonday = (utcWeekStart.getUTCDay() + 6) % 7;
+    utcWeekStart.setUTCDate(utcWeekStart.getUTCDate() - daysSinceMonday);
+    const utcMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const memberPeriodCounts = await this.dataSource.query(
+      `SELECT
+          COUNT(DISTINCT p."userId") FILTER (WHERE p."joinedAt" >= $2)::int AS "today",
+          COUNT(DISTINCT p."userId") FILTER (WHERE p."joinedAt" >= $3)::int AS "week",
+          COUNT(DISTINCT p."userId") FILTER (WHERE p."joinedAt" >= $4)::int AS "month"
        FROM agency_membership_periods p
-       WHERE p."agencyId" = $1 AND p."joinedAt" >= $2`,
-      [agencyId, utcDayStart],
+       WHERE p."agencyId" = $1`,
+      [agencyId, utcDayStart, utcWeekStart, utcMonthStart],
     );
+    const periodCounts = memberPeriodCounts?.[0] || {};
     const lastActivity = memberStats
       .map((item) => item.lastGiftAt
         ? (item.lastGiftAt instanceof Date
@@ -2176,8 +2198,14 @@ export class AgenciesService implements OnModuleInit {
     return {
       agencyId,
       dailyDiamonds: dailyReceived,
+      weeklyDiamonds: weeklyReceived,
+      monthlyDiamonds: monthlyReceived,
       activeHostsToday,
-      newMembersToday: Number(newMembersToday?.[0]?.count || 0),
+      activeHostsThisWeek,
+      activeHostsThisMonth,
+      newMembersToday: Number(periodCounts.today || 0),
+      newMembersThisWeek: Number(periodCounts.week || 0),
+      newMembersThisMonth: Number(periodCounts.month || 0),
       lastGiftActivityAt: lastActivity > 0 ? new Date(lastActivity).toISOString() : null,
       publicId: agency.publicId,
       name: agency.name,
