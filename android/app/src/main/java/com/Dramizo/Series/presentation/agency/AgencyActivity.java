@@ -134,11 +134,19 @@ public class AgencyActivity extends ThemedActivity {
         binding.btnJoinByCode.setOnClickListener(v -> {
             String code = binding.etActivationCode.getText() != null
                     ? binding.etActivationCode.getText().toString().trim() : "";
-            if (code.length() < 4) {
-                Toast.makeText(this, R.string.agency_join_code_invalid, Toast.LENGTH_SHORT).show();
+            String publicId = binding.etAgencySearch != null && binding.etAgencySearch.getText() != null
+                    ? binding.etAgencySearch.getText().toString().trim() : "";
+            if (publicId.length() < 3) {
+                Toast.makeText(this, "ابحث عن الوكالة بمعرفها أولاً", Toast.LENGTH_SHORT).show();
+                if (binding.etAgencySearch != null) binding.etAgencySearch.requestFocus();
                 return;
             }
-            vm.joinByCode(code);
+            if (code.length() < 4) {
+                Toast.makeText(this, R.string.agency_join_code_invalid, Toast.LENGTH_SHORT).show();
+                binding.etActivationCode.requestFocus();
+                return;
+            }
+            vm.joinByCode(publicId, code);
         });
         if (binding.btnSearchAgency != null) {
             binding.btnSearchAgency.setOnClickListener(v -> {
