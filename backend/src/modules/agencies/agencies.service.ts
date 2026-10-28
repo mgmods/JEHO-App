@@ -2051,6 +2051,7 @@ export class AgenciesService implements OnModuleInit {
       select: ['userId', 'role'],
     });
     const memberIds = members.map((m) => m.userId);
+    const roleByUser = new Map(members.map((member) => [member.userId, member.role]));
     // Aggregate gift totals in one query rather than issuing two queries per member.
     const activePeriods: Array<{
       userId: string;
@@ -2119,7 +2120,6 @@ export class AgenciesService implements OnModuleInit {
       .sort((a, b) => a.threshold - b.threshold);
 
     const memberStats = activePeriods.map((period) => {
-      const membership = members.find((m) => m.userId === period.userId);
       const targetState = targetByUser.get(period.userId);
       const targetProgress = targetState?.progress || 0;
       // Match the host's existing target ladder: a stage remains current until its
@@ -2130,7 +2130,7 @@ export class AgenciesService implements OnModuleInit {
         userId: period.userId,
         displayName: period.displayName || 'مضيف',
         publicId: period.publicId == null ? null : String(period.publicId),
-        role: membership?.role || AgencyRole.HOST,
+        role: roleByUser.get(period.userId) || AgencyRole.HOST,
         membershipStartedAt: period.joinedAt,
         giftsReceivedDiamonds: Number(period.giftsReceivedDiamonds || 0),
         targetEnabled: !!targetConfig.enabled,
