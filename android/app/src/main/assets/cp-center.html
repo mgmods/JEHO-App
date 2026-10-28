@@ -129,7 +129,8 @@ window.renderCpCatalog=function(){};
 window.renderCpTasks=function(){};
 window.showCpMessage=toast;window.showCpError=m=>toast(m||"حدث خطأ");
 window.setCpView=function(view){if(view==="home"||view==="weekly")page("weekly");else if(view==="incoming"||view==="sent"||view==="send")page("relationship");else if(view==="discover"){page("weekly");document.querySelector('[data-tab="world"]').click();}else if(view==="rules")page("rules");else page("relationship");};
-window.getCpView=()=> $("weekly").classList.contains("hidden")?(!$("relationship").classList.contains("hidden")?"relationship":"rules"):"home";\nwindow.CPPage={reload:function(){if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();JehoCP.loadLeaderboard("weekly");JehoCP.loadLeaderboard("world");JehoCP.loadRewards();}},go:page};
+window.getCpView=()=> $("weekly").classList.contains("hidden")?(!$("relationship").classList.contains("hidden")?"relationship":"rules"):"home";
+window.CPPage={reload:function(){if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();JehoCP.loadLeaderboard("weekly");JehoCP.loadLeaderboard("world");JehoCP.loadRewards();}},go:page};
 render();
 window.addEventListener("load",()=>{if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();JehoCP.loadLeaderboard("weekly");JehoCP.loadLeaderboard("world");JehoCP.loadRewards();}});
 </script>
