@@ -39,6 +39,7 @@ public final class ChallengeWheelView extends View {
     private final Paint centerInnerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint logoPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint labelPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private final StaticLayout[] labelLayouts = new StaticLayout[LABELS.length];
     private final RectF bounds = new RectF();
     private ValueAnimator spinAnimator;
 
@@ -57,6 +58,12 @@ public final class ChallengeWheelView extends View {
         labelPaint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         labelPaint.setTextSize(dp(10.5f));
         labelPaint.setShadowLayer(dp(2), 0, dp(1), 0xCC000000);
+        int textWidth = Math.max(1, (int) dp(78));
+        for (int i = 0; i < LABELS.length; i++) {
+            labelLayouts[i] = new StaticLayout(
+                    LABELS[i], labelPaint, textWidth, Layout.Alignment.ALIGN_CENTER,
+                    0.98f, 0f, false);
+        }
         setContentDescription("عجلة تحديات جيهو");
     }
 
@@ -121,10 +128,7 @@ public final class ChallengeWheelView extends View {
             canvas.save();
             canvas.rotate(start + 18f, cx, cy);
             float labelRadius = radius * 0.47f;
-            int textWidth = Math.max(1, (int) dp(78));
-            StaticLayout layout = new StaticLayout(
-                    LABELS[i], labelPaint, textWidth, Layout.Alignment.ALIGN_CENTER,
-                    0.98f, 0f, false);
+            StaticLayout layout = labelLayouts[i];
             canvas.translate(labelRadius, -layout.getHeight() / 2f);
             layout.draw(canvas);
             canvas.restore();
