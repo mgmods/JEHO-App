@@ -622,12 +622,30 @@ public class ProfileFragment extends Fragment {
     /** Keep the requested profile shortcuts visible; their existing click handlers remain unchanged. */
     private void applyTasksFeatureVisibility() {
         if (binding == null) return;
-        // These are user-facing profile entries and must not be hidden by the legacy tasks feature flag.
+
+        // The five Me-page service actions are permanent native shortcuts, not feature-flagged.
+        // Restore the parent grid as well as each item so stale runtime visibility cannot hide them.
+        if (binding.profileServicesGrid != null) {
+            binding.profileServicesGrid.setVisibility(View.VISIBLE);
+            binding.profileServicesGrid.setColumnCount(3);
+            binding.profileServicesGrid.requestLayout();
+        }
+        binding.rowMyEvents.setVisibility(View.VISIBLE);
+        binding.btnAgency.setVisibility(View.VISIBLE);
         binding.btnTaskCenter.setVisibility(View.VISIBLE);
-        if (binding.rowMyEvents != null) binding.rowMyEvents.setVisibility(View.VISIBLE);
-        if (binding.btnAgency != null) binding.btnAgency.setVisibility(View.VISIBLE);
-        if (binding.btnRechargeAgent != null) binding.btnRechargeAgent.setVisibility(View.VISIBLE);
-        if (binding.btnSettingsQuick != null) binding.btnSettingsQuick.setVisibility(View.VISIBLE);
+        binding.btnRechargeAgent.setVisibility(View.VISIBLE);
+        binding.btnSettingsQuick.setVisibility(View.VISIBLE);
+
+        binding.rowMyEvents.setEnabled(true);
+        binding.btnAgency.setEnabled(true);
+        binding.btnTaskCenter.setEnabled(true);
+        binding.btnRechargeAgent.setEnabled(true);
+        binding.btnSettingsQuick.setEnabled(true);
+        binding.rowMyEvents.requestLayout();
+        binding.btnAgency.requestLayout();
+        binding.btnTaskCenter.requestLayout();
+        binding.btnRechargeAgent.requestLayout();
+        binding.btnSettingsQuick.requestLayout();
     }
 
     private void bindStaffUi(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
