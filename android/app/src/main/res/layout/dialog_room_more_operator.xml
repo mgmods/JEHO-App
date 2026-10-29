@@ -71,7 +71,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/dp_35"
-            android:text="@string/effect"
+            android:text="التحديات"
             android:textColor="#4dffffff"
             android:textSize="18sp"
             app:layout_constraintStart_toEndOf="@id/tv_tool"
