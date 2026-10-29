@@ -14414,6 +14414,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         ChallengeWheelView wheel = new ChallengeWheelView(this);
         wheelHost.addView(wheel, new FrameLayout.LayoutParams(dp(286), dp(286), Gravity.CENTER));
 
+        TextView pointer = new TextView(this);
+        pointer.setText("▼");
+        pointer.setTextColor(0xFFFFD36C);
+        pointer.setTextSize(22);
+        pointer.setGravity(Gravity.CENTER);
+        pointer.setShadowLayer(dp(3), 0, dp(1), 0x88000000);
+        wheelHost.addView(pointer, new FrameLayout.LayoutParams(
+                dp(30), dp(26), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
+
         TextView resultCaption = new TextView(this);
         resultCaption.setText("نوع الفقرة");
         resultCaption.setTextColor(0xFFBFB5D1);
