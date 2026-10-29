@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F4F5F5">
+    android:background="#FFFFFFFF">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -47,7 +47,7 @@
                 android:paddingTop="10dp"
                 android:paddingBottom="8dp"
                 android:paddingHorizontal="2dp"
-                android:background="@android:color/transparent">
+                android:background="@drawable/bg_profile_reference_header">
 
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/imgProfileAvatar"
