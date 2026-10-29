@@ -669,9 +669,7 @@ public class ProfileFragment extends Fragment {
                 View child = shortcut.getChildAt(j);
                 if (child instanceof android.widget.ImageView) {
                     android.widget.ImageView icon = (android.widget.ImageView) child;
-                    if (icon.getContentDescription() != null
-                            && icon.getContentDescription().toString().length() > 0
-                            && j == 0) {
+                    if (j == 0) {
                         android.widget.LinearLayout.LayoutParams iconLp =
                                 new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
                         icon.setLayoutParams(iconLp);
