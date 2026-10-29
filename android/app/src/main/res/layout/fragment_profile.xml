@@ -633,6 +633,33 @@
                     android:orientation="vertical">
 
                     <TextView
+                        android:id="@+id/tvFriendsCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="#FF222222"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/friends"
+                        android:textColor="#FF73758A"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/statVisitors"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
                         android:id="@+id/tvFollowers"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -889,99 +916,54 @@
                     android:visibility="gone" />
             </FrameLayout>
 
-            <!-- Side-by-side VIP and Level cards, retaining their existing click targets. -->
+            <!-- Two wide profile insignias, matching the reference image. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
+                android:layout_marginHorizontal="18dp"
                 android:layout_marginTop="10dp"
                 android:orientation="horizontal"
+                android:gravity="center"
                 android:baselineAligned="false">
-                <LinearLayout
-                    android:id="@+id/vipCard"
-                    android:layout_width="0dp"
-                    android:layout_height="82dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_profile_dark_card"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <ImageView
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:contentDescription="@string/vip"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/ic_feat_vip" />
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/vip"
-                            android:textColor="#FF222222"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="امتيازات VIP"
-                            android:textColor="#FF777777"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-                </LinearLayout>
+
                 <LinearLayout
                     android:id="@+id/levelCard"
                     android:layout_width="0dp"
-                    android:layout_height="82dp"
+                    android:layout_height="96dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_profile_dark_card"
+                    android:layout_marginEnd="8dp"
+                    android:gravity="center"
+                    android:orientation="vertical"
                     android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
                     android:clickable="true"
                     android:focusable="true">
-                    <TextView
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:background="#FFF1ECFF"
-                        android:gravity="center"
-                        android:text="Lv"
-                        android:textColor="#FF6B4CC2"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/user_level"
-                            android:textColor="#FF222222"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="مستواك الحالي"
-                            android:textColor="#FF777777"
-                            android:textSize="11sp" />
-                    </LinearLayout>
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@string/user_level"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_me_level_card" />
                 </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/vipCard"
+                    android:layout_width="0dp"
+                    android:layout_height="96dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@string/vip"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_me_vip_card" />
+                </LinearLayout>
+
                 <include
                     android:id="@+id/btnUserLevel"
                     layout="@layout/item_profile_service_row"
@@ -1002,10 +984,10 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="12dp"
-                android:background="@drawable/bg_profile_dark_card"
-                android:elevation="3dp"
+                android:background="@android:color/transparent"
+                android:elevation="0dp"
                 android:orientation="horizontal"
-                android:paddingVertical="15dp">
+                android:paddingVertical="12dp">
 
                 <LinearLayout
                     android:id="@+id/btnAppearance"
@@ -1107,8 +1089,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="10dp"
-                android:background="@drawable/bg_profile_dark_card"
-                android:elevation="3dp"
+                android:background="@android:color/transparent"
+                android:elevation="0dp"
                
                 android:paddingHorizontal="12dp"
                 android:paddingVertical="4dp" android:columnCount="3" android:useDefaultMargins="true">
