@@ -72,11 +72,6 @@ public class ProfileFragment extends Fragment {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
             int top = bars.top + (int) (16 * getResources().getDisplayMetrics().density);
             if (binding != null) {
-                android.view.ViewGroup.LayoutParams settingsLp = binding.btnSettingsTopReference.getLayoutParams();
-                if (settingsLp instanceof android.view.ViewGroup.MarginLayoutParams) {
-                    android.view.ViewGroup.MarginLayoutParams p = (android.view.ViewGroup.MarginLayoutParams) settingsLp;
-                    if (p.topMargin != top) { p.topMargin = top; binding.btnSettingsTopReference.setLayoutParams(p); }
-                }
                 android.view.ViewGroup.LayoutParams editLp = binding.btnEditProfileIcon.getLayoutParams();
                 if (editLp instanceof android.view.ViewGroup.MarginLayoutParams) {
                     android.view.ViewGroup.MarginLayoutParams p = (android.view.ViewGroup.MarginLayoutParams) editLp;
@@ -119,7 +114,29 @@ public class ProfileFragment extends Fragment {
             binding.rowProfileBadges.setOnClickListener(v ->
                     startActivity(new Intent(requireContext(), MedalActivity.class)));
         }
-        // The inline container is not used by this screen; the dedicated cabinet renders medals.
+        // Compact visual strip linking to the real cabinet, where medals can be equipped or removed.
+        if (binding.earnedBadgesContainer != null && binding.earnedBadgesContainer.getChildCount() == 0) {
+            String[] symbols = {"🏅", "🥇", "🥈", "🥉", "🎖️", "⭐"};
+            for (String symbol : symbols) {
+                android.widget.TextView badge = new android.widget.TextView(requireContext());
+                badge.setText(symbol);
+                badge.setTextSize(17f);
+                badge.setGravity(android.view.Gravity.CENTER);
+                badge.setIncludeFontPadding(false);
+                badge.setPadding(0, 0, Math.round(5 * getResources().getDisplayMetrics().density), 0);
+                binding.earnedBadgesContainer.addView(badge, new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Math.round(28 * getResources().getDisplayMetrics().density)));
+            }
+            android.widget.TextView label = new android.widget.TextView(requireContext());
+            label.setText("الميداليات والشارات");
+            label.setTextColor(android.graphics.Color.parseColor("#FF6C5A91"));
+            label.setTextSize(11f);
+            label.setPadding(Math.round(5 * getResources().getDisplayMetrics().density), 0, 0, 0);
+            binding.earnedBadgesContainer.addView(label, new android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Math.round(28 * getResources().getDisplayMetrics().density)));
+        }
 
         // Bind only views that exist in fragment_profile.xml. The former action*/icon* IDs
         // belonged to a removed shortcut grid and caused FragmentProfileBinding compilation errors.
@@ -184,10 +201,6 @@ public class ProfileFragment extends Fragment {
         binding.btnVip.setOnClickListener(v -> openVipHtmlPage());
         binding.btnSettingsQuick.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), SettingsActivity.class)));
-        if (binding.btnSettingsTopReference != null) {
-            binding.btnSettingsTopReference.setOnClickListener(v ->
-                    startActivity(new Intent(requireContext(), SettingsActivity.class)));
-        }
         bindMysteriousModeShortcut();
         if (binding.levelCard != null) {
             binding.levelCard.setOnClickListener(v ->
@@ -647,7 +660,7 @@ public class ProfileFragment extends Fragment {
         }
 
         int density = getResources().getDisplayMetrics().densityDpi;
-        int rowHeight = Math.round(62f * density / 160f);
+        int rowHeight = Math.round(52f * density / 160f);
         int horizontalPadding = Math.round(16f * density / 160f);
         int iconSize = Math.round(30f * density / 160f);
         int textGap = Math.round(12f * density / 160f);
