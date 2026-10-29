@@ -1092,10 +1092,9 @@
                         android:src="@drawable/ic_me_living_record" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/visitors"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1106,6 +1105,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1126,10 +1126,9 @@
                         android:src="@drawable/ic_me_gift" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/gift_history"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1140,6 +1139,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1159,10 +1159,9 @@
                         android:src="@drawable/ic_me_living_record" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/my_events"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1173,6 +1172,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1192,10 +1192,9 @@
                         android:src="@drawable/ic_me_agency" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/open_agency"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1206,6 +1205,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1226,10 +1226,9 @@
                         android:src="@drawable/ic_recharge_agent" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/recharge_agent"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1240,6 +1239,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1267,10 +1267,9 @@
                         android:src="@drawable/ic_me_invite" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="رمز دعوتي"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1281,6 +1280,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1301,10 +1301,9 @@
                         android:src="@drawable/ic_friend_requests" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/my_relations"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1315,6 +1314,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1335,10 +1335,9 @@
                         app:tint="#FFE8D8FF" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/task_center"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1349,6 +1348,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1369,10 +1369,9 @@
                         android:src="@drawable/ic_me_rank" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/ranking"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1383,6 +1382,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1403,10 +1403,9 @@
                         android:src="@drawable/ic_me_edit" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/edit_profile"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1417,6 +1416,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1440,10 +1440,9 @@
                         app:tint="#FFE8D8FF" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/notifications"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1454,6 +1453,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1472,7 +1472,6 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
                         android:orientation="vertical">
                         <TextView
                             android:layout_width="match_parent"
@@ -1514,10 +1513,9 @@
                         android:src="@drawable/ic_me_setting" />
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:layout_weight="1"
                         android:text="@string/settings"
                         android:textColor="#FF222222"
                         android:textSize="14sp"
@@ -1528,6 +1526,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="gone"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
             </GridLayout>
