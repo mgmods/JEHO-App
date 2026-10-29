@@ -1110,6 +1110,15 @@
                     android:orientation="vertical" />
             </LinearLayout>
 
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="18dp"
+                android:layout_marginEnd="18dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:background="#FFF0EDF4" />
+
             <!-- Clean lower-section heading above the native service shortcuts. -->
             <LinearLayout
                 android:layout_width="match_parent"
