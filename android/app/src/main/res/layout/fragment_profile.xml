@@ -34,9 +34,9 @@
         android:id="@+id/btnEditProfileIcon"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_gravity="top|end"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="72dp"
         android:layout_marginTop="14dp"
-        android:layout_marginEnd="14dp"
         android:background="@drawable/bg_profile_edit_fab"
         android:contentDescription="@string/edit_profile"
         android:elevation="4dp"
@@ -64,7 +64,7 @@
             <ImageView
                 android:id="@+id/imgCover"
                 android:layout_width="match_parent"
-                android:layout_height="106dp"
+                android:layout_height="148dp"
                 android:contentDescription="@null"
                 android:scaleType="fitXY"
                 android:src="@drawable/bg_profile_reference_header" />
@@ -83,15 +83,15 @@
 
                 <!-- Mikoo Me: face 70dp + frame 90dp centered (same locked pair with/without wear). -->
                 <FrameLayout
-                    android:layout_width="96dp"
-                    android:layout_height="96dp"
+                    android:layout_width="108dp"
+                    android:layout_height="108dp"
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
                     <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/imgAvatar"
-                        android:layout_width="74dp"
-                        android:layout_height="74dp"
+                        android:layout_width="82dp"
+                        android:layout_height="82dp"
                         android:layout_gravity="center"
                         android:contentDescription="@string/nav_profile"
                         android:scaleType="centerCrop"
@@ -100,8 +100,8 @@
 
                     <ImageView
                         android:id="@+id/imgFrame"
-                        android:layout_width="96dp"
-                        android:layout_height="96dp"
+                        android:layout_width="108dp"
+                        android:layout_height="108dp"
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:scaleType="fitCenter"
@@ -109,8 +109,8 @@
 
                     <com.Dramizo.Series.util.HostSignalView
                         android:id="@+id/webProfileHostSignal"
-                        android:layout_width="90dp"
-                        android:layout_height="90dp"
+                        android:layout_width="102dp"
+                        android:layout_height="102dp"
                         android:layout_gravity="center"
                         android:visibility="gone" />
                 </FrameLayout>
