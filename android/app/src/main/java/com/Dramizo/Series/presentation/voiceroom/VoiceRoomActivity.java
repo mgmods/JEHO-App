@@ -3871,6 +3871,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 RoomMoreOperatorSheet.shareWhatsApp(this, roomId, title);
                 break;
             }
+            case "challenge_wheel":
+                // The room-wide wheel requires a server-authoritative realtime result;
+                // do not run a local-only spin that could show different outcomes to members.
+                Toast.makeText(this,
+                        "واجهة عجلة التحديات أُضيفت، ويجري تجهيز التدوير المتزامن لكل الموجودين",
+                        Toast.LENGTH_LONG).show();
+                break;
+            case "pk_challenge":
+                if (!isOwner) {
+                    Toast.makeText(this, "تحديات PK متاحة لمضيف الغرفة فقط", Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                if (!roomPkFeatureEnabled) {
+                    Toast.makeText(this, "تحديات PK معطّلة من لوحة التحكم", Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                if (roomPkCurrentContestId != null && !roomPkCurrentContestId.isEmpty()
+                        && !"pending".equals(roomPkCurrentContestId)) {
+                    Toast.makeText(this, "يوجد تحدٍّ PK جارٍ في هذه الغرفة", Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                showRoomPkChallengeDialog();
+                break;
             case "entry_effect": {
                 if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
