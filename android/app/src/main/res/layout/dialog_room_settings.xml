@@ -259,34 +259,6 @@
         android:visibility="gone" />
 
     <TextView
-        android:id="@+id/tvRoomChallengesTitle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:paddingHorizontal="4dp"
-        android:text="تحديات الغرفة"
-        android:textColor="@color/aurora_teal"
-        android:textSize="12sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/btnChallengeWheel"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_room_dialog_item"
-        android:drawableStart="@drawable/ic_hub_wheel"
-        android:drawablePadding="10dp"
-        android:gravity="center_vertical"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:text="عجلة التحديات"
-        android:textColor="@color/aurora_gold"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:visibility="gone" />
-
-    <TextView
         android:id="@+id/btnRoomPkChallenge"
         android:layout_width="match_parent"
         android:layout_height="48dp"
