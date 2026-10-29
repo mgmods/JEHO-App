@@ -64,9 +64,9 @@
             <ImageView
                 android:id="@+id/imgCover"
                 android:layout_width="match_parent"
-                android:layout_height="148dp"
+                android:layout_height="164dp"
                 android:contentDescription="@null"
-                android:scaleType="fitXY"
+                android:scaleType="centerCrop"
                 android:src="@drawable/bg_profile_reference_header" />
 
             <!-- User row: single avatar left + info right (no top settings — Mikoo keeps settings in list) -->
@@ -83,15 +83,15 @@
 
                 <!-- Mikoo Me: face 70dp + frame 90dp centered (same locked pair with/without wear). -->
                 <FrameLayout
-                    android:layout_width="108dp"
-                    android:layout_height="108dp"
+                    android:layout_width="116dp"
+                    android:layout_height="116dp"
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
                     <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/imgAvatar"
-                        android:layout_width="82dp"
-                        android:layout_height="82dp"
+                        android:layout_width="78dp"
+                        android:layout_height="78dp"
                         android:layout_gravity="center"
                         android:contentDescription="@string/nav_profile"
                         android:scaleType="centerCrop"
@@ -100,8 +100,8 @@
 
                     <ImageView
                         android:id="@+id/imgFrame"
-                        android:layout_width="108dp"
-                        android:layout_height="108dp"
+                        android:layout_width="116dp"
+                        android:layout_height="116dp"
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:scaleType="fitCenter"
@@ -109,8 +109,8 @@
 
                     <com.Dramizo.Series.util.HostSignalView
                         android:id="@+id/webProfileHostSignal"
-                        android:layout_width="102dp"
-                        android:layout_height="102dp"
+                        android:layout_width="108dp"
+                        android:layout_height="108dp"
                         android:layout_gravity="center"
                         android:visibility="gone" />
                 </FrameLayout>
@@ -563,12 +563,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="14dp"
                 android:gravity="center"
                 android:orientation="horizontal"
-                android:paddingVertical="12dp"
-                android:background="@drawable/bg_profile_dark_card"
-                android:elevation="3dp">
+                android:paddingVertical="16dp"
+                android:background="@android:color/transparent"
+                android:elevation="0dp">
 
                 <LinearLayout
                     android:id="@+id/statFollowing"
@@ -731,15 +731,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="12dp"
                 android:orientation="horizontal"
                 android:gravity="center"
-                android:background="@drawable/bg_profile_dark_card"
+                android:background="@drawable/bg_profile_reference_card"
                 android:foreground="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingHorizontal="4dp"
-                android:paddingVertical="2dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="8dp"
                 android:baselineAligned="false">
 
                 <LinearLayout
@@ -837,9 +837,9 @@
                 android:id="@+id/profileBannerWrap"
                 android:layout_width="match_parent"
                 android:layout_height="72dp"
-                android:layout_marginHorizontal="12dp"
+                android:layout_marginHorizontal="8dp"
                 android:layout_marginTop="12dp"
-                android:background="@drawable/bg_profile_dark_card"
+                android:background="@android:color/transparent"
                 android:clipToOutline="true"
                 android:visibility="gone">
                 <ImageView
