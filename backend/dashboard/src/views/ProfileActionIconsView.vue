@@ -11,7 +11,7 @@
 
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
-    <p class="text-secondary small mb-3">الأزرار المعروضة في التطبيق: فعالياتي، فتح وكالة، وكيل شحن، مركز المهام، الإعدادات، الدعم. إعدادات هذه الأيقونات مشتركة مع أيقونات التبويبات، ولن تتأثر عند حفظ أيقونات التبويبات. ترك الأيقونة فارغة يعيد أيقونة التطبيق الافتراضية.</p>
+    <p class="text-secondary small mb-3">الأيقونات التي تُطبّق على جميع المستخدمين: VIP، المستوى، المتجر، الغرفة، الوكالة، فعالياتي، فتح وكالة، مركز المهام، وكيل الشحن، الأدوات. إعدادات هذه الأيقونات مشتركة مع أيقونات التبويبات، ولن تتأثر عند حفظ أيقونات التبويبات. ترك الأيقونة فارغة يعيد أيقونة التطبيق الافتراضية.</p>
 
     <LoadingSpinner v-if="loading" />
     <div v-else class="profile-icons-grid">
@@ -41,10 +41,16 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const ORIGIN = (import.meta.env.VITE_API_ORIGIN || window.location.origin).replace(/\/$/, '')
 const actions = [
+  { key: 'vip', label: 'VIP' },
+  { key: 'level', label: 'المستوى' },
+  { key: 'store', label: 'المتجر' },
+  { key: 'room', label: 'الغرفة' },
+  { key: 'agencyCenter', label: 'الوكالة' },
   { key: 'events', label: 'فعالياتي' },
   { key: 'agency', label: 'فتح وكالة' },
-  { key: 'rechargeAgent', label: 'وكيل شحن' },
   { key: 'tasks', label: 'مركز المهام' },
+  { key: 'rechargeAgent', label: 'وكيل الشحن' },
+  { key: 'tools', label: 'الأدوات' },
   { key: 'settings', label: 'الإعدادات' },
   { key: 'support', label: 'الدعم' },
 ]
