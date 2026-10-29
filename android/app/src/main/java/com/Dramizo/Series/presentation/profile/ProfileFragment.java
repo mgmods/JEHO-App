@@ -623,29 +623,53 @@ public class ProfileFragment extends Fragment {
     private void applyTasksFeatureVisibility() {
         if (binding == null) return;
 
-        // The five Me-page service actions are permanent native shortcuts, not feature-flagged.
-        // Restore the parent grid as well as each item so stale runtime visibility cannot hide them.
-        if (binding.profileServicesGrid != null) {
-            binding.profileServicesGrid.setVisibility(View.VISIBLE);
-            binding.profileServicesGrid.setColumnCount(3);
-            binding.profileServicesGrid.requestLayout();
-        }
-        binding.rowMyEvents.setVisibility(View.VISIBLE);
-        binding.btnAgency.setVisibility(View.VISIBLE);
-        binding.btnTaskCenter.setVisibility(View.VISIBLE);
-        binding.btnRechargeAgent.setVisibility(View.VISIBLE);
-        binding.btnSettingsQuick.setVisibility(View.VISIBLE);
+        // These five native shortcuts must remain visible even if old server flags or
+        // zero-width GridLayout weights would otherwise collapse them on some devices.
+        android.widget.GridLayout grid = binding.profileServicesGrid;
+        if (grid != null) {
+            grid.setVisibility(View.VISIBLE);
+            grid.setColumnCount(3);
+            grid.setUseDefaultMargins(false);
 
-        binding.rowMyEvents.setEnabled(true);
-        binding.btnAgency.setEnabled(true);
-        binding.btnTaskCenter.setEnabled(true);
-        binding.btnRechargeAgent.setEnabled(true);
-        binding.btnSettingsQuick.setEnabled(true);
-        binding.rowMyEvents.requestLayout();
-        binding.btnAgency.requestLayout();
-        binding.btnTaskCenter.requestLayout();
-        binding.btnRechargeAgent.requestLayout();
-        binding.btnSettingsQuick.requestLayout();
+            int density = getResources().getDisplayMetrics().densityDpi;
+            int dp16 = Math.round(16f * density / 160f);
+            int dp12 = Math.round(12f * density / 160f);
+            int cellWidth = Math.max(1,
+                    (getResources().getDisplayMetrics().widthPixels - dp16 - dp12) / 3);
+            int cellHeight = Math.round(96f * density / 160f);
+
+            View[] shortcuts = {
+                    binding.rowMyEvents,
+                    binding.btnAgency,
+                    binding.btnTaskCenter,
+                    binding.btnRechargeAgent,
+                    binding.btnSettingsQuick
+            };
+            for (View shortcut : shortcuts) {
+                if (shortcut == null) continue;
+                shortcut.setVisibility(View.VISIBLE);
+                shortcut.setEnabled(true);
+                android.view.ViewGroup.LayoutParams raw = shortcut.getLayoutParams();
+                if (raw instanceof android.widget.GridLayout.LayoutParams) {
+                    android.widget.GridLayout.LayoutParams lp =
+                            (android.widget.GridLayout.LayoutParams) raw;
+                    // Avoid 0dp child widths depending on column-weight distribution.
+                    lp.width = cellWidth;
+                    lp.height = cellHeight;
+                    lp.columnSpec = android.widget.GridLayout.spec(
+                            android.widget.GridLayout.UNDEFINED, 1f);
+                    lp.setGravity(android.view.Gravity.CENTER);
+                    shortcut.setLayoutParams(lp);
+                } else {
+                    raw.width = cellWidth;
+                    raw.height = cellHeight;
+                    shortcut.setLayoutParams(raw);
+                }
+                shortcut.requestLayout();
+            }
+            grid.requestLayout();
+            grid.invalidate();
+        }
     }
 
     private void bindStaffUi(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
