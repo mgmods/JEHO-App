@@ -39,7 +39,6 @@ public final class ChallengeWheelView extends View {
     private final Paint outerLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hubPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hubEdgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint pointerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint labelPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint logoPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final StaticLayout[] layouts = new StaticLayout[SHORT_LABELS.length];
@@ -67,9 +66,6 @@ public final class ChallengeWheelView extends View {
         hubEdgePaint.setStyle(Paint.Style.STROKE);
         hubEdgePaint.setStrokeWidth(dp(2));
 
-        pointerPaint.setStyle(Paint.Style.FILL);
-        pointerPaint.setColor(0xFFFFD36C);
-        pointerPaint.setShadowLayer(dp(3), 0, dp(1), 0x77000000);
 
         labelPaint.setColor(0xFFFFFFFF);
         labelPaint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
@@ -174,13 +170,6 @@ public final class ChallengeWheelView extends View {
         canvas.drawCircle(cx, cy, hub - dp(2), hubEdgePaint);
         canvas.drawText("JEHO", cx, cy + dp(5), logoPaint);
 
-        // Compact fixed pointer at 12 o'clock.
-        Path pointer = new Path();
-        pointer.moveTo(cx, cy - radius + dp(2));
-        pointer.lineTo(cx - dp(9), cy - radius - dp(13));
-        pointer.lineTo(cx + dp(9), cy - radius - dp(13));
-        pointer.close();
-        canvas.drawPath(pointer, pointerPaint);
     }
 
     private int lighten(int color) {
