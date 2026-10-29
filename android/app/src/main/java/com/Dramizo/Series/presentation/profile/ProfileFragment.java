@@ -117,6 +117,17 @@ public class ProfileFragment extends Fragment {
         // Only real, equipped medals are rendered here; no placeholder symbols or label.
         if (binding.earnedBadgesContainer != null) binding.earnedBadgesContainer.removeAllViews();
 
+        // Dashboard-managed custom icons for the Me page; empty URLs retain native defaults.
+        bindDashboardProfileIcon(R.id.imgMeVipActionIcon, "vip", R.drawable.ic_me_vip_card);
+        bindDashboardProfileIcon(R.id.imgMeLevelActionIcon, "level", R.drawable.ic_me_level_card);
+        bindDashboardProfileIcon(R.id.imgMeStoreActionIcon, "store", R.drawable.me_mall);
+        bindDashboardProfileIcon(R.id.imgMeRoomActionIcon, "room", R.drawable.me_room);
+        bindDashboardProfileIcon(R.id.imgMeAgencyActionIcon, "agencyCenter", R.drawable.ic_me_agency);
+        bindDashboardProfileIcon(R.id.imgMeEventsActionIcon, "events", R.drawable.ic_me_living_record);
+        bindDashboardProfileIcon(R.id.imgMeOpenAgencyActionIcon, "agency", R.drawable.icon_agency);
+        bindDashboardProfileIcon(R.id.imgMeTasksActionIcon, "tasks", R.drawable.ic_me_task);
+        bindDashboardProfileIcon(R.id.imgMeRechargeActionIcon, "recharge", R.drawable.ic_recharge_agent);
+
         // Bind only views that exist in fragment_profile.xml. The former action*/icon* IDs
         // belonged to a removed shortcut grid and caused FragmentProfileBinding compilation errors.
         bindRow(binding.btnAppearance, v ->
@@ -329,6 +340,14 @@ public class ProfileFragment extends Fragment {
     }
 
     /** Loads the profile-only banner; home carousel banners are managed independently. */
+    private void bindDashboardProfileIcon(int viewId, String key, int fallbackRes) {
+        if (binding == null || getView() == null) return;
+        android.view.View target = getView().findViewById(viewId);
+        if (target instanceof android.widget.ImageView) {
+            RemoteNavIcons.bindProfileAction((android.widget.ImageView) target, key, fallbackRes);
+        }
+    }
+
     private void loadProfileBanner() {
         if (binding == null || !isAdded()) return;
         AppContainer c = ContainerProvider.from(requireActivity());
