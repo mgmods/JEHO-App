@@ -910,6 +910,7 @@
                     <ImageView
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
+                        android:id="@+id/imgMeLevelActionIcon"
                         android:contentDescription="@string/user_level"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_me_level_card" />
@@ -929,6 +930,7 @@
                     <ImageView
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
+                        android:id="@+id/imgMeVipActionIcon"
                         android:contentDescription="@string/vip"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_me_vip_card" />
@@ -972,6 +974,7 @@
                     <ImageView
                         android:layout_width="38dp"
                         android:layout_height="38dp"
+                        android:id="@+id/imgMeStoreActionIcon"
                         android:contentDescription="@string/store_title"
                         android:scaleType="fitCenter"
                         android:src="@drawable/me_mall" />
@@ -999,6 +1002,7 @@
                     <ImageView
                         android:layout_width="38dp"
                         android:layout_height="38dp"
+                        android:id="@+id/imgMeRoomActionIcon"
                         android:contentDescription="@string/my_room"
                         android:scaleType="fitCenter"
                         android:src="@drawable/me_room" />
@@ -1030,6 +1034,7 @@
                     <ImageView
                         android:layout_width="38dp"
                         android:layout_height="38dp"
+                        android:id="@+id/imgMeOpenAgencyActionIcon"
                         android:contentDescription="@string/agency"
                         android:scaleType="fitCenter"
                         android:src="@drawable/icon_agency" />
@@ -1088,6 +1093,7 @@
                     <ImageView
                         android:layout_width="44dp"
                         android:layout_height="44dp"
+                        android:id="@+id/imgMeEventsActionIcon"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_me_living_record" />
 
@@ -1190,6 +1196,7 @@
                     <ImageView
                         android:layout_width="44dp"
                         android:layout_height="44dp"
+                        android:id="@+id/imgMeAgencyActionIcon"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_me_agency" />
 
@@ -1224,6 +1231,7 @@
                     <ImageView
                         android:layout_width="44dp"
                         android:layout_height="44dp"
+                        android:id="@+id/imgMeTasksActionIcon"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_me_task"
                         app:tint="#FFD8AD43" />
@@ -1259,6 +1267,7 @@
                     <ImageView
                         android:layout_width="44dp"
                         android:layout_height="44dp"
+                        android:id="@+id/imgMeRechargeActionIcon"
                         android:contentDescription="@string/recharge_agent"
                         android:scaleType="centerCrop"
                         android:src="@drawable/ic_recharge_agent" />
