@@ -979,32 +979,6 @@
                     android:orientation="horizontal" />
             </LinearLayout>
 
-            <!-- Section title for the compact quick-access shortcuts. -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="18dp"
-                android:layout_marginEnd="18dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="0dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="اختصارات سريعة"
-                    android:textColor="#FF292333"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <View
-                    android:layout_width="34dp"
-                    android:layout_height="2dp"
-                    android:background="#FFD8AD43" />
-            </LinearLayout>
-
             <!-- Mikoo quick row: Mall / Room / Badge — unique large icons -->
             <LinearLayout
                 android:layout_width="match_parent"
