@@ -623,53 +623,78 @@ public class ProfileFragment extends Fragment {
     private void applyTasksFeatureVisibility() {
         if (binding == null) return;
 
-        // These five native shortcuts must remain visible even if old server flags or
-        // zero-width GridLayout weights would otherwise collapse them on some devices.
-        android.widget.GridLayout grid = binding.profileServicesGrid;
-        if (grid != null) {
-            grid.setVisibility(View.VISIBLE);
-            grid.setColumnCount(3);
-            grid.setUseDefaultMargins(false);
+        // Use a true vertical list for the five requested Me-page shortcuts.
+        android.widget.LinearLayout list = binding.profileServicesGrid;
+        if (list == null) return;
+        list.setVisibility(View.VISIBLE);
+        list.setOrientation(android.widget.LinearLayout.VERTICAL);
 
-            int density = getResources().getDisplayMetrics().densityDpi;
-            int dp16 = Math.round(16f * density / 160f);
-            int dp12 = Math.round(12f * density / 160f);
-            int cellWidth = Math.max(1,
-                    (getResources().getDisplayMetrics().widthPixels - dp16 - dp12) / 3);
-            int cellHeight = Math.round(96f * density / 160f);
+        View[] shortcuts = {
+                binding.rowMyEvents,
+                binding.btnAgency,
+                binding.btnTaskCenter,
+                binding.btnRechargeAgent,
+                binding.btnSettingsQuick
+        };
 
-            View[] shortcuts = {
-                    binding.rowMyEvents,
-                    binding.btnAgency,
-                    binding.btnTaskCenter,
-                    binding.btnRechargeAgent,
-                    binding.btnSettingsQuick
-            };
-            for (View shortcut : shortcuts) {
-                if (shortcut == null) continue;
-                shortcut.setVisibility(View.VISIBLE);
-                shortcut.setEnabled(true);
-                android.view.ViewGroup.LayoutParams raw = shortcut.getLayoutParams();
-                if (raw instanceof android.widget.GridLayout.LayoutParams) {
-                    android.widget.GridLayout.LayoutParams lp =
-                            (android.widget.GridLayout.LayoutParams) raw;
-                    // Avoid 0dp child widths depending on column-weight distribution.
-                    lp.width = cellWidth;
-                    lp.height = cellHeight;
-                    lp.columnSpec = android.widget.GridLayout.spec(
-                            android.widget.GridLayout.UNDEFINED, 1f);
-                    lp.setGravity(android.view.Gravity.CENTER);
-                    shortcut.setLayoutParams(lp);
-                } else {
-                    raw.width = cellWidth;
-                    raw.height = cellHeight;
-                    shortcut.setLayoutParams(raw);
-                }
-                shortcut.requestLayout();
-            }
-            grid.requestLayout();
-            grid.invalidate();
+        // Keep this section focused on the five requested actions, rather than
+        // allowing legacy grid items to take space or push these rows off-screen.
+        java.util.Set<View> keep = new java.util.HashSet<>();
+        java.util.Collections.addAll(keep, shortcuts);
+        for (int i = 0; i < list.getChildCount(); i++) {
+            View child = list.getChildAt(i);
+            if (!keep.contains(child)) child.setVisibility(View.GONE);
         }
+
+        int density = getResources().getDisplayMetrics().densityDpi;
+        int rowHeight = Math.round(62f * density / 160f);
+        int horizontalPadding = Math.round(16f * density / 160f);
+        int iconSize = Math.round(30f * density / 160f);
+        int textGap = Math.round(12f * density / 160f);
+        for (View shortcut : shortcuts) {
+            if (shortcut == null) continue;
+            shortcut.setVisibility(View.VISIBLE);
+            shortcut.setEnabled(true);
+            shortcut.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            shortcut.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            shortcut.setPadding(horizontalPadding, 0, horizontalPadding, 0);
+            android.widget.LinearLayout.LayoutParams rowLp =
+                    new android.widget.LinearLayout.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT, rowHeight);
+            rowLp.bottomMargin = Math.round(1f * density / 160f);
+            shortcut.setLayoutParams(rowLp);
+            shortcut.setBackgroundResource(R.drawable.bg_profile_reference_card);
+
+            for (int j = 0; j < shortcut.getChildCount(); j++) {
+                View child = shortcut.getChildAt(j);
+                if (child instanceof android.widget.ImageView) {
+                    android.widget.ImageView icon = (android.widget.ImageView) child;
+                    if (icon.getContentDescription() != null
+                            && icon.getContentDescription().toString().length() > 0
+                            && j == 0) {
+                        android.widget.LinearLayout.LayoutParams iconLp =
+                                new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+                        icon.setLayoutParams(iconLp);
+                    } else if (j == shortcut.getChildCount() - 1) {
+                        child.setVisibility(View.GONE);
+                    }
+                } else if (child instanceof android.widget.TextView) {
+                    android.widget.LinearLayout.LayoutParams textLp =
+                            new android.widget.LinearLayout.LayoutParams(
+                                    0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                    textLp.leftMargin = textGap;
+                    textLp.rightMargin = textGap;
+                    ((android.widget.TextView) child).setGravity(
+                            android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
+                    ((android.widget.TextView) child).setTextColor(
+                            android.graphics.Color.parseColor("#FF332A40"));
+                    ((android.widget.TextView) child).setTextSize(15);
+                    child.setLayoutParams(textLp);
+                }
+            }
+            shortcut.requestLayout();
+        }
+        list.requestLayout();
     }
 
     private void bindStaffUi(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
