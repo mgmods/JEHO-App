@@ -4,7 +4,6 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.text.Layout;
@@ -126,7 +125,7 @@ public final class ChallengeWheelView extends View {
             StaticLayout layout = new StaticLayout(
                     LABELS[i], labelPaint, textWidth, Layout.Alignment.ALIGN_CENTER,
                     0.98f, 0f, false);
-            canvas.translate(cx + labelRadius, cy - layout.getHeight() / 2f);
+            canvas.translate(labelRadius, -layout.getHeight() / 2f);
             layout.draw(canvas);
             canvas.restore();
         }
