@@ -6,7 +6,6 @@ import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -18,44 +17,34 @@ import android.view.animation.DecelerateInterpolator;
 
 import androidx.annotation.NonNull;
 
-/** Premium native JEHO challenge wheel. The server remains authoritative for the selected sector. */
+/** Flat, clean Fortune Wheel. Long result names are shown below the wheel, not squeezed into slices. */
 public final class ChallengeWheelView extends View {
     private static final String[] LABELS = {
-            "تحدي الألغاز",
-            "رسالة من مجهول",
-            "فقرة الأسئلة",
-            "تحدي الإجابة السريعة بين شخصين",
-            "كرسي الاعتراف",
-            "احزر الأغنية أو أكمل المثل",
-            "المايك المفخخ",
-            "صراحة أم جرأة",
-            "الحزازير",
-            "حقيقتان وكذبة"
+            "تحدي الألغاز", "رسالة من مجهول", "فقرة الأسئلة",
+            "تحدي الإجابة السريعة بين شخصين", "كرسي الاعتراف",
+            "احزر الأغنية أو أكمل المثل", "المايك المفخخ",
+            "صراحة أم جرأة", "الحزازير", "حقيقتان وكذبة"
     };
-    private static final int[][] PALETTES = {
-            {0xFF6E43A1, 0xFF38205F},
-            {0xFF3C75B8, 0xFF1B355E},
-            {0xFF279A9B, 0xFF14545C},
-            {0xFFC18442, 0xFF70401F},
-            {0xFFB34D78, 0xFF682744},
-            {0xFF526FC0, 0xFF293B78},
-            {0xFF4F9A67, 0xFF24583C},
-            {0xFFC65D4D, 0xFF78352F},
-            {0xFF8066C1, 0xFF493777},
-            {0xFF3487A1, 0xFF1B4E68}
+    private static final String[] SHORT_LABELS = {
+            "الألغاز", "مجهول", "أسئلة", "سرعة", "اعتراف",
+            "أغنية", "مايك", "جرأة", "حزازير", "حقيقتان"
+    };
+    private static final int[] COLORS = {
+            0xFF6E43A1, 0xFF287F9A, 0xFF287B69, 0xFFB77A36, 0xFFB34D78,
+            0xFF496CB4, 0xFF4C925C, 0xFFC15B48, 0xFF7860B2, 0xFF277E9A
     };
 
-    private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint detailPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint sectorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint separatorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint outerLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hubPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint hubInnerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint logoPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint hubEdgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint pointerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint labelPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-    private final StaticLayout[] labelLayouts = new StaticLayout[LABELS.length];
-    private final RectF wheelBounds = new RectF();
-    private final RectF rimBounds = new RectF();
+    private final TextPaint logoPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private final StaticLayout[] layouts = new StaticLayout[SHORT_LABELS.length];
+    private final RectF bounds = new RectF();
+    private final Path wedge = new Path();
     private ValueAnimator spinAnimator;
 
     public ChallengeWheelView(Context context) {
@@ -63,33 +52,38 @@ public final class ChallengeWheelView extends View {
         setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         setContentDescription("عجلة تحديات جيهو");
 
-        rimPaint.setStyle(Paint.Style.FILL);
-        rimPaint.setShadowLayer(dp(8), 0, dp(4), 0x99000000);
+        sectorPaint.setStyle(Paint.Style.FILL);
+        separatorPaint.setStyle(Paint.Style.STROKE);
+        separatorPaint.setStrokeWidth(dp(1.35f));
+        separatorPaint.setColor(0xDFFFFFFF);
+        separatorPaint.setStrokeCap(Paint.Cap.ROUND);
 
-        linePaint.setStyle(Paint.Style.STROKE);
-        linePaint.setStrokeCap(Paint.Cap.ROUND);
-
-        detailPaint.setStyle(Paint.Style.FILL);
+        outerLinePaint.setStyle(Paint.Style.STROKE);
+        outerLinePaint.setStrokeWidth(dp(1.4f));
+        outerLinePaint.setColor(0x99FFFFFF);
 
         hubPaint.setStyle(Paint.Style.FILL);
-        hubPaint.setShadowLayer(dp(5), 0, dp(2), 0x99000000);
+        hubPaint.setShadowLayer(dp(5), 0, dp(2), 0x66000000);
+        hubEdgePaint.setStyle(Paint.Style.STROKE);
+        hubEdgePaint.setStrokeWidth(dp(2));
 
-        hubInnerPaint.setStyle(Paint.Style.FILL);
-
-        logoPaint.setTextAlign(Paint.Align.CENTER);
-        logoPaint.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
+        pointerPaint.setStyle(Paint.Style.FILL);
+        pointerPaint.setColor(0xFFFFD36C);
+        pointerPaint.setShadowLayer(dp(3), 0, dp(1), 0x77000000);
 
         labelPaint.setColor(0xFFFFFFFF);
         labelPaint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-        labelPaint.setTextSize(dp(9.2f));
-        labelPaint.setShadowLayer(dp(2.4f), 0, dp(1.2f), 0xDD10101A);
-
-        int textWidth = Math.max(1, (int) dp(78));
-        for (int i = 0; i < LABELS.length; i++) {
-            labelLayouts[i] = new StaticLayout(
-                    LABELS[i], labelPaint, textWidth, Layout.Alignment.ALIGN_CENTER,
-                    1.02f, 0f, false);
+        labelPaint.setTextSize(dp(10.5f));
+        labelPaint.setShadowLayer(dp(1.5f), 0, dp(1), 0x77000000);
+        for (int i = 0; i < SHORT_LABELS.length; i++) {
+            layouts[i] = new StaticLayout(SHORT_LABELS[i], labelPaint, (int) dp(64),
+                    Layout.Alignment.ALIGN_CENTER, 1f, 0f, false);
         }
+
+        logoPaint.setColor(0xFFFFE9B5);
+        logoPaint.setTextAlign(Paint.Align.CENTER);
+        logoPaint.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
+        logoPaint.setTextSize(dp(14));
     }
 
     public static String labelAt(int index) {
@@ -99,21 +93,16 @@ public final class ChallengeWheelView extends View {
     public void spinTo(int index, long durationMs, @NonNull Runnable onFinished) {
         int selected = Math.max(0, Math.min(LABELS.length - 1, index));
         if (spinAnimator != null) spinAnimator.cancel();
-
         float current = getRotation();
         float desired = normalize(-selected * 36f - 18f);
-        float remainder = normalize(desired - normalize(current));
-        float target = current + 7f * 360f + remainder;
-
+        float target = current + 6f * 360f + normalize(desired - normalize(current));
         spinAnimator = ValueAnimator.ofFloat(current, target);
         spinAnimator.setDuration(Math.max(5200L, durationMs));
-        spinAnimator.setInterpolator(new DecelerateInterpolator(2.15f));
-        spinAnimator.addUpdateListener(a -> setRotation((Float) a.getAnimatedValue()));
+        spinAnimator.setInterpolator(new DecelerateInterpolator(2.2f));
+        spinAnimator.addUpdateListener(v -> setRotation((Float) v.getAnimatedValue()));
         spinAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
             private boolean cancelled;
-            @Override public void onAnimationCancel(android.animation.Animator animation) {
-                cancelled = true;
-            }
+            @Override public void onAnimationCancel(android.animation.Animator animation) { cancelled = true; }
             @Override public void onAnimationEnd(android.animation.Animator animation) {
                 if (!cancelled) onFinished.run();
             }
@@ -137,112 +126,77 @@ public final class ChallengeWheelView extends View {
         super.onDraw(canvas);
         float side = Math.min(getWidth(), getHeight());
         if (side <= 0f) return;
-
         float cx = getWidth() / 2f;
         float cy = getHeight() / 2f;
-        float outer = side * 0.492f;
-        float radius = side * 0.452f;
+        float radius = side * .485f;
+        bounds.set(cx - radius, cy - radius, cx + radius, cy + radius);
 
-        // Deep outer housing and polished multi-layer metallic rim.
-        canvas.drawCircle(cx, cy + dp(2), outer, rimPaint);
-        rimBounds.set(cx - outer, cy - outer, cx + outer, cy + outer);
-        rimPaint.clearShadowLayer();
-        rimPaint.setShader(new LinearGradient(cx, cy - outer, cx, cy + outer,
-                new int[]{0xFFFFF0BE, 0xFFB77A2E, 0xFFFFD979, 0xFF80501F},
-                null, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx, cy, outer - dp(1), rimPaint);
-        rimPaint.setShader(null);
-
-        float face = radius;
-        wheelBounds.set(cx - face, cy - face, cx + face, cy + face);
-        fillPaint.setShader(new RadialGradient(cx - face * .28f, cy - face * .34f,
-                face * 1.55f, new int[]{0xFF4A405C, 0xFF171321, 0xFF090811},
-                null, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx, cy, face + dp(1), fillPaint);
-        fillPaint.setShader(null);
-
-        // Ten equal sectors, each with its own subtle dimensional gradient.
+        // The wheel is the only graphic surface: no enclosing plate, box, or heavy rim.
         for (int i = 0; i < LABELS.length; i++) {
             float start = -90f + i * 36f;
-            fillPaint.setShader(new LinearGradient(
-                    cx - face * .55f, cy - face * .72f,
-                    cx + face * .58f, cy + face * .72f,
-                    new int[]{PALETTES[i][0], PALETTES[i][1]},
-                    null, Shader.TileMode.CLAMP));
-            canvas.drawArc(wheelBounds, start, 36f, true, fillPaint);
-            fillPaint.setShader(null);
+            sectorPaint.setShader(new LinearGradient(cx - radius * .45f, cy - radius,
+                    cx + radius * .55f, cy + radius,
+                    new int[]{lighten(COLORS[i]), COLORS[i], darken(COLORS[i])},
+                    new float[]{0f, .58f, 1f}, Shader.TileMode.CLAMP));
+            canvas.drawArc(bounds, start, 36f, true, sectorPaint);
+            sectorPaint.setShader(null);
 
-            // Fine separators and a restrained inner highlight keep every slice crisp.
-            linePaint.setStrokeWidth(dp(1.45f));
-            linePaint.setColor(0xFFFFE7A2);
             double angle = Math.toRadians(start);
             canvas.drawLine(cx, cy,
-                    cx + (float) Math.cos(angle) * face,
-                    cy + (float) Math.sin(angle) * face, linePaint);
+                    cx + (float) Math.cos(angle) * radius,
+                    cy + (float) Math.sin(angle) * radius, separatorPaint);
 
-            linePaint.setStrokeWidth(dp(.65f));
-            linePaint.setColor(0x66FFFFFF);
-            canvas.drawArc(wheelBounds, start + 1.2f, 33.6f, false, linePaint);
-
-            // Radial text orientation gives long Arabic labels room without crowding the hub.
+            // Each short label is centered in its own wedge and clipped to the wheel disc.
             canvas.save();
+            wedge.reset();
+            wedge.moveTo(cx, cy);
+            wedge.arcTo(bounds, start, 36f);
+            wedge.close();
+            canvas.clipPath(wedge);
             canvas.rotate(start + 18f, cx, cy);
-            StaticLayout layout = labelLayouts[i];
-            float labelRadius = face * .535f;
-            canvas.translate(labelRadius - dp(39), -layout.getHeight() / 2f);
-            layout.draw(canvas);
+            StaticLayout text = layouts[i];
+            float textRadius = radius * .655f;
+            canvas.translate(cx + textRadius - dp(32), cy - text.getHeight() / 2f);
+            text.draw(canvas);
             canvas.restore();
         }
 
-        // Fine outer track and ten jewel-like index studs.
-        linePaint.setColor(0xFFFFE8A6);
-        linePaint.setStrokeWidth(dp(1.25f));
-        canvas.drawCircle(cx, cy, face - dp(1), linePaint);
-        linePaint.setColor(0xFF8A5B29);
-        linePaint.setStrokeWidth(dp(2.2f));
-        canvas.drawCircle(cx, cy, outer - dp(5), linePaint);
-        for (int i = 0; i < 40; i++) {
-            double a = Math.toRadians(i * 9f - 90f);
-            float r1 = outer - dp(i % 4 == 0 ? 10 : 8);
-            float r2 = outer - dp(i % 4 == 0 ? 15 : 11);
-            detailPaint.setColor(i % 4 == 0 ? 0xFFFFF1C1 : 0xFF9E6D35);
-            canvas.drawCircle(cx + (float) Math.cos(a) * r1,
-                    cy + (float) Math.sin(a) * r1,
-                    dp(i % 4 == 0 ? 1.8f : 1.05f), detailPaint);
-            if (i % 4 == 0) {
-                linePaint.setColor(0xFFFFE6A0);
-                linePaint.setStrokeWidth(dp(1.1f));
-                canvas.drawLine(cx + (float) Math.cos(a) * r1,
-                        cy + (float) Math.sin(a) * r1,
-                        cx + (float) Math.cos(a) * r2,
-                        cy + (float) Math.sin(a) * r2, linePaint);
-            }
-        }
+        canvas.drawCircle(cx, cy, radius - dp(1), outerLinePaint);
 
-        // Raised JEHO center medallion.
-        float hub = face * .205f;
+        // Small central button, integrated into the wheel face.
+        float hub = radius * .205f;
         hubPaint.setShader(new LinearGradient(cx - hub, cy - hub, cx + hub, cy + hub,
-                new int[]{0xFFFFF0B8, 0xFFC18A3C, 0xFFFFD978, 0xFF80501F},
+                new int[]{0xFF39264F, 0xFF171222, 0xFF342342},
                 null, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx, cy, hub + dp(4), hubPaint);
+        canvas.drawCircle(cx, cy, hub, hubPaint);
         hubPaint.setShader(null);
+        hubEdgePaint.setColor(0xFFFFD477);
+        canvas.drawCircle(cx, cy, hub - dp(2), hubEdgePaint);
+        canvas.drawText("JEHO", cx, cy + dp(5), logoPaint);
 
-        hubInnerPaint.setShader(new RadialGradient(cx - hub * .28f, cy - hub * .38f,
-                hub * 1.4f, new int[]{0xFF40334F, 0xFF171323, 0xFF0B0911},
-                null, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx, cy, hub, hubInnerPaint);
-        hubInnerPaint.setShader(null);
+        // Compact fixed pointer at 12 o'clock.
+        Path pointer = new Path();
+        pointer.moveTo(cx, cy - radius + dp(2));
+        pointer.lineTo(cx - dp(9), cy - radius - dp(13));
+        pointer.lineTo(cx + dp(9), cy - radius - dp(13));
+        pointer.close();
+        canvas.drawPath(pointer, pointerPaint);
+    }
 
-        linePaint.setColor(0xFFFFE6A0);
-        linePaint.setStrokeWidth(dp(1.1f));
-        canvas.drawCircle(cx, cy, hub - dp(5), linePaint);
+    private int lighten(int color) {
+        return blend(color, 0xFFFFFFFF, .16f);
+    }
 
-        logoPaint.setShader(new LinearGradient(cx, cy - dp(12), cx, cy + dp(12),
-                new int[]{0xFFFFF4CF, 0xFFFFD36D, 0xFFCA9141},
-                null, Shader.TileMode.CLAMP));
-        logoPaint.setTextSize(dp(18));
-        canvas.drawText("JEHO", cx, cy + dp(6), logoPaint);
-        logoPaint.setShader(null);
+    private int darken(int color) {
+        return blend(color, 0xFF000000, .22f);
+    }
+
+    private int blend(int a, int b, float amount) {
+        int alpha = (int) (((a >>> 24) & 255) * (1f - amount) + ((b >>> 24) & 255) * amount);
+        int red = (int) (((a >> 16) & 255) * (1f - amount) + ((b >> 16) & 255) * amount);
+        int green = (int) (((a >> 8) & 255) * (1f - amount) + ((b >> 8) & 255) * amount);
+        int blue = (int) ((a & 255) * (1f - amount) + (b & 255) * amount);
+        return (alpha << 24) | (red << 16) | (green << 8) | blue;
     }
 
     private float dp(float value) {
