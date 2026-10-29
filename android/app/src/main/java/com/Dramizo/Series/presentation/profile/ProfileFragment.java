@@ -107,16 +107,6 @@ public class ProfileFragment extends Fragment {
         };
         binding.headerProfile.setOnClickListener(openProfile);
         binding.imgAvatar.setOnClickListener(openProfile);
-        // Keep the medals entry available from the Me tab; MedalActivity loads
-        // the signed-in user's persisted medals from the backend.
-        if (binding.rowProfileBadges != null) {
-            binding.rowProfileBadges.setVisibility(View.VISIBLE);
-            binding.rowProfileBadges.setOnClickListener(v ->
-                    startActivity(new Intent(requireContext(), MedalActivity.class)));
-        }
-        // Only real, equipped medals are rendered here; no placeholder symbols or label.
-        if (binding.earnedBadgesContainer != null) binding.earnedBadgesContainer.removeAllViews();
-
         // Dashboard-managed custom icons for the Me page; empty URLs retain native defaults.
         bindDashboardProfileIcon(R.id.imgMeVipActionIcon, "vip", R.drawable.ic_me_vip_card);
         bindDashboardProfileIcon(R.id.imgMeLevelActionIcon, "level", R.drawable.ic_me_level_card);
@@ -219,7 +209,6 @@ public class ProfileFragment extends Fragment {
         viewModel.getUser().observe(getViewLifecycleOwner(), user -> {
             if (user == null) return;
             myId = user.id;
-            loadEquippedMedals(user);
             bindMyCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
             binding.tvDisplayName.setText(user.displayName);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
@@ -623,60 +612,9 @@ public class ProfileFragment extends Fragment {
         // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
         if (viewModel != null) viewModel.loadMe(false);
         loadAgencyAction();
-        // Keep the medals entry visible after returning from other screens.
-        if (binding != null && binding.rowProfileBadges != null) {
-            binding.rowProfileBadges.setVisibility(View.VISIBLE);
-        }
         refreshWalletBalances(false);
     }
 
-    /** Keep the requested profile shortcuts visible; their existing click handlers remain unchanged. */
-    private void loadEquippedMedals(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
-        if (binding == null || binding.earnedBadgesContainer == null || user == null) return;
-        binding.earnedBadgesContainer.removeAllViews();
-        if (user.displayedMedalIds == null || user.displayedMedalIds.isEmpty()) return;
-        final java.util.List<String> selected = new java.util.ArrayList<>(user.displayedMedalIds);
-        AppContainer c = ContainerProvider.from(requireActivity());
-        c.getIoExecutor().execute(() -> {
-            java.util.Map<String, String> icons = new java.util.LinkedHashMap<>();
-            try {
-                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response = c.getUserApi().badges(user.id).execute();
-                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
-                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
-                        if (badge != null && badge.id != null && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) icons.put(badge.id, badge.imageUrl);
-                    }
-                }
-            } catch (Exception ignored) { }
-            try {
-                com.Dramizo.Series.domain.model.Result<com.Dramizo.Series.data.remote.dto.MiscDtos.VipPlanList> plans = c.getVipPlansUseCase.execute();
-                if (plans.success && plans.data != null) for (com.Dramizo.Series.data.remote.dto.MiscDtos.VipPlanDto plan : plans.data) {
-                    if (plan != null && plan.level > 0) {
-                        String url = plan.badgeUrl;
-                        if (url == null || url.trim().isEmpty()) url = "/assets/visual-system/vip/vip_medal_mikoo_" + plan.level + ".png";
-                        icons.put("vip:" + plan.level, url);
-                    }
-                }
-            } catch (Exception ignored) { }
-            final java.util.Map<String, String> resolved = new java.util.LinkedHashMap<>();
-            for (String key : selected) if (icons.containsKey(key)) resolved.put(key, icons.get(key));
-            if (!isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
-                if (binding == null || binding.earnedBadgesContainer == null) return;
-                binding.earnedBadgesContainer.removeAllViews();
-                for (java.util.Map.Entry<String, String> entry : resolved.entrySet()) {
-                    android.widget.ImageView icon = new android.widget.ImageView(requireContext());
-                    int size = Math.round(30 * getResources().getDisplayMetrics().density);
-                    android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(size, size);
-                    lp.setMargins(0, 0, Math.round(5 * getResources().getDisplayMetrics().density), 0);
-                    icon.setLayoutParams(lp);
-                    icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-                    icon.setContentDescription("ميدالية مجهزة");
-                    binding.earnedBadgesContainer.addView(icon);
-                    Glide.with(icon).load(AssetCatalog.absoluteUrl(entry.getValue())).placeholder(R.drawable.ic_medal_default).error(R.drawable.ic_medal_default).into(icon);
-                }
-            });
-        });
-    }
     private void applyTasksFeatureVisibility() {
         if (binding == null) return;
 
