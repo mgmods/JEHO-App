@@ -1064,16 +1064,16 @@
             </LinearLayout>
 
             <!-- Mikoo services list — each row has its own unique icon (hardcoded) -->
-            <LinearLayout
+            <GridLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_profile_dark_card"
                 android:elevation="3dp"
-                android:orientation="vertical"
+               
                 android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp">
+                android:paddingVertical="4dp" android:columnCount="3" android:useDefaultMargins="true">
 
                 <LinearLayout
                     android:id="@+id/btnVisitors"
@@ -1459,15 +1459,15 @@
 
                 <LinearLayout
                     android:id="@+id/rowMysteriousModeShortcut"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bg_profile_dark_card"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="10dp"
-                    android:visibility="gone">
+                    android:visibility="gone" android:layout_columnWeight="1" android:layout_gravity="center">
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -1530,7 +1530,7 @@
                         android:src="@drawable/ic_arrow_right_me"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
-            </LinearLayout>
+            </GridLayout>
 
             <!-- Hidden grid keeps legacy IDs for binding safety -->
             <GridLayout
