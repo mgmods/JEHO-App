@@ -14,29 +14,14 @@
         android:src="@drawable/bg_mikoo_page"
         android:visibility="gone" />
 
-    <!-- Reference-style settings button in the upper left. -->
-    <ImageView
-        android:id="@+id/btnSettingsTopReference"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_gravity="top|left"
-        android:layout_marginLeft="14dp"
-        android:layout_marginTop="20dp"
-        android:background="@drawable/bg_profile_edit_fab"
-        android:contentDescription="@string/settings"
-        android:elevation="4dp"
-        android:padding="9dp"
-        android:src="@drawable/ic_me_setting"
-        app:tint="#FF222222" />
-
     <!-- Always-visible pencil: open edit profile (top-end corner). -->
     <ImageView
         android:id="@+id/btnEditProfileIcon"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:layout_gravity="top|left"
-        android:layout_marginLeft="72dp"
-        android:layout_marginTop="14dp"
+        android:layout_marginLeft="14dp"
+        android:layout_marginTop="20dp"
         android:background="@drawable/bg_profile_edit_fab"
         android:contentDescription="@string/edit_profile"
         android:elevation="4dp"
@@ -64,7 +49,7 @@
             <ImageView
                 android:id="@+id/imgCover"
                 android:layout_width="match_parent"
-                android:layout_height="144dp"
+                android:layout_height="130dp"
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
                 android:src="@drawable/bg_profile_reference_header" />
@@ -74,7 +59,7 @@
                 android:id="@+id/headerProfile"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="-28dp"
+                android:layout_marginTop="-36dp"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:orientation="horizontal"
@@ -234,20 +219,20 @@
                 android:id="@+id/rowProfileBadges"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:paddingHorizontal="20dp"
+                android:layout_marginTop="1dp"
+                android:paddingHorizontal="14dp"
                 android:gravity="start|center_vertical"
                 android:orientation="horizontal"
                 android:layoutDirection="rtl"
                 android:foreground="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
-                android:visibility="gone"
-                android:contentDescription="عرض الشارات المكتسبة">
+                android:visibility="visible"
+                android:contentDescription="عرض الشارات والميداليات">
 
                 <LinearLayout
                     android:id="@+id/earnedBadgesContainer"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal" />
@@ -759,7 +744,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="8dp"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="5dp"
                 android:orientation="vertical"
                 android:gravity="center"
                 android:background="@drawable/bg_profile_reference_card"
@@ -767,7 +752,7 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:paddingHorizontal="8dp"
-                android:paddingVertical="6dp"
+                android:paddingVertical="2dp"
                 android:baselineAligned="false">
 
                 <LinearLayout
@@ -783,7 +768,7 @@
                         android:layout_weight="1"
                         android:text="المحفظة"
                         android:textColor="#FFE0A52B"
-                        android:textSize="16sp"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
 
 
@@ -991,7 +976,7 @@
                 android:background="@android:color/transparent"
                 android:elevation="0dp"
                 android:orientation="horizontal"
-                android:paddingVertical="12dp">
+                android:paddingVertical="5dp">
 
                 <LinearLayout
                     android:id="@+id/btnAppearance"
@@ -1001,11 +986,11 @@
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingVertical="4dp">
+                    android:paddingVertical="2dp">
 
                     <ImageView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
                         android:contentDescription="@string/store_title"
                         android:scaleType="fitCenter"
                         android:src="@drawable/me_mall" />
@@ -1013,10 +998,10 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
+                        android:layout_marginTop="2dp"
                         android:text="@string/store_title"
                         android:textColor="#FF806A22"
-                        android:textSize="14sp"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
@@ -1028,11 +1013,11 @@
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingVertical="4dp">
+                    android:paddingVertical="2dp">
 
                     <ImageView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
                         android:contentDescription="@string/my_room"
                         android:scaleType="fitCenter"
                         android:src="@drawable/me_room" />
@@ -1041,10 +1026,10 @@
                         android:id="@+id/tvMyRoomQuickLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
+                        android:layout_marginTop="2dp"
                         android:text="@string/room_short"
                         android:textColor="#FF806A22"
-                        android:textSize="14sp"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
@@ -1058,12 +1043,12 @@
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingVertical="4dp"
+                    android:paddingVertical="2dp"
                     android:visibility="gone">
 
                     <ImageView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
                         android:contentDescription="@string/agency"
                         android:scaleType="fitCenter"
                         android:src="@drawable/icon_agency" />
@@ -1071,10 +1056,10 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
+                        android:layout_marginTop="2dp"
                         android:text="@string/agency"
                         android:textColor="#FF222222"
-                        android:textSize="14sp"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
