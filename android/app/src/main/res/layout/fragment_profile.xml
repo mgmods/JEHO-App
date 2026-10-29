@@ -214,27 +214,48 @@
                     android:src="@drawable/ic_me_setting" />
             </LinearLayout>
 
-            <!-- Earned dashboard/achievement badges sit directly below the main profile avatar. -->
+            <!-- Always-visible badges and medals cabinet entry; tap to equip items for the profile. -->
             <LinearLayout
                 android:id="@+id/rowProfileBadges"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
-                android:paddingHorizontal="14dp"
-                android:gravity="start|center_vertical"
-                android:orientation="horizontal"
+                android:layout_marginHorizontal="14dp"
+                android:layout_marginTop="8dp"
+                android:padding="10dp"
+                android:background="@drawable/bg_profile_reference_card"
+                android:gravity="center_vertical"
+                android:orientation="vertical"
                 android:layoutDirection="rtl"
                 android:foreground="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
                 android:visibility="visible"
-                android:contentDescription="عرض الميداليات">
+                android:contentDescription="الشارات والميداليات، اضغط للتجهيز">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="الشارات والميداليات"
+                    android:textColor="#29213D"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:gravity="start" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="اضغط هنا لاختيار شارة أو ميدالية وإظهارها في ملفك الشخصي"
+                    android:textColor="#777184"
+                    android:textSize="11sp"
+                    android:gravity="start" />
 
                 <LinearLayout
                     android:id="@+id/earnedBadgesContainer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
+                    android:layout_marginTop="6dp"
+                    android:gravity="start|center_vertical"
                     android:orientation="horizontal" />
             </LinearLayout>
 
