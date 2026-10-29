@@ -1097,7 +1097,7 @@
                 android:background="#FFF0EDF4" />
 
             <!-- Mikoo services list — each row has its own unique icon (hardcoded) -->
-            <GridLayout
+            <LinearLayout
                 android:id="@+id/profileServicesGrid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -1107,7 +1107,6 @@
                 android:elevation="0dp"
                 android:paddingHorizontal="6dp"
                 android:paddingVertical="4dp"
-                android:columnCount="3"
                 android:useDefaultMargins="false">
 
                 <LinearLayout
@@ -1571,7 +1570,7 @@
                         android:visibility="visible"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
-            </GridLayout>
+            </LinearLayout>
 
             <!-- Hidden grid keeps legacy IDs for binding safety -->
             <GridLayout
