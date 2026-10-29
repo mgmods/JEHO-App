@@ -1467,7 +1467,7 @@
                     android:orientation="vertical"
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="10dp"
-                    android:visibility="gone" android:layout_columnWeight="1" android:layout_gravity="center" android:layout_columnWeight="1" android:layout_gravity="center">
+                    android:visibility="gone" android:layout_columnWeight="1" android:layout_gravity="center">
 
                     <LinearLayout
                         android:layout_width="0dp"
