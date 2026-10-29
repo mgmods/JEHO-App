@@ -214,6 +214,119 @@
                     android:src="@drawable/ic_me_setting" />
             </LinearLayout>
 
+            <!-- Compact stats under profile (age / level / VIP / wealth / charm) -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:paddingHorizontal="12dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvAgeChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="20dp"
+                        android:background="@drawable/bg_chip_age"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:minWidth="28dp"
+                        android:paddingHorizontal="8dp"
+                        android:text="18"
+                        android:textColor="#FF5B477D"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+
+
+                    <ImageView
+                        android:id="@+id/imgVipBadge"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="5dp"
+                        android:contentDescription="@string/vip"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tvVipChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="5dp"
+                        android:background="@drawable/bg_chip_vip"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="8dp"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/imgHostBadge"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="5dp"
+                        android:contentDescription="@string/my_room"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tvWealthChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="5dp"
+                        android:background="@drawable/bg_chip_wealth"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="8dp"
+                        android:text="❤ 1"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvCharmChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="5dp"
+                        android:background="@drawable/bg_chip_charm"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="8dp"
+                        android:text="🌙 1"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvLevelChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="5dp"
+                        android:background="@drawable/bg_chip_level"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="8dp"
+                        android:text="Lv.1"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:visibility="visible" />
+
+                    <TextView
+                        android:id="@+id/tvDiamondChip"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </HorizontalScrollView>
+
             <!-- Always-visible badges and medals cabinet entry; tap to equip items for the profile. -->
             <LinearLayout
                 android:id="@+id/rowProfileBadges"
@@ -452,118 +565,7 @@
                     </LinearLayout>
                 </LinearLayout>
 
-            <!-- Compact stats under profile (age / level / VIP / wealth / charm) -->
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:paddingHorizontal="12dp"
-                android:scrollbars="none">
 
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/tvAgeChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="20dp"
-                        android:background="@drawable/bg_chip_age"
-                        android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:minWidth="28dp"
-                        android:paddingHorizontal="8dp"
-                        android:text="18"
-                        android:textColor="#FF5B477D"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-
-
-
-                    <ImageView
-                        android:id="@+id/imgVipBadge"
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="5dp"
-                        android:contentDescription="@string/vip"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tvVipChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="20dp"
-                        android:layout_marginStart="5dp"
-                        android:background="@drawable/bg_chip_vip"
-                        android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:textColor="@color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
-
-                    <ImageView
-                        android:id="@+id/imgHostBadge"
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="5dp"
-                        android:contentDescription="@string/my_room"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tvWealthChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="20dp"
-                        android:layout_marginStart="5dp"
-                        android:background="@drawable/bg_chip_wealth"
-                        android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:text="❤ 1"
-                        android:textColor="@color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvCharmChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="20dp"
-                        android:layout_marginStart="5dp"
-                        android:background="@drawable/bg_chip_charm"
-                        android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:text="🌙 1"
-                        android:textColor="@color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvLevelChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="20dp"
-                        android:layout_marginStart="5dp"
-                        android:background="@drawable/bg_chip_level"
-                        android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:text="Lv.1"
-                        android:textColor="@color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold"
-                        android:visibility="visible" />
-
-                    <TextView
-                        android:id="@+id/tvDiamondChip"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:visibility="gone" />
-                </LinearLayout>
-            </HorizontalScrollView>
 
             <!-- Following / Fans / Visitors -->
             <LinearLayout
