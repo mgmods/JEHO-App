@@ -66,8 +66,25 @@ public class ProfileFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         binding = FragmentProfileBinding.inflate(inflater, container, false);
         View root = binding.getRoot();
-        // Do not apply status-bar insets as padding to the whole root:
-        // that adds a second top offset and pushes the entire profile content downward.
+        // Keep the content flush to the top; offset only the floating edit/settings
+        // controls below the system status bar so they never overlap battery/network icons.
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
+            int top = bars.top + (int) (8 * getResources().getDisplayMetrics().density);
+            if (binding != null) {
+                android.view.ViewGroup.LayoutParams settingsLp = binding.btnSettingsTopReference.getLayoutParams();
+                if (settingsLp instanceof android.view.ViewGroup.MarginLayoutParams) {
+                    android.view.ViewGroup.MarginLayoutParams p = (android.view.ViewGroup.MarginLayoutParams) settingsLp;
+                    if (p.topMargin != top) { p.topMargin = top; binding.btnSettingsTopReference.setLayoutParams(p); }
+                }
+                android.view.ViewGroup.LayoutParams editLp = binding.btnEditProfileIcon.getLayoutParams();
+                if (editLp instanceof android.view.ViewGroup.MarginLayoutParams) {
+                    android.view.ViewGroup.MarginLayoutParams p = (android.view.ViewGroup.MarginLayoutParams) editLp;
+                    if (p.topMargin != top) { p.topMargin = top; binding.btnEditProfileIcon.setLayoutParams(p); }
+                }
+            }
+            return insets;
+        });
         return root;
     }
 
