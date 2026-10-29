@@ -169,7 +169,7 @@ public final class AgencyFamilyInfoSheet {
                 boolean belongsToThisAgency = mine != null && mine.success && mine.data != null
                         && mine.data.agency != null && mine.data.agency.id != null
                         && id.equals(mine.data.agency.id)
-                        && !("pending".equalsIgnoreCase(mine.data.status)
+                        && !("pending".equalsIgnoreCase(mine.data.membershipStatus)
                         || "pending".equalsIgnoreCase(mine.data.membershipStatus));
                 boolean canManageThisAgency = isSuper || (belongsToThisAgency
                         && ("owner".equals(role) || "manager".equals(role)));
