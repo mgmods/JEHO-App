@@ -189,7 +189,7 @@ public final class ChallengeWheelView extends View {
             canvas.rotate(start + 18f, cx, cy);
             StaticLayout layout = labelLayouts[i];
             float labelRadius = face * .535f;
-            canvas.translate(cx + labelRadius - dp(39), cy - layout.getHeight() / 2f);
+            canvas.translate(labelRadius - dp(39), -layout.getHeight() / 2f);
             layout.draw(canvas);
             canvas.restore();
         }
