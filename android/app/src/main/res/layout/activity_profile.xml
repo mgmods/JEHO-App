@@ -524,7 +524,7 @@
                     android:paddingStart="8dp"
                     android:paddingEnd="8dp"
                     android:scrollbars="none"
-                    android:background="@drawable/bg_profile_stat_light"
+                    android:background="@android:color/transparent"
                     android:clipToPadding="false"
                     android:overScrollMode="never"
                     android:visibility="gone">
