@@ -102,10 +102,8 @@ public class ProfileFragment extends Fragment {
         // belonged to a removed shortcut grid and caused FragmentProfileBinding compilation errors.
         bindRow(binding.btnAppearance, v ->
                 startActivity(new Intent(requireContext(), StoreHubActivity.class)));
-        bindRow(binding.btnTaskCenter, v -> {
-            if (!com.Dramizo.Series.util.TasksFeature.isEnabled(requireContext())) return;
-            startActivity(new Intent(requireContext(), TaskCenterActivity.class));
-        });
+        bindRow(binding.btnTaskCenter, v ->
+                startActivity(new Intent(requireContext(), TaskCenterActivity.class)));
         applyTasksFeatureVisibility();
         if (binding.btnContests != null) binding.btnContests.setVisibility(View.GONE);
         bindRow(binding.btnMyRoom, v -> RoomOpenChooser.open(requireActivity()));
