@@ -598,11 +598,15 @@ public class ProfileFragment extends Fragment {
         refreshWalletBalances(false);
     }
 
-    /** Badge/medal cabinet is disabled platform-wide; no request or rendering path remains. */
+    /** Keep the requested profile shortcuts visible; their existing click handlers remain unchanged. */
     private void applyTasksFeatureVisibility() {
         if (binding == null) return;
-        // Entire row GONE — no "مهام" label left on profile.
-        com.Dramizo.Series.util.TasksFeature.applyVisibility(binding.btnTaskCenter, requireContext());
+        // These are user-facing profile entries and must not be hidden by the legacy tasks feature flag.
+        binding.btnTaskCenter.setVisibility(View.VISIBLE);
+        if (binding.rowMyEvents != null) binding.rowMyEvents.setVisibility(View.VISIBLE);
+        if (binding.btnAgency != null) binding.btnAgency.setVisibility(View.VISIBLE);
+        if (binding.btnRechargeAgent != null) binding.btnRechargeAgent.setVisibility(View.VISIBLE);
+        if (binding.btnSettingsQuick != null) binding.btnSettingsQuick.setVisibility(View.VISIBLE);
     }
 
     private void bindStaffUi(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
