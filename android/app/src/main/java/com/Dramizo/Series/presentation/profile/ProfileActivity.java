@@ -138,7 +138,8 @@ public class ProfileActivity extends ThemedActivity {
         // Medal cabinet is shown on the profile itself, beneath the identity and moments rows.
         // Public/custom IDs are resolved to the actual UUID by ProfileViewModel before loading.
         if (binding.rowBadges != null) {
-            binding.rowBadges.setVisibility(View.GONE);
+            // Keep the public profile's badges/medals cabinet entry available.
+            binding.rowBadges.setVisibility(View.VISIBLE);
             binding.rowBadges.setOnClickListener(v -> {
                 String profileId = targetUserIdHold[0];
                 if (profileId == null || profileId.trim().isEmpty()) {
