@@ -206,7 +206,7 @@ public class AgencyManageActivity extends ThemedActivity {
                         && mineResult.data != null && mineResult.data.agency != null
                         && mineResult.data.agency.id != null
                         && agencyId.equals(mineResult.data.agency.id)
-                        && !("pending".equalsIgnoreCase(mineResult.data.status)
+                        && !("pending".equalsIgnoreCase(mineResult.data.membershipStatus)
                         || "pending".equalsIgnoreCase(mineResult.data.membershipStatus));
                 boolean allowedToManage = isPlatformSuper || (belongsToRequestedAgency
                         && ("owner".equals(currentRole) || "manager".equals(currentRole)));
