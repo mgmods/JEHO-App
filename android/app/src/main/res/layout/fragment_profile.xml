@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFEFA">
+    android:background="#FFFFFFFF">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -14,13 +14,28 @@
         android:src="@drawable/bg_mikoo_page"
         android:visibility="gone" />
 
+    <!-- Reference-style settings button in the upper left. -->
+    <ImageView
+        android:id="@+id/btnSettingsTopReference"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_profile_edit_fab"
+        android:contentDescription="@string/settings"
+        android:elevation="4dp"
+        android:padding="9dp"
+        android:src="@drawable/ic_me_setting"
+        app:tint="#FF222222" />
+
     <!-- Always-visible pencil: open edit profile (top-end corner). -->
     <ImageView
         android:id="@+id/btnEditProfileIcon"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:layout_gravity="top|end"
-        android:layout_marginTop="42dp"
+        android:layout_marginTop="14dp"
         android:layout_marginEnd="14dp"
         android:background="@drawable/bg_profile_edit_fab"
         android:contentDescription="@string/edit_profile"
@@ -52,7 +67,7 @@
                 android:layout_height="106dp"
                 android:contentDescription="@null"
                 android:scaleType="fitXY"
-                android:src="@drawable/bg_home_full_gradient" />
+                android:src="@drawable/bg_profile_reference_header" />
 
             <!-- User row: single avatar left + info right (no top settings — Mikoo keeps settings in list) -->
             <LinearLayout
@@ -244,7 +259,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="14dp"
                 android:layout_marginTop="8dp"
-                android:background="@drawable/bg_profile_dark_card"
+                android:background="@drawable/bg_profile_reference_card"
                 android:elevation="3dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -333,7 +348,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="14dp"
                     android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_profile_dark_card"
+                    android:background="@drawable/bg_profile_reference_card"
                     android:orientation="vertical"
                     android:padding="12dp"
                     android:visibility="gone">
