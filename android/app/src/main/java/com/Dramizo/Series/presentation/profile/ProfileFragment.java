@@ -66,14 +66,8 @@ public class ProfileFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         binding = FragmentProfileBinding.inflate(inflater, container, false);
         View root = binding.getRoot();
-        // Keep the profile page and its floating top controls below the status bar.
-        // This prevents the screen content from sliding beyond the physical top edge
-        // on devices using edge-to-edge system bars.
-        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
-            Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
-            v.setPadding(v.getPaddingLeft(), bars.top, v.getPaddingRight(), v.getPaddingBottom());
-            return insets;
-        });
+        // Do not apply status-bar insets as padding to the whole root:
+        // that adds a second top offset and pushes the entire profile content downward.
         return root;
     }
 
