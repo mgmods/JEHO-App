@@ -14605,10 +14605,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }, delay);
     }
 
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
-    }
-
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
         if ("challenge:wheel:result".equals(event)) {
