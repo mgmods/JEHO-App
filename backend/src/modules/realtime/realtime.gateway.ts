@@ -50,7 +50,21 @@ const ALLOWED_ROOM_EVENTS = new Set([
   'room:summon',
   'room:chat_cleared',
   'room:music_volume',
+  'challenge:wheel:spin',
 ]);
+
+const CHALLENGE_WHEEL_ITEMS = [
+  'فقرة تحدي الالغاز',
+  'فقرة رسالة من مجهول',
+  'فقرة الاسئلة',
+  'فقرة تحدي الاجابة السريعة بين شخصين',
+  'فقرة كرسي الإعتراف',
+  'فقرة احزر الاغنية او اكمل المثل التالي',
+  'فقرة المايك المفخخ',
+  'فقرة صراحة ام جراءة',
+  'فقرة الحزازير',
+  'فقرة حقيقتان وكذبة',
+] as const;
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -686,7 +700,43 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { error: 'Event payload is too large' };
     }
     let payload: Record<string, unknown> = { ...incoming, userId: client.userId };
-    if (data.event === 'room:music_volume') {
+    if (data.event === 'challenge:wheel:spin') {
+      const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
+      const isRoomLead =
+        !!room &&
+        (room.hostId === client.userId ||
+          room.activeHostId === client.userId ||
+          room.cohostId === client.userId);
+      let canSpin = isRoomLead;
+      if (!canSpin) {
+        const mod = await this.roomModerators.findOne({
+          where: { roomId: data.roomId, userId: client.userId },
+        });
+        canSpin = mod?.canManageRoom === true ||
+          mod?.canKick === true ||
+          mod?.canBan === true;
+      }
+      if (!canSpin) return { error: 'Only room staff can spin the challenge wheel' };
+
+      // The server chooses the outcome; clients only animate this authoritative result.
+      const index = Math.floor(Math.random() * CHALLENGE_WHEEL_ITEMS.length);
+      const startAt = Date.now() + 1200;
+      const wheelPayload = {
+        userId: client.userId,
+        index,
+        label: CHALLENGE_WHEEL_ITEMS[index],
+        spinId: `${Date.now()}-${client.userId}`,
+        startAt,
+      };
+      this.server.to(`room:${data.roomId}`).emit('room:event', {
+        roomId: data.roomId,
+        event: 'challenge:wheel:result',
+        payload: wheelPayload,
+        from: { userId: client.userId, username: client.username },
+        at: new Date().toISOString(),
+      });
+      return { ok: true, ...wheelPayload };
+    } else if (data.event === 'room:music_volume') {
       const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
       if (!room) return { error: 'Room not found' };
       let canControlMusic =
