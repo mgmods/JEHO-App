@@ -22,6 +22,7 @@ import com.Dramizo.Series.util.AgencyUi;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
+import com.Dramizo.Series.util.StaffRoleHelper;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.text.NumberFormat;
@@ -81,6 +82,8 @@ public final class AgencyFamilyInfoSheet {
         final boolean[] following = {false};
 
         if (btnOpen != null) {
+            // Fail closed while membership/role is being verified.
+            btnOpen.setVisibility(View.GONE);
             btnOpen.setOnClickListener(v -> {
                 dialog.dismiss();
                 try {
@@ -143,6 +146,7 @@ public final class AgencyFamilyInfoSheet {
         container.getIoExecutor().execute(() -> {
             Result<MiscDtos.AgencyDto> r =
                     ApiCall.execute(container.getAgencyApi().get(id));
+            Result<MiscDtos.AgencyMineDto> mine = container.getAgencyRepository().mine();
             activity.runOnUiThread(() -> {
                 if (!dialog.isShowing()) return;
                 if (!r.success || r.data == null) {
@@ -155,6 +159,23 @@ public final class AgencyFamilyInfoSheet {
                     return;
                 }
                 MiscDtos.AgencyDto a = r.data;
+                boolean isSuper = false;
+                try {
+                    isSuper = StaffRoleHelper.isSuper(container.getSessionManager().getUser());
+                } catch (Exception ignored) { }
+                String role = mine != null && mine.success && mine.data != null
+                        && mine.data.role != null
+                        ? mine.data.role.trim().toLowerCase(java.util.Locale.US) : "";
+                boolean belongsToThisAgency = mine != null && mine.success && mine.data != null
+                        && mine.data.agency != null && mine.data.agency.id != null
+                        && id.equals(mine.data.agency.id)
+                        && !("pending".equalsIgnoreCase(mine.data.status)
+                        || "pending".equalsIgnoreCase(mine.data.membershipStatus));
+                boolean canManageThisAgency = isSuper || (belongsToThisAgency
+                        && ("owner".equals(role) || "manager".equals(role)));
+                if (btnOpen != null) {
+                    btnOpen.setVisibility(canManageThisAgency ? View.VISIBLE : View.GONE);
+                }
                 if (tvName != null) {
                     tvName.setText(a.name != null ? a.name : activity.getString(R.string.agency));
                 }
