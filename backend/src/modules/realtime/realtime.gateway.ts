@@ -78,6 +78,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   private readonly onlineUsers = new Map<string, Set<string>>();
   /** Live-session music gain; defaults to full volume and does not alter mic gain. */
   private readonly roomMusicVolumes = new Map<string, number>();
+  /** Prevent two staff members from starting overlapping challenge-wheel spins. */
+  private readonly roomChallengeWheelLocks = new Map<string, number>();
   private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
   private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
 
@@ -719,8 +721,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       if (!canSpin) return { error: 'Only room staff can spin the challenge wheel' };
 
       // The server chooses the outcome; clients only animate this authoritative result.
+      const now = Date.now();
+      const lockedUntil = this.roomChallengeWheelLocks.get(data.roomId) || 0;
+      if (lockedUntil > now) return { error: 'The challenge wheel is already spinning' };
       const index = Math.floor(Math.random() * CHALLENGE_WHEEL_ITEMS.length);
-      const startAt = Date.now() + 1200;
+      const startAt = now + 1200;
+      this.roomChallengeWheelLocks.set(data.roomId, startAt + 6200);
       const wheelPayload = {
         userId: client.userId,
         index,
