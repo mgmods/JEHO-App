@@ -652,28 +652,29 @@ public class ProfileFragment extends Fragment {
         int iconSize = Math.round(30f * density / 160f);
         int textGap = Math.round(12f * density / 160f);
         for (View shortcut : shortcuts) {
-            if (shortcut == null) continue;
-            shortcut.setVisibility(View.VISIBLE);
-            shortcut.setEnabled(true);
-            shortcut.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-            shortcut.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            shortcut.setPadding(horizontalPadding, 0, horizontalPadding, 0);
+            if (!(shortcut instanceof android.widget.LinearLayout)) continue;
+            android.widget.LinearLayout row = (android.widget.LinearLayout) shortcut;
+            row.setVisibility(View.VISIBLE);
+            row.setEnabled(true);
+            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(horizontalPadding, 0, horizontalPadding, 0);
             android.widget.LinearLayout.LayoutParams rowLp =
                     new android.widget.LinearLayout.LayoutParams(
                             android.view.ViewGroup.LayoutParams.MATCH_PARENT, rowHeight);
             rowLp.bottomMargin = Math.round(1f * density / 160f);
-            shortcut.setLayoutParams(rowLp);
-            shortcut.setBackgroundResource(R.drawable.bg_profile_reference_card);
+            row.setLayoutParams(rowLp);
+            row.setBackgroundResource(R.drawable.bg_profile_reference_card);
 
-            for (int j = 0; j < shortcut.getChildCount(); j++) {
-                View child = shortcut.getChildAt(j);
+            for (int j = 0; j < row.getChildCount(); j++) {
+                View child = row.getChildAt(j);
                 if (child instanceof android.widget.ImageView) {
                     android.widget.ImageView icon = (android.widget.ImageView) child;
                     if (j == 0) {
                         android.widget.LinearLayout.LayoutParams iconLp =
                                 new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
                         icon.setLayoutParams(iconLp);
-                    } else if (j == shortcut.getChildCount() - 1) {
+                    } else if (j == row.getChildCount() - 1) {
                         child.setVisibility(View.GONE);
                     }
                 } else if (child instanceof android.widget.TextView) {
@@ -690,7 +691,7 @@ public class ProfileFragment extends Fragment {
                     child.setLayoutParams(textLp);
                 }
             }
-            shortcut.requestLayout();
+            row.requestLayout();
         }
         list.requestLayout();
     }
