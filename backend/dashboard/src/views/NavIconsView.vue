@@ -142,7 +142,7 @@ function emptyForm() {
 }
 
 const form = reactive(emptyForm())
-const profileIcons = reactive({ events: '', agency: '', recharge: '', tasks: '', settings: '', support: '' })
+const profileIcons = reactive({ vip: '', level: '', store: '', room: '', agencyCenter: '', events: '', agency: '', recharge: '', tasks: '', tools: '', settings: '', support: '' })
 const channelIcons = reactive({ officialNews: '', adminMessages: '', notifications: '' })
 const verification = reactive({ officialNews: true, adminMessages: true })
 const channelList = [
@@ -151,10 +151,16 @@ const channelList = [
   { key: 'notifications', label: 'الإشعارات' },
 ]
 const profileActionsList = [
+  { key: 'vip', label: 'VIP' },
+  { key: 'level', label: 'المستوى' },
+  { key: 'store', label: 'المتجر' },
+  { key: 'room', label: 'الغرفة' },
+  { key: 'agencyCenter', label: 'الوكالة' },
   { key: 'events', label: 'فعالياتي' },
   { key: 'agency', label: 'فتح وكالة' },
-  { key: 'recharge', label: 'وكيل شحن' },
   { key: 'tasks', label: 'مركز المهام' },
+  { key: 'recharge', label: 'وكيل الشحن' },
+  { key: 'tools', label: 'الأدوات' },
   { key: 'settings', label: 'الإعدادات' },
   { key: 'support', label: 'الدعم' },
 ]
