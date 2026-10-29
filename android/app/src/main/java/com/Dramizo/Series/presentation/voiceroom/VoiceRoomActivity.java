@@ -14393,71 +14393,50 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(dp(18), dp(18), dp(18), dp(18));
-        GradientDrawable surface = new GradientDrawable();
-        surface.setColor(0xFF171326);
-        surface.setCornerRadius(dp(24));
-        surface.setStroke(dp(1), 0xFFD8B46B);
-        root.setBackground(surface);
+        root.setPadding(dp(6), dp(8), dp(6), dp(8));
+        root.setBackgroundColor(Color.TRANSPARENT);
 
         TextView title = new TextView(this);
         title.setText("عجلة التحديات");
         title.setTextColor(0xFFFFE5B0);
-        title.setTextSize(20);
+        title.setTextSize(19);
         title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView subtitle = new TextView(this);
-        subtitle.setText("اختاروا فقرة واحدة للجميع في الغرفة");
-        subtitle.setTextColor(0xFFBDB7CE);
-        subtitle.setTextSize(12);
-        subtitle.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        subtitleLp.topMargin = dp(4);
-        root.addView(subtitle, subtitleLp);
-
         FrameLayout wheelHost = new FrameLayout(this);
         LinearLayout.LayoutParams wheelHostLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(324));
-        wheelHostLp.topMargin = dp(8);
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(300));
+        wheelHostLp.topMargin = dp(5);
         root.addView(wheelHost, wheelHostLp);
 
         ChallengeWheelView wheel = new ChallengeWheelView(this);
-        wheelHost.addView(wheel, new FrameLayout.LayoutParams(dp(304), dp(304), Gravity.CENTER));
+        wheelHost.addView(wheel, new FrameLayout.LayoutParams(dp(286), dp(286), Gravity.CENTER));
 
-        TextView pointer = new TextView(this);
-        pointer.setText("▼");
-        pointer.setTextColor(0xFFFFD36C);
-        pointer.setTextSize(27);
-        pointer.setGravity(Gravity.CENTER);
-        pointer.setShadowLayer(dp(5), 0, dp(2), 0xCC000000);
-        FrameLayout.LayoutParams pointerLp = new FrameLayout.LayoutParams(
-                dp(40), dp(38), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        wheelHost.addView(pointer, pointerLp);
+        TextView resultCaption = new TextView(this);
+        resultCaption.setText("نوع الفقرة");
+        resultCaption.setTextColor(0xFFBFB5D1);
+        resultCaption.setTextSize(12);
+        resultCaption.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams captionLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        captionLp.topMargin = dp(3);
+        root.addView(resultCaption, captionLp);
 
         TextView result = new TextView(this);
-        result.setText("اضغط تدوير لاختيار فقرة التحدي");
+        result.setText("بانتظار تدوير العجلة");
         result.setTextColor(0xFFFFE9C2);
-        result.setTextSize(15);
+        result.setTextSize(16);
         result.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         result.setGravity(Gravity.CENTER);
-        result.setMinHeight(dp(54));
-        result.setPadding(dp(8), dp(6), dp(8), dp(6));
-        GradientDrawable resultBg = new GradientDrawable();
-        resultBg.setColor(0xFF28213A);
-        resultBg.setCornerRadius(dp(14));
-        resultBg.setStroke(dp(1), 0xFF8B7045);
-        result.setBackground(resultBg);
-        LinearLayout.LayoutParams resultLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        resultLp.topMargin = dp(2);
-        root.addView(result, resultLp);
+        result.setMinHeight(dp(32));
+        result.setPadding(dp(8), dp(2), dp(8), dp(2));
+        root.addView(result, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView spin = new TextView(this);
-        spin.setText("تدوير العجلة");
+        spin.setText("تدوير");
         spin.setTextColor(0xFF21172B);
         spin.setTextSize(15);
         spin.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
@@ -14465,23 +14444,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         GradientDrawable spinBg = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{0xFFFFE6A4, 0xFFD6A84D});
-        spinBg.setCornerRadius(dp(15));
+        spinBg.setCornerRadius(dp(24));
         spin.setBackground(spinBg);
         spin.setVisibility(canSpin ? View.VISIBLE : View.GONE);
         LinearLayout.LayoutParams spinLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
-        spinLp.topMargin = dp(12);
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(46));
+        spinLp.topMargin = dp(8);
         root.addView(spin, spinLp);
         spin.setOnClickListener(v -> requestChallengeWheelSpin());
 
         TextView close = new TextView(this);
         close.setText("إغلاق");
         close.setTextColor(0xFFBEB7CA);
-        close.setTextSize(13);
+        close.setTextSize(12);
         close.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(38));
-        closeLp.topMargin = dp(4);
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(32));
+        closeLp.topMargin = dp(2);
         root.addView(close, closeLp);
         close.setOnClickListener(v -> dialog.dismiss());
 
@@ -14502,7 +14481,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             int screen = getResources().getDisplayMetrics().widthPixels;
-            window.setLayout(Math.min(screen - dp(28), dp(420)),
+            window.setLayout(Math.min(screen - dp(20), dp(390)),
                     ViewGroup.LayoutParams.WRAP_CONTENT);
         }
         challengeWheelDialog = dialog;
