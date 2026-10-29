@@ -130,7 +130,7 @@ final class RoomMoreOperatorSheet {
         List<List<Item>> pages = new ArrayList<>();
         if (staff) pages.add(buildRoomItems(host));
         pages.add(buildToolItems(host));
-        if (staff) pages.add(buildEffectItems(host));
+        if (staff) pages.add(buildChallengeItems(host));
 
         // Guest: only Tool tab visible (Mikoo behavior).
         if (!staff) {
@@ -160,10 +160,10 @@ final class RoomMoreOperatorSheet {
             int page = pager.getCurrentItem();
             int roomPage = staff ? 0 : -1;
             int toolPage = staff ? 1 : 0;
-            int effectPage = staff ? 2 : -1;
+            int challengePage = staff ? 2 : -1;
             selectTab(tvRoom, ivRoom, page == roomPage);
             selectTab(tvTool, ivTool, page == toolPage);
-            selectTab(tvEffect, ivEffect, page == effectPage);
+            selectTab(tvEffect, ivEffect, page == challengePage);
         };
         pager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
             @Override public void onPageSelected(int position) { syncTabs.run(); }
@@ -264,11 +264,7 @@ final class RoomMoreOperatorSheet {
                 R.string.room_more_invite_friends, "invite"));
         list.add(item(R.mipmap.icon_room_tool_link, R.string.room_more_copy_link, "copy_link"));
         list.add(item(R.mipmap.icon_room_tool_whatsapp, R.string.room_more_whatsapp, "whatsapp"));
-        return list;
-    }
-
-    private static List<Item> buildEffectItems(Host host) {
-        List<Item> list = new ArrayList<>();
+        // The former Effect-tab controls now live in Tools; keep their existing actions intact.
         boolean entryOn = host.entryEffectsOn();
         list.add(item(
                 entryOn
@@ -280,6 +276,13 @@ final class RoomMoreOperatorSheet {
                 host.lowGiftEffectsOn() ? R.drawable.low_open : R.drawable.low_close,
                 R.string.room_more_low_gift,
                 "low_gift"));
+        return list;
+    }
+
+    private static List<Item> buildChallengeItems(Host host) {
+        List<Item> list = new ArrayList<>();
+        list.add(item(R.drawable.ic_hub_wheel, "عجلة التحديات", "challenge_wheel"));
+        list.add(item(R.drawable.ic_hub_contest, "تحديات PK", "pk_challenge"));
         return list;
     }
 
