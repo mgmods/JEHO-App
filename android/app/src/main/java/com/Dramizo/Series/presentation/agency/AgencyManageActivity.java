@@ -197,6 +197,26 @@ public class AgencyManageActivity extends ThemedActivity {
                 }
                 if (isPlatformSuper) isOwner = true;
 
+                // Never expose the management dashboard from a guessed/deep-linked agency ID.
+                // The server's /mine response must confirm an active owner/manager relationship.
+                String currentRole = mineResult != null && mineResult.success
+                        && mineResult.data != null && mineResult.data.role != null
+                        ? mineResult.data.role.trim().toLowerCase(Locale.US) : "";
+                boolean belongsToRequestedAgency = mineResult != null && mineResult.success
+                        && mineResult.data != null && mineResult.data.agency != null
+                        && mineResult.data.agency.id != null
+                        && agencyId.equals(mineResult.data.agency.id)
+                        && !("pending".equalsIgnoreCase(mineResult.data.status)
+                        || "pending".equalsIgnoreCase(mineResult.data.membershipStatus));
+                boolean allowedToManage = isPlatformSuper || (belongsToRequestedAgency
+                        && ("owner".equals(currentRole) || "manager".equals(currentRole)));
+                if (!allowedToManage) {
+                    Toast.makeText(this, "ليس لديك صلاحية إدارة هذه الوكالة", Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
+                isOwner = isPlatformSuper || "owner".equals(currentRole);
+
                 if (mineResult.success && mineResult.data != null && mineResult.data.agency != null
                         && agencyId.equals(mineResult.data.agency.id)) {
                     MiscDtos.AgencyDto ag = mineResult.data.agency;
