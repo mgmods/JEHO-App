@@ -162,6 +162,10 @@ public class ProfileFragment extends Fragment {
         binding.btnVip.setOnClickListener(v -> openVipHtmlPage());
         binding.btnSettingsQuick.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), SettingsActivity.class)));
+        if (binding.btnSettingsTopReference != null) {
+            binding.btnSettingsTopReference.setOnClickListener(v ->
+                    startActivity(new Intent(requireContext(), SettingsActivity.class)));
+        }
         bindMysteriousModeShortcut();
         if (binding.levelCard != null) {
             binding.levelCard.setOnClickListener(v ->
