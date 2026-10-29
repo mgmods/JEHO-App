@@ -70,7 +70,7 @@ public class ProfileFragment extends Fragment {
         // controls below the system status bar so they never overlap battery/network icons.
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
-            int top = bars.top + (int) (8 * getResources().getDisplayMetrics().density);
+            int top = bars.top + (int) (16 * getResources().getDisplayMetrics().density);
             if (binding != null) {
                 android.view.ViewGroup.LayoutParams settingsLp = binding.btnSettingsTopReference.getLayoutParams();
                 if (settingsLp instanceof android.view.ViewGroup.MarginLayoutParams) {
