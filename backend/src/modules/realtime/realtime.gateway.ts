@@ -33,6 +33,7 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
+import { normalizeStaffRole } from '../../common/staff-role';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 import { ZegoTokenService } from '../zego/zego-token.service';
 
@@ -710,6 +711,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           room.activeHostId === client.userId ||
           room.cohostId === client.userId);
       let canSpin = isRoomLead;
+      if (!canSpin) {
+        const user = await this.usersRepo.findOne({
+          where: { id: client.userId },
+          select: ['id', 'staffRole', 'isAdmin'],
+        });
+        const platformRole = normalizeStaffRole(user);
+        canSpin = platformRole === 'manager' ||
+          platformRole === 'admin' ||
+          platformRole === 'super';
+      }
       if (!canSpin) {
         const mod = await this.roomModerators.findOne({
           where: { roomId: data.roomId, userId: client.userId },
