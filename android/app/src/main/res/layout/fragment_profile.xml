@@ -732,15 +732,52 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="12dp"
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:gravity="center"
                 android:background="@drawable/bg_profile_reference_card"
                 android:foreground="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="8dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="10dp"
                 android:baselineAligned="false">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingBottom="6dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="المحفظة"
+                        android:textColor="#FFE0A52B"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/btnWalletRecharge"
+                        android:layout_width="92dp"
+                        android:layout_height="42dp"
+                        android:background="@drawable/bg_profile_reference_header"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="شحن"
+                        android:textColor="#FF33280A"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="false">
 
                 <LinearLayout
                     android:id="@+id/btnWallet"
@@ -829,6 +866,7 @@
                             android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
+                </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
 
