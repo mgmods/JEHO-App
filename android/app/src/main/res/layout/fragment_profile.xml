@@ -1255,7 +1255,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        android:visibility="gone"
+                        android:visibility="visible"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1288,7 +1288,41 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        android:visibility="gone"
+                        android:visibility="visible"
+                        app:tint="#FFB5AFC8" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnTaskCenter"
+                    android:layout_width="0dp"
+                    android:layout_height="96dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center">
+
+                    <ImageView
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_me_task"
+                        app:tint="#FFD8AD43" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:text="@string/task_center"
+                        android:textColor="#FF806A22"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_arrow_right_me"
+                        android:visibility="visible"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1322,7 +1356,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        android:visibility="gone"
+                        android:visibility="visible"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
@@ -1401,39 +1435,7 @@
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
-                <LinearLayout
-                    android:id="@+id/btnTaskCenter"
-                    android:layout_width="0dp"
-                    android:layout_height="96dp"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center">
-
-                    <ImageView
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:contentDescription="@null"
-                        android:src="@drawable/ic_me_task"
-                        app:tint="#FFD8AD43" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:text="@string/task_center"
-                        android:textColor="#FF806A22"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:contentDescription="@null"
-                        android:src="@drawable/ic_arrow_right_me"
-                        android:visibility="gone"
-                        app:tint="#FFB5AFC8" />
-                </LinearLayout>
+                
 
                 <LinearLayout
                     android:id="@+id/btnRanking"
@@ -1609,7 +1611,7 @@
                         android:layout_height="16dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_arrow_right_me"
-                        android:visibility="gone"
+                        android:visibility="visible"
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
             </GridLayout>
