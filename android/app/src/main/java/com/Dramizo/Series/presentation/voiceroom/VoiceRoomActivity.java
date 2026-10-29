@@ -193,6 +193,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean roomPkCanEndChallenge;
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
+    @Nullable private Dialog challengeWheelDialog;
+    @Nullable private ChallengeWheelView challengeWheelView;
+    @Nullable private TextView challengeWheelResult;
+    @Nullable private TextView challengeWheelSpinButton;
+    @Nullable private String lastChallengeWheelSpinId;
+    private boolean challengeWheelSpinPending;
     private final Handler handler = new Handler(Looper.getMainLooper());
     /** Fallback poll so a host still sees an invitation if a room event arrives during reconnect. */
     private final Runnable roomPkInvitationPoll = new Runnable() {
@@ -3872,11 +3878,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 break;
             }
             case "challenge_wheel":
-                // The room-wide wheel requires a server-authoritative realtime result;
-                // do not run a local-only spin that could show different outcomes to members.
-                Toast.makeText(this,
-                        "واجهة عجلة التحديات أُضيفت، ويجري تجهيز التدوير المتزامن لكل الموجودين",
-                        Toast.LENGTH_LONG).show();
+                showChallengeWheelDialog(canModerateRoom());
                 break;
             case "pk_challenge":
                 if (!isOwner) {
@@ -14377,8 +14379,242 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+
+    private void showChallengeWheelDialog(boolean canSpin) {
+        if (isFinishing() || isDestroyed()) return;
+        if (challengeWheelDialog != null && challengeWheelDialog.isShowing()) {
+            if (challengeWheelSpinButton != null) {
+                challengeWheelSpinButton.setVisibility(canSpin ? View.VISIBLE : View.GONE);
+            }
+            return;
+        }
+
+        Dialog dialog = new Dialog(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(dp(18), dp(18), dp(18), dp(18));
+        GradientDrawable surface = new GradientDrawable();
+        surface.setColor(0xFF171326);
+        surface.setCornerRadius(dp(24));
+        surface.setStroke(dp(1), 0xFFD8B46B);
+        root.setBackground(surface);
+
+        TextView title = new TextView(this);
+        title.setText("عجلة التحديات");
+        title.setTextColor(0xFFFFE5B0);
+        title.setTextSize(20);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("اختاروا فقرة واحدة للجميع في الغرفة");
+        subtitle.setTextColor(0xFFBDB7CE);
+        subtitle.setTextSize(12);
+        subtitle.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subtitleLp.topMargin = dp(4);
+        root.addView(subtitle, subtitleLp);
+
+        FrameLayout wheelHost = new FrameLayout(this);
+        LinearLayout.LayoutParams wheelHostLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(324));
+        wheelHostLp.topMargin = dp(8);
+        root.addView(wheelHost, wheelHostLp);
+
+        ChallengeWheelView wheel = new ChallengeWheelView(this);
+        wheelHost.addView(wheel, new FrameLayout.LayoutParams(dp(304), dp(304), Gravity.CENTER));
+
+        TextView pointer = new TextView(this);
+        pointer.setText("▼");
+        pointer.setTextColor(0xFFFFD36C);
+        pointer.setTextSize(27);
+        pointer.setGravity(Gravity.CENTER);
+        pointer.setShadowLayer(dp(5), 0, dp(2), 0xCC000000);
+        FrameLayout.LayoutParams pointerLp = new FrameLayout.LayoutParams(
+                dp(40), dp(38), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        wheelHost.addView(pointer, pointerLp);
+
+        TextView result = new TextView(this);
+        result.setText("اضغط تدوير لاختيار فقرة التحدي");
+        result.setTextColor(0xFFFFE9C2);
+        result.setTextSize(15);
+        result.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        result.setGravity(Gravity.CENTER);
+        result.setMinHeight(dp(54));
+        result.setPadding(dp(8), dp(6), dp(8), dp(6));
+        GradientDrawable resultBg = new GradientDrawable();
+        resultBg.setColor(0xFF28213A);
+        resultBg.setCornerRadius(dp(14));
+        resultBg.setStroke(dp(1), 0xFF8B7045);
+        result.setBackground(resultBg);
+        LinearLayout.LayoutParams resultLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        resultLp.topMargin = dp(2);
+        root.addView(result, resultLp);
+
+        TextView spin = new TextView(this);
+        spin.setText("تدوير العجلة");
+        spin.setTextColor(0xFF21172B);
+        spin.setTextSize(15);
+        spin.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        spin.setGravity(Gravity.CENTER);
+        GradientDrawable spinBg = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFFFFE6A4, 0xFFD6A84D});
+        spinBg.setCornerRadius(dp(15));
+        spin.setBackground(spinBg);
+        spin.setVisibility(canSpin ? View.VISIBLE : View.GONE);
+        LinearLayout.LayoutParams spinLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        spinLp.topMargin = dp(12);
+        root.addView(spin, spinLp);
+        spin.setOnClickListener(v -> requestChallengeWheelSpin());
+
+        TextView close = new TextView(this);
+        close.setText("إغلاق");
+        close.setTextColor(0xFFBEB7CA);
+        close.setTextSize(13);
+        close.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(38));
+        closeLp.topMargin = dp(4);
+        root.addView(close, closeLp);
+        close.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.setContentView(root);
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.setOnDismissListener(d -> {
+            wheel.stop();
+            if (challengeWheelDialog == dialog) {
+                challengeWheelDialog = null;
+                challengeWheelView = null;
+                challengeWheelResult = null;
+                challengeWheelSpinButton = null;
+                challengeWheelSpinPending = false;
+            }
+        });
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            int screen = getResources().getDisplayMetrics().widthPixels;
+            window.setLayout(Math.min(screen - dp(28), dp(420)),
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        challengeWheelDialog = dialog;
+        challengeWheelView = wheel;
+        challengeWheelResult = result;
+        challengeWheelSpinButton = spin;
+    }
+
+    private void requestChallengeWheelSpin() {
+        if (!canModerateRoom()) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (roomId == null || roomId.isEmpty()) return;
+        if (challengeWheelSpinPending) return;
+        RealtimeClient realtime = RealtimeClient.getInstance();
+        if (!realtime.isConnected() || !realtime.isJoinedRoom(roomId)) {
+            Toast.makeText(this, "جارٍ الاتصال بالغرفة… حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+            connectRealtimeRoom();
+            return;
+        }
+        challengeWheelSpinPending = true;
+        if (challengeWheelView != null) {
+            challengeWheelView.setScaleX(1f);
+            challengeWheelView.setScaleY(1f);
+        }
+        if (challengeWheelSpinButton != null) {
+            challengeWheelSpinButton.setEnabled(false);
+            challengeWheelSpinButton.setAlpha(0.65f);
+            challengeWheelSpinButton.setText("جارٍ طلب التدوير…");
+        }
+        boolean sent = realtime.emitRoomEvent(roomId, "challenge:wheel:spin",
+                new JsonObject(), (ok, error, code) -> handler.post(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!ok) {
+                        challengeWheelSpinPending = false;
+                        if (challengeWheelSpinButton != null) {
+                            challengeWheelSpinButton.setEnabled(true);
+                            challengeWheelSpinButton.setAlpha(1f);
+                            challengeWheelSpinButton.setText("تدوير العجلة");
+                        }
+                        Toast.makeText(this,
+                                error != null && !error.isEmpty() ? error : "تعذر تدوير العجلة",
+                                Toast.LENGTH_LONG).show();
+                    }
+                }));
+        if (!sent) {
+            challengeWheelSpinPending = false;
+            if (challengeWheelSpinButton != null) {
+                challengeWheelSpinButton.setEnabled(true);
+                challengeWheelSpinButton.setAlpha(1f);
+                challengeWheelSpinButton.setText("تدوير العجلة");
+            }
+            Toast.makeText(this, "تعذر الاتصال بخدمة التحديات", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void handleChallengeWheelResult(JsonObject payload) {
+        String spinId = memberStr(payload, "spinId");
+        if (spinId != null && spinId.equals(lastChallengeWheelSpinId)) return;
+        if (spinId != null) lastChallengeWheelSpinId = spinId;
+        int index = memberInt(payload, "index", -1);
+        String label = memberStr(payload, "label");
+        if (index < 0 || index >= 10 || label == null || label.isEmpty()) return;
+
+        showChallengeWheelDialog(canModerateRoom());
+        challengeWheelSpinPending = false;
+        if (challengeWheelResult != null) {
+            challengeWheelResult.setText("العجلة تدور…");
+        }
+        if (challengeWheelSpinButton != null) {
+            challengeWheelSpinButton.setEnabled(false);
+            challengeWheelSpinButton.setAlpha(0.65f);
+            challengeWheelSpinButton.setText("جارٍ التدوير…");
+        }
+        long startAt = memberLong(payload, "startAt", System.currentTimeMillis());
+        long delay = Math.max(0L, Math.min(4000L, startAt - System.currentTimeMillis()));
+        handler.postDelayed(() -> {
+            if (challengeWheelView == null || challengeWheelDialog == null
+                    || !challengeWheelDialog.isShowing()) return;
+            challengeWheelView.setScaleX(1f);
+            challengeWheelView.setScaleY(1f);
+            challengeWheelView.spinTo(index, 6200L, () -> {
+                if (challengeWheelResult != null) {
+                    challengeWheelResult.setText("الفقرة المختارة\n" + label);
+                }
+                if (challengeWheelSpinButton != null) {
+                    challengeWheelSpinButton.setEnabled(true);
+                    challengeWheelSpinButton.setAlpha(1f);
+                    challengeWheelSpinButton.setText("تدوير مرة أخرى");
+                }
+                handler.postDelayed(() -> {
+                    if (challengeWheelDialog != null && challengeWheelDialog.isShowing()
+                            && challengeWheelView != null) {
+                        challengeWheelView.animate().scaleX(0.62f).scaleY(0.62f)
+                                .setDuration(550L).start();
+                    }
+                }, 5000L);
+            });
+        }, delay);
+    }
+
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
+        if ("challenge:wheel:result".equals(event)) {
+            handleChallengeWheelResult(payload);
+            return;
+        }
         if ("contest:team-score".equals(event) || "contest:team-ended".equals(event)
                 || "contest:pk-started".equals(event)) {
             handler.removeCallbacks(roomPkPendingTimeout);
