@@ -1084,6 +1084,32 @@
                     android:orientation="vertical" />
             </LinearLayout>
 
+            <!-- Clean lower-section heading above the native service shortcuts. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_marginEnd="18dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="2dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="خدماتي"
+                    android:textColor="#FF292333"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <View
+                    android:layout_width="34dp"
+                    android:layout_height="2dp"
+                    android:background="#FFD8AD43" />
+            </LinearLayout>
+
             <!-- Mikoo services list — each row has its own unique icon (hardcoded) -->
             <GridLayout
                 android:layout_width="match_parent"
