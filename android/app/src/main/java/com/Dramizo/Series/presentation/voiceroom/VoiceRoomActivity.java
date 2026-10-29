@@ -14575,7 +14575,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             challengeWheelView.setScaleY(1f);
             challengeWheelView.spinTo(index, 6200L, () -> {
                 if (challengeWheelResult != null) {
-                    challengeWheelResult.setText("الفقرة المختارة\n" + label);
+                    challengeWheelResult.setText(label);
                 }
                 if (challengeWheelSpinButton != null) {
                     challengeWheelSpinButton.setEnabled(true);
