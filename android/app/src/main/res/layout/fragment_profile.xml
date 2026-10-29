@@ -1233,7 +1233,8 @@
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center">
+                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center"
+                    android:visibility="visible">
 
                     <ImageView
                         android:layout_width="44dp"
@@ -1266,7 +1267,8 @@
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center">
+                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center"
+                    android:visibility="visible">
 
                     <ImageView
                         android:layout_width="44dp"
@@ -1299,7 +1301,8 @@
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center">
+                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center"
+                    android:visibility="visible">
 
                     <ImageView
                         android:layout_width="44dp"
@@ -1333,7 +1336,8 @@
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center">
+                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center"
+                    android:visibility="visible">
 
                     <ImageView
                         android:layout_width="44dp"
@@ -1589,7 +1593,8 @@
                     android:foreground="?attr/selectableItemBackground"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center">
+                    android:paddingVertical="10dp" android:layout_columnWeight="1" android:layout_gravity="center"
+                    android:visibility="visible">
 
                     <ImageView
                         android:layout_width="44dp"
