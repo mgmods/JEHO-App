@@ -181,7 +181,8 @@ public class ProfileFragment extends Fragment {
             if (tag instanceof Integer) i.putExtra(FriendsActivity.EXTRA_TAB, (Integer) tag);
             startActivity(i);
         };
-        binding.statFriends.setOnClickListener(v ->
+        binding.statFriends.setOnClickListener(openFriends);
+        binding.statVisitors.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), VisitorsActivity.class)));
         binding.statFollowing.setTag(1);
         binding.statFans.setTag(2);
@@ -225,6 +226,9 @@ public class ProfileFragment extends Fragment {
             cLoadVisitorCount();
             binding.tvFollowing.setText(String.valueOf(Math.max(0, user.followingCount)));
             binding.tvFans.setText(String.valueOf(Math.max(0, user.followersCount)));
+            if (binding.tvFriendsCount != null) {
+                binding.tvFriendsCount.setText(String.valueOf(Math.max(0, user.friendsCount)));
+            }
             // Profile: fixed VIP nobility frame (ud_vip_tou); mall SVGA stays on mics only.
             String nobilityFrame = VipStyle.profileNobilityFrameUrl(
                     Math.max(0, user.vipLevel), user.vipTouUrl);
