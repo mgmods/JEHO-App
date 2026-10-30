@@ -30,6 +30,7 @@ export type NavIconsConfig = {
   profileActions?: Partial<Record<ProfileActionKey, string>>;
   /** Shared icons and global verification state for chat inbox channels. */
   channelIcons?: Partial<Record<ChannelIconKey, string>>;
+  homeShortcuts?: Partial<Record<HomeShortcutKey, string>>;
   officialNewsVerified?: boolean;
   adminMessagesVerified?: boolean;
 };
@@ -101,6 +102,7 @@ export function defaultNavIconsConfig(
     me: pair('me'),
     profileActions: {},
     channelIcons: {},
+    homeShortcuts: {},
     officialNewsVerified: true,
     adminMessagesVerified: true,
   };
@@ -146,6 +148,10 @@ export function sanitizeNavIconsConfig(raw: unknown): NavIconsConfig {
     if (url) channelIcons[key] = url;
   }
   out.channelIcons = channelIcons;
+  const rawHome = src.homeShortcuts && typeof src.homeShortcuts === 'object' ? src.homeShortcuts : {};
+  const homeShortcuts: Partial<Record<HomeShortcutKey, string>> = {};
+  for (const key of ['search', 'room'] as HomeShortcutKey[]) { const url = cleanUrl(rawHome[key]); if (url) homeShortcuts[key] = url; }
+  out.homeShortcuts = homeShortcuts;
   out.officialNewsVerified = obj.officialNewsVerified !== false;
   out.adminMessagesVerified = obj.adminMessagesVerified !== false;
   return out;
@@ -193,6 +199,7 @@ export function navIconsClientPayload(
     channelIcons: Object.fromEntries(
       CHANNEL_ICON_KEYS.map((key) => [key, resolveNavIconUrl({ icon: cfg.channelIcons?.[key] }, false, origin) || '']),
     ),
+    homeShortcuts: Object.fromEntries((['search', 'room'] as HomeShortcutKey[]).map((key) => [key, resolveNavIconUrl({ icon: cfg.homeShortcuts?.[key] }, false, origin) || ''])),
     officialNewsVerified: cfg.officialNewsVerified !== false,
     adminMessagesVerified: cfg.adminMessagesVerified !== false,
     /** Hint for clients / docs. */
