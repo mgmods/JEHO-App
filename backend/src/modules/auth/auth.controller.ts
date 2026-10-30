@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Keep the public registration route available on the deployed JEHO-OWN API.
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Register with email and password' })
