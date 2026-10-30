@@ -131,10 +131,6 @@
             <span class="login-meta-k">{{ t('login.api') }}</span>
             <code dir="ltr">JEHO-OWN · same server</code>
           </div>
-          <div>
-            <span class="login-meta-k">{{ t('login.defaultAccount') }}</span>
-            <code dir="ltr">{{ PRIMARY_ADMIN_EMAIL }}</code>
-          </div>
         </footer>
       </section>
     </div>
@@ -151,9 +147,6 @@ import AlertMessage from '@/components/AlertMessage.vue'
 import brandLogo from '@/assets/brand/logo.png'
 
 const { t } = useI18n()
-
-/** Primary platform admin (seed account). */
-const PRIMARY_ADMIN_EMAIL = 'admin@auralive.com'
 
 const auth = useAuthStore()
 const router = useRouter()
