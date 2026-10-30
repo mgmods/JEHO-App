@@ -14503,8 +14503,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         close.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
         root.addView(close, closeLp);
         close.setOnClickListener(v -> {
-            if (!canModerateRoom()) return;
-            dialog.dismiss();
+            if (!canModerateRoom() || roomId == null || roomId.isEmpty()) return;
+            RealtimeClient realtime = RealtimeClient.getInstance();
+            if (!realtime.isConnected() || !realtime.isJoinedRoom(roomId)) {
+                Toast.makeText(this, "تعذر الاتصال بالغرفة لإغلاق العجلة عند الجميع", Toast.LENGTH_SHORT).show();
+                connectRealtimeRoom();
+                return;
+            }
+            close.setEnabled(false);
+            realtime.emitRoomEvent(roomId, "challenge:wheel:close", new JsonObject(),
+                    (ok, error, code) -> handler.post(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        if (!ok) {
+                            close.setEnabled(true);
+                            Toast.makeText(this, error != null && !error.isEmpty()
+                                    ? error : "تعذر إغلاق العجلة عند الجميع", Toast.LENGTH_LONG).show();
+                        } else {
+                            dismissChallengeWheelDialog();
+                        }
+                    }));
         });
 
         dialog.setContentView(root);
@@ -14696,8 +14713,36 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private void dismissChallengeWheelDialog() {
+        handler.removeCallbacksAndMessages(null);
+        if (challengeWheelDialog != null && challengeWheelDialog.isShowing()) {
+            challengeWheelDialog.dismiss();
+        } else {
+            if (challengeWheelView != null) challengeWheelView.stop();
+            challengeWheelDialog = null;
+            challengeWheelView = null;
+            challengeWheelResult = null;
+            challengeWheelSpinButton = null;
+            challengeWheelCloseButton = null;
+            challengeWheelSpinPending = false;
+        }
+        View content = findViewById(android.R.id.content);
+        if (content instanceof ViewGroup) {
+            ViewGroup host = (ViewGroup) content;
+            Object old = host.getTag();
+            if (old instanceof View && ((View) old).getParent() == host) {
+                host.removeView((View) old);
+                host.setTag(null);
+            }
+        }
+    }
+
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
+        if ("challenge:wheel:closed".equals(event)) {
+            dismissChallengeWheelDialog();
+            return;
+        }
         if ("challenge:wheel:result".equals(event)) {
             handleChallengeWheelResult(payload);
             return;
