@@ -1267,7 +1267,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     qb.where(conditions.map((part) => `(${part})`).join(' OR '))
       .andWhere('room."status" != :closedStatus', { closedStatus: RoomStatus.CLOSED })
-      .orderBy('room."updatedAt"', 'DESC')
+      .orderBy('room.updatedAt', 'DESC')
       .take(100);
     const rooms = this.dedupeRoomsById(await qb.getMany());
     const giftCoins = await this.roomGiftCoinTotals(rooms.map((room) => room.id));
