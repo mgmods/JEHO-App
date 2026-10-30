@@ -214,13 +214,47 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       .in(`user:${client.userId}`)
       .fetchSockets();
     if (remainingSockets.length === 0) {
+      // Give mobile clients time to reconnect after brief network changes or app backgrounding.
+      // A successful room:join cancels this timer, so users are not removed during reconnect.
       for (const roomId of joinedRoomIds) {
-        await this.autoLeaveSeatOnDisconnect(client.userId, roomId);
+        this.scheduleDisconnectCleanup(client.userId, roomId);
       }
     }
     for (const roomId of joinedRoomIds) {
       await this.emitRoomMembers(roomId);
     }
+  }
+
+  private disconnectCleanupKey(userId: string, roomId: string): string {
+    return `${userId}:${roomId}`;
+  }
+
+  private cancelDisconnectCleanup(userId: string, roomId: string): void {
+    const key = this.disconnectCleanupKey(userId, roomId);
+    const timer = this.roomDisconnectCleanupTimers.get(key);
+    if (timer) {
+      clearTimeout(timer);
+      this.roomDisconnectCleanupTimers.delete(key);
+    }
+  }
+
+  private scheduleDisconnectCleanup(userId: string, roomId: string): void {
+    const key = this.disconnectCleanupKey(userId, roomId);
+    this.cancelDisconnectCleanup(userId, roomId);
+    const timer = setTimeout(async () => {
+      this.roomDisconnectCleanupTimers.delete(key);
+      try {
+        // A reconnect on any socket cancels cleanup, including reconnects across tabs/devices.
+        const sockets = await this.server.in(`user:${userId}`).fetchSockets();
+        if (sockets.length > 0) return;
+        await this.autoLeaveSeatOnDisconnect(userId, roomId);
+      } catch (err) {
+        this.logger.warn(
+          `Delayed disconnect cleanup failed for ${userId}/${roomId}: ${(err as Error).message}`,
+        );
+      }
+    }, RealtimeGateway.ROOM_RECONNECT_GRACE_MS);
+    this.roomDisconnectCleanupTimers.set(key, timer);
   }
 
   /** When the user's last socket drops, free any voice-room mic seat they occupied. */
