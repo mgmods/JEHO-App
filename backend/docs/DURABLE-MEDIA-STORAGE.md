@@ -4,13 +4,13 @@
 
 The Blitz container filesystem is not durable across replacement/redeploy/sleep cycles. Production uploads must be written to Supabase Storage; the local `uploads/` directory is only a temporary staging area.
 
-The upload service now rejects production uploads with HTTP 503 when Supabase Storage is not configured, instead of returning a URL that can disappear on restart. Local uploads remain available for development.
+The upload service validates Supabase Storage at startup and uses the private bucket for durable media. Keep the server-side secret only in Ghaymah environment secrets; never expose it to the APK or dashboard. Local uploads remain available for development.
 
-## Configure the dedicated JEHO-OWN Supabase project
+## Configure the existing primary Supabase project
 
-Use the dedicated JEHO-OWN project only. Do not point these settings at the legacy `JEHOO` project.
+Use the already-existing active Supabase project selected for JEHOO. Its private `jeho-own-uploads` bucket has been verified to exist. Do not create another project or bucket, and do not change database tables, RLS policies, or existing storage settings as part of this rollout.
 
-Set these server-side environment variables in Blitz for the backend service:
+Set these server-side environment variables in Ghaymah for the `jeho-own` backend service:
 
 - `SUPABASE_URL`: the project API URL, e.g. `https://<project-ref>.supabase.co`.
 - `SUPABASE_STORAGE_BUCKET=jeho-own-uploads`.
@@ -18,7 +18,7 @@ Set these server-side environment variables in Blitz for the backend service:
 
 Never put the server-side key in the Android app, Vite/public dashboard variables, source control, logs, or chat.
 
-Create a Storage bucket named `jeho-own-uploads` in that same project. A private bucket is supported because file reads are proxied through the backend using the server-side key. The current `/uploads/:filename` route does not require user authentication, matching the app's existing media URL behavior. Set the bucket's maximum file size to at least 40 MiB if uploads of that size are required. The backend accepts image, video, SVGA, audio, PDF and JSON files within its configured size limit.
+The existing `jeho-own-uploads` bucket is private and supports this backend's server-side upload/read flow. The current `/uploads/:filename` route does not require user authentication, matching the app's existing media URL behavior. Its verified file size limit is 40 MiB; do not change it without a separate requirement. The backend accepts image, video, SVGA, audio, PDF and JSON files within its configured size limit.
 
 ## Verification checklist
 
