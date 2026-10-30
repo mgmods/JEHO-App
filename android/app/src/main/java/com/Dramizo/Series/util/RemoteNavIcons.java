@@ -84,6 +84,29 @@ public final class RemoteNavIcons {
         }
     }
 
+    /** Bind a dashboard-managed home shortcut icon. */
+    public static void bindHomeShortcut(@Nullable ImageView view, @Nullable String key) {
+        if (view == null) return;
+        MiscDtos.NavIconsDto cfg = cached;
+        String raw = cfg != null && cfg.homeShortcuts != null && key != null ? cfg.homeShortcuts.get(key) : null;
+        if (raw == null || raw.trim().isEmpty()) {
+            if ("room".equals(key)) view.setVisibility(android.view.View.GONE);
+            return;
+        }
+        view.setVisibility(android.view.View.VISIBLE);
+        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(raw.trim()));
+        view.clearColorFilter();
+        view.setImageTintList(null);
+        if (isSvgUrl(url)) { loadRemoteSvg(view, url, null, null, false); return; }
+        Object prev = view.getTag(R.id.tag_image_url);
+        if (prev instanceof String && url.equals(prev) && view.getDrawable() != null) return;
+        view.setTag(R.id.tag_image_url, url);
+        try {
+            Glide.with(view).load(url).apply(MediaAssetSync.requestOptions()).dontAnimate().fitCenter()
+                    .error(android.R.drawable.ic_menu_search).into(view);
+        } catch (Exception ignored) { view.setVisibility(android.view.View.GONE); }
+    }
+
     /** Bind an icon uploaded for one of the profile action tiles. */
     public static void bindProfileAction(@Nullable ImageView view, @Nullable String actionKey, int fallbackRes) {
         if (view == null) return;
