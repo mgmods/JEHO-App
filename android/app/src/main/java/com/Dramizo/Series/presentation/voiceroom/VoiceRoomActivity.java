@@ -1914,7 +1914,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         dialog.setContentView(host);
         dialog.setCancelable(true);
-        dialog.setCanceledOnTouchOutside(true);
+        // Keep the wheel open until the explicit Close button is pressed.
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
         dialog.setOnDismissListener(d -> {
             handler.removeCallbacks(refreshChest);
             web.stopLoading();
@@ -14405,7 +14407,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         title.setPadding(dp(20), dp(7), dp(20), dp(7));
         GradientDrawable titleBg = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0xFF252044, 0xFF3C3268, 0xFF252044});
+                new int[]{0xFFB51F68, 0xFF67318F, 0xFF32164F});
         titleBg.setCornerRadius(dp(18));
         titleBg.setStroke(dp(1), 0xFF8073B8);
         title.setBackground(titleBg);
@@ -14416,12 +14418,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         FrameLayout wheelHost = new FrameLayout(this);
         LinearLayout.LayoutParams wheelHostLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(342));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(370));
         wheelHostLp.topMargin = dp(5);
         root.addView(wheelHost, wheelHostLp);
 
         ChallengeWheelView wheel = new ChallengeWheelView(this);
-        wheelHost.addView(wheel, new FrameLayout.LayoutParams(dp(326), dp(326), Gravity.CENTER));
+        wheelHost.addView(wheel, new FrameLayout.LayoutParams(dp(354), dp(354), Gravity.CENTER));
 
         TextView resultCaption = new TextView(this);
         resultCaption.setText("نوع الفقرة");
@@ -14467,7 +14469,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         spin.setGravity(Gravity.CENTER);
         GradientDrawable spinBg = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0xFF6757A6, 0xFF3D8E91});
+                new int[]{0xFFFF1744, 0xFFD5003F, 0xFF8E0038});
         spinBg.setCornerRadius(dp(20));
         spinBg.setStroke(dp(1), 0xFF9B91D8);
         spin.setBackground(spinBg);
@@ -14648,7 +14650,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                     Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            lp.setMargins(dp(16), dp(12), dp(16), 0);
+            int statusBarInset = 0;
+            try {
+                android.graphics.Rect visibleFrame = new android.graphics.Rect();
+                content.getWindowVisibleDisplayFrame(visibleFrame);
+                statusBarInset = Math.max(0, visibleFrame.top);
+                androidx.core.view.WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(content);
+                if (insets != null) {
+                    statusBarInset = Math.max(statusBarInset,
+                            insets.getInsets(WindowInsetsCompat.Type.statusBars()).top);
+                }
+            } catch (Exception ignored) {
+            }
+            lp.setMargins(dp(16), statusBarInset + dp(12), dp(16), 0);
             host.addView(card, lp);
             host.setTag(card);
             card.setAlpha(0f);
