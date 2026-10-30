@@ -27,7 +27,7 @@ android {
     // NDK r28+ defaults to 16 KB ELF page alignment (Play requirement).
     ndkVersion "28.0.12433566"
     defaultConfig {
-        applicationId "com.Dramizo.Series"
+        applicationId "com.mgwa.chat"
         minSdk 24
         targetSdk 36
         versionCode 49
