@@ -92,26 +92,9 @@
       </article>
     </div>
 
-    <PageHeader title="أيقونات اختصارات الشاشة الرئيسية" subtitle="ارفع أيقونتي البحث والغرفة أعلى الشاشة الرئيسية لتظهر عند جميع المستخدمين بعد الحفظ." />
-    <div class="nav-icons-grid mb-4">
-      <article v-for="shortcut in homeShortcutList" :key="shortcut.key" class="glass p-3 nav-icon-card">
-        <h3 class="h6 mb-2">{{ shortcut.label }}</h3>
-        <div class="icon-slot">
-          <div class="icon-preview">
-            <img v-if="homeShortcuts[shortcut.key]" :src="absUrl(homeShortcuts[shortcut.key])" alt="" />
-            <span v-else class="text-muted small">أيقونة التطبيق الافتراضية</span>
-          </div>
-          <label class="form-label small mb-1">أيقونة الزر</label>
-          <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
-            class="form-control form-control-sm" @change="(e) => onHomeShortcutFile(e, shortcut.key)" />
-          <button v-if="homeShortcuts[shortcut.key]" class="btn btn-link btn-sm text-danger px-0" type="button"
-            @click="homeShortcuts[shortcut.key] = ''">استعادة الأيقونة الافتراضية</button>
-        </div>
-      </article>
-    </div>
-
-    <PageHeader title="أيقونات قسم أنا" subtitle="ارفع أيقونات مربعات الملف الشخصي لتظهر داخل التطبيق." />
-    <div class="nav-icons-grid">
+    <PageHeader title="أيقونات قسم أنا" subtitle="ارفع أيقونات مربعات الملف الشخصي واختصارات الشاشة الرئيسية لتظهر عند جميع المستخدمين." />
+    <div class="small text-secondary fw-semibold mb-2">أيقونات مربعات قسم أنا</div>
+    <div class="nav-icons-grid mb-3">
       <article v-for="action in profileActionsList" :key="action.key" class="glass p-3 nav-icon-card">
         <h3 class="h6 mb-2">{{ action.label }}</h3>
         <div class="icon-slot">
@@ -124,6 +107,23 @@
             class="form-control form-control-sm" @change="(e) => onProfileFile(e, action.key)" />
           <button v-if="profileIcons[action.key]" class="btn btn-link btn-sm text-danger px-0" type="button"
             @click="profileIcons[action.key] = ''">إزالة الأيقونة المخصصة</button>
+        </div>
+      </article>
+    </div>
+    <div class="small text-secondary fw-semibold mb-2">اختصارات الشاشة الرئيسية</div>
+    <div class="nav-icons-grid">
+      <article v-for="shortcut in homeShortcutList" :key="shortcut.key" class="glass p-3 nav-icon-card">
+        <h3 class="h6 mb-2">{{ shortcut.label }}</h3>
+        <div class="icon-slot">
+          <div class="icon-preview">
+            <img v-if="homeShortcuts[shortcut.key]" :src="absUrl(homeShortcuts[shortcut.key])" alt="" />
+            <span v-else class="text-muted small">أيقونة التطبيق الافتراضية</span>
+          </div>
+          <label class="form-label small mb-1">أيقونة الزر</label>
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+            class="form-control form-control-sm" @change="(e) => onHomeShortcutFile(e, shortcut.key)" />
+          <button v-if="homeShortcuts[shortcut.key]" class="btn btn-link btn-sm text-danger px-0" type="button"
+            @click="homeShortcuts[shortcut.key] = ''">استعادة الأيقونة الافتراضية</button>
         </div>
       </article>
     </div>
