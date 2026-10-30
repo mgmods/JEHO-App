@@ -404,6 +404,7 @@ public final class MiscDtos {
         @SerializedName("me") public NavIconPairDto me;
         @SerializedName("profileActions") public Map<String, String> profileActions;
         @SerializedName("channelIcons") public Map<String, String> channelIcons;
+        @SerializedName("homeShortcuts") public Map<String, String> homeShortcuts;
         @SerializedName("officialNewsVerified") public Boolean officialNewsVerified;
         @SerializedName("adminMessagesVerified") public Boolean adminMessagesVerified;
     }
