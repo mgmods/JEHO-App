@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - jeho-own
-      - MG-JEHO
     paths:
       - "backend/**"
       - ".github/workflows/publish-jeho-own-backend.yml"
@@ -20,7 +19,7 @@ concurrency:
 
 jobs:
   build-and-publish:
-    if: ${{ github.ref_name == 'jeho-own' || github.ref_name == 'MG-JEHO' }}
+    if: ${{ github.ref_name == 'jeho-own' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out selected JEHO branch
@@ -47,37 +46,4 @@ jobs:
             ghcr.io/mgmods/jeho-own-backend:jeho-own
             ghcr.io/mgmods/jeho-own-backend:sha-${{ github.sha }}
 
-      - name: Build and publish isolated MG-JEHO candidate
-        if: ${{ github.ref_name == 'MG-JEHO' }}
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/mgmods/jeho-own-backend:mg-jeho
-            ghcr.io/mgmods/jeho-own-backend:mg-jeho-candidate
-            ghcr.io/mgmods/jeho-own-backend:sha-${{ github.sha }}
 
-  restore-stable-tags:
-    if: ${{ github.event_name == 'push' && github.ref_name == 'MG-JEHO' && contains(github.event.head_commit.message, '[restore-stable-tags]') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Restore stable tags to the user-confirmed known-good digest
-        shell: bash
-        run: |
-          set -euo pipefail
-          IMAGE=ghcr.io/mgmods/jeho-own-backend
-          STABLE=ghcr.io/mgmods/jeho-own-backend@sha256:f565197f15e7be34ad8f57af13448fd451b81d8ace962f0dbbad9e7615baf458
-          docker buildx imagetools create --tag "${IMAGE}:mg-jeho" "${STABLE}"
-          docker buildx imagetools create --tag "${IMAGE}:badge-fix-8f26b6dc33d198fc5ce695be7bc638658b8693e8" "${STABLE}"
