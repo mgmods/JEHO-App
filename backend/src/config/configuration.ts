@@ -123,7 +123,7 @@ export default registerAs('app', () => {
   },
   googlePlay: {
     // Must match android `applicationId` / Play Console package exactly.
-    packageName: process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.mgwa.chat',
+    packageName: 'com.mgwa.chat',
     /**
      * Optional dedicated service-account JSON for Android Publisher API
      * (Play Console → Users and permissions → API access). NOT Firebase.
