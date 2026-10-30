@@ -10,6 +10,7 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.SweepGradient;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
@@ -35,6 +36,7 @@ public final class ChallengeWheelView extends View {
     private final Paint textBackground = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint labelPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint hubText = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private final Drawable appLogo;
     private final StaticLayout[] labels = new StaticLayout[LABELS.length];
     private final RectF wheelBounds = new RectF();
     private final Path wedge = new Path();
@@ -44,7 +46,8 @@ public final class ChallengeWheelView extends View {
     public ChallengeWheelView(Context context) {
         super(context);
         setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-        setContentDescription("عجلة التحديات");
+        setContentDescription("عجلة التحديات مع شعار JEHO في المنتصف");
+        appLogo = context.getPackageManager().getApplicationIcon(context.getApplicationInfo());
         paint.setStyle(Paint.Style.FILL);
         linePaint.setStyle(Paint.Style.STROKE);
         linePaint.setStrokeWidth(dp(1.2f));
@@ -57,10 +60,6 @@ public final class ChallengeWheelView extends View {
             labels[i] = new StaticLayout(LABELS[i], labelPaint, (int) dp(64),
                     Layout.Alignment.ALIGN_CENTER, 0.94f, 0f, false);
         }
-        hubText.setColor(0xFFFFFFFF);
-        hubText.setTextAlign(Paint.Align.CENTER);
-        hubText.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
-        hubText.setTextSize(dp(11));
         textBackground.setStyle(Paint.Style.FILL);
     }
 
@@ -163,18 +162,28 @@ public final class ChallengeWheelView extends View {
         canvas.drawCircle(cx, cy, wheelRadius - dp(1), linePaint);
         canvas.restore();
 
-        // Central gold hub.
+        // Central hub with the app's own launcher logo instead of the SPIN text.
         float hub = wheelRadius * .19f;
         paint.setShader(new LinearGradient(cx - hub, cy - hub, cx + hub, cy + hub,
                 new int[]{0xFFE6FFFC, 0xFF5C4B91, 0xFF282044}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, hub, paint);
         paint.setShader(null);
+        // Clip the launcher icon to the round center so it fits the wheel's premium hub.
+        int logoSave = canvas.save();
+        Path logoClip = new Path();
+        logoClip.addCircle(cx, cy, hub - dp(2), Path.Direction.CW);
+        canvas.clipPath(logoClip);
+        int logoSize = Math.round(hub * 1.72f);
+        appLogo.setBounds(Math.round(cx - logoSize / 2f), Math.round(cy - logoSize / 2f),
+                Math.round(cx + logoSize / 2f), Math.round(cy + logoSize / 2f));
+        appLogo.draw(canvas);
+        canvas.restoreToCount(logoSave);
+
         paint.setColor(0xFFFFFFFF);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(dp(2));
         canvas.drawCircle(cx, cy, hub - dp(2), paint);
         paint.setStyle(Paint.Style.FILL);
-        canvas.drawText("SPIN", cx, cy + dp(4), hubText);
 
         // Fixed red pointer at twelve o'clock; it never rotates with the wheel.
         Path pointer = new Path();
