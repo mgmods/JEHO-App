@@ -50,3 +50,76 @@ jobs:
             org.opencontainers.image.title=JEHO Ghaymah candidate (backend and dashboard)
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-ghaymah-test:
+    needs: build-and-publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Update only the existing Ghaymah test app image
+        env:
+          GHAYMAH_API_TOKEN: ${{ secrets.GHAYMAH_API_TOKEN }}
+          IMAGE: ghcr.io/mgmods/jeho-own-backend:ghaymah-${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GHAYMAH_API_TOKEN:-}" ]]; then
+            echo "::error::GHAYMAH_API_TOKEN is missing."
+            exit 1
+          fi
+
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+
+          # Read the existing app first. Never create an app or change its
+          # resources, ports, environment, networking, or attached services.
+          status="$(curl --silent --show-error --output "$tmp/apps.json" --write-out '%{http_code}' \
+            --header "Authorization: Bearer $GHAYMAH_API_TOKEN" \
+            --header "Accept: application/json" \
+            https://api.cumin.dev/apps)"
+          if [[ "$status" != "200" ]]; then
+            echo "::error::Ghaymah app lookup failed (HTTP $status); no update was attempted."
+            exit 1
+          fi
+
+          jq -e '
+            if type == "array" then .
+            elif (.apps | type) == "array" then .apps
+            elif (.data | type) == "array" then .data
+            else error("Unrecognized Ghaymah /apps response shape")
+            end
+            | map(select(.name == "jeho-own"))
+          ' "$tmp/apps.json" > "$tmp/matches.json"
+
+          count="$(jq 'length' "$tmp/matches.json")"
+          if [[ "$count" != "1" ]]; then
+            echo "::error::Expected exactly one visible app named jeho-own; found $count. No update was attempted."
+            exit 1
+          fi
+
+          jq -e '.[0] | select((.id | type) == "string" and (.id | length) > 0)' \
+            "$tmp/matches.json" > "$tmp/current-app.json"
+
+          current_image="$(jq -r '.[0].image // ""' "$tmp/matches.json")"
+          echo "Target confirmed: jeho-own. Current image: ${current_image:-unknown}"
+
+          # Preserve the complete app object returned by Ghaymah and change
+          # only its image field. Refuse unexpected response formats.
+          jq --arg image "$IMAGE" '.[0] | .image = $image' \
+            "$tmp/matches.json" > "$tmp/update.json"
+          jq -e 'has("id") and .name == "jeho-own" and .image == env.IMAGE' \
+            "$tmp/update.json" >/dev/null
+
+          status="$(curl --silent --show-error --output "$tmp/update-response.json" --write-out '%{http_code}' \
+            --request PUT \
+            --header "Authorization: Bearer $GHAYMAH_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --header "Accept: application/json" \
+            --data-binary @"$tmp/update.json" \
+            https://api.cumin.dev/apps)"
+          if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+            echo "::error::Ghaymah update failed (HTTP $status). Check Ghaymah API logs; no retry or app creation was attempted."
+            exit 1
+          fi
+
+          echo "Ghaymah accepted the image update for jeho-own: $IMAGE"
