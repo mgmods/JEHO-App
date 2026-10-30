@@ -197,6 +197,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private ChallengeWheelView challengeWheelView;
     @Nullable private TextView challengeWheelResult;
     @Nullable private TextView challengeWheelSpinButton;
+    @Nullable private TextView challengeWheelCloseButton;
     @Nullable private String lastChallengeWheelSpinId;
     private boolean challengeWheelSpinPending;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -14388,10 +14389,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (challengeWheelSpinButton != null) {
                 challengeWheelSpinButton.setVisibility(canSpin ? View.VISIBLE : View.GONE);
             }
-            View existingClose = challengeWheelDialog.findViewById(android.R.id.button2);
             // The close control is permission-gated; audience members cannot dismiss the shared wheel.
-            if (existingClose != null) {
-                existingClose.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
+            if (challengeWheelCloseButton != null) {
+                challengeWheelCloseButton.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
             }
             return;
         }
@@ -14518,6 +14518,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 challengeWheelView = null;
                 challengeWheelResult = null;
                 challengeWheelSpinButton = null;
+                challengeWheelCloseButton = null;
                 challengeWheelSpinPending = false;
             }
         });
@@ -14533,6 +14534,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         challengeWheelView = wheel;
         challengeWheelResult = result;
         challengeWheelSpinButton = spin;
+        challengeWheelCloseButton = close;
     }
 
     private void requestChallengeWheelSpin() {
