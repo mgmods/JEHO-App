@@ -14586,7 +14586,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             View content = findViewById(android.R.id.content);
             if (!(content instanceof ViewGroup)) return;
             ViewGroup host = (ViewGroup) content;
-            Object old = host.getTag(R.id.content);
+            Object old = host.getTag();
             if (old instanceof View && ((View) old).getParent() == host) {
                 host.removeView((View) old);
             }
@@ -14627,7 +14627,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     Gravity.TOP | Gravity.CENTER_HORIZONTAL);
             lp.setMargins(dp(16), dp(24), dp(16), 0);
             host.addView(card, lp);
-            host.setTag(R.id.content, card);
+            host.setTag(card);
             card.setAlpha(0f);
             card.setTranslationY(-dp(80));
             card.animate().alpha(1f).translationY(0f).setDuration(320L).start();
@@ -14636,7 +14636,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     card.animate().alpha(0f).translationY(-dp(60)).setDuration(240L)
                             .withEndAction(() -> {
                                 if (card.getParent() == host) host.removeView(card);
-                                if (host.getTag(R.id.content) == card) host.setTag(R.id.content, null);
+                                if (host.getTag() == card) host.setTag(null);
                             }).start();
                 }
             }, 4200L);
