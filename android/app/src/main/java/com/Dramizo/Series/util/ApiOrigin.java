@@ -3,11 +3,11 @@ package com.Dramizo.Series.util;
 import com.Dramizo.Series.BuildConfig;
 
 /**
- * JEHO CHAT's canonical API is the isolated JEHO-OWN backend deployed on Blitz Cloud.
+ * JEHO CHAT's canonical API is the isolated JEHO-OWN backend deployed on the isolated JEHO-OWN Cumin service.
  * The admin dashboard is served by the same backend host under /admin/.
  */
 public final class ApiOrigin {
-    private static final String CANONICAL_API = "https://jeho-own-backend.mgs.blitz.cloud";
+    private static final String CANONICAL_API = "https://jeho-own-web-910481ae.hosted.cumin.dev";
 
     private ApiOrigin() {}
 
