@@ -23,7 +23,15 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
-  const apiPrefix = configService.get<string>('app.apiPrefix') || 'api/v1';
+  // Android and the same-origin admin dashboard both use /api/v1.
+  // Do not let a stale host-level API_PREFIX silently move every controller
+  // away from the paths shipped in the APK and dashboard bundle.
+  const configuredApiPrefix = String(configService.get<string>('app.apiPrefix') || 'api/v1')
+    .replace(/^\\/+|\\/+$/g, '');
+  const apiPrefix = 'api/v1';
+  if (configuredApiPrefix !== apiPrefix) {
+    console.warn(`[JEHO-OWN boot] Ignoring mismatched API_PREFIX="${configuredApiPrefix}"; clients require /api/v1.`);
+  }
   const corsOrigins = configService.get<string[]>('app.corsOrigins') || ['*'];
   const redisIoAdapter = new RedisIoAdapter(app, configService);
   // Redis is optional for a single backend instance. Never let Redis DNS/network
@@ -357,7 +365,7 @@ const baishunModuleMap: Record<string, string> = {
   expressApp.get('/healthz', (_req: unknown, res: {
     status: (n: number) => { json: (body: unknown) => void };
   }) => {
-    res.status(200).json({ ok: true, service: 'jeho-own-api' });
+    res.status(200).json({ ok: true, service: 'jeho-own-api', apiPrefix });
   });
 
   console.log(`[JEHO-OWN boot] Opening HTTP listener on port ${port}...`);
