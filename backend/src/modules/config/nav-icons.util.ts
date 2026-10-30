@@ -8,6 +8,7 @@ export const PROFILE_ACTION_KEYS = ['events', 'agency', 'recharge', 'tasks', 'se
 export type ProfileActionKey = typeof PROFILE_ACTION_KEYS[number];
 export const CHANNEL_ICON_KEYS = ['officialNews', 'adminMessages', 'notifications'] as const;
 export type ChannelIconKey = typeof CHANNEL_ICON_KEYS[number];
+export type HomeShortcutKey = 'search' | 'room';
 
 export type NavIconPair = {
   /** Default / unselected icon URL (png/jpg). */
