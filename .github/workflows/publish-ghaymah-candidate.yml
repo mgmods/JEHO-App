@@ -1,4 +1,4 @@
-name: Build JEHO image for Ghaymah (isolated candidate)
+name: Build and deploy JEHO-OWN on Cumin (Ghaymah)
 
 on:
   push:
@@ -58,6 +58,8 @@ jobs:
 
   build-and-publish:
     needs: checks
+    outputs:
+      image_digest: ${{ steps.push.outputs.digest }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -72,6 +74,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and publish isolated Ghaymah candidate (backend + Vue admin dashboard)
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: ./backend
@@ -87,7 +90,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-ghaymah-test:
+  deploy-jeho-own:
     needs: build-and-publish
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -95,7 +98,7 @@ jobs:
       - name: Update only the existing Ghaymah test app image
         env:
           GHAYMAH_API_TOKEN: ${{ secrets.GHAYMAH_API_TOKEN }}
-          IMAGE: ghcr.io/mgmods/jeho-own-backend:ghaymah-${{ github.sha }}
+          IMAGE: ghcr.io/mgmods/jeho-own-backend@${{ needs.build-and-publish.outputs.image_digest }}
         shell: bash
         run: |
           set -euo pipefail
@@ -114,7 +117,12 @@ jobs:
             --header "Accept: application/json" \
             https://api.cumin.dev/apps)"
           if [[ "$status" != "200" ]]; then
-            echo "::error::Ghaymah app lookup failed (HTTP $status); no update was attempted."
+            if [[ "$status" == "401" ]]; then
+              echo "::error::Cumin returned 401 Unauthorized. Refresh the GHAYMAH_API_TOKEN GitHub Actions secret; no app or image was changed."
+            else
+              echo "::error::Cumin app lookup failed (HTTP $status); no update was attempted."
+            fi
+            sed -E 's/(token|secret|password)[^,}]*/\\1=[REDACTED]/Ig' "$tmp/apps.json" || true
             exit 1
           fi
 
@@ -154,8 +162,9 @@ jobs:
             --data-binary @"$tmp/update.json" \
             https://api.cumin.dev/apps)"
           if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
-            echo "::error::Ghaymah update failed (HTTP $status). Check Ghaymah API logs; no retry or app creation was attempted."
+            echo "::error::Cumin image update failed (HTTP $status). No retry or app creation was attempted."
+            sed -E 's/(token|secret|password)[^,}]*/\\1=[REDACTED]/Ig' "$tmp/update-response.json" || true
             exit 1
           fi
 
-          echo "Ghaymah accepted the image update for jeho-own: $IMAGE"
+          echo "Cumin accepted the exact JEHO-OWN image digest for app jeho-own: $IMAGE"
