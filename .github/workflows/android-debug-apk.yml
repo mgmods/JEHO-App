@@ -81,12 +81,12 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Validate JEHO-OWN Blitz API URL
+      - name: Validate JEHO-OWN Cumin API URL
         env:
-          JEHO_OWN_API_URL: https://jeho-own-backend.mgs.blitz.cloud/api/v1
+          JEHO_OWN_API_URL: https://jeho-own-web-910481ae.hosted.cumin.dev/api/v1
         shell: bash
         run: |
-          if [[ "$JEHO_OWN_API_URL" != "https://jeho-own-backend.mgs.blitz.cloud/api/v1" ]]; then
+          if [[ "$JEHO_OWN_API_URL" != "https://jeho-own-web-910481ae.hosted.cumin.dev/api/v1" ]]; then
             echo "::error::The APK must target the JEHO-OWN Blitz Cloud API."
             exit 1
           fi
@@ -132,7 +132,7 @@ jobs:
         run: |
           set -euo pipefail
           cat > local.properties <<EOF
-          API_BASE_URL=https://jeho-own-backend.mgs.blitz.cloud/api/v1
+          API_BASE_URL=https://jeho-own-web-910481ae.hosted.cumin.dev/api/v1
           STORE_FILE=$JEHO_RELEASE_KEYSTORE
           STORE_PASSWORD=$JEHO_RELEASE_STORE_PASSWORD
           KEY_ALIAS=$JEHO_RELEASE_KEY_ALIAS
@@ -142,7 +142,7 @@ jobs:
       - name: Build universal release APK
         working-directory: android
         env:
-          JEHO_OWN_API_URL: https://jeho-own-backend.mgs.blitz.cloud/api/v1
+          JEHO_OWN_API_URL: https://jeho-own-web-910481ae.hosted.cumin.dev/api/v1
         run: gradle --no-daemon -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL" assembleRelease
 
       - name: Verify universal APK, HTML assets, and signing certificate
