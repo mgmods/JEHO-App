@@ -102,8 +102,12 @@ jobs:
             echo "::error::Android SDK sdkmanager was not found."
             exit 1
           fi
+          # sdkmanager may close stdin after accepting licenses; avoid treating
+          # the resulting SIGPIPE from `yes` as a build failure.
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
-          "$SDKMANAGER" "platforms;android-36" "build-tools;35.0.0"
+          set -o pipefail
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;35.0.0"
 
       - name: Build signed universal debug APK
         working-directory: android
