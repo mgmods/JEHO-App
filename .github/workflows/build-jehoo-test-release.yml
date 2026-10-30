@@ -68,7 +68,7 @@ jobs:
     timeout-minutes: 60
     env:
       JEHO_OWN_API_URL: https://jeho-own-web-910481ae.hosted.cumin.dev
-      JEHO_DEBUG_KEYSTORE: ${{ runner.temp }}/jehoo-test-release.jks
+      JEHO_DEBUG_KEYSTORE: ${{ github.workspace }}/jehoo-test-release.jks
       JEHO_DEBUG_STORE_PASSWORD: ${{ secrets.JEHOO_TEST_KEYSTORE_PASSWORD }}
       JEHO_DEBUG_KEY_PASSWORD: ${{ secrets.JEHOO_TEST_KEY_PASSWORD }}
       JEHO_DEBUG_KEY_ALIAS: jehoo-test
