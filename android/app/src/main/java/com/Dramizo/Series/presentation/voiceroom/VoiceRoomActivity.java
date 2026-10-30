@@ -14397,12 +14397,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         root.setBackgroundColor(Color.TRANSPARENT);
 
         TextView title = new TextView(this);
-        title.setText("عجلة التحديات");
+        title.setText("العجلة تدور");
         title.setTextColor(0xFFFFE5B0);
-        title.setTextSize(19);
+        title.setTextSize(20);
         title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView wheelSubtitle = new TextView(this);
+        wheelSubtitle.setText("عجلة التحديات");
+        wheelSubtitle.setTextColor(0xFFBFB5D1);
+        wheelSubtitle.setTextSize(12);
+        wheelSubtitle.setGravity(Gravity.CENTER);
+        root.addView(wheelSubtitle, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         FrameLayout wheelHost = new FrameLayout(this);
@@ -14413,15 +14421,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         ChallengeWheelView wheel = new ChallengeWheelView(this);
         wheelHost.addView(wheel, new FrameLayout.LayoutParams(dp(286), dp(286), Gravity.CENTER));
-
-        TextView pointer = new TextView(this);
-        pointer.setText("▼");
-        pointer.setTextColor(0xFFFFD36C);
-        pointer.setTextSize(22);
-        pointer.setGravity(Gravity.CENTER);
-        pointer.setShadowLayer(dp(3), 0, dp(1), 0x88000000);
-        wheelHost.addView(pointer, new FrameLayout.LayoutParams(
-                dp(30), dp(26), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
 
         TextView resultCaption = new TextView(this);
         resultCaption.setText("نوع الفقرة");
@@ -14457,8 +14456,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         spin.setBackground(spinBg);
         spin.setVisibility(canSpin ? View.VISIBLE : View.GONE);
         LinearLayout.LayoutParams spinLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(46));
-        spinLp.topMargin = dp(8);
+                dp(164), dp(40));
+        spinLp.gravity = Gravity.CENTER_HORIZONTAL;
+        spinLp.topMargin = dp(7);
         root.addView(spin, spinLp);
         spin.setOnClickListener(v -> requestChallengeWheelSpin());
 
@@ -14513,10 +14513,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         challengeWheelSpinPending = true;
-        if (challengeWheelView != null) {
-            challengeWheelView.setScaleX(1f);
-            challengeWheelView.setScaleY(1f);
-        }
         if (challengeWheelSpinButton != null) {
             challengeWheelSpinButton.setEnabled(false);
             challengeWheelSpinButton.setAlpha(0.65f);
@@ -14571,26 +14567,81 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         handler.postDelayed(() -> {
             if (challengeWheelView == null || challengeWheelDialog == null
                     || !challengeWheelDialog.isShowing()) return;
-            challengeWheelView.setScaleX(1f);
-            challengeWheelView.setScaleY(1f);
-            challengeWheelView.spinTo(index, 6200L, () -> {
+            challengeWheelView.spinTo(index, 7000L, () -> {
                 if (challengeWheelResult != null) {
                     challengeWheelResult.setText(label);
                 }
+                showChallengeWheelWinnerToast(label);
                 if (challengeWheelSpinButton != null) {
                     challengeWheelSpinButton.setEnabled(true);
                     challengeWheelSpinButton.setAlpha(1f);
                     challengeWheelSpinButton.setText("تدوير مرة أخرى");
                 }
-                handler.postDelayed(() -> {
-                    if (challengeWheelDialog != null && challengeWheelDialog.isShowing()
-                            && challengeWheelView != null) {
-                        challengeWheelView.animate().scaleX(0.62f).scaleY(0.62f)
-                                .setDuration(550L).start();
-                    }
-                }, 5000L);
             });
         }, delay);
+    }
+
+    private void showChallengeWheelWinnerToast(@NonNull String label) {
+        try {
+            View content = findViewById(android.R.id.content);
+            if (!(content instanceof ViewGroup)) return;
+            ViewGroup host = (ViewGroup) content;
+            Object old = host.getTag(R.id.content);
+            if (old instanceof View && ((View) old).getParent() == host) {
+                host.removeView((View) old);
+            }
+
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setGravity(Gravity.CENTER);
+            card.setPadding(dp(18), dp(10), dp(18), dp(12));
+            GradientDrawable background = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{0xFF17142F, 0xFF39204F, 0xFF17142F});
+            background.setCornerRadius(dp(18));
+            background.setStroke(dp(2), 0xFFFFD56A);
+            card.setBackground(background);
+            card.setElevation(dp(14));
+
+            TextView heading = new TextView(this);
+            heading.setText("🏆  التحدي الفائز  🏆");
+            heading.setTextColor(0xFFFFD978);
+            heading.setTextSize(13);
+            heading.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            heading.setGravity(Gravity.CENTER);
+            card.addView(heading, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            TextView result = new TextView(this);
+            result.setText(label);
+            result.setTextColor(Color.WHITE);
+            result.setTextSize(18);
+            result.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            result.setGravity(Gravity.CENTER);
+            result.setPadding(0, dp(4), 0, 0);
+            card.addView(result, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            lp.setMargins(dp(16), dp(24), dp(16), 0);
+            host.addView(card, lp);
+            host.setTag(R.id.content, card);
+            card.setAlpha(0f);
+            card.setTranslationY(-dp(80));
+            card.animate().alpha(1f).translationY(0f).setDuration(320L).start();
+            handler.postDelayed(() -> {
+                if (card.getParent() == host) {
+                    card.animate().alpha(0f).translationY(-dp(60)).setDuration(240L)
+                            .withEndAction(() -> {
+                                if (card.getParent() == host) host.removeView(card);
+                                if (host.getTag(R.id.content) == card) host.setTag(R.id.content, null);
+                            }).start();
+                }
+            }, 4200L);
+        } catch (Exception ignored) {
+        }
     }
 
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
