@@ -200,6 +200,8 @@ public class HomeFragment extends Fragment {
         onLogicalTabSelected(activeTab);
         // Home header icons from assets/icons by original file name.
         AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
+        com.Dramizo.Series.util.RemoteNavIcons.bindHomeShortcut(binding.btnSearch, "search");
+        com.Dramizo.Series.util.RemoteNavIcons.bindHomeShortcut(binding.imgMyRoomShortcutIcon, "room");
         binding.btnMyRoomShortcut.setOnClickListener(v ->
                 com.Dramizo.Series.util.MyRoomLauncher.open(requireActivity()));
         binding.btnSearch.setOnClickListener(v ->
