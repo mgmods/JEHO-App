@@ -24,13 +24,13 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout isolated candidate
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        uses: docker/login-action@v4
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -38,7 +38,7 @@ jobs:
 
       - name: Build and push backend plus admin dashboard
         id: image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
@@ -74,7 +74,7 @@ jobs:
       JEHO_DEBUG_KEY_ALIAS: jehoo-test
     steps:
       - name: Checkout isolated candidate
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Check signing secret availability
         env:
@@ -88,7 +88,7 @@ jobs:
           test -s "$JEHO_DEBUG_KEYSTORE"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
@@ -96,22 +96,31 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android build tools
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
       - name: Build signed universal debug APK
         working-directory: android
         run: ./gradlew --no-daemon --stacktrace assembleDebug -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL"
 
       - name: Verify APK package and signing certificate
         run: |
-          APK=$(find android/app/build/outputs/apk/debug -name '*universal*.apk' -o -name 'app-debug.apk' | head -n 1)
+          APK=$(find android/app/build/outputs/apk/debug -type f -name '*universal*.apk' | head -n 1)
+          if [ -z "$APK" ]; then
+            APK=$(find android/app/build/outputs/apk/debug -type f -name 'app-debug.apk' | head -n 1)
+          fi
           test -n "$APK"
-          apksigner verify --verbose "$APK"
-          aapt dump badging "$APK" | grep -F "package: name='com.mgwa.chat'"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.mgwa.chat'"
+          CERT_SHA1=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/.*SHA-1 digest: //p' | head -n 1 | tr -d ':')
+          test "$CERT_SHA1" = "ec3e9f58a7ba163cdfe5f846427e8df4c0c72ba7"
+          echo "Verified APK: $APK"
           echo "APK=$APK" >> "$GITHUB_ENV"
 
       - name: Upload JEHOO APK
         uses: actions/upload-artifact@v4
         with:
           name: JEHOO-com-mgwa-chat-test-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.APK }}
           if-no-files-found: error
           retention-days: 30
