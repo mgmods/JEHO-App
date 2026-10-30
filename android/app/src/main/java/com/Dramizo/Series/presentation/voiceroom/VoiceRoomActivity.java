@@ -14499,7 +14499,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         close.setOnClickListener(v -> dialog.dismiss());
 
         dialog.setContentView(root);
-        dialog.setCanceledOnTouchOutside(true);
+        // The wheel stays open until the user presses the explicit Close button.
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
         dialog.setOnDismissListener(d -> {
             wheel.stop();
             if (challengeWheelDialog == dialog) {
