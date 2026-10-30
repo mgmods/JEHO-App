@@ -27,11 +27,11 @@ android {
     // NDK r28+ defaults to 16 KB ELF page alignment (Play requirement).
     ndkVersion "28.0.12433566"
     defaultConfig {
-        applicationId "com.Dramizo.Series"
+        applicationId "com.mgwa.chat"
         minSdk 24
         targetSdk 36
-        versionCode 49
-        versionName "2.0.51"
+        versionCode 50
+        versionName "2.0.52"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Never bake ZEGO AppSign into the APK. AppID comes from the server (/config/zego + join token).
         buildConfigField "long", "ZEGO_APP_ID", "0L"
