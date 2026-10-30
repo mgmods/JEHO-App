@@ -52,6 +52,7 @@ const ALLOWED_ROOM_EVENTS = new Set([
   'room:chat_cleared',
   'room:music_volume',
   'challenge:wheel:spin',
+  'challenge:wheel:close',
 ]);
 
 const CHALLENGE_WHEEL_ITEMS = [
@@ -703,33 +704,45 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { error: 'Event payload is too large' };
     }
     let payload: Record<string, unknown> = { ...incoming, userId: client.userId };
-    if (data.event === 'challenge:wheel:spin') {
+    if (data.event === 'challenge:wheel:spin' || data.event === 'challenge:wheel:close') {
       const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
       const isRoomLead =
         !!room &&
         (room.hostId === client.userId ||
           room.activeHostId === client.userId ||
           room.cohostId === client.userId);
-      let canSpin = isRoomLead;
-      if (!canSpin) {
+      let canManageWheel = isRoomLead;
+      if (!canManageWheel) {
         const user = await this.usersRepo.findOne({
           where: { id: client.userId },
           select: ['id', 'staffRole', 'isAdmin'],
         });
         const platformRole = normalizeStaffRole(user);
-        canSpin = platformRole === 'manager' ||
+        canManageWheel = platformRole === 'manager' ||
           platformRole === 'admin' ||
           platformRole === 'super';
       }
-      if (!canSpin) {
+      if (!canManageWheel) {
         const mod = await this.roomModerators.findOne({
           where: { roomId: data.roomId, userId: client.userId },
         });
-        canSpin = mod?.canManageRoom === true ||
+        canManageWheel = mod?.canManageRoom === true ||
           mod?.canKick === true ||
           mod?.canBan === true;
       }
-      if (!canSpin) return { error: 'Only room staff can spin the challenge wheel' };
+      if (!canManageWheel) return { error: 'Only room staff can manage the challenge wheel' };
+
+      if (data.event === 'challenge:wheel:close') {
+        this.roomChallengeWheelLocks.delete(data.roomId);
+        this.server.to(`room:${data.roomId}`).emit('room:event', {
+          roomId: data.roomId,
+          event: 'challenge:wheel:closed',
+          payload: { roomId: data.roomId, userId: client.userId, closedAt: new Date().toISOString() },
+          from: { userId: client.userId, username: client.username },
+          at: new Date().toISOString(),
+        });
+        return { ok: true, closed: true };
+      }
 
       // The server chooses the outcome; clients only animate this authoritative result.
       const now = Date.now();
