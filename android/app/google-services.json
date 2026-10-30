@@ -41,6 +41,43 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:807697628126:android:a6868f3a8581e034c9fb4f",
+        "android_client_info": {
+          "package_name": "com.mgwa.chat"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "807697628126-skl40m1kp7s99s0drbmuhl3qe8gvalvt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mgwa.chat",
+            "certificate_hash": "ec3e9f58a7ba163cdfe5f846427e8df4c0c72ba7"
+          }
+        },
+        {
+          "client_id": "807697628126-sc7hj3pccrkt4p0b8ilji91mqb9ojs53.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoqHusYCTacBRZHlu6dY9OxnOR_pjXST4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "807697628126-sc7hj3pccrkt4p0b8ilji91mqb9ojs53.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"
