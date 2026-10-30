@@ -1,10 +1,11 @@
 package com.Dramizo.Series.util;
 
-import com.Dramizo.Series.BuildConfig;
-
 /**
- * JEHO CHAT's canonical API is the isolated JEHO-OWN backend deployed on the dedicated JEHO-OWN Cumin service.
- * The admin dashboard is served by the same backend host under /admin/.
+ * JEHO CHAT connects only to its dedicated JEHO-OWN Cumin backend.
+ * The admin dashboard is served by the same origin under /admin/.
+ *
+ * A stale BuildConfig override must never redirect the installed app to a
+ * different JEHO copy or an unrelated hosting provider.
  */
 public final class ApiOrigin {
     private static final String CANONICAL_API = "https://jeho-own-web-910481ae.hosted.cumin.dev";
@@ -13,16 +14,20 @@ public final class ApiOrigin {
 
     public static String origin() {
         String configured = BuildConfig.API_BASE_URL == null ? "" : BuildConfig.API_BASE_URL.trim();
-        String value = configured.isEmpty() || configured.contains("YOUR-JEHO-OWN-API-HOST")
-                ? CANONICAL_API
-                : configured;
-        while (value.endsWith("/")) {
-            value = value.substring(0, value.length() - 1);
+        if (!configured.isEmpty()) {
+            while (configured.endsWith("/")) {
+                configured = configured.substring(0, configured.length() - 1);
+            }
+            if (configured.endsWith("/api/v1")) {
+                configured = configured.substring(0, configured.length() - "/api/v1".length());
+            }
+            // Accept only the canonical JEHO-OWN host. Ignore any old/foreign
+            // URL left in local.properties or a stale CI build parameter.
+            if (CANONICAL_API.equalsIgnoreCase(configured)) {
+                return CANONICAL_API;
+            }
         }
-        if (value.endsWith("/api/v1")) {
-            value = value.substring(0, value.length() - "/api/v1".length());
-        }
-        return value;
+        return CANONICAL_API;
     }
 
     public static String apiV1() {
