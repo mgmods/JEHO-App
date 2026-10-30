@@ -129,7 +129,7 @@
         <footer class="login-meta">
           <div>
             <span class="login-meta-k">{{ t('login.api') }}</span>
-            <code dir="ltr">api.adnova.bbs.tr</code>
+            <code dir="ltr">JEHO-OWN · same server</code>
           </div>
           <div>
             <span class="login-meta-k">{{ t('login.defaultAccount') }}</span>
