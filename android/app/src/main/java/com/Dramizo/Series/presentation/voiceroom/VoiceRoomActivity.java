@@ -14714,7 +14714,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void dismissChallengeWheelDialog() {
-        handler.removeCallbacksAndMessages(null);
         if (challengeWheelDialog != null && challengeWheelDialog.isShowing()) {
             challengeWheelDialog.dismiss();
         } else {
