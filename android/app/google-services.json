@@ -51,11 +51,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "807697628126-skl40m1kp7s99s0drbmuhl3qe8gvalvt.apps.googleusercontent.com",
+          "client_id": "807697628126-bs4dq15ovd73on5j92va4lckcndgn1no.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.mgwa.chat",
-            "certificate_hash": "ec3e9f58a7ba163cdfe5f846427e8df4c0c72ba7"
+            "certificate_hash": "fe544713a2726865005599472b4527c62818e696"
           }
         },
         {
