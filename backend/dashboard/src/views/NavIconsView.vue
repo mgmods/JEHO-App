@@ -92,6 +92,24 @@
       </article>
     </div>
 
+    <PageHeader title="أيقونات اختصارات الشاشة الرئيسية" subtitle="ارفع أيقونتي البحث والغرفة أعلى الشاشة الرئيسية لتظهر عند جميع المستخدمين بعد الحفظ." />
+    <div class="nav-icons-grid mb-4">
+      <article v-for="shortcut in homeShortcutList" :key="shortcut.key" class="glass p-3 nav-icon-card">
+        <h3 class="h6 mb-2">{{ shortcut.label }}</h3>
+        <div class="icon-slot">
+          <div class="icon-preview">
+            <img v-if="homeShortcuts[shortcut.key]" :src="absUrl(homeShortcuts[shortcut.key])" alt="" />
+            <span v-else class="text-muted small">أيقونة التطبيق الافتراضية</span>
+          </div>
+          <label class="form-label small mb-1">أيقونة الزر</label>
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+            class="form-control form-control-sm" @change="(e) => onHomeShortcutFile(e, shortcut.key)" />
+          <button v-if="homeShortcuts[shortcut.key]" class="btn btn-link btn-sm text-danger px-0" type="button"
+            @click="homeShortcuts[shortcut.key] = ''">استعادة الأيقونة الافتراضية</button>
+        </div>
+      </article>
+    </div>
+
     <PageHeader title="أيقونات قسم أنا" subtitle="ارفع أيقونات مربعات الملف الشخصي لتظهر داخل التطبيق." />
     <div class="nav-icons-grid">
       <article v-for="action in profileActionsList" :key="action.key" class="glass p-3 nav-icon-card">
@@ -144,6 +162,8 @@ function emptyForm() {
 const form = reactive(emptyForm())
 const profileIcons = reactive({ vip: '', level: '', store: '', room: '', agencyCenter: '', events: '', agency: '', recharge: '', tasks: '', tools: '', settings: '', support: '' })
 const channelIcons = reactive({ officialNews: '', adminMessages: '', notifications: '' })
+const homeShortcuts = reactive({ search: '', room: '' })
+const homeShortcutList = [{ key: 'search', label: 'زر البحث أعلى الشاشة الرئيسية' }, { key: 'room', label: 'زر الغرفة أعلى الشاشة الرئيسية' }]
 const verification = reactive({ officialNews: true, adminMessages: true })
 const channelList = [
   { key: 'officialNews', label: 'الأخبار الرسمية' },
@@ -219,6 +239,7 @@ function applyConfig(cfg) {
   for (const key of Object.keys(channelIcons)) {
     channelIcons[key] = (cfg && cfg.channelIcons && cfg.channelIcons[key]) || ''
   }
+  for (const key of Object.keys(homeShortcuts)) homeShortcuts[key] = cfg?.homeShortcuts?.[key] || ''
   verification.officialNews = cfg?.officialNewsVerified !== false
   verification.adminMessages = cfg?.adminMessagesVerified !== false
 }
@@ -322,6 +343,21 @@ async function onProfileFile(e, actionKey) {
   toast().success(t('app.success'))
 }
 
+async function onHomeShortcutFile(e, shortcutKey) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  const name = (file.name || '').toLowerCase()
+  const ok = file.type === 'image/png' || file.type === 'image/jpeg' || file.type === 'image/webp' || file.type === 'image/svg+xml' || /\.(png|jpe?g|webp|svg)$/i.test(name)
+  if (!ok) { error.value = t('navIcons.badFormat'); toast().danger(t('navIcons.badFormat')); return }
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const url = storedUrl(data?.path || data?.url || data?.data?.path || data?.data?.url || '')
+  if (!url) { toast().danger(t('app.error')); return }
+  homeShortcuts[shortcutKey] = url
+  toast().success(t('app.success'))
+}
+
 function clearAll() {
   applyConfig(null)
   version.value = 1
@@ -341,6 +377,7 @@ async function save() {
     me: { ...form.me },
     profileActions: { ...profileIcons },
     channelIcons: { ...channelIcons },
+    homeShortcuts: { ...homeShortcuts },
     officialNewsVerified: verification.officialNews,
     adminMessagesVerified: verification.adminMessages,
   }
