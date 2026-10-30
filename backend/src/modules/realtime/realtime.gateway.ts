@@ -533,8 +533,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {
     if (!data?.roomId || !client.userId) return;
 
-    // A successful room rejoin cancels pending cleanup from an earlier socket drop.
-    this.cancelDisconnectCleanup(client.userId, data.roomId);
     const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
     if (!room) return { error: 'Room not found' };
     if (room.status === RoomStatus.CLOSED) return { error: 'Room is closed' };
@@ -562,6 +560,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (!privileged && !this.hasActiveAccess(access)) {
       return { error: 'HTTP room authorization required' };
     }
+    // Only a fully authorized room rejoin cancels cleanup from an earlier socket drop.
+    this.cancelDisconnectCleanup(client.userId, data.roomId);
     const profilePayload = await this.buildJoinPayload(client.userId, data.roomId, room.hostId);
 
     client.data.roomProfiles = client.data.roomProfiles || {};
