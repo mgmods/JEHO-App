@@ -27,7 +27,7 @@ async function bootstrap() {
   // Do not let a stale host-level API_PREFIX silently move every controller
   // away from the paths shipped in the APK and dashboard bundle.
   const configuredApiPrefix = String(configService.get<string>('app.apiPrefix') || 'api/v1')
-    .replace(/^\\/+|\\/+$/g, '');
+    .replace(/^\/+|\/+$/g, '');
   const apiPrefix = 'api/v1';
   if (configuredApiPrefix !== apiPrefix) {
     console.warn(`[JEHO-OWN boot] Ignoring mismatched API_PREFIX="${configuredApiPrefix}"; clients require /api/v1.`);
