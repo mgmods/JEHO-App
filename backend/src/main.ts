@@ -225,7 +225,7 @@ async function bootstrap() {
   // Invite deep links: if the app is not installed, send user to Play with referrer.
   // When installed, Android App Links open SplashActivity instead of hitting this.
   const expressApp = app.getHttpAdapter().getInstance();
-  const playPackage = 'com.Dramizo.Series';
+  const playPackage = 'com.mgwa.chat';
   const inviteToPlay = (code: string) => {
     const clean = String(code || '')
       .trim()
