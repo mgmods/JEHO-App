@@ -78,6 +78,259 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private readonly logger = new Logger(RealtimeGateway.name);
   private readonly onlineUsers = new Map<string, Set<string>>();
+  /** Delay disconnect cleanup so brief network/socket reconnects do not eject room members. */
+  private readonly roomDisconnectCleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private static readonly ROOM_RECONNECT_GRACE_MS = 30_000;
+  /** Live-session music gain; defaults to full volume and does not alter mic gain. */
+  private readonly roomMusicVolumes = new Map<string, number>();
+  /** Prevent two staff members from starting overlapping challenge-wheel spins. */
+  private readonly roomChallengeWheelLocks = new Map<string, number>();
+  private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
+  private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
+
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    @InjectRepository(ChatParticipant)
+    private readonly chatParticipants: Repository<ChatParticipant>,
+    @InjectRepository(RoomSeat)
+    private readonly roomSeats: Repository<RoomSeat>,
+    @InjectRepository(RoomModerator)
+    private readonly roomModerators: Repository<RoomModerator>,
+    @InjectRepository(Room)
+    private readonly roomsRepo: Repository<Room>,
+    @InjectRepository(RoomBan)
+    private readonly roomBans: Repository<RoomBan>,
+    @InjectRepository(RoomAccess)
+    private readonly roomAccess: Repository<RoomAccess>,
+    @InjectRepository(Agency)
+    private readonly agenciesRepo: Repository<Agency>,
+    @InjectRepository(User)
+    private readonly usersRepo: Repository<User>,
+    @InjectRepository(UserProfile)
+    private readonly profilesRepo: Repository<UserProfile>,
+    @InjectRepository(UserVip)
+    private readonly userVipRepo: Repository<UserVip>,
+    @InjectRepository(GiftSend)
+    private readonly giftSendsRepo: Repository<GiftSend>,
+    @InjectRepository(AppSetting)
+    private readonly settingsRepo: Repository<AppSetting>,
+    private readonly moderation: ContentModerationService,
+    private readonly zegoTokenService: ZegoTokenService,
+  ) {}
+
+  /** Cache the tiny dashboard policy briefly to avoid a database read for every chat message. */
+  private async mysteriousPolicy(): Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }> {
+    const now = Date.now();
+    if (this.mysteriousPolicyCache && this.mysteriousPolicyCache.expiresAt > now) {
+      return this.mysteriousPolicyCache;
+    }
+    if (this.mysteriousPolicyLookup) return this.mysteriousPolicyLookup;
+    this.mysteriousPolicyLookup = this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } })
+      .then((row) => ({ row, failed: false, expiresAt: Date.now() + 5_000 }))
+      .catch(() => ({ row: null, failed: true, expiresAt: Date.now() + 2_000 }))
+      .then((result) => {
+        this.mysteriousPolicyCache = result;
+        return result;
+      })
+      .finally(() => { this.mysteriousPolicyLookup = undefined; });
+    return this.mysteriousPolicyLookup;
+  }
+
+  /** Keep realtime identity in lockstep with VIP status and the dashboard's live policy. */
+  private async isMysteriousModeEligible(user: User | null | undefined, vip: UserVip | null | undefined): Promise<boolean> {
+    if (!user?.mysteriousMode || !vip || !vip.isActive) return false;
+    if (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) return false;
+    const level = Number(vip.level || 0);
+    if (!Number.isInteger(level) || level < 1 || level > 7) return false;
+
+    const currentPolicy = await this.mysteriousPolicy();
+    if (currentPolicy.failed) return false; // fail closed when eligibility cannot be verified
+    const policyRow = currentPolicy.row;
+    const benefits = vip.vipPlan?.benefits as any;
+    if (policyRow) {
+      let policy: any = {};
+      try {
+        policy = typeof policyRow.value === 'string'
+          ? JSON.parse(policyRow.value)
+          : (policyRow.value || {});
+      } catch {
+        return false;
+      }
+      const levels = Array.isArray(policy.eligibleVipLevels)
+        ? policy.eligibleVipLevels.map(Number).filter((n: number) =>
+            Number.isInteger(n) && n >= 1 && n <= 7)
+        : [];
+      return policy.enabled === true && levels.includes(level);
+    }
+    const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
+    return Array.isArray(extra) && extra.includes('mysterious_man');
+  }
+
+  async handleConnection(client: AuthSocket) {
+    try {
+      const token =
+        (client.handshake.auth?.token as string) ||
+        (client.handshake.headers?.authorization as string)?.replace('Bearer ', '');
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+      const payload = await this.jwtService.verifyAsync(token, {
+        secret: this.configService.get<string>('app.jwt.secret'),
+      });
+      const user = await this.usersRepo.findOne({ where: { id: payload.sub } });
+      if (!user || user.status !== UserStatus.ACTIVE) {
+        client.disconnect();
+        return;
+      }
+      client.userId = user.id;
+      client.username = user.username;
+      client.data.userId = user.id;
+      client.data.username = user.username;
+      client.data.roomProfiles = {};
+      if (!this.onlineUsers.has(user.id)) {
+        this.onlineUsers.set(user.id, new Set());
+      }
+      this.onlineUsers.get(user.id)!.add(client.id);
+      client.join(`user:${user.id}`);
+      this.logger.log(`Connected ${user.username} (${client.id})`);
+    } catch {
+      client.disconnect();
+    }
+  }
+
+  async handleDisconnect(client: AuthSocket) {
+    if (!client.userId) return;
+    const joinedRoomIds = Object.keys(client.data.roomProfiles || {});
+    const sockets = this.onlineUsers.get(client.userId);
+    if (sockets) {
+      sockets.delete(client.id);
+      if (sockets.size === 0) {
+        this.onlineUsers.delete(client.userId);
+      }
+    }
+    // Do not immediately free seats or revoke room-session access: Socket.IO may
+    // disconnect briefly during network changes, app backgrounding, or reconnect.
+    // Keep the existing seat/session intact for a grace period, then clean up only
+    // if the user still has no authenticated socket connection.
+    for (const roomId of joinedRoomIds) {
+      this.scheduleDisconnectCleanup(client.userId, roomId);
+    }
+  }
+
+  private roomDisconnectKey(userId: string, roomId: string): string {
+    return userId + ":" + roomId;
+  }
+
+  private cancelDisconnectCleanup(userId: string, roomId: string): void {
+    const key = this.roomDisconnectKey(userId, roomId);
+    const timer = this.roomDisconnectCleanupTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.roomDisconnectCleanupTimers.delete(key);
+  }
+
+  private scheduleDisconnectCleanup(userId: string, roomId: string): void {
+    this.cancelDisconnectCleanup(userId, roomId);
+    const key = this.roomDisconnectKey(userId, roomId);
+    const timer = setTimeout(() => {
+      this.roomDisconnectCleanupTimers.delete(key);
+      void (async () => {
+        try {
+          const activeSockets = await this.server.in("user:" + userId).fetchSockets();
+          // Any live authenticated socket means this was not a confirmed departure.
+          if (activeSockets.length > 0) return;
+          await this.autoLeaveSeatOnDisconnect(userId, roomId);
+          await this.emitRoomMembers(roomId);
+        } catch (error) {
+          this.logger.warn("Delayed room disconnect cleanup failed for " + userId + "/" + roomId + ": " +
+            (error instanceof Error ? error.message : String(error)));
+        }
+      })();
+    }, RealtimeGateway.ROOM_RECONNECT_GRACE_MS);
+    this.roomDisconnectCleanupTimers.set(key, timer);
+  }
+
+  /** When the user stays offline beyond the reconnect grace, free their mic seat. */
+on,
+  OnGatewayDisconnect,
+  ConnectedSocket,
+  MessageBody,
+} from '@nestjs/websockets';
+import {
+  Logger,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, MoreThan, Repository } from 'typeorm';
+import { Server, Socket } from 'socket.io';
+import { ChatParticipant } from '../../database/entities/chat-participant.entity';
+import { RoomSeat, SeatStatus } from '../../database/entities/room-seat.entity';
+import { RoomModerator } from '../../database/entities/room-moderator.entity';
+import { Room, RoomStatus, RoomKind } from '../../database/entities/room.entity';
+import { RoomBan } from '../../database/entities/room-ban.entity';
+import {
+  RoomAccess,
+  RoomAccessGrant,
+} from '../../database/entities/room-access.entity';
+import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
+import { User, UserStatus } from '../../database/entities/user.entity';
+import { UserProfile } from '../../database/entities/user-profile.entity';
+import { UserVip } from '../../database/entities/user-vip.entity';
+import { GiftSend } from '../../database/entities/gift-send.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
+import { Cosmetic } from '../../database/entities/cosmetic.entity';
+import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
+import { effectiveVipLevel } from '../../common/vip-progress';
+import { normalizeStaffRole } from '../../common/staff-role';
+import { ContentModerationService } from '../moderation/content-moderation.service';
+import { ZegoTokenService } from '../zego/zego-token.service';
+
+interface AuthSocket extends Socket {
+  userId?: string;
+  username?: string;
+}
+
+const ALLOWED_ROOM_EVENTS = new Set([
+  'room:typing',
+  'room:reaction',
+  'lucky:opened',
+  'room:like',
+  'chat:message',
+  'room:summon',
+  'room:chat_cleared',
+  'room:music_volume',
+  'challenge:wheel:spin',
+  'challenge:wheel:close',
+]);
+
+const CHALLENGE_WHEEL_ITEMS = [
+  'فقرة تحدي الالغاز',
+  'فقرة رسالة من مجهول',
+  'فقرة الاسئلة',
+  'فقرة تحدي الاجابة السريعة بين شخصين',
+  'فقرة كرسي الإعتراف',
+  'فقرة احزر الاغنية او اكمل المثل التالي',
+  'فقرة المايك المفخخ',
+  'فقرة صراحة ام جراءة',
+  'فقرة الحزازير',
+  'فقرة حقيقتان وكذبة',
+] as const;
+
+@WebSocketGateway({
+  cors: { origin: '*' },
+  namespace: '/realtime',
+})
+export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer()
+  server!: Server;
+
+  private readonly logger = new Logger(RealtimeGateway.name);
+  private readonly onlineUsers = new Map<string, Set<string>>();
+  /** Delay disconnect cleanup so brief network/socket reconnects do not eject room members. */
+  private readonly roomDisconnectCleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private static readonly ROOM_RECONNECT_GRACE_MS = 30_000;
   /** Live-session music gain; defaults to full volume and does not alter mic gain. */
   private readonly roomMusicVolumes = new Map<string, number>();
   /** Prevent two staff members from starting overlapping challenge-wheel spins. */
@@ -280,6 +533,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {
     if (!data?.roomId || !client.userId) return;
 
+    // A successful room rejoin cancels pending cleanup from an earlier socket drop.
+    this.cancelDisconnectCleanup(client.userId, data.roomId);
     const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
     if (!room) return { error: 'Room not found' };
     if (room.status === RoomStatus.CLOSED) return { error: 'Room is closed' };
