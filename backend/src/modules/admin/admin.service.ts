@@ -2792,7 +2792,8 @@ export class AdminService {
     await this.ensureDashboardAdminSchema();
     await this.ensureStaffRoleColumn();
     await this.ensureDashboardPermissionsColumn();
-    await this.migrateLegacyDashboardAccounts();
+    // Do not scan and migrate every legacy user on every login. The targeted
+    // legacy lookup below safely imports only the account attempting to sign in.
     const identifier = String(email || '').trim().toLowerCase();
     if (!identifier || !password) {
       throw new UnauthorizedException('Invalid admin credentials');
