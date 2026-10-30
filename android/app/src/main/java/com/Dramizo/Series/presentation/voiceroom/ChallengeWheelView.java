@@ -28,8 +28,8 @@ public final class ChallengeWheelView extends View {
             "صراحة أم جرأة", "فقرة الحزازير", "حقيقتان وكذبة"
     };
     private static final int[] COLORS = {
-            0xFFB83C4B, 0xFF187F7B, 0xFFB58A22, 0xFF347F6C, 0xFFB94E60,
-            0xFF69529B, 0xFFB35C83, 0xFF397D61, 0xFFB36D43, 0xFFB94D50
+            0xFF9F102D, 0xFF006B67, 0xFF855600, 0xFF17664D, 0xFF9D2348,
+            0xFF49317F, 0xFF8B245A, 0xFF155B43, 0xFF8A3C19, 0xFF8F1832
     };
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -54,10 +54,10 @@ public final class ChallengeWheelView extends View {
         linePaint.setColor(0xEFFFFFFF);
         labelPaint.setColor(0xFFFFFFFF);
         labelPaint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-        labelPaint.setTextSize(dp(9.8f));
+        labelPaint.setTextSize(dp(10.5f));
         labelPaint.setShadowLayer(dp(1.8f), 0, dp(1), 0xCC000000);
         for (int i = 0; i < LABELS.length; i++) {
-            labels[i] = new StaticLayout(LABELS[i], labelPaint, (int) dp(64),
+            labels[i] = new StaticLayout(LABELS[i], labelPaint, (int) dp(68),
                     Layout.Alignment.ALIGN_CENTER, 0.94f, 0f, false);
         }
         textBackground.setStyle(Paint.Style.FILL);
