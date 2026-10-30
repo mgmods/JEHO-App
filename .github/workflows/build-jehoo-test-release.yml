@@ -52,7 +52,7 @@ jobs:
 
       - name: Record immutable image digest
         run: |
-          echo "Image: ghcr.io/mgmods/jeho-own-backend@ ${{ steps.image.outputs.digest }}" | tee image-reference.txt
+          echo "Image: ghcr.io/mgmods/jeho-own-backend@${{ steps.image.outputs.digest }}" | tee image-reference.txt
 
       - name: Upload image reference
         uses: actions/upload-artifact@v4
