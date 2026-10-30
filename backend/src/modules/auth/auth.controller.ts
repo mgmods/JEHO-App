@@ -21,7 +21,7 @@ export class AuthController {
 
   // Keep the public registration route available on the deployed JEHO-OWN API.
   @Public()
-  @Post('register')
+  @Post(['register', 'egister'])
   @ApiOperation({ summary: 'Register with email and password' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
