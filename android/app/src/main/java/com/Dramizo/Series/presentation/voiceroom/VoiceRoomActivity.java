@@ -14388,6 +14388,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (challengeWheelSpinButton != null) {
                 challengeWheelSpinButton.setVisibility(canSpin ? View.VISIBLE : View.GONE);
             }
+            View existingClose = challengeWheelDialog.findViewById(android.R.id.button2);
+            // The close control is permission-gated; audience members cannot dismiss the shared wheel.
+            if (existingClose != null) {
+                existingClose.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
+            }
             return;
         }
 
@@ -14495,8 +14500,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 dp(110), dp(32));
         closeLp.gravity = Gravity.CENTER_HORIZONTAL;
         closeLp.topMargin = dp(5);
+        close.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
         root.addView(close, closeLp);
-        close.setOnClickListener(v -> dialog.dismiss());
+        close.setOnClickListener(v -> {
+            if (!canModerateRoom()) return;
+            dialog.dismiss();
+        });
 
         dialog.setContentView(root);
         // The wheel stays open until the user presses the explicit Close button.
@@ -14579,6 +14588,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String label = memberStr(payload, "label");
         if (index < 0 || index >= 10 || label == null || label.isEmpty()) return;
 
+        // Every room participant receives the authoritative result and sees the wheel/toast;
+        // only authorized room staff can spin or close it.
         showChallengeWheelDialog(canModerateRoom());
         challengeWheelSpinPending = false;
         if (challengeWheelResult != null) {
