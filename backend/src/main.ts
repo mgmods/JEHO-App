@@ -197,7 +197,14 @@ async function bootstrap() {
     // Required so Google can fetch /.well-known/assetlinks.json
     dotfiles: 'allow',
     setHeaders: (res, filePath) => {
-      noStoreHeaders(res);
+      // Vite production assets are content-hashed. Cache them aggressively so
+      // repeat dashboard opens do not re-download the JS/CSS bundle. The HTML
+      // entry point remains no-store and always points at the current build.
+      if (/[/\\\\]admin[/\\\\]assets[/\\\\]/.test(String(filePath))) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        noStoreHeaders(res);
+      }
       if (String(filePath).endsWith('assetlinks.json') || String(filePath).endsWith('jeho-force-local.js')) {
         if (String(filePath).endsWith('assetlinks.json')) {
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
