@@ -87,7 +87,7 @@ jobs:
         shell: bash
         run: |
           if [[ "$JEHO_OWN_API_URL" != "https://jeho-own-web-910481ae.hosted.cumin.dev/api/v1" ]]; then
-            echo "::error::The APK must target the JEHO-OWN Blitz Cloud API."
+            echo "::error::The APK must target the dedicated JEHO-OWN Cumin API."
             exit 1
           fi
 
