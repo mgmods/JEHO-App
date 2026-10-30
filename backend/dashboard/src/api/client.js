@@ -4,9 +4,9 @@ import router from '@/router'
 
 const api = axios.create({
   // Dashboard is hosted by the JEHO-OWN backend at /admin/, so use the
-  // same origin's /api/v1 by default and avoid stale production API data.
-  // VITE_API_URL remains available for explicit deployment overrides.
-  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
+  // Always use the API served by this exact JEHO-OWN host. Never allow a
+  // stale VITE_API_URL to redirect the admin panel to another deployment.
+  baseURL: '/api/v1',
   timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
