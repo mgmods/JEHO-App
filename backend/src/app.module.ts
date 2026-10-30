@@ -94,7 +94,7 @@ const entityList = Object.values(entities).filter(
           ? { rejectUnauthorized: false }
           : undefined,
         schema: 'jeho_own',
-        extra: { options: '-c search_path=jeho_own', connectionTimeoutMillis: 8000 },
+        extra: { options: '-c search_path=jeho_own,extensions,public', connectionTimeoutMillis: 8000 },
         entities: entityList,
         synchronize: config.get<boolean>('app.database.synchronize'),
         logging: config.get<boolean>('app.database.logging'),
@@ -115,6 +115,9 @@ const entityList = Object.values(entities).filter(
         } as any);
         await bootstrap.initialize();
         try {
+          // TypeORM UUID defaults call uuid_generate_v4(). Ensure uuid-ossp is
+          // available before synchronize runs; it may live in public or extensions.
+          await bootstrap.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public');
           await bootstrap.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
         } finally {
           await bootstrap.destroy();
