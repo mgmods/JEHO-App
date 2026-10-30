@@ -1,0 +1,57 @@
+name: Validate isolated JEHO admin candidate
+
+on:
+  push:
+    branches: [admin-isolated-test]
+    paths:
+      - "backend/**"
+      - ".github/workflows/validate-admin-isolated.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeho-admin-isolated-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout isolated candidate
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Backend TypeScript check
+        working-directory: backend
+        run: npm run lint
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Install dashboard dependencies
+        working-directory: backend/dashboard
+        run: npm ci
+
+      - name: Build latest Vue admin dashboard
+        working-directory: backend/dashboard
+        env:
+          VITE_API_URL: /api/v1
+          VITE_BASE: /admin/
+        run: npm run build
+
+      - name: Build combined candidate Docker image (no push, no deploy)
+        run: docker build --tag jeho-admin-isolated:validation ./backend
