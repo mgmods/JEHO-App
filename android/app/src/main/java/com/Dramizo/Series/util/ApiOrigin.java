@@ -3,7 +3,7 @@ package com.Dramizo.Series.util;
 import com.Dramizo.Series.BuildConfig;
 
 /**
- * JEHO CHAT's canonical API is the isolated JEHO-OWN backend deployed on the isolated JEHO-OWN Cumin service.
+ * JEHO CHAT's canonical API is the isolated JEHO-OWN backend deployed on the dedicated JEHO-OWN Cumin service.
  * The admin dashboard is served by the same backend host under /admin/.
  */
 public final class ApiOrigin {
