@@ -14624,15 +14624,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             card.setPadding(dp(18), dp(12), dp(18), dp(14));
             GradientDrawable background = new GradientDrawable(
                     GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{0xFF262044, 0xFF3B2F68, 0xFF252044});
+                    new int[]{0xFF9E174D, 0xFF7A174F, 0xFF4D123D});
             background.setCornerRadius(dp(18));
-            background.setStroke(dp(2), 0xFF79D9D0);
+            background.setStroke(dp(2), 0xFFE85A9B);
             card.setBackground(background);
             card.setElevation(dp(14));
 
             TextView heading = new TextView(this);
             heading.setText("🏆  التحدي الفائز  🏆");
-            heading.setTextColor(0xFF8FE8DD);
+            heading.setTextColor(0xFFFFA6D0);
             heading.setTextSize(13);
             heading.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
             heading.setGravity(Gravity.CENTER);
