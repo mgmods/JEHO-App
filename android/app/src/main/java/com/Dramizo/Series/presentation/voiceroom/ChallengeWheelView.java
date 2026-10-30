@@ -27,8 +27,8 @@ public final class ChallengeWheelView extends View {
             "صراحة أم جرأة", "فقرة الحزازير", "حقيقتان وكذبة"
     };
     private static final int[] COLORS = {
-            0xFFFF6B6B, 0xFF4ECDC4, 0xFFFFD95B, 0xFF72CDB4, 0xFFF38181,
-            0xFFAA96DA, 0xFFEF91B9, 0xFF8ED9B4, 0xFFFFB98D, 0xFFFF928D
+            0xFFB83C4B, 0xFF187F7B, 0xFFB58A22, 0xFF347F6C, 0xFFB94E60,
+            0xFF69529B, 0xFFB35C83, 0xFF397D61, 0xFFB36D43, 0xFFB94D50
     };
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -51,13 +51,13 @@ public final class ChallengeWheelView extends View {
         linePaint.setColor(0xEFFFFFFF);
         labelPaint.setColor(0xFFFFFFFF);
         labelPaint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-        labelPaint.setTextSize(dp(8.2f));
+        labelPaint.setTextSize(dp(9.8f));
         labelPaint.setShadowLayer(dp(1.8f), 0, dp(1), 0xCC000000);
         for (int i = 0; i < LABELS.length; i++) {
-            labels[i] = new StaticLayout(LABELS[i], labelPaint, (int) dp(58),
+            labels[i] = new StaticLayout(LABELS[i], labelPaint, (int) dp(64),
                     Layout.Alignment.ALIGN_CENTER, 0.94f, 0f, false);
         }
-        hubText.setColor(0xFFFFE8AD);
+        hubText.setColor(0xFFFFFFFF);
         hubText.setTextAlign(Paint.Align.CENTER);
         hubText.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
         hubText.setTextSize(dp(11));
@@ -107,17 +107,17 @@ public final class ChallengeWheelView extends View {
         float side = Math.min(getWidth(), getHeight());
         if (side <= 0f) return;
         float cx = getWidth() / 2f, cy = getHeight() / 2f;
-        float frameRadius = side * .485f;
-        float wheelRadius = side * .425f;
+        float frameRadius = side * .495f;
+        float wheelRadius = side * .432f;
 
-        // Stationary metallic gold frame and illuminated bulbs.
+        // Stationary premium purple/teal frame and illuminated bulbs.
         paint.setShader(new SweepGradient(cx, cy,
-                new int[]{0xFFFFF1A8, 0xFFB77A18, 0xFFFFE36B, 0xFF9B6415, 0xFFFFF1A8}, null));
+                new int[]{0xFFE9F0FF, 0xFF4A3C73, 0xFF73E0D3, 0xFF30274F, 0xFFE9F0FF}, null));
         canvas.drawCircle(cx, cy, frameRadius, paint);
         paint.setShader(null);
         paint.setColor(0xFF26172C);
         canvas.drawCircle(cx, cy, frameRadius - dp(5), paint);
-        paint.setColor(0xFFFFD45F);
+        paint.setColor(0xFF5B4A8A);
         canvas.drawCircle(cx, cy, frameRadius - dp(8), paint);
         paint.setColor(0xFF24172E);
         canvas.drawCircle(cx, cy, frameRadius - dp(11), paint);
@@ -127,7 +127,7 @@ public final class ChallengeWheelView extends View {
             float x = cx + (float) Math.cos(a) * (frameRadius - dp(4));
             float y = cy + (float) Math.sin(a) * (frameRadius - dp(4));
             paint.setShader(new LinearGradient(x - dp(3), y - dp(3), x + dp(3), y + dp(3),
-                    new int[]{0xFFFFFFFF, 0xFFFFE77B, 0xFFFF8A24}, null, Shader.TileMode.CLAMP));
+                    new int[]{0xFFFFFFFF, 0xFF80E8DE, 0xFF9D8CFF}, null, Shader.TileMode.CLAMP));
             canvas.drawCircle(x, y, dp(3.1f), paint);
             paint.setShader(null);
         }
@@ -166,7 +166,7 @@ public final class ChallengeWheelView extends View {
         // Central gold hub.
         float hub = wheelRadius * .19f;
         paint.setShader(new LinearGradient(cx - hub, cy - hub, cx + hub, cy + hub,
-                new int[]{0xFFFFF2B8, 0xFFD79A32, 0xFF8E5315}, null, Shader.TileMode.CLAMP));
+                new int[]{0xFFE6FFFC, 0xFF5C4B91, 0xFF282044}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, hub, paint);
         paint.setShader(null);
         paint.setColor(0xFFFFFFFF);
@@ -182,7 +182,7 @@ public final class ChallengeWheelView extends View {
         pointer.lineTo(cx + dp(12), cy - frameRadius + dp(1));
         pointer.lineTo(cx, cy - frameRadius + dp(25));
         pointer.close();
-        paint.setColor(0xFFFF1744);
+        paint.setColor(0xFFFF4D78);
         paint.setShadowLayer(dp(4), 0, dp(2), 0x99000000);
         canvas.drawPath(pointer, paint);
         paint.clearShadowLayer();
