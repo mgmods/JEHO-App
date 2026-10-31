@@ -160,7 +160,7 @@ export class ConfigController {
     };
     let parsed: any = {};
     try { parsed = row?.value ? JSON.parse(row.value) : {}; } catch { parsed = {}; }
-    const apiBase = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || 'https://jeho-own-backend.mgs.blitz.cloud')
+    const apiBase = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || 'https://jeho-own-web-910481ae.hosted.cumin.dev')
       .trim().replace(/\/+$/, '').replace(/\/api\/v\d+$/i, '');
     const normalize = (value: unknown): string => {
       const raw = typeof value === 'string' ? value.trim() : '';
