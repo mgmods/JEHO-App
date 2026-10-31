@@ -147,8 +147,8 @@ public class EditProfileActivity extends ThemedActivity {
                             ? (user.username != null ? user.username : user.id)
                             : user.displayPublicId()));
             AvatarImageLoader.load(binding.imgAvatarPreview, user.avatarUrl);
-            Glide.with(this).load(AssetCatalog.absoluteUrl(user.coverUrl))
-                    .placeholder(ImagePlaceholder.cover()).into(binding.imgCoverPreview);
+            AvatarImageLoader.loadMedia(binding.imgCoverPreview, user.coverUrl,
+                    ImagePlaceholder.cover());
         });
 
         binding.btnPickAvatar.setOnClickListener(v -> {
@@ -499,7 +499,7 @@ public class EditProfileActivity extends ThemedActivity {
         binding.progress.setVisibility(View.VISIBLE);
         final boolean cover = pickingCover;
         if (cover) {
-            Glide.with(this).load(uri).centerCrop().into(binding.imgCoverPreview);
+            AvatarImageLoader.loadMedia(binding.imgCoverPreview, uri, ImagePlaceholder.cover());
         } else {
             AvatarImageLoader.load(binding.imgAvatarPreview, uri);
         }
@@ -524,14 +524,18 @@ public class EditProfileActivity extends ThemedActivity {
                         throw new IllegalStateException(
                                 UploadApi.errorMessage(saved, "تم رفع الصورة لكن تعذر تطبيقها على الملف الشخصي"));
                     }
+                    // Keep the local account snapshot in sync immediately. Otherwise
+                    // returning to Profile can briefly restore the old cover/avatar.
+                    if (saved.body().data != null) {
+                        c.getSessionManager().updateCachedUser(saved.body().data);
+                    }
                     runOnUiThread(() -> {
                         if (isFinishing() || binding == null) return;
                         binding.progress.setVisibility(View.GONE);
                         if (cover) {
                             binding.etCover.setText(url);
-                            Glide.with(EditProfileActivity.this).load(url)
-                                    .placeholder(ImagePlaceholder.cover()).centerCrop()
-                                    .into(binding.imgCoverPreview);
+                            AvatarImageLoader.loadMedia(binding.imgCoverPreview, url,
+                                    ImagePlaceholder.cover());
                         } else {
                             binding.etAvatar.setText(url);
                             AvatarImageLoader.load(binding.imgAvatarPreview, url);
