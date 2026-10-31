@@ -502,10 +502,8 @@ public class ProfileActivity extends ThemedActivity {
             }
 
             if (user.coverUrl != null && !user.coverUrl.isEmpty()) {
-                Glide.with(this)
-                        .load(AssetCatalog.absoluteUrl(user.coverUrl))
-                        .placeholder(ImagePlaceholder.cover())
-                        .into(binding.imgCover);
+                AvatarImageLoader.loadMedia(binding.imgCover, user.coverUrl,
+                        ImagePlaceholder.cover());
             } else {
                 binding.imgCover.setImageResource(ImagePlaceholder.cover());
             }
