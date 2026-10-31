@@ -181,7 +181,7 @@ public class AppContainer {
         // Room joins, chat sends, gifts and background data work share this pool.
         // Four workers let long uploads/background calls queue latency-sensitive actions;
         // keep a little more headroom without creating an unbounded thread-per-request pool.
-        ioExecutor = Executors.newFixedThreadPool(8);
+        ioExecutor = Executors.newFixedThreadPool(16);
         database = Room.databaseBuilder(appContext, AuraDatabase.class, "auralive.db")
                 .fallbackToDestructiveMigration()
                 .build();
