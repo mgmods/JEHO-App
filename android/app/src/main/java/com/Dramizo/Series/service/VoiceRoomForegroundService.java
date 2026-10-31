@@ -78,7 +78,9 @@ public class VoiceRoomForegroundService extends Service {
                             RoomRtcEngine.getInstance().getCurrentUserId());
                     // Play every remote stream including host (_host) — needed while minimized.
                     if (streamId != null && !streamId.equals(mine)) {
-                        RoomRtcEngine.getInstance().setSpeakerMuted(false);
+                        // Preserve the user's speaker-mute choice while the room is minimized.
+                        // Zego will skip pulling while muted; LiveKit remains auto-subscribed
+                        // but its output route stays muted.
                         RoomRtcEngine.getInstance().startPlayingAudio(streamId);
                     }
                 }
