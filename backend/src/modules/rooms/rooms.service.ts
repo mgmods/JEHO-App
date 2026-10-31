@@ -1294,21 +1294,19 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const rawLevel = profile.levelBadgeUrl ?? user.levelBadgeUrl ?? null;
     // Prefer owned+equipped URL, but never strip a profile-equipped host frame
     // (room stage/seats were losing the badge while profile/chat still showed it).
-    const [verifiedHost, verifiedVip, verifiedLevel] = await Promise.all([
-      this.activeOwnedWearUrl(user.id, rawHost),
-      this.activeOwnedWearUrl(user.id, rawVip),
-      this.activeOwnedWearUrl(user.id, rawLevel),
-    ]);
-    const hostBadgeUrl = verifiedHost ?? rawHost;
+    // The profile fields are already the equipped visual references. The previous
+    // ownership lookups fell back to these same raw URLs when no row matched, so
+    // issuing three per-user DB queries here added latency without changing output.
+    const hostBadgeUrl = rawHost;
     const level = Number(vipLevel || user.vipLevel || 0);
     // Equipped wear first (mall / SVGA). Static VIP art is vipTouUrl/vipHeadUrl only.
-    let vipBadgeUrl = verifiedVip ?? rawVip;
+    let vipBadgeUrl = rawVip;
     if (isStaticVipTouUrl(vipBadgeUrl)) {
       vipBadgeUrl = await this.findEquippedMallHeadFrame(user.id);
     }
     const vipHeadUrl = fixedVipHeadUrl(level);
     const vipTouUrl = fixedVipFrameUrl(level);
-    const levelBadgeUrl = verifiedLevel ?? rawLevel;
+    const levelBadgeUrl = rawLevel;
     const hostBadgeMeta = await this.wearMetaForUrl(hostBadgeUrl);
     return {
       ...user,
