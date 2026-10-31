@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const DEFAULT_TOAST_STYLE = {
   backgroundUrl: '',
@@ -40,7 +41,10 @@ function clampTextSize(value: unknown, fallback: number): number {
 @UseGuards(JwtAuthGuard, AdminGuard)
 @ApiBearerAuth()
 export class ToastManagerController {
-  constructor(@InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>) {}
+  constructor(
+    @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
+    private readonly realtime: RealtimeGateway,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Read dashboard-managed gift and lucky-win toast appearance' })
@@ -190,6 +194,11 @@ export class ToastManagerController {
         throw new Error(`Toast setting did not persist: luckyWinHighRoom.${field}`);
       }
     }
+    this.realtime.emitToAll('config:updated', {
+      scope: 'toast-style',
+      version: next.version,
+      updatedAt: new Date().toISOString(),
+    });
     return this.getConfig();
   }
 }
