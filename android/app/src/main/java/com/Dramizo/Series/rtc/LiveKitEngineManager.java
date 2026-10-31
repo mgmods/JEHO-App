@@ -364,8 +364,8 @@ public final class LiveKitEngineManager {
             }
         }
         if (connected.get()) {
-            // Faster than 220ms so waves feel responsive on LiveKit free engine.
-            mainHandler.postDelayed(speakLevelPollRunnable, 140L);
+            // Speaking ripples remain responsive while avoiding excessive main-thread polling.
+            mainHandler.postDelayed(speakLevelPollRunnable, 220L);
         }
     }
 
