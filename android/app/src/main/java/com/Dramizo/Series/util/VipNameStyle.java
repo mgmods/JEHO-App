@@ -2,6 +2,7 @@ package com.Dramizo.Series.util;
 
 import android.animation.ValueAnimator;
 import android.graphics.Color;
+import android.content.res.ColorStateList;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Shader;
@@ -33,6 +34,13 @@ public final class VipNameStyle {
         view.getPaint().setShader(null);
         view.setAlpha(1f);
         view.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT);
+        Object savedColors = view.getTag(R.id.tag_vip_name_default_color);
+        if (savedColors == null) {
+            savedColors = view.getTextColors();
+            view.setTag(R.id.tag_vip_name_default_color, savedColors);
+        }
+        if (savedColors instanceof ColorStateList) view.setTextColor((ColorStateList) savedColors);
+        view.setTag(R.id.tag_vip_name_style_config, style);
         if (style == null || !asBoolean(style.get("enabled"))) return;
 
         int c1 = color(style.get("color1"), 0xFFD946EF);
@@ -83,11 +91,15 @@ public final class VipNameStyle {
             return;
         }
 
-        LinearGradient gradient = new LinearGradient(
-                0f, 0f, Math.max(1, view.getWidth()), 0f,
-                colors, null, Shader.TileMode.CLAMP);
-        view.getPaint().setShader(gradient);
-        view.invalidate();
+        Runnable applyGradient = () -> {
+            if (view.getTag(R.id.tag_vip_name_style_config) != style || view.getWidth() <= 0) return;
+            LinearGradient gradient = new LinearGradient(
+                    0f, 0f, Math.max(1, view.getWidth()), 0f,
+                    colors, null, Shader.TileMode.CLAMP);
+            view.getPaint().setShader(gradient);
+            view.invalidate();
+        };
+        if (view.getWidth() > 0) applyGradient.run(); else view.post(applyGradient);
     }
 
     private static long duration(Map<String, Object> style) {
