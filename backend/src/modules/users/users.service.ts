@@ -446,6 +446,7 @@ export class UsersService {
       profileCardUrl: vipVisuals.profileCardUrl || vipVisuals.vipCardUrl || flat.profileCardUrl,
       chatBubbleUrl: vipVisuals.chatBubbleUrl || flat.chatBubbleUrl,
       nameplateUrl: vipVisuals.nameplateUrl || flat.nameplateUrl,
+      nameStyle: vipVisuals.nameStyle && typeof vipVisuals.nameStyle === 'object' ? vipVisuals.nameStyle : null,
     };
     return this.withWearMeta(
       await this.withPublicIdStyle(withVipVisuals, userId),
@@ -528,6 +529,7 @@ export class UsersService {
       profileCardUrl: vipVisuals.profileCardUrl || vipVisuals.vipCardUrl || flat.profileCardUrl,
       chatBubbleUrl: vipVisuals.chatBubbleUrl || flat.chatBubbleUrl,
       nameplateUrl: vipVisuals.nameplateUrl || flat.nameplateUrl,
+      nameStyle: vipVisuals.nameStyle && typeof vipVisuals.nameStyle === 'object' ? vipVisuals.nameStyle : null,
     };
     return this.withWearMeta(
       await this.withPublicIdStyle(withVipVisuals, id),
