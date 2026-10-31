@@ -35,6 +35,20 @@ export class Badge {
   @Column({ type: 'int', default: 0 })
   achievementThreshold: number;
 
+  /** Private server-tracked activity condition; never exposed to user task APIs. */
+  @Column({ type: 'boolean', default: false })
+  hiddenTaskEnabled: boolean;
+
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  hiddenTaskEvent: string | null;
+
+  @Column({ type: 'int', default: 1 })
+  hiddenTaskTarget: number;
+
+  /** 0 = permanent; otherwise the earned medal expires after this many days. */
+  @Column({ type: 'int', default: 0 })
+  hiddenTaskDays: number;
+
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
