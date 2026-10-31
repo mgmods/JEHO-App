@@ -1894,18 +1894,24 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getRoom(id: string, options?: { fast?: boolean }) {
+    // Load the room/host separately from the two one-to-many collections.
+    // Joining seats and moderators in one TypeORM query multiplies rows
+    // (seatCount × moderatorCount) and inflates every room-entry response.
     const room = await this.roomsRepo.findOne({
       where: { id },
-      relations: [
-        'host',
-        'host.profile',
-        'seats',
-        'seats.user',
-        'seats.user.profile',
-        'moderators',
-      ],
+      relations: ['host', 'host.profile'],
     });
     if (!room) throw new NotFoundException('Room not found');
+    const [loadedSeats, loadedModerators] = await Promise.all([
+      this.seatsRepo.find({
+        where: { roomId: id },
+        relations: ['user', 'user.profile'],
+        order: { seatIndex: 'ASC' },
+      }),
+      this.modsRepo.find({ where: { roomId: id } }),
+    ]);
+    room.seats = loadedSeats;
+    room.moderators = loadedModerators;
     await this.assertAgencyRoomActive(room);
     // Respect host-configured size (guest mics + host seat). Never force back to default 11.
     const desiredSeatCount = Math.max(
