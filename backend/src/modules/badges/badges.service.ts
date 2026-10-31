@@ -138,7 +138,7 @@ export class BadgesService {
       : raw.startsWith('game') || raw.startsWith('host_game') ? 'game'
       : raw.startsWith('win') ? 'win'
       : (raw.startsWith('ad') || raw.includes('rewarded')) ? 'ad'
-      : (raw.startsWith('chat') || raw.startsWith('message') || raw.startsWith('dm')) ? 'chat'
+      : (raw.startsWith('chat') || raw.startsWith('host_chat') || raw.startsWith('message') || raw.startsWith('dm')) ? 'chat'
       : '';
     if (!family) return;
 
@@ -525,6 +525,18 @@ export class BadgesService {
       }
       if (!Number.isFinite(Number(dto.achievementThreshold)) || Number(dto.achievementThreshold) <= 0) {
         throw new BadRequestException('Achievement threshold must be a positive number');
+      }
+    }
+    if (dto.hiddenTaskEnabled) {
+      const allowedEvents = ['rooms', 'gift', 'follow', 'mic', 'checkin', 'recharge', 'game', 'win', 'chat', 'ad'];
+      if (!dto.hiddenTaskEvent || !allowedEvents.includes(dto.hiddenTaskEvent)) {
+        throw new BadRequestException('Private medal activity type is invalid');
+      }
+      if (!Number.isFinite(Number(dto.hiddenTaskTarget)) || Number(dto.hiddenTaskTarget) < 1) {
+        throw new BadRequestException('Private medal target must be at least 1');
+      }
+      if (!Number.isFinite(Number(dto.hiddenTaskDays)) || Number(dto.hiddenTaskDays) < 0 || Number(dto.hiddenTaskDays) > 3650) {
+        throw new BadRequestException('Private medal duration must be between 0 and 3650 days');
       }
     }
   }
