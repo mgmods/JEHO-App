@@ -146,6 +146,18 @@ public final class AvatarImageLoader {
         request.dontTransform().into(view);
     }
 
+    /** Local cover preview (gallery Uri) — keep the original animated drawable. */
+    public static void loadMedia(@Nullable ImageView view, @Nullable Uri uri, int placeholder) {
+        if (view == null) return;
+        view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        if (uri == null) {
+            view.setImageResource(placeholder);
+            return;
+        }
+        Glide.with(view).load(uri).dontTransform()
+                .placeholder(placeholder).error(placeholder).into(view);
+    }
+
     /** Local preview (gallery Uri) — preserves GIF animation. */
     public static void load(@Nullable ImageView view, @Nullable Uri uri) {
         if (view == null) return;
