@@ -14396,7 +14396,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (challengeWheelSpinButton != null) {
                 challengeWheelSpinButton.setVisibility(canSpin ? View.VISIBLE : View.GONE);
             }
-            // The close control is permission-gated; audience members cannot dismiss the shared wheel.
             if (challengeWheelCloseButton != null) {
                 challengeWheelCloseButton.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
             }
@@ -14410,25 +14409,73 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         root.setPadding(dp(8), dp(8), dp(8), dp(8));
         root.setBackgroundColor(Color.TRANSPARENT);
 
+        // Native top bar: large, easy-to-hit minimize and close controls.
+        FrameLayout header = new FrameLayout(this);
+        LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        root.addView(header, headerLp);
+
         TextView title = new TextView(this);
         title.setText("عجلة التحديات");
         title.setTextColor(0xFFF2F0FF);
-        title.setTextSize(23);
+        title.setTextSize(19);
         title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
-        title.setPadding(dp(20), dp(7), dp(20), dp(7));
+        title.setPadding(dp(18), dp(5), dp(18), dp(5));
         GradientDrawable titleBg = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{0xFFB51F68, 0xFF67318F, 0xFF32164F});
-        titleBg.setCornerRadius(dp(18));
+        titleBg.setCornerRadius(dp(16));
         titleBg.setStroke(dp(1), 0xFF8073B8);
         title.setBackground(titleBg);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        titleLp.gravity = Gravity.CENTER_HORIZONTAL;
-        root.addView(title, titleLp);
+        FrameLayout.LayoutParams titleLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(42), Gravity.CENTER);
+        header.addView(title, titleLp);
 
-        // Persistent challenge-type toast stays visible in both normal and compact modes.
+        LinearLayout topControls = new LinearLayout(this);
+        topControls.setOrientation(LinearLayout.HORIZONTAL);
+        topControls.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams controlsLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.END | Gravity.CENTER_VERTICAL);
+        header.addView(topControls, controlsLp);
+
+        TextView minimize = new TextView(this);
+        minimize.setText("−");
+        minimize.setTextColor(0xFFFFFFFF);
+        minimize.setTextSize(34);
+        minimize.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        minimize.setGravity(Gravity.CENTER);
+        minimize.setIncludeFontPadding(false);
+        GradientDrawable minimizeBg = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFF7660B5, 0xFF39285F});
+        minimizeBg.setCornerRadius(dp(16));
+        minimizeBg.setStroke(dp(1.5f), 0xFFB7A8F0);
+        minimize.setBackground(minimizeBg);
+        minimize.setElevation(dp(4));
+        LinearLayout.LayoutParams minimizeLp = new LinearLayout.LayoutParams(dp(48), dp(44));
+        minimizeLp.setMarginEnd(dp(6));
+        topControls.addView(minimize, minimizeLp);
+
+        TextView close = new TextView(this);
+        close.setText("×");
+        close.setTextColor(0xFFFFFFFF);
+        close.setTextSize(34);
+        close.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        close.setGravity(Gravity.CENTER);
+        close.setIncludeFontPadding(false);
+        GradientDrawable closeBg = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFFFF5578, 0xFFB8144B});
+        closeBg.setCornerRadius(dp(16));
+        closeBg.setStroke(dp(1.5f), 0xFFFFB0C1);
+        close.setBackground(closeBg);
+        close.setElevation(dp(4));
+        topControls.addView(close, new LinearLayout.LayoutParams(dp(48), dp(44)));
+        close.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
+
+        // The challenge result remains visible while expanded and is hidden in compact mode.
         TextView challengeBanner = new TextView(this);
         challengeBanner.setText("نوع التحدي: بانتظار النتيجة");
         challengeBanner.setTextColor(0xFFFFFFFF);
@@ -14505,82 +14552,62 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         spinBg.setStroke(dp(1), 0xFF9B91D8);
         spin.setBackground(spinBg);
         spin.setVisibility(canSpin ? View.VISIBLE : View.GONE);
-        LinearLayout.LayoutParams spinLp = new LinearLayout.LayoutParams(
-                dp(164), dp(40));
+        LinearLayout.LayoutParams spinLp = new LinearLayout.LayoutParams(dp(164), dp(40));
         spinLp.gravity = Gravity.CENTER_HORIZONTAL;
         spinLp.topMargin = dp(7);
         root.addView(spin, spinLp);
         spin.setOnClickListener(v -> requestChallengeWheelSpin());
 
-        TextView close = new TextView(this);
-        close.setText("إغلاق");
-        close.setTextColor(0xFFD8D4E8);
-        close.setTextSize(12);
-        close.setGravity(Gravity.CENTER);
-        GradientDrawable closeBg = new GradientDrawable();
-        closeBg.setColor(0xFF242136);
-        closeBg.setCornerRadius(dp(14));
-        closeBg.setStroke(dp(1), 0xFF514A6E);
-        close.setBackground(closeBg);
-        LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(
-                dp(110), dp(32));
-        closeLp.gravity = Gravity.CENTER_HORIZONTAL;
-        closeLp.topMargin = dp(5);
-        close.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
-        root.addView(close, closeLp);
-
-        TextView minimize = new TextView(this);
-        minimize.setText("تصغير العجلة");
-        minimize.setTextColor(0xFFEDEAFF);
-        minimize.setTextSize(12);
-        minimize.setGravity(Gravity.CENTER);
-        GradientDrawable minimizeBg = new GradientDrawable();
-        minimizeBg.setColor(0xFF302849);
-        minimizeBg.setCornerRadius(dp(14));
-        minimizeBg.setStroke(dp(1), 0xFF75689D);
-        minimize.setBackground(minimizeBg);
-        LinearLayout.LayoutParams minimizeLp = new LinearLayout.LayoutParams(dp(140), dp(32));
-        minimizeLp.gravity = Gravity.CENTER_HORIZONTAL;
-        minimizeLp.topMargin = dp(5);
-        root.addView(minimize, minimizeLp);
-        minimize.setOnClickListener(v -> {
-            challengeWheelMinimized = !challengeWheelMinimized;
+        Runnable updateCompactMode = () -> {
             int detailVisibility = challengeWheelMinimized ? View.GONE : View.VISIBLE;
+            challengeBanner.setVisibility(detailVisibility);
             wheelHost.setVisibility(detailVisibility);
             resultCaption.setVisibility(detailVisibility);
             result.setVisibility(detailVisibility);
             spin.setVisibility(challengeWheelMinimized ? View.GONE : (canSpin ? View.VISIBLE : View.GONE));
-            close.setVisibility(challengeWheelMinimized ? View.GONE : (canModerateRoom() ? View.VISIBLE : View.GONE));
-            minimize.setText(challengeWheelMinimized ? "تكبير العجلة" : "تصغير العجلة");
+            minimize.setText(challengeWheelMinimized ? "+" : "−");
+
             Window w = dialog.getWindow();
-            if (w != null) {
-                w.setLayout(Math.min(getResources().getDisplayMetrics().widthPixels - dp(20),
-                        challengeWheelMinimized ? dp(330) : dp(390)),
+            if (w == null) return;
+            if (challengeWheelMinimized) {
+                // Do not let the compact wheel window own IME focus. Touches outside
+                // its small header pass through to the room composer and gift controls.
+                w.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+                w.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
+                w.setGravity(Gravity.TOP | Gravity.END);
+                w.setLayout(Math.min(getResources().getDisplayMetrics().widthPixels - dp(20), dp(250)),
                         ViewGroup.LayoutParams.WRAP_CONTENT);
+                WindowManager.LayoutParams attrs = w.getAttributes();
+                attrs.x = dp(8);
+                attrs.y = dp(70);
+                w.setAttributes(attrs);
+            } else {
+                w.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+                w.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
+                w.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+                w.setLayout(Math.min(getResources().getDisplayMetrics().widthPixels - dp(20), dp(390)),
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+                WindowManager.LayoutParams attrs = w.getAttributes();
+                attrs.x = 0;
+                attrs.y = dp(88);
+                w.setAttributes(attrs);
+            }
+        };
+
+        minimize.setOnClickListener(v -> {
+            challengeWheelMinimized = !challengeWheelMinimized;
+            updateCompactMode.run();
+        });
+        title.setOnClickListener(v -> {
+            if (challengeWheelMinimized) {
+                challengeWheelMinimized = false;
+                updateCompactMode.run();
             }
         });
-
-        // Drag the wheel by holding its title; the challenge banner remains pinned inside it.
-        title.setOnTouchListener(new View.OnTouchListener() {
-            float downRawX, downRawY;
-            int startX, startY;
-            @Override public boolean onTouch(View view, android.view.MotionEvent event) {
-                Window w = dialog.getWindow();
-                if (w == null) return false;
-                WindowManager.LayoutParams lp = w.getAttributes();
-                if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
-                    downRawX = event.getRawX(); downRawY = event.getRawY();
-                    startX = lp.x; startY = lp.y;
-                    return true;
-                }
-                if (event.getAction() == android.view.MotionEvent.ACTION_MOVE) {
-                    lp.x = startX + Math.round(event.getRawX() - downRawX);
-                    lp.y = startY + Math.round(event.getRawY() - downRawY);
-                    w.setAttributes(lp);
-                    return true;
-                }
-                return event.getAction() == android.view.MotionEvent.ACTION_UP
-                        || event.getAction() == android.view.MotionEvent.ACTION_CANCEL;
+        challengeBanner.setOnClickListener(v -> {
+            if (challengeWheelMinimized) {
+                challengeWheelMinimized = false;
+                updateCompactMode.run();
             }
         });
 
@@ -14607,7 +14634,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
 
         dialog.setContentView(root);
-        // The wheel stays open until the user presses the explicit Close button.
         dialog.setCancelable(false);
         dialog.setCanceledOnTouchOutside(false);
         dialog.setOnDismissListener(d -> {
