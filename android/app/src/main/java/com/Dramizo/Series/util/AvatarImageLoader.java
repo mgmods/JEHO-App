@@ -84,15 +84,12 @@ public final class AvatarImageLoader {
         }
         view.setTag(R.id.tag_image_url, abs);
         view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
-        String lower = abs != null ? abs.toLowerCase(Locale.US) : "";
-        boolean animated = lower.contains(".gif") || lower.contains(".webp");
+        boolean animated = isAnimatedMediaUrl(abs);
         int size = Math.max(96, Math.min(
                 view.getWidth() > 0 ? view.getWidth() : 256, 512));
         var req = Glide.with(view)
                 .load(abs)
-                .thumbnail(0.2f)
                 .override(size, size)
-                .centerCrop()
                 .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
                 .error(ImagePlaceholder.avatar())
                 .listener(new RequestListener<Drawable>() {
@@ -121,9 +118,32 @@ public final class AvatarImageLoader {
         if (view.getDrawable() == null) {
             req = req.placeholder(ImagePlaceholder.avatar());
         }
-        // Still photos: freeze. GIF/WebP: keep motion (Mikoo shows live head).
-        if (!animated) req = req.dontAnimate();
+        // Let ImageView's CENTER_CROP scale type do the clipping. Applying a
+        // bitmap transform to every GIF/WebP frame is expensive and can stutter.
+        // Static photos can use a small thumbnail; animated media starts its real
+        // decoder directly so it never appears as a frozen preview.
+        if (!animated) {
+            req = req.centerCrop().dontAnimate().thumbnail(0.2f);
+        } else {
+            req = req.dontTransform();
+        }
         req.into(view);
+    }
+
+    /** Load profile covers without rasterizing every animation frame. */
+    public static void loadMedia(@Nullable ImageView view, @Nullable String mediaUrl, int placeholder) {
+        if (view == null) return;
+        view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        if (mediaUrl == null || mediaUrl.trim().isEmpty()) {
+            view.setImageResource(placeholder);
+            return;
+        }
+        String abs = AssetCatalog.absoluteUrl(mediaUrl);
+        var request = Glide.with(view).load(abs)
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                .error(placeholder);
+        if (view.getDrawable() == null) request = request.placeholder(placeholder);
+        request.dontTransform().into(view);
     }
 
     /** Local preview (gallery Uri) — preserves GIF animation. */
@@ -134,7 +154,18 @@ public final class AvatarImageLoader {
             view.setImageResource(ImagePlaceholder.avatar());
             return;
         }
-        Glide.with(view).load(uri).into(view);
+        view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        Glide.with(view).load(uri).dontTransform().into(view);
+    }
+
+    private static boolean isAnimatedMediaUrl(@Nullable String value) {
+        if (value == null) return false;
+        String path = value.toLowerCase(Locale.US);
+        int query = path.indexOf('?');
+        if (query >= 0) path = path.substring(0, query);
+        int hash = path.indexOf('#');
+        if (hash >= 0) path = path.substring(0, hash);
+        return path.endsWith(".gif") || path.endsWith(".webp");
     }
 
     /**
