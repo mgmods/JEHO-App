@@ -456,7 +456,8 @@ public class VoiceRoomForegroundService extends Service {
         boolean micOk = ContextCompat.checkSelfPermission(
                 this, android.Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED;
-        if (micOk && RoomRtcEngine.getInstance().isPublishing()) {
+        if (micOk && RoomRtcEngine.getInstance().isPublishing()
+                && RoomRtcEngine.getInstance().isMicEnabled()) {
             types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
         }
         return types;
