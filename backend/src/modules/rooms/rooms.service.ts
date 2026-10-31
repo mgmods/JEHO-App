@@ -1339,7 +1339,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           AND (owned."expiresAt" IS NULL OR owned."expiresAt" > NOW())
           AND COALESCE(cosmetic."previewUrl", '') NOT LIKE '%ud_vip_tou_%'
           AND COALESCE(cosmetic."previewUrl", '') NOT LIKE '%vip_tou_fixed_%'
-          AND COALESCE(cosmetic.meta->>'fixedVipFrame', '') <> 'true'
+          AND COALESCE((COALESCE(NULLIF(cosmetic.meta, '')::jsonb, '{}'::jsonb) ->> 'fixedVipFrame'), '') <> 'true'
         ORDER BY owned."updatedAt" DESC NULLS LAST
         LIMIT 1`,
       [userId],
@@ -1432,7 +1432,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.dataSource.query(
       `SELECT DISTINCT ON (uv."userId")
               uv."userId" AS "userId",
-              vp.benefits->'visuals'->'nameStyle' AS "nameStyle"
+              COALESCE(NULLIF(vp.benefits, '')::jsonb, '{}'::jsonb)->'visuals'->'nameStyle' AS "nameStyle"
          FROM user_vips uv
          JOIN vip_plans vp ON vp.id = uv."vipPlanId"
         WHERE uv."userId" = ANY($1::uuid[])
