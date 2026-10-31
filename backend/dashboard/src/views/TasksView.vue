@@ -529,7 +529,7 @@ async function load() {
   }
   const payload = data?.data ?? data ?? {}
   tasks.value = Array.isArray(payload.items)
-    ? payload.items.map((t) => ({ scope: 'global', roomId: '', agencyId: '', ...t, target: Number(t.target) || Number(String(t.type || '').match(/_(\\d+)$/)?.[1] || 1), rewardBadgeId: t.rewardBadgeId || '', rewardBadgeDays: Number(t.rewardBadgeDays) || 0 }))
+    ? payload.items.map((t) => ({ scope: 'global', roomId: '', agencyId: '', ...t, target: Number(t.target) || Number(String(t.type || '').match(/_(\d+)$/)?.[1] || 1), rewardBadgeId: t.rewardBadgeId || '', rewardBadgeDays: Number(t.rewardBadgeDays) || 0 }))
     : []
   if (typeof payload.enabled === 'boolean') {
     tasksEnabled.value = payload.enabled
