@@ -74,7 +74,7 @@ public class RoomJoinGateActivity extends AppCompatActivity {
                 // Private/password rooms may forbid GET until join — still try enter.
                 if (err.contains("join this room") || err.contains("forbidden")
                         || err.contains("password") || err.contains("كلمة")) {
-                    openLiveRoom(id, password);
+                    openLiveRoom(id, password, null);
                     return;
                 }
                 if (err.contains("closed") || err.contains("not found")
@@ -96,7 +96,7 @@ public class RoomJoinGateActivity extends AppCompatActivity {
         // Unknown GET failures still open Activity; join/password errors handled there.
         runOnUiThread(() -> {
             if (isFinishing()) return;
-            openLiveRoom(id, password);
+            openLiveRoom(id, password, null);
         });
     }
 
