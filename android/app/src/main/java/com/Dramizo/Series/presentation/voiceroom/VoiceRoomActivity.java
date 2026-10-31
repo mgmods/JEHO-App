@@ -15112,8 +15112,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (personCount <= 1 && !allMic && receiverName != null && !receiverName.isEmpty()) {
                 // Isolate dynamic names/gift text from Arabic RTL ordering so mixed Arabic,
                 // Latin names and numeric IDs can never visually swap sender/receiver.
-                appendGiftEconomyLine("\\u2068" + sender + "\\u2069 أهدى إلى \\u2068" + receiverName
-                        + "\\u2069 " + "\\u2068" + name + "\\u2069");
+                appendGiftEconomyLine("\u2068" + sender + "\u2069 أهدى إلى \u2068" + receiverName
+                        + "\u2069 " + "\u2068" + name + "\u2069");
             }
             boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
             boolean cannonLaunch = memberBool(payload, "cannonLaunch", false);
