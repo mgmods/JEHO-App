@@ -364,6 +364,7 @@ public class ProfileActivity extends ThemedActivity {
                     ? user.displayName : "مستخدم";
             // Custom display-rank/medal system is retired from the app UI.
             binding.tvDisplayName.setText(profileDisplayName);
+            com.Dramizo.Series.util.VipNameStyle.bind(binding.tvDisplayName, user);
             Glide.with(binding.imgCustomDisplayRank).clear(binding.imgCustomDisplayRank);
             binding.imgCustomDisplayRank.setVisibility(View.GONE);
             GenderVerifiedBadge.bind(binding.tvDisplayName, null, user.genderVerified);
