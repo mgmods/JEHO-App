@@ -3,7 +3,7 @@ package com.Dramizo.Series.util;
 import androidx.annotation.Nullable;
 
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
-import com.Dramizo.Series.zego.ZegoEngineManager;
+import com.Dramizo.Series.rtc.RoomRtcEngine;
 
 /**
  * Process-wide live-room session (Mikoo RoomDataManager analogue).
@@ -128,9 +128,14 @@ public final class ActiveRoomSession {
     public synchronized boolean canResumeUi(@Nullable String targetRoomId) {
         if (targetRoomId == null || targetRoomId.isEmpty()) return false;
         if (session == null || roomId == null || !roomId.equals(targetRoomId)) return false;
-        ZegoEngineManager zego = ZegoEngineManager.getInstance();
+        // Use the selected RTC provider. Checking Zego directly made LiveKit sessions
+        // look disconnected after minimize, so the app performed a fresh HTTP join and
+        // could lose the user's existing mic/seat state on restore.
+        RoomRtcEngine rtc = RoomRtcEngine.getInstance();
         String zegoId = zegoRoomId != null ? zegoRoomId : roomId;
-        return zego.isInRoom(zegoId) || zego.isInRoom(roomId);
+        if (rtc.isInRoom(zegoId) || rtc.isInRoom(roomId)) return true;
+        String livekitId = session.livekitRoomName;
+        return livekitId != null && !livekitId.isEmpty() && rtc.isInRoom(livekitId);
     }
 
     /** Snapshot flags for UI restore without inventing a new join. */
