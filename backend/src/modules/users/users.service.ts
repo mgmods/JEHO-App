@@ -79,6 +79,22 @@ export class UsersService {
     @Optional() private readonly tasksService?: TasksService,
   ) {}
 
+  /** Expired timed medals must disappear from the profile showcase on every profile read. */
+  private async cleanupExpiredMedalShowcase(userId: string, profile?: UserProfile | null): Promise<void> {
+    if (!profile || !Array.isArray(profile.displayedMedalIds) || !profile.displayedMedalIds.length) return;
+    const expired = await this.dataSource.query(
+      'SELECT "badgeId" FROM "jeho_own"."user_badges" WHERE "userId" = $1 AND "expiresAt" IS NOT NULL AND "expiresAt" <= NOW()',
+      [userId],
+    ) as Array<{ badgeId: string }>;
+    if (!expired.length) return;
+    const expiredIds = new Set(expired.map((row) => String(row.badgeId)));
+    const next = profile.displayedMedalIds.filter((id) => !expiredIds.has(String(id)));
+    if (next.length !== profile.displayedMedalIds.length) {
+      profile.displayedMedalIds = next;
+      await this.profilesRepo.save(profile);
+    }
+  }
+
   private economyStats(profile?: UserProfile | null) {
     const received = Math.max(0, Number(profile?.totalReceivedDiamonds ?? 0));
     const sent = Math.max(0, Number(profile?.totalSentCoins ?? 0));
@@ -391,6 +407,7 @@ export class UsersService {
       relations: ['profile', 'wallet'],
     });
     if (!user) throw new NotFoundException('User not found');
+    await this.cleanupExpiredMedalShowcase(userId, user.profile);
     const now = new Date();
     const vip = await this.userVipsRepo.findOne({
       where: { userId, isActive: true },
@@ -441,6 +458,7 @@ export class UsersService {
       relations: ['profile'],
     });
     if (!user) throw new NotFoundException('User not found');
+    await this.cleanupExpiredMedalShowcase(id, user.profile);
     const now = new Date();
     const vip = await this.userVipsRepo.findOne({
       where: { userId: id, isActive: true },
@@ -523,6 +541,7 @@ export class UsersService {
       relations: ['profile'],
     });
     if (!user) throw new NotFoundException('User not found');
+    await this.cleanupExpiredMedalShowcase(user.id, user.profile);
     const vip = await this.userVipsRepo.findOne({
       where: { userId: user.id, isActive: true },
       relations: ['vipPlan'],
