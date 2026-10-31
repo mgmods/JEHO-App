@@ -590,5 +590,5 @@ async function save() {
 
 
 
-onMounted(() => { load(); loadDailyLogin(); loadCosmetics(); loadMedals() })
+onMounted(() => { load(); loadDailyLogin(); loadCosmetics() })
 </script>
