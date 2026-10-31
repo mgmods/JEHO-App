@@ -4,6 +4,21 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+
+const CURRENT_JEHO_API_ORIGIN = 'https://jeho-own-web-910481ae.hosted.cumin.dev';
+
+function publicApiBase(): string {
+  const configured = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || '')
+    .trim()
+    .replace(/\\/+$/, '')
+    .replace(/\\/api\\/v\\d+$/i, '');
+  // Some existing Cumin environments still carry the retired Blitz origin.
+  if (!configured || /jeho-own-backend\\.mgs\\.blitz\\.cloud/i.test(configured)) {
+    return CURRENT_JEHO_API_ORIGIN;
+  }
+  return configured;
+}
+
 import { Public } from '../../common/decorators';
 import { ZegoSettingsService } from '../zego/zego-settings.service';
 import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
@@ -160,8 +175,7 @@ export class ConfigController {
     };
     let parsed: any = {};
     try { parsed = row?.value ? JSON.parse(row.value) : {}; } catch { parsed = {}; }
-    const apiBase = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || 'https://jeho-own-web-910481ae.hosted.cumin.dev')
-      .trim().replace(/\/+$/, '').replace(/\/api\/v\d+$/i, '');
+    const apiBase = publicApiBase();
     const normalize = (value: unknown): string => {
       const raw = typeof value === 'string' ? value.trim() : '';
       let url = raw;
@@ -519,14 +533,7 @@ export class ConfigController {
         // paths into absolute URLs so mobile clients and Glide can load them.
         // Uploads are served at the root path (/uploads/:filename), not under
         // the Nest API prefix. Normalize env values that may include /api/v1.
-        const apiBase = String(
-          process.env.PUBLIC_API_URL ||
-            process.env.API_PUBLIC_URL ||
-            'https://jeho-own-web-910481ae.hosted.cumin.dev',
-        )
-          .trim()
-          .replace(/\/+$/, '')
-          .replace(/\/api\/v\d+$/i, '');
+        const apiBase = publicApiBase();
         let url = raw;
         if (raw.startsWith('/uploads/') && !raw.startsWith('//')) {
           url = apiBase + raw;
