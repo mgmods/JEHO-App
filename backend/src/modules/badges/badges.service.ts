@@ -70,13 +70,22 @@ export class BadgesService {
     return grants
       .filter((grant) => !!grant.badge)
       .filter((grant) => !grant.expiresAt || new Date(grant.expiresAt).getTime() > Date.now())
-      .map((grant) => ({
-        ...grant.badge,
-        earned: true,
-        grantedAt: grant.grantedAt,
-        expiresAt: grant.expiresAt ?? null,
-        source: grant.source,
-      }));
+      .map((grant) => {
+        const {
+          hiddenTaskEnabled: _hiddenTaskEnabled,
+          hiddenTaskEvent: _hiddenTaskEvent,
+          hiddenTaskTarget: _hiddenTaskTarget,
+          hiddenTaskDays: _hiddenTaskDays,
+          ...publicBadge
+        } = grant.badge;
+        return {
+          ...publicBadge,
+          earned: true,
+          grantedAt: grant.grantedAt,
+          expiresAt: grant.expiresAt ?? null,
+          source: grant.source,
+        };
+      });
   }
 
   async catalog(userId: string) {
@@ -99,12 +108,21 @@ export class BadgesService {
     // visible to their owner even when no longer offered to new users.
     return catalog
       .filter((badge) => badge.isActive || ownedById.has(badge.id))
-      .map((badge) => ({
-        ...badge,
-        earned: ownedById.has(badge.id),
-        grantedAt: ownedById.get(badge.id)?.grantedAt ?? null,
-        source: ownedById.get(badge.id)?.source ?? null,
-      }));
+      .map((badge) => {
+        const {
+          hiddenTaskEnabled: _hiddenTaskEnabled,
+          hiddenTaskEvent: _hiddenTaskEvent,
+          hiddenTaskTarget: _hiddenTaskTarget,
+          hiddenTaskDays: _hiddenTaskDays,
+          ...publicBadge
+        } = badge;
+        return {
+          ...publicBadge,
+          earned: ownedById.has(badge.id),
+          grantedAt: ownedById.get(badge.id)?.grantedAt ?? null,
+          source: ownedById.get(badge.id)?.source ?? null,
+        };
+      });
   }
 
   /** Remove expired medal IDs from the profile showcase so timed medals disappear everywhere. */
