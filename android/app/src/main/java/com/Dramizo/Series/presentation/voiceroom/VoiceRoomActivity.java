@@ -1,4 +1,6 @@
 package com.Dramizo.Series.presentation.voiceroom;
+
+import com.Dramizo.Series.util.VipNameStyle;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.annotation.SuppressLint;
