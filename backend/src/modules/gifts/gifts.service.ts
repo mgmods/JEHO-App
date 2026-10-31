@@ -2121,8 +2121,13 @@ export class GiftsService implements OnModuleInit {
     senderId: string,
     requestId: string,
     receiverIds: string[],
+    manager?: any,
+    expected?: { giftId?: string; quantity?: number; roomId?: string; comboCount?: number },
   ): Promise<any | null> {
-    const rows = await this.sendsRepo.find({ where: { requestId, senderId } });
+    const sendsRepo = manager ? manager.getRepository(GiftSend) : this.sendsRepo;
+    const giftsRepo = manager ? manager.getRepository(Gift) : this.giftsRepo;
+    const walletsRepo = manager ? manager.getRepository(Wallet) : this.walletsRepo;
+    const rows = await sendsRepo.find({ where: { requestId, senderId } });
     if (!rows.length) return null;
     const requested = [...new Set(receiverIds.map(String))].sort();
     const recorded = [...new Set(rows.map((row) => String(row.receiverId)))].sort();
@@ -2131,9 +2136,24 @@ export class GiftsService implements OnModuleInit {
     }
     const first = rows[0];
     const gift = first.giftId
-      ? await this.giftsRepo.findOne({ where: { id: first.giftId } })
+      ? await giftsRepo.findOne({ where: { id: first.giftId } })
       : null;
-    const wallet = await this.walletsRepo.findOne({ where: { userId: senderId } });
+    if (expected) {
+      const lucky = gift?.type === GiftType.LUCKY;
+      const qty = Math.max(1, Math.min(lucky ? 177 : 99, Math.floor(Number(expected.quantity) || 1)));
+      const combo = lucky ? 1 : Math.max(1, Math.min(99, Math.floor(Number(expected.comboCount) || 1)));
+      const roomId = expected.roomId || null;
+      const payloadMatches = rows.every((row) =>
+        String(row.giftId || '') === String(expected.giftId || '') &&
+        Number(row.quantity || 1) === qty &&
+        Number(row.comboCount || 1) === combo &&
+        (row.roomId || null) === roomId,
+      );
+      if (!payloadMatches) {
+        throw new BadRequestException('This gift request ID was already used for a different gift payload');
+      }
+    }
+    const wallet = await walletsRepo.findOne({ where: { userId: senderId } });
     return {
       send: first,
       sends: rows,
@@ -2201,7 +2221,7 @@ export class GiftsService implements OnModuleInit {
       );
     }
     if (dto.requestId) {
-      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, [dto.receiverId]);
+      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, [dto.receiverId], undefined, dto);
       if (prior) return prior;
     }
     const gift = await this.giftsRepo.findOne({ where: { id: dto.giftId, isActive: true } });
@@ -2269,7 +2289,16 @@ export class GiftsService implements OnModuleInit {
         where: { userId: senderId },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!wallet || Number(wallet.coins) < totalCoins) {
+      if (!wallet) throw new BadRequestException('Insufficient coins');
+      // Re-check after acquiring the sender lock: concurrent retries with the same
+      // requestId now return the committed result instead of reaching the unique index.
+      if (dto.requestId) {
+        const prior = await this.findPriorCannonRequest(
+          senderId, dto.requestId, [dto.receiverId], manager, dto,
+        );
+        if (prior) return prior;
+      }
+      if (Number(wallet.coins) < totalCoins) {
         throw new BadRequestException('Insufficient coins');
       }
 
@@ -2510,6 +2539,8 @@ export class GiftsService implements OnModuleInit {
         },
       };
     }).then(async (result) => {
+      // An idempotent replay must not repeat progress, scoring, or realtime effects.
+      if (result?.alreadyProcessed) return result;
       const taskRoom = dto.roomId
         ? await this.roomsRepo.findOne({ where: { id: dto.roomId } })
         : null;
@@ -2867,7 +2898,7 @@ export class GiftsService implements OnModuleInit {
       );
     }
     if (dto.requestId) {
-      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds);
+      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds, undefined, dto);
       if (prior) return prior;
     }
     if (receiverIds.length === 1) {
@@ -2947,7 +2978,16 @@ export class GiftsService implements OnModuleInit {
         where: { userId: senderId },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!wallet || Number(wallet.coins) < totalCoins) {
+      if (!wallet) throw new BadRequestException('Insufficient coins');
+      // Re-check after the sender wallet lock so simultaneous all-mic retries
+      // reuse the first committed send and never attempt another charge.
+      if (dto.requestId) {
+        const prior = await this.findPriorCannonRequest(
+          senderId, dto.requestId, receiverIds, manager, dto,
+        );
+        if (prior) return prior;
+      }
+      if (Number(wallet.coins) < totalCoins) {
         throw new BadRequestException('Insufficient coins');
       }
       wallet.coins = Number(wallet.coins) - totalCoins;
@@ -3159,6 +3199,8 @@ export class GiftsService implements OnModuleInit {
         },
       };
     }).then(async (result) => {
+      // An idempotent replay must not repeat progress, scoring, or room animations.
+      if (result?.alreadyProcessed) return result;
       void this.tasksService
         .recordProgress(senderId, 'gift', 1, {
           roomId: dto.roomId,
