@@ -73,6 +73,13 @@ public final class NotificationRouter {
                 && !TextUtils.isEmpty(roomId)) {
             Intent i = new Intent(context, VoiceRoomActivity.class);
             i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
+            put(i, VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID,
+                    first(data, "display_room_id", "displayRoomId", "room_display_id", "roomDisplayId"));
+            String roomKind = first(data, "room_type", "roomType", "room_kind", "roomKind");
+            String agencyFlag = first(data, "is_agency", "isAgency", "agencyRoom");
+            boolean isAgency = "true".equalsIgnoreCase(agencyFlag)
+                    || "agency".equalsIgnoreCase(roomKind);
+            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY, isAgency);
             return i;
         }
         if (("follow".equals(t) || "gift".equals(t) || "profile".equals(t)
