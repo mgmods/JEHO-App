@@ -2382,6 +2382,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return cached == null || cached.trim().isEmpty() ? null : cached.trim();
     }
 
+    /** Resolve the VIP name treatment from the latest room payload for seated speakers. */
+    @Nullable
+    private java.util.Map<String, Object> roomNameStyleForUser(@Nullable String userId) {
+        if (userId == null || userId.trim().isEmpty() || viewModel == null) return null;
+        RoomDtos.RoomDto room = viewModel.getRoom().getValue();
+        if (room == null) return null;
+        if (room.host != null && sameUser(userId, room.host.id)) return room.host.nameStyle;
+        if (room.seats != null) {
+            for (RoomDtos.SeatDto seat : room.seats) {
+                if (seat == null || seat.user == null) continue;
+                String uid = seat.userId != null ? seat.userId : seat.user.id;
+                if (uid != null && sameUser(userId, uid)) return seat.user.nameStyle;
+            }
+        }
+        return null;
+    }
+
     private void appendChatLine(String name, String text, int vipLevel, int userLevel) {
         appendChatLine(name, text, vipLevel, userLevel, null);
     }
@@ -2551,6 +2568,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else {
             nameView.setText(name != null && !name.isEmpty() ? name : "—");
             nameView.setTextColor(VipStyle.nameColor(vipLevel));
+            VipNameStyle.bind(nameView, roomNameStyleForUser(userId));
             if (avatar != null) {
                 HostSignalView hostSignal = row.findViewById(R.id.webChatHostSignal);
                 if (system) {
