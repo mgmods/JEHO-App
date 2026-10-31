@@ -48,6 +48,9 @@ public final class AgencyRoomLauncher {
                             Toast.LENGTH_LONG).show();
                     return;
                 }
+                // The agency open endpoint already returned the authenticated join session.
+                // Hand it to VoiceRoomActivity instead of issuing another join HTTP request.
+                RoomJoinPrefetch.seedReady(opened.data.room.id, opened.data);
                 Intent i = new Intent(activity, VoiceRoomActivity.class);
                 i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, opened.data.room.id);
                 i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, true);
