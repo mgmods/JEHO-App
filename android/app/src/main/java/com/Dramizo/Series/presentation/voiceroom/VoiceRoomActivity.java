@@ -13052,6 +13052,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 @Override
                 public void onUserEvent(String event, JsonObject payload) {
                     if (event == null) return;
+                    if ("config:updated".equals(event)) {
+                        String scope = payload != null && payload.has("scope")
+                                && !payload.get("scope").isJsonNull()
+                                ? payload.get("scope").getAsString() : "";
+                        if ("toast-style".equals(scope)) {
+                            handler.post(() -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                refreshLuckyToastButtonStyle();
+                                GlobalCelebrationToast.refreshStyleNow(VoiceRoomActivity.this);
+                            });
+                        }
+                        return;
+                    }
                     if ("contest:pk-status".equals(event)) {
                         boolean enabled = payload != null && payload.has("enabled")
                                 && !payload.get("enabled").isJsonNull()
