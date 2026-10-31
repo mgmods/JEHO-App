@@ -15110,7 +15110,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // intentionally stay anonymous as a group, without listing all recipients.
             String receiverName = memberStr(payload, "receiverName");
             if (personCount <= 1 && !allMic && receiverName != null && !receiverName.isEmpty()) {
-                appendGiftEconomyLine(sender + " أهدى " + receiverName + " " + name);
+                // Isolate dynamic names/gift text from Arabic RTL ordering so mixed Arabic,
+                // Latin names and numeric IDs can never visually swap sender/receiver.
+                appendGiftEconomyLine("\\u2068" + sender + "\\u2069 أهدى إلى \\u2068" + receiverName
+                        + "\\u2069 " + "\\u2068" + name + "\\u2069");
             }
             boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
             boolean cannonLaunch = memberBool(payload, "cannonLaunch", false);
