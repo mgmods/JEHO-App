@@ -71,13 +71,11 @@ export class BadgesService {
       .filter((grant) => !!grant.badge)
       .filter((grant) => !grant.expiresAt || new Date(grant.expiresAt).getTime() > Date.now())
       .map((grant) => {
-        const {
-          hiddenTaskEnabled: _hiddenTaskEnabled,
-          hiddenTaskEvent: _hiddenTaskEvent,
-          hiddenTaskTarget: _hiddenTaskTarget,
-          hiddenTaskDays: _hiddenTaskDays,
-          ...publicBadge
-        } = grant.badge;
+        const publicBadge: any = { ...grant.badge };
+        delete publicBadge.hiddenTaskEnabled;
+        delete publicBadge.hiddenTaskEvent;
+        delete publicBadge.hiddenTaskTarget;
+        delete publicBadge.hiddenTaskDays;
         return {
           ...publicBadge,
           earned: true,
@@ -109,13 +107,11 @@ export class BadgesService {
     return catalog
       .filter((badge) => badge.isActive || ownedById.has(badge.id))
       .map((badge) => {
-        const {
-          hiddenTaskEnabled: _hiddenTaskEnabled,
-          hiddenTaskEvent: _hiddenTaskEvent,
-          hiddenTaskTarget: _hiddenTaskTarget,
-          hiddenTaskDays: _hiddenTaskDays,
-          ...publicBadge
-        } = badge;
+        const publicBadge: any = { ...badge };
+        delete publicBadge.hiddenTaskEnabled;
+        delete publicBadge.hiddenTaskEvent;
+        delete publicBadge.hiddenTaskTarget;
+        delete publicBadge.hiddenTaskDays;
         return {
           ...publicBadge,
           earned: ownedById.has(badge.id),
