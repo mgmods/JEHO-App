@@ -20,6 +20,17 @@ public class ChatRepositoryImpl implements ChatRepository {
         this.api = api; this.dao = dao; this.io = io;
     }
 
+    /** Persist a confirmed server message before returning to the UI. */
+    private void cacheConfirmedMessage(ChatDtos.MessageDto m) {
+        if (m == null || m.id == null || m.conversationId == null) return;
+        ChatMessageEntity e = new ChatMessageEntity();
+        e.id = m.id; e.conversationId = m.conversationId; e.senderId = m.senderId;
+        e.content = m.content; e.type = m.type; e.replyToId = m.replyToId;
+        e.createdAt = m.createdAt; e.cachedAt = System.currentTimeMillis();
+        try { dao.upsertAll(java.util.Collections.singletonList(e)); }
+        catch (Exception ignored) {}
+    }
+
     @Override public Result<ChatDtos.ConversationList> getConversations() {
         return ApiCall.execute(api.conversations());
     }
@@ -39,10 +50,9 @@ public class ChatRepositoryImpl implements ChatRepository {
                 cached.add(e);
             }
             if (!cached.isEmpty()) {
-                io.execute(() -> {
-                    if (page <= 1) dao.clearConversation(conversationId);
-                    dao.upsertAll(cached);
-                });
+                // Already on the IO executor: persist before returning. Upsert without
+                // clearing page 1 so older locally retained messages are not erased.
+                try { dao.upsertAll(cached); } catch (Exception ignored) {}
             }
         }
         return result;
@@ -75,15 +85,19 @@ public class ChatRepositoryImpl implements ChatRepository {
     }
 
     @Override public Result<ChatDtos.MessageDto> sendMessage(String conversationId, String content, String replyToId) {
-        return ApiCall.execute(api.send(conversationId, new ChatDtos.SendMessageRequest(content, "text", replyToId)));
+        Result<ChatDtos.MessageDto> result = ApiCall.execute(api.send(conversationId, new ChatDtos.SendMessageRequest(content, "text", replyToId)));
+        if (result.success) cacheConfirmedMessage(result.data);
+        return result;
     }
 
     @Override public Result<ChatDtos.MessageDto> sendImage(String conversationId, String imageUrl, String replyToId) {
         ChatDtos.MediaDto media = new ChatDtos.MediaDto();
         media.url = imageUrl;
         media.mimeType = "image/jpeg";
-        return ApiCall.execute(api.send(conversationId,
+        Result<ChatDtos.MessageDto> result = ApiCall.execute(api.send(conversationId,
                 new ChatDtos.SendMessageRequest("", "image", replyToId, media)));
+        if (result.success) cacheConfirmedMessage(result.data);
+        return result;
     }
 
     @Override public Result<ChatDtos.MessageDto> sendAudio(String conversationId, String audioUrl, int durationSec, String replyToId) {
@@ -91,8 +105,10 @@ public class ChatRepositoryImpl implements ChatRepository {
         media.url = audioUrl;
         media.mimeType = "audio/mp4";
         media.duration = Math.max(0, durationSec);
-        return ApiCall.execute(api.send(conversationId,
+        Result<ChatDtos.MessageDto> result = ApiCall.execute(api.send(conversationId,
                 new ChatDtos.SendMessageRequest("", "audio", replyToId, media)));
+        if (result.success) cacheConfirmedMessage(result.data);
+        return result;
     }
 
     @Override public Result<ChatDtos.MessageDto> sendVideo(String conversationId, String videoUrl, String thumbnailUrl, String mimeType, long size, int durationSec, String replyToId) {
@@ -102,8 +118,10 @@ public class ChatRepositoryImpl implements ChatRepository {
         media.mimeType = mimeType != null && mimeType.startsWith("video/") ? mimeType : "video/mp4";
         media.size = Math.max(0, size);
         media.duration = Math.max(0, durationSec);
-        return ApiCall.execute(api.send(conversationId,
+        Result<ChatDtos.MessageDto> result = ApiCall.execute(api.send(conversationId,
                 new ChatDtos.SendMessageRequest("", "video", replyToId, media)));
+        if (result.success) cacheConfirmedMessage(result.data);
+        return result;
     }
 
     @Override public Result<ChatDtos.MessageDto> sendGift(String conversationId, String giftName, String iconUrl, String replyToId) {
@@ -121,7 +139,9 @@ public class ChatRepositoryImpl implements ChatRepository {
             }
         }
         String content = giftName != null ? giftName : "هدية";
-        return ApiCall.execute(api.send(conversationId,
+        Result<ChatDtos.MessageDto> result = ApiCall.execute(api.send(conversationId,
                 new ChatDtos.SendMessageRequest(content, "gift", replyToId, media)));
+        if (result.success) cacheConfirmedMessage(result.data);
+        return result;
     }
 }
