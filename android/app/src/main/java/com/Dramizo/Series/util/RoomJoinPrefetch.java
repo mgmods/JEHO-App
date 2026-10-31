@@ -93,6 +93,24 @@ public final class RoomJoinPrefetch {
         });
     }
 
+    /**
+     * Adopt a join session already returned by a create/open endpoint. This avoids a second
+     * HTTP join round-trip when the launcher already has a fresh authenticated room session.
+     */
+    public static boolean seedReady(@Nullable String roomId,
+                                    @Nullable RoomDtos.JoinRoomResult session) {
+        if (roomId == null || roomId.isEmpty() || session == null) return false;
+        synchronized (LOCK) {
+            // Do not replace another room's active prefetch or race an in-flight request.
+            if (inFlight || (targetRoomId != null && !roomId.equals(targetRoomId))) return false;
+            targetRoomId = roomId;
+            result = session;
+            error = null;
+            inFlight = false;
+        }
+        return true;
+    }
+
     /** Consume completed prefetch for this room (null if still running or different room). */
     @Nullable
     public static RoomDtos.JoinRoomResult takeReady(@Nullable String roomId) {
