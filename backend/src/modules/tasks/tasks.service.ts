@@ -804,6 +804,8 @@ export class TasksService {
     context: TaskProgressContext = {},
   ) {
     if (!userId || !event || amount <= 0) return;
+    // Secret medal conditions run independently of the visible daily-tasks feature.
+    await this.badges.recordHiddenTaskProgress(userId, event, amount);
     if (!(await this.isEnabled())) return;
     const family = this.familyOf(event);
     const tasks = await this.loadTasks();
