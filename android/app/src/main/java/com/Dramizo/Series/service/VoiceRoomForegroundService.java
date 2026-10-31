@@ -859,6 +859,28 @@ public class VoiceRoomForegroundService extends Service {
         }
     }
 
+    /**
+     * Removing the app task is an explicit user exit, not a room minimize.
+     * Do not let START_STICKY resurrect the previous room on the next app launch.
+     */
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        String activeRoom = roomId != null && !roomId.isEmpty()
+                ? roomId : activeRoomId(this);
+        if (activeRoom != null && !activeRoom.isEmpty()) {
+            leaveRoom(activeRoom);
+        } else {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().clear().apply();
+            clearRoomNotifications(this);
+            try {
+                stopForeground(STOP_FOREGROUND_REMOVE);
+            } catch (Exception ignored) {
+            }
+            stopSelf();
+        }
+        super.onTaskRemoved(rootIntent);
+    }
+
     @Override
     public void onDestroy() {
         detachBackgroundOwner();
