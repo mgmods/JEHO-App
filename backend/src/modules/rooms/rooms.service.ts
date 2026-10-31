@@ -89,13 +89,9 @@ function agencyVisualBannerTier(totalDiamonds: number): number {
   if (d >= 10_000) return 2;
   return 1;
 }
-/** Personal empty live rooms auto-end after this many minutes (owner-away / ghost rooms). */
-const DEFAULT_PERSONAL_EMPTY_CLOSE_MINUTES = 30;
-
 @Injectable()
 export class RoomsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(RoomsService.name);
-  private personalEmptySweepTimer: ReturnType<typeof setInterval> | null = null;
   private chatAutoClearTimer: ReturnType<typeof setInterval> | null = null;
   private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
   private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
@@ -241,14 +237,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         }`,
       );
     }
-    // Personal rooms: end live if nobody is in (host away + empty) for ~30 minutes.
-    this.personalEmptySweepTimer = setInterval(() => {
-      void this.sweepEmptyPersonalRooms().catch((err) =>
-        this.log.warn(
-          `personal empty sweep: ${err instanceof Error ? err.message : String(err)}`,
-        ),
-      );
-    }, 60_000);
+    // Personal live rooms remain open until the host or authorized staff explicitly ends them.
     // Auto-clear public chat for rooms with chatAutoClearMinutes > 0.
     this.chatAutoClearTimer = setInterval(() => {
       void this.sweepAutoChatClear().catch((err) =>
@@ -260,10 +249,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy() {
-    if (this.personalEmptySweepTimer) {
-      clearInterval(this.personalEmptySweepTimer);
-      this.personalEmptySweepTimer = null;
-    }
     if (this.chatAutoClearTimer) {
       clearInterval(this.chatAutoClearTimer);
       this.chatAutoClearTimer = null;
@@ -321,65 +306,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       room.emptySince = new Date();
       await this.roomsRepo.save(room);
     }
-  }
-
-  /** End personal lives that have been fully empty for the configured window. */
-  async sweepEmptyPersonalRooms() {
-    const minutes = await this.numberSetting(
-      'rooms.personal_empty_close_minutes',
-      DEFAULT_PERSONAL_EMPTY_CLOSE_MINUTES,
-    );
-    const cutoff = new Date(Date.now() - Math.max(5, minutes) * 60_000);
-    const candidates = await this.roomsRepo
-      .createQueryBuilder('room')
-      .where('room.activeHostId IS NOT NULL')
-      .andWhere('room.status != :closed', { closed: RoomStatus.CLOSED })
-      .andWhere('room.agencyId IS NULL')
-      .andWhere("(room.roomKind IS NULL OR room.roomKind = :std)", {
-        std: RoomKind.STANDARD,
-      })
-      .getMany();
-
-    let closed = 0;
-    for (const room of candidates) {
-      if (!this.isPersonalLiveRoom(room)) continue;
-      const presence = await this.countLivePresence(room.id);
-      if (presence > 0) {
-        if (room.emptySince) {
-          room.emptySince = null;
-          await this.roomsRepo.save(room);
-        }
-        continue;
-      }
-      if (!room.emptySince) {
-        room.emptySince = new Date();
-        await this.roomsRepo.save(room);
-        continue;
-      }
-      if (room.emptySince > cutoff) continue;
-      await this.endLiveSession(room);
-      this.realtimeGateway.emitToRoom(room.id, 'room:event', {
-        roomId: room.id,
-        event: 'room:auto_closed',
-        payload: {
-          roomId: room.id,
-          reason: 'personal_empty_timeout',
-          emptyMinutes: minutes,
-        },
-        at: new Date().toISOString(),
-      });
-      closed += 1;
-      this.log.log(
-        `Auto-closed empty personal room ${room.id} after ${minutes}m idle`,
-      );
-    }
-    return { scanned: candidates.length, closed };
-  }
-
-  private async numberSetting(key: string, fallback: number): Promise<number> {
-    const row = await this.settingsRepo.findOne({ where: { key } });
-    const n = Number(row?.value);
-    return Number.isFinite(n) && n > 0 ? n : fallback;
   }
 
   private async boolSetting(key: string, fallback: boolean): Promise<boolean> {
