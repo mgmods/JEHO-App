@@ -11,6 +11,7 @@ import com.Dramizo.Series.util.ApiCall;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -21,6 +22,7 @@ public class GiftRepositoryImpl implements GiftRepository {
     private static final AtomicReference<GiftDtos.GiftList> MEMORY = new AtomicReference<>();
     private static final AtomicReference<List<GiftDtos.GiftCategoryDto>> MEMORY_CATS =
             new AtomicReference<>();
+    private static final AtomicBoolean REFRESH_IN_FLIGHT = new AtomicBoolean(false);
     private static volatile long memoryAt;
     private static final long MEMORY_SOFT_TTL_MS = 10 * 60_000L;
 
@@ -36,7 +38,13 @@ public class GiftRepositoryImpl implements GiftRepository {
 
     @Override
     public Result<GiftDtos.GiftList> getGifts() {
-        // Prefer a fresh network catalog; callers wanting instant UI use peekLocal first.
+        // Warm catalog opens instantly; refresh it off the caller thread for the next open.
+        GiftDtos.GiftList mem = MEMORY.get();
+        if (mem != null && !mem.isEmpty()
+                && System.currentTimeMillis() - memoryAt < MEMORY_SOFT_TTL_MS) {
+            refreshInBackground();
+            return Result.ok(copyList(mem));
+        }
         Result<GiftDtos.GiftList> net = fetchNetwork();
         if (net.success && net.data != null && !net.data.isEmpty()) {
             return net;
@@ -48,6 +56,21 @@ public class GiftRepositoryImpl implements GiftRepository {
         return net.success && net.data != null
                 ? net
                 : Result.err(net.error != null ? net.error : "لا توجد هدايا");
+    }
+
+    private void refreshInBackground() {
+        if (!REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        try {
+            io.execute(() -> {
+                try {
+                    fetchNetwork();
+                } finally {
+                    REFRESH_IN_FLIGHT.set(false);
+                }
+            });
+        } catch (RuntimeException rejected) {
+            REFRESH_IN_FLIGHT.set(false);
+        }
     }
 
     @Override
