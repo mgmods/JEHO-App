@@ -12451,7 +12451,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         roomJoinLoadingDismissed = false;
         showRoomJoinLoading();
-        viewModel.join(targetRoomId, password);
+        // Adopt the Home/Search prefetch when a singleTask room is hopped in place.
+        // Otherwise the prefetch runs unused and this issues a second HTTP join.
+        RoomDtos.JoinRoomResult prefetched = RoomJoinPrefetch.takeReady(targetRoomId);
+        if (prefetched != null) {
+            viewModel.restoreLocalSession(prefetched, prefetched.room);
+        } else if (RoomJoinPrefetch.isInFlight(targetRoomId)) {
+            final String expectedRoomId = targetRoomId;
+            RoomJoinPrefetch.await(expectedRoomId, (session, err) -> {
+                if (isFinishing() || isDestroyed() || exiting
+                        || !expectedRoomId.equals(roomId)) return;
+                if (session != null) {
+                    viewModel.restoreLocalSession(session, session.room);
+                } else {
+                    // Soft prefetch failure: preserve the normal join fallback.
+                    viewModel.join(expectedRoomId, password);
+                }
+            });
+        } else {
+            viewModel.join(targetRoomId, password);
+        }
         // hoppingRoom stays true until the new session arrives (see session observer).
     }
 
