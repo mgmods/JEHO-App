@@ -12066,7 +12066,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Waiting until onStop often causes SecurityException with microphone type.
         if (!exiting && !isChangingConfigurations()
                 && roomId != null && !roomId.isEmpty()
-                && pendingSession != null) {
+                && (pendingSession != null
+                    || ActiveRoomSession.get().canResumeUi(roomId))) {
             ensuringRoomKeepAlive(true);
         }
         super.onUserLeaveHint();
@@ -12082,9 +12083,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.webHostSignal.pauseMotion();
         }
         stopMusicDiscAnimation();
+        // A resumed LiveKit room may have its session only in ActiveRoomSession.
+        // Do not treat a missing Activity field as a real leave: the selected RTC
+        // provider may still own the live connection and the user's occupied seat.
         boolean keepAlive = !exiting && !isChangingConfigurations()
                 && roomId != null && !roomId.isEmpty()
-                && pendingSession != null;
+                && (minimizing || pendingSession != null
+                    || ActiveRoomSession.get().canResumeUi(roomId));
         if (keepAlive) {
             // Keep a durable copy of our seat roster before the UI/session can be refreshed
             // by a partial server response while minimized. Never send a seat leave here.
