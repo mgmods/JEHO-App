@@ -145,6 +145,7 @@ export class Room {
   @Column({ type: 'varchar', length: 16, default: RoomKind.STANDARD })
   roomKind: RoomKind;
 
+  /** Personal and agency room identities stay stored until the host or staff explicitly closes them. */
   @Column({ type: 'boolean', default: false })
   isPersistent: boolean;
 
@@ -156,9 +157,8 @@ export class Room {
   liveSessionStartedAt: Date | null;
 
   /**
-   * Personal rooms only: first moment the live room had zero presence
-   * (no seated users, no live sessions, no sockets). Cleared when someone returns.
-   * After ~30 minutes the idle sweeper ends the stream permanently.
+   * Legacy idle marker. Persistent personal rooms do not use this field to end
+   * a live session; disconnects and empty rooms must not close the room.
    */
   @Column({ type: 'timestamptz', nullable: true })
   emptySince: Date | null;
