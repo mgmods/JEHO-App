@@ -115,7 +115,7 @@ async function load() {
     for (const item of medals.value) {
       if (duration[item.id] === undefined) duration[item.id] = 0
       if (recipient[item.id] === undefined) recipient[item.id] = ''
-      if (!hiddenTask[item.id]) hiddenTask[item.id] = {
+      hiddenTask[item.id] = {
         enabled: !!item.hiddenTaskEnabled, event: item.hiddenTaskEvent || 'gift',
         target: Number(item.hiddenTaskTarget) || 1, days: Number(item.hiddenTaskDays) || 0,
       }
