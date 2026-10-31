@@ -14451,7 +14451,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{0xFF7660B5, 0xFF39285F});
         minimizeBg.setCornerRadius(dp(16));
-        minimizeBg.setStroke(dp(1.5f), 0xFFB7A8F0);
+        minimizeBg.setStroke(dp(2), 0xFFB7A8F0);
         minimize.setBackground(minimizeBg);
         minimize.setElevation(dp(4));
         LinearLayout.LayoutParams minimizeLp = new LinearLayout.LayoutParams(dp(48), dp(44));
@@ -14469,7 +14469,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{0xFFFF5578, 0xFFB8144B});
         closeBg.setCornerRadius(dp(16));
-        closeBg.setStroke(dp(1.5f), 0xFFFFB0C1);
+        closeBg.setStroke(dp(2), 0xFFFFB0C1);
         close.setBackground(closeBg);
         close.setElevation(dp(4));
         topControls.addView(close, new LinearLayout.LayoutParams(dp(48), dp(44)));
