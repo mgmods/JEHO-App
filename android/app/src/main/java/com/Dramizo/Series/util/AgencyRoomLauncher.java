@@ -51,6 +51,12 @@ public final class AgencyRoomLauncher {
                 Intent i = new Intent(activity, VoiceRoomActivity.class);
                 i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, opened.data.room.id);
                 i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, true);
+                if (opened.data.room.displayRoomId != null
+                        && !opened.data.room.displayRoomId.trim().isEmpty()) {
+                    i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID,
+                            opened.data.room.displayRoomId.trim());
+                }
+                i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY, true);
                 activity.startActivity(i);
             });
         });
