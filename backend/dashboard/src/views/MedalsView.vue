@@ -18,6 +18,18 @@
           <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" :disabled="uploading" @change="uploadImage" />
         </label>
         <div v-if="form.imageUrl" class="medal-preview"><img :src="form.imageUrl" alt="معاينة المدالية" @error="previewBroken = true" @load="previewBroken = false" /><span v-if="previewBroken">تعذر تحميل الصورة</span></div>
+        <div class="hidden-task-config wide">
+          <h3>مهمة سرّية تمنح المدالية تلقائياً</h3>
+          <p>لا تظهر المهمة أو التقدم للمستخدم. السيرفر يمنح المدالية فور اكتمال الشرط.</p>
+          <label class="check-row"><input v-model="form.hiddenTaskEnabled" type="checkbox" /> تفعيل المهمة السرّية</label>
+          <label>نوع النشاط
+            <select v-model="form.hiddenTaskEvent" class="form-select">
+              <option value="gift">إرسال هدايا</option><option value="rooms">دخول غرف صوتية</option><option value="mic">الجلوس على الميكروفون</option><option value="follow">متابعة مستخدمين</option><option value="recharge">الشحن</option><option value="game">لعب الألعاب</option><option value="win">الفوز بالألعاب</option><option value="chat">المحادثات</option><option value="checkin">الحضور اليومي</option><option value="ad">مشاهدة الإعلانات</option>
+            </select>
+          </label>
+          <label>العدد المطلوب<input v-model.number="form.hiddenTaskTarget" class="form-control" type="number" min="1" max="1000000000" /></label>
+          <label>مدة المدالية بالأيام<input v-model.number="form.hiddenTaskDays" class="form-control" type="number" min="0" max="3650" /><small>0 = دائمة</small></label>
+        </div>
         <label>الترتيب<input v-model.number="form.sortOrder" class="form-control" type="number" min="0" /></label>
         <label class="check-row"><input v-model="form.isAnimated" type="checkbox" /> المدالية متحركة</label>
         <button class="btn btn-success wide submit-btn" type="submit" :disabled="saving || uploading">{{ saving ? 'جارٍ الحفظ…' : 'حفظ المدالية' }}</button>
@@ -39,6 +51,19 @@
         </div>
         <h3>{{ medal.name }}</h3>
         <p class="description">{{ medal.description || 'مدالية مميزة لحساب المستخدم' }}</p>
+        <div class="hidden-task-card">
+          <h4>المهمة السرّية لهذه المدالية</h4>
+          <label class="check-row"><input v-model="hiddenTask[medal.id].enabled" type="checkbox" /> تفعيل المنح التلقائي</label>
+          <label>النشاط
+            <select v-model="hiddenTask[medal.id].event" class="form-select">
+              <option value="gift">إرسال هدايا</option><option value="rooms">دخول غرف صوتية</option><option value="mic">الجلوس على الميكروفون</option><option value="follow">متابعة مستخدمين</option><option value="recharge">الشحن</option><option value="game">لعب الألعاب</option><option value="win">الفوز بالألعاب</option><option value="chat">المحادثات</option><option value="checkin">الحضور اليومي</option><option value="ad">مشاهدة الإعلانات</option>
+            </select>
+          </label>
+          <label>العدد المطلوب<input v-model.number="hiddenTask[medal.id].target" class="form-control" type="number" min="1" /></label>
+          <label>مدة المدالية بالأيام<input v-model.number="hiddenTask[medal.id].days" class="form-control" type="number" min="0" max="3650" /><small>0 = دائمة</small></label>
+          <button class="btn btn-outline-success w-100" type="button" :disabled="busyId === medal.id" @click="saveHiddenTask(medal)">حفظ المهمة السرّية</button>
+          <p class="secret-note">هذه المهمة مخفية تماماً عن المستخدم، والمنح تلقائي دون زر استلام.</p>
+        </div>
         <div class="gift-box">
           <label>رقم المستخدم أو ID العام<input v-model.trim="recipient[medal.id]" class="form-control" placeholder="أدخل ID المستخدم" /></label>
           <label>مدة الإهداء
@@ -75,7 +100,8 @@ const busyId = ref('')
 const previewBroken = ref(false)
 const recipient = reactive({})
 const duration = reactive({})
-const form = reactive({ name: '', description: '', imageUrl: '', sortOrder: 0, isAnimated: false })
+const hiddenTask = reactive({})
+const form = reactive({ name: '', description: '', imageUrl: '', sortOrder: 0, isAnimated: false, hiddenTaskEnabled: false, hiddenTaskEvent: 'gift', hiddenTaskTarget: 1, hiddenTaskDays: 7 })
 
 function unwrap(data) { return data?.data?.data ?? data?.data ?? data ?? {} }
 async function load() {
@@ -89,6 +115,10 @@ async function load() {
     for (const item of medals.value) {
       if (duration[item.id] === undefined) duration[item.id] = 0
       if (recipient[item.id] === undefined) recipient[item.id] = ''
+      if (!hiddenTask[item.id]) hiddenTask[item.id] = {
+        enabled: !!item.hiddenTaskEnabled, event: item.hiddenTaskEvent || 'gift',
+        target: Number(item.hiddenTaskTarget) || 1, days: Number(item.hiddenTaskDays) || 0,
+      }
     }
   } catch (e) { error.value = e?.message || 'تعذر تحميل المداليات' }
   finally { loading.value = false }
@@ -115,13 +145,33 @@ async function createMedal() {
       name: form.name, description: form.description, imageUrl: form.imageUrl,
       category: 'general', awardType: 'manual', isActive: true,
       isAnimated: form.isAnimated, sortOrder: Number(form.sortOrder) || 0,
+      hiddenTaskEnabled: form.hiddenTaskEnabled, hiddenTaskEvent: form.hiddenTaskEvent,
+      hiddenTaskTarget: Math.max(1, Number(form.hiddenTaskTarget) || 1),
+      hiddenTaskDays: Math.max(0, Math.min(3650, Number(form.hiddenTaskDays) || 0)),
     })
     if (err) throw new Error(err.message || 'تعذر حفظ المدالية')
     success.value = 'تم حفظ المدالية بنجاح.'
-    Object.assign(form, { name: '', description: '', imageUrl: '', sortOrder: 0, isAnimated: false })
+    Object.assign(form, { name: '', description: '', imageUrl: '', sortOrder: 0, isAnimated: false, hiddenTaskEnabled: false, hiddenTaskEvent: 'gift', hiddenTaskTarget: 1, hiddenTaskDays: 7 })
     await load()
   } catch (e) { error.value = e?.message || 'تعذر حفظ المدالية' }
   finally { saving.value = false }
+}
+async function saveHiddenTask(medal) {
+  const config = hiddenTask[medal.id]
+  if (!config) return
+  busyId.value = medal.id; error.value = ''; success.value = ''
+  try {
+    const { error: err } = await medalsApi.update(medal.id, {
+      hiddenTaskEnabled: !!config.enabled,
+      hiddenTaskEvent: config.event,
+      hiddenTaskTarget: Math.max(1, Math.floor(Number(config.target) || 1)),
+      hiddenTaskDays: Math.max(0, Math.min(3650, Math.floor(Number(config.days) || 0))),
+    })
+    if (err) throw new Error(err.message || 'تعذر حفظ المهمة السرّية')
+    success.value = config.enabled ? 'تم حفظ المهمة السرّية وتفعيل المنح التلقائي.' : 'تم إيقاف المهمة السرّية.'
+    await load()
+  } catch (e) { error.value = e?.message || 'تعذر حفظ المهمة السرّية' }
+  finally { busyId.value = '' }
 }
 async function giftOne(medal) {
   const userId = String(recipient[medal.id] || '').trim()
@@ -178,6 +228,11 @@ onMounted(load)
 .section-heading h2 { font-size: 1.15rem; font-weight: 800; margin:0 0 5px; }
 .section-heading p { color: #a8b1c5; margin:0; font-size:.9rem; }
 .heading-icon { width:48px;height:48px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(135deg,#20b26b,#117b4b);font-size:1.35rem; }
+.hidden-task-config,.hidden-task-card { grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:15px;border:1px solid rgba(124,226,173,.25);border-radius:14px;background:rgba(18,95,61,.12); }
+.hidden-task-config h3,.hidden-task-config p,.hidden-task-card h4,.secret-note { grid-column:1/-1;margin:0; }
+.hidden-task-config h3,.hidden-task-card h4 { color:#7ce2ad;font-size:.98rem;font-weight:800; }
+.hidden-task-config p,.secret-note,.hidden-task-config small,.hidden-task-card small { color:#a8b1c5;font-size:.8rem; }
+.hidden-task-card { margin-top:12px; }
 .form-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:end; }
 .form-grid label,.gift-box label { display:flex;flex-direction:column;gap:7px;font-size:.88rem;font-weight:700;color:#dce4f2; }
 .form-grid .wide { grid-column:1/-1; }
