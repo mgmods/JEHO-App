@@ -658,15 +658,22 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       return saved;
     });
 
-    const full = await this.msgRepo.findOne({
-      where: { id: message.id },
-      relations: ['sender', 'sender.profile', 'replyTo'],
-    });
-    const [senderVipMap, senderRanks] = await Promise.all([this.vipMapForUsers([senderId]), this.displayRankMapForUsers([senderId])]);
+    // Fetch the message decorations and peer list concurrently after commit.
+    // These are independent reads; serial awaits added avoidable latency to every send.
+    const [full, peers, paidTransaction] = await Promise.all([
+      this.msgRepo.findOne({
+        where: { id: message.id },
+        relations: ['sender', 'sender.profile', 'replyTo'],
+      }),
+      this.partRepo.find({ where: { conversationId }, relations: ['user'] }),
+      this.dataSource.getRepository(WalletTransaction).findOne({
+        where: { userId: senderId, referenceType: 'paid_message', referenceId: message.id },
+      }),
+    ]);
+    const [senderVipMap, senderRanks] = await Promise.all([
+      this.vipMapForUsers([senderId]), this.displayRankMapForUsers([senderId]),
+    ]);
     const mapped: any = this.mapMessage(full || message, senderVipMap.get(senderId) ?? 0, senderRanks.get(senderId));
-    const paidTransaction = await this.dataSource.getRepository(WalletTransaction).findOne({
-      where: { userId: senderId, referenceType: 'paid_message', referenceId: message.id },
-    });
     if (paidTransaction) {
       const paidMetadata = (paidTransaction.metadata || {}) as Record<string, unknown>;
       mapped.paidCoins = Math.abs(Number(paidTransaction.amount) || 0);
@@ -674,47 +681,34 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       mapped.replyDeadlineAt = new Date(new Date(message.createdAt).getTime() + Math.max(0, Number(paidMetadata.refundWindowMinutes ?? 30)) * 60_000).toISOString();
     }
 
-    const peers = await this.partRepo.find({
-      where: { conversationId },
-      relations: ['user'],
-    });
-    for (const p of peers) {
-      const viewing =
-        p.userId !== senderId &&
-        this.realtime &&
-        (await this.realtime.isUserInConversation(p.userId, conversationId));
-
+    // Deliver to both participants concurrently instead of waiting for each socket
+    // presence check and unread update in sequence.
+    await Promise.all(peers.map(async (p) => {
+      const viewing = p.userId !== senderId && this.realtime
+        ? await this.realtime.isUserInConversation(p.userId, conversationId)
+        : false;
       if (p.userId !== senderId && !viewing) {
         await this.partRepo.increment({ id: p.id }, 'unreadCount', 1);
         p.unreadCount = Number(p.unreadCount || 0) + 1;
       } else if (p.userId !== senderId && viewing) {
-        // Actively viewing this thread — mark read instantly for sender ticks.
         const readAt = new Date();
         await this.partRepo.update({ id: p.id }, { unreadCount: 0, lastReadAt: readAt });
         p.unreadCount = 0;
         p.lastReadAt = readAt;
         this.realtime?.emitToUser(senderId, 'chat:read', {
-          conversationId,
-          userId: p.userId,
-          readerId: p.userId,
-          lastReadAt: readAt.toISOString(),
-          at: readAt.toISOString(),
+          conversationId, userId: p.userId, readerId: p.userId,
+          lastReadAt: readAt.toISOString(), at: readAt.toISOString(),
         });
       }
-
       this.realtime?.emitToUser(p.userId, 'chat:message', {
-        conversationId,
-        message: mapped,
-        at: new Date().toISOString(),
+        conversationId, message: mapped, at: new Date().toISOString(),
       });
       this.realtime?.emitToUser(p.userId, 'chat:conversation:updated', {
-        conversationId,
-        lastMessage: mapped,
+        conversationId, lastMessage: mapped,
         unreadCount: p.userId === senderId ? 0 : Number(p.unreadCount || 0),
         at: new Date().toISOString(),
       });
-
-    }
+    }));
 
     // New-male ↔ female host chat task progress (≥2 min rounds).
     try {
