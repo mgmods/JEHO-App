@@ -502,7 +502,7 @@ public class ProfileActivity extends ThemedActivity {
             }
 
             if (user.coverUrl != null && !user.coverUrl.isEmpty()) {
-                AvatarImageLoader.loadMedia(binding.imgCover, user.coverUrl,
+                com.Dramizo.Series.util.AvatarImageLoader.loadMedia(binding.imgCover, user.coverUrl,
                         ImagePlaceholder.cover());
             } else {
                 binding.imgCover.setImageResource(ImagePlaceholder.cover());
