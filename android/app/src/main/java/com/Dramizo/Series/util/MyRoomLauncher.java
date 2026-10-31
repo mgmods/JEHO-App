@@ -43,7 +43,7 @@ public final class MyRoomLauncher {
             if (listed.success && listed.data != null && listed.data.items != null) {
                 RoomDtos.RoomDto owned = MyRoomCardBinder.findOwnedPersonal(listed.data.items, myId);
                 if (owned != null && owned.id != null && !owned.id.isEmpty()) {
-                    activity.runOnUiThread(() -> enter(activity, owned.id));
+                    activity.runOnUiThread(() -> enter(activity, owned));
                     return;
                 }
             }
@@ -59,16 +59,21 @@ public final class MyRoomLauncher {
                             Toast.LENGTH_LONG).show();
                     return;
                 }
-                enter(activity, created.data.room.id);
+                enter(activity, created.data.room);
             });
         });
     }
 
-    private static void enter(@NonNull Activity activity, @NonNull String roomId) {
+    private static void enter(@NonNull Activity activity, @NonNull RoomDtos.RoomDto room) {
+        String roomId = room.id;
         RoomJoinPrefetch.begin(activity, roomId, null);
         Intent i = new Intent(activity, VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
         i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, true);
+        if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
+            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID, room.displayRoomId.trim());
+        }
+        i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY, false);
         activity.startActivity(i);
     }
 
