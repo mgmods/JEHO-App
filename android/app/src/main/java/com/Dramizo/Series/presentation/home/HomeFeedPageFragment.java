@@ -57,7 +57,8 @@ public class HomeFeedPageFragment extends Fragment {
         recycler.setClipToPadding(false);
         recycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
         recycler.setItemAnimator(null);
-        recycler.setItemViewCacheSize(20);
+        // Keep four rows of recycled room cards warm without pinning 20 image-heavy holders.
+        recycler.setItemViewCacheSize(8);
         float d = getResources().getDisplayMetrics().density;
         // Mikoo fragment_home_live_list: paddingStart=3, paddingEnd=10
         recycler.setPadding((int) (3 * d), (int) (10 * d), (int) (10 * d), (int) (96 * d));
