@@ -1252,6 +1252,40 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
+  /**
+   * First-paint room decoration. The initial join must not issue per-user cosmetic
+   * ownership/meta queries (up to five extra DB round-trips per seat). Use the
+   * profile's already-equipped visual fields and batched VIP/rank/name-style maps;
+   * the normal detail refresh performs the full ownership verification afterward.
+   */
+  private attachFrameFast(
+    user: any,
+    vipLevel = 0,
+    displayRank?: Record<string, unknown> | null,
+    nameStyle?: Record<string, unknown> | null,
+  ) {
+    if (!user) return null;
+    const profile = user.profile || {};
+    const level = Number(vipLevel || user.vipLevel || 0);
+    const rawVip = profile.vipBadgeUrl ?? user.vipBadgeUrl ?? null;
+    return {
+      ...user,
+      country: profile.country ?? user.country ?? null,
+      hostBadgeUrl: profile.hostBadgeUrl ?? user.hostBadgeUrl ?? null,
+      hostBadgeMeta: null,
+      // Static VIP art is supplied through the fixed head/tou fields below.
+      vipBadgeUrl: isStaticVipTouUrl(rawVip) ? null : rawVip,
+      vipHeadUrl: fixedVipHeadUrl(level),
+      vipTouUrl: fixedVipFrameUrl(level),
+      levelBadgeUrl: profile.levelBadgeUrl ?? user.levelBadgeUrl ?? null,
+      roomCardUrl: profile.roomCardUrl ?? user.roomCardUrl ?? null,
+      vipLevel: level,
+      nameStyle: nameStyle || null,
+      ...(displayRank || {}),
+      profile: undefined,
+    };
+  }
+
   private async attachFrame(user: any, vipLevel = 0, displayRank?: Record<string, unknown> | null, nameStyle?: Record<string, unknown> | null) {
     if (!user) return null;
     const profile = user.profile || {};
@@ -1942,9 +1976,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       ]);
       const fastSeats = await Promise.all((room.seats || []).map(async (seat: any) => {
         const uid = seat?.userId || seat?.user?.id;
-        return { ...seat, user: await this.attachFrame(seat.user, fastVipMap.get(uid) || 0, fastRanks.get(uid) || null, fastNameStyles.get(uid) || null) };
+        return { ...seat, user: this.attachFrameFast(seat.user, fastVipMap.get(uid) || 0, fastRanks.get(uid) || null, fastNameStyles.get(uid) || null) };
       }));
-      const fastHost = await this.attachFrame(room.host, fastVipMap.get(room.hostId) || 0, fastRanks.get(room.hostId) || null, fastNameStyles.get(room.hostId) || null);
+      const fastHost = this.attachFrameFast(room.host, fastVipMap.get(room.hostId) || 0, fastRanks.get(room.hostId) || null, fastNameStyles.get(room.hostId) || null);
       return {
         ...safeRoom,
         host: fastHost,
