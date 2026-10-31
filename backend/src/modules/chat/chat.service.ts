@@ -507,10 +507,26 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
   }
 
   async send(conversationId: string, senderId: string, dto: SendMessageDto) {
-    await this.getConversation(conversationId, senderId);
-    const dmConversation = await this.convRepo.findOne({ where: { id: conversationId } });
-    if (dmConversation?.type === ConversationType.DIRECT) {
-      const participants = await this.partRepo.find({ where: { conversationId } });
+    // Sending needs membership + conversation type only. Calling getConversation()
+    // here used to decorate the entire peer profile (VIP/rank lookups) and then
+    // immediately re-query the same conversation/participants, delaying every send.
+    const [membership, dmConversation] = await Promise.all([
+      this.partRepo.findOne({
+        where: { conversationId, userId: senderId },
+        select: ['id'],
+      }),
+      this.convRepo.findOne({
+        where: { id: conversationId },
+        select: ['id', 'type'],
+      }),
+    ]);
+    if (!membership) throw new ForbiddenException('Not a participant');
+    if (!dmConversation) throw new NotFoundException('Conversation not found');
+    if (dmConversation.type === ConversationType.DIRECT) {
+      const participants = await this.partRepo.find({
+        where: { conversationId },
+        select: ['userId'],
+      });
       const recipient = participants.find((participant) => participant.userId !== senderId);
       if (recipient?.userId) await this.assertDirectMessageAllowed(senderId, recipient.userId);
     }
