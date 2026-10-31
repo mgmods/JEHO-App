@@ -190,17 +190,6 @@
                   :disabled="!tasksEnabled"
                 />
               </td>
-              <td style="min-width:190px">
-                <select v-model="row.rewardBadgeId" class="form-select form-select-sm" :disabled="!tasksEnabled">
-                  <option value="">بدون ميدالية</option>
-                  <option v-for="medal in medals" :key="medal.id" :value="medal.id">{{ medal.name }}</option>
-                </select>
-                <div v-if="row.rewardBadgeId" class="small text-muted mt-1">تُمنح وتُجهّز تلقائياً عند إكمال المهمة</div>
-              </td>
-              <td style="width:110px">
-                <input v-model.number="row.rewardBadgeDays" type="number" min="0" max="3650" class="form-control form-control-sm" :disabled="!tasksEnabled || !row.rewardBadgeId" title="0 = دائمة" />
-                <small class="text-muted">0 = دائمة</small>
-              </td>
               <td style="width:70px">
                 <input
                   v-model.number="row.rewardVipLevel"
@@ -529,7 +518,7 @@ async function load() {
   }
   const payload = data?.data ?? data ?? {}
   tasks.value = Array.isArray(payload.items)
-    ? payload.items.map((t) => ({ scope: 'global', roomId: '', agencyId: '', ...t, target: Number(t.target) || Number(String(t.type || '').match(/_(\d+)$/)?.[1] || 1), rewardBadgeId: t.rewardBadgeId || '', rewardBadgeDays: Number(t.rewardBadgeDays) || 0 }))
+    ? payload.items.map((t) => ({ scope: 'global', roomId: '', agencyId: '', ...t, target: Number(t.target) || Number(String(t.type || '').match(/_(\d+)$/)?.[1] || 1) }))
     : []
   if (typeof payload.enabled === 'boolean') {
     tasksEnabled.value = payload.enabled
@@ -564,8 +553,6 @@ function addRow() {
     rewardVipLevel: 0,
     rewardVipDays: 2,
     target: 1,
-    rewardBadgeId: '',
-    rewardBadgeDays: 0,
     type: 'custom',
     scope: 'global',
     roomId: '',
