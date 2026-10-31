@@ -206,6 +206,25 @@
                   </div>
                 </div>
               </div>
+              <div class="p-3 rounded border mt-3">
+                <h6 class="mb-2">اسم الحساب — لون وحركة وتوهج · VIP {{ planForm.level }}</h6>
+                <div class="form-check form-switch mb-3">
+                  <input id="vipNameStyleEnabled" v-model="planForm.visuals.nameStyle.enabled" class="form-check-input" type="checkbox" />
+                  <label class="form-check-label fw-semibold" for="vipNameStyleEnabled">تفعيل الاسم المميز لهذا المستوى</label>
+                </div>
+                <div v-if="planForm.visuals.nameStyle.enabled">
+                  <div class="row g-2">
+                    <div class="col-md-6"><label class="form-label">نوع اللون</label><select v-model="planForm.visuals.nameStyle.mode" class="form-select"><option value="solid">لون ثابت</option><option value="gradient">تدرج ثابت</option><option value="animated">تدرج متحرك</option></select></div>
+                    <div class="col-md-6" v-if="planForm.visuals.nameStyle.mode === 'animated'"><label class="form-label">حركة الاسم</label><select v-model="planForm.visuals.nameStyle.animation" class="form-select"><option value="rainbow">قوس قزح</option><option value="wave">موجة لونية</option><option value="pulse">نبض لوني</option></select></div>
+                    <div class="col-4"><label class="form-label">اللون الأول</label><input v-model="planForm.visuals.nameStyle.color1" type="color" class="form-control form-control-color w-100" /></div>
+                    <div class="col-4"><label class="form-label">اللون الثاني</label><input v-model="planForm.visuals.nameStyle.color2" type="color" class="form-control form-control-color w-100" /></div>
+                    <div class="col-4"><label class="form-label">اللون الثالث</label><input v-model="planForm.visuals.nameStyle.color3" type="color" class="form-control form-control-color w-100" /></div>
+                    <div class="col-md-6"><label class="form-label">سرعة الحركة</label><select v-model.number="planForm.visuals.nameStyle.speed" class="form-select"><option :value="0.6">سريعة</option><option :value="1">متوسطة</option><option :value="1.8">بطيئة</option></select></div>
+                    <div class="col-md-6"><label class="form-label">التوهج</label><select v-model="planForm.visuals.nameStyle.glow" class="form-select"><option :value="false">بدون توهج</option><option :value="true">مع توهج</option></select></div>
+                  </div>
+                  <div class="mt-3 p-3 rounded text-center bg-dark"><span class="name-style-preview" :class="{ 'name-style-preview-animated': planForm.visuals.nameStyle.mode === 'animated' }" :style="{ '--name-c1': planForm.visuals.nameStyle.color1, '--name-c2': planForm.visuals.nameStyle.color2, '--name-c3': planForm.visuals.nameStyle.color3, textShadow: planForm.visuals.nameStyle.glow ? '0 0 8px ' + planForm.visuals.nameStyle.color2 + ', 0 0 18px ' + planForm.visuals.nameStyle.color1 : 'none' }">{{ 'اسم الحساب · VIP ' + planForm.level }}</span><div class="small text-white-50 mt-2">معاينة شكل الاسم قبل الحفظ</div></div>
+                </div>
+              </div>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-ghost" @click="showPlan = false">{{ t('common.cancel') }}</button>
@@ -329,7 +348,7 @@ const showAssign = ref(false)
 const planForm = reactive({
   id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '',
   mysteriousManEnabled: false,
-  badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom' },
+  badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom', nameStyle: { enabled: false, mode: 'solid', animation: 'rainbow', color1: '#D946EF', color2: '#8B5CF6', color3: '#22D3EE', glow: false, speed: 1 } },
 })
 const uploadingVisual = ref('')
 const assignForm = reactive({ userId: '', planId: '' })
@@ -446,13 +465,14 @@ function openPlan(p = null) {
         nameplateUrl: planVisuals(p).nameplateUrl || '',
         mysteriousManFrameUrl: planVisuals(p).mysteriousManFrameUrl || '',
         mysteriousManFrameMode: planVisuals(p).mysteriousManFrameMode === 'user' ? 'user' : 'custom',
+        nameStyle: { enabled: false, mode: 'solid', animation: 'rainbow', color1: '#D946EF', color2: '#8B5CF6', color3: '#22D3EE', glow: false, speed: 1, ...(planVisuals(p).nameStyle || {}) },
       },
     })
   } else {
     Object.assign(planForm, {
       id: null, name: '', price: 99, durationDays: 30, level: plans.value.length + 1, benefitsText: '',
       mysteriousManEnabled: false,
-      badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom' },
+      badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom', nameStyle: { enabled: false, mode: 'solid', animation: 'rainbow', color1: '#D946EF', color2: '#8B5CF6', color3: '#22D3EE', glow: false, speed: 1 } },
     })
   }
   showPlan.value = true
@@ -583,6 +603,9 @@ onMounted(load)
 </script>
 
 <style scoped>
+  .name-style-preview { font-size: 1.35rem; font-weight: 800; background: linear-gradient(90deg, var(--name-c1), var(--name-c2), var(--name-c3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .name-style-preview-animated { background-size: 220% 100%; animation: vipNamePreview 2.8s linear infinite; }
+  @keyframes vipNamePreview { from { background-position: 0% 50%; } to { background-position: 220% 50%; } }
 .vip-card {
   --vip-accent: #00c9b1;
   border-color: color-mix(in srgb, var(--vip-accent) 35%, var(--border-color));
