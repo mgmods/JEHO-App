@@ -2586,6 +2586,22 @@ export class AdminService {
         // keep original value if JSON is invalid
       }
     }
+    if (key === 'app_theme') {
+      try {
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        const previous = await this.settingsRepo.findOne({ where: { key } });
+        let previousVersion = 0;
+        try { previousVersion = Math.max(0, Number(JSON.parse(previous?.value || '{}')?.version) || 0); }
+        catch { previousVersion = 0; }
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          parsed.version = previousVersion + 1;
+          parsed.updatedAt = new Date().toISOString();
+          nextValue = JSON.stringify(parsed);
+        }
+      } catch {
+        // Preserve the submitted value if a legacy theme row is not valid JSON.
+      }
+    }
     if (key === 'app_nav_icons') {
       try {
         const { sanitizeNavIconsConfig } = await import('../config/nav-icons.util');
