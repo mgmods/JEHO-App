@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Badge } from '../../database/entities/badge.entity';
 import { UserBadge } from '../../database/entities/user-badge.entity';
 import { User } from '../../database/entities/user.entity';
@@ -32,6 +32,7 @@ export class BadgesService {
     @InjectRepository(Follow) private readonly follows: Repository<Follow>,
     @InjectRepository(Wallet) private readonly wallets: Repository<Wallet>,
     @InjectRepository(UserProfile) private readonly profiles: Repository<UserProfile>,
+    private readonly dataSource: DataSource,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -168,6 +169,87 @@ export class BadgesService {
       `حصلت على ميدالية ${badge.name}`,
       { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
     )));
+  }
+
+  async isActiveForTask(badgeId: string): Promise<boolean> {
+    if (!badgeId) return false;
+    return !!(await this.badges.findOne({
+      where: { id: badgeId, isActive: true },
+      select: { id: true },
+    }));
+  }
+
+  /**
+   * Automatic task reward. A per-user/per-medal advisory lock prevents duplicate
+   * grants. The medal is pinned into the public profile showcase even if it was
+   * already owned, so completing the task always equips it automatically.
+   */
+  async grantForTask(userId: string, badgeId: string, durationDaysRaw = 0): Promise<boolean> {
+    const badge = await this.badges.findOne({ where: { id: badgeId, isActive: true } });
+    if (!badge || !userId) return false;
+
+    const durationDays = Math.max(0, Math.min(3650, Math.floor(Number(durationDaysRaw) || 0)));
+    const expiresAt = durationDays > 0
+      ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000)
+      : null;
+
+    const granted = await this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `task-medal:${userId}:${badgeId}`,
+      ]);
+      const existing = await manager.findOne(UserBadge, {
+        where: { userId, badgeId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      let newlyGranted = false;
+      if (!existing || (existing.expiresAt && new Date(existing.expiresAt).getTime() <= Date.now())) {
+        if (existing) {
+          existing.grantedAt = new Date();
+          existing.grantedByAdminId = null;
+          existing.source = 'task';
+          existing.expiresAt = expiresAt;
+          await manager.save(existing);
+        } else {
+          await manager.save(manager.create(UserBadge, {
+            userId,
+            badgeId,
+            grantedByAdminId: null,
+            source: 'task',
+            expiresAt,
+          }));
+        }
+        newlyGranted = true;
+      }
+
+      let profile = await manager.findOne(UserProfile, {
+        where: { userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!profile) profile = manager.create(UserProfile, { userId });
+      const displayed = Array.isArray(profile.displayedMedalIds) ? profile.displayedMedalIds : [];
+      profile.displayedMedalIds = [
+        badgeId,
+        ...displayed.filter((id) => id !== badgeId),
+      ].slice(0, 5);
+      await manager.save(profile);
+      return newlyGranted;
+    });
+
+    if (granted) {
+      try {
+        await this.notifications.notifyUser(
+          userId,
+          NotificationType.SYSTEM,
+          'ميدالية جديدة! 🏅',
+          `أكملت المهمة وحصلت تلقائياً على ميدالية ${badge.name}`,
+          { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, source: 'task' },
+        );
+      } catch (error) {
+        // Notification delivery must never roll back a successfully granted medal.
+        console.error('[Badges] Task medal notification failed', error instanceof Error ? error.message : String(error));
+      }
+    }
+    return granted;
   }
 
   listAdmin() {

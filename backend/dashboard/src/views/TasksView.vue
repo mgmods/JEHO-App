@@ -114,9 +114,12 @@
               <th>{{ t('common.coins') }}</th>
               <th>المكافأة التجميلية</th>
               <th>أيام</th>
+              <th>ميدالية المهمة</th>
+              <th>مدة الميدالية (أيام)</th>
               <th>VIP</th>
               <th>أيام VIP</th>
-              <th>{{ t('common.type') }}</th>
+              <th>نوع الشرط</th>
+              <th>العدد المطلوب</th>
               <th>{{ t('common.scope') }}</th>
               <th>{{ t('tasks.scopeId') }}</th>
               <th></th>
@@ -187,6 +190,17 @@
                   :disabled="!tasksEnabled"
                 />
               </td>
+              <td style="min-width:190px">
+                <select v-model="row.rewardBadgeId" class="form-select form-select-sm" :disabled="!tasksEnabled">
+                  <option value="">بدون ميدالية</option>
+                  <option v-for="medal in medals" :key="medal.id" :value="medal.id">{{ medal.name }}</option>
+                </select>
+                <div v-if="row.rewardBadgeId" class="small text-muted mt-1">تُمنح وتُجهّز تلقائياً عند إكمال المهمة</div>
+              </td>
+              <td style="width:110px">
+                <input v-model.number="row.rewardBadgeDays" type="number" min="0" max="3650" class="form-control form-control-sm" :disabled="!tasksEnabled || !row.rewardBadgeId" title="0 = دائمة" />
+                <small class="text-muted">0 = دائمة</small>
+              </td>
               <td style="width:70px">
                 <input
                   v-model.number="row.rewardVipLevel"
@@ -205,7 +219,10 @@
                   :disabled="!tasksEnabled"
                 />
               </td>
-              <td><input v-model="row.type" class="form-control form-control-sm" :disabled="!tasksEnabled" /></td>
+              <td><input v-model="row.type" class="form-control form-control-sm" :disabled="!tasksEnabled" placeholder="gift / recharge / rooms..." /></td>
+              <td style="width:100px">
+                <input v-model.number="row.target" type="number" min="1" max="1000000000" class="form-control form-control-sm" :disabled="!tasksEnabled" />
+              </td>
               <td style="width:130px">
                 <select v-model="row.scope" class="form-select form-select-sm" :disabled="!tasksEnabled">
                   <option value="global">{{ t('common.global') }}</option>
@@ -306,7 +323,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { tasksApi, cosmeticsApi, dailyLoginRewardsApi } from '@/api'
+import { tasksApi, cosmeticsApi, dailyLoginRewardsApi, medalsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -328,6 +345,7 @@ const confirmMsg = ref('')
 const pendingRemoveIdx = ref(-1)
 const cosmetics = ref([])
 const cosmeticsLoading = ref(false)
+const medals = ref([])
 const dailyLoginEnabled = ref(true)
 const dailyLoginDays = ref([
   { day: 1, type: 'coins', amount: 100, label: 'عملات ذهبية' },
@@ -511,7 +529,7 @@ async function load() {
   }
   const payload = data?.data ?? data ?? {}
   tasks.value = Array.isArray(payload.items)
-    ? payload.items.map((t) => ({ scope: 'global', roomId: '', agencyId: '', ...t }))
+    ? payload.items.map((t) => ({ scope: 'global', roomId: '', agencyId: '', ...t, target: Number(t.target) || Number(String(t.type || '').match(/_(\\d+)$/)?.[1] || 1), rewardBadgeId: t.rewardBadgeId || '', rewardBadgeDays: Number(t.rewardBadgeDays) || 0 }))
     : []
   if (typeof payload.enabled === 'boolean') {
     tasksEnabled.value = payload.enabled
@@ -545,6 +563,9 @@ function addRow() {
     rewardCosmeticDays: 2,
     rewardVipLevel: 0,
     rewardVipDays: 2,
+    target: 1,
+    rewardBadgeId: '',
+    rewardBadgeDays: 0,
     type: 'custom',
     scope: 'global',
     roomId: '',
@@ -583,5 +604,16 @@ async function save() {
   }
 }
 
-onMounted(() => { load(); loadDailyLogin(); loadCosmetics() })
+async function loadMedals() {
+  const { data, error: err } = await medalsApi.list()
+  if (err) {
+    toast().danger('تعذر تحميل الميداليات لاختيار مكافأة المهمة: ' + err.message)
+    return
+  }
+  const payload = data?.data?.data ?? data?.data ?? data ?? []
+  medals.value = (Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [])
+    .filter((medal) => medal && medal.id && medal.isActive !== false)
+}
+
+onMounted(() => { load(); loadDailyLogin(); loadCosmetics(); loadMedals() })
 </script>

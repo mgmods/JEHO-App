@@ -20,6 +20,7 @@ import {
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { VipService } from '../vip/vip.service';
+import { BadgesService } from '../badges/badges.service';
 import {
   HOST_NEW_USER_CHAT,
   HOST_ROOM_INVITE_REWARD,
@@ -48,6 +49,12 @@ export type DailyTask = {
   /** Optional temporary VIP level. */
   rewardVipLevel?: number;
   rewardVipDays?: number;
+  /** Explicit completion count; falls back to the numeric suffix for legacy tasks. */
+  target?: number;
+  /** Optional existing dashboard medal awarded automatically when task progress reaches target. */
+  rewardBadgeId?: string;
+  /** Medal visibility duration in days; 0 means permanent. */
+  rewardBadgeDays?: number;
   type: string;
   /** Who sees/claims this task. host = female users only. */
   audience?: TaskAudience;
@@ -373,6 +380,7 @@ export class TasksService {
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(AgencyMember) private readonly members: Repository<AgencyMember>,
     private readonly dataSource: DataSource,
+    private readonly badges: BadgesService,
     @Optional() private readonly realtime?: RealtimeGateway,
     @Optional() private readonly cosmetics?: CosmeticsService,
     @Optional() private readonly vip?: VipService,
@@ -641,6 +649,7 @@ export class TasksService {
       throw new BadRequestException('قائمة المهام فارغة');
     }
     const normalized = tasks.map((t, i) => {
+      const type = String(t.type || 'custom').trim() || 'custom';
       const scope = (['global', 'room', 'agency'].includes(String(t.scope))
         ? t.scope
         : 'global') as TaskScope;
@@ -659,7 +668,10 @@ export class TasksService {
         ) || undefined,
         rewardVipLevel: Math.max(0, Math.floor(Number(t.rewardVipLevel) || 0)) || undefined,
         rewardVipDays: Math.max(0, Math.floor(Number(t.rewardVipDays) || 0)) || undefined,
-        type: String(t.type || 'custom').trim() || 'custom',
+        target: Math.min(1_000_000_000, Math.max(1, Math.floor(Number(t.target) || this.targetFor(type)))),
+        rewardBadgeId: String(t.rewardBadgeId || '').trim() || undefined,
+        rewardBadgeDays: Math.min(3650, Math.max(0, Math.floor(Number(t.rewardBadgeDays) || 0))),
+        type,
         audience,
         scope,
         roomId: scope === 'room' ? t.roomId || null : null,
@@ -674,6 +686,11 @@ export class TasksService {
     if (normalized.some((t) => !t.id || !t.title)) {
       throw new BadRequestException('كل مهمة تحتاج id وعنوان');
     }
+    for (const task of normalized) {
+      if (task.rewardBadgeId && !(await this.badges.isActiveForTask(task.rewardBadgeId))) {
+        throw new BadRequestException(`الميدالية المحددة للمهمة «${task.title}» غير موجودة أو غير مفعّلة`);
+      }
+    }
     let row = await this.settings.findOne({ where: { key: TASKS_KEY } });
     if (!row) row = this.settings.create({ key: TASKS_KEY, value: '[]' });
     row.value = JSON.stringify(normalized);
@@ -683,7 +700,9 @@ export class TasksService {
   }
 
   /** Parse target count from type suffix: rooms_1 → 1, gift_2 → 2, checkin → 1 */
-  targetFor(type: string): number {
+  targetFor(type: string, task?: DailyTask): number {
+    const configured = Math.floor(Number(task?.target) || 0);
+    if (Number.isFinite(configured) && configured > 0) return Math.min(1_000_000_000, configured);
     const m = String(type || '').match(/_(\d+)$/);
     if (m) return Math.max(1, parseInt(m[1], 10));
     return 1;
@@ -821,7 +840,7 @@ export class TasksService {
       const changes: Array<{ taskId: string; current: number; target: number }> = [];
       for (const task of matching) {
         if (claimed.includes(task.id)) continue;
-        const target = this.targetFor(task.type);
+        const target = this.targetFor(task.type, task);
         const current = Number(progress[task.id] || 0);
         const next = Math.min(target, current + amount);
         if (next !== current) {
@@ -843,12 +862,38 @@ export class TasksService {
     });
 
     if (updated.length) {
+      const completedTaskIds = new Set(
+        updated.filter((change) => change.current >= change.target).map((change) => change.taskId),
+      );
+      await this.awardTaskMedals(userId, matching.filter((task) => completedTaskIds.has(task.id)));
       this.realtime?.emitToUser(userId, 'task:progress', {
         event,
         context,
         changes: updated,
         at: new Date().toISOString(),
       });
+    }
+  }
+
+  /** Award configured task medals immediately and idempotently; claiming task points is not required. */
+  private async awardTaskMedals(userId: string, tasks: DailyTask[]) {
+    for (const task of tasks) {
+      const badgeId = String(task.rewardBadgeId || '').trim();
+      if (!badgeId) continue;
+      try {
+        await this.badges.grantForTask(
+          userId,
+          badgeId,
+          Math.max(0, Math.min(3650, Math.floor(Number(task.rewardBadgeDays) || 0))),
+        );
+      } catch (error) {
+        // Keep task progress successful; the next task refresh retries the medal grant.
+        console.error('[Tasks] Automatic medal grant failed', {
+          userId,
+          taskId: task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 
@@ -874,8 +919,12 @@ export class TasksService {
     });
     const claimed = await this.readClaims(userId);
     const progress = await this.readProgress(userId);
+    await this.awardTaskMedals(
+      userId,
+      tasks.filter((task) => !!task.rewardBadgeId && Number(progress[task.id] || 0) >= this.targetFor(task.type, task)),
+    );
     return tasks.map((t) => {
-      const target = this.targetFor(t.type);
+      const target = this.targetFor(t.type, t);
       const current = Math.min(target, Number(progress[t.id] || 0));
       const done = claimed.includes(t.id);
       const claimable = !done && current >= target;
@@ -934,7 +983,7 @@ export class TasksService {
       }
     }
     const progress = await this.readProgress(userId);
-    const target = this.targetFor(task.type);
+    const target = this.targetFor(task.type, task);
     const current = Number(progress[task.id] || 0);
     if (current < target) {
       throw new BadRequestException(

@@ -9,6 +9,7 @@ import { TasksService } from './tasks.service';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { CosmeticsModule } from '../cosmetics/cosmetics.module';
 import { VipModule } from '../vip/vip.module';
+import { BadgesModule } from '../badges/badges.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { VipModule } from '../vip/vip.module';
     RealtimeModule,
     CosmeticsModule,
     VipModule,
+    BadgesModule,
   ],
   controllers: [TasksController],
   providers: [TasksService],
