@@ -237,6 +237,24 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         }`,
       );
     }
+    // Personal rooms are durable room identities, not temporary live-session records.
+    // Repair older active personal rooms once at boot so a stale idle marker or a legacy
+    // non-persistent flag can never make them disappear after the host disconnects.
+    try {
+      await this.dataSource.query(`
+        UPDATE rooms
+           SET "isPersistent" = TRUE,
+               "emptySince" = NULL,
+               "activeHostId" = COALESCE("activeHostId", "hostId")
+         WHERE "agencyId" IS NULL
+           AND "roomKind" = $1
+           AND status <> $2
+           AND "hostId" IS NOT NULL
+      `, [RoomKind.STANDARD, RoomStatus.CLOSED]);
+    } catch (err) {
+      this.log.warn(`ensure persistent personal rooms: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
     // Personal live rooms remain open until the host or authorized staff explicitly ends them.
     // Auto-clear public chat for rooms with chatAutoClearMinutes > 0.
     this.chatAutoClearTimer = setInterval(() => {
@@ -293,7 +311,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
    */
   async syncPersonalRoomEmptyState(roomId: string) {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
-    if (!room || !this.isPersonalLiveRoom(room)) return;
+    if (!room || !this.isPersonalLiveRoom(room) || room.isPersistent) return;
     const presence = await this.countLivePresence(roomId);
     if (presence > 0) {
       if (room.emptySince) {
@@ -851,7 +869,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         activeHostId: hostId,
         liveSessionStartedAt: existing.liveSessionStartedAt || new Date(),
         emptySince: null,
-        isPersistent: false,
+        isPersistent: true,
         isPublic: true,
         accessMode: RoomAccessMode.FREE,
         entryFeeCoins: 0,
@@ -884,7 +902,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       activeHostId: hostId,
       status: RoomStatus.OPEN,
       roomKind: RoomKind.STANDARD,
-      isPersistent: false,
+      isPersistent: true,
       seatCount,
       topic: dto.topic || null,
       isPublic: true,
