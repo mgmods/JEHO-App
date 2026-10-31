@@ -28,6 +28,7 @@ import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.SeatReactionEmojis;
 import com.Dramizo.Series.util.StaffRoleHelper;
 import com.Dramizo.Series.util.StaffIdentityConfigCache;
+import com.Dramizo.Series.util.VipNameStyle;
 import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
@@ -298,6 +299,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && Objects.equals(a.user.hostBadgeUrl, b.user.hostBadgeUrl)
                 && Objects.equals(a.user.vipBadgeUrl, b.user.vipBadgeUrl)
                 && Objects.equals(a.user.levelBadgeUrl, b.user.levelBadgeUrl)
+                && Objects.equals(a.user.nameStyle, b.user.nameStyle)
                 && Objects.equals(a.user.hostBadgeMeta, b.user.hostBadgeMeta)
                 && a.user.level == b.user.level
                 && a.user.vipLevel == b.user.vipLevel;
@@ -657,6 +659,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.tvName.setText(seat.user.displayName != null
                         ? seat.user.displayName
                         : String.valueOf(displaySeatNo(seat)));
+                VipNameStyle.bind(holder.b.tvName, seat.user);
                 holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
                 AvatarCosmetics.bindAvatar(holder.b.imgAvatar, seat.user.avatarUrl);
                 try {
@@ -668,6 +671,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 // Seat hop race: userId set before nested user DTO arrives — keep self visible.
                 holder.b.tvName.setText(selfDisplayName != null && !selfDisplayName.isEmpty()
                         ? selfDisplayName : String.valueOf(displaySeatNo(seat)));
+                VipNameStyle.bind(holder.b.tvName, (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto) null);
                 holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
                 com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto stub =
                         new com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto();
