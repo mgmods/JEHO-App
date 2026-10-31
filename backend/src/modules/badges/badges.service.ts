@@ -166,7 +166,11 @@ export class BadgesService {
       if (!shouldGrant) continue;
       try {
         const granted = await this.grantForTask(userId, medal.id, medal.hiddenTaskDays, 'hidden_task', false);
-        if (granted) {
+        const alreadyOwned = !granted && !!(await this.userBadges.createQueryBuilder('ub')
+          .where('ub.userId = :userId AND ub.badgeId = :badgeId', { userId, badgeId: medal.id })
+          .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
+          .getOne());
+        if (granted || alreadyOwned) {
           const row = await this.dataSource.getRepository(AppSetting).findOne({ where: { key } });
           if (row?.value) {
             const state = JSON.parse(row.value);
