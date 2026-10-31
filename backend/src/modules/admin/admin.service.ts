@@ -1560,14 +1560,16 @@ export class AdminService {
       room.emptySince = null;
     } else if (disableSupport) {
       room.roomKind = RoomKind.STANDARD;
-      room.isPersistent = false;
+      // Personal rooms remain persistent even when they are no longer support rooms.
+      room.isPersistent = true;
     }
 
+    // Only agency/support rooms are forced public and free. Persistence alone
+    // must not disable the host's normal room lock/access settings.
     const lockedFree =
       !!room.agencyId ||
       room.roomKind === RoomKind.AGENCY ||
-      room.roomKind === RoomKind.SUPPORT ||
-      room.isPersistent;
+      room.roomKind === RoomKind.SUPPORT;
 
     if (lockedFree) {
       room.status = RoomStatus.OPEN;
