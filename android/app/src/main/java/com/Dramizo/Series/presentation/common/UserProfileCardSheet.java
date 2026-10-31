@@ -36,6 +36,7 @@ import com.Dramizo.Series.util.FlagImages;
 import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.HostSignalView;
 import com.Dramizo.Series.util.VipStyle;
+import com.Dramizo.Series.util.VipNameStyle;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
@@ -427,6 +428,7 @@ public final class UserProfileCardSheet {
                         tvName.setTag(null);
                         tvName.setText(displayName);
                     }
+                    VipNameStyle.bind(tvName, u);
                     GenderVerifiedBadge.bind(tvName, null, u.genderVerified);
                 }
                 bindGenderIcon(imgGender, u.gender);
