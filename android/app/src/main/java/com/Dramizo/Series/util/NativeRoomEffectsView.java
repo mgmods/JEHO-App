@@ -57,6 +57,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Transparent, touch-pass-through native renderer for room entries and gifts.
@@ -79,6 +81,11 @@ public final class NativeRoomEffectsView extends FrameLayout {
                     return Math.max(1, value.getByteCount() / 1024);
                 }
             };
+    /** Prevent duplicate downloads when the sheet and ViewModel warm the same catalog. */
+    private static final Set<String> PRELOAD_VIDEO_IN_FLIGHT =
+            ConcurrentHashMap.newKeySet();
+    private static final int MAX_PRELOAD_VIDEOS = 12;
+    private static final int MAX_PRELOAD_IMAGES = 24;
 
     private final Runnable scheduledFinish = this::finishActive;
     private final List<Animator> looseAnimators = new ArrayList<>();
@@ -1281,7 +1288,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
         return null;
     }
 
-    /** Warm gift media so send/play is instant for everyone in the room. */
+    /** Warm a small priority window; selected gifts outside it load on demand. */
     public static void preloadGiftUrls(Context context, @Nullable Iterable<String> urls) {
         if (context == null || urls == null) return;
         Context app = context.getApplicationContext();
@@ -1293,14 +1300,20 @@ public final class NativeRoomEffectsView extends FrameLayout {
             if (abs == null || abs.isEmpty()) continue;
             CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
             if (kind == CosmeticMedia.Kind.VIDEO) {
-                if (!videos.contains(abs)) videos.add(abs);
-            } else if (kind == CosmeticMedia.Kind.GIF
+                if (videos.size() < MAX_PRELOAD_VIDEOS
+                        && !videos.contains(abs)
+                        && peekGiftMp4Cache(app, abs) == null
+                        && PRELOAD_VIDEO_IN_FLIGHT.add(abs)) {
+                    videos.add(abs);
+                }
+            } else if ((kind == CosmeticMedia.Kind.GIF
                     || kind == CosmeticMedia.Kind.IMAGE
-                    || kind == CosmeticMedia.Kind.SVGA) {
-                if (!images.contains(abs)) images.add(abs);
+                    || kind == CosmeticMedia.Kind.SVGA)
+                    && images.size() < MAX_PRELOAD_IMAGES && !images.contains(abs)) {
+                images.add(abs);
             }
         }
-        // Videos first — limited concurrency so weak networks still finish the important ones.
+        // Two video downloads maximum across the app; duplicate sheet/ViewModel calls coalesce.
         final java.util.concurrent.atomic.AtomicInteger inFlight =
                 new java.util.concurrent.atomic.AtomicInteger(0);
         final java.util.concurrent.ConcurrentLinkedQueue<String> q =
@@ -1310,13 +1323,13 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 while (inFlight.get() < 2) {
                     String next = q.poll();
                     if (next == null) return;
-                    if (peekGiftMp4Cache(app, next) != null) continue;
                     inFlight.incrementAndGet();
                     final String url = next;
                     new Thread(() -> {
                         try {
                             cacheGiftMp4(app, url);
                         } finally {
+                            PRELOAD_VIDEO_IN_FLIGHT.remove(url);
                             inFlight.decrementAndGet();
                             run();
                         }
