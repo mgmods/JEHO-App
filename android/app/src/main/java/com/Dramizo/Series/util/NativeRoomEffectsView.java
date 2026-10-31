@@ -1313,7 +1313,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 images.add(abs);
             }
         }
-        // Two video downloads maximum across the app; duplicate sheet/ViewModel calls coalesce.
+        // Keep each catalog warm-up to two concurrent video downloads; duplicate URLs coalesce.
         final java.util.concurrent.atomic.AtomicInteger inFlight =
                 new java.util.concurrent.atomic.AtomicInteger(0);
         final java.util.concurrent.ConcurrentLinkedQueue<String> q =
