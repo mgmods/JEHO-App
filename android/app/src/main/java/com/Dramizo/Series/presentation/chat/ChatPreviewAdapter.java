@@ -188,6 +188,7 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
             displayName = displayName + "  ·  " + rankName.trim();
         }
         holder.b.tvTitle.setText(displayName);
+        com.Dramizo.Series.util.VipNameStyle.bind(holder.b.tvTitle, item.peer);
 
         boolean verified = item.peer != null && item.peer.genderVerified;
         if (holder.b.imgOfficial != null) {
