@@ -2160,6 +2160,22 @@ export class GiftsService implements OnModuleInit {
     };
   }
 
+  /**
+   * Serialize wallet mutations in a stable global order. Reciprocal/concurrent gifts
+   * previously locked sender first and receiver second, allowing A→B and B→A to
+   * deadlock. Transaction-scoped advisory locks are acquired by sorted user id
+   * before any wallet row lock; this also covers overlapping all-mic sends.
+   */
+  private async lockGiftWalletUsers(manager: any, userIds: Array<string | null | undefined>) {
+    const ids = [...new Set(userIds.map((id) => String(id || '').trim()).filter(Boolean))].sort();
+    for (const id of ids) {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        ['jeho:gift-wallet:' + id],
+      );
+    }
+  }
+
   async send(senderId: string, dto: SendGiftDto) {
     const selfGift = String(senderId) === String(dto.receiverId);
     const selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
@@ -2231,6 +2247,8 @@ export class GiftsService implements OnModuleInit {
     // The host payout and any agency bonus are independent credits.
 
     return this.dataSource.transaction(async (manager) => {
+      // Lock both accounts in deterministic order before taking row-level wallet locks.
+      await this.lockGiftWalletUsers(manager, [senderId, dto.receiverId]);
       const wallet = await manager.findOne(Wallet, {
         where: { userId: senderId },
         lock: { mode: 'pessimistic_write' },
@@ -2906,6 +2924,9 @@ export class GiftsService implements OnModuleInit {
     }
 
     return this.dataSource.transaction(async (manager) => {
+      // Lock every wallet participating in the split in sorted order. This prevents
+      // overlapping all-mic sends from acquiring the same wallets in opposite orders.
+      await this.lockGiftWalletUsers(manager, [senderId, ...receiverIds, roomHostId]);
       const wallet = await manager.findOne(Wallet, {
         where: { userId: senderId },
         lock: { mode: 'pessimistic_write' },
