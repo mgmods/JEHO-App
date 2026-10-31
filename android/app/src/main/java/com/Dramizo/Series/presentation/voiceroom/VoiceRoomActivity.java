@@ -15651,6 +15651,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (exiting || hoppingRoom) return;
         clearSeatRequestsUi();
         clearTopSupportersUi();
+        // A forced/final exit must discard this device's room-feed snapshot too.
+        // This is strictly local: never emit a room-wide chat clear or touch gift/wallet records.
+        clearRoomChatSession();
         exiting = true;
         minimizing = false;
         handler.removeCallbacks(refreshRunnable);
