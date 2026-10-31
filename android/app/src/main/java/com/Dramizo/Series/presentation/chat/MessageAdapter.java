@@ -45,6 +45,7 @@ import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.RoomShareCodec;
 import com.Dramizo.Series.util.VipStyle;
+import com.Dramizo.Series.util.VipNameStyle;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
@@ -632,6 +633,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
 
         holder.b.tvSender.setVisibility(View.GONE);
         holder.b.tvSender.setText(name);
+        VipNameStyle.bind(holder.b.tvSender, mine ? me : msg.sender);
 
         if (showAvatar && listener != null) {
             String clickUserId;
