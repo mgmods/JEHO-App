@@ -189,8 +189,18 @@ public class HomeFeedPageFragment extends Fragment {
             ((HomeFragment) parent).openVoiceRoomFromPage(room);
         } else if (room != null && room.id != null) {
             RecentRoomsStore.remember(requireContext(), room);
+            // Keep the standalone feed path as fast as the HomeFragment route:
+            // start the HTTP join before the large room Activity is inflated.
+            com.Dramizo.Series.util.RoomJoinPrefetch.begin(
+                    requireContext(), room.id, null);
             Intent i = new Intent(requireContext(), VoiceRoomActivity.class);
             i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, room.id);
+            if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
+                i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID,
+                        room.displayRoomId.trim());
+            }
+            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY,
+                    com.Dramizo.Series.util.RoomUiHelper.isAgencyRoom(room));
             startActivity(i);
         }
     }
