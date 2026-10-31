@@ -2101,7 +2101,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const ban = await this.bansRepo.findOne({ where: { roomId, userId } });
+    const [ban, existingAccess] = await Promise.all([
+      this.bansRepo.findOne({ where: { roomId, userId } }),
+      this.accessRepo.findOne({ where: { roomId, userId } }),
+    ]);
     if (ban && (!ban.expiresAt || ban.expiresAt > new Date())) {
       throw new ForbiddenException('You are banned from this room');
     }
@@ -2118,7 +2121,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       if (!ok) throw new ForbiddenException('Invalid room password');
     }
 
-    let priorAccess = await this.accessRepo.findOne({ where: { roomId, userId } });
+    let priorAccess = existingAccess;
     if (
       priorAccess?.grantType === RoomAccessGrant.SESSION &&
       priorAccess.expiresAt &&
