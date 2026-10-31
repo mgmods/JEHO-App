@@ -13062,6 +13062,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                 refreshLuckyToastButtonStyle();
                                 GlobalCelebrationToast.refreshStyleNow(VoiceRoomActivity.this);
                             });
+                        } else if ("app-theme".equals(scope)) {
+                            try {
+                                AppContainer container = ContainerProvider.from(VoiceRoomActivity.this);
+                                container.getIoExecutor().execute(() ->
+                                        RemoteTheme.refreshFromApi(
+                                                getApplicationContext(), container.getConfigApi()));
+                            } catch (Exception error) {
+                                android.util.Log.w("VoiceRoom", "Could not refresh dashboard theme", error);
+                            }
                         }
                         return;
                     }
