@@ -178,7 +178,10 @@ public class AppContainer {
         appContext = context.getApplicationContext();
         sessionManager = new SessionManager(appContext);
         featureCache = new EncryptedFeatureCache(appContext);
-        ioExecutor = Executors.newFixedThreadPool(4);
+        // Room joins, chat sends, gifts and background data work share this pool.
+        // Four workers let long uploads/background calls queue latency-sensitive actions;
+        // keep a little more headroom without creating an unbounded thread-per-request pool.
+        ioExecutor = Executors.newFixedThreadPool(8);
         database = Room.databaseBuilder(appContext, AuraDatabase.class, "auralive.db")
                 .fallbackToDestructiveMigration()
                 .build();
