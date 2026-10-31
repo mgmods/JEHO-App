@@ -1889,45 +1889,68 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (isFinishing() || isDestroyed() || roomId == null || roomId.isEmpty()) return;
         final String chestRoomId = roomId;
         BottomSheetDialog dialog = new BottomSheetDialog(this);
-        FrameLayout host = new FrameLayout(this);
-        host.setBackgroundColor(Color.TRANSPARENT);
-        WebView web = new WebView(this);
-        web.setBackgroundColor(Color.TRANSPARENT);
-        WebSettings settings = web.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(false);
-        settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(true);
-        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        web.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                if ("file:///android_asset/support-chest.html".equals(url)) {
-                    loadSupportChestState(view, chestRoomId);
-                }
-            }
-        });
+
+        // Native views avoid constructing a cold WebView on the room's main thread.
+        // The previous WebView initialization could stall the entire voice-room UI.
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(chestDp(18), chestDp(14), chestDp(18), chestDp(22));
+        GradientDrawable panel = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFF29243A, 0xFF151622});
+        panel.setCornerRadii(new float[]{chestDp(22), chestDp(22), chestDp(22), chestDp(22),
+                0, 0, 0, 0});
+        panel.setStroke(chestDp(1), 0xFF80663B);
+        root.setBackground(panel);
+
+        TextView title = chestText("🎁 صندوق الدعم", 19f, 0xFFFFE4A0, true);
+        root.addView(title, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0));
+        TextView subtitle = chestText("كل هدية تقرّب الروم من فتح الكنز", 12f, 0xFFD4C5A4, false);
+        root.addView(subtitle, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 4));
+
+        TextView level = chestText("المستوى 1 · صندوق الروم", 14f, 0xFFFFE4A0, true);
+        root.addView(level, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 14));
+
+        TextView metric = chestText("بانتظار بيانات الصندوق من الخادم…", 13f, 0xFFFFFFFF, true);
+        root.addView(metric, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 10));
+
+        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(100);
+        progress.setProgress(0);
+        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(0xFF69DDEB));
+        progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF414052));
+        root.addView(progress, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, chestDp(12), 9));
+
+        TextView stats = chestText("المجموع: —     الهدف: —     المتبقي: —", 12f, 0xFFE8E5F0, false);
+        root.addView(stats, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 9));
+
+        TextView instructions = chestText("تعتمد قواعد الصندوق ومكافآته على إعدادات الداشبورد.", 11f, 0xFFB8B8C8, false);
+        root.addView(instructions, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 13));
+
+        TextView close = chestText("إغلاق", 14f, 0xFFFFE4A0, true);
+        close.setGravity(Gravity.CENTER);
+        GradientDrawable closeBg = new GradientDrawable();
+        closeBg.setColor(0xFF40344D);
+        closeBg.setCornerRadius(chestDp(13));
+        closeBg.setStroke(chestDp(1), 0xFFB9944B);
+        close.setBackground(closeBg);
+        close.setPadding(0, chestDp(12), 0, chestDp(12));
+        root.addView(close, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 16));
+        close.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.setContentView(root);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+
         final Runnable refreshChest = new Runnable() {
             @Override public void run() {
-                if (!dialog.isShowing() || isFinishing() || isDestroyed()) return;
-                loadSupportChestState(web, chestRoomId);
+                if (!dialog.isShowing() || isFinishing() || isDestroyed()
+                        || !chestRoomId.equals(roomId)) return;
+                loadSupportChestStateNative(chestRoomId, level, metric, progress, stats, instructions);
                 handler.postDelayed(this, 15000L);
             }
         };
-        web.loadUrl("file:///android_asset/support-chest.html");
-        host.addView(web, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        dialog.setContentView(host);
-        dialog.setCancelable(true);
-        // Keep the wheel open until the explicit Close button is pressed.
-        dialog.setCancelable(false);
-        dialog.setCanceledOnTouchOutside(false);
-        dialog.setOnDismissListener(d -> {
-            handler.removeCallbacks(refreshChest);
-            web.stopLoading();
-            web.loadUrl("about:blank");
-            web.destroy();
-        });
+        dialog.setOnDismissListener(d -> handler.removeCallbacks(refreshChest));
         dialog.setOnShowListener(d -> {
             android.view.View bottomSheet = dialog.findViewById(
                     com.google.android.material.R.id.design_bottom_sheet);
@@ -1944,9 +1967,89 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 behavior.setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
             }
             handler.removeCallbacks(refreshChest);
-            handler.postDelayed(refreshChest, 15000L);
+            handler.post(refreshChest);
         });
         dialog.show();
+    }
+
+    private int chestDp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private LinearLayout.LayoutParams chestParams(int width, int height, int topMarginDp) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(width, height);
+        params.topMargin = chestDp(topMarginDp);
+        return params;
+    }
+
+    private TextView chestText(String value, float sizeSp, int color, boolean bold) {
+        TextView text = new TextView(this);
+        text.setText(value);
+        text.setTextSize(sizeSp);
+        text.setTextColor(color);
+        text.setGravity(Gravity.CENTER_VERTICAL);
+        if (bold) text.setTypeface(null, android.graphics.Typeface.BOLD);
+        return text;
+    }
+
+    private void loadSupportChestStateNative(@NonNull String targetRoomId,
+            @NonNull TextView level, @NonNull TextView metric, @NonNull ProgressBar progress,
+            @NonNull TextView stats, @NonNull TextView instructions) {
+        try {
+            ContainerProvider.from(this).getGiftApi().supportChest(targetRoomId)
+                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                @Override public void onResponse(
+                        retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                        retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                    if (!response.isSuccessful() || response.body() == null
+                            || response.body().data == null || isFinishing() || isDestroyed()
+                            || !targetRoomId.equals(roomId)) return;
+                    Map<String, Object> data = response.body().data;
+                    Object rawConfig = data.get("config");
+                    Object rawState = data.get("state");
+                    Map<?, ?> config = rawConfig instanceof Map ? (Map<?, ?>) rawConfig : java.util.Collections.emptyMap();
+                    Map<?, ?> state = rawState instanceof Map ? (Map<?, ?>) rawState : java.util.Collections.emptyMap();
+                    boolean enabled = Boolean.parseBoolean(String.valueOf(config.get("enabled")));
+                    boolean iconVisible = !Boolean.FALSE.equals(config.get("iconVisible"));
+                    if (!enabled || !iconVisible) {
+                        metric.setText("صندوق الدعم غير مفعّل حالياً");
+                        progress.setProgress(0);
+                        stats.setText("سيظهر التقدّم عند تفعيل الصندوق من الداشبورد.");
+                        return;
+                    }
+                    boolean diamonds = "diamonds".equalsIgnoreCase(String.valueOf(config.get("goalMode")));
+                    String unit = diamonds ? "ماسات" : "كوينزات";
+                    Object currentValue = state.get(diamonds ? "diamonds" : "coins");
+                    Object targetValue = config.get(diamonds ? "diamondTarget" : "coinTarget");
+                    long current = 0L, target = 0L;
+                    try { current = Math.max(0L, Math.round(Double.parseDouble(String.valueOf(currentValue)))); }
+                    catch (Exception ignored) { }
+                    try { target = Math.max(0L, Math.round(Double.parseDouble(String.valueOf(targetValue)))); }
+                    catch (Exception ignored) { }
+                    int percent = target > 0L ? (int) Math.min(100L, (current * 100L) / target) : 0;
+                    level.setText("المستوى " + Math.max(1, (int) numberForChest(state.get("level"), 1)) + " · صندوق الروم");
+                    metric.setText("تقدّم " + unit + " · " + percent + "%");
+                    progress.setProgress(percent);
+                    stats.setText("المجموع: " + String.format(java.util.Locale.US, "%,d", current)
+                            + "     الهدف: " + (target > 0L ? String.format(java.util.Locale.US, "%,d", target) : "—")
+                            + "     المتبقي: " + (target > 0L ? String.format(java.util.Locale.US, "%,d", Math.max(0L, target - current)) : "—"));
+                    Object help = config.get("instructions");
+                    instructions.setText(help instanceof String && !((String) help).trim().isEmpty()
+                            ? (String) help : "تعتمد قواعد الصندوق ومكافآته على إعدادات الداشبورد.");
+                }
+                @Override public void onFailure(
+                        retrofit2.Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
+                    metric.setText("تعذر تحديث بيانات الصندوق حالياً");
+                }
+            });
+        } catch (Exception error) {
+            android.util.Log.w("SupportChest", "Native support chest request failed", error);
+        }
+    }
+
+    private long numberForChest(@Nullable Object value, long fallback) {
+        try { return Math.round(Double.parseDouble(String.valueOf(value))); }
+        catch (Exception ignored) { return fallback; }
     }
 
     private void ensureMusicUiReady() {
@@ -4371,7 +4474,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // The draggable launcher is a private sender control, never a room-wide UI.
         // Remote members render only the gift-flight celebration, not another tappable cannon.
         boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
-        luckyCannonLayer.setVisibility(keepVisible ? View.VISIBLE : View.GONE);
+        // A different sender's simultaneous event must never hide this device's own
+        // active launcher. The launcher is a local control; remote sends only animate flights.
+        if (localSender) {
+            luckyCannonLayer.setVisibility(keepVisible ? View.VISIBLE : View.GONE);
+        }
         // The sender already received immediate local press feedback; other room members
         // still animate the launch effect without exposing the launcher control.
         if (!localSender && luckyCannonPulseEnabled) luckyCannonView.fire();
