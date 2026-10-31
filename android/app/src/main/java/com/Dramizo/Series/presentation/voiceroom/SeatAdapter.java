@@ -613,6 +613,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             bindEmptySeatShell(holder, true);
             holder.b.seatRing.setVisibility(View.GONE);
             holder.b.tvName.setText(String.valueOf(displaySeatNo(seat)));
+            VipNameStyle.bind(holder.b.tvName, (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto) null);
             holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
             holder.b.imgAvatar.setVisibility(View.GONE);
             if (holder.b.imgSeatShell != null) {
@@ -691,6 +692,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgAvatar.setImageResource(ImagePlaceholder.avatar());
                 clearHostWear(holder);
                 holder.b.tvName.setText(String.valueOf(displaySeatNo(seat)));
+            VipNameStyle.bind(holder.b.tvName, (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto) null);
                 holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
             }
 
@@ -722,6 +724,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.imgSeatShell.setVisibility(View.VISIBLE);
         }
         holder.b.tvName.setText(String.valueOf(displaySeatNo(seat)));
+            VipNameStyle.bind(holder.b.tvName, (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto) null);
         holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
         if (holder.b.imgSeatHostMark != null) {
             holder.b.imgSeatHostMark.setVisibility(View.GONE);
