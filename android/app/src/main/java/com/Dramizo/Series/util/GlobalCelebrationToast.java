@@ -274,6 +274,13 @@ public final class GlobalCelebrationToast {
         catch (Exception ignored) { return fallback; }
     }
 
+    /** Force a fresh dashboard style after the server announces a config change. */
+    public static void refreshStyleNow(@Nullable Activity activity) {
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+        lastStyleFetchAt = 0L;
+        refreshToastStyle(activity);
+    }
+
     private static void refreshToastStyle(Activity activity) {
         long now = System.currentTimeMillis();
         if (now - lastStyleFetchAt < 60_000L) return;
