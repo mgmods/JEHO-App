@@ -10,4 +10,6 @@
     <item name="tag_edge_padded" type="id" />
     <item name="tag_vanity_id_style_key" type="id" />
     <item name="tag_vip_name_animator" type="id" />
+    <item name="tag_vip_name_style_config" type="id" />
+    <item name="tag_vip_name_default_color" type="id" />
 </resources>
