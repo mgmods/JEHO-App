@@ -202,6 +202,7 @@ public class HomeMeFragment extends Fragment {
             if (name == null || name.trim().isEmpty()) name = me.username;
             if (name == null || name.trim().isEmpty()) name = "عضو جيهو";
             binding.tvProfileName.setText(name);
+            com.Dramizo.Series.util.VipNameStyle.bind(binding.tvProfileName, me);
             String publicId = me.displayPublicId();
             binding.tvProfileId.setText(publicId.isEmpty() ? "ID —" : "ID " + publicId);
             String bio = me.bio;
