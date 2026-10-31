@@ -30,7 +30,7 @@ public final class RoomJoinPrefetch {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     // Keep room joins from waiting behind background feed, ranking, badge, and media requests.
     // This executor is intentionally separate from the app's shared IO pool.
-    private static final ExecutorService JOIN_EXECUTOR = Executors.newSingleThreadExecutor(task -> {
+    private static final ExecutorService JOIN_EXECUTOR = Executors.newFixedThreadPool(4, task -> {
         Thread thread = new Thread(task, "jeho-room-join");
         thread.setPriority(Thread.NORM_PRIORITY);
         thread.setDaemon(true);
