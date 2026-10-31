@@ -12347,6 +12347,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         super.onNewIntent(intent);
         setIntent(intent);
         if (intent == null) return;
+        // A singleTask room can be reopened with fresher card/notification metadata.
+        String incomingDisplayId = intent.getStringExtra(EXTRA_ROOM_DISPLAY_ID);
+        if (incomingDisplayId != null && !incomingDisplayId.trim().isEmpty()
+                && binding != null && binding.tvRoomId != null) {
+            String label = intent.getBooleanExtra(EXTRA_ROOM_IS_AGENCY, false) ? "GID:" : "ID:";
+            binding.tvRoomId.setText(label + incomingDisplayId.trim());
+        }
         // singleTask: re-entering same activity — either restore UI or hop to another room.
         String incomingRoomId = intent.getStringExtra(EXTRA_ROOM_ID);
         if (incomingRoomId != null && !incomingRoomId.isEmpty()
