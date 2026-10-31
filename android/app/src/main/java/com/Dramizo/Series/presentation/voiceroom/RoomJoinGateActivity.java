@@ -54,7 +54,7 @@ public class RoomJoinGateActivity extends AppCompatActivity {
         final String id = roomId.trim();
         // Already live in-process (minimized) — skip gate loading / GET, reopen UI instantly.
         if (com.Dramizo.Series.util.ActiveRoomSession.get().canResumeUi(id)) {
-            openLiveRoom(id, password);
+            openLiveRoom(id, password, null);
             return;
         }
         AppContainer c = ContainerProvider.from(this);
@@ -67,7 +67,7 @@ public class RoomJoinGateActivity extends AppCompatActivity {
                         finishQuiet(getString(R.string.room_not_live));
                         return;
                     }
-                    openLiveRoom(id, password);
+                    openLiveRoom(id, password, r.data.displayRoomId);
                     return;
                 }
                 String err = r.error != null ? r.error.toLowerCase(java.util.Locale.US) : "";
@@ -105,10 +105,13 @@ public class RoomJoinGateActivity extends AppCompatActivity {
         return "closed".equalsIgnoreCase(room.status.trim());
     }
 
-    private void openLiveRoom(String roomId, String password) {
+    private void openLiveRoom(String roomId, String password, @Nullable String displayRoomId) {
         Intent i = new Intent(this, VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
         i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, false);
+        if (displayRoomId != null && !displayRoomId.trim().isEmpty()) {
+            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID, displayRoomId.trim());
+        }
         if (password != null && !password.isEmpty()) {
             i.putExtra(VoiceRoomActivity.EXTRA_PASSWORD, password);
         }
