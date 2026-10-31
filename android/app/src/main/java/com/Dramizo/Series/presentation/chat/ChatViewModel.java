@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.UUID;
 
 public class ChatViewModel extends ViewModel {
     private final AppContainer c;
@@ -208,7 +209,7 @@ public class ChatViewModel extends ViewModel {
         RealtimeClient.getInstance().emitTyping(conversationId, false);
         final String reply = replyToId;
         clearReply();
-        final String localId = "local:" + System.currentTimeMillis();
+        final String localId = "local:" + UUID.randomUUID();
         ChatDtos.MessageDto pending = newOptimistic("text", localId, conversationId, reply);
         pending.content = content;
         appendMessage(pending);
@@ -228,7 +229,7 @@ public class ChatViewModel extends ViewModel {
         RealtimeClient.getInstance().emitTyping(conversationId, false);
         final String reply = replyToId;
         clearReply();
-        final String localId = "local:" + System.currentTimeMillis();
+        final String localId = "local:" + UUID.randomUUID();
         ChatDtos.MessageDto pending = newOptimistic("image", localId, conversationId, reply);
         pending.media = new ChatDtos.MediaDto();
         pending.media.url = imageUrl;
@@ -246,7 +247,7 @@ public class ChatViewModel extends ViewModel {
         RealtimeClient.getInstance().emitTyping(conversationId, false);
         final String reply = replyToId;
         clearReply();
-        final String localId = "local:" + System.currentTimeMillis();
+        final String localId = "local:" + UUID.randomUUID();
         ChatDtos.MessageDto pending = newOptimistic("audio", localId, conversationId, reply);
         pending.media = new ChatDtos.MediaDto();
         pending.media.url = audioUrl;
@@ -265,7 +266,7 @@ public class ChatViewModel extends ViewModel {
         RealtimeClient.getInstance().emitTyping(conversationId, false);
         final String reply = replyToId;
         clearReply();
-        final String localId = "local:" + System.currentTimeMillis();
+        final String localId = "local:" + UUID.randomUUID();
         ChatDtos.MessageDto pending = newOptimistic("video", localId, conversationId, reply);
         pending.media = new ChatDtos.MediaDto();
         pending.media.url = videoUrl;
@@ -287,7 +288,7 @@ public class ChatViewModel extends ViewModel {
         RealtimeClient.getInstance().emitTyping(conversationId, false);
         final String reply = replyToId;
         clearReply();
-        final String localId = "local:" + System.currentTimeMillis();
+        final String localId = "local:" + UUID.randomUUID();
         ChatDtos.MessageDto pending = newOptimistic("gift", localId, conversationId, reply);
         pending.content = giftName != null && !giftName.isEmpty() ? giftName : "هدية";
         String safeIcon = iconUrl;
