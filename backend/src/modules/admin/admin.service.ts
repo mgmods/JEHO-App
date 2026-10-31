@@ -2648,6 +2648,15 @@ export class AdminService {
         at: new Date().toISOString(),
       });
     }
+    if (key === 'app_theme') {
+      let version = 1;
+      try { version = Math.max(1, Number(JSON.parse(nextValue)?.version) || 1); } catch { /* keep fallback */ }
+      this.realtimeGateway.emitToAll('config:updated', {
+        scope: 'app-theme',
+        version,
+        at: new Date().toISOString(),
+      });
+    }
     // New covers / catalog → force clients to drop Glide disk cache.
     if (key === 'app_games') {
       await this.bumpMediaAssetEpoch();
