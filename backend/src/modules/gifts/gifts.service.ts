@@ -2176,6 +2176,22 @@ export class GiftsService implements OnModuleInit {
     }
   }
 
+  /** Retry only fully rolled-back PostgreSQL deadlock/serialization failures. */
+  private async runGiftTransaction<T>(work: (manager: any) => Promise<T>): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.dataSource.transaction(work);
+      } catch (error: any) {
+        const code = error?.driverError?.code || error?.code;
+        const retryable = code === '40P01' || code === '40001';
+        if (!retryable || attempt === 2) throw error;
+        this.log.warn(`Gift transaction conflict (${code}); retry ${attempt + 1}/2`);
+        await new Promise((resolve) => setTimeout(resolve, 35 * (attempt + 1)));
+      }
+    }
+    throw new Error('Gift transaction failed after retries');
+  }
+
   async send(senderId: string, dto: SendGiftDto) {
     const selfGift = String(senderId) === String(dto.receiverId);
     const selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
@@ -2246,7 +2262,7 @@ export class GiftsService implements OnModuleInit {
     // No platform commission fields are returned to gift clients.
     // The host payout and any agency bonus are independent credits.
 
-    return this.dataSource.transaction(async (manager) => {
+    return this.runGiftTransaction(async (manager) => {
       // Lock both accounts in deterministic order before taking row-level wallet locks.
       await this.lockGiftWalletUsers(manager, [senderId, dto.receiverId]);
       const wallet = await manager.findOne(Wallet, {
@@ -2923,7 +2939,7 @@ export class GiftsService implements OnModuleInit {
       micShares.set(rid, baseMic + extra);
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    return this.runGiftTransaction(async (manager) => {
       // Lock every wallet participating in the split in sorted order. This prevents
       // overlapping all-mic sends from acquiring the same wallets in opposite orders.
       await this.lockGiftWalletUsers(manager, [senderId, ...receiverIds, roomHostId]);
