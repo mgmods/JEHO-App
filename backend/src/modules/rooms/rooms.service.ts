@@ -1252,7 +1252,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
-  private async attachFrame(user: any, vipLevel = 0, displayRank?: Record<string, unknown> | null) {
+  private async attachFrame(user: any, vipLevel = 0, displayRank?: Record<string, unknown> | null, nameStyle?: Record<string, unknown> | null) {
     if (!user) return null;
     const profile = user.profile || {};
     const rawHost = profile.hostBadgeUrl ?? user.hostBadgeUrl ?? null;
@@ -1287,6 +1287,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       levelBadgeUrl,
       roomCardUrl: profile.roomCardUrl ?? user.roomCardUrl ?? null,
       vipLevel: level,
+      nameStyle: nameStyle || null,
       ...(displayRank || {}),
       profile: undefined,
     };
@@ -1387,6 +1388,36 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     for (const user of users) {
       const base = map.get(user.id) || 0;
       map.set(user.id, effectiveVipLevel(base, Number((user as any).profile?.totalSentCoins || 0)));
+    }
+    return map;
+  }
+
+  /** Public VIP name styles for room seats/host; only active, unexpired subscriptions qualify. */
+  private async nameStyleMapForUsers(userIds: string[]) {
+    const ids = [...new Set((userIds || []).filter(Boolean))];
+    const map = new Map<string, Record<string, unknown>>();
+    if (!ids.length) return map;
+    const rows = await this.dataSource.query(
+      `SELECT DISTINCT ON (uv."userId")
+              uv."userId" AS "userId",
+              vp.benefits->'visuals'->'nameStyle' AS "nameStyle"
+         FROM user_vips uv
+         JOIN vip_plans vp ON vp.id = uv."vipPlanId"
+        WHERE uv."userId" = ANY($1::uuid[])
+          AND uv."isActive" = true
+          AND uv."startsAt" <= NOW()
+          AND uv."expiresAt" > NOW()
+        ORDER BY uv."userId", uv.level DESC, uv."updatedAt" DESC`,
+      [ids],
+    ) as Array<{ userId: string; nameStyle: Record<string, unknown> | string | null }>;
+    for (const row of rows || []) {
+      let style: any = row.nameStyle;
+      if (typeof style === 'string') {
+        try { style = JSON.parse(style); } catch { style = null; }
+      }
+      if (style && typeof style === 'object' && style.enabled === true) {
+        map.set(String(row.userId), style as Record<string, unknown>);
+      }
     }
     return map;
   }
@@ -1521,9 +1552,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       if (s.userId) userIds.push(s.userId);
       else if (s.user?.id) userIds.push(s.user.id);
     }
-    const [vipMap, displayRanks] = await Promise.all([
+    const [vipMap, displayRanks, nameStyles] = await Promise.all([
       this.vipMapForUsers(userIds),
       this.displayRankMapForUsers(userIds),
+      this.nameStyleMapForUsers(userIds),
     ]);
     const uploadedRoomBackground = this.isUploadedRoomImageUrl(room.backgroundUrl)
       ? String(room.backgroundUrl).trim()
@@ -1551,7 +1583,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const decoratedSeats = await Promise.all(
       (room.seats || []).map(async (s: any) => {
         const uid = s.userId || s.user?.id;
-        const attached = await this.attachFrame(s.user, vipMap.get(uid) || 0, displayRanks.get(uid) || null);
+        const attached = await this.attachFrame(s.user, vipMap.get(uid) || 0, displayRanks.get(uid) || null, nameStyles.get(uid) || null);
         const anonymous = await this.mysteriousRoomIdentity(uid);
         return {
           ...s,
@@ -1566,7 +1598,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const isOwnersPersonalRoom = !room.agencyId
       && room.roomKind === RoomKind.STANDARD
       && !!room.hostId;
-    const attachedHost = isPlatformRoom ? null : await this.attachFrame(room.host, vipMap.get(room.hostId) || 0, displayRanks.get(room.hostId) || null);
+    const attachedHost = isPlatformRoom ? null : await this.attachFrame(room.host, vipMap.get(room.hostId) || 0, displayRanks.get(room.hostId) || null, nameStyles.get(room.hostId) || null);
     const hostAnonymous = !isPlatformRoom && !isOwnersPersonalRoom && room.hostId
       ? await this.mysteriousRoomIdentity(room.hostId)
       : null;
@@ -1903,15 +1935,16 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         const uid = seat?.userId || seat?.user?.id;
         if (uid) fastUserIds.push(uid);
       }
-      const [fastVipMap, fastRanks] = await Promise.all([
+      const [fastVipMap, fastRanks, fastNameStyles] = await Promise.all([
         this.vipMapForUsers(fastUserIds),
         this.displayRankMapForUsers(fastUserIds),
+        this.nameStyleMapForUsers(fastUserIds),
       ]);
       const fastSeats = await Promise.all((room.seats || []).map(async (seat: any) => {
         const uid = seat?.userId || seat?.user?.id;
-        return { ...seat, user: await this.attachFrame(seat.user, fastVipMap.get(uid) || 0, fastRanks.get(uid) || null) };
+        return { ...seat, user: await this.attachFrame(seat.user, fastVipMap.get(uid) || 0, fastRanks.get(uid) || null, fastNameStyles.get(uid) || null) };
       }));
-      const fastHost = await this.attachFrame(room.host, fastVipMap.get(room.hostId) || 0, fastRanks.get(room.hostId) || null);
+      const fastHost = await this.attachFrame(room.host, fastVipMap.get(room.hostId) || 0, fastRanks.get(room.hostId) || null, fastNameStyles.get(room.hostId) || null);
       return {
         ...safeRoom,
         host: fastHost,
