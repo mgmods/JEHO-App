@@ -126,6 +126,7 @@ import com.Dramizo.Series.util.RoomUiHelper;
 import com.Dramizo.Series.util.RoomVisualEffects;
 import com.Dramizo.Series.util.SeatReactionEmojis;
 import com.Dramizo.Series.util.RemoteSeatStickers;
+import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.VipStyle;
 import com.Dramizo.Series.util.YoutubeAudioResolver;
 
