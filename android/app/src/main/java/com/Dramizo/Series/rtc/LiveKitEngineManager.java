@@ -11,7 +11,9 @@ import androidx.annotation.Nullable;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -355,6 +357,10 @@ public final class LiveKitEngineManager {
         Room r = room;
         if (r != null) {
             try {
+                // Collect a complete sample off-main, then enqueue one UI delivery for the
+                // whole room. Posting one Handler task per participant creates avoidable
+                // main-queue pressure in 20–30 seat rooms (4 polls × every participant).
+                Map<String, Float> levels = new HashMap<>();
                 LocalParticipant local = r.getLocalParticipant();
                 if (local != null && currentUserId != null) {
                     boolean localActiveMic = micEnabled && (publishing || pendingPublishStreamId != null);
@@ -363,14 +369,15 @@ public final class LiveKitEngineManager {
                     if (localActiveMic && level < 12f && isParticipantSpeaking(local)) {
                         level = 36f;
                     }
-                    notifySoundLevel(currentUserId, level);
+                    levels.put(currentUserId, level);
                 }
                 for (Participant p : r.getRemoteParticipants().values()) {
                     if (p == null) continue;
                     String identity = participantIdentity(p);
                     if (identity == null || identity.isEmpty()) continue;
-                    notifySoundLevel(identity, participantLevel0to100(p, false));
+                    levels.put(identity, participantLevel0to100(p, false));
                 }
+                if (!levels.isEmpty()) notifySoundLevels(levels);
             } catch (Throwable t) {
                 Log.w(TAG, "pollSpeak: " + t.getMessage());
             }
@@ -470,6 +477,22 @@ public final class LiveKitEngineManager {
         } else {
             mainHandler.post(deliver);
         }
+    }
+
+    /** Deliver one sampled batch to the UI instead of one Handler task per participant. */
+    private void notifySoundLevels(Map<String, Float> levels) {
+        if (levels == null || levels.isEmpty()) return;
+        Map<String, Float> snapshot = new HashMap<>(levels);
+        mainHandler.post(() -> {
+            for (ZegoEngineManager.RoomListener l : listeners) {
+                for (Map.Entry<String, Float> entry : snapshot.entrySet()) {
+                    try {
+                        l.onSoundLevel(entry.getKey(), entry.getValue());
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+        });
     }
 
     /** Identity / Sid are Kotlin value classes + flowDelegate — resolve from Java. */
