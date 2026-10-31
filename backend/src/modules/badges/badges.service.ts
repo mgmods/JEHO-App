@@ -129,13 +129,13 @@ export class BadgesService {
   async recordHiddenTaskProgress(userId: string, event: string, amount = 1): Promise<void> {
     if (!userId || !event || amount <= 0) return;
     const raw = String(event).toLowerCase();
-    const family = raw.startsWith('rooms') ? 'rooms'
-      : raw.startsWith('gift') ? 'gift'
+    const family = (raw.startsWith('rooms') || raw.startsWith('host_room') || raw.startsWith('host_visit')) ? 'rooms'
+      : (raw.startsWith('gift') || raw.startsWith('host_gift')) ? 'gift'
       : raw.startsWith('follow') ? 'follow'
-      : raw.startsWith('mic') ? 'mic'
-      : raw.startsWith('checkin') ? 'checkin'
+      : (raw.startsWith('mic') || raw.startsWith('host_mic')) ? 'mic'
+      : (raw.startsWith('checkin') || raw.startsWith('host_checkin')) ? 'checkin'
       : (raw.startsWith('recharge') || raw.startsWith('exchange')) ? 'recharge'
-      : raw.startsWith('game') ? 'game'
+      : raw.startsWith('game') || raw.startsWith('host_game') ? 'game'
       : raw.startsWith('win') ? 'win'
       : (raw.startsWith('ad') || raw.includes('rewarded')) ? 'ad'
       : (raw.startsWith('chat') || raw.startsWith('message') || raw.startsWith('dm')) ? 'chat'
