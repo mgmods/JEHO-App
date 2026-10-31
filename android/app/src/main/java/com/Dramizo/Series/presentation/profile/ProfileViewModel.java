@@ -85,6 +85,7 @@ public class ProfileViewModel extends ViewModel {
         if (!eq(a.id, b.id)) return false;
         if (!eq(a.displayName, b.displayName)) return false;
         if (!eq(a.avatarUrl, b.avatarUrl)) return false;
+        if (!eq(a.coverUrl, b.coverUrl)) return false;
         if (!eq(a.vipBadgeUrl, b.vipBadgeUrl)) return false;
         if (!eq(a.hostBadgeUrl, b.hostBadgeUrl)) return false;
         if (!eq(a.staffRole, b.staffRole)) return false;
