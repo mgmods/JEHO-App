@@ -11,11 +11,13 @@ import androidx.annotation.Nullable;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 
 import java.lang.reflect.Method;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.livekit.android.ConnectOptions;
@@ -39,7 +41,7 @@ public final class LiveKitEngineManager {
     private static LiveKitEngineManager instance;
 
     private Application application;
-    @Nullable private Room room;
+    @Nullable private volatile Room room;
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "livekit-rtc");
         t.setDaemon(true);
@@ -48,24 +50,28 @@ public final class LiveKitEngineManager {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final CopyOnWriteArrayList<ZegoEngineManager.RoomListener> listeners =
             new CopyOnWriteArrayList<>();
-    private final Set<String> syntheticPlaying = new HashSet<>();
+    // Participant inspection and audio-level reflection must not run on Android's UI thread.
+    private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "livekit-room-monitor");
+        t.setDaemon(true);
+        return t;
+    });
+    private final Set<String> syntheticPlaying = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private final AtomicBoolean connectInFlight = new AtomicBoolean(false);
-    /** Poll remotes — avoid SharedFlow.collect from Java (crashes process). */
-    private final Runnable pollRemotesRunnable = this::pollRemoteParticipants;
-    /** Combined local+remote speak levels (no SharedFlow collect). */
-    private final Runnable speakLevelPollRunnable = this::pollSpeakLevels;
+    @Nullable private ScheduledFuture<?> remotePollTask;
+    @Nullable private ScheduledFuture<?> speakPollTask;
 
     private String currentRoomId;
-    private String currentUserId;
-    private boolean micEnabled = false;
-    private boolean speakerMuted = false;
-    private boolean publishing;
+    private volatile String currentUserId;
+    private volatile boolean micEnabled = false;
+    private volatile boolean speakerMuted = false;
+    private volatile boolean publishing;
     /** JWT canPublish grant of the currently connected LiveKit session. */
     private boolean sessionCanPublish = false;
-    @Nullable private String publishingStreamId;
+    @Nullable private volatile String publishingStreamId;
     /** Publish requested before room was CONNECTED — applied on connect. */
-    @Nullable private String pendingPublishStreamId;
+    @Nullable private volatile String pendingPublishStreamId;
 
     private String lastUrl;
     private String lastToken;
@@ -242,13 +248,21 @@ public final class LiveKitEngineManager {
 
     private void startPolling() {
         stopPolling();
-        mainHandler.post(pollRemotesRunnable);
-        mainHandler.post(speakLevelPollRunnable);
+        // SDK participant inspection and reflective audio-level reads can be expensive with
+        // many seats. Keep that work off the UI thread; only listener delivery is posted.
+        remotePollTask = monitor.scheduleWithFixedDelay(
+                this::pollRemoteParticipants, 0L, 900L, TimeUnit.MILLISECONDS);
+        speakPollTask = monitor.scheduleWithFixedDelay(
+                this::pollSpeakLevels, 0L, 250L, TimeUnit.MILLISECONDS);
     }
 
     private void stopPolling() {
-        mainHandler.removeCallbacks(pollRemotesRunnable);
-        mainHandler.removeCallbacks(speakLevelPollRunnable);
+        ScheduledFuture<?> remote = remotePollTask;
+        remotePollTask = null;
+        if (remote != null) remote.cancel(false);
+        ScheduledFuture<?> speak = speakPollTask;
+        speakPollTask = null;
+        if (speak != null) speak.cancel(false);
     }
 
     private void pollRemoteParticipants() {
@@ -281,9 +295,6 @@ public final class LiveKitEngineManager {
             } catch (Throwable t) {
                 Log.w(TAG, "pollRemote: " + t.getMessage());
             }
-        }
-        if (connected.get()) {
-            mainHandler.postDelayed(pollRemotesRunnable, 900L);
         }
     }
 
@@ -362,10 +373,6 @@ public final class LiveKitEngineManager {
             } catch (Throwable t) {
                 Log.w(TAG, "pollSpeak: " + t.getMessage());
             }
-        }
-        if (connected.get()) {
-            // Speaking ripples remain responsive while avoiding excessive main-thread polling.
-            mainHandler.postDelayed(speakLevelPollRunnable, 220L);
         }
     }
 
