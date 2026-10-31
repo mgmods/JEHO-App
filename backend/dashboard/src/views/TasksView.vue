@@ -114,8 +114,6 @@
               <th>{{ t('common.coins') }}</th>
               <th>المكافأة التجميلية</th>
               <th>أيام</th>
-              <th>ميدالية المهمة</th>
-              <th>مدة الميدالية (أيام)</th>
               <th>VIP</th>
               <th>أيام VIP</th>
               <th>نوع الشرط</th>
@@ -312,7 +310,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { tasksApi, cosmeticsApi, dailyLoginRewardsApi, medalsApi } from '@/api'
+import { tasksApi, cosmeticsApi, dailyLoginRewardsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -334,7 +332,6 @@ const confirmMsg = ref('')
 const pendingRemoveIdx = ref(-1)
 const cosmetics = ref([])
 const cosmeticsLoading = ref(false)
-const medals = ref([])
 const dailyLoginEnabled = ref(true)
 const dailyLoginDays = ref([
   { day: 1, type: 'coins', amount: 100, label: 'عملات ذهبية' },
@@ -591,16 +588,7 @@ async function save() {
   }
 }
 
-async function loadMedals() {
-  const { data, error: err } = await medalsApi.list()
-  if (err) {
-    toast().danger('تعذر تحميل الميداليات لاختيار مكافأة المهمة: ' + err.message)
-    return
-  }
-  const payload = data?.data?.data ?? data?.data ?? data ?? []
-  medals.value = (Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [])
-    .filter((medal) => medal && medal.id && medal.isActive !== false)
-}
+
 
 onMounted(() => { load(); loadDailyLogin(); loadCosmetics(); loadMedals() })
 </script>
