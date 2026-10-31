@@ -7,6 +7,7 @@ import { User } from '../../database/entities/user.entity';
 import { Follow } from '../../database/entities/follow.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
 
@@ -18,6 +19,10 @@ export interface UpsertBadgeDto {
   awardType?: string;
   achievementKey?: string | null;
   achievementThreshold?: number;
+  hiddenTaskEnabled?: boolean;
+  hiddenTaskEvent?: string | null;
+  hiddenTaskTarget?: number;
+  hiddenTaskDays?: number;
   isActive?: boolean;
   isAnimated?: boolean;
   sortOrder?: number;
@@ -56,6 +61,7 @@ export class BadgesService {
       select: { id: true, publicId: true },
     });
     if (!user) throw new NotFoundException('User not found');
+    await this.cleanupExpiredDisplayedMedals(user.id);
     const grants = await this.userBadges.find({
       where: { userId: user.id },
       relations: { badge: true },
@@ -74,6 +80,7 @@ export class BadgesService {
   }
 
   async catalog(userId: string) {
+    await this.cleanupExpiredDisplayedMedals(userId);
     // Reconcile configured achievement badges against the user's real, persisted metrics.
     // The unique user/badge index plus INSERT .. ON CONFLICT DO NOTHING makes this idempotent.
     await this.awardEligibleAchievementBadges(userId);
@@ -98,6 +105,80 @@ export class BadgesService {
         grantedAt: ownedById.get(badge.id)?.grantedAt ?? null,
         source: ownedById.get(badge.id)?.source ?? null,
       }));
+  }
+
+  /** Remove expired medal IDs from the profile showcase so timed medals disappear everywhere. */
+  private async cleanupExpiredDisplayedMedals(userId: string): Promise<void> {
+    const expired = await this.userBadges.createQueryBuilder('ub')
+      .select('ub.badgeId', 'badgeId')
+      .where('ub.userId = :userId', { userId })
+      .andWhere('ub.expiresAt IS NOT NULL AND ub.expiresAt <= NOW()')
+      .getRawMany<{ badgeId: string }>();
+    if (!expired.length) return;
+    const expiredIds = new Set(expired.map((row) => String(row.badgeId)));
+    const profile = await this.profiles.findOne({ where: { userId } });
+    if (!profile || !Array.isArray(profile.displayedMedalIds)) return;
+    const next = profile.displayedMedalIds.filter((id) => !expiredIds.has(String(id)));
+    if (next.length !== profile.displayedMedalIds.length) {
+      profile.displayedMedalIds = next;
+      await this.profiles.save(profile);
+    }
+  }
+
+  /** Track secret medal conditions from real server activity; no task record/event/API is created. */
+  async recordHiddenTaskProgress(userId: string, event: string, amount = 1): Promise<void> {
+    if (!userId || !event || amount <= 0) return;
+    const raw = String(event).toLowerCase();
+    const family = raw.startsWith('rooms') ? 'rooms'
+      : raw.startsWith('gift') ? 'gift'
+      : raw.startsWith('follow') ? 'follow'
+      : raw.startsWith('mic') ? 'mic'
+      : raw.startsWith('checkin') ? 'checkin'
+      : (raw.startsWith('recharge') || raw.startsWith('exchange')) ? 'recharge'
+      : raw.startsWith('game') ? 'game'
+      : raw.startsWith('win') ? 'win'
+      : (raw.startsWith('ad') || raw.includes('rewarded')) ? 'ad'
+      : (raw.startsWith('chat') || raw.startsWith('message') || raw.startsWith('dm')) ? 'chat'
+      : '';
+    if (!family) return;
+
+    const configured = await this.badges.find({
+      where: { isActive: true, hiddenTaskEnabled: true, hiddenTaskEvent: family },
+      select: { id: true, hiddenTaskTarget: true, hiddenTaskDays: true },
+    });
+    for (const medal of configured) {
+      const target = Math.max(1, Math.min(1_000_000_000, Math.floor(Number(medal.hiddenTaskTarget) || 1)));
+      const key = `hidden_medal_progress:${userId}:${medal.id}`;
+      let shouldGrant = false;
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+        let row = await manager.findOne(AppSetting, { where: { key }, lock: { mode: 'pessimistic_write' } });
+        let state: { current: number; awarded: boolean } = { current: 0, awarded: false };
+        try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
+        if (!state.awarded) {
+          state.current = Math.min(target, Math.max(0, Number(state.current) || 0) + amount);
+          shouldGrant = state.current >= target;
+          if (!row) row = manager.create(AppSetting, { key, value: '', description: 'Private medal condition progress' });
+          row.value = JSON.stringify(state);
+          await manager.save(row);
+        }
+      });
+      if (!shouldGrant) continue;
+      try {
+        const granted = await this.grantForTask(userId, medal.id, medal.hiddenTaskDays, 'hidden_task', false);
+        if (granted) {
+          const row = await this.dataSource.getRepository(AppSetting).findOne({ where: { key } });
+          if (row?.value) {
+            const state = JSON.parse(row.value);
+            state.awarded = true;
+            row.value = JSON.stringify(state);
+            await this.dataSource.getRepository(AppSetting).save(row);
+          }
+        }
+      } catch (error) {
+        console.error('[Badges] Private medal grant failed', error instanceof Error ? error.message : String(error));
+      }
+    }
   }
 
   private async awardEligibleAchievementBadges(userId: string): Promise<void> {
@@ -184,7 +265,7 @@ export class BadgesService {
    * grants. The medal is pinned into the public profile showcase even if it was
    * already owned, so completing the task always equips it automatically.
    */
-  async grantForTask(userId: string, badgeId: string, durationDaysRaw = 0): Promise<boolean> {
+  async grantForTask(userId: string, badgeId: string, durationDaysRaw = 0, source = 'task', notify = true): Promise<boolean> {
     const badge = await this.badges.findOne({ where: { id: badgeId, isActive: true } });
     if (!badge || !userId) return false;
 
@@ -206,7 +287,7 @@ export class BadgesService {
         if (existing) {
           existing.grantedAt = new Date();
           existing.grantedByAdminId = null;
-          existing.source = 'task';
+          existing.source = source;
           existing.expiresAt = expiresAt;
           await manager.save(existing);
         } else {
@@ -214,7 +295,7 @@ export class BadgesService {
             userId,
             badgeId,
             grantedByAdminId: null,
-            source: 'task',
+            source,
             expiresAt,
           }));
         }
@@ -235,14 +316,14 @@ export class BadgesService {
       return newlyGranted;
     });
 
-    if (granted) {
+    if (granted && notify) {
       try {
         await this.notifications.notifyUser(
           userId,
           NotificationType.SYSTEM,
           'ميدالية جديدة! 🏅',
-          `أكملت المهمة وحصلت تلقائياً على ميدالية ${badge.name}`,
-          { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, source: 'task' },
+          source === 'hidden_task' ? 'حصلت على ميدالية جديدة.' : `أكملت المهمة وحصلت تلقائياً على ميدالية ${badge.name}`,
+          { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, source },
         );
       } catch (error) {
         // Notification delivery must never roll back a successfully granted medal.
@@ -265,6 +346,10 @@ export class BadgesService {
       awardType: dto.awardType ?? 'manual',
       achievementKey: dto.achievementKey ?? null,
       achievementThreshold: dto.achievementThreshold ?? 0,
+      hiddenTaskEnabled: dto.hiddenTaskEnabled ?? false,
+      hiddenTaskEvent: dto.hiddenTaskEvent ?? null,
+      hiddenTaskTarget: Math.max(1, Math.floor(Number(dto.hiddenTaskTarget) || 1)),
+      hiddenTaskDays: Math.max(0, Math.min(3650, Math.floor(Number(dto.hiddenTaskDays) || 0))),
       isActive: dto.isActive ?? true,
       isAnimated: dto.isAnimated ?? false,
       sortOrder: dto.sortOrder ?? 0,
@@ -277,6 +362,8 @@ export class BadgesService {
     const merged = { ...badge, ...dto };
     this.validate(merged);
     Object.assign(badge, dto);
+    if (dto.hiddenTaskTarget !== undefined) badge.hiddenTaskTarget = Math.max(1, Math.floor(Number(dto.hiddenTaskTarget) || 1));
+    if (dto.hiddenTaskDays !== undefined) badge.hiddenTaskDays = Math.max(0, Math.min(3650, Math.floor(Number(dto.hiddenTaskDays) || 0)));
     return this.badges.save(badge);
   }
 
