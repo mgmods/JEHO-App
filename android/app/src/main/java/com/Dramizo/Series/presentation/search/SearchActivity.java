@@ -277,6 +277,13 @@ public class SearchActivity extends ThemedActivity {
                         com.Dramizo.Series.util.RoomJoinPrefetch.begin(this, room.id, pwd);
                         Intent i = new Intent(this, VoiceRoomActivity.class);
                         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, room.id);
+                        // Keep the room's public ID visible on the first frame, just like Home.
+                        if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
+                            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID,
+                                    room.displayRoomId.trim());
+                        }
+                        i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY,
+                                RoomUiHelper.isAgencyRoom(room));
                         if (pwd != null && !pwd.isEmpty()) {
                             i.putExtra(VoiceRoomActivity.EXTRA_PASSWORD, pwd);
                         }
@@ -287,6 +294,11 @@ public class SearchActivity extends ThemedActivity {
         com.Dramizo.Series.util.RoomJoinPrefetch.begin(this, room.id, null);
         Intent i = new Intent(this, VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, room.id);
+        // Keep the room's public ID visible on the first frame, just like Home.
+        if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
+            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID, room.displayRoomId.trim());
+        }
+        i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY, RoomUiHelper.isAgencyRoom(room));
         startActivity(i);
     }
 
