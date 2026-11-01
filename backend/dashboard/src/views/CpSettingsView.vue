@@ -51,7 +51,7 @@
               <label class="form-label">وصف المهمة للعضو</label>
               <input v-model.trim="task.description" class="form-control mb-3" maxlength="240" placeholder="شرح مختصر لما يجب إنجازه">
               <label class="form-label">شرط إكمال المهمة</label>
-              <select v-model="task.condition" class="form-select mb-3">
+              <select v-model="task.condition" class="form-select mb-3" @change="normalizeCpTaskTarget(task)">
                 <option value="points_today">جمع نقاط علاقة خلال اليوم</option>
                 <option value="gift_exchange_today">أن يرسل كل شريك هدية للآخر خلال اليوم</option>
                 <option value="memory_count">إضافة ذكريات مشتركة خلال اليوم</option>
@@ -609,6 +609,9 @@ async function saveCpStoreItem(item) {
 function date(value) { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('ar') }
 function selectedGift(item) { return gifts.value.find(g => String(g.id) === String(item.giftId)) || null }
 function selectedCpReward(code) { return cpStoreItems.value.find(item => item.code === code) || null }
+function normalizeCpTaskTarget(task) {
+  if (task?.condition === 'gift_exchange_today') task.target = 2
+}
 function addCpTask() {
   const id = 'cp_task_' + Math.random().toString(36).slice(2, 10)
   cpFeatures.value.tasks.push({ id, enabled: true, title: '', description: '', condition: 'points_today', target: 10, rewardPoints: 0, rewardCosmeticCode: '' })
