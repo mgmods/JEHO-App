@@ -90,6 +90,7 @@ export class RankingService {
       take: limit,
     });
     const cacheIsFresh =
+      !this.isUserCategory(category) &&
       cached.length > 0 &&
       Date.now() - new Date(cached[0].createdAt).getTime() < 60_000;
     if (cacheIsFresh) {
@@ -161,9 +162,9 @@ export class RankingService {
         .where('g.createdAt >= :since', { since })
         .groupBy('g.senderId')
         .orderBy('score', 'DESC')
-        .limit(limit)
+        .limit(Math.min(limit * 5, 500))
         .getRawMany();
-      return this.withUserNames(rows);
+      return (await this.withUserNames(rows)).slice(0, limit);
     }
 
     if (category === RankingCategory.POPULAR) {
