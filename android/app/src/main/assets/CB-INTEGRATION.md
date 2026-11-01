@@ -28,12 +28,13 @@ document.querySelector('#cb-card').innerHTML =
   window.JehoCB.renderCard(relationship, '<h3>الثنائي</h3>');
 document.querySelector('#profile-name').innerHTML =
   window.JehoCB.renderName(displayName, relationship);
+node.innerHTML = window.JehoCB.renderDuoGift(relationship, { a: partnerAvatarUrl, b: userAvatarUrl });
 window.JehoCB.apply(document, relationship);
 
 // Or load and render in one call:
 window.JehoCB.load(userId, apiBase, document).catch(console.error);
 ```
 
-For declarative integration, mark elements with `data-cb-level`, `data-cb-card`, or `data-cb-name`, then call `window.JehoCB.apply(root, relationship)`.
+For declarative integration, mark elements with `data-cb-level`, `data-cb-card`, `data-cb-name`, or `data-cb-gift`, then call `window.JehoCB.apply(root, relationship)`.
 
 All URLs are supplied by the API; do not hard-code image URLs in HTML pages. Keep user names escaped when constructing custom markup.
