@@ -16,6 +16,7 @@ public final class MiscDtos {
         @SerializedName("today") public String today;
         @SerializedName("reward") public DailyLoginRewardDto reward;
         @SerializedName("days") public List<DailyLoginRewardDto> days;
+        @SerializedName("theme") public Map<String, Object> theme;
     }
 
     public static class DailyLoginRewardDto {
