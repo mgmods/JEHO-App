@@ -15803,8 +15803,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } else if (leftId != null) {
                 RoomRtcEngine.getInstance().stopPlaying(RoomRtcEngine.audioStreamId(leftId));
             }
+            String leftName = memberStr(payload, "displayName");
+            if (leftName == null || leftName.trim().isEmpty()) leftName = "مستخدم";
             appendChatLine("النظام",
-                    forced ? "تم إنزال مستخدم من المايك" : "مستخدم نزل من المايك",
+                    forced ? leftName + " تم إنزاله من المايك" : leftName + " نزل من المايك",
                     0, 1);
             requestRoomRefresh(true);
         } else if ("room:staff_updated".equals(event)
