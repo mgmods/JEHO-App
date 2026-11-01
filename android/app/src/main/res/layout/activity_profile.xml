@@ -1077,13 +1077,6 @@
                                 android:layout_marginTop="3dp"
                                 android:gravity="center_vertical"
                                 android:orientation="horizontal">
-                                <ImageView
-                                    android:id="@+id/imgProfileCpLevelBadge"
-                                    android:layout_width="20dp"
-                                    android:layout_height="20dp"
-                                    android:contentDescription="شارة مستوى العلاقة"
-                                    android:scaleType="fitCenter"
-                                    android:visibility="gone" />
                                 <TextView
                                     android:id="@+id/tvProfileCpCvLevel"
                                 android:layout_width="wrap_content"
