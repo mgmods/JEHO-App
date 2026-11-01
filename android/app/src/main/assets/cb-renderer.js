@@ -18,15 +18,16 @@
   }
   function renderCard(relationship, content) {
     const p = presentation(relationship), bg = safeUrl(p.cardBackgroundUrl || relationship && relationship.cardBackgroundUrl);
-    const logo = safeUrl(p.frameUrl || p.levelLogoUrl || p.logoUrl);
+    const frame = safeUrl(p.frameUrl);
+    const logo = safeUrl(p.levelLogoUrl || p.logoUrl);
     return '<section class="jeho-cb-card"' + (bg ? ' style="background-image:linear-gradient(#160a1a55,#160a1a77),url(&quot;' + esc(bg) + '&quot;)"' : '') + '>' +
-      (logo ? '<img class="jeho-cb-frame" src="' + esc(logo) + '" alt="">' : '') +
+      (frame ? '<img class="jeho-cb-frame" src="' + esc(frame) + '" alt="">' : '') +
       '<div style="position:relative;z-index:1">' + renderLevelBadge(relationship) + (content || '') + '</div></section>';
   }
   function renderName(name, relationship) {
     const p = presentation(relationship), color = String(p.nameColor || p.titleColor || '').trim();
     const shadow = p.nameGlow ? '0 0 8px ' + (color || '#f5ce70') : 'none';
-    return '<span class="jeho-cb-title"' + (color ? ' style="--cb-name-color:' + esc(color) + ';--cb-name-shadow:' + esc(shadow) + '"' : '') + '>' + esc(name) + '</span>';
+    return '<span class="jeho-cb-title"' + ((color || p.nameGlow) ? ' style="' + (color ? '--cb-name-color:' + esc(color) + ';' : '') + '--cb-name-shadow:' + esc(shadow) + '"' : '') + '>' + esc(name) + '</span>';
   }
   function apply(root, relationship) {
     if (!root || !relationship) return;
