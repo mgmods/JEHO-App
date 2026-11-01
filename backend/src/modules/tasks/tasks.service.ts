@@ -423,7 +423,7 @@ export class TasksService {
   private defaultDailyLoginConfig() {
     return {
       enabled: true,
-      theme: { backgroundColor:'#dff0b8', backgroundImageUrl:'', overlayColor:'#ffffff', overlayOpacity:0.12, logoUrl:'', title:'مكافآت تسجيل الدخول لمدة 7 أيام', titleColor:'#176b32', titleSize:28, titleTop:24, headerGap:14, cardColor:'#fffef4', cardBorderColor:'#e8efcf', cardRadius:20, cardGap:12, cardsPerRow:4, cardHeight:112, cardImageSize:76, cardLabelSize:16, buttonText:'تسجيل الدخول', buttonColor:'#168b36', buttonTextColor:'#ffffff', buttonRadius:64, buttonHeight:64, buttonBottom:20, contentTop:18, contentGap:16, fontFamily:'default' },
+      theme: { backgroundColor:'#f5f0e8', backgroundImageUrl:'', overlayColor:'#ffffff', overlayOpacity:0.12, logoUrl:'', title:'مكافآت تسجيل الدخول لمدة 7 أيام', subtitle:'سجّل دخولك يومياً واحصل على مكافأتك', titleColor:'#3d3158', subtitleColor:'#766b80', cardsPerRow:4, buttonText:'استلام المكافأة', buttonColor:'#7652a5', buttonTextColor:'#ffffff' },
       days: [
         { day: 1, type: 'coins', amount: 100, label: 'عملات ذهبية' },
         { day: 2, type: 'coins', amount: 150, label: 'مكافأة يومية' },
@@ -476,14 +476,22 @@ export class TasksService {
     const defaults = this.defaultDailyLoginConfig().theme;
     const rawTheme = input.theme && typeof input.theme === 'object' ? input.theme : {};
     const safeColor = (value: unknown, fallback: string) => /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : fallback;
-    const safeNumber = (value: unknown, fallback: number, min: number, max: number) => Math.max(min, Math.min(max, Number.isFinite(Number(value)) ? Number(value) : fallback));
-    const theme = { ...defaults,
-      backgroundColor: safeColor(rawTheme.backgroundColor, defaults.backgroundColor), backgroundImageUrl: String(rawTheme.backgroundImageUrl || '').slice(0, 2048),
-      overlayColor: safeColor(rawTheme.overlayColor, defaults.overlayColor), overlayOpacity: safeNumber(rawTheme.overlayOpacity, defaults.overlayOpacity, 0, 1), logoUrl: String(rawTheme.logoUrl || '').slice(0, 2048),
-      title: String(rawTheme.title || defaults.title).slice(0, 80), titleColor: safeColor(rawTheme.titleColor, defaults.titleColor), titleSize: safeNumber(rawTheme.titleSize, defaults.titleSize, 12, 48), titleTop: safeNumber(rawTheme.titleTop, defaults.titleTop, 0, 120), headerGap: safeNumber(rawTheme.headerGap, defaults.headerGap, 0, 60),
-      cardColor: safeColor(rawTheme.cardColor, defaults.cardColor), cardBorderColor: safeColor(rawTheme.cardBorderColor, defaults.cardBorderColor), cardRadius: safeNumber(rawTheme.cardRadius, defaults.cardRadius, 0, 40), cardGap: safeNumber(rawTheme.cardGap, defaults.cardGap, 0, 32), cardsPerRow: Math.max(2, Math.min(4, Math.floor(safeNumber(rawTheme.cardsPerRow, defaults.cardsPerRow, 2, 4)))), cardHeight: safeNumber(rawTheme.cardHeight, defaults.cardHeight, 82, 180), cardImageSize: safeNumber(rawTheme.cardImageSize, defaults.cardImageSize, 24, 140), cardLabelSize: safeNumber(rawTheme.cardLabelSize, defaults.cardLabelSize, 8, 28),
-      buttonText: String(rawTheme.buttonText || defaults.buttonText).slice(0, 40), buttonColor: safeColor(rawTheme.buttonColor, defaults.buttonColor), buttonTextColor: safeColor(rawTheme.buttonTextColor, defaults.buttonTextColor), buttonRadius: safeNumber(rawTheme.buttonRadius, defaults.buttonRadius, 0, 80), buttonHeight: safeNumber(rawTheme.buttonHeight, defaults.buttonHeight, 36, 100), buttonBottom: safeNumber(rawTheme.buttonBottom, defaults.buttonBottom, 0, 100),
-      contentTop: safeNumber(rawTheme.contentTop, defaults.contentTop, 0, 100), contentGap: safeNumber(rawTheme.contentGap, defaults.contentGap, 0, 60), fontFamily: ['default','sans','serif'].includes(String(rawTheme.fontFamily)) ? String(rawTheme.fontFamily) : defaults.fontFamily };
+    const safeOpacity = Number(rawTheme.overlayOpacity);
+    const theme = {
+      backgroundColor: safeColor(rawTheme.backgroundColor, defaults.backgroundColor),
+      backgroundImageUrl: String(rawTheme.backgroundImageUrl || '').slice(0, 2048),
+      overlayColor: safeColor(rawTheme.overlayColor, defaults.overlayColor),
+      overlayOpacity: Number.isFinite(safeOpacity) ? Math.max(0, Math.min(1, safeOpacity)) : defaults.overlayOpacity,
+      logoUrl: String(rawTheme.logoUrl || '').slice(0, 2048),
+      title: String(rawTheme.title || defaults.title).slice(0, 80),
+      subtitle: String(rawTheme.subtitle || defaults.subtitle).slice(0, 120),
+      titleColor: safeColor(rawTheme.titleColor, defaults.titleColor),
+      subtitleColor: safeColor(rawTheme.subtitleColor, defaults.subtitleColor),
+      cardsPerRow: 4,
+      buttonText: String(rawTheme.buttonText || defaults.buttonText).slice(0, 40),
+      buttonColor: safeColor(rawTheme.buttonColor, defaults.buttonColor),
+      buttonTextColor: safeColor(rawTheme.buttonTextColor, defaults.buttonTextColor),
+    };
     const value = JSON.stringify({ enabled: input.enabled !== false, theme, days });
     let row = await this.settings.findOne({ where: { key: TasksService.DAILY_LOGIN_KEY } });
     if (!row) row = this.settings.create({ key: TasksService.DAILY_LOGIN_KEY, value, description: 'Seven-day daily login rewards configuration' });
