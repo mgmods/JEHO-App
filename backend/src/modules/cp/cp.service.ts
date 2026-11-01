@@ -1104,6 +1104,24 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           levelConfig,
         ).catch(error => console.warn('[CP] initial level reward delivery failed', levelConfig.level, error));
       }
+      const currentLevelConfig = reachedLevels.find(item => Number(item.level) === Number(outcome.relationship.level || 1)) || null;
+      const levelName = currentLevelConfig?.name || currentLevelConfig?.title || currentLevelConfig?.presentation?.title || null;
+      const levelPayload = {
+        type: 'cp_level_up',
+        relationshipId: outcome.relationship.id,
+        level: Number(outcome.relationship.level) || 1,
+        previousLevel: 0,
+        points: String(outcome.relationship.points || 0),
+        levelName,
+        presentation: currentLevelConfig?.presentation || null,
+        benefits: currentLevelConfig?.benefits || currentLevelConfig?.rewards || [],
+      };
+      const levelTitle = 'بدأت علاقتكما في CP ❤️';
+      const levelBody = levelName ? `بدأت علاقتكما بمستوى ${levelName}` : `بدأت علاقتكما بالمستوى ${levelPayload.level}`;
+      for (const memberId of [outcome.senderId, outcome.receiverId].filter(Boolean)) {
+        await this.notifications.notifyUser(memberId, NotificationType.SYSTEM, levelTitle, levelBody, levelPayload).catch(() => undefined);
+        this.realtime.emitToUser(memberId, 'cp:level-up', { ...levelPayload, title: levelTitle, body: levelBody });
+      }
     }
 
     const responseStatus = String(outcome.result?.status || '');
