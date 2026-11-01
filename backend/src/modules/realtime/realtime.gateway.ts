@@ -266,6 +266,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       }),
       this.roomsRepo.findOne({ where: { id: roomId } }),
     ]);
+    const leaveIdentity = room
+      ? await this.buildJoinPayload(userId, roomId, room.hostId)
+      : null;
     if (seated) {
       await this.roomSeats.update(
         { roomId, userId },
@@ -279,7 +282,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.server.to(`room:${roomId}`).emit('room:event', {
         roomId,
         event: 'room:seat_left',
-        payload: { roomId, userId },
+        payload: {
+          roomId,
+          userId,
+          displayName: leaveIdentity?.displayName || null,
+          username: leaveIdentity?.username || null,
+          avatarUrl: leaveIdentity?.avatarUrl || null,
+          mysteriousMan: leaveIdentity?.mysteriousMan === true,
+        },
         at: new Date().toISOString(),
       });
     }
