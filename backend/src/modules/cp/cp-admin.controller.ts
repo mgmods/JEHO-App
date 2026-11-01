@@ -68,6 +68,7 @@ export class CpAdminController {
     tasks.earn_points_today = { enabled: true, title: 'نشاط مشترك', description: 'اجمعوا نقاط العلاقة اليوم', condition: 'points_today', target: 10, rewardPoints: 15, rewardCosmeticCode: '', ...(tasks.earn_points_today || {}) };
     return {
       globallyEnabled: settings['cp.enabled.global'] !== false && settings['cp.enabled.global'] !== 'false',
+      giftTabEnabled: settings['cp.gift_tab.enabled'] !== false && settings['cp.gift_tab.enabled'] !== 'false',
       tasks,
       types,
       policy: {
@@ -88,6 +89,7 @@ export class CpAdminController {
     @CurrentUser('sub') adminId: string,
     @Body() body: {
       globallyEnabled?: boolean;
+      giftTabEnabled?: boolean;
       tasks?: Record<string, { enabled?: boolean; title?: string; description?: string; condition?: string; target?: number; rewardPoints?: number; rewardCosmeticCode?: string }>;
     },
   ) {
@@ -123,6 +125,7 @@ export class CpAdminController {
     }
     const values: Record<string, string> = {};
     if (body.globallyEnabled !== undefined) values['cp.enabled.global'] = String(body.globallyEnabled);
+    if (body.giftTabEnabled !== undefined) values['cp.gift_tab.enabled'] = String(body.giftTabEnabled);
     if (body.tasks !== undefined) values['cp.tasks.config'] = JSON.stringify(current);
     await this.dataSource.transaction(async manager => {
       for (const [key, value] of Object.entries(values)) {
@@ -208,17 +211,6 @@ export class CpAdminController {
             [level.rewardCosmeticCode],
           );
           if (!rewardCosmetic) throw new BadRequestException('اختر مكافأة تجميلية نشطة من كتالوج المتجر');
-        }
-        if (level.rewardBadgeId !== undefined && level.rewardBadgeId !== '') {
-          if (typeof level.rewardBadgeId !== 'string' ||
-              !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(level.rewardBadgeId)) {
-            throw new BadRequestException('معرّف شارة مكافأة مستوى CP غير صالح');
-          }
-          const [rewardBadge] = await this.dataSource.query(
-            'SELECT id FROM badges WHERE id=$1 AND "isActive"=true LIMIT 1',
-            [level.rewardBadgeId],
-          );
-          if (!rewardBadge) throw new BadRequestException('اختر شارة نشطة من قسم الشارات في الداشبورد');
         }
         if (level.rewardDays !== undefined && (!Number.isInteger(Number(level.rewardDays)) || Number(level.rewardDays) < 1 || Number(level.rewardDays) > 365)) {
           throw new BadRequestException('مدة مكافأة مستوى CB يجب أن تكون بين يوم و365 يوماً');
