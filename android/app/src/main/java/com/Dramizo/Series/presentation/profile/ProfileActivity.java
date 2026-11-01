@@ -1134,11 +1134,53 @@ public class ProfileActivity extends ThemedActivity {
                 int relationshipLevel = parsePositiveInt(relation.get("level"), 1);
                 long relationshipDays = cpDurationDays(relation.get("startedAt"));
                 binding.tvProfileCpCvType.setText(cpTypeLabel(type));
+                if (binding.tvProfileCpCvPartnerName != null) {
+                    binding.tvProfileCpCvPartnerName.setText(name == null || name.trim().isEmpty() ? "الشريك" : name.trim());
+                    binding.tvProfileCpCvPartnerName.setVisibility(View.VISIBLE);
+                }
                 binding.tvProfileCpCvHeart.setText("♥");
-                Object cardBackground = relation.get("cardBackgroundUrl");
+                Object presentationObject = relation.get("presentation");
+                Map<?, ?> levelPresentation = presentationObject instanceof Map ? (Map<?, ?>) presentationObject : java.util.Collections.emptyMap();
+                Object cardBackground = firstNonEmpty(
+                        levelPresentation.get("cardBackgroundUrl"),
+                        relation.get("cardBackgroundUrl"));
                 applyCpCardBackground(cardBackground == null ? "" : String.valueOf(cardBackground));
-                binding.tvProfileCpCvLevel.setText("Lv." + relationshipLevel);
-                binding.tvProfileCpCvDays.setText(relationshipDays + " أيام");
+                Object levelTitleValue = firstNonEmpty(
+                        relation.get("profileTitle"),
+                        relation.get("levelName"),
+                        levelPresentation.get("title"));
+                String levelTitle = levelTitleValue == null ? "" : String.valueOf(levelTitleValue).trim();
+                binding.tvProfileCpCvLevel.setText(levelTitle.isEmpty() ? "Lv." + relationshipLevel : levelTitle);
+                Object levelBadgeValue = firstNonEmpty(
+                        relation.get("levelLogoUrl"),
+                        relation.get("levelBadgeUrl"),
+                        levelPresentation.get("levelLogoUrl"),
+                        levelPresentation.get("logoUrl"),
+                        levelPresentation.get("badgeUrl"));
+                String levelBadgeUrl = levelBadgeValue == null ? "" : String.valueOf(levelBadgeValue).trim();
+                if (binding.imgProfileCpLevelBadge != null) {
+                    if (!levelBadgeUrl.isEmpty()) {
+                        binding.imgProfileCpLevelBadge.setVisibility(View.VISIBLE);
+                        Glide.with(ProfileActivity.this)
+                                .load(AssetCatalog.absoluteUrl(levelBadgeUrl))
+                                .fitCenter()
+                                .into(binding.imgProfileCpLevelBadge);
+                    } else {
+                        binding.imgProfileCpLevelBadge.setImageDrawable(null);
+                        binding.imgProfileCpLevelBadge.setVisibility(View.GONE);
+                    }
+                }
+                String durationText;
+                if (relationshipDays >= 365) {
+                    long years = relationshipDays / 365;
+                    long months = (relationshipDays % 365) / 30;
+                    durationText = years + " سنة" + (months > 0 ? " و" + months + " شهر" : "");
+                } else if (relationshipDays >= 30) {
+                    durationText = (relationshipDays / 30) + " شهر و" + (relationshipDays % 30) + " يوم";
+                } else {
+                    durationText = relationshipDays + " يوم";
+                }
+                binding.tvProfileCpCvDays.setText("♥ معاً منذ " + durationText);
                 binding.rowProfileCpCv.setVisibility(View.VISIBLE);
 
                 // Show exactly two portraits in the upper profile area: reuse the larger
