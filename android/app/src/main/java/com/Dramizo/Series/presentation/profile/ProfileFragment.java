@@ -210,7 +210,10 @@ public class ProfileFragment extends Fragment {
             if (user == null) return;
             myId = user.id;
             bindMyCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
-            binding.tvDisplayName.setText(user.displayName);
+            binding.tvDisplayName.setText(user.displayName != null && !user.displayName.trim().isEmpty()
+                    ? user.displayName : (user.username != null ? user.username : "مستخدم"));
+            // Keep the purchased animated account-name style active on the Me/profile page.
+            com.Dramizo.Series.util.VipNameStyle.bind(binding.tvDisplayName, user);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
             bindGenderIcon(user);
             loadProfileBanner();

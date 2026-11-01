@@ -29,7 +29,7 @@ type RankingBoardItem = {
     frameUrl: string | null;
     followersCount: number;
     totalReceivedDiamonds: number;
-    totalSentCoins: number;
+    nameStyle: Record<string, unknown> | null;
   } | null;
 };
 
@@ -244,37 +244,39 @@ export class RankingService {
     if (!ids.length) return [];
     const users = await this.usersRepo.find({
       where: { id: In(ids) },
-      relations: { profile: true },
+      relations: { profile: true, vips: { vipPlan: true } },
     });
     const map = new Map(users.map((u) => [u.id, u]));
-    return rows.filter((r) => map.has(r.targetId)).map((r) => ({
-      ...r,
-      targetId: r.targetId,
-      targetName:
-        map.get(r.targetId)?.displayName ||
-        map.get(r.targetId)?.username ||
-        r.targetName ||
-        null,
-      score: Number(r.score),
-      user: {
-        id: map.get(r.targetId)!.id,
-        username: map.get(r.targetId)!.username,
-        displayName: map.get(r.targetId)!.displayName,
-        avatarUrl: map.get(r.targetId)!.avatarUrl,
-        level: map.get(r.targetId)!.level,
-        hostBadgeUrl: map.get(r.targetId)!.profile?.hostBadgeUrl || null,
-        vipBadgeUrl: map.get(r.targetId)!.profile?.vipBadgeUrl || null,
-        frameUrl:
-          map.get(r.targetId)!.profile?.hostBadgeUrl ||
-          map.get(r.targetId)!.profile?.vipBadgeUrl ||
-          null,
-        followersCount: map.get(r.targetId)!.profile?.followersCount || 0,
-        totalReceivedDiamonds:
-          Number(map.get(r.targetId)!.profile?.totalReceivedDiamonds) || 0,
-        totalSentCoins:
-          Number(map.get(r.targetId)!.profile?.totalSentCoins) || 0,
-      },
-    }));
+    return rows.filter((r) => map.has(r.targetId)).map((r) => {
+      const user = map.get(r.targetId)!;
+      const activeVip = (user.vips || [])
+        .filter((vip) => vip.isActive && (!vip.expiresAt || new Date(vip.expiresAt).getTime() > Date.now()))
+        .sort((a, b) => Number(b.level || 0) - Number(a.level || 0))[0];
+      const benefits = activeVip?.vipPlan?.benefits as any;
+      const nameStyle = benefits?.visuals?.nameStyle && typeof benefits.visuals.nameStyle === 'object'
+        ? benefits.visuals.nameStyle as Record<string, unknown>
+        : null;
+      return {
+        ...r,
+        targetId: r.targetId,
+        targetName: user.displayName || user.username || r.targetName || null,
+        score: Number(r.score),
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+          level: user.level,
+          hostBadgeUrl: user.profile?.hostBadgeUrl || null,
+          vipBadgeUrl: user.profile?.vipBadgeUrl || null,
+          frameUrl: user.profile?.hostBadgeUrl || user.profile?.vipBadgeUrl || null,
+          followersCount: user.profile?.followersCount || 0,
+          totalReceivedDiamonds: Number(user.profile?.totalReceivedDiamonds) || 0,
+          totalSentCoins: Number(user.profile?.totalSentCoins) || 0,
+          nameStyle,
+        },
+      };
+    });
   }
 
   private isUserCategory(category: RankingCategory): boolean {

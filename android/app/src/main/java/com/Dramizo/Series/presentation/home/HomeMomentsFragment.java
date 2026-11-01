@@ -458,6 +458,7 @@ public class HomeMomentsFragment extends Fragment {
             authorInfo.setOrientation(LinearLayout.VERTICAL);
             authorInfo.setPadding(dp(10), 0, 0, 0);
             TextView author = text(name, 15, 0xFF24212A, true);
+            bindNameStyle(author, post);
             author.setPadding(0, 0, 0, 0);
             String publicId = string(post, "publicId");
             String createdAt = string(post, "createdAt");
@@ -944,7 +945,9 @@ public class HomeMomentsFragment extends Fragment {
         postPreview.setBackground(rounded(0xFFFFFFFF, 0xFFECE7ED, dp(14), dp(1)));
         String authorName = string(post, "displayName");
         if (authorName.isEmpty()) authorName = string(post, "username");
-        postPreview.addView(text(authorName, 13, 0xFFB70F52, true), matchWrap());
+            TextView postAuthor = text(authorName, 13, 0xFFB70F52, true);
+            bindNameStyle(postAuthor, post);
+            postPreview.addView(postAuthor, matchWrap());
         String previewBody = string(post, "body");
         if (!previewBody.isEmpty()) {
             TextView preview = text(previewBody, 14, 0xFF38343D, false);
@@ -1103,6 +1106,7 @@ public class HomeMomentsFragment extends Fragment {
         authorLine.setOrientation(LinearLayout.HORIZONTAL);
         authorLine.setGravity(Gravity.CENTER_VERTICAL);
         TextView author = text(name, 13, 0xFF302B35, true);
+        bindNameStyle(author, comment);
         authorLine.addView(author, new LinearLayout.LayoutParams(0, -2, 1));
         String rankImageUrl = string(comment, "customDisplayRankImageUrl");
         if (!rankImageUrl.isEmpty()) {
@@ -1139,6 +1143,17 @@ public class HomeMomentsFragment extends Fragment {
         replyRow.addView(reply, new LinearLayout.LayoutParams(-2, dp(34)));
         card.addView(replyRow, matchWrap());
         parent.addView(card, cardLp);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void bindNameStyle(TextView target, Map<String, Object> owner) {
+        Object raw = owner == null ? null : owner.get("nameStyle");
+        if (raw instanceof Map) {
+            com.Dramizo.Series.util.VipNameStyle.bind(target, (Map<String, Object>) raw);
+        } else {
+            com.Dramizo.Series.util.VipNameStyle.bind(target,
+                    (Map<String, Object>) null);
+        }
     }
 
     private boolean containsCommentId(List<Map<String, Object>> comments, String id) {

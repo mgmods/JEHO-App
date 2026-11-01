@@ -59,7 +59,13 @@ export class MomentsService {
     const rows = await this.dataSource.query(
       `SELECT m.id, m."userId", m.body, m."imageUrl", m.visibility, m."createdAt",
               u.username, u."displayName", u."avatarUrl", u."publicId",
-              COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+(SELECT vp.benefits::jsonb #> '{visuals,nameStyle}'
+                FROM "jeho_own"."user_vips" uv
+                JOIN "jeho_own"."vip_plans" vp ON vp.id = uv."vipPlanId"
+                WHERE uv."userId" = u.id AND uv."isActive" = true
+                  AND (uv."expiresAt" IS NULL OR uv."expiresAt" > NOW())
+                ORDER BY uv.level DESC LIMIT 1) AS "nameStyle",
+                            COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
                        to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
                        to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl",
               display_rank.name AS "customDisplayRankName",
@@ -93,7 +99,13 @@ export class MomentsService {
     const rows = await this.dataSource.query(
       `SELECT m.id, m."userId", m.body, m."imageUrl", m.visibility, m."createdAt",
               u.username, u."displayName", u."avatarUrl", u."publicId",
-              COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+(SELECT vp.benefits::jsonb #> '{visuals,nameStyle}'
+                FROM "jeho_own"."user_vips" uv
+                JOIN "jeho_own"."vip_plans" vp ON vp.id = uv."vipPlanId"
+                WHERE uv."userId" = u.id AND uv."isActive" = true
+                  AND (uv."expiresAt" IS NULL OR uv."expiresAt" > NOW())
+                ORDER BY uv.level DESC LIMIT 1) AS "nameStyle",
+                            COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
                        to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
                        to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl",
               display_rank.name AS "customDisplayRankName",
@@ -134,7 +146,13 @@ export class MomentsService {
     );
     const [author] = await this.dataSource.query(
       `SELECT u.username, u."displayName", u."avatarUrl", u."publicId",
-        COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+(SELECT vp.benefits::jsonb #> '{visuals,nameStyle}'
+                FROM "jeho_own"."user_vips" uv
+                JOIN "jeho_own"."vip_plans" vp ON vp.id = uv."vipPlanId"
+                WHERE uv."userId" = u.id AND uv."isActive" = true
+                  AND (uv."expiresAt" IS NULL OR uv."expiresAt" > NOW())
+                ORDER BY uv.level DESC LIMIT 1) AS "nameStyle",
+                      COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
                  to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
                  to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl",
         display_rank.name AS "customDisplayRankName",
@@ -188,7 +206,13 @@ export class MomentsService {
     return this.dataSource.query(
       `SELECT c.id, c."momentId", c."userId", c."parentCommentId", c.body, c."createdAt",
               u.username, u."displayName", u."avatarUrl", u."publicId",
-              COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+(SELECT vp.benefits::jsonb #> '{visuals,nameStyle}'
+                FROM "jeho_own"."user_vips" uv
+                JOIN "jeho_own"."vip_plans" vp ON vp.id = uv."vipPlanId"
+                WHERE uv."userId" = u.id AND uv."isActive" = true
+                  AND (uv."expiresAt" IS NULL OR uv."expiresAt" > NOW())
+                ORDER BY uv.level DESC LIMIT 1) AS "nameStyle",
+                            COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
                        to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
                        to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl",
               display_rank.name AS "customDisplayRankName",
@@ -231,7 +255,13 @@ export class MomentsService {
     );
     const [author] = await this.dataSource.query(
       `SELECT u.username, u."displayName", u."avatarUrl", u."publicId",
-        COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+(SELECT vp.benefits::jsonb #> '{visuals,nameStyle}'
+                FROM "jeho_own"."user_vips" uv
+                JOIN "jeho_own"."vip_plans" vp ON vp.id = uv."vipPlanId"
+                WHERE uv."userId" = u.id AND uv."isActive" = true
+                  AND (uv."expiresAt" IS NULL OR uv."expiresAt" > NOW())
+                ORDER BY uv.level DESC LIMIT 1) AS "nameStyle",
+                      COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
                  to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
                  to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl",
         display_rank.name AS "customDisplayRankName",
@@ -309,11 +339,17 @@ export class MomentsService {
       [momentId, body, imageUrl, visibility],
     );
     const [author] = await this.dataSource.query(
-      `SELECT username, "displayName", "avatarUrl", "publicId",
+      `SELECT u.username, u."displayName", u."avatarUrl", u."publicId",
+         (SELECT vp.benefits::jsonb #> '{visuals,nameStyle}'
+          FROM "jeho_own"."user_vips" uv
+          JOIN "jeho_own"."vip_plans" vp ON vp.id = uv."vipPlanId"
+          WHERE uv."userId" = u.id AND uv."isActive" = true
+            AND (uv."expiresAt" IS NULL OR uv."expiresAt" > NOW())
+          ORDER BY uv.level DESC LIMIT 1) AS "nameStyle",
         COALESCE(to_jsonb("users")->>'frameUrl', to_jsonb("users")->>'avatarFrameUrl',
                  to_jsonb("users")->>'equippedFrameUrl', to_jsonb("users")->>'profileFrameUrl',
                  to_jsonb("users")->>'frameImageUrl', to_jsonb("users")->>'currentFrameUrl') AS "frameUrl"
-       FROM "jeho_own"."users" WHERE id = $1`,
+       FROM "jeho_own"."users" u WHERE u.id = $1`,
       [userId],
     );
     return { ...row, ...author };
