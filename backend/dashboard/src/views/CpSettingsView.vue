@@ -162,7 +162,7 @@
                     <input v-model.trim="level.presentation.title" class="form-control" maxlength="100" @change="syncLevelEditor(item)">
                   </div>
                   <div class="col-md-4">
-                    <label class="form-label">شعار المستوى (صورة أو GIF)</label>
+                    <label class="form-label">أيقونة CP العرضية بجانب VIP والثروة والشعبية (صورة أو GIF)</label>
                     <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" @change="uploadLevelAsset(item,level,'levelLogoUrl',$event)">
                     <input v-model.trim="level.presentation.levelLogoUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط الشعار" @change="syncLevelEditor(item)">
                     <img v-if="level.presentation.levelLogoUrl" :src="level.presentation.levelLogoUrl" alt="شعار المستوى" width="54" height="54" class="mt-2" style="object-fit:contain">
