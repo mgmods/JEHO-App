@@ -1180,10 +1180,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const mappedType = configured.length
       ? String(configured[0].key).slice('cp.gift.'.length)
       : '';
-    // Only gifts currently classified as CP by the dashboard may initiate a CP
-    // request. The legacy mapping is a fallback for older CP gift rows only.
-    if (String(giftConfig?.category || '').toLowerCase() !== 'cp') return null;
-    const type = String(giftConfig?.cpRelationshipType || mappedType || 'love') as CpType;
+    // A gift may be marked as a CP gift either by its dashboard category or
+    // by the explicit legacy cp.gift.<type> mapping. The mapping must remain
+    // sufficient on older installations where the category column was never
+    // backfilled. Prefer the explicit mapping when present; otherwise use the
+    // relationship type stored on the CP gift row.
+    const isCpGift = String(giftConfig?.category || '').toLowerCase() === 'cp' || !!mappedType;
+    if (!isCpGift) return null;
+    const type = String(mappedType || giftConfig?.cpRelationshipType || 'love') as CpType;
     if (!TYPES.has(type)) return null;
     const [globalSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.enabled.global']);
     const [typeSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
@@ -1302,14 +1306,27 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       [senderId, receiverId],
     );
     for (const relationship of relationships) {
-      const [setting] = await this.dataSource.query(
-        'SELECT value FROM app_settings WHERE key=$1',
-        [`cp.points.gift_send.${relationship.type}`],
-      );
+      const [setting, legacyGiftSetting] = await Promise.all([
+        this.dataSource.query(
+          'SELECT value FROM app_settings WHERE key=$1',
+          [`cp.points.gift_send.${relationship.type}`],
+        ).then(rows => rows[0] || null),
+        this.dataSource.query(
+          'SELECT value FROM app_settings WHERE key=$1',
+          [`cp.gift_points.${relationship.type}`],
+        ).then(rows => rows[0] || null),
+      ]);
       const perGiftPoints = Number(giftPoints);
-      const basePoints = Number.isSafeInteger(perGiftPoints) && perGiftPoints >= 0
+      // Explicit per-gift points win only when positive. Otherwise fall back
+      // first to the interaction-points setting, then to the CP gift-points
+      // setting used by older dashboard versions.
+      const configuredInteractionPoints = Number(setting?.value);
+      const configuredGiftPoints = Number(legacyGiftSetting?.value);
+      const basePoints = Number.isSafeInteger(perGiftPoints) && perGiftPoints > 0
         ? perGiftPoints
-        : Number(setting?.value);
+        : Number.isSafeInteger(configuredInteractionPoints) && configuredInteractionPoints > 0
+          ? configuredInteractionPoints
+          : configuredGiftPoints;
       if (!Number.isSafeInteger(basePoints) || basePoints <= 0) continue;
       const [levelSetting] = await this.dataSource.query(
         'SELECT value FROM app_settings WHERE key=$1',
