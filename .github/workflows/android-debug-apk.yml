@@ -57,7 +57,7 @@ jobs:
           echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
       - name: Accept Android SDK licenses
         shell: bash
-        run: yes | sdkmanager --licenses
+        run: set +o pipefail; yes | sdkmanager --licenses
       - name: Install Android SDK 36 and pinned NDK
         shell: bash
         run: |
@@ -119,6 +119,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          set +o pipefail
           yes | sdkmanager --licenses
 
       - name: Install Android SDK 36 and required NDK
