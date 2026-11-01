@@ -177,6 +177,14 @@
                     <div v-if="selectedGift({giftId:level.rewardGiftId})" class="small mt-1">{{ selectedGift({giftId:level.rewardGiftId}).name }}</div>
                   </div>
                   <div class="col-md-6">
+                    <label class="form-label">شارة CP تُمنح تلقائياً وتظهر تحت الـ ID</label>
+                    <select v-model="level.rewardBadgeId" class="form-select" @change="syncLevelEditor(item)">
+                      <option value="">بدون شارة تلقائية</option>
+                      <option v-for="badge in cpBadges" :key="badge.id" :value="badge.id">{{ badge.name }}</option>
+                    </select>
+                    <div class="form-text">عند بلوغ المستوى تُمنح الشارة تلقائياً، وتُثبّت في معرض الشارات تحت معرّف الحساب، ويصل إشعار فوري للمستخدم. مدة الشارة تعتمد على مدة مكافأة المستوى؛ صفر في مدة الشارة يعني دائمة.</div>
+                  </div>
+                  <div class="col-md-6">
                     <label class="form-label">مكافأة تجميلية تلقائية عند بلوغ المستوى</label>
                     <select v-model="level.rewardCosmeticCode" class="form-select" @change="syncLevelEditor(item)">
                       <option value="">بدون مكافأة تجميلية تلقائية</option>
@@ -462,7 +470,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { cpAdminApi, giftsApi, uploadsApi, cosmeticsApi } from '@/api'
+import { cpAdminApi, giftsApi, uploadsApi, cosmeticsApi, medalsApi } from '@/api'
 import { extractList } from '@/composables/useUtils'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -491,6 +499,7 @@ const cpFeatures = ref({
   ],
 })
 const cpStoreItems = ref([])
+const cpBadges = ref([])
 const loadingCpStore = ref(false)
 const savingCpStore = ref(false)
 const uploadingCpStorePreview = ref(false)
@@ -624,9 +633,10 @@ function payloadOf(response) { return response?.data?.data ?? response?.data ?? 
 async function load() {
   loading.value = true; error.value = ''; success.value = ''
   try {
-    const [configResponse, giftsResponse] = await Promise.all([cpAdminApi.config(), giftsApi.list({ limit: 500 })])
+    const [configResponse, giftsResponse, badgesResponse] = await Promise.all([cpAdminApi.config(), giftsApi.list({ limit: 500 }), medalsApi.list()])
     const config = payloadOf(configResponse)
     gifts.value = extractList(giftsResponse?.data?.data ?? giftsResponse?.data ?? giftsResponse).filter(gift => gift && gift.isActive !== false)
+    cpBadges.value = extractList(badgesResponse?.data?.data ?? badgesResponse?.data ?? badgesResponse).filter(badge => badge && badge.isActive !== false)
     const configuredTasks = config.tasks && typeof config.tasks === 'object' ? config.tasks : {}
     const taskEntries = Object.entries(configuredTasks).map(([id, task]) => ({
       id,
@@ -653,7 +663,7 @@ async function load() {
       giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
       levelsText: JSON.stringify(item.levels || [], null, 2),
-      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true })),
+      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardBadgeId: String(level.rewardBadgeId || ''), rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true })),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
       seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
       seatEffectUrl: item.rules?.seatEffect?.url || '',
@@ -740,6 +750,7 @@ function syncLevelEditor(item) {
     giftBonusPercent: Math.max(0, Math.min(500, Number(level.giftBonusPercent) || 0)),
     rewardGiftId: String(level.rewardGiftId || ''),
     rewardCosmeticCode: String(level.rewardCosmeticCode || ''),
+    rewardBadgeId: String(level.rewardBadgeId || ''),
     rewardDays: Math.max(1, Math.min(365, Number(level.rewardDays) || 30)),
     rewardPermanent: level.rewardPermanent === true,
   }))
