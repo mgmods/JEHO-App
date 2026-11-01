@@ -524,7 +524,7 @@ class MainActivity : ThemedActivity() {
         }
         val heading = TextView(this).apply {
             text = status.theme?.get("title")?.toString() ?: "مكافآت تسجيل الدخول لمدة 7 أيام"
-            textSize = dailyLoginThemeNumber(status, "titleSize", 28f)
+            textSize = dailyLoginThemeNumber(status, "titleSize", 28)
             setTextColor(dailyLoginThemeColor(status, "titleColor", Color.rgb(23, 107, 50)))
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
@@ -732,8 +732,8 @@ class MainActivity : ThemedActivity() {
             isAllCaps = false
             textSize = 16f
             setTextColor(dailyLoginThemeColor(status, "buttonTextColor", Color.WHITE))
-            background = roundedBackground(dailyLoginThemeColor(status, "buttonColor", Color.rgb(35, 157, 83)), dailyLoginThemeNumber(status, "buttonRadius", 64f).toInt(), Color.rgb(26, 130, 67))
-            layoutParams = LinearLayout.LayoutParams(-1, (dailyLoginThemeNumber(status, "buttonHeight", 64f) * resources.displayMetrics.density).toInt()).apply { topMargin = pad }
+            background = roundedBackground(dailyLoginThemeColor(status, "buttonColor", Color.rgb(35, 157, 83)), dailyLoginThemeNumber(status, "buttonRadius", 64).toInt(), Color.rgb(26, 130, 67))
+            layoutParams = LinearLayout.LayoutParams(-1, (dailyLoginThemeNumber(status, "buttonHeight", 64) * resources.displayMetrics.density).toInt()).apply { topMargin = pad }
         }
         root.addView(claimButton)
 
