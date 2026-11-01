@@ -397,11 +397,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const claimed = new Set(claimedRows.map((row: any) => String(row.referenceId)));
     const pointsToday = Math.max(0, Number(pointsRow?.points) || 0);
     const [giftExchangeCount] = await this.dataSource.query(
-      \`SELECT COUNT(DISTINCT metadata->>'senderId')::int AS count
+      `SELECT COUNT(DISTINCT metadata->>'senderId')::int AS count
        FROM cp_point_events
        WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())
          AND "eventType"='gift_send'
-         AND metadata->>'senderId'=ANY($2::text[])\`,
+         AND metadata->>'senderId'=ANY($2::text[])`,
       [relationship.id, [relationship.userAId, relationship.userBId]],
     );
     const [taskConfigRow] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
@@ -419,7 +419,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         const base = defaults[id] || { title: 'مهمة CP', description: 'أكملوا شرط المهمة اليوم', condition: 'points_today', target: 10, rewardPoints: 0 };
         const config = taskConfig[id] || {};
         const condition = ['memory_count', 'gift_exchange_today'].includes(String(config.condition || (id === 'memory_today' ? 'memory_count' : 'points_today'))) ? String(config.condition || 'memory_count') : 'points_today';
-        const configuredTarget = Math.max(1, Math.min(1000000, Math.floor(Number(config.target ?? base.target) || base.target));
+        const configuredTarget = Math.max(1, Math.min(1000000, Math.floor(Number(config.target ?? base.target) || base.target)));
         const target = condition === 'gift_exchange_today' ? Math.min(2, configuredTarget) : configuredTarget;
         const progressValue = condition === 'memory_count' ? Number(memoryCount?.count) || 0 : condition === 'gift_exchange_today' ? Number(giftExchangeCount?.count) || 0 : pointsToday;
         return {
@@ -498,11 +498,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       eligible = Number(row?.count) >= target;
     } else if (taskCondition === 'gift_exchange_today') {
       const [row] = await this.dataSource.query(
-        \`SELECT COUNT(DISTINCT metadata->>'senderId')::int AS count
+        `SELECT COUNT(DISTINCT metadata->>'senderId')::int AS count
          FROM cp_point_events
          WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())
            AND "eventType"='gift_send'
-           AND metadata->>'senderId'=ANY($2::text[])\`,
+           AND metadata->>'senderId'=ANY($2::text[])`,
         [relationship.id, [relationship.userAId, relationship.userBId]],
       );
       eligible = Number(row?.count) >= target;
