@@ -6,6 +6,7 @@ import { CpRequestStatus } from '../../database/entities/cp-request.entity';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
+import { BadgesService } from '../badges/badges.service';
 
 const TYPES = new Set<string>(Object.values(CpType));
 const EXPIRY_MINUTES = 30;
@@ -20,6 +21,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     private readonly realtime: RealtimeGateway,
     private readonly notifications: NotificationsService,
     private readonly cosmetics: CosmeticsService,
+    private readonly badges: BadgesService,
   ) {}
 
   async onModuleInit() {
@@ -103,12 +105,13 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     ];
     const unique = Array.from(new Map(candidates.map(item => [String(item.code).trim(), item])).values())
       .filter(item => /^[a-zA-Z0-9_-]{2,64}$/.test(String(item.code || '').trim()));
-    if (!unique.length) return;
+    const badgeId = String(levelConfig.rewardBadgeId || '').trim();
+    if (!unique.length && !UUID_REGEX.test(badgeId)) return;
     const codes = unique.map(item => String(item.code).trim());
-    const available = await this.dataSource.query(
+    const available = codes.length ? await this.dataSource.query(
       'SELECT id,code FROM cosmetics WHERE code=ANY($1::text[]) AND "isActive"=true',
       [codes],
-    );
+    ) : [];
     const availableCodes = new Set(available.map((item: any) => String(item.code)));
     for (const userId of userIds) {
       for (const reward of unique) {
@@ -133,6 +136,30 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           await this.dataSource.query('DELETE FROM cp_level_reward_claims WHERE id=$1', [claim.id]).catch(() => undefined);
           // A cosmetic reward must never roll back the already-earned relationship points.
           console.warn('[CB] level cosmetic reward delivery failed', code, error);
+        }
+      }
+      // CP level badges use the existing badge ownership/showcase system. This
+      // pins the earned badge below the public ID and sends the normal badge notification.
+      if (UUID_REGEX.test(badgeId)) {
+        const claimCode = 'badge:' + badgeId;
+        const [claim] = await this.dataSource.query(
+          `INSERT INTO cp_level_reward_claims ("relationshipId","userId",level,"cosmeticCode",status)
+           VALUES ($1,$2,$3,$4,'pending')
+           ON CONFLICT ("relationshipId",level,"userId","cosmeticCode") DO NOTHING
+           RETURNING id`,
+          [relationshipId, userId, level, claimCode],
+        );
+        if (claim?.id) {
+          try {
+            await this.badges.grantForTask(userId, badgeId, Math.max(0, Math.min(3650, Math.floor(Number(levelConfig.rewardBadgeDays ?? levelConfig.rewardDays) || 0))), 'cp_level', true);
+            await this.dataSource.query(
+              'UPDATE cp_level_reward_claims SET status=$1,"grantedAt"=now() WHERE id=$2',
+              ['granted', claim.id],
+            );
+          } catch (error) {
+            await this.dataSource.query('DELETE FROM cp_level_reward_claims WHERE id=$1', [claim.id]).catch(() => undefined);
+            console.warn('[CP] level badge delivery failed', badgeId, error);
+          }
         }
       }
     }
