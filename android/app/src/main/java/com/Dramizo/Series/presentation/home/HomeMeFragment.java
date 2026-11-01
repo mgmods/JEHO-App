@@ -200,11 +200,11 @@ public class HomeMeFragment extends Fragment {
         AuthDtos.UserDto me = c.getSessionManager().getUser();
         if (me != null) {
             binding.mysteriousModeRow.setVisibility(Boolean.TRUE.equals(me.mysteriousManEligible) ? View.VISIBLE : View.GONE);
-            binding.mysteriousModeDivider.setVisibility(me.mysteriousManEligible ? View.VISIBLE : View.GONE);
+            binding.mysteriousModeDivider.setVisibility(Boolean.TRUE.equals(me.mysteriousManEligible) ? View.VISIBLE : View.GONE);
             binding.switchMysteriousMode.setOnCheckedChangeListener(null);
             binding.switchMysteriousMode.setChecked(Boolean.TRUE.equals(me.mysteriousMode));
             requireContext().getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
-                    .edit().putBoolean("enabled", me.mysteriousMode).apply();
+                    .edit().putBoolean("enabled", Boolean.TRUE.equals(me.mysteriousMode)).apply();
             binding.switchMysteriousMode.setOnCheckedChangeListener((button, enabled) -> {
                 if (enabled == Boolean.TRUE.equals(me.mysteriousMode)) return;
                 button.setEnabled(false);
@@ -235,7 +235,7 @@ public class HomeMeFragment extends Fragment {
                         button.setEnabled(true);
                         if (saved && fresh != null) {
                             me.mysteriousMode = fresh.mysteriousMode;
-                            binding.switchMysteriousMode.setChecked(fresh.mysteriousMode);
+                            binding.switchMysteriousMode.setChecked(Boolean.TRUE.equals(fresh.mysteriousMode));
                             requireContext().getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
                                     .edit().putBoolean("enabled", Boolean.TRUE.equals(fresh.mysteriousMode)).apply();
                             Toast.makeText(requireContext(),
