@@ -82,6 +82,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private final Map<String, String> cpGiftTypes = new LinkedHashMap<>();
     private final Map<String, Integer> cpGiftPrices = new LinkedHashMap<>();
     private volatile boolean cpCatalogLoaded;
+    private volatile boolean cpGiftTabEnabled;
     @Nullable private String giftTypeFilter;
 
     private DialogRoomGiftBinding binding;
@@ -546,17 +547,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 active.add(c);
             }
         }
-        // Keep the CP gift section visible even before an admin has configured
-        // an active CP gift. The server catalog still decides which actual gifts appear.
-        boolean hasCpTab = false;
-        for (GiftDtos.GiftCategoryDto item : active) {
-            if ("cp".equalsIgnoreCase(item.key)) { hasCpTab = true; break; }
-        }
-        if (!hasCpTab) {
+        // The CP tab is controlled by the dashboard setting returned by /cp/catalog.
+        // Remove any stale category entry when the administrator switches it off.
+        active.removeIf(item -> "cp".equalsIgnoreCase(item.key));
+        if (cpGiftTabEnabled) {
             GiftDtos.GiftCategoryDto cpTab = new GiftDtos.GiftCategoryDto();
             cpTab.key = "cp";
-            cpTab.labelAr = "هدايا CP";
-            cpTab.labelEn = "CP Gifts";
+            cpTab.labelAr = "هدايا CB";
+            cpTab.labelEn = "CB Gifts";
             cpTab.sortOrder = Integer.MAX_VALUE;
             cpTab.isActive = true;
             active.add(cpTab);
@@ -1145,9 +1143,16 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             Result<List<Map<String, Object>>> result = ApiCall.execute(container.getUserApi().cpCatalog());
             Map<String, String> mappings = new LinkedHashMap<>();
             Map<String, Integer> prices = new LinkedHashMap<>();
+            boolean configuredGiftTabEnabled = false;
             if (result.success && result.data != null) {
                 for (Map<String, Object> row : result.data) {
-                    if (row == null || !Boolean.TRUE.equals(row.get("enabled"))) continue;
+                    if (row == null) continue;
+                    if ("_settings".equals(String.valueOf(row.get("type")))) {
+                        configuredGiftTabEnabled = !Boolean.FALSE.equals(row.get("giftTabEnabled"))
+                                && !"false".equalsIgnoreCase(String.valueOf(row.get("giftTabEnabled")));
+                        continue;
+                    }
+                    if (!Boolean.TRUE.equals(row.get("enabled"))) continue;
                     Object type = row.get("type");
                     Object giftObj = row.get("gift");
                     if (!(type instanceof String) || !(giftObj instanceof Map)) continue;
@@ -1166,6 +1171,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (result.success && isAdded()) {
                 requireActivity().runOnUiThread(() -> {
                     if (!isAdded()) return;
+                    cpGiftTabEnabled = configuredGiftTabEnabled;
                     cpGiftTypes.clear();
                     cpGiftTypes.putAll(mappings);
                     cpGiftPrices.clear();
