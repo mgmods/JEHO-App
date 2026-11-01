@@ -81,6 +81,11 @@ export class BadgesService {
         delete publicBadge.hiddenTaskEvent;
         delete publicBadge.hiddenTaskTarget;
         delete publicBadge.hiddenTaskDays;
+        delete publicBadge.manualTaskEnabled;
+        delete publicBadge.manualTaskVisibility;
+        delete publicBadge.manualTaskTitle;
+        delete publicBadge.manualTaskDescription;
+        delete publicBadge.manualTaskDays;
         return {
           ...publicBadge,
           earned: true,

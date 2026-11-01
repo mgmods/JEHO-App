@@ -22,6 +22,8 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.realtime.RealtimeClient;
 import com.Dramizo.Series.util.ApiCall;
+import com.Dramizo.Series.util.AssetCatalog;
+import com.bumptech.glide.Glide;
 import com.Dramizo.Series.util.RewardBurstOverlay;
 import com.google.gson.JsonObject;
 
@@ -383,7 +385,15 @@ public class TaskCenterActivity extends ThemedActivity {
                 else if (t.claimed) icon = R.drawable.ic_asset_gift;
                 else if (t.isHostTask()) icon = R.drawable.ic_asset_diamond;
                 else if (t.claimable) icon = R.drawable.ic_asset_coin_gold;
-                h.b.imgTaskIcon.setImageResource(icon);
+                if ("medal_manual".equalsIgnoreCase(type) && t.medalImageUrl != null && !t.medalImageUrl.trim().isEmpty()) {
+                    Glide.with(h.itemView)
+                            .load(AssetCatalog.absoluteUrl(t.medalImageUrl))
+                            .placeholder(R.drawable.ic_medal_default)
+                            .error(R.drawable.ic_medal_default)
+                            .into(h.b.imgTaskIcon);
+                } else {
+                    h.b.imgTaskIcon.setImageResource(icon);
+                }
             }
             if (h.b.tvTaskIcon != null) h.b.tvTaskIcon.setVisibility(android.view.View.GONE);
 
