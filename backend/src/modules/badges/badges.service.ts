@@ -391,7 +391,11 @@ export class BadgesService {
           userId,
           NotificationType.SYSTEM,
           'ميدالية جديدة! 🏅',
-          source === 'hidden_task' ? `مبروك! أكملت المهمة السرّية وحصلت على ميدالية ${badge.name}.` : `أكملت المهمة وحصلت تلقائياً على ميدالية ${badge.name}`,
+          source === 'hidden_task'
+            ? `مبروك! أكملت المهمة السرّية وحصلت على ميدالية ${badge.name}.`
+            : source === 'cp_level'
+              ? `مبروك! وصلت إلى مستوى جديد في CP وحصلت تلقائياً على شارة ${badge.name}.`
+              : `أكملت المهمة وحصلت تلقائياً على ميدالية ${badge.name}`,
           { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, source },
         );
       } catch (error) {
