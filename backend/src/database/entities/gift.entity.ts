@@ -45,6 +45,14 @@ export class Gift {
   @Column({ type: 'varchar', length: 32, default: 'normal' })
   category: string;
 
+  /** Relationship type used when this CP gift starts a new relationship request. */
+  @Column({ type: 'varchar', length: 24, default: 'love' })
+  cpRelationshipType: string;
+
+  /** Relationship points awarded per unit when exchanged by active CP partners. */
+  @Column({ type: 'int', default: 0 })
+  cpPoints: number;
+
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
