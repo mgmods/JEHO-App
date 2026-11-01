@@ -530,6 +530,7 @@ export class TasksService {
     }));
     return {
       enabled: config.enabled,
+      theme: config.theme,
       shouldShow: config.enabled && !alreadyClaimed,
       alreadyClaimed,
       streak: activeStreak,
