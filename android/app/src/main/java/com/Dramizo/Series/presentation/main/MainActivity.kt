@@ -561,7 +561,7 @@ class MainActivity : ThemedActivity() {
                 "sans" -> Typeface.SANS_SERIF
                 else -> Typeface.DEFAULT_BOLD
             }
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
         }
         val close = TextView(this).apply {
             text = "×"
