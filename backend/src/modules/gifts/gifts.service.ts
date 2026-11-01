@@ -2230,9 +2230,6 @@ export class GiftsService implements OnModuleInit {
     if (!gift) throw new NotFoundException('Gift not found');
     await this.assertGiftTarget(dto, selfGift);
 
-    const giftCategory = String((gift as any).category || '')
-      .trim()
-      .toLowerCase();
     // CB/CP starter gifts are ordinary catalog gifts. The configured gift-to-type
     // mapping creates an invitation after the gift transaction commits; linked users
     // can exchange the same gift normally and receive relationship points.
