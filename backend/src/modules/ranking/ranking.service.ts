@@ -176,9 +176,9 @@ export class RankingService {
         .where('g.createdAt >= :since', { since })
         .groupBy('g.receiverId')
         .orderBy('score', 'DESC')
-        .limit(limit)
+        .limit(Math.min(limit * 5, 500))
         .getRawMany();
-      return this.withUserNames(rows);
+      return (await this.withUserNames(rows)).slice(0, limit);
     }
 
     if (category === RankingCategory.GIFTS) {
@@ -189,9 +189,9 @@ export class RankingService {
         .where('g.createdAt >= :since', { since })
         .groupBy('g.receiverId')
         .orderBy('score', 'DESC')
-        .limit(limit)
+        .limit(Math.min(limit * 5, 500))
         .getRawMany();
-      return this.withUserNames(rows);
+      return (await this.withUserNames(rows)).slice(0, limit);
     }
 
     if (category === RankingCategory.HOST) {
@@ -203,9 +203,9 @@ export class RankingService {
         .andWhere('g.roomId IS NOT NULL')
         .groupBy('g.receiverId')
         .orderBy('score', 'DESC')
-        .limit(limit)
+        .limit(Math.min(limit * 5, 500))
         .getRawMany();
-      return this.withUserNames(rows);
+      return (await this.withUserNames(rows)).slice(0, limit);
     }
 
     if (category === RankingCategory.AGENCY) {
