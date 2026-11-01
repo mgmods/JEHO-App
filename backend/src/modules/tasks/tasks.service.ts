@@ -624,7 +624,7 @@ export class TasksService {
       }
     }
     // Hard stop: no free cashout diamonds from any task (host or audience).
-    const dailyTasks = tasks.map((t) => {
+    return tasks.map((t) => {
       const audience: TaskAudience = t.audience === 'host' ? 'host' : 'all';
       const title =
         t.id === 'h9' && String(t.title || '').includes('ماسة')
@@ -884,7 +884,7 @@ export class TasksService {
     });
     const claimed = await this.readClaims(userId);
     const progress = await this.readProgress(userId);
-    return tasks.map((t) => {
+    const dailyTasks = tasks.map((t) => {
       const target = this.targetFor(t.type, t);
       const current = Math.min(target, Number(progress[t.id] || 0));
       const done = claimed.includes(t.id);
