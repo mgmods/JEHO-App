@@ -32,6 +32,13 @@ export class BadgesController {
     return this.service.earnedForIdentifier(userId);
   }
 
+  @Get('tasks/medals')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Visible manual medal tasks for the current user' })
+  visibleMedalTasks(@CurrentUser('sub') userId: string) {
+    return this.service.visibleManualTasks(userId);
+  }
+
   @Get('admin/badges')
   @UseGuards(JwtAuthGuard, AdminGuard)
   listAdmin() { return this.service.listAdmin(); }

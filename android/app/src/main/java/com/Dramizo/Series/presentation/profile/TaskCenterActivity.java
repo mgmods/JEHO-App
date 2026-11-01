@@ -354,6 +354,10 @@ public class TaskCenterActivity extends ThemedActivity {
                     : (t.current + "/" + Math.max(1, t.target));
             long rewardCoins = Math.max(0, t.rewardPoints) + Math.max(0, t.rewardSilver);
             String reward = progress + (rewardCoins > 0 ? (" · " + rewardCoins + " كوينز") : "");
+            if ("medal_manual".equalsIgnoreCase(t.type)) {
+                reward = "ميدالية: " + (t.medalName != null ? t.medalName : "ميدالية") + " · بانتظار اعتماد الإدارة";
+                if (t.description != null && !t.description.trim().isEmpty()) reward += " · " + t.description.trim();
+            }
             if (!t.isHostTask() && t.rewardDiamonds > 0) reward += " · " + t.rewardDiamonds + " ماس";
             h.b.tvReward.setText(reward);
 
@@ -373,7 +377,8 @@ public class TaskCenterActivity extends ThemedActivity {
                     || "admob".equals(type);
             if (h.b.imgTaskIcon != null) {
                 int icon = R.drawable.ic_asset_tasks;
-                if (isCheckin) icon = R.drawable.ic_asset_chest_gold;
+                if ("medal_manual".equalsIgnoreCase(type)) icon = R.drawable.ic_medal_default;
+                else if (isCheckin) icon = R.drawable.ic_asset_chest_gold;
                 else if (isAdTask) icon = R.drawable.ic_asset_coin_gold;
                 else if (t.claimed) icon = R.drawable.ic_asset_gift;
                 else if (t.isHostTask()) icon = R.drawable.ic_asset_diamond;
@@ -415,6 +420,13 @@ public class TaskCenterActivity extends ThemedActivity {
                 h.b.btnClaim.setOnClickListener(v -> {
                     if (watchAdListener != null) watchAdListener.run();
                 });
+            } else if ("medal_manual".equalsIgnoreCase(type)) {
+                h.b.btnClaim.setText("بانتظار الإدارة");
+                h.b.btnClaim.setEnabled(false);
+                h.b.btnClaim.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(0xFF2A2A38));
+                h.b.btnClaim.setTextColor(0xFFE8C96A);
+                h.b.btnClaim.setOnClickListener(null);
             } else {
                 h.b.btnClaim.setText("أكمل أولاً");
                 h.b.btnClaim.setEnabled(false);

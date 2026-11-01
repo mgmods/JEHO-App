@@ -23,6 +23,11 @@ export interface UpsertBadgeDto {
   hiddenTaskEvent?: string | null;
   hiddenTaskTarget?: number;
   hiddenTaskDays?: number;
+  manualTaskEnabled?: boolean;
+  manualTaskVisibility?: 'visible' | 'hidden';
+  manualTaskTitle?: string;
+  manualTaskDescription?: string;
+  manualTaskDays?: number;
   isActive?: boolean;
   isAnimated?: boolean;
   sortOrder?: number;
@@ -112,6 +117,13 @@ export class BadgesService {
         delete publicBadge.hiddenTaskEvent;
         delete publicBadge.hiddenTaskTarget;
         delete publicBadge.hiddenTaskDays;
+        if (!publicBadge.manualTaskEnabled || publicBadge.manualTaskVisibility !== 'visible') {
+          delete publicBadge.manualTaskTitle;
+          delete publicBadge.manualTaskDescription;
+        }
+        delete publicBadge.manualTaskEnabled;
+        delete publicBadge.manualTaskVisibility;
+        delete publicBadge.manualTaskDays;
         return {
           ...publicBadge,
           earned: ownedById.has(badge.id),
@@ -119,6 +131,40 @@ export class BadgesService {
           source: ownedById.get(badge.id)?.source ?? null,
         };
       });
+  }
+
+  /** Visible manual medal missions for the existing task center. Hidden missions never leave the admin API. */
+  async visibleManualTasks(userId: string) {
+    if (!userId) return [];
+    const [configured, owned] = await Promise.all([
+      this.badges.find({
+        where: { isActive: true, manualTaskEnabled: true, manualTaskVisibility: 'visible' },
+        order: { sortOrder: 'ASC', name: 'ASC' },
+      }),
+      this.userBadges.createQueryBuilder('ub')
+        .where('ub.userId = :userId', { userId })
+        .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
+        .getMany(),
+    ]);
+    const ownedIds = new Set(owned.map((row) => row.badgeId));
+    return configured.filter((badge) => !ownedIds.has(badge.id)).map((badge) => ({
+      id: `medal_${badge.id}`,
+      title: badge.manualTaskTitle?.trim() || `مهمة الحصول على ميدالية ${badge.name}`,
+      type: 'medal_manual',
+      audience: 'all',
+      section: 'medals',
+      current: 0,
+      target: 1,
+      claimed: false,
+      claimable: false,
+      progressLabel: 'بانتظار اعتماد الإدارة',
+      rewardPoints: 0,
+      rewardSilver: 0,
+      medalId: badge.id,
+      medalName: badge.name,
+      medalImageUrl: badge.imageUrl,
+      description: badge.manualTaskDescription || badge.description || '',
+    }));
   }
 
   /** Remove expired medal IDs from the profile showcase so timed medals disappear everywhere. */
@@ -368,6 +414,11 @@ export class BadgesService {
       hiddenTaskEvent: dto.hiddenTaskEvent ?? null,
       hiddenTaskTarget: Math.max(1, Math.floor(Number(dto.hiddenTaskTarget) || 1)),
       hiddenTaskDays: Math.max(0, Math.min(3650, Math.floor(Number(dto.hiddenTaskDays) || 0))),
+      manualTaskEnabled: dto.manualTaskEnabled ?? false,
+      manualTaskVisibility: dto.manualTaskVisibility === 'visible' ? 'visible' : 'hidden',
+      manualTaskTitle: (dto.manualTaskTitle || '').trim(),
+      manualTaskDescription: (dto.manualTaskDescription || '').trim(),
+      manualTaskDays: Math.max(0, Math.min(3650, Math.floor(Number(dto.manualTaskDays) || 0))),
       isActive: dto.isActive ?? true,
       isAnimated: dto.isAnimated ?? false,
       sortOrder: dto.sortOrder ?? 0,
@@ -382,6 +433,10 @@ export class BadgesService {
     Object.assign(badge, dto);
     if (dto.hiddenTaskTarget !== undefined) badge.hiddenTaskTarget = Math.max(1, Math.floor(Number(dto.hiddenTaskTarget) || 1));
     if (dto.hiddenTaskDays !== undefined) badge.hiddenTaskDays = Math.max(0, Math.min(3650, Math.floor(Number(dto.hiddenTaskDays) || 0)));
+    if (dto.manualTaskVisibility !== undefined) badge.manualTaskVisibility = dto.manualTaskVisibility === 'visible' ? 'visible' : 'hidden';
+    if (dto.manualTaskDays !== undefined) badge.manualTaskDays = Math.max(0, Math.min(3650, Math.floor(Number(dto.manualTaskDays) || 0)));
+    if (dto.manualTaskTitle !== undefined) badge.manualTaskTitle = String(dto.manualTaskTitle || '').trim();
+    if (dto.manualTaskDescription !== undefined) badge.manualTaskDescription = String(dto.manualTaskDescription || '').trim();
     return this.badges.save(badge);
   }
 
@@ -425,13 +480,19 @@ export class BadgesService {
         badgeId, userId: user.id, grantedByAdminId: adminId, source: 'manual', expiresAt,
       }));
     }
-    const notification = await this.notifications.notifyUser(
-      user.id,
-      NotificationType.SYSTEM,
-      'تم إهداؤك ميدالية جديدة! 🏅',
-      `مبروك! تمت إضافة ميدالية ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
-      { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
-    );
+    let notification: any = null;
+    try {
+      notification = await this.notifications.notifyUser(
+        user.id,
+        NotificationType.SYSTEM,
+        'تم إهداؤك ميدالية جديدة! 🏅',
+        `مبروك! تمت إضافة ميدالية ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
+        { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
+      );
+    } catch (error) {
+      // A push-provider failure must not undo or hide a successful medal grant.
+      console.error('[Badges] Manual medal notification failed', error instanceof Error ? error.message : String(error));
+    }
     return {
       ...grant,
       user: { id: user.id, publicId: user.publicId, username: user.username, displayName: user.displayName },
@@ -537,6 +598,10 @@ export class BadgesService {
     if (!dto.name?.trim()) throw new BadRequestException('Medal name is required');
     if (!dto.imageUrl?.trim()) throw new BadRequestException('Medal image URL is required');
     if (dto.name.length > 80 || dto.imageUrl.length > 512) throw new BadRequestException('Medal field is too long');
+    if (dto.manualTaskTitle && dto.manualTaskTitle.length > 120) throw new BadRequestException('Manual task title is too long');
+    if (dto.manualTaskDescription && dto.manualTaskDescription.length > 500) throw new BadRequestException('Manual task description is too long');
+    if (dto.manualTaskVisibility && !['visible', 'hidden'].includes(dto.manualTaskVisibility)) throw new BadRequestException('Manual task visibility is invalid');
+    if (dto.manualTaskDays !== undefined && (!Number.isFinite(Number(dto.manualTaskDays)) || Number(dto.manualTaskDays) < 0 || Number(dto.manualTaskDays) > 3650)) throw new BadRequestException('Manual task duration must be between 0 and 3650 days');
     if (dto.awardType === 'achievement') {
       if (!dto.achievementKey || !['level', 'experience', 'followers', 'recharge', 'support', 'received'].includes(dto.achievementKey)) {
         throw new BadRequestException('Achievement key must be level, experience, followers, recharge, support, or received');

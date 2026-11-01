@@ -35,6 +35,19 @@ export class Badge {
   @Column({ type: 'int', default: 0 })
   achievementThreshold: number;
 
+  /** Manually curated medal task; visible tasks appear in the existing task center. */
+  @Column({ type: 'boolean', default: false })
+  manualTaskEnabled: boolean;
+  /** visible = shown in task center; hidden = admin-only/manual award. */
+  @Column({ type: 'varchar', length: 16, default: 'hidden' })
+  manualTaskVisibility: string;
+  @Column({ type: 'varchar', length: 120, default: '' })
+  manualTaskTitle: string;
+  @Column({ type: 'varchar', length: 500, default: '' })
+  manualTaskDescription: string;
+  @Column({ type: 'int', default: 0 })
+  manualTaskDays: number;
+
   /** Private server-tracked activity condition; never exposed to user task APIs. */
   @Column({ type: 'boolean', default: false })
   hiddenTaskEnabled: boolean;

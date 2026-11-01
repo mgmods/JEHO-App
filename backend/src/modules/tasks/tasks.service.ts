@@ -624,7 +624,7 @@ export class TasksService {
       }
     }
     // Hard stop: no free cashout diamonds from any task (host or audience).
-    return tasks.map((t) => {
+    const dailyTasks = tasks.map((t) => {
       const audience: TaskAudience = t.audience === 'host' ? 'host' : 'all';
       const title =
         t.id === 'h9' && String(t.title || '').includes('ماسة')
@@ -900,6 +900,8 @@ export class TasksService {
         requiresAgency: (t.audience || 'all') === 'host',
       };
     });
+    const medalTasks = await this.badges.visibleManualTasks(userId);
+    return [...dailyTasks, ...medalTasks];
   }
 
   private matchesScope(task: DailyTask, context: TaskProgressContext) {

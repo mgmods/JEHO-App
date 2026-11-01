@@ -540,6 +540,10 @@ public final class MiscDtos {
         @SerializedName("current") public int current;
         @SerializedName("target") public int target;
         @SerializedName("progressLabel") public String progressLabel;
+        @SerializedName("medalId") public String medalId;
+        @SerializedName("medalName") public String medalName;
+        @SerializedName("medalImageUrl") public String medalImageUrl;
+        @SerializedName("description") public String description;
 
         public boolean isHostTask() {
             return "host".equalsIgnoreCase(audience) || "host".equalsIgnoreCase(section);

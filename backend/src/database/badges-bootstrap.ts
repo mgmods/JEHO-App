@@ -42,7 +42,12 @@ export async function ensureBadgeTables(dataSource: DataSource): Promise<void> {
       ADD COLUMN IF NOT EXISTS "hiddenTaskEnabled" boolean NOT NULL DEFAULT false,
       ADD COLUMN IF NOT EXISTS "hiddenTaskEvent" varchar(32),
       ADD COLUMN IF NOT EXISTS "hiddenTaskTarget" integer NOT NULL DEFAULT 1,
-      ADD COLUMN IF NOT EXISTS "hiddenTaskDays" integer NOT NULL DEFAULT 0
+      ADD COLUMN IF NOT EXISTS "hiddenTaskDays" integer NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS "manualTaskEnabled" boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS "manualTaskVisibility" varchar(16) NOT NULL DEFAULT 'hidden',
+      ADD COLUMN IF NOT EXISTS "manualTaskTitle" varchar(120) NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS "manualTaskDescription" varchar(500) NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS "manualTaskDays" integer NOT NULL DEFAULT 0
     `);
     await manager.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."user_badges" (
