@@ -42,6 +42,7 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
         CHECK (length(trim(body)) > 0 OR "imageUrl" IS NOT NULL)
       )
     `);
+    await manager.query(`ALTER TABLE "jeho_own"."moments" ADD COLUMN IF NOT EXISTS "updatedAt" timestamptz NOT NULL DEFAULT now()`);
     await manager.query(`CREATE INDEX IF NOT EXISTS "IDX_moments_created" ON "jeho_own"."moments" ("createdAt" DESC)`);
     await manager.query(`CREATE INDEX IF NOT EXISTS "IDX_moments_user_created" ON "jeho_own"."moments" ("userId", "createdAt" DESC)`);
     await manager.query(`
