@@ -2176,10 +2176,10 @@ export class GiftsService implements OnModuleInit {
     if (!userId) return { enabled: false, frameUrl: null };
     try {
       const rows = await this.dataSource.query(
-        `SELECT u."mysteriousMode" AS "mysteriousMode", active.benefits AS benefits
+        `SELECT u."mysteriousMode" AS "mysteriousMode", active.benefits AS benefits, active.level AS "vipLevel"
            FROM users u
            LEFT JOIN LATERAL (
-             SELECT vp.benefits
+             SELECT vp.benefits, uv.level
                FROM user_vips uv
                JOIN vip_plans vp ON vp.id = uv."vipPlanId"
               WHERE uv."userId" = u.id
@@ -2198,7 +2198,21 @@ export class GiftsService implements OnModuleInit {
       if (typeof benefits === 'string') {
         try { benefits = JSON.parse(benefits); } catch { benefits = {}; }
       }
-      if (!Array.isArray(benefits?.extra) || !benefits.extra.includes('mysterious_man')) {
+      const policyRow = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+      if (policyRow) {
+        let policy: any = {};
+        try {
+          policy = typeof policyRow.value === 'string' ? JSON.parse(policyRow.value) : (policyRow.value || {});
+        } catch {
+          return { enabled: false, frameUrl: null };
+        }
+        const allowedLevels = Array.isArray(policy.eligibleVipLevels)
+          ? policy.eligibleVipLevels.map(Number).filter((n: number) => Number.isInteger(n) && n >= 1 && n <= 7)
+          : [];
+        if (policy.enabled !== true || !allowedLevels.includes(Number(row.vipLevel))) {
+          return { enabled: false, frameUrl: null };
+        }
+      } else if (!Array.isArray(benefits?.extra) || !benefits.extra.includes('mysterious_man')) {
         return { enabled: false, frameUrl: null };
       }
       const visuals = benefits.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
