@@ -212,7 +212,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     if (userIds.length < 2) return { relationships: [], effects: {} };
 
     const rows = await this.dataSource.query(
-      `SELECT id, type, "userAId", "userBId"
+      `SELECT id, type, "userAId", "userBId", level, points::text AS points
        FROM cp_relationships
        WHERE status = 'active'
          AND "userAId" = ANY($1::uuid[])
@@ -224,13 +224,18 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
     const types = Array.from(new Set<string>(rows.map((row: any) => String(row.type))));
     const effects: Record<string, any> = {};
+    const levelConfigs: Record<string, any[]> = {};
     for (const type of types) {
-      const [setting] = await this.dataSource.query(
-        'SELECT value FROM app_settings WHERE key=$1',
-        [`cp.rules.${type}`],
-      );
+      const [setting, levelSetting] = await Promise.all([
+        this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.rules.${type}`]).then(rows => rows[0]),
+        this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${type}`]).then(rows => rows[0]),
+      ]);
       let rules: Record<string, any> = {};
       try { rules = JSON.parse(String(setting?.value || '{}')); } catch { rules = {}; }
+      try {
+        const parsed = JSON.parse(String(levelSetting?.value || '[]'));
+        levelConfigs[type] = Array.isArray(parsed) ? parsed : [];
+      } catch { levelConfigs[type] = []; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
       effects[type] = {
         enabled: effect.enabled !== false,
@@ -240,9 +245,18 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       };
     }
     return {
-      relationships: rows.map((row: any) => ({
-        id: row.id, type: row.type, userAId: row.userAId, userBId: row.userBId,
-      })),
+      relationships: rows.map((row: any) => {
+        const currentLevelConfig = (levelConfigs[row.type] || []).find(item => Number(item?.level) === Number(row.level)) || null;
+        return {
+          id: row.id, type: row.type, userAId: row.userAId, userBId: row.userBId,
+          points: row.points, level: row.level, currentLevelConfig,
+          levelName: currentLevelConfig?.name || currentLevelConfig?.title || currentLevelConfig?.presentation?.title || null,
+          presentation: currentLevelConfig?.presentation || null,
+          benefits: currentLevelConfig?.benefits || currentLevelConfig?.rewards || [],
+          giftPresentation: currentLevelConfig?.giftPresentation || null,
+          giftBonusPercent: Math.max(0, Math.min(500, Number(currentLevelConfig?.giftBonusPercent) || 0)),
+        };
+      }),
       effects,
     };
   }
@@ -1078,7 +1092,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     if (!UUID_REGEX.test(relationshipId) || !Number.isSafeInteger(points) || points < 0 || !eventType || !referenceType || !referenceId) {
       throw new BadRequestException('حدث النقاط غير صالح');
     }
-    return this.dataSource.transaction(async manager => {
+    const result = await this.dataSource.transaction(async manager => {
       const [relationship] = await manager.query(
         'SELECT * FROM cp_relationships WHERE id=$1 AND status=\'active\' FOR UPDATE',
         [relationshipId],
@@ -1090,7 +1104,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
          ON CONFLICT ("referenceType","referenceId") DO NOTHING RETURNING id`,
         [relationshipId, eventType, referenceType, referenceId, String(points), JSON.stringify(metadata)],
       );
-      if (!inserted.length) return { relationshipId, duplicate: true, points: relationship.points, level: relationship.level };
+      if (!inserted.length) return { relationshipId, duplicate: true, points: relationship.points, level: relationship.level, levelChanged: false };
+      const previousLevel = Number(relationship.level) || 1;
       const total = BigInt(String(relationship.points)) + BigInt(points);
       const [levelConfig] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${relationship.type}`]);
       let level = 1;
@@ -1105,8 +1120,36 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         'UPDATE cp_relationships SET points=$1,level=$2,"updatedAt"=now() WHERE id=$3',
         [total.toString(), level, relationshipId],
       );
-      return { relationshipId, duplicate: false, points: total.toString(), level };
+      return { relationshipId, duplicate: false, points: total.toString(), level, previousLevel, levelChanged: level > previousLevel };
     });
+    if (result.levelChanged) {
+      const [relationship] = await this.dataSource.query(
+        'SELECT type,"userAId","userBId" FROM cp_relationships WHERE id=$1',
+        [relationshipId],
+      );
+      const [levelsSetting] = relationship
+        ? await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${relationship.type}`])
+        : [];
+      let currentLevelConfig: any = null;
+      try {
+        const levels = JSON.parse(levelsSetting?.value || '[]');
+        currentLevelConfig = Array.isArray(levels) ? levels.find(item => Number(item?.level) === Number(result.level)) || null : null;
+      } catch { currentLevelConfig = null; }
+      const payload = {
+        type: 'cp_level_up', relationshipId, level: result.level,
+        previousLevel: result.previousLevel, points: result.points,
+        levelName: currentLevelConfig?.name || currentLevelConfig?.title || currentLevelConfig?.presentation?.title || null,
+        presentation: currentLevelConfig?.presentation || null,
+        benefits: currentLevelConfig?.benefits || currentLevelConfig?.rewards || [],
+      };
+      const title = 'ارتفع مستوى CB!';
+      const body = payload.levelName ? `وصلتما إلى مستوى ${payload.levelName}` : `وصلتما إلى المستوى ${result.level}`;
+      for (const memberId of [relationship?.userAId, relationship?.userBId].filter(Boolean)) {
+        await this.notifications.notifyUser(memberId, NotificationType.SYSTEM, title, body, payload).catch(() => undefined);
+        this.realtime.emitToUser(memberId, 'cp:level-up', { ...payload, title, body });
+      }
+    }
+    return result;
   }
 
   private async expireDueRequests() {
