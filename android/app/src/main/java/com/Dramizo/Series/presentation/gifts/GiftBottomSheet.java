@@ -546,22 +546,20 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 active.add(c);
             }
         }
-        // Dedicated CP gift tab is generated from the live CP dashboard catalog.
-        // It is additive to the normal dashboard categories and never hardcodes gift IDs.
-        if (!cpGiftTypes.isEmpty()) {
-            boolean hasCpTab = false;
-            for (GiftDtos.GiftCategoryDto item : active) {
-                if ("cp".equalsIgnoreCase(item.key)) { hasCpTab = true; break; }
-            }
-            if (!hasCpTab) {
-                GiftDtos.GiftCategoryDto cpTab = new GiftDtos.GiftCategoryDto();
-                cpTab.key = "cp";
-                cpTab.labelAr = "هدايا CB";
-                cpTab.labelEn = "CB Gifts";
-                cpTab.sortOrder = Integer.MAX_VALUE;
-                cpTab.isActive = true;
-                active.add(cpTab);
-            }
+        // Keep the CP gift section visible even before an admin has configured
+        // an active CP gift. The server catalog still decides which actual gifts appear.
+        boolean hasCpTab = false;
+        for (GiftDtos.GiftCategoryDto item : active) {
+            if ("cp".equalsIgnoreCase(item.key)) { hasCpTab = true; break; }
+        }
+        if (!hasCpTab) {
+            GiftDtos.GiftCategoryDto cpTab = new GiftDtos.GiftCategoryDto();
+            cpTab.key = "cp";
+            cpTab.labelAr = "هدايا CP";
+            cpTab.labelEn = "CP Gifts";
+            cpTab.sortOrder = Integer.MAX_VALUE;
+            cpTab.isActive = true;
+            active.add(cpTab);
         }
         Collections.sort(active, (a, b) -> {
             int sa = a != null ? a.sortOrder : 0;
