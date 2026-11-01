@@ -7,13 +7,13 @@
     <div class="editor-grid">
       <div class="controls">
         <details open><summary>الخلفية</summary>
-          <label>رابط صورة الخلفية<input v-model.trim="draft.backgroundImageUrl" dir="ltr" placeholder="https://..."></label>
+          <label>رابط صورة الخلفية<input v-model.trim="draft.backgroundImageUrl" @change="applyBackgroundUrl" dir="ltr" placeholder="https://..." autocomplete="url" spellcheck="false"></label>
           <label>لون الخلفية الاحتياطي<input v-model="draft.backgroundColor" type="color"></label>
           <label>لون طبقة التعتيم<input v-model="draft.overlayColor" type="color"></label>
           <label>شفافية التعتيم · {{ Math.round(draft.overlayOpacity*100) }}%<input v-model.number="draft.overlayOpacity" type="range" min="0" max="1" step=".05"></label>
         </details>
         <details open><summary>الشعار والنصوص</summary>
-          <label>رابط الشعار<input v-model.trim="draft.logoUrl" dir="ltr" placeholder="https://..."></label>
+          <label>رابط الشعار<input v-model.trim="draft.logoUrl" @change="applyLogoUrl" dir="ltr" placeholder="https://..." autocomplete="url" spellcheck="false"></label>
           <label>النص بجانب الشعار<input v-model="draft.title" maxlength="80" placeholder="مكافآت تسجيل الدخول"></label>
           <label>النص أسفل العنوان<input v-model="draft.subtitle" maxlength="120" placeholder="سجّل دخولك يومياً واحصل على مكافأتك"></label>
           <label>لون العنوان<input v-model="draft.titleColor" type="color"></label>
@@ -29,7 +29,7 @@
         <strong>معاينة مباشرة · نافذة المستخدم</strong>
         <div class="preview" :style="previewStyle">
           <div class="preview-head">
-            <img v-if="draft.logoUrl" :src="draft.logoUrl" alt="الشعار">
+            <img v-if="previewLogoUrl" :src="previewLogoUrl" alt="الشعار" loading="lazy" decoding="async">
             <div class="head-copy">
               <h2 :style="{color:draft.titleColor}">{{ draft.title }}</h2>
               <p :style="{color:draft.subtitleColor}">{{ draft.subtitle }}</p>
