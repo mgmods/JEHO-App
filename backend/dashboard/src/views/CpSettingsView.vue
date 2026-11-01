@@ -126,7 +126,7 @@
           <div class="col-12">
             <label class="form-label">جدول المستويات والمكافآت (JSON)</label>
             <textarea v-model="item.levelsText" class="form-control font-monospace" rows="5" dir="ltr" spellcheck="false" placeholder='[{"level":1,"pointsRequired":0,"reward":"إطار البداية"}]'></textarea>
-            <div class="form-text">كل عنصر: level و pointsRequired، واختيارياً reward. يجب ترتيب النقاط تصاعدياً. لا يوجد عدد مستويات مفروض مسبقاً.</div>
+            <div class="form-text">كل عنصر: level و pointsRequired. يمكن إضافة reward أو benefits/rewards (قائمة مكافآت متعددة)، وpresentation (إطار/شارة/خلفية/تأثير/عنوان)، وgiftPresentation (شكل الهدية الثنائية)، وgiftBonusPercent (نسبة نقاط إضافية). مثال: {"level":5,"pointsRequired":2500,"benefits":[{"type":"frame","code":"cb_frame_5"},{"type":"badge","code":"cb_badge_5"},{"type":"gift","code":"heart_duo"}],"presentation":{"frameUrl":"https://…","badgeUrl":"https://…","cardBackgroundUrl":"https://…","title":"ثنائي متألق"},"giftPresentation":{"animationUrl":"https://…","showPartnerAvatars":true},"giftBonusPercent":5}. يجب ترتيب النقاط تصاعدياً. هذه الإعدادات تُعرض عبر API ويمكن تعديلها دون تحديث التطبيق.</div>
           </div>
           <div class="col-12">
             <label class="form-label">قواعد النوع (JSON)</label>
