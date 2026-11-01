@@ -16,7 +16,7 @@ Pass the API base including `/api/v1` (for example `https://api-host.example/api
 GET /api/v1/cp/users/{userId}
 ```
 
-The response includes the active relationship, `level`, `currentLevelConfig`, `presentation`, `benefits`, `giftPresentation`, and `giftBonusPercent`. Authenticated relationship workspace responses from `GET /api/cp/me` include the same presentation fields.
+The response includes the active relationship, `level`, `currentLevelConfig`, `presentation`, `benefits`, `giftPresentation`, and `giftBonusPercent`. Authenticated relationship workspace responses from `GET /api/v1/cp/me` include the same presentation fields.
 
 ## Render reusable pieces
 
@@ -28,7 +28,7 @@ document.querySelector('#cb-card').innerHTML =
   window.JehoCB.renderCard(relationship, '<h3>الثنائي</h3>');
 document.querySelector('#profile-name').innerHTML =
   window.JehoCB.renderName(displayName, relationship);
-node.innerHTML = window.JehoCB.renderDuoGift(relationship, { a: partnerAvatarUrl, b: userAvatarUrl });
+document.querySelector('#cb-gift').innerHTML = window.JehoCB.renderDuoGift(relationship, { a: partnerAvatarUrl, b: userAvatarUrl });
 window.JehoCB.apply(document, relationship);
 
 // Or load and render in one call:
