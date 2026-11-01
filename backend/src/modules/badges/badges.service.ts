@@ -179,7 +179,7 @@ export class BadgesService {
       });
       if (!shouldGrant) continue;
       try {
-        const granted = await this.grantForTask(userId, medal.id, medal.hiddenTaskDays, 'hidden_task', false);
+        const granted = await this.grantForTask(userId, medal.id, medal.hiddenTaskDays, 'hidden_task', true);
         const alreadyOwned = !granted && !!(await this.userBadges.createQueryBuilder('ub')
           .where('ub.userId = :userId AND ub.badgeId = :badgeId', { userId, badgeId: medal.id })
           .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
@@ -340,7 +340,7 @@ export class BadgesService {
           userId,
           NotificationType.SYSTEM,
           'ميدالية جديدة! 🏅',
-          source === 'hidden_task' ? 'حصلت على ميدالية جديدة.' : `أكملت المهمة وحصلت تلقائياً على ميدالية ${badge.name}`,
+          source === 'hidden_task' ? `مبروك! أكملت المهمة السرّية وحصلت على ميدالية ${badge.name}.` : `أكملت المهمة وحصلت تلقائياً على ميدالية ${badge.name}`,
           { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, source },
         );
       } catch (error) {
