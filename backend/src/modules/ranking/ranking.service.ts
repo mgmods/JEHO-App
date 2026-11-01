@@ -246,7 +246,9 @@ export class RankingService {
       where: { id: In(ids) },
       relations: { profile: true, vips: { vipPlan: true } },
     });
-    const map = new Map(users.map((u) => [u.id, u]));
+    // A user may keep earning and spending normally while using the anonymous identity,
+    // but must not appear as a ranking entry while that mode is enabled.
+    const map = new Map(users.filter((u) => !u.mysteriousMode).map((u) => [u.id, u]));
     return rows.filter((r) => map.has(r.targetId)).map((r) => {
       const user = map.get(r.targetId)!;
       const activeVip = (user.vips || [])
