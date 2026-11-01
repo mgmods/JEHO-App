@@ -38,3 +38,21 @@ window.JehoCB.load(userId, apiBase, document).catch(console.error);
 For declarative integration, mark elements with `data-cb-level`, `data-cb-card`, `data-cb-name`, or `data-cb-gift`, then call `window.JehoCB.apply(root, relationship)`.
 
 All URLs are supplied by the API; do not hard-code image URLs in HTML pages. Keep user names escaped when constructing custom markup.
+
+
+## Profile identity and relationship duration
+
+Add a profile mount point where the CB identity should appear:
+
+```html
+<div data-cb-profile></div>
+```
+
+Then load the viewed account's active relationship:
+
+```js
+window.JehoCB.load(viewedUserId, apiBaseIncludingApiV1, document)
+  .catch(console.error);
+```
+
+The profile summary renders the partner avatar and display name, configured level badge/title, and the relationship duration returned by the API. Keep this mount point in the profile identity area; other pages can use the smaller `data-cb-level`, `data-cb-name`, `data-cb-card`, and `data-cb-gift` mount points independently.
