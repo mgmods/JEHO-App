@@ -634,7 +634,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const nextThreshold = nextLevel ? Math.max(0, Number(nextLevel.pointsRequired) || 0) : null;
       const span = nextThreshold === null ? 0 : nextThreshold - currentThreshold;
       const progressed = Math.max(0, Number(row.points || 0) - currentThreshold);
-      const progressPercent = span > 0 ? Math.max(0, Math.min(100, progressed * 100 / span)) : 100;
+      const progressPercent = span > 0
+        ? Math.max(0, Math.min(100, progressed * 100 / span))
+        : (levels.length > 0 ? 100 : 0);
       const currentLevelConfig = levels.find(item => Number(item?.level) === Number(row.level)) || null;
       const presentation = currentLevelConfig?.presentation || {};
       const startedAt = new Date(row.startedAt);
