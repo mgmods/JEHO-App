@@ -213,7 +213,7 @@ export class CpAdminController {
           for (const field of ['frameUrl', 'levelLogoUrl', 'logoUrl', 'badgeUrl', 'cardBackgroundUrl']) {
             const url = level.presentation[field];
             if (url !== undefined && url !== '' &&
-                (typeof url !== 'string' || url.length > 2048 || !/^https?:\\/\\//i.test(url))) {
+                (typeof url !== 'string' || url.length > 2048 || !(url.startsWith('https://') || url.startsWith('http://')))) {
               throw new BadRequestException('رابط صورة مستوى CB غير صالح: ' + field);
             }
           }
