@@ -18,10 +18,11 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CosmeticsModule } from '../cosmetics/cosmetics.module';
 import { AuthModule } from '../auth/auth.module';
+import { BadgesModule } from '../badges/badges.module';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CpRequest, CpRelationship, CpAuditLog, CpPointEvent, Wallet, WalletTransaction, Room, RoomSeat, User, AppSetting]), RealtimeModule, NotificationsModule, CosmeticsModule, AuthModule],
+  imports: [TypeOrmModule.forFeature([CpRequest, CpRelationship, CpAuditLog, CpPointEvent, Wallet, WalletTransaction, Room, RoomSeat, User, AppSetting]), RealtimeModule, NotificationsModule, CosmeticsModule, AuthModule, BadgesModule],
   controllers: [CpController, CpAdminController],
   providers: [CpService, JwtAuthGuard],
   exports: [CpService],
