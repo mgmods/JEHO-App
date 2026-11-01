@@ -176,6 +176,24 @@
                     </select>
                     <div v-if="selectedGift({giftId:level.rewardGiftId})" class="small mt-1">{{ selectedGift({giftId:level.rewardGiftId}).name }}</div>
                   </div>
+                  <div class="col-md-6">
+                    <label class="form-label">مكافأة تجميلية تلقائية عند بلوغ المستوى</label>
+                    <select v-model="level.rewardCosmeticCode" class="form-select" @change="syncLevelEditor(item)">
+                      <option value="">بدون مكافأة تجميلية تلقائية</option>
+                      <option v-for="cosmetic in cpStoreItems.filter(entry => entry.isActive)" :key="cosmetic.code" :value="cosmetic.code">{{ cosmetic.name }} · {{ cosmeticTypeLabel(cosmetic.type) }}</option>
+                    </select>
+                    <div class="form-text">تُضاف لحساب كل شريك مرة واحدة عند بلوغ المستوى.</div>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">مدة المكافأة (يوم)</label>
+                    <input v-model.number="level.rewardDays" class="form-control" type="number" min="1" max="365" @change="syncLevelEditor(item)">
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-check mt-4">
+                      <input v-model="level.rewardPermanent" class="form-check-input" type="checkbox" @change="syncLevelEditor(item)">
+                      <span class="form-check-label">مكافأة دائمة</span>
+                    </label>
+                  </div>
                   <div class="col-md-4">
                     <label class="form-label">إطار بطاقة المستوى</label>
                     <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg" @change="uploadLevelAsset(item,level,'frameUrl',$event)">
@@ -632,7 +650,7 @@ async function load() {
       giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
       levelsText: JSON.stringify(item.levels || [], null, 2),
-      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || '') })),
+      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true })),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
       seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
       seatEffectUrl: item.rules?.seatEffect?.url || '',
@@ -718,6 +736,9 @@ function syncLevelEditor(item) {
     giftPresentation: { ...(level.giftPresentation || {}) },
     giftBonusPercent: Math.max(0, Math.min(500, Number(level.giftBonusPercent) || 0)),
     rewardGiftId: String(level.rewardGiftId || ''),
+    rewardCosmeticCode: String(level.rewardCosmeticCode || ''),
+    rewardDays: Math.max(1, Math.min(365, Number(level.rewardDays) || 30)),
+    rewardPermanent: level.rewardPermanent === true,
   }))
   item.levelsText = JSON.stringify(levels, null, 2)
 }
