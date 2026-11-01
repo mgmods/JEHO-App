@@ -546,6 +546,23 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 active.add(c);
             }
         }
+        // Dedicated CP gift tab is generated from the live CP dashboard catalog.
+        // It is additive to the normal dashboard categories and never hardcodes gift IDs.
+        if (!cpGiftTypes.isEmpty()) {
+            boolean hasCpTab = false;
+            for (GiftDtos.GiftCategoryDto item : active) {
+                if ("cp".equalsIgnoreCase(item.key)) { hasCpTab = true; break; }
+            }
+            if (!hasCpTab) {
+                GiftDtos.GiftCategoryDto cpTab = new GiftDtos.GiftCategoryDto();
+                cpTab.key = "cp";
+                cpTab.labelAr = "هدايا CB";
+                cpTab.labelEn = "CB Gifts";
+                cpTab.sortOrder = Integer.MAX_VALUE;
+                cpTab.isActive = true;
+                active.add(cpTab);
+            }
+        }
         Collections.sort(active, (a, b) -> {
             int sa = a != null ? a.sortOrder : 0;
             int sb = b != null ? b.sortOrder : 0;
@@ -713,6 +730,13 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         List<GiftDtos.GiftDto> out = new ArrayList<>();
         for (GiftDtos.GiftDto g : allGifts) {
             if (g == null || isLuckyBoxGift(g)) continue;
+            boolean isCpGift = g.id != null && cpGiftTypes.containsKey(g.id);
+            if ("cp".equals(want)) {
+                if (isCpGift) out.add(g);
+                continue;
+            }
+            // Keep configured CB gifts in their own tab, not duplicated in ordinary categories.
+            if (isCpGift) continue;
             if (want.equals(giftBucket(g))) out.add(g);
         }
         return out;
@@ -1082,15 +1106,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         }
 
         int qty = effectiveQty();
-        String cpType = selected.id != null ? cpGiftTypes.get(selected.id) : null;
-        if (cpType != null && (chatMode || roomId == null || roomId.isEmpty())) {
-            Toast.makeText(requireContext(), "هدية بدء الارتباط تُرسل من داخل الروم الصوتي فقط", Toast.LENGTH_LONG).show();
-            return;
-        }
-        if (cpType != null && (targets.size() != 1 || qty != 1)) {
-            Toast.makeText(requireContext(), "هدية الارتباط تُرسل لشخص واحد وبكمية واحدة", Toast.LENGTH_LONG).show();
-            return;
-        }
+        // CP gifts use the exact same committed gift pipeline as every other gift.
+        // The backend decides whether this gift opens a relationship request:
+        // unlinked users trigger a request; users already linked simply gift normally.
         long need = (long) selected.coinPrice * qty * targets.size();
         Long coins = vm.getCoinsBalance().getValue();
         if (coins != null && selected.coinPrice > 0 && coins < need) {
@@ -1098,11 +1116,6 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     "رصيدك غير كافٍ · المطلوب " + fmt(need),
                     Toast.LENGTH_SHORT).show();
             openRechargeOnly();
-            return;
-        }
-
-        if (cpType != null) {
-            sendCpGiftRequest(cpType, targets.get(0), roomId);
             return;
         }
 
@@ -1161,6 +1174,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     cpGiftPrices.putAll(prices);
                     cpCatalogLoaded = true;
                     applyCpGiftPrices();
+                    // Rebuild the tabs now that the live CP catalog is known.
+                    applyCategories(new ArrayList<>(tabCategories));
                     applyFilter();
                     refreshSendBtn();
                     updateDockText();
@@ -1177,44 +1192,6 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             Integer configured = cpGiftPrices.get(gift.id);
             if (configured != null && configured > 0) gift.coinPrice = configured;
         }
-    }
-
-    private void sendCpGiftRequest(@NonNull String cpType, @NonNull String recipientId,
-                                   @NonNull String roomId) {
-        if (sending || !isAdded()) return;
-        sending = true;
-        if (binding != null) {
-            binding.bltvSendGift.setEnabled(false);
-            binding.bltvSendGift.setText("جارٍ إرسال هدية الارتباط…");
-        }
-        Map<String, String> body = new LinkedHashMap<>();
-        body.put("recipientId", recipientId);
-        body.put("type", cpType);
-        body.put("roomId", roomId);
-        body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
-        AppContainer container = ContainerProvider.from(requireActivity());
-        container.getIoExecutor().execute(() -> {
-            Result<Map<String, Object>> result = ApiCall.execute(container.getUserApi().createRoomCpRequest(body));
-            if (!isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
-                if (!isAdded()) return;
-                sending = false;
-                if (binding != null) {
-                    refreshSendBtn();
-                    updateDockText();
-                }
-                if (result.success) {
-                    Toast.makeText(requireContext(),
-                            "تم إرسال هدية الارتباط، بانتظار موافقة الطرف الآخر", Toast.LENGTH_LONG).show();
-                    vm.loadWallet();
-                    dismissAllowingStateLoss();
-                } else {
-                    Toast.makeText(requireContext(),
-                            result.error != null ? result.error : "تعذر إرسال هدية الارتباط",
-                            Toast.LENGTH_LONG).show();
-                }
-            });
-        });
     }
 
     // ─── Gift sent ────────────────────────────────────────────────────────────
