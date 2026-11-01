@@ -534,8 +534,21 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     return rows.map((row: any) => {
       const currentLevelConfig = (configs[row.type] || []).find(item => Number(item?.level) === Number(row.level)) || null;
       const presentation = currentLevelConfig?.presentation || {};
+      const startedAt = new Date(row.startedAt);
+      const durationDays = Number.isNaN(startedAt.getTime()) ? 0 : Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 86400000));
+      const durationYears = Math.floor(durationDays / 365);
+      const durationMonths = Math.floor((durationDays % 365) / 30);
+      const remainingDays = durationDays - durationYears * 365 - durationMonths * 30;
+      const durationLabel = durationYears > 0
+        ? `${durationYears} سنة ${durationMonths} شهر`
+        : durationMonths > 0 ? `${durationMonths} شهر ${remainingDays} يوم` : `${durationDays} يوم`;
       return {
         ...row,
+        durationDays,
+        durationLabel,
+        duration: { days: durationDays, years: durationYears, months: durationMonths, remainingDays },
+        partnerDisplayName: row.partner?.displayName || row.partner?.username || 'الشريك',
+        partnerAvatarUrl: row.partner?.avatarUrl || null,
         currentLevelConfig,
         levelName: currentLevelConfig?.name || currentLevelConfig?.title || presentation?.title || null,
         levelLogoUrl: presentation?.levelLogoUrl || presentation?.logoUrl || currentLevelConfig?.logoUrl || null,
