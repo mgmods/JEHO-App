@@ -482,7 +482,7 @@ const form = reactive({
   type: 'normal',
   category: 'normal',
   cpRelationshipType: 'love',
-  cpPoints: 0,
+  cpPoints: '',
   iconUrl: '',
   animationUrl: '',
   sortOrder: 0,
@@ -570,7 +570,7 @@ function openCreate() {
     type: 'normal',
     category: giftSection.value === 'cp' ? 'cp' : (activeCategories.value[0]?.key || 'normal'),
     cpRelationshipType: 'love',
-    cpPoints: 0,
+    cpPoints: '',
     iconUrl: '',
     animationUrl: '',
     sortOrder: 0,
@@ -593,7 +593,7 @@ function openEdit(g) {
     type: g.type || 'normal',
     category: g.category || g.type || 'normal',
     cpRelationshipType: g.cpRelationshipType || 'love',
-    cpPoints: Number(g.cpPoints ?? 0),
+    cpPoints: g.cpPoints == null ? '' : Number(g.cpPoints),
     iconUrl: g.iconUrl || '',
     animationUrl: g.animationUrl || '',
     sortOrder: g.sortOrder || 0,
@@ -688,7 +688,9 @@ async function save() {
     type: form.type || 'normal',
     category: form.category || form.type || 'normal',
     cpRelationshipType: String(form.cpRelationshipType || 'love'),
-    cpPoints: Math.max(0, Math.floor(Number(form.cpPoints) || 0)),
+    cpPoints: form.cpPoints === '' || form.cpPoints == null
+      ? undefined
+      : Math.max(0, Math.floor(Number(form.cpPoints) || 0)),
     sortOrder: Number(form.sortOrder) || 0,
     isActive: form.status === 'active',
     luckyConfig:
