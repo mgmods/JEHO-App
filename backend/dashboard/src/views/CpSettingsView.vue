@@ -744,7 +744,7 @@ function refreshLevelEditor(item) {
   try {
     const levels = JSON.parse(item.levelsText || '[]')
     if (!Array.isArray(levels)) throw new Error('يجب أن يكون جدول المستويات قائمة JSON.')
-    item.levelsEditor = levels.map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || '') }))
+    item.levelsEditor = levels.map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || '') }))
   } catch (e) { error.value = e?.message || 'تعذر قراءة جدول المستويات.' }
 }
 
