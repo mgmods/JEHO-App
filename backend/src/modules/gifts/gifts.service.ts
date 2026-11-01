@@ -2610,6 +2610,9 @@ export class GiftsService implements OnModuleInit {
           result.send.giftId || gift.id,
           result.send.id,
           dto.roomId || null,
+          String(gift.category || '').toLowerCase() === 'cp' && gift.cpPoints != null
+            ? Math.max(0, Math.floor(Number(gift.cpPoints) || 0)) * Math.max(1, Number(result.send.quantity) || qty)
+            : null,
         ).catch((err) => {
           this.log.warn(`CP initiation request failed: ${err instanceof Error ? err.message : String(err)}`);
         });
@@ -2622,7 +2625,7 @@ export class GiftsService implements OnModuleInit {
           result.send.receiverId,
           result.send.id,
           Number(result.send.totalCoins || totalCoins),
-          String(gift.category || '').toLowerCase() === 'cp'
+          String(gift.category || '').toLowerCase() === 'cp' && gift.cpPoints != null
             ? Math.max(0, Number(gift.cpPoints) || 0) * Math.max(1, Number(result.send.quantity) || qty)
             : undefined,
         ).catch((err) => {
