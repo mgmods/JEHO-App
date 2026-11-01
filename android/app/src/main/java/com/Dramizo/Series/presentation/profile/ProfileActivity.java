@@ -1157,22 +1157,6 @@ public class ProfileActivity extends ThemedActivity {
                         binding.imgCpLevelIcon.setVisibility(View.GONE);
                     }
                 }
-                String levelBadgeValue = firstNonEmptyValue(
-                        relation.get("levelBadgeUrl"),
-                        levelPresentation.get("badgeUrl"));
-                String levelBadgeUrl = levelBadgeValue == null ? "" : levelBadgeValue;
-                if (binding.imgProfileCpLevelBadge != null) {
-                    if (!levelBadgeUrl.isEmpty()) {
-                        binding.imgProfileCpLevelBadge.setVisibility(View.VISIBLE);
-                        Glide.with(ProfileActivity.this)
-                                .load(AssetCatalog.absoluteUrl(levelBadgeUrl))
-                                .fitCenter()
-                                .into(binding.imgProfileCpLevelBadge);
-                    } else {
-                        binding.imgProfileCpLevelBadge.setImageDrawable(null);
-                        binding.imgProfileCpLevelBadge.setVisibility(View.GONE);
-                    }
-                }
                 String durationText;
                 if (relationshipDays >= 365) {
                     long years = relationshipDays / 365;
