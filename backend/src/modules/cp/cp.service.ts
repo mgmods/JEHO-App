@@ -1194,6 +1194,17 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     if (String(globalSetting?.value || 'true').toLowerCase() === 'false' ||
         String(typeSetting?.value || 'true').toLowerCase() === 'false') return null;
 
+    const [configuredGiftPoints] = await this.dataSource.query(
+      'SELECT value FROM app_settings WHERE key=$1',
+      [`cp.gift_points.${type}`],
+    );
+    // A missing/zero legacy gift.cpPoints must not suppress the points
+    // configured for this relationship type in the dashboard.
+    const explicitGiftPoints = Number(giftPoints);
+    const effectiveGiftPoints = Number.isSafeInteger(explicitGiftPoints) && explicitGiftPoints > 0
+      ? explicitGiftPoints
+      : Math.max(0, Math.floor(Number(configuredGiftPoints?.value) || 0));
+
     const idempotencyKey = `gift-send:${giftSendId}`;
     const outcome = await this.dataSource.transaction(async manager => {
       await this.lockRelationshipUsers(manager, [senderId, receiverId]);
@@ -1238,7 +1249,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
          VALUES ($1,$2,$3,'pending',$4,NULL,$5,$6,$7,$8,$9,$10,now()+($11 || ' minutes')::interval,now(),now())
          RETURNING *`,
         [senderId, receiverId, type, roomId || null, gift.id, gift.name, gift.iconUrl, gift.animationUrl,
-          giftPoints == null ? null : String(Math.max(0, Math.floor(Number(giftPoints) || 0))),
+          effectiveGiftPoints > 0 ? String(effectiveGiftPoints) : null,
           idempotencyKey, String(expiryMinutes)],
       );
       return { request, created: true };
