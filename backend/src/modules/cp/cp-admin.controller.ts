@@ -200,6 +200,10 @@ export class CpAdminController {
           throw new BadRequestException('نسبة نقاط هدايا المستوى يجب أن تكون بين 0 و500');
         }
         if (level.rewardGiftId) {
+          if (typeof level.rewardGiftId !== 'string' ||
+              !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(level.rewardGiftId)) {
+            throw new BadRequestException('معرّف هدية مكافأة المستوى غير صالح');
+          }
           const [rewardGift] = await this.dataSource.query(
             'SELECT id FROM gifts WHERE id=$1 AND "isActive"=true LIMIT 1',
             [String(level.rewardGiftId)],
