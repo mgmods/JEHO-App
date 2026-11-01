@@ -554,8 +554,8 @@ class MainActivity : ThemedActivity() {
         }
         val heading = TextView(this).apply {
             text = status.theme?.get("title")?.toString() ?: "مكافآت تسجيل الدخول لمدة 7 أيام"
-            textSize = dailyLoginThemeNumber(status, "titleSize", 28)
-            setTextColor(dailyLoginThemeColor(status, "titleColor", Color.rgb(23, 107, 50)))
+            textSize = 20f
+            setTextColor(dailyLoginThemeColor(status, "titleColor", Color.rgb(61, 49, 88)))
             typeface = when (status.theme?.get("fontFamily")?.toString()) {
                 "serif" -> Typeface.SERIF
                 "sans" -> Typeface.SANS_SERIF
@@ -570,64 +570,24 @@ class MainActivity : ThemedActivity() {
             gravity = Gravity.CENTER
             setPadding(pad / 2, 0, pad / 2, 0)
         }
-        top.addView(heading)
+        val headerCopy = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        headerCopy.addView(heading)
+        headerCopy.addView(TextView(this).apply {
+            text = status.theme?.get("subtitle")?.toString() ?: "سجّل دخولك يومياً واحصل على مكافأتك"
+            textSize = 12f
+            setTextColor(dailyLoginThemeColor(status, "subtitleColor", Color.rgb(118, 107, 128)))
+            setPadding(0, (3 * resources.displayMetrics.density).toInt(), 0, 0)
+        })
+        top.addView(headerCopy)
         top.addView(close)
         root.addView(top)
 
-        val subtitle = TextView(this).apply {
-            text = "سجّل دخولك يوميًا وافتح مكافأة جديدة كل يوم"
-            textSize = 13f
-            setTextColor(Color.rgb(126, 119, 102))
-            setPadding(0, pad / 3, 0, pad)
-        }
-        root.addView(subtitle)
-
-        val giftHero = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(pad, pad / 2, pad, pad)
-            background = roundedBackground(Color.rgb(255, 250, 232), 22, Color.rgb(226, 194, 112))
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = pad }
-        }
-        val giftOrb = ThreeDimensionalGiftView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                (126 * resources.displayMetrics.density).toInt(),
-                (112 * resources.displayMetrics.density).toInt(),
-            )
-            contentDescription = "صندوق هدية ثلاثي الأبعاد لمكافآت تسجيل الدخول"
-            elevation = 8 * resources.displayMetrics.density
-            startAnimation(
-                ScaleAnimation(
-                    0.97f, 1.03f, 0.97f, 1.03f,
-                    Animation.RELATIVE_TO_SELF, 0.5f,
-                    Animation.RELATIVE_TO_SELF, 0.5f,
-                ).apply {
-                    duration = 1800L
-                    repeatMode = Animation.REVERSE
-                    repeatCount = Animation.INFINITE
-                    interpolator = AccelerateDecelerateInterpolator()
-                },
-            )
-        }
-        giftHero.addView(giftOrb)
-        giftHero.addView(TextView(this).apply {
-            text = "هدية اليوم بانتظارك"
-            textSize = 16f
-            setTextColor(Color.rgb(105, 78, 23))
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(0, pad / 3, 0, pad / 6)
-        })
-        giftHero.addView(TextView(this).apply {
-            text = "تابع دخولك يوميًا وافتح الجائزة الكبرى في اليوم السابع"
-            textSize = 12f
-            setTextColor(Color.rgb(132, 119, 88))
-            gravity = Gravity.CENTER
-        })
-        root.addView(giftHero)
-
         val daysScroll = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val daysRow = android.widget.GridLayout(this).apply { columnCount = dailyLoginThemeNumber(status, "cardsPerRow", 4).toInt().coerceIn(2, 4) }
+        val daysRow = android.widget.GridLayout(this).apply { columnCount = 4 }
         val dayList = status.days ?: emptyList()
         for (day in dayList) {
             val tile = LinearLayout(this).apply {
@@ -635,17 +595,17 @@ class MainActivity : ThemedActivity() {
                 gravity = Gravity.CENTER
                 setPadding(pad / 2, pad / 2, pad / 2, pad / 2)
                 background = roundedBackground(
-                    if (day.claimed) Color.rgb(237, 249, 241) else dailyLoginThemeColor(status, "cardColor", Color.WHITE),
-                    dailyLoginThemeNumber(status, "cardRadius", 20).toInt(),
-                    if (day.claimed) Color.rgb(58, 157, 92) else dailyLoginThemeColor(status, "cardBorderColor", Color.rgb(232, 224, 205)),
+                    if (day.claimed) Color.rgb(237, 249, 241) else Color.rgb(255, 255, 255),
+                    14,
+                    if (day.claimed) Color.rgb(58, 157, 92) else Color.rgb(231, 222, 237),
                 )
                 layoutParams = android.widget.GridLayout.LayoutParams(
                     android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED),
                     android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f),
                 ).apply {
                     width = 0
-                    height = (dailyLoginThemeNumber(status, "cardHeight", 112) * resources.displayMetrics.density).toInt()
-                    setMargins((dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt(), (dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt(), (dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt(), (dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt())
+                    height = (104 * resources.displayMetrics.density).toInt()
+                    setMargins((5 * resources.displayMetrics.density).toInt(), (dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt(), (dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt(), (dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt())
                 }
             }
             tile.elevation = (if (day.day == 7 || day.day == status.currentDay) 3 else 0) * resources.displayMetrics.density
@@ -662,7 +622,7 @@ class MainActivity : ThemedActivity() {
             val dayPreview = day.previewUrl ?: day.animationUrl
             if (day.type == "cosmetic" && !dayPreview.isNullOrBlank()) {
                 val dayImage = ImageView(this).apply {
-                    layoutParams = LinearLayout.LayoutParams((dailyLoginThemeNumber(status, "cardImageSize", 76) * resources.displayMetrics.density).toInt(), (dailyLoginThemeNumber(status, "cardImageSize", 76) * resources.displayMetrics.density).toInt())
+                    layoutParams = LinearLayout.LayoutParams((48 * resources.displayMetrics.density).toInt(), (dailyLoginThemeNumber(status, "cardImageSize", 76) * resources.displayMetrics.density).toInt())
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     contentDescription = day.name ?: "مكافأة اليوم"
                 }
@@ -683,7 +643,7 @@ class MainActivity : ThemedActivity() {
                     day.type == "coins" -> "${day.amount} كوينز"
                     else -> "مكافأة قادمة"
                 }
-                textSize = dailyLoginThemeNumber(status, "cardLabelSize", 16).coerceIn(8f, 20f)
+                textSize = 12f
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(
                     when {
@@ -699,74 +659,18 @@ class MainActivity : ThemedActivity() {
         }
         daysScroll.addView(daysRow)
         root.addView(daysScroll, LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = (dailyLoginThemeNumber(status, "contentTop", 18) * resources.displayMetrics.density).toInt()
+            topMargin = (16 * resources.displayMetrics.density).toInt()
         })
-
-        val reward = status.reward
-        val rewardPanel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(pad, pad, pad, pad)
-            background = roundedBackground(dailyLoginThemeColor(status, "cardColor", Color.rgb(255, 252, 243)), dailyLoginThemeNumber(status, "cardRadius", 20).toInt(), dailyLoginThemeColor(status, "cardBorderColor", Color.rgb(218, 180, 82)))
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = (dailyLoginThemeNumber(status, "contentGap", 16) * resources.displayMetrics.density).toInt() }
-        }
-        val rewardImage = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams((96 * resources.displayMetrics.density).toInt(), (96 * resources.displayMetrics.density).toInt())
-            scaleType = ImageView.ScaleType.FIT_CENTER
-        }
-        val previewUrl = reward?.previewUrl ?: reward?.animationUrl
-        if (reward?.type == "coins") {
-            rewardImage.visibility = View.GONE
-            rewardPanel.addView(TextView(this).apply {
-                text = "🪙"
-                textSize = 48f
-                gravity = Gravity.CENTER
-                contentDescription = "كوينزات"
-            })
-        } else {
-            if (!previewUrl.isNullOrBlank()) {
-                Glide.with(this).load(previewUrl).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(rewardImage)
-            } else {
-                rewardImage.setImageResource(android.R.drawable.ic_menu_gallery)
-                rewardImage.contentDescription = "هدية يومية"
-            }
-            rewardPanel.addView(rewardImage)
-        }
-        rewardPanel.elevation = 4 * resources.displayMetrics.density
-        rewardPanel.addView(TextView(this).apply {
-            text = if (status.currentDay == 7) "🏆 الجائزة الكبرى · اليوم السابع" else "مكافأة اليوم ${status.currentDay}"
-            textSize = 12f
-            setTextColor(Color.rgb(151, 111, 22))
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, pad / 5)
-        })
-        rewardPanel.addView(TextView(this).apply {
-            text = reward?.name ?: reward?.label ?: "مكافأة اليوم"
-            textSize = 17f
-            setTextColor(Color.rgb(54, 46, 31))
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(0, pad / 3, 0, pad / 5)
-        })
-        rewardPanel.addView(TextView(this).apply {
-            text = if (reward?.type == "coins") "${reward.amount} كوينز" else "${reward?.cosmeticType?.let { cosmeticTypeLabel(it) } ?: "عنصر تجميلي"} · ${reward?.durationDays ?: 7} يوم"
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.rgb(157, 115, 20))
-            gravity = Gravity.CENTER
-        })
-        root.addView(rewardPanel)
 
         val claimButton = Button(this).apply {
-            text = status.theme?.get("buttonText")?.toString() ?: "تسجيل الدخول"
+            text = status.theme?.get("buttonText")?.toString() ?: "استلام المكافأة"
             isAllCaps = false
             textSize = 16f
             setTextColor(dailyLoginThemeColor(status, "buttonTextColor", Color.WHITE))
-            background = roundedBackground(dailyLoginThemeColor(status, "buttonColor", Color.rgb(35, 157, 83)), dailyLoginThemeNumber(status, "buttonRadius", 64).toInt(), Color.rgb(26, 130, 67))
-            layoutParams = LinearLayout.LayoutParams(-1, (dailyLoginThemeNumber(status, "buttonHeight", 64) * resources.displayMetrics.density).toInt()).apply {
-                topMargin = (dailyLoginThemeNumber(status, "contentGap", 16) * resources.displayMetrics.density).toInt()
-                bottomMargin = (dailyLoginThemeNumber(status, "buttonBottom", 20) * resources.displayMetrics.density).toInt()
+            background = roundedBackground(dailyLoginThemeColor(status, "buttonColor", Color.rgb(118, 82, 165)), 28, Color.rgb(93, 62, 135))
+            layoutParams = LinearLayout.LayoutParams(-1, (54 * resources.displayMetrics.density).toInt()).apply {
+                topMargin = (18 * resources.displayMetrics.density).toInt()
+                bottomMargin = (16 * resources.displayMetrics.density).toInt()
             }
         }
         root.addView(claimButton)
