@@ -52,6 +52,24 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
 
+  private async enrichLevelRewards(levels: any[]) {
+    const giftIds = Array.from(new Set(
+      (Array.isArray(levels) ? levels : [])
+        .map(item => String(item?.rewardGiftId || '').trim())
+        .filter(id => UUID_REGEX.test(id)),
+    ));
+    if (!giftIds.length) return levels;
+    const gifts = await this.dataSource.query(
+      'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true',
+      [giftIds],
+    );
+    const byId = new Map(gifts.map((gift: any) => [String(gift.id), gift]));
+    return levels.map(item => ({
+      ...item,
+      rewardGift: byId.get(String(item?.rewardGiftId || '')) || null,
+    }));
+  }
+
   async catalog() {
     const rows = await this.dataSource.query(
       `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%' ORDER BY key`,
@@ -83,6 +101,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           .filter(item => item && Number.isInteger(Number(item.level)) && Number(item.level) >= 1)
           .sort((a, b) => Number(a.level) - Number(b.level));
       } catch { levels = []; }
+      levels = await this.enrichLevelRewards(levels);
       catalog.push({
         type, enabled, priceCoins: enabled ? giftPrice : null,
         maxLevel: Number(settings[`cp.max_level.${type}`] || 0) || null,
@@ -135,7 +154,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           .filter(item => item && Number.isFinite(Number(item.level)) && Number(item.level) >= 1)
           .sort((a, b) => Number(a.level) - Number(b.level));
       } catch { levels = []; }
-      configs.push({ type, levels });
+      configs.push({ type, levels: await this.enrichLevelRewards(levels) });
     }
     return configs;
   }
@@ -165,8 +184,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         'SELECT value FROM app_settings WHERE key=$1',
         [`cp.levels.${itemType}`],
       );
-      try { configs[itemType] = JSON.parse(setting?.value || '[]'); }
-      catch { configs[itemType] = []; }
+      try {
+        const parsed = JSON.parse(setting?.value || '[]');
+        configs[itemType] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed : []);
+      } catch { configs[itemType] = []; }
     }
     return rows.map((row: any) => {
       const points = BigInt(String(row.points || 0));
@@ -234,7 +255,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       try { rules = JSON.parse(String(setting?.value || '{}')); } catch { rules = {}; }
       try {
         const parsed = JSON.parse(String(levelSetting?.value || '[]'));
-        levelConfigs[type] = Array.isArray(parsed) ? parsed : [];
+        levelConfigs[type] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed : []);
       } catch { levelConfigs[type] = []; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
       effects[type] = {
@@ -507,7 +528,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       );
       try {
         const parsed = JSON.parse(setting?.value || '[]');
-        configs[type] = Array.isArray(parsed) ? parsed : [];
+        configs[type] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed : []);
       } catch { configs[type] = []; }
     }
     return rows.map((row: any) => {
