@@ -95,10 +95,22 @@
       </div>
     </div>
 
+    <div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="تصنيف الهدايا">
+      <button type="button" class="btn btn-sm" :class="giftSection === 'all' ? 'btn-aurora' : 'btn-ghost'" @click="giftSection = 'all'">
+        كل الهدايا ({{ gifts.length }})
+      </button>
+      <button type="button" class="btn btn-sm" :class="giftSection === 'normal' ? 'btn-aurora' : 'btn-ghost'" @click="giftSection = 'normal'">
+        الهدايا العادية ({{ normalGiftsCount }})
+      </button>
+      <button type="button" class="btn btn-sm" :class="giftSection === 'cp' ? 'btn-aurora' : 'btn-ghost'" @click="giftSection = 'cp'">
+        <i class="bi bi-heart-fill me-1"></i> هدايا CP ({{ cpGiftsCount }})
+      </button>
+    </div>
+
     <LoadingSpinner v-if="loading" />
     <template v-else>
       <BulkActionBar
-        :count="gifts.length"
+        :count="visibleGifts.length"
         :selected-count="selectedCount"
         :all-selected="allSelected"
         :some-selected="someSelected"
@@ -109,8 +121,8 @@
         @action="onBulkAction"
       />
       <div class="widget-grid">
-        <div v-if="!gifts.length" class="glass p-4 empty-state">{{ t('app.none') }}</div>
-        <article v-for="g in gifts" :key="g.id" class="widget-card position-relative" :class="{ 'is-selected': isSelected(g.id) }">
+        <div v-if="!visibleGifts.length" class="glass p-4 empty-state">{{ giftSection === 'cp' ? 'لا توجد هدايا CP بعد. أضف هدية جديدة واختر فئة CP.' : t('app.none') }}</div>
+        <article v-for="g in visibleGifts" :key="g.id" class="widget-card position-relative" :class="{ 'is-selected': isSelected(g.id) }">
           <BulkCheck :checked="isSelected(g.id)" @toggle="toggle(g.id)" />
         <div class="widget-card-media">
           <video
@@ -152,6 +164,7 @@
           <div class="widget-card-meta mb-2">
             {{ formatNumber(g.coinPrice ?? 0) }} · {{ giftTypeLabel(g.type) }}
             <span v-if="g.category"> · {{ categoryLabel(g.category) }}</span>
+            <span v-if="String(g.category || '').toLowerCase() === 'cp'" class="badge text-bg-danger ms-1">CP</span>
             <span v-if="giftMediaKindLabel(g)"> · {{ giftMediaKindLabel(g) }}</span>
           </div>
           <div class="action-btns">
@@ -204,6 +217,7 @@
                     <option v-for="c in activeCategories" :key="c.key" :value="c.key">
                       {{ c.labelAr || c.labelEn || c.key }}
                     </option>
+                    <option v-if="!activeCategories.some(c => c.key === 'cp')" value="cp">هدايا CP</option>
                   </select>
                 </div>
                 <template v-if="form.type === 'lucky'">
@@ -373,6 +387,7 @@ const error = ref('')
 const success = ref('')
 const showModal = ref(false)
 const showCategoryModal = ref(false)
+const giftSection = ref('all')
 const editingId = ref(null)
 const catEditingId = ref(null)
 const bulkBusy = ref(false)
@@ -388,9 +403,21 @@ function isCoreCategory(key) {
   return CORE_KEYS.has(String(key || '').toLowerCase())
 }
 
-const activeCategories = computed(() =>
-  (categories.value || []).filter((c) => c && c.isActive !== false),
-)
+const activeCategories = computed(() => {
+  const rows = (categories.value || []).filter((c) => c && c.isActive !== false)
+  if (!rows.some((c) => String(c.key || '').toLowerCase() === 'cp')) {
+    rows.push({ key: 'cp', labelAr: 'هدايا CP', labelEn: 'CP Gifts', isActive: true })
+  }
+  return rows
+})
+
+const cpGiftsCount = computed(() => gifts.value.filter((g) => String(g.category || '').toLowerCase() === 'cp').length)
+const normalGiftsCount = computed(() => gifts.value.filter((g) => String(g.category || '').toLowerCase() !== 'cp').length)
+const visibleGifts = computed(() => {
+  if (giftSection.value === 'cp') return gifts.value.filter((g) => String(g.category || '').toLowerCase() === 'cp')
+  if (giftSection.value === 'normal') return gifts.value.filter((g) => String(g.category || '').toLowerCase() !== 'cp')
+  return gifts.value
+})
 
 const {
   selectedIds,
