@@ -199,6 +199,22 @@ export class CpAdminController {
             (!Number.isFinite(Number(level.giftBonusPercent)) || Number(level.giftBonusPercent) < 0 || Number(level.giftBonusPercent) > 500)) {
           throw new BadRequestException('نسبة نقاط هدايا المستوى يجب أن تكون بين 0 و500');
         }
+        if (level.rewardCosmeticCode !== undefined && level.rewardCosmeticCode !== '') {
+          if (typeof level.rewardCosmeticCode !== 'string' || !/^[a-zA-Z0-9_-]{2,64}$/.test(level.rewardCosmeticCode)) {
+            throw new BadRequestException('رمز المكافأة التجميلية لمستوى CB غير صالح');
+          }
+          const [rewardCosmetic] = await this.dataSource.query(
+            'SELECT id FROM cosmetics WHERE code=$1 AND "isActive"=true LIMIT 1',
+            [level.rewardCosmeticCode],
+          );
+          if (!rewardCosmetic) throw new BadRequestException('اختر مكافأة تجميلية نشطة من كتالوج المتجر');
+        }
+        if (level.rewardDays !== undefined && (!Number.isInteger(Number(level.rewardDays)) || Number(level.rewardDays) < 1 || Number(level.rewardDays) > 365)) {
+          throw new BadRequestException('مدة مكافأة مستوى CB يجب أن تكون بين يوم و365 يوماً');
+        }
+        if (level.rewardPermanent !== undefined && typeof level.rewardPermanent !== 'boolean') {
+          throw new BadRequestException('خيار ديمومة مكافأة مستوى CB غير صالح');
+        }
         if (level.rewardGiftId) {
           if (typeof level.rewardGiftId !== 'string' ||
               !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(level.rewardGiftId)) {
