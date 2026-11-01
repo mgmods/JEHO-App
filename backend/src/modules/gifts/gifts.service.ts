@@ -287,6 +287,18 @@ export class GiftsService implements OnModuleInit {
           iconUrl: null,
         }));
       }
+      // Preserve existing CP type assignments and move their gifts into the CP tab.
+      const configured = await this.dataSource.query(
+        "SELECT value FROM app_settings WHERE key LIKE 'cp.gift.%' AND COALESCE(value, '') <> ''",
+      );
+      const giftIds = Array.from(new Set(configured.map((row: any) => String(row.value || '').trim()).filter(Boolean)));
+      if (giftIds.length) {
+        await this.giftsRepo.createQueryBuilder()
+          .update(Gift)
+          .set({ category: 'cp' })
+          .where('id::text IN (:...giftIds)', { giftIds })
+          .execute();
+      }
     } catch (err) {
       this.log.warn(`ensure CP gift category: ${err instanceof Error ? err.message : String(err)}`);
     }
