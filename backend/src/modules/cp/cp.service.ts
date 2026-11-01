@@ -491,9 +491,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     }
     return rows.map((row: any) => {
       const currentLevelConfig = (configs[row.type] || []).find(item => Number(item?.level) === Number(row.level)) || null;
+      const presentation = currentLevelConfig?.presentation || {};
       return {
         ...row,
         currentLevelConfig,
+        levelName: currentLevelConfig?.name || currentLevelConfig?.title || presentation?.title || null,
+        levelLogoUrl: presentation?.levelLogoUrl || presentation?.logoUrl || currentLevelConfig?.logoUrl || null,
+        levelBadgeUrl: presentation?.badgeUrl || null,
+        profileTitle: presentation?.profileTitle || presentation?.title || currentLevelConfig?.title || null,
         presentation: currentLevelConfig?.presentation || null,
         benefits: currentLevelConfig?.benefits || currentLevelConfig?.rewards || [],
         giftPresentation: currentLevelConfig?.giftPresentation || null,
@@ -538,8 +543,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('هذا النوع من علاقات CP متوقف حالياً من لوحة التحكم');
     }
     const outcome = await this.dataSource.transaction(async manager => {
-      const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
+      await this.lockRelationshipUsers(manager, [userId, recipientId]);
       const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey"=$1 FOR UPDATE', [key]);
       if (existing.length) {
         if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId || existing[0].type !== type) {
@@ -823,8 +827,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         await manager.query(`UPDATE cp_requests SET status='rejected',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
         return { id: requestId, status: 'rejected', refunded: true };
       }
-      const pairKey = [request.fromUserId, request.toUserId].sort().join(':') + ':' + request.type;
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
+      await this.lockRelationshipUsers(manager, [request.fromUserId, request.toUserId]);
       const active = await manager.query(
         `SELECT id FROM cp_relationships WHERE status='active'
          AND ("userAId" = ANY($1::uuid[]) OR "userBId" = ANY($1::uuid[]))
@@ -879,6 +882,132 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
 
+
+
+  /** Create a relationship invitation from an already-committed catalog gift.
+   * The gift is charged and delivered by GiftsService exactly once; this request
+   * never charges or refunds coins. A linked sender keeps sending it as a normal gift.
+   */
+  async createInitiationRequestFromGift(
+    senderId: string,
+    receiverId: string,
+    giftId: string,
+    giftSendId: string,
+    roomId?: string | null,
+  ) {
+    if (!senderId || !receiverId || senderId === receiverId || !giftId || !giftSendId) return null;
+    const configured = await this.dataSource.query(
+      'SELECT key FROM app_settings WHERE key LIKE $1 AND value=$2 ORDER BY key LIMIT 1',
+      ['cp.gift.%', giftId],
+    );
+    if (!configured.length) return null;
+    const type = String(configured[0].key).slice('cp.gift.'.length) as CpType;
+    if (!TYPES.has(type)) return null;
+    const [globalSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.enabled.global']);
+    const [typeSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
+    if (String(globalSetting?.value || 'true').toLowerCase() === 'false' ||
+        String(typeSetting?.value || 'true').toLowerCase() === 'false') return null;
+
+    const idempotencyKey = `gift-send:${giftSendId}`;
+    const outcome = await this.dataSource.transaction(async manager => {
+      await this.lockRelationshipUsers(manager, [senderId, receiverId]);
+      const [existing] = await manager.query(
+        'SELECT * FROM cp_requests WHERE "idempotencyKey"=$1 FOR UPDATE',
+        [idempotencyKey],
+      );
+      if (existing) return { request: existing, created: false };
+
+      // A user may only have one active relationship, regardless of relationship type.
+      const [active] = await manager.query(
+        `SELECT id FROM cp_relationships WHERE status='active'
+         AND ("userAId" = ANY($1::uuid[]) OR "userBId" = ANY($1::uuid[]))
+         LIMIT 1 FOR UPDATE`,
+        [[senderId, receiverId]],
+      );
+      if (active) return { request: null, created: false };
+
+      const [pending] = await manager.query(
+        `SELECT id FROM cp_requests WHERE status='pending' AND "expiresAt">now()
+         AND (("fromUserId"=$1 AND "toUserId"=$2) OR ("fromUserId"=$2 AND "toUserId"=$1))
+         LIMIT 1 FOR UPDATE`,
+        [senderId, receiverId],
+      );
+      if (pending) return { request: pending, created: false };
+
+      const [gift] = await manager.query(
+        'SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true',
+        [giftId],
+      );
+      if (!gift) return { request: null, created: false };
+      const [expiryRow] = await manager.query(
+        'SELECT value FROM app_settings WHERE key=$1',
+        ['cp.policy.request_expiry_minutes'],
+      );
+      const configuredExpiry = Number(expiryRow?.value);
+      const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
+        ? configuredExpiry : EXPIRY_MINUTES;
+      const [request] = await manager.query(
+        `INSERT INTO cp_requests
+          ("fromUserId","toUserId",type,status,"roomId","priceCoins","giftId","giftName","giftIconUrl","giftAnimationUrl","idempotencyKey","expiresAt","createdAt","updatedAt")
+         VALUES ($1,$2,$3,'pending',$4,NULL,$5,$6,$7,$8,$9,now()+($10 || ' minutes')::interval,now(),now())
+         RETURNING *`,
+        [senderId, receiverId, type, roomId || null, gift.id, gift.name, gift.iconUrl, gift.animationUrl, idempotencyKey, String(expiryMinutes)],
+      );
+      return { request, created: true };
+    });
+
+    if (!outcome.created || !outcome.request) return outcome.request;
+    const [sender] = await this.dataSource.query(
+      'SELECT id,"displayName",username,"avatarUrl" FROM users WHERE id=$1',
+      [senderId],
+    );
+    const senderName = String(sender?.displayName || sender?.username || 'أحد المستخدمين');
+    const payload = {
+      type: 'cp_relationship_request',
+      notificationKind: 'cp_relationship_request',
+      requestId: outcome.request.id,
+      relationshipType: type,
+      senderId,
+      senderName,
+      senderAvatarUrl: sender?.avatarUrl || null,
+      recipientId: receiverId,
+      giftId: outcome.request.giftId,
+      giftName: outcome.request.giftName,
+      giftIconUrl: outcome.request.giftIconUrl,
+      giftAnimationUrl: outcome.request.giftAnimationUrl,
+      roomId: roomId || null,
+      route: 'cp',
+      actions: ['accept', 'reject'],
+      requestSource: 'gift_catalog',
+    };
+    await this.notifications.notifyUser(
+      receiverId,
+      NotificationType.SYSTEM,
+      'طلب ارتباط جديد',
+      `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}. وافق أو ارفض الطلب.`,
+      payload,
+    );
+    this.realtime.emitToUser(receiverId, 'cp:request', {
+      ...payload,
+      title: 'هدية وطلب ارتباط جديد',
+      body: `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}.`,
+    });
+    if (roomId) {
+      this.realtime.emitToRoom(roomId, 'room:event', {
+        roomId,
+        event: 'cp:request',
+        payload: { ...payload, title: 'هدية ارتباط', body: `أرسل ${senderName} هدية ارتباط.` },
+        at: new Date().toISOString(),
+      });
+    }
+    return outcome.request;
+  }
+
+  private async lockRelationshipUsers(manager: any, userIds: string[]) {
+    for (const id of Array.from(new Set(userIds)).sort()) {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 1)', [id]);
+    }
+  }
 
   /** Award configured points when a committed normal gift is exchanged by active CP partners. */
   async recordGiftInteraction(senderId: string, receiverId: string, giftSendId: string, totalCoins: number) {
