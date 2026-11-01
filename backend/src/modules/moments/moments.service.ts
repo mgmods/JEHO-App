@@ -346,9 +346,9 @@ export class MomentsService {
           WHERE uv."userId" = u.id AND uv."isActive" = true
             AND (uv."expiresAt" IS NULL OR uv."expiresAt" > NOW())
           ORDER BY uv.level DESC LIMIT 1) AS "nameStyle",
-        COALESCE(to_jsonb("users")->>'frameUrl', to_jsonb("users")->>'avatarFrameUrl',
-                 to_jsonb("users")->>'equippedFrameUrl', to_jsonb("users")->>'profileFrameUrl',
-                 to_jsonb("users")->>'frameImageUrl', to_jsonb("users")->>'currentFrameUrl') AS "frameUrl"
+        COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+                 to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
+                 to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl"
        FROM "jeho_own"."users" u WHERE u.id = $1`,
       [userId],
     );
