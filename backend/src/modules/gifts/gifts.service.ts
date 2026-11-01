@@ -1745,6 +1745,10 @@ export class GiftsService implements OnModuleInit {
     const seen = new Set<string>();
     const out: typeof gifts = [];
     const showDiamonds = !!ECONOMY.showDiamondValueInApp;
+    const cpGiftRows = await this.dataSource.query(
+      "SELECT value FROM app_settings WHERE key LIKE 'cp.gift.%'",
+    ).catch(() => []);
+    const cpGiftIds = new Set(cpGiftRows.map((row: any) => String(row.value || '')).filter(Boolean));
     for (const g of gifts) {
       if (this.isLuckyBoxCatalogGift(g)) continue;
       const stem = this.giftArtStem(g.iconUrl) || this.giftNameKey(g.name);
@@ -1762,6 +1766,9 @@ export class GiftsService implements OnModuleInit {
       // Return a lightweight clone so mutating diamondValue on the response
       // never triggers an implicit repo save.
       const view: any = { ...g };
+      // Configured CB starter gifts get a dedicated gift-sheet tab without
+      // changing the dashboard-owned category stored in the database.
+      if (cpGiftIds.has(String(g.id))) view.category = 'cp';
       view.diamondValue = showDiamonds ? mintedDiamonds : 0;
       out.push(view);
     }
@@ -1777,7 +1784,7 @@ export class GiftsService implements OnModuleInit {
       where: { isActive: true },
       order: { sortOrder: 'ASC', createdAt: 'ASC' },
     });
-    return rows.map((r) => ({
+    const categories = rows.map((r) => ({
       id: r.id,
       key: r.key,
       labelAr: r.labelAr,
@@ -1786,6 +1793,21 @@ export class GiftsService implements OnModuleInit {
       isActive: r.isActive,
       iconUrl: (r as any).iconUrl ?? null,
     }));
+    const [configuredCbGift] = await this.dataSource.query(
+      "SELECT value FROM app_settings WHERE key LIKE 'cp.gift.%' LIMIT 1",
+    ).catch(() => []);
+    if (configuredCbGift?.value && !categories.some(category => category.key === 'cp')) {
+      categories.push({
+        id: 'cp',
+        key: 'cp',
+        labelAr: 'CB',
+        labelEn: 'CB',
+        sortOrder: 5,
+        isActive: true,
+        iconUrl: null,
+      });
+    }
+    return categories;
   }
 
   async listCategoriesAdmin() {
