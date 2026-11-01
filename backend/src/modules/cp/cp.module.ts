@@ -16,11 +16,12 @@ import { User } from '../../database/entities/user.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { CosmeticsModule } from '../cosmetics/cosmetics.module';
 import { AuthModule } from '../auth/auth.module';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CpRequest, CpRelationship, CpAuditLog, CpPointEvent, Wallet, WalletTransaction, Room, RoomSeat, User, AppSetting]), RealtimeModule, NotificationsModule, AuthModule],
+  imports: [TypeOrmModule.forFeature([CpRequest, CpRelationship, CpAuditLog, CpPointEvent, Wallet, WalletTransaction, Room, RoomSeat, User, AppSetting]), RealtimeModule, NotificationsModule, CosmeticsModule, AuthModule],
   controllers: [CpController, CpAdminController],
   providers: [CpService, JwtAuthGuard],
   exports: [CpService],
