@@ -361,7 +361,7 @@ export class UsersService {
   }
 
   private async isMysteriousModeAllowed(user: User, vip: UserVip | null | undefined): Promise<boolean> {
-    if (!user?.mysteriousMode || !vip || !vip.isActive) return false;
+    if (!user || !vip || !vip.isActive) return false;
     if (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) return false;
     const level = Number(vip.level || 0);
     if (!Number.isInteger(level) || level < 1 || level > 7) return false;
@@ -562,6 +562,24 @@ export class UsersService {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
+    if (dto.mysteriousMode !== undefined) {
+      if (dto.mysteriousMode) {
+        const activeVip = await this.userVipsRepo.findOne({
+          where: { userId, isActive: true },
+          relations: ['vipPlan'],
+          order: { level: 'DESC' },
+        });
+        const eligible = await this.isMysteriousModeAllowed(
+          { ...user, mysteriousMode: true } as User,
+          activeVip,
+        );
+        if (!eligible) {
+          throw new BadRequestException('ميزة الرجل الغامض متاحة للحسابات المؤهلة فقط');
+        }
+      }
+      user.mysteriousMode = !!dto.mysteriousMode;
+    }
+
     if (dto.displayName !== undefined) {
       this.moderation.assertNoAgencyImpersonation(dto.displayName, 'الاسم الظاهر');
       user.displayName = dto.displayName;
@@ -587,6 +605,9 @@ export class UsersService {
     }
     if (dto.birthday !== undefined) user.birthday = new Date(dto.birthday);
     await this.usersRepo.save(user);
+    if (dto.mysteriousMode !== undefined) {
+      await this.realtimeGateway.refreshUserProfile(userId, 'mysterious_mode');
+    }
 
     let profile = await this.profilesRepo.findOne({ where: { userId } });
     if (!profile) {
