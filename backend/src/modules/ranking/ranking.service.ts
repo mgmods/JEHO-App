@@ -262,6 +262,7 @@ export class RankingService {
         ...r,
         targetId: r.targetId,
         targetName: user.displayName || user.username || r.targetName || null,
+        rank: rankIndex + 1,
         score: Number(r.score),
         user: {
           id: user.id,
