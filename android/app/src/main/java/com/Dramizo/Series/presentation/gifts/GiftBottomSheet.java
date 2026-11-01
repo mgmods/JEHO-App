@@ -472,9 +472,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     }
                     if (bar != null) {
                         bar.setMax(100);
-                        long span = 500;
-                        long into = st.bondScore % span;
-                        bar.setProgress((int) Math.min(100, (into * 100) / span));
+                        int progress = (int) Math.round(Math.max(0d, Math.min(100d, st.progressPercent)));
+                        bar.setProgress(progress);
                     }
                     String myAvatar = null;
                     try {
