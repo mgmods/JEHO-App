@@ -1009,7 +1009,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
   async respond(userId: string, requestId: string, accept: boolean) {
-    return this.dataSource.transaction(async manager => {
+    const outcome = await this.dataSource.transaction(async manager => {
       const [request] = await manager.query('SELECT * FROM cp_requests WHERE id = $1 FOR UPDATE', [requestId]);
       if (!request) throw new NotFoundException('طلب CP غير موجود');
       if (request.toUserId !== userId) throw new BadRequestException('لا يمكنك الرد على هذا الطلب');
@@ -1017,12 +1017,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (new Date(request.expiresAt).getTime() <= Date.now()) {
         await this.refund(manager, request);
         await manager.query(`UPDATE cp_requests SET status='expired',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
-        return { id: requestId, status: 'expired', refunded: true };
+        return { result: { id: requestId, status: 'expired', refunded: true }, senderId: request.fromUserId, type: request.type, accepted: false };
       }
       if (!accept) {
         await this.refund(manager, request);
         await manager.query(`UPDATE cp_requests SET status='rejected',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
-        return { id: requestId, status: 'rejected', refunded: true };
+        return { result: { id: requestId, status: 'rejected', refunded: true }, senderId: request.fromUserId, type: request.type, accepted: false };
       }
       await this.lockRelationshipUsers(manager, [request.fromUserId, request.toUserId]);
       const active = await manager.query(
@@ -1034,7 +1034,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (active.length) {
         await this.refund(manager, request);
         await manager.query(`UPDATE cp_requests SET status='rejected',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
-        return { id: requestId, status: 'rejected', refunded: true, reason: 'user_already_has_active_relationship' };
+        return {
+          result: { id: requestId, status: 'rejected', refunded: true, reason: 'user_already_has_active_relationship' },
+          senderId: request.fromUserId, type: request.type, accepted: false,
+        };
       }
       const [relationship] = await manager.query(
         `INSERT INTO cp_relationships ("userAId","userBId",type,status,points,level,"startedAt","createdAt","updatedAt")
@@ -1064,8 +1067,65 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         relationship.level = computedLevel;
       }
       await manager.query(`UPDATE cp_requests SET status='accepted',"respondedAt"=now(),"relationshipId"=$2,"updatedAt"=now() WHERE id=$1`, [requestId, relationship.id]);
-      return { requestId, status: 'accepted', relationship };
+      return {
+        result: { requestId, status: 'accepted', relationship },
+        senderId: request.fromUserId, receiverId: request.toUserId, type: request.type,
+        relationship, accepted: true,
+      };
     });
+
+    if (outcome.accepted && outcome.relationship) {
+      // Deliver every configured level reward already reached at relationship creation,
+      // including level 1. This covers badge auto-equipping for the first CP milestone.
+      const [levelsSetting] = await this.dataSource.query(
+        'SELECT value FROM app_settings WHERE key=$1',
+        [`cp.levels.${outcome.type}`],
+      );
+      let levels: any[] = [];
+      try {
+        const parsed = JSON.parse(levelsSetting?.value || '[]');
+        levels = Array.isArray(parsed) ? parsed : [];
+      } catch { levels = []; }
+      const reachedLevels = levels
+        .filter(item => Number(item?.level) >= 1 && Number(item?.level) <= Number(outcome.relationship.level || 1))
+        .sort((a, b) => Number(a.level) - Number(b.level));
+      for (const levelConfig of reachedLevels) {
+        await this.grantLevelCosmeticRewards(
+          outcome.relationship.id,
+          Number(levelConfig.level),
+          [outcome.senderId, outcome.receiverId],
+          levelConfig,
+        ).catch(error => console.warn('[CP] initial level reward delivery failed', levelConfig.level, error));
+      }
+    }
+
+    const responseStatus = String(outcome.result?.status || '');
+    const title = responseStatus === 'accepted'
+      ? 'تم قبول طلب ارتباط CP'
+      : responseStatus === 'expired'
+        ? 'انتهت مهلة طلب CP'
+        : 'تم رفض طلب CP';
+    const body = responseStatus === 'accepted'
+      ? 'وافق الطرف الآخر على هدية الارتباط، وبدأت علاقتكما الآن.'
+      : responseStatus === 'expired'
+        ? 'انتهت مهلة طلب الارتباط وتمت إعادة العملات.'
+        : 'لم تتم الموافقة على طلب الارتباط، وتمت إعادة العملات.';
+    if (outcome.senderId) {
+      const payload = {
+        type: 'cp_relationship_response',
+        notificationKind: 'cp_relationship_response',
+        requestId,
+        relationshipType: outcome.type,
+        status: responseStatus,
+        relationshipId: outcome.relationship?.id || null,
+        route: 'cp',
+      };
+      await this.notifications.notifyUser(
+        outcome.senderId, NotificationType.SYSTEM, title, body, payload,
+      ).catch(() => undefined);
+      this.realtime.emitToUser(outcome.senderId, 'cp:response', { ...payload, title, body });
+    }
+    return outcome.result;
   }
 
   async end(userId: string, relationshipId: string) {
