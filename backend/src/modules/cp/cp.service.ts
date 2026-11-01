@@ -419,7 +419,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         const base = defaults[id] || { title: 'مهمة CP', description: 'أكملوا شرط المهمة اليوم', condition: 'points_today', target: 10, rewardPoints: 0 };
         const config = taskConfig[id] || {};
         const condition = ['memory_count', 'gift_exchange_today'].includes(String(config.condition || (id === 'memory_today' ? 'memory_count' : 'points_today'))) ? String(config.condition || 'memory_count') : 'points_today';
-        const target = Math.max(1, Math.min(1000000, Math.floor(Number(config.target ?? base.target) || base.target)));
+        const configuredTarget = Math.max(1, Math.min(1000000, Math.floor(Number(config.target ?? base.target) || base.target));
+        const target = condition === 'gift_exchange_today' ? Math.min(2, configuredTarget) : configuredTarget;
         const progressValue = condition === 'memory_count' ? Number(memoryCount?.count) || 0 : condition === 'gift_exchange_today' ? Number(giftExchangeCount?.count) || 0 : pointsToday;
         return {
           id,
@@ -476,7 +477,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const taskDefinition = { ...baseTask, ...(taskConfig[taskId] || {}) };
     const taskCondition = ['memory_count', 'gift_exchange_today'].includes(String(taskDefinition.condition || (taskId === 'memory_today' ? 'memory_count' : 'points_today')))
       ? String(taskDefinition.condition || 'memory_count') : 'points_today';
-    const target = Math.max(1, Math.min(1000000, Math.floor(Number(taskDefinition.target) || baseTask.target)));
+    const configuredTarget = Math.max(1, Math.min(1000000, Math.floor(Number(taskDefinition.target) || baseTask.target)));
+    const target = taskCondition === 'gift_exchange_today' ? Math.min(2, configuredTarget) : configuredTarget;
     const configuredRewardPoints = Math.max(0, Math.min(1000000, Math.floor(Number(taskDefinition.rewardPoints ?? baseTask.rewardPoints) || 0)));
     const [relationship] = await this.dataSource.query(
       `SELECT id,points::text AS points,level,type,"userAId","userBId" FROM cp_relationships
