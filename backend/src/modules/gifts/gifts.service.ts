@@ -274,7 +274,22 @@ export class GiftsService implements OnModuleInit {
    * Kept as a no-op so existing call sites don’t break.
    */
   private async ensureDefaultGiftCategories() {
-    /* no-op — admin panel is the source of truth */
+    // CP is a reserved system tab. Create it once; all other categories remain dashboard-owned.
+    try {
+      const existing = await this.categoriesRepo.findOne({ where: { key: 'cp' } });
+      if (!existing) {
+        await this.categoriesRepo.save(this.categoriesRepo.create({
+          key: 'cp',
+          labelAr: 'هدايا CP',
+          labelEn: 'CP Gifts',
+          sortOrder: 5,
+          isActive: true,
+          iconUrl: null,
+        }));
+      }
+    } catch (err) {
+      this.log.warn(`ensure CP gift category: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   /**
