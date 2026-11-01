@@ -129,6 +129,56 @@
             <div class="form-text">كل عنصر: level و pointsRequired. يمكن إضافة reward أو benefits/rewards (قائمة مكافآت متعددة)، وpresentation (إطار/شارة/خلفية/تأثير/عنوان)، وgiftPresentation (شكل الهدية الثنائية)، وgiftBonusPercent (نسبة نقاط إضافية). مثال: {"level":5,"pointsRequired":2500,"benefits":[{"type":"frame","code":"cb_frame_5"},{"type":"badge","code":"cb_badge_5"},{"type":"gift","code":"heart_duo"}],"presentation":{"frameUrl":"https://…","badgeUrl":"https://…","cardBackgroundUrl":"https://…","title":"ثنائي متألق"},"giftPresentation":{"animationUrl":"https://…","showPartnerAvatars":true},"giftBonusPercent":5}. يجب ترتيب النقاط تصاعدياً. هذه الإعدادات تُعرض عبر API ويمكن تعديلها دون تحديث التطبيق.</div>
           </div>
           <div class="col-12">
+            <div class="border rounded-3 p-3">
+              <h4 class="h6 mb-2">تصميم المستويات ومكافآت CB من الداشبورد</h4>
+              <p class="form-text">ارفع شعاراً وشارة وخلفية مستقلة لكل مستوى، واختر هدية مكافأة من كتالوج الهدايا العادي. التغييرات تُحفظ ضمن إعدادات المستوى وتصل للواجهات عبر API.</p>
+              <div v-for="level in item.levelsEditor" :key="level.level" class="border rounded-3 p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <strong>المستوى {{ level.level }} · {{ level.name || level.presentation?.title || 'بدون اسم' }}</strong>
+                  <span class="badge bg-light text-dark">{{ format(level.pointsRequired) }} نقطة</span>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">اسم المستوى / اللقب</label>
+                    <input v-model.trim="level.name" class="form-control" maxlength="100" @change="syncLevelEditor(item)">
+                    <label class="form-label mt-2">عنوان يظهر في الملف الشخصي</label>
+                    <input v-model.trim="level.presentation.title" class="form-control" maxlength="100" @change="syncLevelEditor(item)">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">شعار المستوى (صورة أو GIF)</label>
+                    <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" @change="uploadLevelAsset(item,level,'levelLogoUrl',$event)">
+                    <input v-model.trim="level.presentation.levelLogoUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط الشعار" @change="syncLevelEditor(item)">
+                    <img v-if="level.presentation.levelLogoUrl" :src="level.presentation.levelLogoUrl" alt="شعار المستوى" width="54" height="54" class="mt-2" style="object-fit:contain">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">شارة المستوى</label>
+                    <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" @change="uploadLevelAsset(item,level,'badgeUrl',$event)">
+                    <input v-model.trim="level.presentation.badgeUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط الشارة" @change="syncLevelEditor(item)">
+                    <img v-if="level.presentation.badgeUrl" :src="level.presentation.badgeUrl" alt="شارة المستوى" width="54" height="54" class="mt-2" style="object-fit:contain">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">خلفية بطاقة المستوى</label>
+                    <input class="form-control" type="file" accept=".webp,.png,.jpg,.jpeg,image/webp,image/png,image/jpeg" @change="uploadLevelAsset(item,level,'cardBackgroundUrl',$event)">
+                    <input v-model.trim="level.presentation.cardBackgroundUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط الخلفية" @change="syncLevelEditor(item)">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">هدية مكافأة المستوى من الهدايا العادية</label>
+                    <select v-model="level.rewardGiftId" class="form-select" @change="syncLevelEditor(item)">
+                      <option value="">بدون هدية تلقائية</option>
+                      <option v-for="gift in gifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
+                    </select>
+                    <div v-if="selectedGift({giftId:level.rewardGiftId})" class="small mt-1">{{ selectedGift({giftId:level.rewardGiftId}).name }}</div>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">نسبة نقاط إضافية لهدايا الشريكين %</label>
+                    <input v-model.number="level.giftBonusPercent" class="form-control" type="number" min="0" max="500" @change="syncLevelEditor(item)">
+                  </div>
+                </div>
+              </div>
+              <div v-if="!item.levelsEditor.length" class="text-muted small">أضف المستويات أولاً في جدول JSON أعلاه، ثم ستظهر هنا أدوات رفع الصور واختيار الهدايا.</div>
+            </div>
+          </div>
+          <div class="col-12">
             <label class="form-label">قواعد النوع (JSON)</label>
             <textarea v-model="item.rulesText" class="form-control font-monospace" rows="3" dir="ltr" spellcheck="false" placeholder="{}"></textarea>
             <div class="form-text">قواعد إضافية خاصة بنوع العلاقة.</div>
@@ -550,6 +600,7 @@ async function load() {
       giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
       levelsText: JSON.stringify(item.levels || [], null, 2),
+      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || '') })),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
       seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
       seatEffectUrl: item.rules?.seatEffect?.url || '',
@@ -625,6 +676,40 @@ async function uploadCpCardBackground(item, event) {
     item.uploadingCpCardBackground = false
     if (event?.target) event.target.value = ''
   }
+}
+
+function syncLevelEditor(item) {
+  const levels = (Array.isArray(item.levelsEditor) ? item.levelsEditor : []).map(level => ({
+    ...level,
+    name: String(level.name || '').trim(),
+    presentation: { ...(level.presentation || {}) },
+    giftBonusPercent: Math.max(0, Math.min(500, Number(level.giftBonusPercent) || 0)),
+    rewardGiftId: String(level.rewardGiftId || ''),
+  }))
+  item.levelsText = JSON.stringify(levels, null, 2)
+}
+
+async function uploadLevelAsset(item, level, field, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  const allowed = field === 'cardBackgroundUrl'
+    ? /\.(webp|png|jpe?g)$/i.test(file.name)
+    : /\.(gif|webp|png|jpe?g)$/i.test(file.name)
+  if (!allowed) { error.value = 'صيغة الصورة غير مدعومة لهذا الحقل.'; event.target.value = ''; return }
+  if (file.size > 40 * 1024 * 1024) { error.value = 'حجم الصورة يجب ألا يتجاوز 40 ميغابايت.'; event.target.value = ''; return }
+  error.value = ''
+  try {
+    const response = await uploadsApi.upload(file)
+    if (response?.error) throw new Error(response.error.message || 'تعذر رفع صورة المستوى')
+    const data = payloadOf(response)
+    const uploadedUrl = data?.url || data?.path
+    if (!uploadedUrl) throw new Error('رد رفع الصورة غير مكتمل.')
+    level.presentation = { ...(level.presentation || {}), [field]: /^https?:\/\//i.test(uploadedUrl) ? uploadedUrl : new URL(uploadedUrl, window.location.origin).toString() }
+    syncLevelEditor(item)
+    success.value = 'تم رفع أصل المستوى. احفظ إعدادات النوع لاعتماده.'
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر رفع أصل المستوى'
+  } finally { if (event?.target) event.target.value = '' }
 }
 
 async function saveType(item) {
