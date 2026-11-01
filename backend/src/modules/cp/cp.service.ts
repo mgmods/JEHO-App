@@ -123,18 +123,32 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     if (period === 'world') return this.discover();
     if (period !== 'weekly') throw new BadRequestException('فترة ترتيب CP غير صالحة');
     return this.dataSource.query(
-      `SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
-        COALESCE(SUM(e.points::numeric), 0)::text AS "weeklyPoints",
-        json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level) AS "userA",
-        json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level) AS "userB"
-       FROM cp_relationships r
-       JOIN users a ON a.id = r."userAId"
-       JOIN users b ON b.id = r."userBId"
-       LEFT JOIN cp_point_events e ON e."relationshipId" = r.id
-         AND e."createdAt" >= date_trunc('week', now())
-       WHERE r.status = 'active'
-       GROUP BY r.id, a.id, b.id
-       ORDER BY SUM(e.points::numeric) DESC NULLS LAST, r.points DESC, r."startedAt" ASC
+      `WITH weekly_totals AS (
+         SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
+           COALESCE(SUM(e.points::numeric), 0) AS weekly_points,
+           json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level) AS "userA",
+           json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level) AS "userB"
+         FROM cp_relationships r
+         JOIN users a ON a.id = r."userAId"
+         JOIN users b ON b.id = r."userBId"
+         LEFT JOIN cp_point_events e ON e."relationshipId" = r.id
+           AND e."createdAt" >= date_trunc('week', now())
+         WHERE r.status = 'active'
+         GROUP BY r.id, a.id, b.id
+       ), ranked AS (
+         SELECT weekly_totals.*,
+           ROW_NUMBER() OVER (ORDER BY weekly_points DESC, points::numeric DESC, "startedAt" ASC) AS weekly_rank
+         FROM weekly_totals
+       )
+       SELECT id, type, points, level, "startedAt",
+         GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (now() - "startedAt")) / 86400))::int AS "durationDays",
+         weekly_points::text AS "weeklyPoints",
+         weekly_rank::int AS "weeklyRank",
+         (weekly_rank = 1 AND weekly_points > 0) AS "isWeeklyChampion",
+         (date_trunc('week', now()) + interval '1 week') AS "championUntil",
+         "userA", "userB"
+       FROM ranked
+       ORDER BY weekly_rank
        LIMIT 100`,
     );
   }
