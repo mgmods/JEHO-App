@@ -203,6 +203,8 @@ public class HomeMeFragment extends Fragment {
             binding.mysteriousModeDivider.setVisibility(me.mysteriousManEligible ? View.VISIBLE : View.GONE);
             binding.switchMysteriousMode.setOnCheckedChangeListener(null);
             binding.switchMysteriousMode.setChecked(me.mysteriousMode);
+            requireContext().getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
+                    .edit().putBoolean("enabled", me.mysteriousMode).apply();
             binding.switchMysteriousMode.setOnCheckedChangeListener((button, enabled) -> {
                 if (enabled == me.mysteriousMode) return;
                 button.setEnabled(false);
@@ -234,6 +236,8 @@ public class HomeMeFragment extends Fragment {
                         if (saved && fresh != null) {
                             me.mysteriousMode = fresh.mysteriousMode;
                             binding.switchMysteriousMode.setChecked(fresh.mysteriousMode);
+                            requireContext().getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
+                                    .edit().putBoolean("enabled", fresh.mysteriousMode).apply();
                             Toast.makeText(requireContext(),
                                     fresh.mysteriousMode ? "تم تفعيل هوية الرجل الغامض" : "تم إيقاف هوية الرجل الغامض",
                                     Toast.LENGTH_SHORT).show();
