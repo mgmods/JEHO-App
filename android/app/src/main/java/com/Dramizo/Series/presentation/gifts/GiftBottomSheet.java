@@ -109,6 +109,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     // CP level strip is hosted as a sibling overlay above the bottom-sheet surface.
     @Nullable private FrameLayout cpOverlayHost;
     @Nullable private android.view.ViewTreeObserver.OnGlobalLayoutListener cpOverlayPositionListener;
+    @Nullable private View cpOverlayAnchor;
 
     // ─── Factory ──────────────────────────────────────────────────────────────
 
@@ -387,6 +388,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             hascpLayout.setLayoutParams(lp);
             cpOverlayHost.bringToFront();
         };
+        cpOverlayAnchor = sheet;
         sheet.getViewTreeObserver().addOnGlobalLayoutListener(cpOverlayPositionListener);
         cpOverlayHost.post(() -> {
             if (cpOverlayPositionListener != null) cpOverlayPositionListener.onGlobalLayout();
@@ -394,16 +396,15 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void removeCpProgressOverlay() {
-        if (cpOverlayPositionListener != null && binding != null) {
-            // The sheet may already be detached during teardown; removal is best-effort.
+        if (cpOverlayPositionListener != null && cpOverlayAnchor != null) {
             try {
-                View sheet = requireDialog().findViewById(com.google.android.material.R.id.design_bottom_sheet);
-                if (sheet != null && sheet.getViewTreeObserver().isAlive()) {
-                    sheet.getViewTreeObserver().removeOnGlobalLayoutListener(cpOverlayPositionListener);
+                if (cpOverlayAnchor.getViewTreeObserver().isAlive()) {
+                    cpOverlayAnchor.getViewTreeObserver().removeOnGlobalLayoutListener(cpOverlayPositionListener);
                 }
             } catch (Exception ignored) {}
         }
         cpOverlayPositionListener = null;
+        cpOverlayAnchor = null;
         if (cpOverlayHost != null) {
             ViewGroup parent = cpOverlayHost.getParent() instanceof ViewGroup
                     ? (ViewGroup) cpOverlayHost.getParent() : null;
@@ -681,12 +682,13 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 if (byId.containsKey(g.id)) continue;
                 byId.put(g.id, g);
             }
+            String bucket = giftBucket(g);
             String nameKey = g.name != null
-                    ? g.name.trim().toLowerCase(Locale.US).replaceAll("\\s+", " ")
+                    ? bucket + ":" + g.name.trim().toLowerCase(Locale.US).replaceAll("\\s+", " ")
                     : "";
             String stem = giftArtStem(g.iconUrl);
             if (stem.isEmpty()) stem = giftArtStem(g.animationUrl);
-            String key = !stem.isEmpty() ? "s:" + stem
+            String key = !stem.isEmpty() ? "s:" + bucket + ":" + stem
                     : (!nameKey.isEmpty() ? "n:" + nameKey
                     : (g.id != null ? "id:" + g.id : null));
             if (key == null) continue;
