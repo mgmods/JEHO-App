@@ -728,12 +728,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         List<GiftDtos.GiftDto> out = new ArrayList<>();
         for (GiftDtos.GiftDto g : allGifts) {
             if (g == null || isLuckyBoxGift(g)) continue;
-            boolean isCpGift = g.id != null && cpGiftTypes.containsKey(g.id);
+            boolean isCpGift = "cp".equals(giftBucket(g));
             if ("cp".equals(want)) {
+                // Every active dashboard gift classified as CP is visible, even if it is
+                // not the single starter gift configured for a CP relationship type.
                 if (isCpGift) out.add(g);
                 continue;
             }
-            // Keep configured CB gifts in their own tab, not duplicated in ordinary categories.
+            // CP category gifts must never be duplicated in ordinary tabs.
             if (isCpGift) continue;
             if (want.equals(giftBucket(g))) out.add(g);
         }
