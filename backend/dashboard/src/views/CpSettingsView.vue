@@ -53,12 +53,12 @@
               <label class="form-label">شرط إكمال المهمة</label>
               <select v-model="task.condition" class="form-select mb-3">
                 <option value="points_today">جمع نقاط علاقة خلال اليوم</option>
-                <option value="gift_exchange_today">تبادل هدايا بين الشريكين خلال اليوم</option>
+                <option value="gift_exchange_today">أن يرسل كل شريك هدية للآخر خلال اليوم</option>
                 <option value="memory_count">إضافة ذكريات مشتركة خلال اليوم</option>
               </select>
               <div class="row g-3">
                 <div class="col-6">
-                  <label class="form-label">{{ task.condition === 'memory_count' ? 'عدد الذكريات المطلوبة' : 'نقاط العلاقة المطلوبة' }}</label>
+                  <label class="form-label">{{ task.condition === 'memory_count' ? 'عدد الذكريات المطلوبة' : task.condition === 'gift_exchange_today' ? 'عدد الشريكين اللذين أرسلا هدية اليوم (2 لإكمال التبادل)' : 'نقاط العلاقة المطلوبة' }}</label>
                   <input v-model.number="task.target" class="form-control" type="number" min="1" max="1000000" step="1">
                 </div>
                 <div class="col-6">
