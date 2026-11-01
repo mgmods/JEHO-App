@@ -165,6 +165,7 @@
             {{ formatNumber(g.coinPrice ?? 0) }} · {{ giftTypeLabel(g.type) }}
             <span v-if="g.category"> · {{ categoryLabel(g.category) }}</span>
             <span v-if="String(g.category || '').toLowerCase() === 'cp'" class="badge text-bg-danger ms-1">CP</span>
+            <span v-if="String(g.category || '').toLowerCase() === 'cp'" class="small text-danger ms-1">· {{ g.cpPoints == null ? 'نقاط النوع الافتراضية' : `${formatNumber(g.cpPoints)} نقطة/هدية` }}</span>
             <span v-if="giftMediaKindLabel(g)"> · {{ giftMediaKindLabel(g) }}</span>
           </div>
           <div class="action-btns">
@@ -234,7 +235,7 @@
                   <div class="col-md-4">
                     <label class="form-label">نقاط مستوى CP لكل هدية</label>
                     <input v-model.number="form.cpPoints" type="number" min="0" max="1000000000" step="1" class="form-control" />
-                    <div class="form-text">تُضاف هذه النقاط للعلاقة القائمة عند تبادل الهدية، وتُضرب بعدد النسخ المرسلة.</div>
+                    <div class="form-text">تُضاف للعلاقة القائمة عند تبادل الهدية وتُضرب بعدد النسخ. اتركها فارغة لاستخدام نقاط نوع العلاقة الافتراضية.</div>
                   </div>
                 </template>
                 <template v-if="form.type === 'lucky'">
