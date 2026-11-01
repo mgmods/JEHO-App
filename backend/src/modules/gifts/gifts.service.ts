@@ -114,6 +114,7 @@ export class GiftsService implements OnModuleInit {
   async onModuleInit() {
     // Schema-only fix is always safe. Catalog seeds never run against live DB.
     await this.ensureGiftCategoryColumn();
+    await this.ensureCpGiftColumns();
     await this.ensureGiftCategoriesTable();
     await this.ensureGiftSendIdempotencySchema();
     await this.ensureDefaultGiftCategories();
@@ -244,6 +245,23 @@ export class GiftsService implements OnModuleInit {
       this.log.warn(
         `ensureGiftCategoryColumn: ${err instanceof Error ? err.message : String(err)}`,
       );
+    }
+  }
+
+  /** Add CP gift configuration columns on DB-authoritative installations. */
+  private async ensureCpGiftColumns() {
+    try {
+      await this.dataSource.query(
+        `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS \"cpRelationshipType\" varchar(24) NOT NULL DEFAULT 'love'`,
+      );
+      await this.dataSource.query(
+        `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS \"cpPoints\" integer NOT NULL DEFAULT 0`,
+      );
+      await this.dataSource.query(
+        `UPDATE gifts SET \"cpRelationshipType\"='love' WHERE category='cp' AND COALESCE(\"cpRelationshipType\",'')=''`,
+      );
+    } catch (err) {
+      this.log.warn(`ensureCpGiftColumns: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -2599,6 +2617,9 @@ export class GiftsService implements OnModuleInit {
           result.send.receiverId,
           result.send.id,
           Number(result.send.totalCoins || totalCoins),
+          String(gift.category || '').toLowerCase() === 'cp'
+            ? Math.max(0, Number(gift.cpPoints) || 0) * Math.max(1, Number(result.send.quantity) || qty)
+            : undefined,
         ).catch((err) => {
           this.log.warn(`CP gift progress failed: ${err instanceof Error ? err.message : String(err)}`);
         });
