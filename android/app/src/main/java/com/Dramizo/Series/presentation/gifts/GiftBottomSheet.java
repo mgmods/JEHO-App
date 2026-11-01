@@ -549,7 +549,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         }
         // The CP tab is controlled by the dashboard setting returned by /cp/catalog.
         // Remove any stale category entry when the administrator switches it off.
-        active.removeIf(item -> "cp".equalsIgnoreCase(item.key));
+        for (int i = active.size() - 1; i >= 0; i--) {
+            if ("cp".equalsIgnoreCase(active.get(i).key)) active.remove(i);
+        }
         if (cpGiftTabEnabled) {
             GiftDtos.GiftCategoryDto cpTab = new GiftDtos.GiftCategoryDto();
             cpTab.key = "cp";
