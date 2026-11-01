@@ -1,6 +1,6 @@
 <template>
   <div class="cp-admin-page">
-    <PageHeader title="إعدادات علاقات CP" subtitle="إدارة الأنواع والهدايا والأسعار والمستويات والمكافآت وسجل العمليات. لا توجد أسعار افتراضية." >
+    <PageHeader title="إعدادات CP" subtitle="إدارة الأنواع والهدايا والأسعار والمستويات والمكافآت وسجل العمليات. لا توجد أسعار افتراضية." >
       <template #actions>
         <button class="btn btn-outline-secondary btn-sm" :disabled="loading || saving" @click="load">تحديث البيانات</button>
       </template>
@@ -15,7 +15,7 @@
     <LoadingSpinner v-if="loading" />
 
     <template v-else>
-      <nav class="nav nav-pills cp-admin-tabs mb-3" aria-label="أقسام إعدادات CB">
+      <nav class="nav nav-pills cp-admin-tabs mb-3" aria-label="أقسام إعدادات CP">
         <button type="button" class="nav-link" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">النظرة العامة والمهام</button>
         <button type="button" class="nav-link" :class="{ active: activeTab === 'levels' }" @click="activeTab = 'levels'">الأنواع والمستويات</button>
         <button type="button" class="nav-link" :class="{ active: activeTab === 'store' }" @click="activeTab = 'store'">المتجر والمكافآت</button>
@@ -24,7 +24,7 @@
       <section v-show="activeTab === 'overview'" class="settings-card mb-3 cp-feature-control">
         <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
           <div>
-            <h3 class="settings-card-title mb-1">تشغيل قسم CB/CP والمهمات</h3>
+            <h3 class="settings-card-title mb-1">تشغيل قسم CP/CP والمهمات</h3>
             <p class="form-text mb-0">إيقاف القسم يمنع بدء علاقات جديدة ويوقف عرض مهمات CP والمطالبة بمكافآتها. تبقى العلاقات والسجلات السابقة محفوظة.</p>
           </div>
           <label class="form-check form-switch mb-0">
@@ -34,8 +34,8 @@
         </div>
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap border rounded-3 p-3 mb-3">
           <div>
-            <div class="fw-semibold">تبويب هدايا CB في نافذة الهدايا</div>
-            <div class="form-text">تحكم مستقل بإظهار أو إخفاء تبويب هدايا CB للمستخدمين، دون إيقاف نظام علاقات CP بالكامل.</div>
+            <div class="fw-semibold">تبويب هدايا CP في نافذة الهدايا</div>
+            <div class="form-text">تحكم مستقل بإظهار أو إخفاء تبويب هدايا CP للمستخدمين، دون إيقاف نظام علاقات CP بالكامل.</div>
           </div>
           <label class="form-check form-switch mb-0">
             <input v-model="cpFeatures.giftTabEnabled" class="form-check-input" type="checkbox" role="switch">
@@ -141,18 +141,28 @@
             <input v-model.number="item.maxLevel" class="form-control" type="number" min="1" max="1000" step="1" placeholder="حسب الجدول">
           </div>
           <div class="col-12">
-            <label class="form-label">جدول المستويات والمكافآت (JSON)</label>
-            <textarea v-model="item.levelsText" class="form-control font-monospace" rows="5" dir="ltr" spellcheck="false" placeholder='[{"level":1,"pointsRequired":0,"reward":"إطار البداية"}]' @change="refreshLevelEditor(item)"></textarea>
-            <div class="form-text">كل عنصر: level و pointsRequired. يمكن إضافة reward أو benefits/rewards (قائمة مكافآت متعددة)، وpresentation (إطار/أيقونة أفقية/خلفية/تأثير/عنوان)، وgiftPresentation (شكل الهدية الثنائية)، وgiftBonusPercent (نسبة نقاط إضافية). مثال: {"level":5,"pointsRequired":2500,"benefits":[{"type":"frame","code":"cb_frame_5"},{"type":"gift","code":"heart_duo"}],"presentation":{"frameUrl":"https://…","levelLogoUrl":"https://…","cardBackgroundUrl":"https://…","title":"ثنائي متألق"},"giftPresentation":{"animationUrl":"https://…","showPartnerAvatars":true},"giftBonusPercent":5}. يجب ترتيب النقاط تصاعدياً. هذه الإعدادات تُعرض عبر API ويمكن تعديلها دون تحديث التطبيق.</div>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border rounded-3 p-3 bg-light-subtle">
+              <div>
+                <h4 class="h6 mb-1">مستويات العلاقة</h4>
+                <p class="form-text mb-0">أضف حتى خمسة مستويات. لكل مستوى حد نقاطه ومكافآته وتصميمه الخاص. لا تحتاج إلى كتابة JSON.</p>
+              </div>
+              <button class="btn btn-outline-primary" type="button" :disabled="item.levelsEditor.length >= 5" @click="addLevel(item)">＋ إضافة مستوى</button>
+            </div>
           </div>
           <div class="col-12">
             <div class="border rounded-3 p-3">
-              <h4 class="h6 mb-2">تصميم المستويات ومكافآت CB من الداشبورد</h4>
+              <h4 class="h6 mb-2">تصميم المستويات ومكافآت CP من الداشبورد</h4>
               <p class="form-text">ارفع أيقونة أفقية تظهر بجانب VIP والثروة والشعبية، وإطاراً وخلفية لكل مستوى، واختر هدية مكافأة من كتالوج الهدايا العادي. التغييرات تُحفظ ضمن إعدادات المستوى وتصل للواجهات عبر API.</p>
               <div v-for="level in item.levelsEditor" :key="level.level" class="border rounded-3 p-3 mb-3">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                   <strong>المستوى {{ level.level }} · {{ level.name || level.presentation?.title || 'بدون اسم' }}</strong>
-                  <span class="badge bg-light text-dark">{{ format(level.pointsRequired) }} نقطة</span>
+                  <div class="d-flex align-items-end gap-2 flex-wrap">
+                    <div>
+                      <label class="form-label small mb-1">النقاط المطلوبة لفتح المستوى</label>
+                      <input v-model.number="level.pointsRequired" class="form-control form-control-sm" type="number" min="0" max="1000000000" step="1" style="width:150px" @change="syncLevelEditor(item)">
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" type="button" @click="removeLevel(item, level.level)">حذف المستوى</button>
+                  </div>
                 </div>
                 <div class="row g-3">
                   <div class="col-md-4">
@@ -184,9 +194,26 @@
                     <label class="form-label">مكافأة تجميلية تلقائية عند بلوغ المستوى</label>
                     <select v-model="level.rewardCosmeticCode" class="form-select" @change="syncLevelEditor(item)">
                       <option value="">بدون مكافأة تجميلية تلقائية</option>
-                      <option v-for="cosmetic in cpStoreItems.filter(entry => entry.isActive)" :key="cosmetic.code" :value="cosmetic.code">{{ cosmetic.name }} · {{ cosmeticTypeLabel(cosmetic.type) }}</option>
+                      <option v-for="cosmetic in rewardCosmetics" :key="cosmetic.code" :value="cosmetic.code">{{ cosmetic.name }} · {{ cosmeticTypeLabel(cosmetic.type) }}</option>
                     </select>
                     <div class="form-text">تُضاف لحساب كل شريك مرة واحدة عند بلوغ المستوى.</div>
+                    <div v-if="selectedCpReward(level.rewardCosmeticCode)" class="d-flex align-items-center gap-2 mt-2 p-2 border rounded-3">
+                      <img :src="selectedCpReward(level.rewardCosmeticCode).animationUrl || selectedCpReward(level.rewardCosmeticCode).previewUrl" :alt="selectedCpReward(level.rewardCosmeticCode).name" style="width:58px;height:58px;object-fit:contain">
+                      <div class="small"><strong>{{ selectedCpReward(level.rewardCosmeticCode).name }}</strong><div>{{ cosmeticTypeLabel(selectedCpReward(level.rewardCosmeticCode).type) }}</div></div>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">مكافآت إضافية لهذا المستوى</label>
+                    <div class="row g-2">
+                      <div v-for="cosmetic in rewardCosmetics" :key="cosmetic.code" class="col-sm-6 col-lg-4">
+                        <label class="d-flex align-items-center gap-2 border rounded-3 p-2 h-100">
+                          <input class="form-check-input flex-shrink-0" type="checkbox" :value="cosmetic.code" v-model="level.rewardCosmeticCodes" @change="syncLevelEditor(item)">
+                          <img :src="cosmetic.animationUrl || cosmetic.previewUrl" :alt="cosmetic.name" style="width:44px;height:44px;object-fit:contain">
+                          <span class="small">{{ cosmetic.name }}<span class="d-block text-secondary">{{ cosmeticTypeLabel(cosmetic.type) }}</span></span>
+                        </label>
+                      </div>
+                    </div>
+                    <div v-if="!rewardCosmetics.length" class="form-text">لا توجد عناصر تجميلية نشطة. أضف إطاراً أو شارة من قسم متجر CP أولاً.</div>
                   </div>
                   <div class="col-md-3">
                     <label class="form-label">مدة المكافأة (يوم)</label>
@@ -225,6 +252,31 @@
                   <div class="col-md-4">
                     <label class="form-label">نسبة نقاط إضافية لهدايا الشريكين %</label>
                     <input v-model.number="level.giftBonusPercent" class="form-control" type="number" min="0" max="500" @change="syncLevelEditor(item)">
+                  </div>
+                  <div class="col-12">
+                    <div class="cp-level-live-preview border rounded-3 p-3">
+                      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                        <strong>معاينة مباشرة للمستوى {{ level.level }}</strong>
+                        <span class="small text-secondary">{{ format(level.pointsRequired) }} نقطة مطلوبة</span>
+                      </div>
+                      <div class="cp-level-preview-card" :style="{ backgroundImage: level.presentation.cardBackgroundUrl ? 'url(' + level.presentation.cardBackgroundUrl + ')' : 'linear-gradient(135deg,#24182f,#56304b)' }">
+                        <img v-if="level.presentation.frameUrl" class="cp-level-preview-frame" :src="level.presentation.frameUrl" alt="إطار المستوى">
+                        <img v-if="level.presentation.levelLogoUrl" class="cp-level-preview-logo" :src="level.presentation.levelLogoUrl" alt="أيقونة CP">
+                        <div class="cp-level-preview-copy">
+                          <strong :style="{color:level.presentation.nameColor || '#ffffff',textShadow:level.presentation.nameGlow ? '0 0 10px currentColor' : 'none'}">{{ level.name || level.presentation.title || ('CP · المستوى ' + level.level) }}</strong>
+                          <span>معاً · مستوى {{ level.level }}</span>
+                        </div>
+                        <img v-if="level.giftPresentation.animationUrl" class="cp-level-preview-gift" :src="level.giftPresentation.animationUrl" alt="معاينة هدية CP">
+                      </div>
+                      <div v-if="selectedGift({giftId:level.rewardGiftId})" class="d-flex align-items-center gap-2 mt-2 small">
+                        <img :src="selectedGift({giftId:level.rewardGiftId}).animationUrl || selectedGift({giftId:level.rewardGiftId}).iconUrl" :alt="selectedGift({giftId:level.rewardGiftId}).name" style="width:48px;height:48px;object-fit:contain">
+                        <span>هدية المستوى: <strong>{{ selectedGift({giftId:level.rewardGiftId}).name }}</strong></span>
+                      </div>
+                      <div v-for="reward in rewardCosmetics.filter(entry => level.rewardCosmeticCodes.includes(entry.code) || entry.code === level.rewardCosmeticCode)" :key="reward.code" class="d-inline-flex align-items-center gap-2 mt-2 me-3 small">
+                        <img :src="reward.animationUrl || reward.previewUrl" :alt="reward.name" style="width:42px;height:42px;object-fit:contain">
+                        <span>{{ reward.name }}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -307,7 +359,7 @@
       <section v-show="activeTab === 'store'" class="settings-card mb-3 cp-store-admin">
         <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-2">
           <div>
-            <h3 class="settings-card-title mb-1">متجر CP · العناصر التجميلية</h3>
+            <h3 class="settings-card-title mb-1">متجر CP · الهدايا والمكافآت</h3>
             <p class="form-text mb-0">أنشئ عناصر خاصة بعالم CP، وحدد السعر والمدة والصورة. العناصر المحفوظة هنا تظهر في متجر CP داخل تطبيق Android.</p>
           </div>
           <span class="badge rounded-pill text-bg-light border">متصل بكتالوج المتجر</span>
@@ -496,6 +548,7 @@ const cpFeatures = ref({
   ],
 })
 const cpStoreItems = ref([])
+const rewardCosmetics = ref([])
 const loadingCpStore = ref(false)
 const savingCpStore = ref(false)
 const uploadingCpStorePreview = ref(false)
@@ -506,7 +559,7 @@ function label(type) {
 }
 function format(value) { return Number(value || 0).toLocaleString('ar') }
 function cosmeticTypeLabel(type) {
-  return ({ profile_card: 'بطاقة الملف الشخصي', entry_effect: 'تأثير دخول', room_card: 'بطاقة الروم', nameplate: 'لوحة الاسم', chat_bubble: 'فقاعة الدردشة' })[type] || type
+  return ({ profile_card: 'بطاقة الملف الشخصي', entry_effect: 'تأثير دخول', room_card: 'بطاقة الروم', nameplate: 'لوحة الاسم', chat_bubble: 'فقاعة الدردشة', level_badge: 'شارة مستوى', vip_badge: 'شارة VIP', host_badge: 'شارة مضيف', room_background: 'خلفية روم', join_toast: 'تأثير دخول' })[type] || type
 }
 function isCpStoreItem(item) {
   return item && (item.meta?.cpStore === true || String(item.code || '').startsWith('cp_'))
@@ -516,7 +569,9 @@ async function loadCpStoreItems() {
   try {
     const response = await cosmeticsApi.adminList()
     if (response?.error) throw new Error(response.error.message || 'تعذر تحميل عناصر متجر CP')
-    cpStoreItems.value = extractList(payloadOf(response)).filter(isCpStoreItem).map(item => ({ ...item, meta: { ...(item.meta || {}), leaseDays: Number(item.meta?.leaseDays || 30) } }))
+    const allItems = extractList(payloadOf(response)).filter(item => item && item.isActive !== false)
+    rewardCosmetics.value = allItems
+    cpStoreItems.value = allItems.filter(isCpStoreItem).map(item => ({ ...item, meta: { ...(item.meta || {}), leaseDays: Number(item.meta?.leaseDays || 30) } }))
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل عناصر متجر CP'
   } finally { loadingCpStore.value = false }
@@ -613,9 +668,37 @@ async function saveCpStoreItem(item) {
 }
 function date(value) { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('ar') }
 function selectedGift(item) { return gifts.value.find(g => String(g.id) === String(item.giftId)) || null }
-function selectedCpReward(code) { return cpStoreItems.value.find(item => item.code === code) || null }
+function selectedCpReward(code) { return rewardCosmetics.value.find(item => item.code === code) || null }
 function normalizeCpTaskTarget(task) {
   if (task?.condition === 'gift_exchange_today') task.target = 2
+}
+function addLevel(item) {
+  const current = Array.isArray(item.levelsEditor) ? item.levelsEditor : []
+  if (current.length >= 5) return
+  const previous = current.slice().sort((a, b) => Number(a.level) - Number(b.level)).at(-1)
+  const nextLevel = Math.max(0, ...current.map(level => Number(level.level) || 0)) + 1
+  const previousPoints = Number(previous?.pointsRequired || 0)
+  current.push({
+    level: nextLevel,
+    pointsRequired: previous ? previousPoints + 1000 : 0,
+    name: '',
+    presentation: { title: '', levelLogoUrl: '', frameUrl: '', cardBackgroundUrl: '', nameColor: '#ffffff', nameGlow: false },
+    giftPresentation: { animationUrl: '', showPartnerAvatars: true },
+    rewardGiftId: '',
+    rewardCosmeticCode: '',
+    rewardCosmeticCodes: [],
+    rewardDays: 30,
+    rewardPermanent: false,
+    giftBonusPercent: 0,
+  })
+  current.sort((a, b) => Number(a.level) - Number(b.level))
+  item.levelsEditor = current
+  syncLevelEditor(item)
+}
+function removeLevel(item, levelNumber) {
+  item.levelsEditor = (item.levelsEditor || []).filter(level => Number(level.level) !== Number(levelNumber))
+  item.levelsEditor.forEach((level, index) => { level.level = index + 1 })
+  syncLevelEditor(item)
 }
 function addCpTask() {
   const id = 'cp_task_' + Math.random().toString(36).slice(2, 10)
@@ -658,7 +741,11 @@ async function load() {
       giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
       levelsText: JSON.stringify(item.levels || [], null, 2),
-      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true })),
+      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => {
+        const benefits = [...(Array.isArray(level.benefits) ? level.benefits : []), ...(Array.isArray(level.rewards) ? level.rewards : [])]
+        const rewardCosmeticCodes = Array.from(new Set([level.rewardCosmeticCode, ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
+        return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
+      }),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
       seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
       seatEffectUrl: item.rules?.seatEffect?.url || '',
@@ -745,6 +832,11 @@ function syncLevelEditor(item) {
     giftBonusPercent: Math.max(0, Math.min(500, Number(level.giftBonusPercent) || 0)),
     rewardGiftId: String(level.rewardGiftId || ''),
     rewardCosmeticCode: String(level.rewardCosmeticCode || ''),
+    rewardCosmeticCodes: Array.from(new Set((Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []).map(code => String(code || '').trim()).filter(Boolean))),
+    benefits: [
+      ...(Array.isArray(level.benefits) ? level.benefits : []).filter(entry => !(entry && typeof entry === 'object' && (entry.cosmeticCode || entry.code))),
+      ...Array.from(new Set((Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []).map(code => String(code || '').trim()).filter(Boolean))).map(code => ({ type: 'cosmetic', code, days: Number(level.rewardDays) || 30, permanent: level.rewardPermanent === true })),
+    ],
     rewardDays: Math.max(1, Math.min(365, Number(level.rewardDays) || 30)),
     rewardPermanent: level.rewardPermanent === true,
   }))
@@ -780,7 +872,11 @@ function refreshLevelEditor(item) {
   try {
     const levels = JSON.parse(item.levelsText || '[]')
     if (!Array.isArray(levels)) throw new Error('يجب أن يكون جدول المستويات قائمة JSON.')
-    item.levelsEditor = levels.map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }))
+    item.levelsEditor = levels.map(level => {
+      const benefits = [...(Array.isArray(level.benefits) ? level.benefits : []), ...(Array.isArray(level.rewards) ? level.rewards : [])]
+      const rewardCosmeticCodes = Array.from(new Set([level.rewardCosmeticCode, ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
+      return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
+    })
   } catch (e) { error.value = e?.message || 'تعذر قراءة جدول المستويات.' }
 }
 
@@ -790,7 +886,10 @@ async function saveType(item) {
     let levels, rules
     try { levels = JSON.parse(item.levelsText || '[]'); rules = JSON.parse(item.rulesText || '{}') }
     catch { throw new Error('تحقق من صيغة JSON في المستويات أو القواعد.') }
-    if (!Array.isArray(levels) || !rules || typeof rules !== 'object' || Array.isArray(rules)) throw new Error('المستويات يجب أن تكون قائمة والقواعد كائناً JSON.')
+    if (!Array.isArray(levels) || !rules || typeof rules !== 'object' || Array.isArray(rules)) throw new Error('تحقق من إعدادات المستويات والقواعد.')
+    if (levels.length > 5 || levels.some(level => !Number.isInteger(level.level) || level.level < 1 || !Number.isSafeInteger(level.pointsRequired) || level.pointsRequired < 0)) throw new Error('أدخل رقماً صحيحاً للنقاط في كل مستوى (حتى خمسة مستويات).')
+    levels.sort((a, b) => a.pointsRequired - b.pointsRequired || a.level - b.level)
+    for (let i = 1; i < levels.length; i++) if (levels[i].pointsRequired < levels[i - 1].pointsRequired) throw new Error('رتّب نقاط المستويات تصاعدياً.')
     rules.seatEffect = {
       enabled: item.seatEffectEnabled === true,
       url: String(item.seatEffectUrl || '').trim(),
@@ -804,7 +903,7 @@ async function saveType(item) {
       giftPoints: Number(item.giftPoints || 0),
       giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null || item.maxLevel === '' ? undefined : Number(item.maxLevel),
-      levels, rules,
+      levels: levels.map(level => ({ ...level, benefits: [...(level.benefits || [])] })), rules,
     }
     if (String(item.priceInput).trim() !== '') {
       const price = Number(item.priceInput)
@@ -894,4 +993,12 @@ onMounted(load)
 .cp-admin-tabs{display:flex;gap:.5rem;flex-wrap:wrap;padding:.35rem;border:1px solid var(--bs-border-color);border-radius:14px;background:var(--bs-tertiary-bg)}
 .cp-admin-tabs .nav-link{border-radius:10px;font-weight:600;white-space:normal}
 .cp-admin-tabs .nav-link:not(.active){color:var(--bs-body-color)}
+.cp-level-live-preview{background:var(--bs-tertiary-bg)}
+.cp-level-preview-card{position:relative;display:flex;align-items:center;gap:14px;min-height:112px;max-width:560px;padding:14px 18px;border-radius:16px;background-size:cover;background-position:center;overflow:hidden;color:#fff}
+.cp-level-preview-card:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.56),rgba(0,0,0,.08))}
+.cp-level-preview-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:1;pointer-events:none}
+.cp-level-preview-logo,.cp-level-preview-gift{position:relative;z-index:2;width:54px;height:54px;object-fit:contain;flex:0 0 auto}
+.cp-level-preview-copy{position:relative;z-index:2;display:flex;flex-direction:column;gap:4px;min-width:0}
+.cp-level-preview-copy span{font-size:.8rem;color:rgba(255,255,255,.8)}
+.cp-level-preview-gift{margin-inline-start:auto}
 </style>
