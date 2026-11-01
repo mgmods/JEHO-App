@@ -199,14 +199,14 @@ public class HomeMeFragment extends Fragment {
         AppContainer c = ContainerProvider.from(requireActivity());
         AuthDtos.UserDto me = c.getSessionManager().getUser();
         if (me != null) {
-            binding.mysteriousModeRow.setVisibility(me.mysteriousManEligible ? View.VISIBLE : View.GONE);
+            binding.mysteriousModeRow.setVisibility(Boolean.TRUE.equals(me.mysteriousManEligible) ? View.VISIBLE : View.GONE);
             binding.mysteriousModeDivider.setVisibility(me.mysteriousManEligible ? View.VISIBLE : View.GONE);
             binding.switchMysteriousMode.setOnCheckedChangeListener(null);
-            binding.switchMysteriousMode.setChecked(me.mysteriousMode);
+            binding.switchMysteriousMode.setChecked(Boolean.TRUE.equals(me.mysteriousMode));
             requireContext().getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
                     .edit().putBoolean("enabled", me.mysteriousMode).apply();
             binding.switchMysteriousMode.setOnCheckedChangeListener((button, enabled) -> {
-                if (enabled == me.mysteriousMode) return;
+                if (enabled == Boolean.TRUE.equals(me.mysteriousMode)) return;
                 button.setEnabled(false);
                 MiscDtos.UpdateProfileRequest request = new MiscDtos.UpdateProfileRequest();
                 request.mysteriousMode = enabled;
@@ -237,12 +237,12 @@ public class HomeMeFragment extends Fragment {
                             me.mysteriousMode = fresh.mysteriousMode;
                             binding.switchMysteriousMode.setChecked(fresh.mysteriousMode);
                             requireContext().getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
-                                    .edit().putBoolean("enabled", fresh.mysteriousMode).apply();
+                                    .edit().putBoolean("enabled", Boolean.TRUE.equals(fresh.mysteriousMode)).apply();
                             Toast.makeText(requireContext(),
-                                    fresh.mysteriousMode ? "تم تفعيل هوية الرجل الغامض" : "تم إيقاف هوية الرجل الغامض",
+                                    Boolean.TRUE.equals(fresh.mysteriousMode) ? "تم تفعيل هوية الرجل الغامض" : "تم إيقاف هوية الرجل الغامض",
                                     Toast.LENGTH_SHORT).show();
                         } else {
-                            binding.switchMysteriousMode.setChecked(me.mysteriousMode);
+                            binding.switchMysteriousMode.setChecked(Boolean.TRUE.equals(me.mysteriousMode));
                             Toast.makeText(requireContext(), failure, Toast.LENGTH_LONG).show();
                         }
                     });
