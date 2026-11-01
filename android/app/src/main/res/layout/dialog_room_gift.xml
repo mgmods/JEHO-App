@@ -31,6 +31,7 @@
     </LinearLayout>
     <LinearLayout android:orientation="vertical" android:id="@+id/line_top" android:background="@drawable/shape_121616_top_10dp" android:layout_width="fill_parent" android:layout_height="wrap_content" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toTopOf="@id/mi_gift_category" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent">
         <LinearLayout android:orientation="vertical" android:id="@+id/ll_top" android:layout_width="fill_parent" android:layout_height="wrap_content">
+            <include layout="@layout/room_gift_hascp_layout" />
             <com.Dramizo.Series.widget.GiftUserAvatarView
                 android:id="@+id/guav_gift_user_avatar"
                 android:background="@drawable/shape_d918121e_left_6"
@@ -44,7 +45,6 @@
             <include layout="@layout/room_gift_level_layout" />
         </LinearLayout>
         <include layout="@layout/room_gift_nocp_layout" />
-        <include layout="@layout/room_gift_hascp_layout" />
     </LinearLayout>
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/mi_gift_category"
