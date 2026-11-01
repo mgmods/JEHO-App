@@ -1180,9 +1180,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const mappedType = configured.length
       ? String(configured[0].key).slice('cp.gift.'.length)
       : '';
-    const type = (String(giftConfig?.category || '').toLowerCase() === 'cp'
-      ? String(giftConfig?.cpRelationshipType || mappedType || 'love')
-      : mappedType) as CpType;
+    // Only gifts currently classified as CP by the dashboard may initiate a CP
+    // request. The legacy mapping is a fallback for older CP gift rows only.
+    if (String(giftConfig?.category || '').toLowerCase() !== 'cp') return null;
+    const type = String(giftConfig?.cpRelationshipType || mappedType || 'love') as CpType;
     if (!TYPES.has(type)) return null;
     const [globalSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.enabled.global']);
     const [typeSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
