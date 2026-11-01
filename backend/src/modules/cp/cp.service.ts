@@ -260,7 +260,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       args,
     );
     const types: string[] = Array.from(new Set<string>(rows.map((row: any) => String(row.type))));
-    const configs: Record<string, Array<{ level: number; pointsRequired: number; reward?: string }>> = {};
+    // Dashboard-managed CP level JSON includes optional presentation, rewards and gift metadata.
+    const configs: Record<string, any[]> = {};
     for (const itemType of types) {
       const [setting] = await this.dataSource.query(
         'SELECT value FROM app_settings WHERE key=$1',
