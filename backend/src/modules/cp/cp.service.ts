@@ -627,7 +627,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       } catch { configs[type] = []; }
     }
     return rows.map((row: any) => {
-      const currentLevelConfig = (configs[row.type] || []).find(item => Number(item?.level) === Number(row.level)) || null;
+      const levels = (configs[row.type] || []).slice().sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
+      const currentThreshold = levels.filter(item => Number(item.level) <= Number(row.level)).reduce((max, item) => Math.max(max, Number(item.pointsRequired) || 0), 0);
+      const nextLevel = levels.find(item => Number(item.level) > Number(row.level));
+      const nextThreshold = nextLevel ? Math.max(0, Number(nextLevel.pointsRequired) || 0) : null;
+      const span = nextThreshold === null ? 0 : nextThreshold - currentThreshold;
+      const progressed = Math.max(0, Number(row.points || 0) - currentThreshold);
+      const progressPercent = span > 0 ? Math.max(0, Math.min(100, progressed * 100 / span)) : 100;
+      const currentLevelConfig = levels.find(item => Number(item?.level) === Number(row.level)) || null;
       const presentation = currentLevelConfig?.presentation || {};
       const startedAt = new Date(row.startedAt);
       const durationDays = Number.isNaN(startedAt.getTime()) ? 0 : Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 86400000));
@@ -639,6 +646,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         : durationMonths > 0 ? `${durationMonths} شهر ${remainingDays} يوم` : `${durationDays} يوم`;
       return {
         ...row,
+        currentLevelAt: currentThreshold,
+        nextLevelAt: nextThreshold ?? 0,
+        progressPercent,
         durationDays,
         durationLabel,
         duration: { days: durationDays, years: durationYears, months: durationMonths, remainingDays },
@@ -690,6 +700,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         partnerDisplayName: visual.partnerDisplayName || row.partner?.displayName || row.partner?.username || 'الشريك',
         partnerAvatarUrl: visual.partnerAvatarUrl || row.partner?.avatarUrl || null,
         currentLevelConfig: visual.currentLevelConfig || null,
+        currentLevelAt: Number(visual.currentLevelAt || 0),
+        nextLevelAt: Number(visual.nextLevelAt || 0),
+        progressPercent: Number(visual.progressPercent ?? 100),
         levelName: visual.levelName || null,
         levelLogoUrl: visual.levelLogoUrl || null,
         levelBadgeUrl: visual.levelBadgeUrl || null,
