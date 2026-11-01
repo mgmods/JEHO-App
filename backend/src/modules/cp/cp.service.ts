@@ -6,7 +6,6 @@ import { CpRequestStatus } from '../../database/entities/cp-request.entity';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
-import { BadgesService } from '../badges/badges.service';
 
 const TYPES = new Set<string>(Object.values(CpType));
 const EXPIRY_MINUTES = 30;
@@ -21,7 +20,6 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     private readonly realtime: RealtimeGateway,
     private readonly notifications: NotificationsService,
     private readonly cosmetics: CosmeticsService,
-    private readonly badges: BadgesService,
   ) {}
 
   async onModuleInit() {
@@ -74,23 +72,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const giftIds = Array.from(new Set(
       safeLevels.map(item => String(item?.rewardGiftId || '').trim()).filter(id => UUID_REGEX.test(id)),
     ));
-    const badgeIds = Array.from(new Set(
-      safeLevels.map(item => String(item?.rewardBadgeId || '').trim()).filter(id => UUID_REGEX.test(id)),
-    ));
     const gifts = giftIds.length ? await this.dataSource.query(
       'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true',
       [giftIds],
     ) : [];
-    const badges = badgeIds.length ? await this.dataSource.query(
-      'SELECT id,name,"imageUrl","isAnimated" FROM badges WHERE id::text = ANY($1::text[]) AND "isActive"=true',
-      [badgeIds],
-    ) : [];
     const giftsById = new Map(gifts.map((gift: any) => [String(gift.id), gift]));
-    const badgesById = new Map(badges.map((badge: any) => [String(badge.id), badge]));
     return safeLevels.map(item => ({
       ...item,
       rewardGift: giftsById.get(String(item?.rewardGiftId || '')) || null,
-      rewardBadge: badgesById.get(String(item?.rewardBadgeId || '')) || null,
     }));
   }
 
@@ -112,8 +101,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     ];
     const unique = Array.from(new Map(candidates.map(item => [String(item.code).trim(), item])).values())
       .filter(item => /^[a-zA-Z0-9_-]{2,64}$/.test(String(item.code || '').trim()));
-    const badgeId = String(levelConfig.rewardBadgeId || '').trim();
-    if (!unique.length && !UUID_REGEX.test(badgeId)) return;
+    if (!unique.length) return;
     const codes = unique.map(item => String(item.code).trim());
     const available = codes.length ? await this.dataSource.query(
       'SELECT id,code FROM cosmetics WHERE code=ANY($1::text[]) AND "isActive"=true',
@@ -145,30 +133,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           console.warn('[CB] level cosmetic reward delivery failed', code, error);
         }
       }
-      // CP level badges use the existing badge ownership/showcase system. This
-      // pins the earned badge below the public ID and sends the normal badge notification.
-      if (UUID_REGEX.test(badgeId)) {
-        const claimCode = 'badge:' + badgeId;
-        const [claim] = await this.dataSource.query(
-          `INSERT INTO cp_level_reward_claims ("relationshipId","userId",level,"cosmeticCode",status)
-           VALUES ($1,$2,$3,$4,'pending')
-           ON CONFLICT ("relationshipId",level,"userId","cosmeticCode") DO NOTHING
-           RETURNING id`,
-          [relationshipId, userId, level, claimCode],
-        );
-        if (claim?.id) {
-          try {
-            await this.badges.grantForTask(userId, badgeId, levelConfig.rewardPermanent === true ? 0 : Math.max(1, Math.min(3650, Math.floor(Number(levelConfig.rewardBadgeDays ?? levelConfig.rewardDays) || 30))), 'cp_level', true);
-            await this.dataSource.query(
-              'UPDATE cp_level_reward_claims SET status=$1,"grantedAt"=now() WHERE id=$2',
-              ['granted', claim.id],
-            );
-          } catch (error) {
-            await this.dataSource.query('DELETE FROM cp_level_reward_claims WHERE id=$1', [claim.id]).catch(() => undefined);
-            console.warn('[CP] level badge delivery failed', badgeId, error);
-          }
-        }
-      }
+
     }
   }
 
@@ -179,6 +144,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const settings: Record<string, string> = Object.fromEntries(rows.map((row: any) => [row.key, String(row.value)]));
     const globallyEnabled = settings['cp.enabled.global'] !== 'false';
     const catalog: Array<Record<string, unknown>> = [];
+    const giftTabEnabled = settings['cp.gift_tab.enabled'] !== 'false';
     for (const type of Object.values(CpType)) {
       const giftId = settings[`cp.gift.${type}`] || null;
       const [gift] = giftId ? await this.dataSource.query(
@@ -218,6 +184,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         },
       });
     }
+    // Metadata row keeps the setting available even when no CP type is configured.
+    catalog.push({ type: '_settings', enabled: false, giftTabEnabled });
     return catalog;
   }
 
