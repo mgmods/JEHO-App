@@ -549,7 +549,7 @@ function openCreate() {
     coinPrice: 10,
     diamondValue: 8,
     type: 'normal',
-    category: activeCategories.value[0]?.key || 'normal',
+    category: giftSection.value === 'cp' ? 'cp' : (activeCategories.value[0]?.key || 'normal'),
     iconUrl: '',
     animationUrl: '',
     sortOrder: 0,
