@@ -318,17 +318,28 @@ export class GiftsService implements OnModuleInit {
           iconUrl: null,
         }));
       }
-      // Preserve existing CP type assignments and move their gifts into the CP tab.
-      const configured = await this.dataSource.query(
-        "SELECT value FROM app_settings WHERE key LIKE 'cp.gift.%' AND COALESCE(value, '') <> ''",
-      );
-      const giftIds = Array.from(new Set(configured.map((row: any) => String(row.value || '').trim()).filter(Boolean)));
-      if (giftIds.length) {
-        await this.giftsRepo.createQueryBuilder()
-          .update(Gift)
-          .set({ category: 'cp' })
-          .where('id::text IN (:...giftIds)', { giftIds })
-          .execute();
+      // One-time migration only: legacy CP starter gifts become CP-category gifts.
+      // After migration the dashboard category is authoritative and must never be
+      // overwritten on later application starts.
+      const migrationKey = 'cp.gift_category_migration_v1';
+      const migrated = await this.settingsRepo.findOne({ where: { key: migrationKey } });
+      if (!migrated) {
+        const configured = await this.dataSource.query(
+          "SELECT value FROM app_settings WHERE key LIKE 'cp.gift.%' AND COALESCE(value, '') <> ''",
+        );
+        const giftIds = Array.from(new Set(configured.map((row: any) => String(row.value || '').trim()).filter(Boolean)));
+        if (giftIds.length) {
+          await this.giftsRepo.createQueryBuilder()
+            .update(Gift)
+            .set({ category: 'cp' })
+            .where('id::text IN (:...giftIds)', { giftIds })
+            .execute();
+        }
+        await this.settingsRepo.save(this.settingsRepo.create({
+          key: migrationKey,
+          value: '1',
+          description: 'One-time migration of legacy CP starter gifts into CP category',
+        }));
       }
     } catch (err) {
       this.log.warn(`ensure CP gift category: ${err instanceof Error ? err.message : String(err)}`);
@@ -1806,15 +1817,9 @@ export class GiftsService implements OnModuleInit {
     const seen = new Set<string>();
     const out: typeof gifts = [];
     const showDiamonds = !!ECONOMY.showDiamondValueInApp;
-    const cpGiftRows = await this.dataSource.query(
-      "SELECT value FROM app_settings WHERE key LIKE 'cp.gift.%'",
-    ).catch(() => []);
-    const cpGiftIds = new Set(cpGiftRows.map((row: any) => String(row.value || '')).filter(Boolean));
     for (const g of gifts) {
       if (this.isLuckyBoxCatalogGift(g)) continue;
-      const effectiveCategory = cpGiftIds.has(String(g.id))
-        ? 'cp'
-        : String(g.category || 'normal').toLowerCase();
+      const effectiveCategory = String(g.category || 'normal').toLowerCase();
       const stem = this.giftArtStem(g.iconUrl) || this.giftNameKey(g.name);
       const key = effectiveCategory === 'cp'
         ? 'cp:' + String(g.id)
