@@ -1623,15 +1623,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         };
       }),
     );
-    // Official platform rooms must never expose or resolve a user owner.
-    // The owner's own personal room is the single exception to mysterious mode:
-    // keep its host identity (name/avatar/badges) normal while hiding the owner
-    // everywhere else in the app. Personal rooms are standard, non-agency rooms.
-    const isOwnersPersonalRoom = !room.agencyId
-      && room.roomKind === RoomKind.STANDARD
-      && !!room.hostId;
+    // Official platform rooms have no user owner. Every ordinary room, including
+    // the account owner's personal room, uses the same server-authoritative alias
+    // whenever mysterious mode is enabled; there is no room-specific identity bypass.
     const attachedHost = isPlatformRoom ? null : await this.attachFrame(room.host, vipMap.get(room.hostId) || 0, displayRanks.get(room.hostId) || null, nameStyles.get(room.hostId) || null);
-    const hostAnonymous = !isPlatformRoom && !isOwnersPersonalRoom && room.hostId
+    const hostAnonymous = !isPlatformRoom && room.hostId
       ? await this.mysteriousRoomIdentity(room.hostId)
       : null;
     const hostDto = hostAnonymous && attachedHost ? { ...attachedHost, ...hostAnonymous } : attachedHost;
