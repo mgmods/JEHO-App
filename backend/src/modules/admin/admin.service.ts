@@ -1927,7 +1927,9 @@ export class AdminService {
       sortOrder: dto.sortOrder ?? gift.sortOrder ?? 0,
       category: categoryDefault,
       cpRelationshipType: dto.cpRelationshipType ?? (gift as any).cpRelationshipType ?? 'love',
-      cpPoints: dto.cpPoints !== undefined ? Math.max(0, Math.floor(Number(dto.cpPoints) || 0)) : Number((gift as any).cpPoints || 0),
+      cpPoints: dto.cpPoints !== undefined
+        ? Math.max(0, Math.floor(Number(dto.cpPoints) || 0))
+        : ((gift as any).cpPoints == null ? null : Number((gift as any).cpPoints)),
       brandAgencyId:
         dto.brandAgencyId === undefined
           ? (gift as any).brandAgencyId ?? null
