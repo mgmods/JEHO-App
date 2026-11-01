@@ -829,7 +829,7 @@ function parseLevelInteger(value, fallback = 0) {
   const normalized = String(value)
     .replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
     .replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
-    .replace(/[٬,،\\s]/g, '')
+    .replace(/[٬,،\s]/g, '')
   const number = Number(normalized)
   return Number.isSafeInteger(number) ? number : NaN
 }
