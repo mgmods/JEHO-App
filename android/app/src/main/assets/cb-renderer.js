@@ -18,7 +18,7 @@
   }
   function renderCard(relationship, content) {
     const p = presentation(relationship), bg = safeUrl(p.cardBackgroundUrl || relationship && relationship.cardBackgroundUrl);
-    const logo = safeUrl(p.levelLogoUrl || p.logoUrl);
+    const logo = safeUrl(p.frameUrl || p.levelLogoUrl || p.logoUrl);
     return '<section class="jeho-cb-card"' + (bg ? ' style="background-image:linear-gradient(#160a1a55,#160a1a77),url(&quot;' + esc(bg) + '&quot;)"' : '') + '>' +
       (logo ? '<img class="jeho-cb-frame" src="' + esc(logo) + '" alt="">' : '') +
       '<div style="position:relative;z-index:1">' + renderLevelBadge(relationship) + (content || '') + '</div></section>';
