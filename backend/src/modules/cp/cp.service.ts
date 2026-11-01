@@ -479,7 +479,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const target = Math.max(1, Math.min(1000000, Math.floor(Number(taskDefinition.target) || baseTask.target)));
     const configuredRewardPoints = Math.max(0, Math.min(1000000, Math.floor(Number(taskDefinition.rewardPoints ?? baseTask.rewardPoints) || 0)));
     const [relationship] = await this.dataSource.query(
-      `SELECT id,points::text AS points,level,type FROM cp_relationships
+      `SELECT id,points::text AS points,level,type,"userAId","userBId" FROM cp_relationships
        WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
        ORDER BY "startedAt" DESC LIMIT 1`,
       [userId],
