@@ -640,8 +640,8 @@ class MainActivity : ThemedActivity() {
                     if (day.claimed) Color.rgb(58, 157, 92) else dailyLoginThemeColor(status, "cardBorderColor", Color.rgb(232, 224, 205)),
                 )
                 layoutParams = android.widget.GridLayout.LayoutParams(
-                    android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f),
                     android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED),
+                    android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f),
                 ).apply {
                     width = 0
                     height = (dailyLoginThemeNumber(status, "cardHeight", 112) * resources.displayMetrics.density).toInt()
@@ -698,7 +698,9 @@ class MainActivity : ThemedActivity() {
             daysRow.addView(tile)
         }
         daysScroll.addView(daysRow)
-        root.addView(daysScroll)
+        root.addView(daysScroll, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = (dailyLoginThemeNumber(status, "contentTop", 18) * resources.displayMetrics.density).toInt()
+        })
 
         val reward = status.reward
         val rewardPanel = LinearLayout(this).apply {
