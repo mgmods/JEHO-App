@@ -150,6 +150,7 @@ final class RelationshipSeatEffectsOverlay {
             int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 28, 20, 36);
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
             addEffect(a, b, type, url, sizeDp, duration);
+            addLevelBadge(a, b, relation);
         }
         if (running.isEmpty()) retryIfNoParticles();
     }
@@ -179,6 +180,80 @@ final class RelationshipSeatEffectsOverlay {
      * Never stretch or rotate the uploaded image: its native aspect ratio and orientation
      * are preserved regardless of the distance or direction between the two seats.
      */
+    /** Show the dashboard-configured CB level emblem between the two seated partners. */
+    private void addLevelBadge(@NonNull String userA, @NonNull String userB,
+                               @NonNull Map<String, Object> relationship) {
+        Object presentationValue = relationship.get("presentation");
+        Map<?, ?> presentation = presentationValue instanceof Map
+                ? (Map<?, ?>) presentationValue : java.util.Collections.emptyMap();
+        String badgeUrl = firstValue(relationship, "levelLogoUrl", "levelBadgeUrl");
+        if (badgeUrl.isEmpty()) {
+            Object logo = presentation.get("levelLogoUrl");
+            if (logo == null) logo = presentation.get("logoUrl");
+            if (logo == null) logo = presentation.get("badgeUrl");
+            badgeUrl = logo == null ? "" : String.valueOf(logo).trim();
+        }
+        String title = firstValue(relationship, "levelName", "profileTitle");
+        if (title.isEmpty()) title = "Lv." + intValue(relationship.get("level"), 1, 1, 1000);
+        final View badge;
+        final int width;
+        final int height;
+        if (!badgeUrl.isEmpty() && (badgeUrl.startsWith("https://") || badgeUrl.startsWith("http://"))) {
+            ImageView image = new ImageView(context);
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setContentDescription("شارة مستوى العلاقة " + title);
+            image.setBackgroundColor(Color.TRANSPARENT);
+            Glide.with(context).load(badgeUrl).fitCenter().into(image);
+            badge = image;
+            width = dp(28);
+            height = dp(28);
+        } else {
+            TextView label = new TextView(context);
+            label.setText(title);
+            label.setTextColor(Color.WHITE);
+            label.setTextSize(9f);
+            label.setTypeface(null, android.graphics.Typeface.BOLD);
+            label.setGravity(Gravity.CENTER);
+            label.setPadding(dp(7), dp(3), dp(7), dp(3));
+            label.setBackgroundColor(Color.rgb(91, 35, 76));
+            label.setContentDescription("مستوى العلاقة " + title);
+            badge = label;
+            width = dp(66);
+            height = dp(24);
+        }
+        badge.setClickable(false);
+        badge.setFocusable(false);
+        badge.setElevation(dp(8));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height);
+        badge.setLayoutParams(lp);
+        layer.addView(badge);
+        final int[] gridLoc = new int[2];
+        final int[] aLoc = new int[2];
+        final int[] bLoc = new int[2];
+        ValueAnimator position = ValueAnimator.ofFloat(0f, 1f);
+        position.setDuration(900L);
+        position.setRepeatCount(ValueAnimator.INFINITE);
+        position.setInterpolator(new LinearInterpolator());
+        position.addUpdateListener(animation -> {
+            View anchorA = findAvatarForUser(userA);
+            View anchorB = findAvatarForUser(userB);
+            if (anchorA == null || anchorB == null || layer.getWidth() <= 0 || layer.getHeight() <= 0) {
+                badge.setVisibility(View.INVISIBLE);
+                return;
+            }
+            layer.getLocationInWindow(gridLoc);
+            anchorA.getLocationInWindow(aLoc);
+            anchorB.getLocationInWindow(bLoc);
+            float centerX = ((aLoc[0] + anchorA.getWidth() / 2f) + (bLoc[0] + anchorB.getWidth() / 2f)) / 2f - gridLoc[0];
+            float centerY = ((aLoc[1] + anchorA.getHeight() / 2f) + (bLoc[1] + anchorB.getHeight() / 2f)) / 2f - gridLoc[1];
+            badge.setX(centerX - width / 2f);
+            badge.setY(Math.max(0f, centerY - height - dp(24)));
+            badge.setVisibility(View.VISIBLE);
+        });
+        running.add(position);
+        position.start();
+    }
+
     private void addEffect(@NonNull String userA, @NonNull String userB,
                            String type, String url, int sizeDp, long duration) {
         final int iconSize = dp(Math.max(20, Math.min(36, sizeDp)));
