@@ -1257,15 +1257,17 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
               isModeratorMuted: false,
             },
           );
-          const user = await this.usersRepo.findOne({ where: { id: userId } });
+          const identity = await this.buildJoinPayload(userId, roomId, room.hostId);
           this.emitToRoom(roomId, 'room:event', {
             roomId,
             event: 'room:seat_left',
             payload: {
               roomId,
               userId,
-              username: user?.username || null,
-              displayName: user?.displayName || user?.username || null,
+              username: identity.username || null,
+              displayName: identity.displayName || 'مستخدم',
+              avatarUrl: identity.avatarUrl || null,
+              mysteriousMan: identity.mysteriousMan === true,
               forced: true,
               reason: reason || 'auto_moderation',
             },
