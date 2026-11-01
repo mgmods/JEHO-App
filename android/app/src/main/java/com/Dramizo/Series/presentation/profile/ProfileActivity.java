@@ -241,10 +241,10 @@ public class ProfileActivity extends ThemedActivity {
                 });
             });
         });
-        binding.btnCpRequest.setOnClickListener(v -> {
-            if (userId == null || myId == null || userId.equals(myId)) return;
-            showCpRequestDialog(userId);
-        });
+        // CP relationships are initiated only by sending the configured CP gift.
+        // Keep the legacy view hidden for old layouts; never expose a profile request action.
+        binding.btnCpRequest.setVisibility(View.GONE);
+        binding.btnCpRequest.setOnClickListener(null);
         binding.btnFriend.setOnClickListener(v -> {
             if (userId == null) return;
             if (myId != null && userId.equals(myId)) {
@@ -335,7 +335,7 @@ public class ProfileActivity extends ThemedActivity {
             binding.btnFollow.setEnabled(true);
             boolean ownProfile = myId != null && myId.equals(user.id);
             isOwnProfile = ownProfile;
-            binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
+            binding.btnCpRequest.setVisibility(View.GONE);
             // The mysterious-mode activation control belongs only in Me -> Profile.
             // Never expose an activation/cancel switch from a public profile opened from a room.
             if (binding.rowProfileMysteriousMode != null) {
@@ -957,29 +957,6 @@ public class ProfileActivity extends ThemedActivity {
             if (!text.isEmpty() && !"null".equalsIgnoreCase(text)) return text;
         }
         return null;
-    }
-
-    private void showCpRequestDialog(String recipientId) {
-        final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
-        final String[] labels = {"الصداقة", "الأخوّة", "الحب", "الخطوبة", "الزواج"};
-        new AlertDialog.Builder(this).setTitle("اختر نوع العلاقة")
-                .setItems(labels, (dialog, which) -> {
-                    Map<String, String> body = new HashMap<>();
-                    body.put("recipientId", recipientId);
-                    body.put("type", types[which]);
-                    body.put("idempotencyKey", UUID.randomUUID().toString());
-                    binding.btnCpRequest.setEnabled(false);
-                    container.getIoExecutor().execute(() -> {
-                        Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
-                                container.getUserApi().createProfileCpRequest(body));
-                        runOnUiThread(() -> {
-                            binding.btnCpRequest.setEnabled(true);
-                            Toast.makeText(this, result.success ? "تم إرسال طلب " + labels[which] + " ✓"
-                                    : (result.error != null ? result.error : "تعذر إرسال الطلب"),
-                                    Toast.LENGTH_LONG).show();
-                        });
-                    });
-                }).setNegativeButton("إلغاء", null).show();
     }
 
     private void loadPublicCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl,
