@@ -196,6 +196,16 @@ export class UpsertGiftDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @ApiPropertyOptional({ description: 'CP relationship type for gifts in the CP category' })
+  @IsOptional()
+  @IsString()
+  cpRelationshipType?: string;
+
+  @ApiPropertyOptional({ description: 'CP relationship points awarded per gift unit' })
+  @IsOptional()
+  @IsInt()
+  cpPoints?: number;
 }
 
 export class UpdateUserStatusDto {
@@ -1871,6 +1881,14 @@ export class AdminService {
   }
 
   async upsertGift(id: string | null, dto: UpsertGiftDto) {
+    const nextCategory = String(dto.category ?? '').trim().toLowerCase();
+    const cpType = String(dto.cpRelationshipType ?? 'love').trim().toLowerCase();
+    if (nextCategory === 'cp' && !['friendship', 'brotherhood', 'love', 'engagement', 'marriage'].includes(cpType)) {
+      throw new BadRequestException('نوع علاقة CP للهدية غير صالح');
+    }
+    if (dto.cpPoints !== undefined && (!Number.isSafeInteger(Number(dto.cpPoints)) || Number(dto.cpPoints) < 0 || Number(dto.cpPoints) > 1000000000)) {
+      throw new BadRequestException('نقاط هدية CP يجب أن تكون بين 0 و1,000,000,000');
+    }
     let gift = id ? await this.giftsRepo.findOne({ where: { id } }) : null;
     if (id && !gift) throw new NotFoundException('Gift not found');
     if (!gift) {
@@ -1908,6 +1926,8 @@ export class AdminService {
       isActive: dto.isActive ?? gift.isActive ?? true,
       sortOrder: dto.sortOrder ?? gift.sortOrder ?? 0,
       category: categoryDefault,
+      cpRelationshipType: dto.cpRelationshipType ?? (gift as any).cpRelationshipType ?? 'love',
+      cpPoints: dto.cpPoints !== undefined ? Math.max(0, Math.floor(Number(dto.cpPoints) || 0)) : Number((gift as any).cpPoints || 0),
       brandAgencyId:
         dto.brandAgencyId === undefined
           ? (gift as any).brandAgencyId ?? null
