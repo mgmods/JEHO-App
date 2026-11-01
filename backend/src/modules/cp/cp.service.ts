@@ -510,7 +510,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   async forUser(userId: string) {
     // The CP space is the current relationship workspace, not a history list.
     // Ended relationships stay in audit data but are not returned to the UI.
-    return this.dataSource.query(
+    const rows = await this.dataSource.query(
       `SELECT r.*,
          json_build_object('id', me.id, 'username', me.username, 'displayName', me."displayName",
            'avatarUrl', me."avatarUrl", 'level', me.level,
@@ -527,6 +527,24 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
        ORDER BY r."startedAt" DESC LIMIT 1`,
       [userId],
     );
+    if (!rows.length) return rows;
+    const visuals = await this.profileRelationships(userId);
+    const byId = new Map(visuals.map((item: any) => [String(item.id), item]));
+    return rows.map((row: any) => {
+      const visual: any = byId.get(String(row.id)) || {};
+      return {
+        ...row,
+        currentLevelConfig: visual.currentLevelConfig || null,
+        levelName: visual.levelName || null,
+        levelLogoUrl: visual.levelLogoUrl || null,
+        levelBadgeUrl: visual.levelBadgeUrl || null,
+        profileTitle: visual.profileTitle || null,
+        presentation: visual.presentation || null,
+        benefits: visual.benefits || [],
+        giftPresentation: visual.giftPresentation || null,
+        giftBonusPercent: visual.giftBonusPercent || 0,
+      };
+    });
   }
 
 
