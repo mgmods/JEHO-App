@@ -280,7 +280,7 @@
                   </div>
                 </div>
               </div>
-              <div v-if="!item.levelsEditor.length" class="text-muted small">أضف المستويات أولاً في جدول JSON أعلاه، ثم ستظهر هنا أدوات رفع الصور واختيار الهدايا.</div>
+              <div v-if="!item.levelsEditor.length" class="text-muted small">أضف مستوى جديداً من الزر أعلاه، ثم خصص نقاطه ومكافآته وتصميمه.</div>
             </div>
           </div>
           <div class="col-12">
@@ -377,7 +377,8 @@
           <div class="col-sm-6 col-xl-3">
             <label class="form-label">الفئة</label>
             <select v-model="cpStoreForm.type" class="form-select">
-              <option value="profile_card">بطاقة الملف الشخصي</option>
+              <option value="profile_card">بطاقة / إطار الملف الشخصي</option>
+              <option value="level_badge">شارة مستوى</option>
               <option value="entry_effect">تأثير دخول</option>
               <option value="room_card">بطاقة الروم</option>
               <option value="nameplate">لوحة الاسم</option>
@@ -883,6 +884,7 @@ function refreshLevelEditor(item) {
 async function saveType(item) {
   error.value = ''; success.value = ''; saving.value = true; savingType.value = item.type
   try {
+    syncLevelEditor(item)
     let levels, rules
     try { levels = JSON.parse(item.levelsText || '[]'); rules = JSON.parse(item.rulesText || '{}') }
     catch { throw new Error('تحقق من صيغة JSON في المستويات أو القواعد.') }
