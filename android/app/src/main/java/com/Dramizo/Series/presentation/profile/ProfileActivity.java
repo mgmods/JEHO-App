@@ -1138,11 +1138,27 @@ public class ProfileActivity extends ThemedActivity {
                         levelPresentation.get("title"));
                 String levelTitle = levelTitleValue == null ? "" : levelTitleValue;
                 binding.tvProfileCpCvLevel.setText(levelTitle.isEmpty() ? "Lv." + relationshipLevel : levelTitle);
-                String levelBadgeValue = firstNonEmptyValue(
+                // CP level artwork is a standalone horizontal profile icon, not a medal.
+                // Use only the configured level logo; never put it in the medal showcase.
+                String cpLevelIconValue = firstNonEmptyValue(
                         relation.get("levelLogoUrl"),
-                        relation.get("levelBadgeUrl"),
                         levelPresentation.get("levelLogoUrl"),
-                        levelPresentation.get("logoUrl"),
+                        levelPresentation.get("logoUrl"));
+                String cpLevelIconUrl = cpLevelIconValue == null ? "" : cpLevelIconValue;
+                if (binding.imgCpLevelIcon != null) {
+                    if (!cpLevelIconUrl.isEmpty()) {
+                        binding.imgCpLevelIcon.setVisibility(View.VISIBLE);
+                        Glide.with(ProfileActivity.this)
+                                .load(AssetCatalog.absoluteUrl(cpLevelIconUrl))
+                                .fitCenter()
+                                .into(binding.imgCpLevelIcon);
+                    } else {
+                        binding.imgCpLevelIcon.setImageDrawable(null);
+                        binding.imgCpLevelIcon.setVisibility(View.GONE);
+                    }
+                }
+                String levelBadgeValue = firstNonEmptyValue(
+                        relation.get("levelBadgeUrl"),
                         levelPresentation.get("badgeUrl"));
                 String levelBadgeUrl = levelBadgeValue == null ? "" : levelBadgeValue;
                 if (binding.imgProfileCpLevelBadge != null) {
@@ -1363,6 +1379,10 @@ public class ProfileActivity extends ThemedActivity {
             cpHeartAnimator = null;
         }
         binding.rowProfileCp.setVisibility(View.GONE);
+        if (binding.imgCpLevelIcon != null) {
+            binding.imgCpLevelIcon.setImageDrawable(null);
+            binding.imgCpLevelIcon.setVisibility(View.GONE);
+        }
         if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.VISIBLE);
         if (binding.rowProfileCpCv != null) {
             binding.rowProfileCpCv.setVisibility(View.GONE);
