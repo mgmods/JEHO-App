@@ -255,7 +255,7 @@ export class GiftsService implements OnModuleInit {
         `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS \"cpRelationshipType\" varchar(24) NOT NULL DEFAULT 'love'`,
       );
       await this.dataSource.query(
-        `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS \"cpPoints\" integer NOT NULL DEFAULT 0`,
+        `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS \"cpPoints\" integer NULL`,
       );
       await this.dataSource.query(
         `UPDATE gifts SET \"cpRelationshipType\"='love' WHERE category='cp' AND COALESCE(\"cpRelationshipType\",'')=''`,
