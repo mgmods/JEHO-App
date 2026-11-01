@@ -121,6 +121,7 @@ public class NotificationsActivity extends ThemedActivity {
     private void showCpRequestPrompt(String requestId, String title, String body) {
         if (isFinishing() || requestId == null || requestId.trim().isEmpty()) return;
         new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setIcon(R.drawable.gift_cp_hx)
                 .setTitle(title == null || title.trim().isEmpty() ? "طلب ارتباط جديد" : title)
                 .setMessage(body == null || body.trim().isEmpty()
                         ? "لديك طلب ارتباط جديد. هل تريد قبول العلاقة أم رفضها؟" : body)
