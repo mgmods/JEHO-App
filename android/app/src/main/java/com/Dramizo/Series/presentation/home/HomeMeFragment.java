@@ -65,6 +65,7 @@ public class HomeMeFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         applySectionWallpaper();
         bindProfileDashboard();
+        refreshMyProfile();
         setupAdminConsoleEntry();
         keepOnlyMyRoomActivityAndRoomLists();
         viewModel = new ViewModelProvider(requireParentFragment(),
@@ -192,6 +193,24 @@ public class HomeMeFragment extends Fragment {
         // This tab is the rooms/activity feed and must never show a second admin shortcut.
         binding.actionAdminConsole.setVisibility(View.GONE);
         binding.actionAdminConsole.setOnClickListener(null);
+    }
+
+    private void refreshMyProfile() {
+        if (!isAdded()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AuthDtos.UserDto>> response =
+                        c.getUserApi().me().execute();
+                if (!response.isSuccessful() || response.body() == null
+                        || !response.body().success || response.body().data == null) return;
+                c.getSessionManager().updateCachedUser(response.body().data);
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    if (binding != null && isAdded()) bindProfileDashboard();
+                });
+            } catch (Exception ignored) { }
+        });
     }
 
     private void bindProfileDashboard() {
