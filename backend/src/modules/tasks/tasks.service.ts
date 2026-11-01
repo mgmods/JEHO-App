@@ -517,8 +517,15 @@ export class TasksService {
     const yesterday = `${yesterdayDate.getUTCFullYear()}-${String(yesterdayDate.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getUTCDate()).padStart(2, '0')}`;
     const alreadyClaimed = state.lastClaimDate === today;
     const streakIsCurrent = alreadyClaimed || state.lastClaimDate === yesterday;
-    const activeStreak = streakIsCurrent ? state.streak : 0;
-    const nextDay = alreadyClaimed ? Math.min(7, Math.max(1, activeStreak)) : state.lastClaimDate === yesterday ? (activeStreak >= 7 ? 1 : activeStreak + 1) : 1;
+    // Once day 7 was claimed, the next calendar day starts a fresh seven-day cycle.
+    // Do not leave all seven cards marked as claimed while presenting day 1 again.
+    const completedCycleYesterday = !alreadyClaimed && state.lastClaimDate === yesterday && state.streak >= 7;
+    const activeStreak = streakIsCurrent && !completedCycleYesterday ? state.streak : 0;
+    const nextDay = alreadyClaimed
+      ? Math.min(7, Math.max(1, activeStreak))
+      : state.lastClaimDate === yesterday
+        ? (state.streak >= 7 ? 1 : activeStreak + 1)
+        : 1;
     const day = config.days.find((d: any) => d.day === nextDay) || config.days[0];
     const cosmetic = day?.type === 'cosmetic' && day.cosmeticCode
       ? await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: day.cosmeticCode } })
