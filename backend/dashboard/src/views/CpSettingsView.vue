@@ -47,6 +47,7 @@
               <label class="form-label">شرط إكمال المهمة</label>
               <select v-model="task.condition" class="form-select mb-3">
                 <option value="points_today">جمع نقاط علاقة خلال اليوم</option>
+                <option value="gift_exchange_today">تبادل هدايا بين الشريكين خلال اليوم</option>
                 <option value="memory_count">إضافة ذكريات مشتركة خلال اليوم</option>
               </select>
               <div class="row g-3">
@@ -784,7 +785,7 @@ async function saveFeatures() {
           !task.title?.trim() || task.title.trim().length > 100 ||
           !Number.isSafeInteger(target) || target < 1 || target > 1000000 ||
           !Number.isSafeInteger(rewardPoints) || rewardPoints < 0 || rewardPoints > 1000000 ||
-          !['memory_count', 'points_today'].includes(task.condition)) {
+          !['memory_count', 'points_today', 'gift_exchange_today'].includes(task.condition)) {
         throw new Error('تحقق من معرّف المهمة واسمها وشرطها والهدف والمكافأة.')
       }
       seen.add(id)
