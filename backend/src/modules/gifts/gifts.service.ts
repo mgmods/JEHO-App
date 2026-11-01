@@ -484,32 +484,32 @@ export class GiftsService implements OnModuleInit {
     // 1) same name+price
     await runPass(
       (g) =>
-        `${this.giftNameKey(g.name)}|${Math.floor(Number(g.coinPrice) || 0)}`,
+        `${String(g.category || 'normal').toLowerCase()}:${this.giftNameKey(g.name)}|${Math.floor(Number(g.coinPrice) || 0)}`,
     );
 
     // 2) same display name (any price) — one “وردة” only
     await runPass((g) => {
       const nk = this.giftNameKey(g.name);
-      return nk ? `name:${nk}` : '';
+      return nk ? `name:${String(g.category || 'normal').toLowerCase()}:${nk}` : '';
     });
 
     // 3) same icon file basename
     await runPass((g) => {
       const icon = this.giftMediaFileKey(g.iconUrl);
-      return icon ? `icon:${icon}` : '';
+      return icon ? `icon:${String(g.category || 'normal').toLowerCase()}:${icon}` : '';
     });
 
     // 4) same art stem (gift-rose / rose / gift_rose)
     await runPass((g) => {
       const stem = this.giftArtStem(g.iconUrl);
-      return stem ? `stem:${stem}` : '';
+      return stem ? `stem:${String(g.category || 'normal').toLowerCase()}:${stem}` : '';
     });
 
     // 5) same real motion asset
     await runPass((g) => {
       const anim = this.giftMediaFileKey(g.animationUrl);
       if (!anim || !/\.(mp4|webm|mov|gif|webp)$/i.test(anim)) return '';
-      return `anim:${anim}`;
+      return `anim:${String(g.category || 'normal').toLowerCase()}:${anim}`;
     });
 
     return deactivated;
@@ -1766,8 +1766,11 @@ export class GiftsService implements OnModuleInit {
     const cpGiftIds = new Set(cpGiftRows.map((row: any) => String(row.value || '')).filter(Boolean));
     for (const g of gifts) {
       if (this.isLuckyBoxCatalogGift(g)) continue;
+      const effectiveCategory = cpGiftIds.has(String(g.id))
+        ? 'cp'
+        : String(g.category || 'normal').toLowerCase();
       const stem = this.giftArtStem(g.iconUrl) || this.giftNameKey(g.name);
-      const key = stem || String(g.id);
+      const key = effectiveCategory + ':' + (stem || String(g.id));
       if (seen.has(key)) continue;
       seen.add(key);
       const price = Math.max(0, Math.floor(Number(g.coinPrice) || 0));
@@ -1783,7 +1786,7 @@ export class GiftsService implements OnModuleInit {
       const view: any = { ...g };
       // Configured CB starter gifts get a dedicated gift-sheet tab without
       // changing the dashboard-owned category stored in the database.
-      if (cpGiftIds.has(String(g.id))) view.category = 'cp';
+      view.category = effectiveCategory;
       view.diamondValue = showDiamonds ? mintedDiamonds : 0;
       out.push(view);
     }
