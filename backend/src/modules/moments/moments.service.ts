@@ -335,23 +335,35 @@ export class MomentsService {
     if (imageUrl && (imageUrl.length > 1024 || !/^https?:\/\//i.test(imageUrl))) throw new BadRequestException('Image URL must be an uploaded HTTP(S) URL');
     if (!body && !imageUrl) throw new BadRequestException('Add text or an image');
     const [row] = await this.dataSource.query(
-      'UPDATE "jeho_own"."moments" SET body = $2, "imageUrl" = $3, visibility = $4 WHERE id = $1 RETURNING id, "userId", body, "imageUrl", visibility, "createdAt"',
-      [momentId, body, imageUrl, visibility],
+      `UPDATE "jeho_own"."moments"
+          SET body = $2, "imageUrl" = $3, visibility = $4, "updatedAt" = NOW()
+        WHERE id = $1 AND "userId" = $5
+        RETURNING id, "userId", body, "imageUrl", visibility, "createdAt"`,
+      [momentId, body, imageUrl, visibility, userId],
     );
-    const [author] = await this.dataSource.query(
-      `SELECT u.username, u."displayName", u."avatarUrl", u."publicId",
-         (SELECT vp.benefits::jsonb #> '{visuals,nameStyle}'
-          FROM "jeho_own"."user_vips" uv
-          JOIN "jeho_own"."vip_plans" vp ON vp.id = uv."vipPlanId"
-          WHERE uv."userId" = u.id AND uv."isActive" = true
-            AND (uv."expiresAt" IS NULL OR uv."expiresAt" > NOW())
-          ORDER BY uv.level DESC LIMIT 1) AS "nameStyle",
-        COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
-                 to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
-                 to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl"
-       FROM "jeho_own"."users" u WHERE u.id = $1`,
-      [userId],
-    );
+    if (!row) throw new NotFoundException('Moment not found');
+    // Updating the post is the success condition. Optional profile cosmetics must
+    // never turn a saved edit into a 500 response that the app reports as a failure.
+    let author: Record<string, unknown> = {};
+    try {
+      const [resolvedAuthor] = await this.dataSource.query(
+        `SELECT u.username, u."displayName", u."avatarUrl", u."publicId",
+           (SELECT vp.benefits::jsonb #> '{visuals,nameStyle}'
+            FROM "jeho_own"."user_vips" uv
+            JOIN "jeho_own"."vip_plans" vp ON vp.id = uv."vipPlanId"
+            WHERE uv."userId" = u.id AND uv."isActive" = true
+              AND (uv."expiresAt" IS NULL OR uv."expiresAt" > NOW())
+            ORDER BY uv.level DESC LIMIT 1) AS "nameStyle",
+          COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+                   to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
+                   to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl"
+         FROM "jeho_own"."users" u WHERE u.id = $1`,
+        [userId],
+      );
+      author = resolvedAuthor || {};
+    } catch {
+      author = {};
+    }
     return { ...row, ...author };
   }
 
@@ -389,13 +401,17 @@ export class MomentsService {
   }
 
   async remove(momentId: string, userId: string) {
-    const [row] = await this.dataSource.query(
-      'SELECT "userId" FROM "jeho_own"."moments" WHERE id = $1',
-      [momentId],
-    );
-    if (!row) throw new NotFoundException('Moment not found');
-    if (row.userId !== userId) throw new ForbiddenException('Only the author can delete this moment');
-    await this.dataSource.query('DELETE FROM "jeho_own"."moments" WHERE id = $1', [momentId]);
-    return { deleted: true };
+    return this.dataSource.transaction(async (manager) => {
+      const [row] = await manager.query(
+        'SELECT "userId" FROM "jeho_own"."moments" WHERE id = $1 FOR UPDATE',
+        [momentId],
+      );
+      if (!row) throw new NotFoundException('Moment not found');
+      if (row.userId !== userId) throw new ForbiddenException('Only the author can delete this moment');
+      await manager.query('DELETE FROM "jeho_own"."moment_comments" WHERE "momentId" = $1', [momentId]);
+      await manager.query('DELETE FROM "jeho_own"."moment_likes" WHERE "momentId" = $1', [momentId]);
+      await manager.query('DELETE FROM "jeho_own"."moments" WHERE id = $1 AND "userId" = $2', [momentId, userId]);
+      return { deleted: true };
+    });
   }
 }
