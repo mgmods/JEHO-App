@@ -15,7 +15,7 @@ class CpTypeConfigDto {
   @IsOptional() @IsInt() @Min(0) @Max(1000000000) giftPoints?: number;
   @IsOptional() @IsInt() @Min(0) @Max(1000000000) giftInteractionPoints?: number;
   @IsOptional() @IsInt() @Min(1) @Max(1000) maxLevel?: number;
-  @IsOptional() @IsArray() levels?: Array<{ level: number; pointsRequired: number; reward?: string }>;
+  @IsOptional() @IsArray() levels?: Array<Record<string, any>>;
   @IsOptional() @IsBoolean() enabled?: boolean;
   @IsOptional() @IsObject() rules?: Record<string, unknown>;
 }
@@ -192,6 +192,39 @@ export class CpAdminController {
           throw new BadRequestException('تأكد أن أرقام المستويات والنقاط صحيحة ومرتبة تصاعدياً');
         }
         previous = level.pointsRequired;
+        if (level.name !== undefined && (typeof level.name !== 'string' || level.name.length > 100)) {
+          throw new BadRequestException('اسم مستوى CB غير صالح');
+        }
+        if (level.giftBonusPercent !== undefined &&
+            (!Number.isFinite(Number(level.giftBonusPercent)) || Number(level.giftBonusPercent) < 0 || Number(level.giftBonusPercent) > 500)) {
+          throw new BadRequestException('نسبة نقاط هدايا المستوى يجب أن تكون بين 0 و500');
+        }
+        if (level.rewardGiftId) {
+          const [rewardGift] = await this.dataSource.query(
+            'SELECT id FROM gifts WHERE id=$1 AND "isActive"=true LIMIT 1',
+            [String(level.rewardGiftId)],
+          );
+          if (!rewardGift) throw new BadRequestException('هدية مكافأة المستوى يجب أن تكون هدية نشطة من الكتالوج');
+        }
+        if (level.presentation !== undefined) {
+          if (!level.presentation || typeof level.presentation !== 'object' || Array.isArray(level.presentation)) {
+            throw new BadRequestException('إعدادات عرض مستوى CB غير صالحة');
+          }
+          for (const field of ['frameUrl', 'levelLogoUrl', 'logoUrl', 'badgeUrl', 'cardBackgroundUrl']) {
+            const url = level.presentation[field];
+            if (url !== undefined && url !== '' &&
+                (typeof url !== 'string' || url.length > 2048 || !/^https?:\\/\\//i.test(url))) {
+              throw new BadRequestException('رابط صورة مستوى CB غير صالح: ' + field);
+            }
+          }
+          if (level.presentation.nameColor !== undefined &&
+              (typeof level.presentation.nameColor !== 'string' || !/^#[0-9a-f]{6}$/i.test(level.presentation.nameColor))) {
+            throw new BadRequestException('لون اسم مستوى CB غير صالح');
+          }
+          if (level.presentation.nameGlow !== undefined && typeof level.presentation.nameGlow !== 'boolean') {
+            throw new BadRequestException('خيار توهج اسم مستوى CB غير صالح');
+          }
+        }
       }
     }
     if (body.giftId !== undefined && body.giftId) {
