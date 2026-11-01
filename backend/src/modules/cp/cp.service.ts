@@ -1017,12 +1017,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (new Date(request.expiresAt).getTime() <= Date.now()) {
         await this.refund(manager, request);
         await manager.query(`UPDATE cp_requests SET status='expired',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
-        return { result: { id: requestId, status: 'expired', refunded: true }, senderId: request.fromUserId, type: request.type, accepted: false };
+        return { result: { id: requestId, status: 'expired', refunded: true }, senderId: request.fromUserId, receiverId: null, type: request.type, relationship: null, accepted: false };
       }
       if (!accept) {
         await this.refund(manager, request);
         await manager.query(`UPDATE cp_requests SET status='rejected',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
-        return { result: { id: requestId, status: 'rejected', refunded: true }, senderId: request.fromUserId, type: request.type, accepted: false };
+        return { result: { id: requestId, status: 'rejected', refunded: true }, senderId: request.fromUserId, receiverId: null, type: request.type, relationship: null, accepted: false };
       }
       await this.lockRelationshipUsers(manager, [request.fromUserId, request.toUserId]);
       const active = await manager.query(
@@ -1036,7 +1036,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         await manager.query(`UPDATE cp_requests SET status='rejected',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
         return {
           result: { id: requestId, status: 'rejected', refunded: true, reason: 'user_already_has_active_relationship' },
-          senderId: request.fromUserId, type: request.type, accepted: false,
+          senderId: request.fromUserId, receiverId: null, type: request.type, relationship: null, accepted: false,
         };
       }
       const [relationship] = await manager.query(
