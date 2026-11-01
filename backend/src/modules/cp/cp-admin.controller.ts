@@ -206,6 +206,21 @@ export class CpAdminController {
           );
           if (!rewardGift) throw new BadRequestException('هدية مكافأة المستوى يجب أن تكون هدية نشطة من الكتالوج');
         }
+        if (level.giftPresentation !== undefined) {
+          if (!level.giftPresentation || typeof level.giftPresentation !== 'object' || Array.isArray(level.giftPresentation)) {
+            throw new BadRequestException('إعدادات هدية مستوى CB غير صالحة');
+          }
+          const animationUrl = level.giftPresentation.animationUrl;
+          if (animationUrl !== undefined && animationUrl !== '' &&
+              (typeof animationUrl !== 'string' || animationUrl.length > 2048 ||
+               !(animationUrl.startsWith('https://') || animationUrl.startsWith('http://')))) {
+            throw new BadRequestException('رابط أنيميشن هدية CB غير صالح');
+          }
+          if (level.giftPresentation.showPartnerAvatars !== undefined &&
+              typeof level.giftPresentation.showPartnerAvatars !== 'boolean') {
+            throw new BadRequestException('خيار صور الشريكين في هدية CB غير صالح');
+          }
+        }
         if (level.presentation !== undefined) {
           if (!level.presentation || typeof level.presentation !== 'object' || Array.isArray(level.presentation)) {
             throw new BadRequestException('إعدادات عرض مستوى CB غير صالحة');
