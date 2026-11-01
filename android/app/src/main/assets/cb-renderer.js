@@ -28,11 +28,22 @@
     const shadow = p.nameGlow ? '0 0 8px ' + (color || '#f5ce70') : 'none';
     return '<span class="jeho-cb-title"' + ((color || p.nameGlow) ? ' style="' + (color ? '--cb-name-color:' + esc(color) + ';' : '') + '--cb-name-shadow:' + esc(shadow) + '"' : '') + '>' + esc(name) + '</span>';
   }
+  function renderDuoGift(relationship, avatars) {
+    const gift = relationship && (relationship.giftPresentation || relationship.currentLevelConfig && relationship.currentLevelConfig.giftPresentation) || {};
+    const animation = safeUrl(gift.animationUrl);
+    if (!animation) return '';
+    const showAvatars = gift.showPartnerAvatars !== false;
+    const a = safeUrl(avatars && avatars.a), b = safeUrl(avatars && avatars.b);
+    return '<div class="jeho-cb-duo-gift"><img class="jeho-cb-duo-animation" src="' + esc(animation) + '" alt="هدية CB">' +
+      (showAvatars ? '<div class="jeho-cb-duo-avatars">' + (a ? '<img src="' + esc(a) + '" alt="">' : '') + (b ? '<img src="' + esc(b) + '" alt="">' : '') + '</div>' : '') +
+      '</div>';
+  }
   function apply(root, relationship) {
     if (!root || !relationship) return;
     root.querySelectorAll('[data-cb-level]').forEach(node => { node.innerHTML = renderLevelBadge(relationship); });
     root.querySelectorAll('[data-cb-card]').forEach(node => { node.outerHTML = renderCard(relationship, node.innerHTML); });
     root.querySelectorAll('[data-cb-name]').forEach(node => { node.innerHTML = renderName(node.textContent, relationship); });
+    root.querySelectorAll('[data-cb-gift]').forEach(node => { node.innerHTML = renderDuoGift(relationship, { a: node.dataset.cbAvatarA, b: node.dataset.cbAvatarB }); });
   }
   async function load(userId, apiBase, root) {
     if (!userId || !apiBase || typeof window.fetch !== 'function') throw new Error('CB load requires userId and apiBase');
@@ -46,5 +57,5 @@
     if (root && relationship) apply(root, relationship);
     return relationship;
   }
-  window.JehoCB = Object.freeze({ version: 1, renderLevelBadge, renderCard, renderName, apply, load, presentation });
+  window.JehoCB = Object.freeze({ version: 1, renderLevelBadge, renderCard, renderName, renderDuoGift, apply, load, presentation });
 })(window, document);
