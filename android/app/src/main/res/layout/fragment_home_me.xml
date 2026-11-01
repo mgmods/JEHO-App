@@ -349,6 +349,33 @@
                     android:textStyle="bold"
                     android:visibility="gone" />
 
+                <LinearLayout
+                    android:id="@+id/mysteriousModeRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="10dp"
+                    android:visibility="gone">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="🕶️  الرجل الغامض"
+                        android:textColor="#49371D"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                    <Switch
+                        android:id="@+id/switchMysteriousMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="إخفاء هويتي"
+                        android:textColor="#806A4A"
+                        android:textSize="12sp" />
+                </LinearLayout>
+                <View android:id="@+id/mysteriousModeDivider" style="@style/ProfileLuxuryDivider" android:visibility="gone" />
+
                 <LinearLayout android:id="@+id/actionActivities" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
                     <TextView style="@style/ProfileLuxuryEmoji" android:text="✨"/>
                     <TextView style="@style/ProfileLuxuryMenuLabel" android:text="فعالياتي ومركز المهام"/>
