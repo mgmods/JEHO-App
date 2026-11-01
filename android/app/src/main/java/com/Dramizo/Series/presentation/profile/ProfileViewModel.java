@@ -87,6 +87,8 @@ public class ProfileViewModel extends ViewModel {
         if (!eq(a.avatarUrl, b.avatarUrl)) return false;
         if (!eq(a.coverUrl, b.coverUrl)) return false;
         if (!eq(a.vipBadgeUrl, b.vipBadgeUrl)) return false;
+        // Refresh the visible profile when the dashboard changes the purchased animated name style.
+        if (!java.util.Objects.equals(a.nameStyle, b.nameStyle)) return false;
         if (!eq(a.hostBadgeUrl, b.hostBadgeUrl)) return false;
         if (!eq(a.staffRole, b.staffRole)) return false;
         if (a.isAdmin != b.isAdmin) return false;
