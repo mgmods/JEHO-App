@@ -966,6 +966,11 @@ public class ProfileActivity extends ThemedActivity {
             hideProfileCpRelationship();
             return;
         }
+        // Clear the previous profile's CP level icon while the new relationship is loading.
+        if (binding.imgCpLevelIcon != null) {
+            binding.imgCpLevelIcon.setImageDrawable(null);
+            binding.imgCpLevelIcon.setVisibility(View.GONE);
+        }
         container.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> result = com.Dramizo.Series.util.ApiCall.execute(
                     container.getUserApi().cpProfileRelationships(targetId));
