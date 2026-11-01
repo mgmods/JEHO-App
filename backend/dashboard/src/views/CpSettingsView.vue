@@ -15,7 +15,13 @@
     <LoadingSpinner v-if="loading" />
 
     <template v-else>
-      <section class="settings-card mb-3 cp-feature-control">
+      <nav class="nav nav-pills cp-admin-tabs mb-3" aria-label="أقسام إعدادات CB">
+        <button type="button" class="nav-link" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">النظرة العامة والمهام</button>
+        <button type="button" class="nav-link" :class="{ active: activeTab === 'levels' }" @click="activeTab = 'levels'">الأنواع والمستويات</button>
+        <button type="button" class="nav-link" :class="{ active: activeTab === 'store' }" @click="activeTab = 'store'">المتجر والمكافآت</button>
+        <button type="button" class="nav-link" :class="{ active: activeTab === 'operations' }" @click="activeTab = 'operations'">الطلبات والسياسات والسجلات</button>
+      </nav>
+      <section v-show="activeTab === 'overview'" class="settings-card mb-3 cp-feature-control">
         <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
           <div>
             <h3 class="settings-card-title mb-1">تشغيل قسم CB/CP والمهمات</h3>
@@ -83,7 +89,7 @@
           </button>
         </div>
       </section>
-      <section v-for="item in types" :key="item.type" class="settings-card mb-3">
+      <section v-show="activeTab === 'levels'" v-for="item in types" :key="item.type" class="settings-card mb-3">
         <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
           <div>
             <h3 class="settings-card-title mb-1">{{ label(item.type) }}</h3>
@@ -276,7 +282,7 @@
         </div>
       </section>
 
-      <section class="settings-card mb-3 cp-store-admin">
+      <section v-show="activeTab === 'store'" class="settings-card mb-3 cp-store-admin">
         <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-2">
           <div>
             <h3 class="settings-card-title mb-1">متجر CP · العناصر التجميلية</h3>
@@ -362,7 +368,7 @@
         </div>
       </section>
 
-      <section class="settings-card mb-3">
+      <section v-show="activeTab === 'operations'" class="settings-card mb-3">
         <h3 class="settings-card-title">سياسة الطلبات</h3>
         <p class="form-text">الرفض والانتهاء والإلغاء من صاحب الطلب يعيد المبلغ الأصلي كاملاً. لا يمكن تعطيل الاسترداد الكامل من لوحة التحكم.</p>
         <div class="row g-3 align-items-end">
@@ -380,7 +386,7 @@
         </div>
       </section>
 
-      <section class="settings-card mb-3">
+      <section v-show="activeTab === 'operations'" class="settings-card mb-3">
         <h3 class="settings-card-title">تعديل نقاط علاقة (إجراء إداري مسجّل)</h3>
         <p class="form-text">يُستخدم للتصحيح الإداري فقط. لا يمنح المستخدم صلاحية إرسال نقاط لنفسه، وكل تعديل يسجل في سجل التدقيق.</p>
         <div class="row g-3">
@@ -393,7 +399,7 @@
         <div class="mt-3 d-flex justify-content-end"><button class="btn btn-aurora" :disabled="savingPoints" @click="adjustPoints"><span v-if="savingPoints" class="spinner-border spinner-border-sm me-1" />تسجيل تعديل النقاط</button></div>
       </section>
 
-      <section class="settings-card mb-3">
+      <section v-show="activeTab === 'operations'" class="settings-card mb-3">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
           <div>
             <h3 class="settings-card-title mb-1">طلبات CP وسجل الاسترداد</h3>
@@ -417,7 +423,7 @@
         </div>
       </section>
 
-      <section class="settings-card mb-3">
+      <section v-show="activeTab === 'operations'" class="settings-card mb-3">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
           <div><h3 class="settings-card-title mb-1">سجل تدقيق CP</h3><p class="form-text mb-0">تغييرات الإعدادات وتعديلات النقاط الإدارية.</p></div>
           <button class="btn btn-outline-secondary btn-sm" :disabled="loadingLogs" @click="loadLogs">تحديث</button>
@@ -444,6 +450,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
+const activeTab = ref('overview')
 const types = ref([])
 const gifts = ref([])
 const requests = ref([])
@@ -853,3 +860,9 @@ async function loadLogs() {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.cp-admin-tabs{display:flex;gap:.5rem;flex-wrap:wrap;padding:.35rem;border:1px solid var(--bs-border-color);border-radius:14px;background:var(--bs-tertiary-bg)}
+.cp-admin-tabs .nav-link{border-radius:10px;font-weight:600;white-space:normal}
+.cp-admin-tabs .nav-link:not(.active){color:var(--bs-body-color)}
+</style>
