@@ -1180,9 +1180,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const mappedType = configured.length
       ? String(configured[0].key).slice('cp.gift.'.length)
       : '';
-    const type = (mappedType || (String(giftConfig?.category || '').toLowerCase() === 'cp'
-      ? String(giftConfig?.cpRelationshipType || 'love')
-      : '')) as CpType;
+    const type = (String(giftConfig?.category || '').toLowerCase() === 'cp'
+      ? String(giftConfig?.cpRelationshipType || mappedType || 'love')
+      : mappedType) as CpType;
     if (!TYPES.has(type)) return null;
     const [globalSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.enabled.global']);
     const [typeSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
