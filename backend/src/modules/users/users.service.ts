@@ -361,6 +361,11 @@ export class UsersService {
   }
 
   private async isMysteriousModeAllowed(user: User, vip: UserVip | null | undefined): Promise<boolean> {
+    if (!user?.mysteriousMode) return false;
+    return this.isMysteriousModeEligible(user, vip);
+  }
+
+  private async isMysteriousModeEligible(user: User, vip: UserVip | null | undefined): Promise<boolean> {
     if (!user || !vip || !vip.isActive) return false;
     if (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) return false;
     const level = Number(vip.level || 0);
@@ -569,7 +574,7 @@ export class UsersService {
           relations: ['vipPlan'],
           order: { level: 'DESC' },
         });
-        const eligible = await this.isMysteriousModeAllowed(
+        const eligible = await this.isMysteriousModeEligible(
           { ...user, mysteriousMode: true } as User,
           activeVip,
         );
