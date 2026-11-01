@@ -15761,7 +15761,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (approvedName == null) approvedName = "مستخدم";
             // Free-mic sit uses room:seat_taken — still show climb line for others.
             if (!sameUser(myUserId, approvedId) || "room:seat_approved".equals(event)) {
-                appendChatLine("النظام", approvedName + " صعد إلى المايك 🎤", 0, 1);
+                boolean anonymousSeat = memberBool(payload, "mysteriousMan", false)
+                        || "الرجل الغامض".equals(approvedName);
+                if (anonymousSeat) {
+                    appendChatLine("الرجل الغامض", "صعد إلى المايك 🎤", 0, 1,
+                            null, approvedId, configuredMysteriousAvatarUrl());
+                } else {
+                    appendChatLine("النظام", approvedName + " صعد إلى المايك 🎤", 0, 1);
+                }
             }
             if (myUserId != null && sameUser(myUserId, approvedId)) {
                 if ("room:seat_approved".equals(event)) {
@@ -15805,9 +15812,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             String leftName = memberStr(payload, "displayName");
             if (leftName == null || leftName.trim().isEmpty()) leftName = "مستخدم";
-            appendChatLine("النظام",
-                    forced ? leftName + " تم إنزاله من المايك" : leftName + " نزل من المايك",
-                    0, 1);
+            boolean anonymousLeft = memberBool(payload, "mysteriousMan", false)
+                    || "الرجل الغامض".equals(leftName);
+            if (anonymousLeft) {
+                appendChatLine("الرجل الغامض",
+                        forced ? "تم إنزاله من المايك" : "نزل من المايك",
+                        0, 1, null, leftId, configuredMysteriousAvatarUrl());
+            } else {
+                appendChatLine("النظام",
+                        forced ? leftName + " تم إنزاله من المايك" : leftName + " نزل من المايك",
+                        0, 1);
+            }
             requestRoomRefresh(true);
         } else if ("room:staff_updated".equals(event)
                 || "room:seat_locked".equals(event)
