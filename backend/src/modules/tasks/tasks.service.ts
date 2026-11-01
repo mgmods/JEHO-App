@@ -423,6 +423,7 @@ export class TasksService {
   private defaultDailyLoginConfig() {
     return {
       enabled: true,
+      theme: { backgroundColor:'#dff0b8', backgroundImageUrl:'', overlayColor:'#ffffff', overlayOpacity:0.12, logoUrl:'', title:'مكافآت تسجيل الدخول لمدة 7 أيام', titleColor:'#176b32', titleSize:28, titleTop:24, headerGap:14, cardColor:'#fffef4', cardBorderColor:'#e8efcf', cardRadius:20, cardGap:12, cardImageSize:76, cardLabelSize:16, buttonText:'تسجيل الدخول', buttonColor:'#168b36', buttonTextColor:'#ffffff', buttonRadius:64, buttonHeight:64, buttonBottom:20, contentTop:18, contentGap:16, fontFamily:'default' },
       days: [
         { day: 1, type: 'coins', amount: 100, label: 'عملات ذهبية' },
         { day: 2, type: 'coins', amount: 150, label: 'مكافأة يومية' },
@@ -444,6 +445,7 @@ export class TasksService {
       const days = Array.isArray(parsed?.days) ? parsed.days : fallback.days;
       return {
         enabled: parsed?.enabled !== false,
+        theme: { ...fallback.theme, ...(parsed?.theme && typeof parsed.theme === 'object' ? parsed.theme : {}) },
         days: Array.from({ length: 7 }, (_, i) => {
           const candidate = days.find((d: any) => Number(d?.day) === i + 1) || fallback.days[i];
           return { ...fallback.days[i], ...candidate, day: i + 1 };
@@ -471,7 +473,18 @@ export class TasksService {
       const cosmetic = await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: day.cosmeticCode, isActive: true } });
       if (!cosmetic) throw new BadRequestException(`العنصر المحدد لليوم ${day.day} غير موجود أو غير نشط`);
     }
-    const value = JSON.stringify({ enabled: input.enabled !== false, days });
+    const defaults = this.defaultDailyLoginConfig().theme;
+    const rawTheme = input.theme && typeof input.theme === 'object' ? input.theme : {};
+    const safeColor = (value: unknown, fallback: string) => /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : fallback;
+    const safeNumber = (value: unknown, fallback: number, min: number, max: number) => Math.max(min, Math.min(max, Number.isFinite(Number(value)) ? Number(value) : fallback));
+    const theme = { ...defaults,
+      backgroundColor: safeColor(rawTheme.backgroundColor, defaults.backgroundColor), backgroundImageUrl: String(rawTheme.backgroundImageUrl || '').slice(0, 2048),
+      overlayColor: safeColor(rawTheme.overlayColor, defaults.overlayColor), overlayOpacity: safeNumber(rawTheme.overlayOpacity, defaults.overlayOpacity, 0, 1), logoUrl: String(rawTheme.logoUrl || '').slice(0, 2048),
+      title: String(rawTheme.title || defaults.title).slice(0, 80), titleColor: safeColor(rawTheme.titleColor, defaults.titleColor), titleSize: safeNumber(rawTheme.titleSize, defaults.titleSize, 12, 48), titleTop: safeNumber(rawTheme.titleTop, defaults.titleTop, 0, 120), headerGap: safeNumber(rawTheme.headerGap, defaults.headerGap, 0, 60),
+      cardColor: safeColor(rawTheme.cardColor, defaults.cardColor), cardBorderColor: safeColor(rawTheme.cardBorderColor, defaults.cardBorderColor), cardRadius: safeNumber(rawTheme.cardRadius, defaults.cardRadius, 0, 40), cardGap: safeNumber(rawTheme.cardGap, defaults.cardGap, 0, 32), cardImageSize: safeNumber(rawTheme.cardImageSize, defaults.cardImageSize, 24, 140), cardLabelSize: safeNumber(rawTheme.cardLabelSize, defaults.cardLabelSize, 8, 28),
+      buttonText: String(rawTheme.buttonText || defaults.buttonText).slice(0, 40), buttonColor: safeColor(rawTheme.buttonColor, defaults.buttonColor), buttonTextColor: safeColor(rawTheme.buttonTextColor, defaults.buttonTextColor), buttonRadius: safeNumber(rawTheme.buttonRadius, defaults.buttonRadius, 0, 80), buttonHeight: safeNumber(rawTheme.buttonHeight, defaults.buttonHeight, 36, 100), buttonBottom: safeNumber(rawTheme.buttonBottom, defaults.buttonBottom, 0, 100),
+      contentTop: safeNumber(rawTheme.contentTop, defaults.contentTop, 0, 100), contentGap: safeNumber(rawTheme.contentGap, defaults.contentGap, 0, 60), fontFamily: ['default','sans','serif'].includes(String(rawTheme.fontFamily)) ? String(rawTheme.fontFamily) : defaults.fontFamily };
+    const value = JSON.stringify({ enabled: input.enabled !== false, theme, days });
     let row = await this.settings.findOne({ where: { key: TasksService.DAILY_LOGIN_KEY } });
     if (!row) row = this.settings.create({ key: TasksService.DAILY_LOGIN_KEY, value, description: 'Seven-day daily login rewards configuration' });
     else row.value = value;
