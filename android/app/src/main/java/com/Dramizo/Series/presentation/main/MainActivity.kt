@@ -497,6 +497,15 @@ class MainActivity : ThemedActivity() {
         }
     }
 
+    private fun dailyLoginThemeColor(status: MiscDtos.DailyLoginStatusDto, key: String, fallback: Int): Int {
+        val raw = status.theme?.get(key)?.toString() ?: return fallback
+        return try { android.graphics.Color.parseColor(raw) } catch (_: Throwable) { fallback }
+    }
+
+    private fun dailyLoginThemeNumber(status: MiscDtos.DailyLoginStatusDto, key: String, fallback: Int): Float {
+        return (status.theme?.get(key) as? Number)?.toFloat() ?: fallback.toFloat()
+    }
+
     private fun showDailyLoginRewardDialog(
         container: AppContainer,
         status: MiscDtos.DailyLoginStatusDto,
@@ -507,16 +516,16 @@ class MainActivity : ThemedActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, pad)
             minimumWidth = (320 * resources.displayMetrics.density).toInt()
-            background = roundedBackground(Color.rgb(255, 255, 255), 26, Color.rgb(218, 180, 82))
+            background = roundedBackground(dailyLoginThemeColor(status, "backgroundColor", Color.rgb(223, 240, 184)), 26, Color.rgb(218, 180, 82))
         }
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
         val heading = TextView(this).apply {
-            text = "مكافآت تسجيل الدخول"
-            textSize = 21f
-            setTextColor(Color.rgb(45, 39, 28))
+            text = status.theme?.get("title")?.toString() ?: "مكافآت تسجيل الدخول لمدة 7 أيام"
+            textSize = dailyLoginThemeNumber(status, "titleSize", 28f)
+            setTextColor(dailyLoginThemeColor(status, "titleColor", Color.rgb(23, 107, 50)))
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         }
@@ -719,12 +728,12 @@ class MainActivity : ThemedActivity() {
         root.addView(rewardPanel)
 
         val claimButton = Button(this).apply {
-            text = "استلام"
+            text = status.theme?.get("buttonText")?.toString() ?: "تسجيل الدخول"
             isAllCaps = false
             textSize = 16f
-            setTextColor(Color.WHITE)
-            background = roundedBackground(Color.rgb(35, 157, 83), 16, Color.rgb(26, 130, 67))
-            layoutParams = LinearLayout.LayoutParams(-1, (50 * resources.displayMetrics.density).toInt()).apply { topMargin = pad }
+            setTextColor(dailyLoginThemeColor(status, "buttonTextColor", Color.WHITE))
+            background = roundedBackground(dailyLoginThemeColor(status, "buttonColor", Color.rgb(35, 157, 83)), dailyLoginThemeNumber(status, "buttonRadius", 64f).toInt(), Color.rgb(26, 130, 67))
+            layoutParams = LinearLayout.LayoutParams(-1, (dailyLoginThemeNumber(status, "buttonHeight", 64f) * resources.displayMetrics.density).toInt()).apply { topMargin = pad }
         }
         root.addView(claimButton)
 
