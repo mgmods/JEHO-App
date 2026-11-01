@@ -101,7 +101,7 @@ export class CpAdminController {
         const task = body.tasks[id];
         if (!task || typeof task !== 'object' || Array.isArray(task)) throw new BadRequestException('بيانات المهمة غير صالحة');
         if (task.enabled !== undefined && typeof task.enabled !== 'boolean') throw new BadRequestException('حالة المهمة غير صالحة');
-        if (task.condition !== undefined && !['memory_count', 'points_today'].includes(String(task.condition))) throw new BadRequestException('شرط المهمة غير مدعوم');
+        if (task.condition !== undefined && !['memory_count', 'points_today', 'gift_exchange_today'].includes(String(task.condition))) throw new BadRequestException('شرط المهمة غير مدعوم');
         if (task.description !== undefined && (typeof task.description !== 'string' || task.description.length > 240)) throw new BadRequestException('وصف المهمة غير صالح');
         if (task.target !== undefined && (!Number.isSafeInteger(task.target) || task.target < 1 || task.target > 1000000)) throw new BadRequestException('هدف المهمة يجب أن يكون بين 1 و1,000,000');
         if (task.rewardPoints !== undefined && (!Number.isSafeInteger(task.rewardPoints) || task.rewardPoints < 0 || task.rewardPoints > 1000000)) throw new BadRequestException('مكافأة المهمة يجب أن تكون بين 0 و1,000,000 نقطة');
