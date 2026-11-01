@@ -871,11 +871,22 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         'SELECT value FROM app_settings WHERE key=$1',
         [`cp.points.gift_send.${relationship.type}`],
       );
-      const points = Number(setting?.value);
-      if (!Number.isSafeInteger(points) || points <= 0) continue;
+      const basePoints = Number(setting?.value);
+      if (!Number.isSafeInteger(basePoints) || basePoints <= 0) continue;
+      const [levelSetting] = await this.dataSource.query(
+        'SELECT value FROM app_settings WHERE key=$1',
+        [`cp.levels.${relationship.type}`],
+      );
+      let levelConfig: any = null;
+      try {
+        const levelRows = JSON.parse(levelSetting?.value || '[]');
+        if (Array.isArray(levelRows)) levelConfig = levelRows.find(item => Number(item?.level) === Number(relationship.level)) || null;
+      } catch { levelConfig = null; }
+      const bonusPercent = Math.max(0, Math.min(500, Number(levelConfig?.giftBonusPercent) || 0));
+      const points = Math.floor(basePoints * (100 + bonusPercent) / 100);
       await this.recordPoints(
         relationship.id, 'gift_send', 'gift_send', `${giftSendId}:${relationship.id}`, points,
-        { senderId, receiverId, giftSendId, totalCoins: Math.max(0, Number(totalCoins) || 0) },
+        { senderId, receiverId, giftSendId, totalCoins: Math.max(0, Number(totalCoins) || 0), basePoints, bonusPercent, relationshipLevel: Number(relationship.level) || 1 },
       );
     }
   }
