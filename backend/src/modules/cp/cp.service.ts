@@ -466,7 +466,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
   async profileRelationships(userId: string) {
-    return this.dataSource.query(
+    const rows = await this.dataSource.query(
       `SELECT r.id,r.type,r.points::text AS points,r.level,r."startedAt",
        COALESCE((SELECT value::jsonb ->> 'cardBackgroundUrl' FROM app_settings WHERE key = 'cp.rules.' || r.type), '') AS "cardBackgroundUrl",
        json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl",'level',p.level,
@@ -478,6 +478,28 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
        ORDER BY r.points DESC,r."startedAt" ASC`,
       [userId],
     );
+    const configs: Record<string, any[]> = {};
+    for (const type of Array.from(new Set<string>(rows.map((row: any) => String(row.type))))) {
+      const [setting] = await this.dataSource.query(
+        'SELECT value FROM app_settings WHERE key=$1',
+        [`cp.levels.${type}`],
+      );
+      try {
+        const parsed = JSON.parse(setting?.value || '[]');
+        configs[type] = Array.isArray(parsed) ? parsed : [];
+      } catch { configs[type] = []; }
+    }
+    return rows.map((row: any) => {
+      const currentLevelConfig = (configs[row.type] || []).find(item => Number(item?.level) === Number(row.level)) || null;
+      return {
+        ...row,
+        currentLevelConfig,
+        presentation: currentLevelConfig?.presentation || null,
+        benefits: currentLevelConfig?.benefits || currentLevelConfig?.rewards || [],
+        giftPresentation: currentLevelConfig?.giftPresentation || null,
+        giftBonusPercent: Math.max(0, Math.min(500, Number(currentLevelConfig?.giftBonusPercent) || 0)),
+      };
+    });
   }
 
   async forUser(userId: string) {
