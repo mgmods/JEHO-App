@@ -1259,12 +1259,18 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         const levels = JSON.parse(levelsSetting?.value || '[]');
         currentLevelConfig = Array.isArray(levels) ? levels.find(item => Number(item?.level) === Number(result.level)) || null : null;
       } catch { currentLevelConfig = null; }
-      await this.grantLevelCosmeticRewards(
-        relationshipId,
-        Number(result.level),
-        [relationship.userAId, relationship.userBId].filter(Boolean),
-        currentLevelConfig,
-      );
+      try {
+        await this.grantLevelCosmeticRewards(
+          relationshipId,
+          Number(result.level),
+          [relationship.userAId, relationship.userBId].filter(Boolean),
+          currentLevelConfig,
+        );
+      } catch (error) {
+        // Cosmetic delivery is best-effort and must never suppress the level-up event
+        // or make a successful gift transaction appear to have failed.
+        console.warn('[CB] level reward processing failed', relationshipId, result.level, error);
+      }
       const payload = {
         type: 'cp_level_up', relationshipId, level: result.level,
         previousLevel: result.previousLevel, points: result.points,
