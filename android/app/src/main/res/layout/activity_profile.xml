@@ -474,6 +474,15 @@
                             android:textStyle="bold" />
 
                         <ImageView
+                            android:id="@+id/imgCpLevelIcon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="7dp"
+                            android:contentDescription="مستوى CP"
+                            android:scaleType="fitCenter"
+                            android:visibility="gone" />
+
+                        <ImageView
                             android:id="@+id/imgLevelIcon"
                             android:layout_width="20dp"
                             android:layout_height="20dp"
