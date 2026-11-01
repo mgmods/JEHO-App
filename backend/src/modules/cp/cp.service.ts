@@ -76,8 +76,17 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       let rules: Record<string, any> = {};
       try { rules = JSON.parse(settings[`cp.rules.${type}`] || '{}'); } catch { rules = {}; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
+      let levels: Array<Record<string, any>> = [];
+      try {
+        const parsedLevels = JSON.parse(settings[`cp.levels.${type}`] || '[]');
+        if (Array.isArray(parsedLevels)) levels = parsedLevels
+          .filter(item => item && Number.isInteger(Number(item.level)) && Number(item.level) >= 1)
+          .sort((a, b) => Number(a.level) - Number(b.level));
+      } catch { levels = []; }
       catalog.push({
         type, enabled, priceCoins: enabled ? giftPrice : null,
+        maxLevel: Number(settings[`cp.max_level.${type}`] || 0) || null,
+        levels,
         gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl, coinPrice: giftPrice } : null,
         giftPoints: Number(settings[`cp.gift_points.${type}`] || 0) || 0,
         seatEffect: {
@@ -170,9 +179,23 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const progressPercent = span > 0n ? Math.max(0, Math.min(100, Number((progressed * 10000n) / span) / 100)) : 100;
       const startedAt = new Date(row.startedAt);
       const durationDays = Number.isNaN(startedAt.getTime()) ? 0 : Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 86400000));
-      const rewardsUnlocked = levels.filter(item => Number(item.level) <= Number(row.level) && item.reward).map(item => ({ level: item.level, reward: item.reward }));
+      const unlockedLevels = levels.filter(item => Number(item.level) <= Number(row.level));
+      const rewardsUnlocked = unlockedLevels
+        .filter(item => item.reward || item.rewards || item.benefits || item.presentation || item.giftPresentation)
+        .map(item => ({
+          ...item,
+          level: Number(item.level),
+          reward: item.reward ?? null,
+          benefits: item.benefits ?? item.rewards ?? [],
+          presentation: item.presentation ?? null,
+          giftPresentation: item.giftPresentation ?? null,
+          giftBonusPercent: Number(item.giftBonusPercent || 0) || 0,
+        }));
+      const currentLevelConfig = levels.find(item => Number(item.level) === Number(row.level)) || null;
       return {
         ...row,
+        currentLevelConfig,
+        unlockedLevels,
         durationDays,
         nextLevel: next ? Number(next.level) : null,
         nextLevelPoints: nextThreshold === null ? null : nextThreshold.toString(),
