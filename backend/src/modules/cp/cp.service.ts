@@ -70,20 +70,27 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
 
   private async enrichLevelRewards(levels: any[]) {
+    const safeLevels = Array.isArray(levels) ? levels : [];
     const giftIds = Array.from(new Set(
-      (Array.isArray(levels) ? levels : [])
-        .map(item => String(item?.rewardGiftId || '').trim())
-        .filter(id => UUID_REGEX.test(id)),
+      safeLevels.map(item => String(item?.rewardGiftId || '').trim()).filter(id => UUID_REGEX.test(id)),
     ));
-    if (!giftIds.length) return levels;
-    const gifts = await this.dataSource.query(
+    const badgeIds = Array.from(new Set(
+      safeLevels.map(item => String(item?.rewardBadgeId || '').trim()).filter(id => UUID_REGEX.test(id)),
+    ));
+    const gifts = giftIds.length ? await this.dataSource.query(
       'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true',
       [giftIds],
-    );
-    const byId = new Map(gifts.map((gift: any) => [String(gift.id), gift]));
-    return levels.map(item => ({
+    ) : [];
+    const badges = badgeIds.length ? await this.dataSource.query(
+      'SELECT id,name,"imageUrl","isAnimated" FROM badges WHERE id::text = ANY($1::text[]) AND "isActive"=true',
+      [badgeIds],
+    ) : [];
+    const giftsById = new Map(gifts.map((gift: any) => [String(gift.id), gift]));
+    const badgesById = new Map(badges.map((badge: any) => [String(badge.id), badge]));
+    return safeLevels.map(item => ({
       ...item,
-      rewardGift: byId.get(String(item?.rewardGiftId || '')) || null,
+      rewardGift: giftsById.get(String(item?.rewardGiftId || '')) || null,
+      rewardBadge: badgesById.get(String(item?.rewardBadgeId || '')) || null,
     }));
   }
 
