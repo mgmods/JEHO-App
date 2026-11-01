@@ -1773,10 +1773,15 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
   private async memberIdentity(userId: string) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
+    const anonymous = await this.mysteriousRoomIdentity(userId);
     return {
       userId,
-      displayName: user?.displayName || user?.username || 'مستخدم',
-      publicId: user?.publicId || null,
+      displayName: anonymous ? 'الرجل الغامض' : (user?.displayName || user?.username || 'مستخدم'),
+      username: anonymous ? 'mysterious_man' : (user?.username || null),
+      avatarUrl: anonymous ? null : (user?.avatarUrl || null),
+      publicId: anonymous ? null : (user?.publicId || null),
+      mysteriousMan: !!anonymous,
+      ...(anonymous || {}),
     };
   }
 
@@ -2920,14 +2925,15 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.seatSignalsRepo.delete({ roomId, userId: targetUserId });
 
     this.notifyRoomUpdated(roomId);
+    const approvedIdentity = await this.memberIdentity(targetUserId);
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
       roomId,
       event: 'room:seat_approved',
       payload: {
         roomId,
+        ...approvedIdentity,
         userId: targetUserId,
         seatIndex: target.seatIndex,
-        displayName: pending?.displayName || null,
       },
       at: new Date().toISOString(),
     });
