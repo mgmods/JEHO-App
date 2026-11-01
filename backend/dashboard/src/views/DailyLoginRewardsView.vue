@@ -14,6 +14,7 @@
     <div v-if="loading" class="loading">جارٍ تحميل المكافآت…</div>
     <section v-else class="reward-panel">
       <header class="panel-title"><div><span class="eyebrow">DAILY REWARDS · 7 DAYS</span><h2>مكافآت الأسبوع</h2><p>اختر عملات أو عنصرًا تجميليًا من المتجر لكل يوم. تظهر المعاينة كما ستُعرض للمستخدم.</p></div><span class="week-chip"><i class="bi bi-calendar-week"></i> ٧ أيام</span></header>
+      <DailyLoginVisualEditor v-model="theme" :days="days" :cosmetics="cosmetics" />
       <div class="reward-grid">
         <article v-for="(day, idx) in days" :key="day.day" class="reward-card">
           <div class="reward-card-top"><span class="day-pill">اليوم {{ day.day }}</span><span class="card-number">{{ String(day.day).padStart(2,'0') }}</span></div>
@@ -63,7 +64,10 @@ import { computed, onMounted, ref } from 'vue'
 import { dailyLoginRewardsApi, cosmeticsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
+import DailyLoginVisualEditor from '@/components/DailyLoginVisualEditor.vue'
 
+const defaultTheme = () => ({ backgroundColor:'#dff0b8',backgroundImageUrl:'',overlayColor:'#ffffff',overlayOpacity:0.12,logoUrl:'',title:'مكافآت تسجيل الدخول لمدة 7 أيام',titleColor:'#176b32',titleSize:28,titleTop:24,headerGap:14,cardColor:'#fffef4',cardBorderColor:'#e8efcf',cardRadius:20,cardGap:12,cardImageSize:76,cardLabelSize:16,buttonText:'تسجيل الدخول',buttonColor:'#168b36',buttonTextColor:'#ffffff',buttonRadius:64,buttonHeight:64,buttonBottom:20,contentTop:18,contentGap:16,fontFamily:'default' })
+const theme = ref(defaultTheme())
 const enabled = ref(true)
 const loading = ref(true)
 const saving = ref(false)
@@ -92,6 +96,7 @@ async function load() {
   if (config.error) { error.value = config.error.message || 'تعذر تحميل الإعدادات'; return }
   const payload = config.data?.data ?? config.data ?? {}
   enabled.value = payload.enabled !== false
+  theme.value = { ...defaultTheme(), ...(payload.theme || {}) }
   if (Array.isArray(payload.days) && payload.days.length === 7) days.value = payload.days.map((d,i) => ({ ...days.value[i], ...d, day:i+1, amount:Math.max(0,Number(d.amount)||0), cosmeticCode:String(d.cosmeticCode||''), durationDays:Math.max(1,Math.min(365,Math.floor(Number(d.durationDays)||7))) }))
   if (!catalog.error) { const c = catalog.data?.data ?? catalog.data; cosmetics.value = Array.isArray(c) ? c : Array.isArray(c?.items) ? c.items : [] }
   else toast().danger('تم تحميل المكافآت، لكن تعذر تحميل صور المتجر: ' + catalog.error.message)
@@ -115,7 +120,7 @@ function choose(item) {
 }
 async function save() {
   saving.value = true; clearNotices()
-  const submitted = { enabled: enabled.value, days: days.value.map((d,i) => ({ ...d, day:i+1, amount:Math.max(0,Math.floor(Number(d.amount)||0)), durationDays:Math.max(1,Math.min(365,Math.floor(Number(d.durationDays)||7))), cosmeticCode:String(d.cosmeticCode||'').trim() })) }
+  const submitted = { enabled: enabled.value, theme: { ...theme.value }, days: days.value.map((d,i) => ({ ...d, day:i+1, amount:Math.max(0,Math.floor(Number(d.amount)||0)), durationDays:Math.max(1,Math.min(365,Math.floor(Number(d.durationDays)||7))), cosmeticCode:String(d.cosmeticCode||'').trim() })) }
   const { error: err } = await dailyLoginRewardsApi.save(submitted)
   if (err) { saving.value = false; error.value = err.message || 'تعذر حفظ المكافآت'; toast().danger(error.value); return }
   const { data, error: readErr } = await dailyLoginRewardsApi.get()
