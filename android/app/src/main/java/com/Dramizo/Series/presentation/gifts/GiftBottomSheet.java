@@ -393,6 +393,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         cpOverlayHost.post(() -> {
             if (cpOverlayPositionListener != null) cpOverlayPositionListener.onGlobalLayout();
         });
+        // Re-run after attaching the external host so an initially selected CP tab
+        // cannot lose its banner during dialog-window setup.
+        if ("cp".equalsIgnoreCase(String.valueOf(giftTypeFilter))) refreshCpBanner();
     }
 
     private void removeCpProgressOverlay() {
