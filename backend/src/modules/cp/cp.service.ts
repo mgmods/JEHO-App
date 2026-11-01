@@ -603,6 +603,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const visual: any = byId.get(String(row.id)) || {};
       return {
         ...row,
+        durationDays: visual.durationDays ?? 0,
+        durationLabel: visual.durationLabel || '0 يوم',
+        duration: visual.duration || { days: 0, years: 0, months: 0, remainingDays: 0 },
+        partnerDisplayName: visual.partnerDisplayName || row.partner?.displayName || row.partner?.username || 'الشريك',
+        partnerAvatarUrl: visual.partnerAvatarUrl || row.partner?.avatarUrl || null,
         currentLevelConfig: visual.currentLevelConfig || null,
         levelName: visual.levelName || null,
         levelLogoUrl: visual.levelLogoUrl || null,
