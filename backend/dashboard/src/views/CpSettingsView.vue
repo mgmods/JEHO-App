@@ -143,12 +143,12 @@
           <div class="col-12">
             <label class="form-label">جدول المستويات والمكافآت (JSON)</label>
             <textarea v-model="item.levelsText" class="form-control font-monospace" rows="5" dir="ltr" spellcheck="false" placeholder='[{"level":1,"pointsRequired":0,"reward":"إطار البداية"}]' @change="refreshLevelEditor(item)"></textarea>
-            <div class="form-text">كل عنصر: level و pointsRequired. يمكن إضافة reward أو benefits/rewards (قائمة مكافآت متعددة)، وpresentation (إطار/شارة/خلفية/تأثير/عنوان)، وgiftPresentation (شكل الهدية الثنائية)، وgiftBonusPercent (نسبة نقاط إضافية). مثال: {"level":5,"pointsRequired":2500,"benefits":[{"type":"frame","code":"cb_frame_5"},{"type":"badge","code":"cb_badge_5"},{"type":"gift","code":"heart_duo"}],"presentation":{"frameUrl":"https://…","badgeUrl":"https://…","cardBackgroundUrl":"https://…","title":"ثنائي متألق"},"giftPresentation":{"animationUrl":"https://…","showPartnerAvatars":true},"giftBonusPercent":5}. يجب ترتيب النقاط تصاعدياً. هذه الإعدادات تُعرض عبر API ويمكن تعديلها دون تحديث التطبيق.</div>
+            <div class="form-text">كل عنصر: level و pointsRequired. يمكن إضافة reward أو benefits/rewards (قائمة مكافآت متعددة)، وpresentation (إطار/أيقونة أفقية/خلفية/تأثير/عنوان)، وgiftPresentation (شكل الهدية الثنائية)، وgiftBonusPercent (نسبة نقاط إضافية). مثال: {"level":5,"pointsRequired":2500,"benefits":[{"type":"frame","code":"cb_frame_5"},{"type":"badge","code":"cb_badge_5"},{"type":"gift","code":"heart_duo"}],"presentation":{"frameUrl":"https://…","badgeUrl":"https://…","cardBackgroundUrl":"https://…","title":"ثنائي متألق"},"giftPresentation":{"animationUrl":"https://…","showPartnerAvatars":true},"giftBonusPercent":5}. يجب ترتيب النقاط تصاعدياً. هذه الإعدادات تُعرض عبر API ويمكن تعديلها دون تحديث التطبيق.</div>
           </div>
           <div class="col-12">
             <div class="border rounded-3 p-3">
               <h4 class="h6 mb-2">تصميم المستويات ومكافآت CB من الداشبورد</h4>
-              <p class="form-text">ارفع شعاراً وشارة وخلفية مستقلة لكل مستوى، واختر هدية مكافأة من كتالوج الهدايا العادي. التغييرات تُحفظ ضمن إعدادات المستوى وتصل للواجهات عبر API.</p>
+              <p class="form-text">ارفع أيقونة أفقية تظهر بجانب VIP والثروة والشعبية، وإطاراً وخلفية لكل مستوى، واختر هدية مكافأة من كتالوج الهدايا العادي. التغييرات تُحفظ ضمن إعدادات المستوى وتصل للواجهات عبر API.</p>
               <div v-for="level in item.levelsEditor" :key="level.level" class="border rounded-3 p-3 mb-3">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                   <strong>المستوى {{ level.level }} · {{ level.name || level.presentation?.title || 'بدون اسم' }}</strong>
@@ -166,12 +166,6 @@
                     <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" @change="uploadLevelAsset(item,level,'levelLogoUrl',$event)">
                     <input v-model.trim="level.presentation.levelLogoUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط الشعار" @change="syncLevelEditor(item)">
                     <img v-if="level.presentation.levelLogoUrl" :src="level.presentation.levelLogoUrl" alt="شعار المستوى" width="54" height="54" class="mt-2" style="object-fit:contain">
-                  </div>
-                  <div class="col-md-4">
-                    <label class="form-label">شارة المستوى</label>
-                    <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" @change="uploadLevelAsset(item,level,'badgeUrl',$event)">
-                    <input v-model.trim="level.presentation.badgeUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط الشارة" @change="syncLevelEditor(item)">
-                    <img v-if="level.presentation.badgeUrl" :src="level.presentation.badgeUrl" alt="شارة المستوى" width="54" height="54" class="mt-2" style="object-fit:contain">
                   </div>
                   <div class="col-md-4">
                     <label class="form-label">خلفية بطاقة المستوى</label>
