@@ -691,14 +691,16 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     : "";
             String stem = giftArtStem(g.iconUrl);
             if (stem.isEmpty()) stem = giftArtStem(g.animationUrl);
-            String key = !stem.isEmpty() ? "s:" + bucket + ":" + stem
+            String key = "cp".equals(bucket) && g.id != null
+                    ? "cp:" + g.id
+                    : (!stem.isEmpty() ? "s:" + bucket + ":" + stem
                     : (!nameKey.isEmpty() ? "n:" + nameKey
-                    : (g.id != null ? "id:" + g.id : null));
+                    : (g.id != null ? "id:" + g.id : null)));
             if (key == null) continue;
             if (byStem.containsKey(key)) continue;
-            if (!nameKey.isEmpty() && byName.containsKey(nameKey)) continue;
+            if (!"cp".equals(bucket) && !nameKey.isEmpty() && byName.containsKey(nameKey)) continue;
             byStem.put(key, g);
-            if (!nameKey.isEmpty()) byName.put(nameKey, g);
+            if (!"cp".equals(bucket) && !nameKey.isEmpty()) byName.put(nameKey, g);
             // Cap diamonds on board display/send path (server also enforces).
             if (g.diamondValue > 1000) g.diamondValue = 1000;
             // Keep dashboard category if set; only fill empty.
