@@ -1264,18 +1264,24 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const [levelsSetting] = relationship
         ? await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${relationship.type}`])
         : [];
-      let currentLevelConfig: any = null;
+      let levels: any[] = [];
       try {
-        const levels = JSON.parse(levelsSetting?.value || '[]');
-        currentLevelConfig = Array.isArray(levels) ? levels.find(item => Number(item?.level) === Number(result.level)) || null : null;
-      } catch { currentLevelConfig = null; }
+        const parsed = JSON.parse(levelsSetting?.value || '[]');
+        levels = Array.isArray(parsed) ? parsed : [];
+      } catch { levels = []; }
+      const currentLevelConfig = levels.find(item => Number(item?.level) === Number(result.level)) || null;
       try {
-        await this.grantLevelCosmeticRewards(
-          relationshipId,
-          Number(result.level),
-          [relationship.userAId, relationship.userBId].filter(Boolean),
-          currentLevelConfig,
-        );
+        const crossedLevels = levels
+          .filter(item => Number(item?.level) > Number(result.previousLevel) && Number(item?.level) <= Number(result.level))
+          .sort((a, b) => Number(a.level) - Number(b.level));
+        for (const unlockedLevel of crossedLevels) {
+          await this.grantLevelCosmeticRewards(
+            relationshipId,
+            Number(unlockedLevel.level),
+            [relationship.userAId, relationship.userBId].filter(Boolean),
+            unlockedLevel,
+          );
+        }
       } catch (error) {
         // Cosmetic delivery is best-effort and must never suppress the level-up event
         // or make a successful gift transaction appear to have failed.
