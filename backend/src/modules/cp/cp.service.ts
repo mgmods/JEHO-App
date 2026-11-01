@@ -1146,12 +1146,22 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     roomId?: string | null,
   ) {
     if (!senderId || !receiverId || senderId === receiverId || !giftId || !giftSendId) return null;
+    // Prefer the legacy explicit gift-to-type mapping; otherwise use the type saved
+    // directly on any dashboard gift classified as CP.
     const configured = await this.dataSource.query(
       'SELECT key FROM app_settings WHERE key LIKE $1 AND value=$2 ORDER BY key LIMIT 1',
       ['cp.gift.%', giftId],
     );
-    if (!configured.length) return null;
-    const type = String(configured[0].key).slice('cp.gift.'.length) as CpType;
+    const [giftConfig] = await this.dataSource.query(
+      'SELECT category, \"cpRelationshipType\" FROM gifts WHERE id=$1 AND \"isActive\"=true LIMIT 1',
+      [giftId],
+    );
+    const mappedType = configured.length
+      ? String(configured[0].key).slice('cp.gift.'.length)
+      : '';
+    const type = (mappedType || (String(giftConfig?.category || '').toLowerCase() === 'cp'
+      ? String(giftConfig?.cpRelationshipType || 'love')
+      : '')) as CpType;
     if (!TYPES.has(type)) return null;
     const [globalSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.enabled.global']);
     const [typeSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
@@ -1260,7 +1270,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Award configured points when a committed normal gift is exchanged by active CP partners. */
-  async recordGiftInteraction(senderId: string, receiverId: string, giftSendId: string, totalCoins: number) {
+  async recordGiftInteraction(senderId: string, receiverId: string, giftSendId: string, totalCoins: number, giftPoints?: number) {
     if (!senderId || !receiverId || !giftSendId || senderId === receiverId) return;
     const relationships = await this.dataSource.query(
       `SELECT id,type,level FROM cp_relationships WHERE status='active'
@@ -1272,7 +1282,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         'SELECT value FROM app_settings WHERE key=$1',
         [`cp.points.gift_send.${relationship.type}`],
       );
-      const basePoints = Number(setting?.value);
+      const perGiftPoints = Number(giftPoints);
+      const basePoints = Number.isSafeInteger(perGiftPoints) && perGiftPoints >= 0
+        ? perGiftPoints
+        : Number(setting?.value);
       if (!Number.isSafeInteger(basePoints) || basePoints <= 0) continue;
       const [levelSetting] = await this.dataSource.query(
         'SELECT value FROM app_settings WHERE key=$1',
