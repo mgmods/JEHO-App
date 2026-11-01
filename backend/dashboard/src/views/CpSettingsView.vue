@@ -125,7 +125,7 @@
           </div>
           <div class="col-12">
             <label class="form-label">جدول المستويات والمكافآت (JSON)</label>
-            <textarea v-model="item.levelsText" class="form-control font-monospace" rows="5" dir="ltr" spellcheck="false" placeholder='[{"level":1,"pointsRequired":0,"reward":"إطار البداية"}]'></textarea>
+            <textarea v-model="item.levelsText" class="form-control font-monospace" rows="5" dir="ltr" spellcheck="false" placeholder='[{"level":1,"pointsRequired":0,"reward":"إطار البداية"}]' @change="refreshLevelEditor(item)"></textarea>
             <div class="form-text">كل عنصر: level و pointsRequired. يمكن إضافة reward أو benefits/rewards (قائمة مكافآت متعددة)، وpresentation (إطار/شارة/خلفية/تأثير/عنوان)، وgiftPresentation (شكل الهدية الثنائية)، وgiftBonusPercent (نسبة نقاط إضافية). مثال: {"level":5,"pointsRequired":2500,"benefits":[{"type":"frame","code":"cb_frame_5"},{"type":"badge","code":"cb_badge_5"},{"type":"gift","code":"heart_duo"}],"presentation":{"frameUrl":"https://…","badgeUrl":"https://…","cardBackgroundUrl":"https://…","title":"ثنائي متألق"},"giftPresentation":{"animationUrl":"https://…","showPartnerAvatars":true},"giftBonusPercent":5}. يجب ترتيب النقاط تصاعدياً. هذه الإعدادات تُعرض عبر API ويمكن تعديلها دون تحديث التطبيق.</div>
           </div>
           <div class="col-12">
@@ -168,6 +168,21 @@
                       <option v-for="gift in gifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
                     </select>
                     <div v-if="selectedGift({giftId:level.rewardGiftId})" class="small mt-1">{{ selectedGift({giftId:level.rewardGiftId}).name }}</div>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">إطار بطاقة المستوى</label>
+                    <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg" @change="uploadLevelAsset(item,level,'frameUrl',$event)">
+                    <input v-model.trim="level.presentation.frameUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط الإطار" @change="syncLevelEditor(item)">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">لون اسم الثنائي</label>
+                    <input v-model.trim="level.presentation.nameColor" class="form-control" type="color" @change="syncLevelEditor(item)">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-check mt-4">
+                      <input v-model="level.presentation.nameGlow" class="form-check-input" type="checkbox" @change="syncLevelEditor(item)">
+                      <span class="form-check-label">توهج اسم الثنائي</span>
+                    </label>
                   </div>
                   <div class="col-md-4">
                     <label class="form-label">نسبة نقاط إضافية لهدايا الشريكين %</label>
@@ -710,6 +725,14 @@ async function uploadLevelAsset(item, level, field, event) {
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر رفع أصل المستوى'
   } finally { if (event?.target) event.target.value = '' }
+}
+
+function refreshLevelEditor(item) {
+  try {
+    const levels = JSON.parse(item.levelsText || '[]')
+    if (!Array.isArray(levels)) throw new Error('يجب أن يكون جدول المستويات قائمة JSON.')
+    item.levelsEditor = levels.map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || '') }))
+  } catch (e) { error.value = e?.message || 'تعذر قراءة جدول المستويات.' }
 }
 
 async function saveType(item) {
