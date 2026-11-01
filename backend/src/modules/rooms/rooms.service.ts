@@ -3070,10 +3070,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     this.notifyRoomUpdated(roomId);
     if (wasSeated) {
+      const leavingIdentity = await this.memberIdentity(userId);
       this.realtimeGateway.emitToRoom(roomId, 'room:event', {
         roomId,
         event: 'room:seat_left',
-        payload: { roomId, userId },
+        payload: { roomId, ...leavingIdentity, userId },
         at: new Date().toISOString(),
       });
     }
