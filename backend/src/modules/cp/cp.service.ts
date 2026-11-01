@@ -680,8 +680,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('هذا النوع من علاقات CP متوقف حالياً من لوحة التحكم');
     }
     const outcome = await this.dataSource.transaction(async manager => {
-      const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
+      await this.lockRelationshipUsers(manager, [userId, recipientId]);
       const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey" = $1 FOR UPDATE', [key]);
       if (existing.length) {
         if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId || existing[0].type !== type || existing[0].roomId !== roomId) {
