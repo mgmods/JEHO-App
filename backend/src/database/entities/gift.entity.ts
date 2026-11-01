@@ -50,8 +50,8 @@ export class Gift {
   cpRelationshipType: string;
 
   /** Relationship points awarded per unit when exchanged by active CP partners. */
-  @Column({ type: 'int', default: 0 })
-  cpPoints: number;
+  @Column({ type: 'int', nullable: true, default: null })
+  cpPoints: number | null;
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
