@@ -165,7 +165,7 @@
             {{ formatNumber(g.coinPrice ?? 0) }} · {{ giftTypeLabel(g.type) }}
             <span v-if="g.category"> · {{ categoryLabel(g.category) }}</span>
             <span v-if="String(g.category || '').toLowerCase() === 'cp'" class="badge text-bg-danger ms-1">CP</span>
-            <span v-if="String(g.category || '').toLowerCase() === 'cp'" class="small text-danger ms-1">· {{ g.cpPoints == null ? 'نقاط النوع الافتراضية' : `${formatNumber(g.cpPoints)} نقطة/هدية` }}</span>
+            <span v-if="String(g.category || '').toLowerCase() === 'cp'" class="small text-danger ms-1">· {{ g.cpPoints == null ? 'نقاط النوع الافتراضية' : formatNumber(g.cpPoints) + ' نقطة/هدية' }}</span>
             <span v-if="giftMediaKindLabel(g)"> · {{ giftMediaKindLabel(g) }}</span>
           </div>
           <div class="action-btns">
