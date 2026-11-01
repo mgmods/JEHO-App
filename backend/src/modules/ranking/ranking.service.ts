@@ -249,7 +249,7 @@ export class RankingService {
     // A user may keep earning and spending normally while using the anonymous identity,
     // but must not appear as a ranking entry while that mode is enabled.
     const map = new Map(users.filter((u) => !u.mysteriousMode).map((u) => [u.id, u]));
-    return rows.filter((r) => map.has(r.targetId)).map((r) => {
+    return rows.filter((r) => map.has(r.targetId)).map((r, rankIndex) => {
       const user = map.get(r.targetId)!;
       const activeVip = (user.vips || [])
         .filter((vip) => vip.isActive && (!vip.expiresAt || new Date(vip.expiresAt).getTime() > Date.now()))
