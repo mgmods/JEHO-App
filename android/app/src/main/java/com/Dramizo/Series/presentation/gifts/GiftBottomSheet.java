@@ -555,8 +555,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         if (cpGiftTabEnabled) {
             GiftDtos.GiftCategoryDto cpTab = new GiftDtos.GiftCategoryDto();
             cpTab.key = "cp";
-            cpTab.labelAr = "هدايا CB";
-            cpTab.labelEn = "CB Gifts";
+            cpTab.labelAr = "هدايا CP";
+            cpTab.labelEn = "CP Gifts";
             cpTab.sortOrder = Integer.MAX_VALUE;
             cpTab.isActive = true;
             active.add(cpTab);
