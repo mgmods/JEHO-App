@@ -370,7 +370,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const [globalSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.enabled.global']);
     if (String(globalSetting?.value || 'true').toLowerCase() === 'false') return [];
     const [relationship] = await this.dataSource.query(
-      `SELECT id,points::text AS points,level,type FROM cp_relationships
+      `SELECT id,points::text AS points,level,type,"userAId","userBId" FROM cp_relationships
        WHERE status='active' AND ("userAId"=$1 OR "userBId"=$1)
        ORDER BY "startedAt" DESC LIMIT 1`,
       [userId],
@@ -397,8 +397,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const claimed = new Set(claimedRows.map((row: any) => String(row.referenceId)));
     const pointsToday = Math.max(0, Number(pointsRow?.points) || 0);
     const [giftExchangeCount] = await this.dataSource.query(
-      'SELECT COUNT(*)::int AS count FROM cp_point_events WHERE "relationshipId"=$1 AND "createdAt">=date_trunc($2,now()) AND "eventType"=$3',
-      [relationship.id, 'day', 'gift_send'],
+      \`SELECT COUNT(DISTINCT metadata->>'senderId')::int AS count
+       FROM cp_point_events
+       WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())
+         AND "eventType"='gift_send'
+         AND metadata->>'senderId'=ANY($2::text[])\`,
+      [relationship.id, [relationship.userAId, relationship.userBId]],
     );
     const [taskConfigRow] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
     let taskConfig: Record<string, any> = {};
@@ -492,8 +496,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       eligible = Number(row?.count) >= target;
     } else if (taskCondition === 'gift_exchange_today') {
       const [row] = await this.dataSource.query(
-        'SELECT COUNT(*)::int AS count FROM cp_point_events WHERE "relationshipId"=$1 AND "createdAt">=date_trunc($2,now()) AND "eventType"=$3',
-        [relationship.id, 'day', 'gift_send'],
+        \`SELECT COUNT(DISTINCT metadata->>'senderId')::int AS count
+         FROM cp_point_events
+         WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())
+           AND "eventType"='gift_send'
+           AND metadata->>'senderId'=ANY($2::text[])\`,
+        [relationship.id, [relationship.userAId, relationship.userBId]],
       );
       eligible = Number(row?.count) >= target;
     } else {
