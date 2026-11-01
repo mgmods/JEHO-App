@@ -279,6 +279,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     );
     const claimed = new Set(claimedRows.map((row: any) => String(row.referenceId)));
     const pointsToday = Math.max(0, Number(pointsRow?.points) || 0);
+    const [giftExchangeCount] = await this.dataSource.query(
+      'SELECT COUNT(*)::int AS count FROM cp_point_events WHERE "relationshipId"=$1 AND "createdAt">=date_trunc($2,now()) AND "eventType"=$3',
+      [relationship.id, 'day', 'gift_send'],
+    );
     const [taskConfigRow] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
     let taskConfig: Record<string, any> = {};
     try { taskConfig = JSON.parse(taskConfigRow?.value || '{}'); } catch { taskConfig = {}; }
@@ -293,9 +297,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       .map(id => {
         const base = defaults[id] || { title: 'مهمة CP', description: 'أكملوا شرط المهمة اليوم', condition: 'points_today', target: 10, rewardPoints: 0 };
         const config = taskConfig[id] || {};
-        const condition = config.condition === 'memory_count' || (!config.condition && id === 'memory_today') ? 'memory_count' : 'points_today';
+        const condition = ['memory_count', 'gift_exchange_today'].includes(String(config.condition || (id === 'memory_today' ? 'memory_count' : 'points_today'))) ? String(config.condition || 'memory_count') : 'points_today';
         const target = Math.max(1, Math.min(1000000, Math.floor(Number(config.target ?? base.target) || base.target)));
-        const progressValue = condition === 'memory_count' ? Number(memoryCount?.count) || 0 : pointsToday;
+        const progressValue = condition === 'memory_count' ? Number(memoryCount?.count) || 0 : condition === 'gift_exchange_today' ? Number(giftExchangeCount?.count) || 0 : pointsToday;
         return {
           id,
           title: String(config.title || base.title).slice(0, 100),
@@ -349,8 +353,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         ? { condition: 'points_today', target: 10, rewardPoints: 15 }
         : { condition: 'points_today', target: 10, rewardPoints: 0 };
     const taskDefinition = { ...baseTask, ...(taskConfig[taskId] || {}) };
-    const taskCondition = taskDefinition.condition === 'memory_count' || (!taskDefinition.condition && taskId === 'memory_today')
-      ? 'memory_count' : 'points_today';
+    const taskCondition = ['memory_count', 'gift_exchange_today'].includes(String(taskDefinition.condition || (taskId === 'memory_today' ? 'memory_count' : 'points_today')))
+      ? String(taskDefinition.condition || 'memory_count') : 'points_today';
     const target = Math.max(1, Math.min(1000000, Math.floor(Number(taskDefinition.target) || baseTask.target)));
     const configuredRewardPoints = Math.max(0, Math.min(1000000, Math.floor(Number(taskDefinition.rewardPoints ?? baseTask.rewardPoints) || 0)));
     const [relationship] = await this.dataSource.query(
@@ -365,17 +369,20 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     let eligible = false;
     if (taskCondition === 'memory_count') {
       const [row] = await this.dataSource.query(
-        `SELECT COUNT(*)::int AS count FROM cp_memories
-         WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())`,
-        [relationship.id],
+        'SELECT COUNT(*)::int AS count FROM cp_memories WHERE "relationshipId"=$1 AND "createdAt">=date_trunc($2,now())',
+        [relationship.id, 'day'],
+      );
+      eligible = Number(row?.count) >= target;
+    } else if (taskCondition === 'gift_exchange_today') {
+      const [row] = await this.dataSource.query(
+        'SELECT COUNT(*)::int AS count FROM cp_point_events WHERE "relationshipId"=$1 AND "createdAt">=date_trunc($2,now()) AND "eventType"=$3',
+        [relationship.id, 'day', 'gift_send'],
       );
       eligible = Number(row?.count) >= target;
     } else {
       const [row] = await this.dataSource.query(
-        `SELECT COALESCE(SUM(points::numeric),0)::text AS points FROM cp_point_events
-         WHERE "relationshipId"=$1 AND "createdAt">=date_trunc('day',now())
-           AND "eventType"<>'cp_task_reward'`,
-        [relationship.id],
+        'SELECT COALESCE(SUM(points::numeric),0)::text AS points FROM cp_point_events WHERE "relationshipId"=$1 AND "createdAt">=date_trunc($2,now()) AND "eventType"<>$3',
+        [relationship.id, 'day', 'cp_task_reward'],
       );
       eligible = Number(row?.points) >= target;
     }
