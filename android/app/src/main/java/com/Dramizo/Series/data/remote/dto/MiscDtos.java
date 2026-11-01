@@ -751,7 +751,9 @@ public final class MiscDtos {
         @SerializedName("partner") public AuthDtos.UserDto partner;
         @SerializedName("bondScore") public long bondScore;
         @SerializedName("level") public int level;
+        @SerializedName("currentLevelAt") public long currentLevelAt;
         @SerializedName("nextLevelAt") public long nextLevelAt;
+        @SerializedName("progressPercent") public double progressPercent;
         @SerializedName("relationId") public String relationId;
     }
 
