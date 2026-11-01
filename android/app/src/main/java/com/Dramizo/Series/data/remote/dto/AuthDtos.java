@@ -119,6 +119,8 @@ public final class AuthDtos {
         @SerializedName("avatarUrl") public String avatarUrl;
         /** True when the room profile is intentionally anonymized by an eligible VIP. */
         @SerializedName("mysteriousMan") public boolean mysteriousMan;
+        @SerializedName("mysteriousMode") public boolean mysteriousMode;
+        @SerializedName("mysteriousManEligible") public boolean mysteriousManEligible;
         @SerializedName("coverUrl") public String coverUrl;
         @SerializedName("levelBadgeUrl") public String levelBadgeUrl;
         @SerializedName("vipBadgeUrl") public String vipBadgeUrl;
