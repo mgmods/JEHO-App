@@ -7,13 +7,13 @@
     <div class="editor-grid">
       <div class="controls">
         <details open><summary>الخلفية</summary>
-          <label>رابط صورة الخلفية<input v-model.trim="draft.backgroundImageUrl" @change="applyBackgroundUrl" dir="ltr" placeholder="https://..." autocomplete="url" spellcheck="false"></label>
+          <label>رابط صورة الخلفية<input v-model.trim="backgroundUrlInput" @change="draft.backgroundImageUrl = backgroundUrlInput" dir="ltr" placeholder="https://..." autocomplete="url" spellcheck="false"></label>
           <label>لون الخلفية الاحتياطي<input v-model="draft.backgroundColor" type="color"></label>
           <label>لون طبقة التعتيم<input v-model="draft.overlayColor" type="color"></label>
           <label>شفافية التعتيم · {{ Math.round(draft.overlayOpacity*100) }}%<input v-model.number="draft.overlayOpacity" type="range" min="0" max="1" step=".05"></label>
         </details>
         <details open><summary>الشعار والنصوص</summary>
-          <label>رابط الشعار<input v-model.trim="draft.logoUrl" @change="applyLogoUrl" dir="ltr" placeholder="https://..." autocomplete="url" spellcheck="false"></label>
+          <label>رابط الشعار<input v-model.trim="logoUrlInput" @change="draft.logoUrl = logoUrlInput" dir="ltr" placeholder="https://..." autocomplete="url" spellcheck="false"></label>
           <label>النص بجانب الشعار<input v-model="draft.title" maxlength="80" placeholder="مكافآت تسجيل الدخول"></label>
           <label>النص أسفل العنوان<input v-model="draft.subtitle" maxlength="120" placeholder="سجّل دخولك يومياً واحصل على مكافأتك"></label>
           <label>لون العنوان<input v-model="draft.titleColor" type="color"></label>
@@ -29,7 +29,7 @@
         <strong>معاينة مباشرة · نافذة المستخدم</strong>
         <div class="preview" :style="previewStyle">
           <div class="preview-head">
-            <img v-if="previewLogoUrl" :src="previewLogoUrl" alt="الشعار" loading="lazy" decoding="async">
+            <img v-if="draft.logoUrl" :src="draft.logoUrl" alt="الشعار" loading="lazy" decoding="async">
             <div class="head-copy">
               <h2 :style="{color:draft.titleColor}">{{ draft.title }}</h2>
               <p :style="{color:draft.subtitleColor}">{{ draft.subtitle }}</p>
@@ -50,16 +50,18 @@
   </section>
 </template>
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 const props=defineProps({modelValue:{type:Object,required:true},days:{type:Array,default:()=>[]},cosmetics:{type:Array,default:()=>[]}})
 const emit=defineEmits(['update:modelValue'])
 const defaults={backgroundColor:'#f5f0e8',backgroundImageUrl:'',overlayColor:'#ffffff',overlayOpacity:.12,logoUrl:'',title:'مكافآت تسجيل الدخول لمدة 7 أيام',subtitle:'سجّل دخولك يومياً واحصل على مكافأتك',titleColor:'#3d3158',subtitleColor:'#766b80',buttonText:'استلام المكافأة',buttonColor:'#7652a5',buttonTextColor:'#ffffff',cardsPerRow:4}
 const draft=reactive({...defaults,...props.modelValue,cardsPerRow:4})
-watch(()=>props.modelValue,v=>Object.assign(draft,defaults,v||{},{cardsPerRow:4}),{deep:true})
+const backgroundUrlInput=ref(draft.backgroundImageUrl)
+const logoUrlInput=ref(draft.logoUrl)
+watch(()=>props.modelValue,v=>{Object.assign(draft,defaults,v||{},{cardsPerRow:4});backgroundUrlInput.value=draft.backgroundImageUrl;logoUrlInput.value=draft.logoUrl},{deep:true})
 watch(draft,v=>emit('update:modelValue',{...v,cardsPerRow:4}),{deep:true})
 const previewDays=computed(()=>Array.from({length:7},(_,i)=>props.days.find(d=>Number(d.day)===i+1)||{day:i+1,type:'coins',amount:0,label:'مكافأة اليوم'}))
 const previewStyle=computed(()=>({backgroundColor:draft.backgroundColor,backgroundImage:draft.backgroundImageUrl?'linear-gradient('+draft.overlayColor+Math.round(draft.overlayOpacity*255).toString(16).padStart(2,'0')+','+draft.overlayColor+Math.round(draft.overlayOpacity*255).toString(16).padStart(2,'0')+'),url('+draft.backgroundImageUrl+')':'none'}))
-function reset(){Object.assign(draft,defaults)}
+function reset(){Object.assign(draft,defaults);backgroundUrlInput.value=defaults.backgroundImageUrl;logoUrlInput.value=defaults.logoUrl}
 function cosmetic(code){return props.cosmetics.find(x=>x.code===code)}
 function image(d){const x=cosmetic(d.cosmeticCode);return x?.previewUrl||x?.animationUrl||d.previewUrl||d.animationUrl||''}
 function label(d){return cosmetic(d.cosmeticCode)?.name||d.label||'هدية'}
