@@ -108,6 +108,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable private View hascpLayout;
     // CP level strip is hosted as a sibling overlay above the bottom-sheet surface.
     @Nullable private FrameLayout cpOverlayHost;
+    @Nullable private PopupWindow cpProgressPopup;
     @Nullable private android.view.ViewTreeObserver.OnGlobalLayoutListener cpOverlayPositionListener;
     @Nullable private View cpOverlayAnchor;
 
@@ -353,48 +354,68 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 R.layout.room_gift_hascp_layout, (ViewGroup) root, false);
     }
 
-    /** Attach the CP progress strip outside the bottom-sheet surface, above its top edge. */
+    /**
+     * Show CP progress in a separate PopupWindow attached to the dialog window token.
+     * This is deliberately NOT added to the BottomSheet decor/content hierarchy.
+     */
     private void attachCpProgressOverlay(BottomSheetDialog dialog, FrameLayout sheet) {
         if (hascpLayout == null || dialog.getWindow() == null) return;
         View decorView = dialog.getWindow().getDecorView();
-        if (!(decorView instanceof ViewGroup)) return;
-        ViewGroup decor = (ViewGroup) decorView;
-        ViewGroup oldParent = hascpLayout.getParent() instanceof ViewGroup
-                ? (ViewGroup) hascpLayout.getParent() : null;
-        if (oldParent != null) oldParent.removeView(hascpLayout);
         cpOverlayHost = new FrameLayout(requireContext());
         cpOverlayHost.setClipChildren(false);
         cpOverlayHost.setClipToPadding(false);
         cpOverlayHost.setClickable(false);
         cpOverlayHost.setFocusable(false);
-        cpOverlayHost.setElevation(dp(24));
-        decor.addView(cpOverlayHost, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        FrameLayout.LayoutParams stripParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cpOverlayHost.addView(hascpLayout, stripParams);
+        cpOverlayHost.addView(hascpLayout, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         hascpLayout.setVisibility(View.GONE);
+
+        cpProgressPopup = new PopupWindow(
+                cpOverlayHost,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                false);
+        cpProgressPopup.setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        cpProgressPopup.setOutsideTouchable(false);
+        cpProgressPopup.setTouchable(false);
+        cpProgressPopup.setFocusable(false);
+        cpProgressPopup.setClippingEnabled(false);
+        if (android.os.Build.VERSION.SDK_INT >= 21) cpProgressPopup.setElevation(dp(24));
+
         cpOverlayPositionListener = () -> {
-            if (cpOverlayHost == null || hascpLayout == null || sheet.getWindowToken() == null) return;
+            if (cpProgressPopup == null || cpOverlayHost == null
+                    || hascpLayout == null || sheet.getWindowToken() == null
+                    || hascpLayout.getVisibility() != View.VISIBLE) {
+                if (cpProgressPopup != null && cpProgressPopup.isShowing()) cpProgressPopup.dismiss();
+                return;
+            }
             int[] sheetLocation = new int[2];
             int[] decorLocation = new int[2];
             sheet.getLocationOnScreen(sheetLocation);
             decorView.getLocationOnScreen(decorLocation);
-            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) hascpLayout.getLayoutParams();
-            lp.width = sheet.getWidth();
-            lp.leftMargin = sheetLocation[0] - decorLocation[0];
-            lp.topMargin = Math.max(0, sheetLocation[1] - decorLocation[1]
-                    - hascpLayout.getMeasuredHeight() - dp(6));
-            hascpLayout.setLayoutParams(lp);
-            cpOverlayHost.bringToFront();
+            int width = sheet.getWidth();
+            if (width <= 0) return;
+            hascpLayout.measure(
+                    View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            int height = hascpLayout.getMeasuredHeight();
+            if (height <= 0) return;
+            int x = sheetLocation[0] - decorLocation[0];
+            int y = sheetLocation[1] - decorLocation[1] - height - dp(6);
+            cpOverlayHost.setLayoutParams(new ViewGroup.LayoutParams(width, height));
+            if (cpProgressPopup.isShowing()) {
+                cpProgressPopup.update(x, y, width, height);
+            } else {
+                cpProgressPopup.setWidth(width);
+                cpProgressPopup.setHeight(height);
+                cpProgressPopup.showAtLocation(sheet, android.view.Gravity.TOP | android.view.Gravity.START, x, y);
+            }
         };
         cpOverlayAnchor = sheet;
         sheet.getViewTreeObserver().addOnGlobalLayoutListener(cpOverlayPositionListener);
         cpOverlayHost.post(() -> {
             if (cpOverlayPositionListener != null) cpOverlayPositionListener.onGlobalLayout();
         });
-        // Re-run after attaching the external host so an initially selected CP tab
-        // cannot lose its banner during dialog-window setup.
         if ("cp".equalsIgnoreCase(String.valueOf(giftTypeFilter))) refreshCpBanner();
     }
 
@@ -408,11 +429,10 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         }
         cpOverlayPositionListener = null;
         cpOverlayAnchor = null;
-        if (cpOverlayHost != null) {
-            ViewGroup parent = cpOverlayHost.getParent() instanceof ViewGroup
-                    ? (ViewGroup) cpOverlayHost.getParent() : null;
-            if (parent != null) parent.removeView(cpOverlayHost);
+        if (cpProgressPopup != null) {
+            try { cpProgressPopup.dismiss(); } catch (Exception ignored) {}
         }
+        cpProgressPopup = null;
         cpOverlayHost = null;
     }
 
@@ -432,6 +452,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         if (!isCpTab) {
             if (noCpLayout != null) noCpLayout.setVisibility(View.GONE);
             if (hascpLayout != null) hascpLayout.setVisibility(View.GONE);
+            if (cpProgressPopup != null && cpProgressPopup.isShowing()) cpProgressPopup.dismiss();
             if (binding.flTop != null) binding.flTop.setVisibility(View.GONE);
             return;
         }
@@ -445,6 +466,10 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 boolean has = r.success && r.data != null && r.data.hasCp && r.data.partner != null;
                 if (noCpLayout != null) noCpLayout.setVisibility(has ? View.GONE : View.VISIBLE);
                 if (hascpLayout != null) hascpLayout.setVisibility(has ? View.VISIBLE : View.GONE);
+                if (!has && cpProgressPopup != null && cpProgressPopup.isShowing()) cpProgressPopup.dismiss();
+                if (has && cpOverlayHost != null) cpOverlayHost.post(() -> {
+                    if (cpOverlayPositionListener != null) cpOverlayPositionListener.onGlobalLayout();
+                });
                 if (!has && noCpLayout != null) {
                     // CP relationship requests are only created by sending a CP gift in-room.
                     noCpLayout.setOnClickListener(null);
