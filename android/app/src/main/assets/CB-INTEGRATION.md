@@ -29,6 +29,9 @@ document.querySelector('#cb-card').innerHTML =
 document.querySelector('#profile-name').innerHTML =
   window.JehoCB.renderName(displayName, relationship);
 window.JehoCB.apply(document, relationship);
+
+// Or load and render in one call:
+window.JehoCB.load(userId, apiBase, document).catch(console.error);
 ```
 
 For declarative integration, mark elements with `data-cb-level`, `data-cb-card`, or `data-cb-name`, then call `window.JehoCB.apply(root, relationship)`.
