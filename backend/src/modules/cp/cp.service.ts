@@ -26,6 +26,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     // Backward-compatible schema adjustment: profile-origin CP requests have no room/payment.
     await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
     await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "priceCoins" DROP NOT NULL').catch(() => undefined);
+    await this.dataSource.query('ALTER TABLE cp_requests ADD COLUMN IF NOT EXISTS "cpPoints" bigint NULL').catch(() => undefined);
     await this.dataSource.query(`
       CREATE TABLE IF NOT EXISTS cp_memories (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1033,7 +1034,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         [request.fromUserId, request.toUserId, request.type],
       );
       const [giftPointsSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.gift_points.${request.type}`]);
-      const initialPoints = Number(giftPointsSetting?.value);
+      // A catalog CP gift can carry its own point value. NULL keeps legacy
+      // CP-type defaults; an explicit zero means the admin intentionally set zero.
+      const initialPoints = request.cpPoints !== null && request.cpPoints !== undefined
+        ? Number(request.cpPoints)
+        : Number(giftPointsSetting?.value);
       if (Number.isSafeInteger(initialPoints) && initialPoints > 0) {
         await manager.query(
           `INSERT INTO cp_point_events ("relationshipId","eventType","referenceType","referenceId",points,metadata,"createdAt")
@@ -1157,6 +1162,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     giftId: string,
     giftSendId: string,
     roomId?: string | null,
+    giftPoints?: number | null,
   ) {
     if (!senderId || !receiverId || senderId === receiverId || !giftId || !giftSendId) return null;
     // Prefer the legacy explicit gift-to-type mapping; otherwise use the type saved
@@ -1221,10 +1227,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         ? configuredExpiry : EXPIRY_MINUTES;
       const [request] = await manager.query(
         `INSERT INTO cp_requests
-          ("fromUserId","toUserId",type,status,"roomId","priceCoins","giftId","giftName","giftIconUrl","giftAnimationUrl","idempotencyKey","expiresAt","createdAt","updatedAt")
-         VALUES ($1,$2,$3,'pending',$4,NULL,$5,$6,$7,$8,$9,now()+($10 || ' minutes')::interval,now(),now())
+          ("fromUserId","toUserId",type,status,"roomId","priceCoins","giftId","giftName","giftIconUrl","giftAnimationUrl","cpPoints","idempotencyKey","expiresAt","createdAt","updatedAt")
+         VALUES ($1,$2,$3,'pending',$4,NULL,$5,$6,$7,$8,$9,$10,now()+($11 || ' minutes')::interval,now(),now())
          RETURNING *`,
-        [senderId, receiverId, type, roomId || null, gift.id, gift.name, gift.iconUrl, gift.animationUrl, idempotencyKey, String(expiryMinutes)],
+        [senderId, receiverId, type, roomId || null, gift.id, gift.name, gift.iconUrl, gift.animationUrl,
+          giftPoints == null ? null : String(Math.max(0, Math.floor(Number(giftPoints) || 0))),
+          idempotencyKey, String(expiryMinutes)],
       );
       return { request, created: true };
     });
