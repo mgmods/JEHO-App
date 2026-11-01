@@ -824,10 +824,22 @@ async function uploadCpCardBackground(item, event) {
   }
 }
 
+function parseLevelInteger(value, fallback = 0) {
+  if (value === null || value === undefined || String(value).trim() === '') return fallback
+  const normalized = String(value)
+    .replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    .replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+    .replace(/[٬,،\\s]/g, '')
+  const number = Number(normalized)
+  return Number.isSafeInteger(number) ? number : NaN
+}
+
 function syncLevelEditor(item) {
-  const levels = (Array.isArray(item.levelsEditor) ? item.levelsEditor : []).map(level => ({
+  const levels = (Array.isArray(item.levelsEditor) ? item.levelsEditor : []).map((level, index) => ({
     ...level,
-    name: String(level.name || '').trim(),
+    level: index + 1,
+    pointsRequired: parseLevelInteger(level.pointsRequired, 0),
+    name: String(level.name ?? '').trim(),
     presentation: { ...(level.presentation || {}) },
     giftPresentation: { ...(level.giftPresentation || {}) },
     giftBonusPercent: Math.max(0, Math.min(500, Number(level.giftBonusPercent) || 0)),
@@ -889,9 +901,17 @@ async function saveType(item) {
     try { levels = JSON.parse(item.levelsText || '[]'); rules = JSON.parse(item.rulesText || '{}') }
     catch { throw new Error('تحقق من صيغة JSON في المستويات أو القواعد.') }
     if (!Array.isArray(levels) || !rules || typeof rules !== 'object' || Array.isArray(rules)) throw new Error('تحقق من إعدادات المستويات والقواعد.')
-    if (levels.length > 5 || levels.some(level => !Number.isInteger(level.level) || level.level < 1 || !Number.isSafeInteger(level.pointsRequired) || level.pointsRequired < 0)) throw new Error('أدخل رقماً صحيحاً للنقاط في كل مستوى (حتى خمسة مستويات).')
+    if (levels.length > 5) throw new Error('يمكنك إضافة خمسة مستويات كحد أقصى.')
+    levels = levels.map((level, index) => {
+      const pointsRequired = parseLevelInteger(level.pointsRequired, 0)
+      if (!Number.isSafeInteger(pointsRequired) || pointsRequired < 0 || pointsRequired > 1000000000) {
+        throw new Error('اكتب عدد نقاط صحيحاً من 0 إلى 1,000,000 لكل مستوى.')
+      }
+      return { ...level, level: index + 1, pointsRequired }
+    })
+    // Thresholds are sorted automatically; names and rewards stay attached to their level.
     levels.sort((a, b) => a.pointsRequired - b.pointsRequired || a.level - b.level)
-    for (let i = 1; i < levels.length; i++) if (levels[i].pointsRequired < levels[i - 1].pointsRequired) throw new Error('رتّب نقاط المستويات تصاعدياً.')
+    levels = levels.map((level, index) => ({ ...level, level: index + 1 }))
     rules.seatEffect = {
       enabled: item.seatEffectEnabled === true,
       url: String(item.seatEffectUrl || '').trim(),
