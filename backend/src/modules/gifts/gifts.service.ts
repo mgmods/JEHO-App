@@ -498,6 +498,9 @@ export class GiftsService implements OnModuleInit {
       const active = await this.giftsRepo.find({ where: { isActive: true } });
       const groups = new Map<string, typeof active>();
       for (const g of active) {
+        // CP gifts are individually configured rewards; never hide one because
+        // another CP gift happens to share its name or artwork.
+        if (String(g.category || '').toLowerCase() === 'cp') continue;
         const key = keyFn(g);
         if (!key) continue;
         const arr = groups.get(key) || [];
@@ -1800,7 +1803,9 @@ export class GiftsService implements OnModuleInit {
         ? 'cp'
         : String(g.category || 'normal').toLowerCase();
       const stem = this.giftArtStem(g.iconUrl) || this.giftNameKey(g.name);
-      const key = effectiveCategory + ':' + (stem || String(g.id));
+      const key = effectiveCategory === 'cp'
+        ? 'cp:' + String(g.id)
+        : effectiveCategory + ':' + (stem || String(g.id));
       if (seen.has(key)) continue;
       seen.add(key);
       const price = Math.max(0, Math.floor(Number(g.coinPrice) || 0));
