@@ -15,6 +15,8 @@ public final class GiftDtos {
         @SerializedName("diamondValue") public int diamondValue;
         @SerializedName("type") public String type;
         @SerializedName("category") public String category;
+        @SerializedName("cpRelationshipType") public String cpRelationshipType;
+        @SerializedName("cpPoints") public int cpPoints;
         @SerializedName("sortOrder") public int sortOrder;
     }
 
