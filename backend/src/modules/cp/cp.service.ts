@@ -884,7 +884,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   async recordGiftInteraction(senderId: string, receiverId: string, giftSendId: string, totalCoins: number) {
     if (!senderId || !receiverId || !giftSendId || senderId === receiverId) return;
     const relationships = await this.dataSource.query(
-      `SELECT id,type FROM cp_relationships WHERE status='active'
+      `SELECT id,type,level FROM cp_relationships WHERE status='active'
        AND (("userAId"=$1 AND "userBId"=$2) OR ("userAId"=$2 AND "userBId"=$1))`,
       [senderId, receiverId],
     );
