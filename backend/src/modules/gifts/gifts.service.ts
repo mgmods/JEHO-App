@@ -82,6 +82,8 @@ const DEFAULT_LUCKY_ODDS_CONFIG: LuckyOddsConfig = {
 @Injectable()
 export class GiftsService implements OnModuleInit {
   private readonly log = new Logger(GiftsService.name);
+  private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
+  private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
 
   constructor(
     @InjectRepository(Gift) private readonly giftsRepo: Repository<Gift>,
@@ -2172,6 +2174,23 @@ export class GiftsService implements OnModuleInit {
     if (result) this.realtime?.emitToRoom(roomId, 'room:event', { roomId, event: 'support_chest:updated', payload: result, at: new Date().toISOString() });
   }
 
+  private async mysteriousPolicy(): Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }> {
+    const now = Date.now();
+    if (this.mysteriousPolicyCache && this.mysteriousPolicyCache.expiresAt > now) {
+      return this.mysteriousPolicyCache;
+    }
+    if (this.mysteriousPolicyLookup) return this.mysteriousPolicyLookup;
+    this.mysteriousPolicyLookup = this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } })
+      .then((row) => ({ row, failed: false, expiresAt: Date.now() + 5_000 }))
+      .catch(() => ({ row: null, failed: true, expiresAt: Date.now() + 2_000 }))
+      .then((result) => {
+        this.mysteriousPolicyCache = result;
+        return result;
+      })
+      .finally(() => { this.mysteriousPolicyLookup = undefined; });
+    return this.mysteriousPolicyLookup;
+  }
+
   private async mysteriousRoomIdentity(userId: string | null | undefined): Promise<{ enabled: boolean; frameUrl: string | null }> {
     if (!userId) return { enabled: false, frameUrl: null };
     try {
@@ -2198,7 +2217,9 @@ export class GiftsService implements OnModuleInit {
       if (typeof benefits === 'string') {
         try { benefits = JSON.parse(benefits); } catch { benefits = {}; }
       }
-      const policyRow = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+      const currentPolicy = await this.mysteriousPolicy();
+      if (currentPolicy.failed) return { enabled: false, frameUrl: null };
+      const policyRow = currentPolicy.row;
       if (policyRow) {
         let policy: any = {};
         try {
