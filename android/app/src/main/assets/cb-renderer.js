@@ -36,8 +36,9 @@
   }
   async function load(userId, apiBase, root) {
     if (!userId || !apiBase || typeof window.fetch !== 'function') throw new Error('CB load requires userId and apiBase');
-    const base = String(apiBase).replace(/\\/+$/, '');
-    const response = await window.fetch(base + '/api/cp/users/' + encodeURIComponent(userId));
+    let base = String(apiBase);
+    while (base.endsWith('/')) base = base.slice(0, -1);
+    const response = await window.fetch(base + '/cp/users/' + encodeURIComponent(userId));
     if (!response.ok) throw new Error('Unable to load CB profile: ' + response.status);
     const payload = await response.json();
     const rows = payload && payload.data && (payload.data.data || payload.data) || payload;
