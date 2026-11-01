@@ -212,6 +212,21 @@ export class CpAdminController {
           );
           if (!rewardCosmetic) throw new BadRequestException('اختر مكافأة تجميلية نشطة من كتالوج المتجر');
         }
+        const extraRewards = [
+          ...(Array.isArray(level.benefits) ? level.benefits : []),
+          ...(Array.isArray(level.rewards) ? level.rewards : []),
+        ];
+        if (extraRewards.length > 30) throw new BadRequestException('لا يمكن إضافة أكثر من 30 مكافأة للمستوى');
+        for (const reward of extraRewards) {
+          const code = String(reward?.cosmeticCode || reward?.code || '').trim();
+          if (!code) continue;
+          if (!/^[a-zA-Z0-9_-]{2,64}$/.test(code)) throw new BadRequestException('رمز إحدى مكافآت المستوى غير صالح');
+          const [activeReward] = await this.dataSource.query(
+            'SELECT id FROM cosmetics WHERE code=$1 AND "isActive"=true LIMIT 1',
+            [code],
+          );
+          if (!activeReward) throw new BadRequestException('كل مكافآت المستوى يجب أن تكون عناصر تجميلية نشطة');
+        }
         if (level.rewardDays !== undefined && (!Number.isInteger(Number(level.rewardDays)) || Number(level.rewardDays) < 1 || Number(level.rewardDays) > 365)) {
           throw new BadRequestException('مدة مكافأة مستوى CB يجب أن تكون بين يوم و365 يوماً');
         }
