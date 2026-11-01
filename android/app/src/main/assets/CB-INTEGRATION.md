@@ -10,10 +10,10 @@ The Android asset `cb-renderer.js` is the shared presentation layer for CB/CP re
 
 ## Load relationship data
 
-Use the public profile endpoint for the viewed account:
+Pass the API base including `/api/v1` (for example `https://api-host.example/api/v1`) and use the public profile endpoint for the viewed account:
 
 ```http
-GET /api/cp/users/{userId}
+GET /api/v1/cp/users/{userId}
 ```
 
 The response includes the active relationship, `level`, `currentLevelConfig`, `presentation`, `benefits`, `giftPresentation`, and `giftBonusPercent`. Authenticated relationship workspace responses from `GET /api/cp/me` include the same presentation fields.
@@ -21,7 +21,7 @@ The response includes the active relationship, `level`, `currentLevelConfig`, `p
 ## Render reusable pieces
 
 ```js
-const relationship = rows[0]; // response from /api/cp/users/{userId}
+const relationship = rows[0]; // response from /api/v1/cp/users/{userId}
 document.querySelector('#cb-level').innerHTML =
   window.JehoCB.renderLevelBadge(relationship);
 document.querySelector('#cb-card').innerHTML =
