@@ -2233,21 +2233,9 @@ export class GiftsService implements OnModuleInit {
     const giftCategory = String((gift as any).category || '')
       .trim()
       .toLowerCase();
-    if (giftCategory === 'cp') {
-      const rows = await this.dataSource.query(
-        `SELECT 1 FROM social_requests
-          WHERE type = 'relation' AND status = 'accepted'
-            AND (("fromUserId" = $1 AND "toUserId" = $2)
-              OR ("fromUserId" = $2 AND "toUserId" = $1))
-          LIMIT 1`,
-        [senderId, dto.receiverId],
-      );
-      if (!rows?.length) {
-        throw new BadRequestException(
-          'هدايا CP للشريك فقط — أكملا ربط CP من مساحة CP أولاً',
-        );
-      }
-    }
+    // CB/CP starter gifts are ordinary catalog gifts. The configured gift-to-type
+    // mapping creates an invitation after the gift transaction commits; linked users
+    // can exchange the same gift normally and receive relationship points.
 
     const isLucky = gift.type === GiftType.LUCKY;
     const qtyCap = isLucky ? 177 : 99;
@@ -2543,6 +2531,17 @@ export class GiftsService implements OnModuleInit {
     }).then(async (result) => {
       // An idempotent replay must not repeat progress, scoring, or realtime effects.
       if (result?.alreadyProcessed) return result;
+      if (result.send?.id && result.send?.receiverId) {
+        await this.cpService.createInitiationRequestFromGift(
+          senderId,
+          result.send.receiverId,
+          result.send.giftId || gift.id,
+          result.send.id,
+          dto.roomId || null,
+        ).catch((err) => {
+          this.log.warn(`CP initiation request failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }
       // Credit shared CB points only after the gift row and wallet transaction committed.
       // The CP ledger uses giftSendId as its idempotency reference, so retries cannot double-award.
       if (result.send?.id && result.send?.receiverId) {
