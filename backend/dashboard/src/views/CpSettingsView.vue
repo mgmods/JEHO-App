@@ -625,7 +625,7 @@ async function load() {
       giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
       levelsText: JSON.stringify(item.levels || [], null, 2),
-      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || '') })),
+      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || '') })),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
       seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
       seatEffectUrl: item.rules?.seatEffect?.url || '',
