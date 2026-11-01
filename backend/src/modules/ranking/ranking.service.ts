@@ -11,6 +11,7 @@ import { Room } from '../../database/entities/room.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { User } from '../../database/entities/user.entity';
 import { Follow } from '../../database/entities/follow.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 
 type RankingBoardItem = {
   targetId: string;
@@ -48,6 +49,8 @@ export class RankingService {
     private readonly usersRepo: Repository<User>,
     @InjectRepository(Follow)
     private readonly followsRepo: Repository<Follow>,
+    @InjectRepository(AppSetting)
+    private readonly settingsRepo: Repository<AppSetting>,
   ) {}
 
   private weekStart(date: Date): Date {
@@ -246,9 +249,35 @@ export class RankingService {
       where: { id: In(ids) },
       relations: { profile: true, vips: { vipPlan: true } },
     });
-    // A user may keep earning and spending normally while using the anonymous identity,
-    // but must not appear as a ranking entry while that mode is enabled.
-    const map = new Map(users.filter((u) => !u.mysteriousMode).map((u) => [u.id, u]));
+    // Hide only accounts whose anonymous mode is currently valid under the same
+    // VIP + dashboard policy used by room identity. Expired/disabled modes rank normally.
+    const policyRow = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } }).catch(() => null);
+    let policy: any = null;
+    if (policyRow) {
+      try {
+        policy = typeof policyRow.value === 'string' ? JSON.parse(policyRow.value) : (policyRow.value || {});
+      } catch {
+        policy = { enabled: false };
+      }
+    }
+    const allowedLevels = Array.isArray(policy?.eligibleVipLevels)
+      ? policy.eligibleVipLevels.map(Number).filter((n: number) => Number.isInteger(n) && n >= 1 && n <= 7)
+      : [];
+    const hiddenIds = new Set<string>();
+    for (const user of users) {
+      if (!user.mysteriousMode) continue;
+      const activeVip = (user.vips || [])
+        .filter((vip) => vip.isActive && (!vip.expiresAt || new Date(vip.expiresAt).getTime() > Date.now()))
+        .sort((a, b) => Number(b.level || 0) - Number(a.level || 0))[0];
+      if (!activeVip) continue;
+      const benefits = activeVip.vipPlan?.benefits as any;
+      const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
+      const eligible = policyRow
+        ? policy?.enabled === true && allowedLevels.includes(Number(activeVip.level))
+        : Array.isArray(extra) && extra.includes('mysterious_man');
+      if (eligible) hiddenIds.add(user.id);
+    }
+    const map = new Map(users.filter((u) => !hiddenIds.has(u.id)).map((u) => [u.id, u]));
     return rows.filter((r) => map.has(r.targetId)).map((r, rankIndex) => {
       const user = map.get(r.targetId)!;
       const activeVip = (user.vips || [])
