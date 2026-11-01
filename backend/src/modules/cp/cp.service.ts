@@ -811,7 +811,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           relationshipType: type, senderId: userId, recipientId, route: 'cp', actions: ['accept', 'reject'], requestSource: 'cp_gift_page',
           giftId: outcome.request.giftId, giftName: outcome.request.giftName, giftIconUrl: outcome.request.giftIconUrl,
           priceCoins: outcome.request.priceCoins },
-      );
+      ).catch(error => console.warn('[CP] request notification delivery failed', error));
       this.realtime.emitToUser(recipientId, 'cp:request', {
         requestId: outcome.request.id, senderId: userId, senderName, relationshipType: type,
         title: 'هدية وطلب ارتباط جديد', body: `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}.`,
@@ -983,7 +983,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           actions: ['accept', 'reject'],
           requestSource: 'room_gift',
         },
-      );
+      ).catch(error => console.warn('[CP] room request notification delivery failed', error));
       this.realtime.emitToUser(recipientId, 'cp:request', {
         requestId: outcome.request.id,
         senderId: userId,
@@ -1250,7 +1250,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       'طلب ارتباط جديد',
       `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}. وافق أو ارفض الطلب.`,
       payload,
-    );
+    ).catch(error => console.warn('[CP] gift request notification delivery failed', error));
     this.realtime.emitToUser(receiverId, 'cp:request', {
       ...payload,
       title: 'هدية وطلب ارتباط جديد',
