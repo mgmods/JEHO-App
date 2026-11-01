@@ -185,6 +185,15 @@
                       <span class="form-check-label">توهج اسم الثنائي</span>
                     </label>
                   </div>
+                  <div class="col-md-6">
+                    <label class="form-label">أنيميشن هدية الثنائي لهذا المستوى (GIF / WebP)</label>
+                    <input class="form-control" type="file" accept=".gif,.webp,.png" @change="uploadLevelAsset(item,level,'giftAnimationUrl',$event)">
+                    <input v-model.trim="level.giftPresentation.animationUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط أنيميشن الهدية" @change="syncLevelEditor(item)">
+                    <label class="form-check mt-2">
+                      <input v-model="level.giftPresentation.showPartnerAvatars" class="form-check-input" type="checkbox" @change="syncLevelEditor(item)">
+                      <span class="form-check-label">إظهار صور الشريكين داخل الهدية</span>
+                    </label>
+                  </div>
                   <div class="col-md-4">
                     <label class="form-label">نسبة نقاط إضافية لهدايا الشريكين %</label>
                     <input v-model.number="level.giftBonusPercent" class="form-control" type="number" min="0" max="500" @change="syncLevelEditor(item)">
@@ -616,7 +625,7 @@ async function load() {
       giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
       levelsText: JSON.stringify(item.levels || [], null, 2),
-      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || '') })),
+      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => ({ ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || '') })),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
       seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
       seatEffectUrl: item.rules?.seatEffect?.url || '',
@@ -699,6 +708,7 @@ function syncLevelEditor(item) {
     ...level,
     name: String(level.name || '').trim(),
     presentation: { ...(level.presentation || {}) },
+    giftPresentation: { ...(level.giftPresentation || {}) },
     giftBonusPercent: Math.max(0, Math.min(500, Number(level.giftBonusPercent) || 0)),
     rewardGiftId: String(level.rewardGiftId || ''),
   }))
@@ -720,7 +730,9 @@ async function uploadLevelAsset(item, level, field, event) {
     const data = payloadOf(response)
     const uploadedUrl = data?.url || data?.path
     if (!uploadedUrl) throw new Error('رد رفع الصورة غير مكتمل.')
-    level.presentation = { ...(level.presentation || {}), [field]: /^https?:\/\//i.test(uploadedUrl) ? uploadedUrl : new URL(uploadedUrl, window.location.origin).toString() }
+    const finalUrl = /^https?:\/\//i.test(uploadedUrl) ? uploadedUrl : new URL(uploadedUrl, window.location.origin).toString()
+    if (field === 'giftAnimationUrl') level.giftPresentation = { ...(level.giftPresentation || {}), animationUrl: finalUrl }
+    else level.presentation = { ...(level.presentation || {}), [field]: finalUrl }
     syncLevelEditor(item)
     success.value = 'تم رفع أصل المستوى. احفظ إعدادات النوع لاعتماده.'
   } catch (e) {
