@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.GridLayoutManager;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.Dramizo.Series.databinding.FragmentHomeMeBinding;
 import com.Dramizo.Series.di.AppContainer;
@@ -198,6 +199,50 @@ public class HomeMeFragment extends Fragment {
         AppContainer c = ContainerProvider.from(requireActivity());
         AuthDtos.UserDto me = c.getSessionManager().getUser();
         if (me != null) {
+            binding.mysteriousModeRow.setVisibility(me.mysteriousManEligible ? View.VISIBLE : View.GONE);
+            binding.mysteriousModeDivider.setVisibility(me.mysteriousManEligible ? View.VISIBLE : View.GONE);
+            binding.switchMysteriousMode.setOnCheckedChangeListener(null);
+            binding.switchMysteriousMode.setChecked(me.mysteriousMode);
+            binding.switchMysteriousMode.setOnCheckedChangeListener((button, enabled) -> {
+                if (enabled == me.mysteriousMode) return;
+                button.setEnabled(false);
+                MiscDtos.UpdateProfileRequest request = new MiscDtos.UpdateProfileRequest();
+                request.mysteriousMode = enabled;
+                c.getIoExecutor().execute(() -> {
+                    boolean success = false;
+                    AuthDtos.UserDto updated = null;
+                    String error = "تعذر تغيير وضع الرجل الغامض";
+                    try {
+                        retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AuthDtos.UserDto>> response =
+                                c.getUserApi().updateProfile(request).execute();
+                        if (response.isSuccessful() && response.body() != null
+                                && response.body().success && response.body().data != null) {
+                            updated = response.body().data;
+                            c.getSessionManager().updateCachedUser(updated);
+                            success = true;
+                        } else if (response.body() != null && response.body().message != null) {
+                            error = response.body().message;
+                        }
+                    } catch (Exception ignored) { }
+                    final boolean saved = success;
+                    final AuthDtos.UserDto fresh = updated;
+                    final String failure = error;
+                    if (!isAdded()) return;
+                    requireActivity().runOnUiThread(() -> {
+                        if (binding == null || !isAdded()) return;
+                        button.setEnabled(true);
+                        if (saved && fresh != null) {
+                            binding.switchMysteriousMode.setChecked(fresh.mysteriousMode);
+                            Toast.makeText(requireContext(),
+                                    fresh.mysteriousMode ? "تم تفعيل هوية الرجل الغامض" : "تم إيقاف هوية الرجل الغامض",
+                                    Toast.LENGTH_SHORT).show();
+                        } else {
+                            binding.switchMysteriousMode.setChecked(me.mysteriousMode);
+                            Toast.makeText(requireContext(), failure, Toast.LENGTH_LONG).show();
+                        }
+                    });
+                });
+            });
             String name = me.displayName;
             if (name == null || name.trim().isEmpty()) name = me.username;
             if (name == null || name.trim().isEmpty()) name = "عضو جيهو";
