@@ -1087,28 +1087,60 @@ export class UsersService {
 
   /** CP hub status for me (partner + intimacy). */
   async myCpStatus(userId: string) {
-    const items = await this.listAcceptedRelations(userId, SocialRequestType.RELATION);
-    const bond = items[0] || null;
-    if (!bond?.user?.id) {
+    // The gift-sheet CP banner must read the same authoritative relationship
+    // and configured level thresholds as the current CP center.
+    const [relationship] = await this.dataSource.query(
+      `SELECT r.id,r.type,r.points::text AS points,r.level,
+         json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",
+           'avatarUrl',p."avatarUrl",'level',p.level) AS partner
+       FROM cp_relationships r
+       JOIN users p ON p.id=CASE WHEN r."userAId"=$1 THEN r."userBId" ELSE r."userAId" END
+       WHERE (r."userAId"=$1 OR r."userBId"=$1) AND r.status='active'
+       ORDER BY r."startedAt" DESC LIMIT 1`,
+      [userId],
+    );
+    if (!relationship) {
       return {
-        hasCp: false,
-        partner: null,
-        bondScore: 0,
-        level: 0,
-        nextLevelAt: 500,
+        hasCp: false, partner: null, bondScore: 0, level: 0,
+        currentLevelAt: 0, nextLevelAt: 0, progressPercent: 0, relationId: null,
       };
     }
-    const bondScore = await this.cpBondScore(userId, bond.user.id);
-    // 500 coins exchanged between pair = 1 level (soft Mikoo-style ladder).
-    const level = Math.min(99, 1 + Math.floor(bondScore / 500));
-    const nextLevelAt = level * 500;
+
+    const [levelSetting] = await this.dataSource.query(
+      'SELECT value FROM app_settings WHERE key=$1',
+      [`cp.levels.${relationship.type}`],
+    );
+    let levels: Array<{ level: number; pointsRequired: number }> = [];
+    try {
+      const parsed = JSON.parse(String(levelSetting?.value || '[]'));
+      if (Array.isArray(parsed)) levels = parsed
+        .filter(item => item && Number.isInteger(Number(item.level)) && Number(item.level) >= 1
+          && Number.isFinite(Number(item.pointsRequired)) && Number(item.pointsRequired) >= 0)
+        .sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
+    } catch { levels = []; }
+
+    const points = BigInt(String(relationship.points || 0));
+    const level = Math.max(1, Number(relationship.level) || 1);
+    const currentLevelAt = levels
+      .filter(item => Number(item.level) <= level)
+      .reduce((max, item) => Math.max(max, Number(item.pointsRequired) || 0), 0);
+    const nextLevel = levels.find(item => Number(item.level) > level);
+    const nextLevelAt = nextLevel ? Math.max(0, Number(nextLevel.pointsRequired) || 0) : 0;
+    const span = nextLevelAt > currentLevelAt ? nextLevelAt - currentLevelAt : 0;
+    const progressed = Math.max(0, Number(points) - currentLevelAt);
+    const progressPercent = span > 0
+      ? Math.max(0, Math.min(100, progressed * 100 / span))
+      : (levels.length > 0 ? 100 : 0);
+
     return {
       hasCp: true,
-      partner: bond.user,
-      bondScore,
+      partner: relationship.partner,
+      bondScore: Number(points),
       level,
+      currentLevelAt,
       nextLevelAt,
-      relationId: bond.id,
+      progressPercent,
+      relationId: relationship.id,
     };
   }
 
