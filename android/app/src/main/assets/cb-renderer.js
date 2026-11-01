@@ -19,7 +19,6 @@
   function renderCard(relationship, content) {
     const p = presentation(relationship), bg = safeUrl(p.cardBackgroundUrl || relationship && relationship.cardBackgroundUrl);
     const frame = safeUrl(p.frameUrl);
-    const logo = safeUrl(p.levelLogoUrl || p.logoUrl);
     return '<section class="jeho-cb-card"' + (bg ? ' style="background-image:linear-gradient(#160a1a55,#160a1a77),url(&quot;' + esc(bg) + '&quot;)"' : '') + '>' +
       (frame ? '<img class="jeho-cb-frame" src="' + esc(frame) + '" alt="">' : '') +
       '<div style="position:relative;z-index:1">' + renderLevelBadge(relationship) + (content || '') + '</div></section>';
@@ -35,5 +34,16 @@
     root.querySelectorAll('[data-cb-card]').forEach(node => { node.outerHTML = renderCard(relationship, node.innerHTML); });
     root.querySelectorAll('[data-cb-name]').forEach(node => { node.innerHTML = renderName(node.textContent, relationship); });
   }
-  window.JehoCB = Object.freeze({ version: 1, renderLevelBadge, renderCard, renderName, apply, presentation });
+  async function load(userId, apiBase, root) {
+    if (!userId || !apiBase || typeof window.fetch !== 'function') throw new Error('CB load requires userId and apiBase');
+    const base = String(apiBase).replace(/\\/+$/, '');
+    const response = await window.fetch(base + '/api/cp/users/' + encodeURIComponent(userId));
+    if (!response.ok) throw new Error('Unable to load CB profile: ' + response.status);
+    const payload = await response.json();
+    const rows = payload && payload.data && (payload.data.data || payload.data) || payload;
+    const relationship = Array.isArray(rows) ? rows[0] || null : rows;
+    if (root && relationship) apply(root, relationship);
+    return relationship;
+  }
+  window.JehoCB = Object.freeze({ version: 1, renderLevelBadge, renderCard, renderName, apply, load, presentation });
 })(window, document);
