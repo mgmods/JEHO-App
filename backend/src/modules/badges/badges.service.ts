@@ -24,7 +24,7 @@ export interface UpsertBadgeDto {
   hiddenTaskTarget?: number;
   hiddenTaskDays?: number;
   manualTaskEnabled?: boolean;
-  manualTaskVisibility?: 'visible' | 'hidden';
+  manualTaskVisibility?: string;
   manualTaskTitle?: string;
   manualTaskDescription?: string;
   manualTaskDays?: number;
