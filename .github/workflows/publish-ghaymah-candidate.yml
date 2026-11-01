@@ -7,6 +7,12 @@ on:
       - "backend/**"
       - ".github/workflows/**"
   workflow_dispatch:
+    inputs:
+      deploy_to_cumin:
+        description: "Deploy the already-built candidate to the existing JEHO-OWN app on Cumin"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -91,6 +97,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy-jeho-own:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_to_cumin == true }}
     needs: build-and-publish
     runs-on: ubuntu-24.04
     timeout-minutes: 15
