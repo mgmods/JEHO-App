@@ -1104,7 +1104,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
          ON CONFLICT ("referenceType","referenceId") DO NOTHING RETURNING id`,
         [relationshipId, eventType, referenceType, referenceId, String(points), JSON.stringify(metadata)],
       );
-      if (!inserted.length) return { relationshipId, duplicate: true, points: relationship.points, level: relationship.level, levelChanged: false };
+      if (!inserted.length) return { relationshipId, duplicate: true, points: relationship.points, level: relationship.level, previousLevel: Number(relationship.level) || 1, levelChanged: false };
       const previousLevel = Number(relationship.level) || 1;
       const total = BigInt(String(relationship.points)) + BigInt(points);
       const [levelConfig] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${relationship.type}`]);
@@ -1116,6 +1116,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const [maxRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.max_level.${relationship.type}`]);
       const maxLevel = Number(maxRow?.value);
       if (Number.isInteger(maxLevel) && maxLevel > 0) level = Math.min(level, maxLevel);
+      // Permanent relationship levels are monotonic: changing dashboard thresholds
+      // or the weekly leaderboard can never lower an already-earned level.
+      level = Math.max(previousLevel, level);
       await manager.query(
         'UPDATE cp_relationships SET points=$1,level=$2,"updatedAt"=now() WHERE id=$3',
         [total.toString(), level, relationshipId],
