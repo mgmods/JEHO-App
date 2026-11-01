@@ -440,11 +440,13 @@ export class UsersService {
     // VIP-tier media is controlled from Dashboard > VIP. Apply it at read time
     // so changing a plan updates active members without overwriting their stored profile data.
     const vipVisuals = (vipValid?.vipPlan?.benefits as any)?.visuals || {};
+    const mysteriousManEligible = await this.isMysteriousModeEligible({ ...user, mysteriousMode: true } as User, vipValid);
     const mysteriousMan = await this.isMysteriousModeAllowed(user, vipValid);
     const withVipVisuals = {
       ...flat,
       mysteriousMode: mysteriousMan,
       mysteriousMan,
+      mysteriousManEligible,
       vipHeadUrl: vipValid?.vipPlan?.badgeUrl || flat.vipHeadUrl,
       vipTouUrl: vipVisuals.vipFrameUrl || flat.vipTouUrl,
       vipCardUrl: vipVisuals.vipCardUrl || null,
