@@ -119,8 +119,8 @@
           <div class="col-sm-6 col-xl-3">
             <label class="form-label">هدية بدء العلاقة</label>
             <select v-model="item.giftId" class="form-select">
-              <option value="">اختر هدية موجودة</option>
-              <option v-for="gift in gifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
+              <option value="">اختر هدية CP مصنّفة من قسم الهدايا</option>
+              <option v-for="gift in cpGifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
             </select>
             <div v-if="selectedGift(item)" class="d-flex align-items-center gap-2 mt-2 small">
               <img v-if="selectedGift(item).iconUrl" :src="selectedGift(item).iconUrl" :alt="selectedGift(item).name" width="40" height="40" style="object-fit:contain" />
@@ -186,7 +186,7 @@
                     <label class="form-label">هدية مكافأة المستوى من الهدايا العادية</label>
                     <select v-model="level.rewardGiftId" class="form-select" @change="syncLevelEditor(item)">
                       <option value="">بدون هدية تلقائية</option>
-                      <option v-for="gift in gifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
+                      <option v-for="gift in normalGifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
                     </select>
                     <div v-if="selectedGift({giftId:level.rewardGiftId})" class="small mt-1">{{ selectedGift({giftId:level.rewardGiftId}).name }}</div>
                   </div>
@@ -518,7 +518,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { cpAdminApi, giftsApi, uploadsApi, cosmeticsApi } from '@/api'
 import { extractList } from '@/composables/useUtils'
 import PageHeader from '@/components/PageHeader.vue'
@@ -528,6 +528,8 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 const activeTab = ref('overview')
 const types = ref([])
 const gifts = ref([])
+const cpGifts = computed(() => gifts.value.filter(gift => String(gift.category || '').toLowerCase() === 'cp'))
+const normalGifts = computed(() => gifts.value.filter(gift => String(gift.category || '').toLowerCase() !== 'cp'))
 const requests = ref([])
 const audit = ref([])
 const loading = ref(false)
