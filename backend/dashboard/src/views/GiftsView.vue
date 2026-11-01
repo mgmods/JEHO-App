@@ -220,6 +220,23 @@
                     <option v-if="!activeCategories.some(c => c.key === 'cp')" value="cp">هدايا CP</option>
                   </select>
                 </div>
+                <template v-if="String(form.category || '').toLowerCase() === 'cp'">
+                  <div class="col-md-4">
+                    <label class="form-label">نوع علاقة CP التي تطلبها الهدية</label>
+                    <select v-model="form.cpRelationshipType" class="form-select" required>
+                      <option value="friendship">صداقة</option>
+                      <option value="brotherhood">أخوّة</option>
+                      <option value="love">حب</option>
+                      <option value="engagement">خطوبة</option>
+                      <option value="marriage">زواج</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">نقاط مستوى CP لكل هدية</label>
+                    <input v-model.number="form.cpPoints" type="number" min="0" max="1000000000" step="1" class="form-control" />
+                    <div class="form-text">تُضاف هذه النقاط للعلاقة القائمة عند تبادل الهدية، وتُضرب بعدد النسخ المرسلة.</div>
+                  </div>
+                </template>
                 <template v-if="form.type === 'lucky'">
                   <div class="col-12">
                     <div class="small text-muted mb-2">{{ t('gifts.luckyHint') }}</div>
@@ -464,6 +481,8 @@ const form = reactive({
   diamondValue: 8,
   type: 'normal',
   category: 'normal',
+  cpRelationshipType: 'love',
+  cpPoints: 0,
   iconUrl: '',
   animationUrl: '',
   sortOrder: 0,
@@ -550,6 +569,8 @@ function openCreate() {
     diamondValue: 8,
     type: 'normal',
     category: giftSection.value === 'cp' ? 'cp' : (activeCategories.value[0]?.key || 'normal'),
+    cpRelationshipType: 'love',
+    cpPoints: 0,
     iconUrl: '',
     animationUrl: '',
     sortOrder: 0,
@@ -571,6 +592,8 @@ function openEdit(g) {
     diamondValue: g.diamondValue ?? Math.max(1, Math.floor((g.coinPrice || 1) * 0.8)),
     type: g.type || 'normal',
     category: g.category || g.type || 'normal',
+    cpRelationshipType: g.cpRelationshipType || 'love',
+    cpPoints: Number(g.cpPoints ?? 0),
     iconUrl: g.iconUrl || '',
     animationUrl: g.animationUrl || '',
     sortOrder: g.sortOrder || 0,
@@ -664,6 +687,8 @@ async function save() {
     diamondValue: Number(form.diamondValue) || 1,
     type: form.type || 'normal',
     category: form.category || form.type || 'normal',
+    cpRelationshipType: String(form.cpRelationshipType || 'love'),
+    cpPoints: Math.max(0, Math.floor(Number(form.cpPoints) || 0)),
     sortOrder: Number(form.sortOrder) || 0,
     isActive: form.status === 'active',
     luckyConfig:
