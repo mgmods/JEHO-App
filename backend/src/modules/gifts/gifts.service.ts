@@ -260,10 +260,19 @@ export class GiftsService implements OnModuleInit {
       await this.dataSource.query(
         `UPDATE gifts SET \"cpRelationshipType\"='love' WHERE category='cp' AND COALESCE(\"cpRelationshipType\",'')=''`,
       );
-      await this.dataSource.query(
-        `UPDATE gifts g SET \"cpRelationshipType\" = regexp_replace(s.key, '^cp\\.gift\\.', '')
-         FROM app_settings s WHERE s.key LIKE 'cp.gift.%' AND s.value = g.id::text`,
-      );
+      const migrationKey = 'cp.gift_relationship_type_migration_v1';
+      const migrated = await this.settingsRepo.findOne({ where: { key: migrationKey } });
+      if (!migrated) {
+        await this.dataSource.query(
+          `UPDATE gifts g SET \"cpRelationshipType\" = regexp_replace(s.key, '^cp\\.gift\\.', '')
+           FROM app_settings s WHERE s.key LIKE 'cp.gift.%' AND s.value = g.id::text`,
+        );
+        await this.settingsRepo.save(this.settingsRepo.create({
+          key: migrationKey,
+          value: '1',
+          description: 'One-time migration of legacy CP gift relationship types',
+        }));
+      }
     } catch (err) {
       this.log.warn(`ensureCpGiftColumns: ${err instanceof Error ? err.message : String(err)}`);
     }
