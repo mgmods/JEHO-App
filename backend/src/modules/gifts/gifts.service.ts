@@ -51,6 +51,7 @@ import {
   recommendedGiftDiamonds,
 } from '../../common/pricing-catalog';
 import { ECONOMY } from '../../common/economy-config';
+import { CpService } from '../cp/cp.service';
 
 type LuckyRoll = {
   luckyMultiplier: number | null;
@@ -101,6 +102,7 @@ export class GiftsService implements OnModuleInit {
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(UserVip) private readonly userVipRepo: Repository<UserVip>,
     private readonly dataSource: DataSource,
+    private readonly cpService: CpService,
     private readonly tasksService: TasksService,
     @Optional() private readonly realtime?: RealtimeGateway,
     @Optional()
@@ -2541,6 +2543,18 @@ export class GiftsService implements OnModuleInit {
     }).then(async (result) => {
       // An idempotent replay must not repeat progress, scoring, or realtime effects.
       if (result?.alreadyProcessed) return result;
+      // Credit shared CB points only after the gift row and wallet transaction committed.
+      // The CP ledger uses giftSendId as its idempotency reference, so retries cannot double-award.
+      if (result.send?.id && result.send?.receiverId) {
+        await this.cpService.recordGiftInteraction(
+          senderId,
+          result.send.receiverId,
+          result.send.id,
+          Number(result.send.totalCoins || totalCoins),
+        ).catch((err) => {
+          this.log.warn(`CP gift progress failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }
       const taskRoom = dto.roomId
         ? await this.roomsRepo.findOne({ where: { id: dto.roomId } })
         : null;
