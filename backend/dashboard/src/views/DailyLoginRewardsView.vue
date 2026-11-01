@@ -14,7 +14,7 @@
     <div v-if="loading" class="loading">جارٍ تحميل المكافآت…</div>
     <section v-else class="reward-panel">
       <header class="panel-title"><div><span class="eyebrow">DAILY REWARDS · 7 DAYS</span><h2>مكافآت الأسبوع</h2><p>اختر عملات أو عنصرًا تجميليًا من المتجر لكل يوم. تظهر المعاينة كما ستُعرض للمستخدم.</p></div><span class="week-chip"><i class="bi bi-calendar-week"></i> ٧ أيام</span></header>
-      <DailyLoginVisualEditor v-model="theme" :days="days" :cosmetics="cosmetics" />
+      <DailyLoginVisualEditor ref="visualEditor" v-model="theme" :days="days" :cosmetics="cosmetics" />
       <div class="reward-grid">
         <article v-for="(day, idx) in days" :key="day.day" class="reward-card">
           <div class="reward-card-top"><span class="day-pill">اليوم {{ day.day }}</span><span class="card-number">{{ String(day.day).padStart(2,'0') }}</span></div>
@@ -68,6 +68,7 @@ import DailyLoginVisualEditor from '@/components/DailyLoginVisualEditor.vue'
 
 const defaultTheme = () => ({ backgroundColor:'#dff0b8',backgroundImageUrl:'',overlayColor:'#ffffff',overlayOpacity:0.12,logoUrl:'',title:'مكافآت تسجيل الدخول لمدة 7 أيام',titleColor:'#176b32',titleSize:28,titleTop:24,headerGap:14,cardColor:'#fffef4',cardBorderColor:'#e8efcf',cardRadius:20,cardGap:12,cardImageSize:76,cardLabelSize:16,buttonText:'تسجيل الدخول',buttonColor:'#168b36',buttonTextColor:'#ffffff',buttonRadius:64,buttonHeight:64,buttonBottom:20,contentTop:18,contentGap:16,fontFamily:'default' })
 const theme = ref(defaultTheme())
+const visualEditor = ref(null)
 const enabled = ref(true)
 const loading = ref(true)
 const saving = ref(false)
@@ -119,6 +120,7 @@ function choose(item) {
   pickerOpen.value = false; clearNotices()
 }
 async function save() {
+  visualEditor.value?.flush()
   saving.value = true; clearNotices()
   const submitted = { enabled: enabled.value, theme: { ...theme.value }, days: days.value.map((d,i) => ({ ...d, day:i+1, amount:Math.max(0,Math.floor(Number(d.amount)||0)), durationDays:Math.max(1,Math.min(365,Math.floor(Number(d.durationDays)||7))), cosmeticCode:String(d.cosmeticCode||'').trim() })) }
   const { error: err } = await dailyLoginRewardsApi.save(submitted)
