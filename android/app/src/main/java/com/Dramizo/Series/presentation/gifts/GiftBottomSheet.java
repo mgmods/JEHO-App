@@ -471,7 +471,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                                     "ألفة %,d · الهدف %,d", st.bondScore, st.nextLevelAt));
                         } else {
                             desc.setText(String.format(java.util.Locale.US,
-                                    "ألفة %,d · أعلى مستوى", st.bondScore));
+                                    "ألفة %,d", st.bondScore));
                         }
                     }
                     if (bar != null) {
