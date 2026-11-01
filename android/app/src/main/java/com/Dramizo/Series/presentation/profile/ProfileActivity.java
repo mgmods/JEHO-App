@@ -949,6 +949,16 @@ public class ProfileActivity extends ThemedActivity {
         return null;
     }
 
+    private static String firstNonEmptyValue(Object... values) {
+        if (values == null) return null;
+        for (Object value : values) {
+            if (value == null) continue;
+            String text = String.valueOf(value).trim();
+            if (!text.isEmpty() && !"null".equalsIgnoreCase(text)) return text;
+        }
+        return null;
+    }
+
     private void showCpRequestDialog(String recipientId) {
         final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
         final String[] labels = {"الصداقة", "الأخوّة", "الحب", "الخطوبة", "الزواج"};
@@ -1141,23 +1151,23 @@ public class ProfileActivity extends ThemedActivity {
                 binding.tvProfileCpCvHeart.setText("♥");
                 Object presentationObject = relation.get("presentation");
                 Map<?, ?> levelPresentation = presentationObject instanceof Map ? (Map<?, ?>) presentationObject : java.util.Collections.emptyMap();
-                Object cardBackground = firstNonEmpty(
+                String cardBackground = firstNonEmptyValue(
                         levelPresentation.get("cardBackgroundUrl"),
                         relation.get("cardBackgroundUrl"));
-                applyCpCardBackground(cardBackground == null ? "" : String.valueOf(cardBackground));
-                Object levelTitleValue = firstNonEmpty(
+                applyCpCardBackground(cardBackground == null ? "" : cardBackground);
+                String levelTitleValue = firstNonEmptyValue(
                         relation.get("profileTitle"),
                         relation.get("levelName"),
                         levelPresentation.get("title"));
-                String levelTitle = levelTitleValue == null ? "" : String.valueOf(levelTitleValue).trim();
+                String levelTitle = levelTitleValue == null ? "" : levelTitleValue;
                 binding.tvProfileCpCvLevel.setText(levelTitle.isEmpty() ? "Lv." + relationshipLevel : levelTitle);
-                Object levelBadgeValue = firstNonEmpty(
+                String levelBadgeValue = firstNonEmptyValue(
                         relation.get("levelLogoUrl"),
                         relation.get("levelBadgeUrl"),
                         levelPresentation.get("levelLogoUrl"),
                         levelPresentation.get("logoUrl"),
                         levelPresentation.get("badgeUrl"));
-                String levelBadgeUrl = levelBadgeValue == null ? "" : String.valueOf(levelBadgeValue).trim();
+                String levelBadgeUrl = levelBadgeValue == null ? "" : levelBadgeValue;
                 if (binding.imgProfileCpLevelBadge != null) {
                     if (!levelBadgeUrl.isEmpty()) {
                         binding.imgProfileCpLevelBadge.setVisibility(View.VISIBLE);
