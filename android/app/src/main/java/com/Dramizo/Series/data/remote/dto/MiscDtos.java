@@ -214,6 +214,7 @@ public final class MiscDtos {
         @SerializedName("dmRequiredGiftId") public String dmRequiredGiftId;
         @SerializedName("albumUrls") public java.util.List<String> albumUrls;
         @SerializedName("displayedMedalIds") public java.util.List<String> displayedMedalIds;
+        @SerializedName("mysteriousMode") public Boolean mysteriousMode;
 
         public UpdateProfileRequest() {}
 
