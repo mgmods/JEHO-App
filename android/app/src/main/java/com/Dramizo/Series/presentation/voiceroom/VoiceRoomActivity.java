@@ -8261,12 +8261,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 final String partnerFrameUrl = cpFrame == null ? "" : cpFrame.trim();
                 final String relationshipType = type;
                 final String partnerName = cpName == null ? "" : cpName;
+                Object cpLevelTitleValue = rel.get("profileTitle");
+                if (cpLevelTitleValue == null || String.valueOf(cpLevelTitleValue).trim().isEmpty()) cpLevelTitleValue = rel.get("levelName");
+                final String cpLevelTitle = cpLevelTitleValue == null ? "Lv." + rel.getOrDefault("level", 1) : String.valueOf(cpLevelTitleValue);
+                final String cpDurationLabel = rel.get("durationLabel") == null ? "" : String.valueOf(rel.get("durationLabel"));
                 runOnUiThread(() -> {
                     // Network may return before the bottom-sheet Window exists; still bind the views.
                     if (isFinishing() || isDestroyed()) return;
                     if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.VISIBLE);
                     if (tvCpRelationship != null) tvCpRelationship.setText(roomCpTypeLabel(relationshipType)
-                            + (partnerName.isEmpty() ? "" : " · " + partnerName));
+                            + (partnerName.isEmpty() ? "" : " · " + partnerName)
+                            + " · " + cpLevelTitle
+                            + (cpDurationLabel.isEmpty() ? "" : " · معاً منذ " + cpDurationLabel));
                     String resolvedPartnerAvatar = partnerAvatarUrl.isEmpty() ? null : AssetCatalog.absoluteUrl(partnerAvatarUrl);
                     if (imgCpPartnerAvatar != null) Glide.with(VoiceRoomActivity.this).load(resolvedPartnerAvatar)
                             .placeholder(R.drawable.ic_tab_me).error(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
