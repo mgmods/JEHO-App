@@ -162,9 +162,12 @@ public final class UserProfileCardSheet {
         if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
         if (cpTopPartnerWrap != null) cpTopPartnerWrap.setVisibility(View.GONE);
         if (tvCpTopHeart != null) tvCpTopHeart.setVisibility(View.GONE);
+        // CP relationships are started only by sending a configured CP gift.
+        // Hide the legacy profile action for every profile (including older layouts).
         if (actCpRequest != null) {
-            actCpRequest.setVisibility(uid.equals(myId) ? View.GONE : View.VISIBLE);
-            actCpRequest.setOnClickListener(v -> showCpRequestDialog(activity, container, uid, dialog));
+            actCpRequest.setVisibility(View.GONE);
+            actCpRequest.setOnClickListener(null);
+            actCpRequest.setClickable(false);
         }
         if (uid != null && !uid.trim().isEmpty()) {
             container.getIoExecutor().execute(() -> {
