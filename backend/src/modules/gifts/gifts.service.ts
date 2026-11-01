@@ -260,6 +260,10 @@ export class GiftsService implements OnModuleInit {
       await this.dataSource.query(
         `UPDATE gifts SET \"cpRelationshipType\"='love' WHERE category='cp' AND COALESCE(\"cpRelationshipType\",'')=''`,
       );
+      await this.dataSource.query(
+        `UPDATE gifts g SET \"cpRelationshipType\" = regexp_replace(s.key, '^cp\\.gift\\.', '')
+         FROM app_settings s WHERE s.key LIKE 'cp.gift.%' AND s.value = g.id::text`,
+      );
     } catch (err) {
       this.log.warn(`ensureCpGiftColumns: ${err instanceof Error ? err.message : String(err)}`);
     }
