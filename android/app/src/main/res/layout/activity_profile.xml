@@ -475,10 +475,12 @@
 
                         <ImageView
                             android:id="@+id/imgCpLevelIcon"
-                            android:layout_width="24dp"
+                            android:layout_width="wrap_content"
                             android:layout_height="24dp"
                             android:layout_marginStart="7dp"
-                            android:contentDescription="مستوى CP"
+                            android:adjustViewBounds="true"
+                            android:maxWidth="72dp"
+                            android:contentDescription="أيقونة مستوى CP"
                             android:scaleType="fitCenter"
                             android:visibility="gone" />
 
