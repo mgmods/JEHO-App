@@ -466,9 +466,13 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                             hascpLayout != null ? hascpLayout.findViewById(R.id.has_cp_right) : null;
                     if (lv != null) lv.setText("LV." + Math.max(0, st.level));
                     if (desc != null) {
-                        long next = Math.max(st.nextLevelAt, st.level * 500L);
-                        desc.setText(String.format(java.util.Locale.US,
-                                "ألفة %,d · الهدف %,d", st.bondScore, next));
+                        if (st.nextLevelAt > 0) {
+                            desc.setText(String.format(java.util.Locale.US,
+                                    "ألفة %,d · الهدف %,d", st.bondScore, st.nextLevelAt));
+                        } else {
+                            desc.setText(String.format(java.util.Locale.US,
+                                    "ألفة %,d · أعلى مستوى", st.bondScore));
+                        }
                     }
                     if (bar != null) {
                         bar.setMax(100);
