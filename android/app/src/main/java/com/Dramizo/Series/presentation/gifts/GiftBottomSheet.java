@@ -1171,9 +1171,10 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 }
             }
             if (result.success && isAdded()) {
+                final boolean resolvedGiftTabEnabled = configuredGiftTabEnabled;
                 requireActivity().runOnUiThread(() -> {
                     if (!isAdded()) return;
-                    cpGiftTabEnabled = configuredGiftTabEnabled;
+                    cpGiftTabEnabled = resolvedGiftTabEnabled;
                     cpGiftTypes.clear();
                     cpGiftTypes.putAll(mappings);
                     cpGiftPrices.clear();
