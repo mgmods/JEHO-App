@@ -113,6 +113,11 @@ export class UpdateProfileDto {
   @IsString({ each: true })
   displayedMedalIds?: string[];
 
+  @ApiPropertyOptional({ description: 'Enable eligible VIP mysterious-man identity in room events' })
+  @IsOptional()
+  @IsBoolean()
+  mysteriousMode?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
