@@ -106,6 +106,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable private android.widget.ImageView wealthLevelFrame;
     @Nullable private View noCpLayout;
     @Nullable private View hascpLayout;
+    // CP level strip is hosted as a sibling overlay above the bottom-sheet surface.
+    @Nullable private FrameLayout cpOverlayHost;
+    @Nullable private android.view.ViewTreeObserver.OnGlobalLayoutListener cpOverlayPositionListener;
 
     // ─── Factory ──────────────────────────────────────────────────────────────
 
@@ -152,6 +155,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             FrameLayout sheet =
                     dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (sheet == null) return;
+            attachCpProgressOverlay(dialog, sheet);
 
             // Same as room settings: hug content — no forced tall empty sheet.
             sheet.setBackgroundColor(
@@ -343,7 +347,69 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         wealthLevelAvatar = root.findViewById(R.id.iv_level);
         wealthLevelFrame = root.findViewById(R.id.iv_level_frame);
         noCpLayout = root.findViewById(R.id.no_cp_layout);
-        hascpLayout = root.findViewById(R.id.hascp_layout);
+        // Inflate separately; it must not be a child of the gift sheet content.
+        hascpLayout = LayoutInflater.from(requireContext()).inflate(
+                R.layout.room_gift_hascp_layout, (ViewGroup) root, false);
+    }
+
+    /** Attach the CP progress strip outside the bottom-sheet surface, above its top edge. */
+    private void attachCpProgressOverlay(BottomSheetDialog dialog, FrameLayout sheet) {
+        if (hascpLayout == null || dialog.getWindow() == null) return;
+        View decorView = dialog.getWindow().getDecorView();
+        if (!(decorView instanceof ViewGroup)) return;
+        ViewGroup decor = (ViewGroup) decorView;
+        ViewGroup oldParent = hascpLayout.getParent() instanceof ViewGroup
+                ? (ViewGroup) hascpLayout.getParent() : null;
+        if (oldParent != null) oldParent.removeView(hascpLayout);
+        cpOverlayHost = new FrameLayout(requireContext());
+        cpOverlayHost.setClipChildren(false);
+        cpOverlayHost.setClipToPadding(false);
+        cpOverlayHost.setClickable(false);
+        cpOverlayHost.setFocusable(false);
+        cpOverlayHost.setElevation(dp(24));
+        decor.addView(cpOverlayHost, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        FrameLayout.LayoutParams stripParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cpOverlayHost.addView(hascpLayout, stripParams);
+        hascpLayout.setVisibility(View.GONE);
+        cpOverlayPositionListener = () -> {
+            if (cpOverlayHost == null || hascpLayout == null || sheet.getWindowToken() == null) return;
+            int[] sheetLocation = new int[2];
+            int[] decorLocation = new int[2];
+            sheet.getLocationOnScreen(sheetLocation);
+            decorView.getLocationOnScreen(decorLocation);
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) hascpLayout.getLayoutParams();
+            lp.width = sheet.getWidth();
+            lp.leftMargin = sheetLocation[0] - decorLocation[0];
+            lp.topMargin = Math.max(0, sheetLocation[1] - decorLocation[1]
+                    - hascpLayout.getMeasuredHeight() - dp(6));
+            hascpLayout.setLayoutParams(lp);
+            cpOverlayHost.bringToFront();
+        };
+        sheet.getViewTreeObserver().addOnGlobalLayoutListener(cpOverlayPositionListener);
+        cpOverlayHost.post(() -> {
+            if (cpOverlayPositionListener != null) cpOverlayPositionListener.onGlobalLayout();
+        });
+    }
+
+    private void removeCpProgressOverlay() {
+        if (cpOverlayPositionListener != null && binding != null) {
+            // The sheet may already be detached during teardown; removal is best-effort.
+            try {
+                View sheet = requireDialog().findViewById(com.google.android.material.R.id.design_bottom_sheet);
+                if (sheet != null && sheet.getViewTreeObserver().isAlive()) {
+                    sheet.getViewTreeObserver().removeOnGlobalLayoutListener(cpOverlayPositionListener);
+                }
+            } catch (Exception ignored) {}
+        }
+        cpOverlayPositionListener = null;
+        if (cpOverlayHost != null) {
+            ViewGroup parent = cpOverlayHost.getParent() instanceof ViewGroup
+                    ? (ViewGroup) cpOverlayHost.getParent() : null;
+            if (parent != null) parent.removeView(cpOverlayHost);
+        }
+        cpOverlayHost = null;
     }
 
     private void hideUnusedMikooPanels() {
@@ -365,7 +431,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (binding.flTop != null) binding.flTop.setVisibility(View.GONE);
             return;
         }
-        if (binding.flTop != null) binding.flTop.setVisibility(View.VISIBLE);
+        if (binding.flTop != null) binding.flTop.setVisibility(View.GONE);
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             Result<MiscDtos.CpStatusDto> r = ApiCall.execute(c.getUserApi().myCp());
@@ -1668,6 +1734,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         wealthLevelAvatar = null;
         wealthLevelFrame = null;
         noCpLayout = null;
+        removeCpProgressOverlay();
         hascpLayout = null;
         super.onDestroyView();
     }
