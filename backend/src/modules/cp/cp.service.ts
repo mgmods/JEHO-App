@@ -5,6 +5,7 @@ import { CpType } from '../../database/entities/cp-relationship.entity';
 import { CpRequestStatus } from '../../database/entities/cp-request.entity';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CosmeticsService } from '../cosmetics/cosmetics.service';
 
 const TYPES = new Set<string>(Object.values(CpType));
 const EXPIRY_MINUTES = 30;
@@ -18,6 +19,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     private readonly dataSource: DataSource,
     private readonly realtime: RealtimeGateway,
     private readonly notifications: NotificationsService,
+    private readonly cosmetics: CosmeticsService,
   ) {}
 
   async onModuleInit() {
@@ -32,6 +34,19 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         text varchar(500) NOT NULL DEFAULT '',
         "imageUrl" varchar(2048),
         "createdAt" timestamptz NOT NULL DEFAULT now()
+      )
+    `).catch(() => undefined);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS cp_level_reward_claims (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "relationshipId" uuid NOT NULL REFERENCES cp_relationships(id) ON DELETE CASCADE,
+        "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        level integer NOT NULL,
+        "cosmeticCode" varchar(64) NOT NULL,
+        status varchar(16) NOT NULL DEFAULT 'pending',
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "grantedAt" timestamptz,
+        UNIQUE ("relationshipId", level, "userId", "cosmeticCode")
       )
     `).catch(() => undefined);
     await this.dataSource.query(`
@@ -68,6 +83,59 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       ...item,
       rewardGift: byId.get(String(item?.rewardGiftId || '')) || null,
     }));
+  }
+
+  private async grantLevelCosmeticRewards(
+    relationshipId: string,
+    level: number,
+    userIds: string[],
+    levelConfig: Record<string, any> | null,
+  ) {
+    if (!levelConfig) return;
+    const benefits = [
+      ...(Array.isArray(levelConfig.benefits) ? levelConfig.benefits : []),
+      ...(Array.isArray(levelConfig.rewards) ? levelConfig.rewards : []),
+    ];
+    const candidates = [
+      ...(typeof levelConfig.rewardCosmeticCode === 'string' ? [{ code: levelConfig.rewardCosmeticCode, days: levelConfig.rewardDays, permanent: levelConfig.rewardPermanent }] : []),
+      ...benefits.filter((item: any) => item && typeof item === 'object' && typeof (item.cosmeticCode || item.code) === 'string')
+        .map((item: any) => ({ code: item.cosmeticCode || item.code, days: item.days, permanent: item.permanent })),
+    ];
+    const unique = Array.from(new Map(candidates.map(item => [String(item.code).trim(), item])).values())
+      .filter(item => /^[a-zA-Z0-9_-]{2,64}$/.test(String(item.code || '').trim()));
+    if (!unique.length) return;
+    const codes = unique.map(item => String(item.code).trim());
+    const available = await this.dataSource.query(
+      'SELECT id,code FROM cosmetics WHERE code=ANY($1::text[]) AND "isActive"=true',
+      [codes],
+    );
+    const availableCodes = new Set(available.map((item: any) => String(item.code)));
+    for (const userId of userIds) {
+      for (const reward of unique) {
+        const code = String(reward.code).trim();
+        if (!availableCodes.has(code)) continue;
+        const [claim] = await this.dataSource.query(
+          `INSERT INTO cp_level_reward_claims ("relationshipId","userId",level,"cosmeticCode",status)
+           VALUES ($1,$2,$3,$4,'pending')
+           ON CONFLICT ("relationshipId",level,"userId","cosmeticCode") DO NOTHING
+           RETURNING id`,
+          [relationshipId, userId, level, code],
+        );
+        if (!claim?.id) continue;
+        try {
+          const days = Math.max(1, Math.min(365, Math.floor(Number(reward.days || levelConfig.rewardDays) || 30)));
+          await this.cosmetics.grantTemporary(userId, code, days, { permanent: reward.permanent === true || levelConfig.rewardPermanent === true });
+          await this.dataSource.query(
+            'UPDATE cp_level_reward_claims SET status=$1,"grantedAt"=now() WHERE id=$2',
+            ['granted', claim.id],
+          );
+        } catch (error) {
+          await this.dataSource.query('DELETE FROM cp_level_reward_claims WHERE id=$1', [claim.id]).catch(() => undefined);
+          // A cosmetic reward must never roll back the already-earned relationship points.
+          console.warn('[CB] level cosmetic reward delivery failed', code, error);
+        }
+      }
+    }
   }
 
   async catalog() {
@@ -1191,6 +1259,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         const levels = JSON.parse(levelsSetting?.value || '[]');
         currentLevelConfig = Array.isArray(levels) ? levels.find(item => Number(item?.level) === Number(result.level)) || null : null;
       } catch { currentLevelConfig = null; }
+      await this.grantLevelCosmeticRewards(
+        relationshipId,
+        Number(result.level),
+        [relationship.userAId, relationship.userBId].filter(Boolean),
+        currentLevelConfig,
+      );
       const payload = {
         type: 'cp_level_up', relationshipId, level: result.level,
         previousLevel: result.previousLevel, points: result.points,
