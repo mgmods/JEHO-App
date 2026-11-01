@@ -151,7 +151,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         );
         if (claim?.id) {
           try {
-            await this.badges.grantForTask(userId, badgeId, Math.max(0, Math.min(3650, Math.floor(Number(levelConfig.rewardBadgeDays ?? levelConfig.rewardDays) || 0))), 'cp_level', true);
+            await this.badges.grantForTask(userId, badgeId, levelConfig.rewardPermanent === true ? 0 : Math.max(1, Math.min(3650, Math.floor(Number(levelConfig.rewardBadgeDays ?? levelConfig.rewardDays) || 30))), 'cp_level', true);
             await this.dataSource.query(
               'UPDATE cp_level_reward_claims SET status=$1,"grantedAt"=now() WHERE id=$2',
               ['granted', claim.id],
