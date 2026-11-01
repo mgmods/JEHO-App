@@ -209,6 +209,17 @@ export class CpAdminController {
           );
           if (!rewardCosmetic) throw new BadRequestException('اختر مكافأة تجميلية نشطة من كتالوج المتجر');
         }
+        if (level.rewardBadgeId !== undefined && level.rewardBadgeId !== '') {
+          if (typeof level.rewardBadgeId !== 'string' ||
+              !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(level.rewardBadgeId)) {
+            throw new BadRequestException('معرّف شارة مكافأة مستوى CP غير صالح');
+          }
+          const [rewardBadge] = await this.dataSource.query(
+            'SELECT id FROM badges WHERE id=$1 AND "isActive"=true LIMIT 1',
+            [level.rewardBadgeId],
+          );
+          if (!rewardBadge) throw new BadRequestException('اختر شارة نشطة من قسم الشارات في الداشبورد');
+        }
         if (level.rewardDays !== undefined && (!Number.isInteger(Number(level.rewardDays)) || Number(level.rewardDays) < 1 || Number(level.rewardDays) > 365)) {
           throw new BadRequestException('مدة مكافأة مستوى CB يجب أن تكون بين يوم و365 يوماً');
         }
