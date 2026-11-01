@@ -232,6 +232,7 @@ public class HomeMeFragment extends Fragment {
                         if (binding == null || !isAdded()) return;
                         button.setEnabled(true);
                         if (saved && fresh != null) {
+                            me.mysteriousMode = fresh.mysteriousMode;
                             binding.switchMysteriousMode.setChecked(fresh.mysteriousMode);
                             Toast.makeText(requireContext(),
                                     fresh.mysteriousMode ? "تم تفعيل هوية الرجل الغامض" : "تم إيقاف هوية الرجل الغامض",
