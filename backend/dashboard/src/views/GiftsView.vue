@@ -234,8 +234,8 @@
                   </div>
                   <div class="col-md-4">
                     <label class="form-label">نقاط مستوى CP لكل هدية</label>
-                    <input v-model.number="form.cpPoints" type="number" min="0" max="1000000000" step="1" class="form-control" />
-                    <div class="form-text">تُضاف للعلاقة القائمة عند تبادل الهدية وتُضرب بعدد النسخ. اتركها فارغة لاستخدام نقاط نوع العلاقة الافتراضية.</div>
+                    <input v-model.number="form.cpPoints" type="number" min="0" max="1000000000" step="1" class="form-control" required />
+                    <div class="form-text">تُحدد هذه القيمة لكل نسخة من الهدية. تُضاف عند إرسالها بين شريكين مرتبطين، وتُسجل هدية البدء عند قبول طلب الارتباط.</div>
                   </div>
                 </template>
                 <template v-if="form.type === 'lucky'">
@@ -483,7 +483,7 @@ const form = reactive({
   type: 'normal',
   category: 'normal',
   cpRelationshipType: 'love',
-  cpPoints: '',
+  cpPoints: 0,
   iconUrl: '',
   animationUrl: '',
   sortOrder: 0,
@@ -571,7 +571,7 @@ function openCreate() {
     type: 'normal',
     category: giftSection.value === 'cp' ? 'cp' : (activeCategories.value[0]?.key || 'normal'),
     cpRelationshipType: 'love',
-    cpPoints: '',
+    cpPoints: 0,
     iconUrl: '',
     animationUrl: '',
     sortOrder: 0,
@@ -594,7 +594,7 @@ function openEdit(g) {
     type: g.type || 'normal',
     category: g.category || g.type || 'normal',
     cpRelationshipType: g.cpRelationshipType || 'love',
-    cpPoints: g.cpPoints == null ? '' : Number(g.cpPoints),
+    cpPoints: g.cpPoints == null ? 0 : Number(g.cpPoints),
     iconUrl: g.iconUrl || '',
     animationUrl: g.animationUrl || '',
     sortOrder: g.sortOrder || 0,
@@ -689,9 +689,9 @@ async function save() {
     type: form.type || 'normal',
     category: form.category || form.type || 'normal',
     cpRelationshipType: String(form.cpRelationshipType || 'love'),
-    cpPoints: form.cpPoints === '' || form.cpPoints == null
-      ? undefined
-      : Math.max(0, Math.floor(Number(form.cpPoints) || 0)),
+    cpPoints: String(form.category || '').toLowerCase() === 'cp'
+      ? Math.max(0, Math.floor(Number(form.cpPoints) || 0))
+      : undefined,
     sortOrder: Number(form.sortOrder) || 0,
     isActive: form.status === 'active',
     luckyConfig:
