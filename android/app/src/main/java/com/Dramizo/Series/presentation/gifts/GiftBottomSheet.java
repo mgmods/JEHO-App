@@ -91,6 +91,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable private TabLayoutMediator tabMediator;
     @Nullable private ViewPager2.OnPageChangeCallback giftPageChangeCallback;
     @Nullable private TabLayout.OnTabSelectedListener giftTabListener;
+    @Nullable private RealtimeClient.UserListener cpConfigListener;
     private boolean syncingTabs;
     @Nullable private ProgressBar loadingBar;
     @Nullable private PopupWindow qtyPopup;
@@ -298,6 +299,19 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         vm.getCategories().observe(getViewLifecycleOwner(), this::applyCategories);
 
         vm.getCoinsBalance().observe(getViewLifecycleOwner(), this::bindCoins);
+
+        cpConfigListener = new RealtimeClient.UserListener() {
+            @Override public void onUserEvent(String event, com.google.gson.JsonObject payload) {
+                if (!"cp:config-updated".equals(event)) return;
+                android.app.Activity host = getActivity();
+                if (host == null || host.isFinishing()) return;
+                host.runOnUiThread(() -> {
+                    if (binding == null || !isAdded() || getActivity() != host) return;
+                    loadCpGiftMappings();
+                });
+            }
+        };
+        RealtimeClient.getInstance().addUserListener(cpConfigListener);
 
         // Clear sticky so observe does not immediately re-run last room/DM send.
         vm.clearSent();
@@ -1764,6 +1778,10 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     public void onDestroyView() {
         dismissQtyPopup();
         clearSeatGiftSelection();
+        if (cpConfigListener != null) {
+            RealtimeClient.getInstance().removeUserListener(cpConfigListener);
+            cpConfigListener = null;
+        }
         if (binding != null && giftPageChangeCallback != null) {
             try { binding.vpGiftListContainer.unregisterOnPageChangeCallback(giftPageChangeCallback); } catch (Exception ignored) {}
         }
