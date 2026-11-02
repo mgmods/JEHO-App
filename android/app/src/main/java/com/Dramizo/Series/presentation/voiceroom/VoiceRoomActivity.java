@@ -1902,6 +1902,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                     mergedConfig.put(String.valueOf(entry.getKey()), entry.getValue());
                                 }
                             }
+                            // The HTML is loaded from file:///android_asset; supply the active
+                            // JEHO API origin so /uploads and /assets reward thumbnails resolve
+                            // exactly like the dashboard's media resolver.
+                            try {
+                                Uri apiUri = Uri.parse(com.Dramizo.Series.BuildConfig.API_BASE_URL);
+                                if (apiUri.getScheme() != null && apiUri.getAuthority() != null) {
+                                    mergedConfig.put("assetBaseUrl",
+                                            apiUri.getScheme() + "://" + apiUri.getAuthority());
+                                }
+                            } catch (Exception ignored) { }
                             if (rawLevel instanceof Map) mergedConfig.put("currentLevel", rawLevel);
                             String configJson = new org.json.JSONObject(mergedConfig).toString();
                             String stateJson = rawState instanceof Map
