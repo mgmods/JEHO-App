@@ -93,6 +93,7 @@ public class HomeFragment extends Fragment {
     private String browseCountry;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private RealtimeClient.RoomListener roomListListener;
+    @Nullable private RealtimeClient.UserListener cpConfigListener;
     private final Runnable roomPkRefreshRunnable = new Runnable() {
         @Override public void run() {
             if (binding == null || !isAdded()) return;
@@ -1564,6 +1565,7 @@ public class HomeFragment extends Fragment {
     public void onResume() {
         super.onResume();
         refreshLocationTabChrome();
+        attachCpConfigListener();
         refreshHomeCpSummary();
         AppContainer c = ContainerProvider.from(requireActivity());
             c.getIoExecutor().execute(() -> {
@@ -1659,6 +1661,25 @@ public class HomeFragment extends Fragment {
         }
     }
 
+    private void attachCpConfigListener() {
+        if (cpConfigListener != null) return;
+        cpConfigListener = new RealtimeClient.UserListener() {
+            @Override public void onUserEvent(String event, JsonObject payload) {
+                if (!"cp:config-updated".equals(event)) return;
+                handler.post(() -> {
+                    if (binding != null && isAdded()) refreshHomeCpSummary();
+                });
+            }
+        };
+        RealtimeClient.getInstance().addUserListener(cpConfigListener);
+    }
+
+    private void detachCpConfigListener() {
+        if (cpConfigListener == null) return;
+        RealtimeClient.getInstance().removeUserListener(cpConfigListener);
+        cpConfigListener = null;
+    }
+
     private void attachRoomListRealtime() {
         if (roomListListener != null) return;
         roomListListener = new RealtimeClient.RoomListener() {
@@ -1714,6 +1735,7 @@ public class HomeFragment extends Fragment {
         handler.removeCallbacks(offersGiftAnimation);
         handler.removeCallbacks(bannerAutoScroll);
         detachRoomListRealtime();
+        detachCpConfigListener();
         super.onPause();
     }
 
