@@ -40,6 +40,7 @@ public class CpCenterActivity extends ThemedActivity {
     private AppContainer c;
     private final Gson gson = new Gson();
     private boolean pageReady;
+    @Nullable private com.Dramizo.Series.realtime.RealtimeClient.UserListener cpConfigListener;
     private String initialView = "home";
     private String initialType = "";
 
@@ -50,6 +51,18 @@ public class CpCenterActivity extends ThemedActivity {
             @Override public void handleOnBackPressed() { handleCpSystemBack(); }
         });
         c = ContainerProvider.from(this);
+        cpConfigListener = new com.Dramizo.Series.realtime.RealtimeClient.UserListener() {
+            @Override public void onUserEvent(String event, com.google.gson.JsonObject payload) {
+                if (!"cp:config-updated".equals(event)) return;
+                runOnUiThread(() -> {
+                    if (isFinishing() || web == null || !pageReady) return;
+                    loadHome();
+                    loadRequests();
+                    loadTasks();
+                });
+            }
+        };
+        com.Dramizo.Series.realtime.RealtimeClient.getInstance().addUserListener(cpConfigListener);
         initialView = safeView(getIntent().getStringExtra(EXTRA_VIEW));
         initialType = safeType(getIntent().getStringExtra(EXTRA_TYPE));
         web = new WebView(this);
@@ -381,6 +394,10 @@ public class CpCenterActivity extends ThemedActivity {
     }
 
     @Override protected void onDestroy() {
+        if (cpConfigListener != null) {
+            com.Dramizo.Series.realtime.RealtimeClient.getInstance().removeUserListener(cpConfigListener);
+            cpConfigListener = null;
+        }
         pageReady = false;
         if (web != null) {
             web.removeJavascriptInterface("JehoCP");
