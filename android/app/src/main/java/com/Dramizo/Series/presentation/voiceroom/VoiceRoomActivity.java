@@ -15200,7 +15200,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     "support-chest:" + roomId + ":" + (roomEventId == null ? "1" : roomEventId)
                             + ":" + (levelId == null ? "1" : levelId),
                     0d, 0L, winner, "support_chest", roomId);
-            RoomSoundFx.playLuckyGold(this, 2);
+            RoomSoundFx.playChestExplosion(this);
             return;
         }
         if ("challenge:wheel:closed".equals(event)) {
