@@ -2085,8 +2085,10 @@ export class GiftsService implements OnModuleInit {
       : (Array.isArray(config.giftIds) ? config.giftIds.map(String) : []);
     const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
     const eligibleGifts = allGifts.filter(gift => {
-      const cat = String(gift.category || '').toLowerCase() === 'cp' ? 'cp'
-        : (String(gift.type || '').toLowerCase() === 'lucky' || String(gift.category || '').toLowerCase() === 'lucky') ? 'lucky' : 'normal';
+      const rawCategory = String(gift.category || '').toLowerCase();
+      const cat = rawCategory === 'cp' ? 'cp'
+        : (String(gift.type || '').toLowerCase() === 'lucky' || rawCategory === 'lucky') ? 'lucky'
+        : rawCategory === 'normal' ? 'normal' : 'other';
       return allowedCategories.includes(cat) && (!selectedGiftIds.length || selectedGiftIds.includes(String(gift.id)));
     }).map(gift => ({
       id: gift.id, name: gift.name, iconUrl: gift.iconUrl,
@@ -2137,9 +2139,9 @@ export class GiftsService implements OnModuleInit {
       try { cfg = JSON.parse(cfgRow.value); } catch { return null; }
       if (cfg.enabled !== true) return null;
       const categoryRaw = String(giftCategory || '').toLowerCase();
-      const category = (String(giftType || '').toLowerCase() === 'lucky' || categoryRaw === 'lucky')
-        ? 'lucky'
-        : categoryRaw === 'cp' ? 'cp' : 'normal';
+      const category = categoryRaw === 'cp' ? 'cp'
+        : (String(giftType || '').toLowerCase() === 'lucky' || categoryRaw === 'lucky') ? 'lucky'
+        : categoryRaw === 'normal' ? 'normal' : 'other';
       const globalCategories = Array.isArray(cfg.giftCategories) ? cfg.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
       if (!globalCategories.includes(category)) return null;
       const globalGiftIds = Array.isArray(cfg.giftIds) ? cfg.giftIds.map(String) : [];
