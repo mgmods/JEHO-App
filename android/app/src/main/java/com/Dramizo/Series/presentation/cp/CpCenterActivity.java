@@ -367,6 +367,8 @@ public class CpCenterActivity extends ThemedActivity {
 
     @Override protected boolean wantsContentSystemPadding() { return false; }
 
+    @Override protected boolean wantsHomeOnRootBack() { return false; }
+
     private void handleCpSystemBack() {
         if (web == null || !pageReady) { finish(); return; }
         web.evaluateJavascript(
