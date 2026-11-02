@@ -50,7 +50,9 @@
           <div v-for="(reward, rewardIndex) in level.rewards" :key="rewardIndex" class="reward-line">
             <label class="field">نوع المكافأة<select v-model="reward.type"><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="vip">VIP</option><option value="frame">إطار</option><option value="badge">شارة</option></select></label>
             <label class="field">الكمية / المدة<input v-model.number="reward.amount" type="number" min="1"></label>
-            <label class="field">معرّف العنصر أو VIP Plan ID<input v-model="reward.itemId" placeholder="معرّف الإطار أو الشارة أو خطة VIP"></label>
+            <label v-if="reward.type === 'frame'" class="field">الإطار<select v-model="reward.itemId"><option value="">اختر الإطار</option><option v-for="item in frameItems" :key="item.id" :value="item.id">{{ itemName(item) }}</option></select></label>
+            <label v-else-if="reward.type === 'vip'" class="field">خطة VIP<select v-model="reward.itemId"><option value="">اختر خطة VIP</option><option v-for="plan in catalogVipPlans" :key="plan.id" :value="plan.id">{{ plan.name || ('VIP '+plan.level) }}</option></select></label>
+            <label v-else-if="reward.type === 'badge'" class="field">معرّف الشارة<input v-model="reward.itemId" placeholder="Badge ID"></label>
             <button type="button" class="btn btn-danger" @click="level.rewards.splice(rewardIndex,1)">إزالة</button>
           </div>
           <p class="muted">المعاينة:</p>
@@ -84,10 +86,10 @@
 </template>
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { supportChestApi, giftsApi, cosmeticsApi } from '@/api'
+import { supportChestApi, giftsApi, cosmeticsApi, vipApi } from '@/api'
 import { resolveAsset } from '@/utils/assets'
 const form = reactive({ enabled:false, iconVisible:true, goalMode:'coins', coinTarget:100000, diamondTarget:10000, giftIds:[], giftCategories:['normal','lucky','cp'], levels:[{level:1,title:'الصندوق الذهبي',goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:['normal','lucky','cp'],giftIds:[],imageUrl:'',rewards:[{type:'coins',amount:5000,itemId:''}]}], rewardType:'none', rewardItemId:'', rewardAmount:0, instructions:'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله يحصل مرسل الهدية الأخيرة على المكافأة.' })
-const catalogGifts=ref([]), catalogCosmetics=ref([]), catalogLoading=ref(false)
+const catalogGifts=ref([]), catalogCosmetics=ref([]), catalogVipPlans=ref([]), catalogLoading=ref(false)
 const saving=ref(false), error=ref(''), notice=ref('')
 function unwrap(r){const d=r?.data?.data ?? r?.data ?? r;return Array.isArray(d)?d:(Array.isArray(d?.items)?d.items:(Array.isArray(d?.data)?d.data:[]))}
 function itemName(item){return item?.nameAr || item?.labelAr || item?.name || item?.title || item?.code || 'عنصر'}
@@ -97,8 +99,9 @@ function isVideo(value){return /\.(mp4|webm)(\?|$)/i.test(String(value||''))}
 function addLevel(){const next=Math.max(0,...form.levels.map(x=>Number(x.level)||0))+1;form.levels.push({level:next,title:'المستوى '+next,goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:[...(form.giftCategories||['normal'])],giftIds:[],imageUrl:'',rewards:[{type:'coins',amount:5000,itemId:''}]})}
 function removeLevel(index){form.levels.splice(index,1);form.levels.forEach((x,i)=>x.level=i+1)}
 function addReward(level){level.rewards=level.rewards||[];level.rewards.push({type:'coins',amount:1000,itemId:''})}
-function rewardLabel(r){const names={coins:'كوينزات',diamonds:'ماسات',vip:'VIP',frame:'إطار',badge:'شارة',gift:'هدية'};return (names[r.type]||r.type)+' × '+(Number(r.amount)||1)+(r.itemId?' · '+r.itemId:'')}
+function rewardLabel(r){const names={coins:'كوينزات',diamonds:'ماسات',vip:'VIP',frame:'إطار',badge:'شارة'};const item=r.type==='frame'?frameItems.value.find(x=>String(x.id)===String(r.itemId)):r.type==='vip'?catalogVipPlans.value.find(x=>String(x.id)===String(r.itemId)):null;return (itemName(item)||names[r.type]||r.type)+' × '+(Number(r.amount)||1)}
 function toggleGift(id, checked){const key=String(id);form.giftIds=checked?[...new Set([...(form.giftIds||[]).map(String),key])]: (form.giftIds||[]).map(String).filter(x=>x!==key)}
+const frameItems = computed(()=>catalogCosmetics.value.filter(x=>/frame/i.test(String(x.type||x.category||''))))
 const rewardItems = computed(()=> {
   const all=catalogCosmetics.value
   if(form.rewardType==='gift')return catalogGifts.value
@@ -111,7 +114,7 @@ onMounted(async()=>{
   try{const r=await supportChestApi.getConfig();if(r?.error)throw r.error;const d=r?.data?.data ?? r?.data;if(!d||typeof d!=='object')throw new Error('Empty support chest config');Object.assign(form,d);form.giftIds=Array.isArray(d.giftIds)?d.giftIds.map(String):[];form.giftCategories=Array.isArray(d.giftCategories)?d.giftCategories:['normal','lucky','cp'];form.levels=Array.isArray(d.levels)&&d.levels.length?d.levels:[{level:1,title:'الصندوق الذهبي',goalMode:d.goalMode||'coins',coinTarget:d.coinTarget||100000,diamondTarget:d.diamondTarget||0,giftCount:1,giftCategories:form.giftCategories,giftIds:form.giftIds,imageUrl:'',rewards:[{type:d.rewardType||'coins',amount:d.rewardAmount||1000,itemId:d.rewardItemId||''}]}]}
   catch(e){error='تعذّر تحميل إعدادات صندوق الدعم من الخادم: '+String(e?.message||'خطأ غير معروف')}
   catalogLoading.value=true
-  try{const [g,c]=await Promise.all([giftsApi.list({limit:500}),cosmeticsApi.adminList({limit:500})]);catalogGifts.value=unwrap(g).filter(x=>x.isActive!==false);catalogCosmetics.value=unwrap(c).filter(x=>x.isActive!==false)}
+  try{const [g,c,vip]=await Promise.all([giftsApi.list({limit:500}),cosmeticsApi.adminList({limit:500}),vipApi.plans()]);catalogGifts.value=unwrap(g).filter(x=>x.isActive!==false);catalogCosmetics.value=unwrap(c).filter(x=>x.isActive!==false);catalogVipPlans.value=unwrap(vip).filter(x=>x.isActive!==false)}
   catch(e){if(!error.value)error='تعذّر تحميل كتالوج الهدايا والإطارات: '+String(e?.message||'خطأ غير معروف')}
   finally{catalogLoading.value=false}
 })
