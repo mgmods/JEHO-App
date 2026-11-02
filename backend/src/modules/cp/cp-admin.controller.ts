@@ -48,7 +48,7 @@ export class CpAdminController {
       try { return [row.key, JSON.parse(raw)]; } catch { return [row.key, raw]; }
     }));
     const types: Array<Record<string, unknown>> = [];
-    for (const type of Object.values(CpType)) {
+    for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] ?? null;
       const price = Number(settings[`cp.price.${type}`]);
       const [gift] = giftId ? await this.dataSource.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true', [giftId]) : [];
@@ -194,7 +194,7 @@ export class CpAdminController {
     @Param('type') type: CpType,
     @Body() body: CpTypeConfigDto,
   ) {
-    if (!Object.values(CpType).includes(type)) throw new BadRequestException('نوع CP غير صالح');
+    if (type !== CpType.RELATIONSHIP) throw new BadRequestException('نظام CP يعتمد نوع ارتباط واحداً فقط');
     if (body.priceCoins !== undefined && (!Number.isSafeInteger(body.priceCoins) || body.priceCoins < 0)) {
       throw new BadRequestException('سعر العملات يجب أن يكون عدداً صحيحاً غير سالب؛ الصفر يعطّل الشراء');
     }
