@@ -760,8 +760,34 @@ function canonicalJson(value) {
   }
   return value
 }
-function sameJson(a, b) { return JSON.stringify(canonicalJson(a)) === JSON.stringify(canonicalJson(b)) }
-function payloadOf(response) { return response?.data?.data ?? response?.data ?? response ?? {} }
+function decodeOuterJson(value) {
+  let decoded = value
+  for (let depth = 0; depth < 3 && typeof decoded === 'string'; depth += 1) {
+    const candidate = decoded.trim()
+    if (!candidate) break
+    try { decoded = JSON.parse(candidate) } catch { break }
+  }
+  return decoded
+}
+function sameJson(a, b) {
+  return JSON.stringify(canonicalJson(decodeOuterJson(a))) === JSON.stringify(canonicalJson(decodeOuterJson(b)))
+}
+function payloadOf(response) {
+  let value = response
+  // safeRequest already unwraps the normal Nest envelope, but accept one or
+  // more legacy { data: ... } wrappers so a transport envelope is never
+  // mistaken for the persisted CP configuration itself.
+  for (let depth = 0; depth < 3 && value && typeof value === 'object'; depth += 1) {
+    if (value.error) return value
+    if (value.success === true && 'data' in value) { value = value.data; continue }
+    if ('data' in value && Object.keys(value).every(key => ['data', 'error', 'status', 'headers', 'config'].includes(key))) {
+      value = value.data
+      continue
+    }
+    break
+  }
+  return value || {}
+}
 
 async function load() {
   loading.value = true; error.value = ''; success.value = ''
@@ -1016,19 +1042,22 @@ async function saveType(item) {
     const persistedType = Array.isArray(persistedConfig?.types)
       ? persistedConfig.types.find(entry => entry.type === item.type)
       : null
-    const persistedMatches =
-      persistedType &&
-      Array.isArray(persistedType.levels) &&
-      sameJson(persistedType.levels, payload.levels) &&
-      String(persistedType.giftId || persistedType.gift?.id || '') === String(payload.giftId || '') &&
-      Number(persistedType.giftPoints || 0) === Number(payload.giftPoints || 0) &&
-      Number(persistedType.giftInteractionPoints || 0) === Number(payload.giftInteractionPoints || 0) &&
-      (payload.maxLevel === undefined || Number(persistedType.maxLevel || 0) === Number(payload.maxLevel)) &&
-      (payload.priceCoins === undefined || Number(persistedType.priceCoins || 0) === Number(payload.priceCoins)) &&
-      sameJson(persistedType.rules || {}, payload.rules || {})
-    if (!persistedMatches) {
-      throw new Error('أعاد الخادم إعدادات CP لا تطابق ما أرسلناه (المستويات أو الهدية أو النقاط أو السعر أو التصميم). لم نعرض نجاحاً غير مؤكد؛ أعد المحاولة بعد مراجعة البيانات.')
+    const persistedLevels = decodeOuterJson(persistedType?.levels)
+    const persistedRules = decodeOuterJson(persistedType?.rules || {})
+    const mismatches = []
+    if (!Array.isArray(persistedLevels) || !sameJson(persistedLevels, payload.levels)) mismatches.push('المستويات والصور والمكافآت')
+    if (String(persistedType?.giftId || persistedType?.gift?.id || '') !== String(payload.giftId || '')) mismatches.push('هدية CP')
+    if (Number(persistedType?.giftPoints || 0) !== Number(payload.giftPoints || 0)) mismatches.push('نقاط الهدية')
+    if (Number(persistedType?.giftInteractionPoints || 0) !== Number(payload.giftInteractionPoints || 0)) mismatches.push('نقاط التفاعل')
+    if (payload.maxLevel !== undefined && Number(persistedType?.maxLevel || 0) !== Number(payload.maxLevel)) mismatches.push('الحد الأعلى للمستوى')
+    if (payload.priceCoins !== undefined && Number(persistedType?.priceCoins || 0) !== Number(payload.priceCoins > 0 ? payload.priceCoins : 0)) mismatches.push('السعر')
+    if (!sameJson(persistedRules || {}, payload.rules || {})) mismatches.push('التصميم والمؤثرات')
+    if (!persistedType || mismatches.length) {
+      throw new Error('تعذر تأكيد حفظ إعدادات CP. الحقول التي لم تتطابق بعد إعادة القراءة: ' + (mismatches.join('، ') || 'نوع CP') + '. لم نعرض نجاحاً غير مؤكد.')
     }
+    // Use the decoded canonical values for the editor after a verified save.
+    persistedType.levels = persistedLevels
+    persistedType.rules = persistedRules
 
     // Update this editor from the verified authoritative response. Do not call
     // load() here: it also waits for unrelated request/audit logs and the cosmetic
