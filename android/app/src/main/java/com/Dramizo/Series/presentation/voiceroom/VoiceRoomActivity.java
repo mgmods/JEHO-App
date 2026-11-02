@@ -15310,7 +15310,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     "support-chest:" + roomId + ":" + (roomEventId == null ? "1" : roomEventId)
                             + ":" + (levelId == null ? "1" : levelId),
                     0d, 0L, null, "support_chest", roomId);
-            RoomSoundFx.playChestExplosion(this);
+            boolean chestSoundEnabled = !payload.has("soundEnabled")
+                    || payload.get("soundEnabled").isJsonNull()
+                    || payload.get("soundEnabled").getAsBoolean();
+            if (chestSoundEnabled) RoomSoundFx.playChestExplosion(this);
             return;
         }
         if ("challenge:wheel:closed".equals(event)) {
