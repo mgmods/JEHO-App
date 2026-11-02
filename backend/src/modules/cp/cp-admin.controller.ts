@@ -7,6 +7,7 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators';
 import { CpType } from '../../database/entities/cp-relationship.entity';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(item => canonicalJson(item)).join(',')}]`;
@@ -34,7 +35,7 @@ class CpTypeConfigDto {
 @Controller('admin/cp')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class CpAdminController {
-  constructor(private readonly dataSource: DataSource, private readonly cp: CpService) {}
+  constructor(private readonly dataSource: DataSource, private readonly cp: CpService, private readonly realtime: RealtimeGateway) {}
 
   @Get('config')
   @ApiOperation({ summary: 'Read CP types and admin-configured prices, gifts, levels and rules' })
@@ -153,7 +154,9 @@ export class CpAdminController {
         [adminId, JSON.stringify({ keys: Object.keys(values), globallyEnabled: body.globallyEnabled ?? null })],
       );
     });
-    return this.getConfig();
+    const saved = await this.getConfig();
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp', updatedAt: new Date().toISOString() });
+    return saved;
   }
 
   @Patch('policy')
@@ -185,7 +188,9 @@ export class CpAdminController {
         [adminId, JSON.stringify({ keys: Object.keys(config) })],
       );
     });
-    return this.getConfig();
+    const saved = await this.getConfig();
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp', updatedAt: new Date().toISOString() });
+    return saved;
   }
 
   @Patch('config/:type')
@@ -356,6 +361,7 @@ export class CpAdminController {
         throw new InternalServerErrorException('لم تتطابق مستويات CB بعد إعادة قراءتها من قاعدة البيانات؛ لم يتم تأكيد الحفظ.');
       }
     }
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp', updatedAt: new Date().toISOString() });
     return savedConfig;
   }
 
