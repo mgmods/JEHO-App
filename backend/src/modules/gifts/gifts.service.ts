@@ -2114,7 +2114,7 @@ export class GiftsService implements OnModuleInit {
     const enrichedLevel = { ...currentLevel, rewards: rewardPreview, eligibleGifts };
     return {
       config: { ...config, eligibleGifts },
-      state: { ...state, currentLevel: currentLevel?.title || ('المستوى ' + (levelIndex + 1)) },
+      state: { ...state, level: levelIndex + 1, currentLevel: currentLevel?.title || ('المستوى ' + (levelIndex + 1)) },
       currentLevel: enrichedLevel,
     };
   }
