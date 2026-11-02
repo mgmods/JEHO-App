@@ -11009,10 +11009,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
         String who = displayName != null && !displayName.trim().isEmpty()
                 ? displayName.trim() : "مستخدم";
+        String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
         // Do not use the legacy mid-room ComingMsgView. Keep the compact top toast as the
         // visible announcement, so this path cannot silently degrade to chat-only output.
         GlobalCelebrationToast.show(
-                this, who, msg, avatarUrl, null,
+                this, who, msg, safeAvatar, null,
                 "room-result-" + who + "-" + System.currentTimeMillis(),
                 28, 0d, 0L, who, "lucky_hit", null);
         if (roomBannerEnabled()) appendGameCelebrationLine(msg, null);
@@ -11061,6 +11062,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     ) {
         if (areCelebrationPopupsMuted()) return;
         String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
+        String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
         String line = body != null && !body.isEmpty()
                 ? body
                 : (title != null ? title : "مبروك!");
@@ -11132,13 +11134,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Global event for this same room: keep the center-screen room presentation.
                 GlobalCelebrationToast.showRoomCenter(
                         this, who, body != null && !body.trim().isEmpty() ? body : chat,
-                        avatarUrl, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
+                        safeAvatar, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
                         who, "lucky_hit_high", targetRoomId);
             } else {
                 String toastKind = highWin ? "lucky_hit_high"
                         : (coins >= 1000L ? "lucky_hit_high" : "lucky_hit_normal");
                 GlobalCelebrationToast.show(
-                        this, who, chat, avatarUrl, badgeUrl, toastKey,
+                        this, who, chat, safeAvatar, badgeUrl, toastKey,
                         28, eventMultiplier, Math.max(0L, coins), who, toastKind, targetRoomId);
             }
             // Keep the room's existing chat announcement, but do not add a second visual bubble.
@@ -11645,6 +11647,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (wonCoins <= 0) return;
 
         String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
+        String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
         String line;
         if (multiplier > 0d && multiplier < 1d) {
             line = "مردود ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
@@ -11660,7 +11663,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (highWin && isWinner) {
             // The winner alone sees their personal dashboard-configured room toast.
             GlobalCelebrationToast.showRoomCenter(
-                    this, who, line, avatarUrl, null, key,
+                    this, who, line, safeAvatar, null, key,
                     Math.max(0d, multiplier), Math.max(0L, wonCoins), who,
                     "lucky_hit_high", roomId);
         } else {
@@ -11669,7 +11672,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String kind = highWin ? "lucky_hit_high"
                     : (multiplier > 0d && multiplier < 1d ? "lucky_hit_return" : "lucky_hit_normal");
             GlobalCelebrationToast.show(
-                    this, who, line, avatarUrl, null, key,
+                    this, who, line, safeAvatar, null, key,
                     28, Math.max(0d, multiplier), Math.max(0L, wonCoins), who, kind, roomId);
         }
     }
