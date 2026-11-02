@@ -2380,7 +2380,16 @@ export class GiftsService implements OnModuleInit {
           };
           this.realtime?.emitToUser(win.winnerId, 'gift:animation', giftPayload);
           this.realtime?.emitToRoom(roomId, 'room:event', {
-            roomId, event: 'support_chest:reward', payload: { ...giftPayload, profileId: winnerProfile?.userId || null },
+            roomId, event: 'gift:animation', payload: giftPayload,
+            from: { userId: win.winnerId }, at: giftPayload.at,
+          });
+          this.realtime?.emitToRoom(roomId, 'room:event', {
+            roomId, event: 'gift:send', payload: giftPayload,
+            from: { userId: win.winnerId }, at: giftPayload.at,
+          });
+          this.realtime?.emitToRoom(roomId, 'room:event', {
+            roomId, event: 'support_chest:reward',
+            payload: { ...giftPayload, profileId: winnerProfile?.userId || null },
             at: giftPayload.at,
           });
         }
