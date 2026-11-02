@@ -2242,11 +2242,11 @@ export class GiftsService implements OnModuleInit {
       // Keep this identical to support-chest.html, which treats a zero side as 100%.
       const coinReached = coinTarget > 0 && state.coins >= coinTarget;
       const diamondReached = diamondTarget > 0 && state.diamonds >= diamondTarget;
+      const coinTargetSatisfied = coinTarget <= 0 || coinReached;
+      const diamondTargetSatisfied = diamondTarget <= 0 || diamondReached;
       const countReached = state.giftCount >= Math.max(1, Number(levelCfg.giftCount) || 1);
       const targetReached = mode === 'both'
-        ? (coinTarget > 0 || diamondTarget > 0)
-          && (coinTarget <= 0 || coinReached)
-          && (diamondTarget <= 0 || diamondReached)
+        ? coinTargetSatisfied && diamondTargetSatisfied
         : mode === 'diamonds' ? diamondReached : coinReached;
       state.goalReached = targetReached && countReached;
       const contributor = await manager.getRepository(User).findOne({ where: { id: senderId } });
