@@ -994,9 +994,12 @@ async function saveFeatures() {
       seen.add(id)
       tasks[id] = { enabled: !!task.enabled, title: task.title.trim(), description: String(task.description || '').trim().slice(0, 240), condition: task.condition, target, rewardPoints, rewardCosmeticCode: String(task.rewardCosmeticCode || '').trim() }
     }
-    await cpAdminApi.updateFeatures({ globallyEnabled: !!cpFeatures.value.globallyEnabled, giftTabEnabled: !!cpFeatures.value.giftTabEnabled, tasks })
-    success.value = 'تم حفظ تشغيل قسم CP وإعدادات المهمات.'
+    const response = await cpAdminApi.updateFeatures({ globallyEnabled: !!cpFeatures.value.globallyEnabled, giftTabEnabled: !!cpFeatures.value.giftTabEnabled, tasks })
+    if (response?.error) throw new Error(response.error.message || 'رفض الخادم حفظ إعدادات CP والمهمات.')
     await load()
+    const savedTasks = Object.fromEntries(cpFeatures.value.tasks.map(task => [task.id, task]))
+    if (cpFeatures.value.globallyEnabled !== !!responsePayload(response).globallyEnabled || cpFeatures.value.giftTabEnabled !== !!responsePayload(response).giftTabEnabled || Object.keys(tasks).some(id => !savedTasks[id] || savedTasks[id].enabled !== tasks[id].enabled || savedTasks[id].title !== tasks[id].title || savedTasks[id].condition !== tasks[id].condition || Number(savedTasks[id].target) !== tasks[id].target || Number(savedTasks[id].rewardPoints) !== tasks[id].rewardPoints || String(savedTasks[id].rewardCosmeticCode || '') !== tasks[id].rewardCosmeticCode)) throw new Error('لم تتطابق إعدادات CP والمهمات بعد إعادة تحميلها من الخادم.')
+    success.value = 'تم حفظ إعدادات CP والمهمات والتحقق منها بعد إعادة التحميل.'
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات المهمات'
   } finally { savingFeatures.value = false }
@@ -1007,9 +1010,10 @@ async function savePolicy() {
   try {
     let rules
     try { rules = JSON.parse(policy.value.rulesText || '{}') } catch { throw new Error('قواعد السياسة ليست JSON صالحاً.') }
-    await cpAdminApi.updatePolicy({ requestExpiryMinutes: Number(policy.value.requestExpiryMinutes), rules })
-    success.value = 'تم حفظ سياسة الطلبات.'
+    const response = await cpAdminApi.updatePolicy({ requestExpiryMinutes: Number(policy.value.requestExpiryMinutes), rules })
+    if (response?.error) throw new Error(response.error.message || 'رفض الخادم حفظ سياسة CP.')
     await load()
+    success.value = 'تم حفظ سياسة الطلبات وإعادة تحميلها من الخادم.'
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ السياسة' }
   finally { saving.value = false }
 }
