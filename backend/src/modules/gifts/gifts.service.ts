@@ -2050,7 +2050,7 @@ export class GiftsService implements OnModuleInit {
     const defaults: any = {
       enabled: false, iconVisible: true, goalMode: 'coins',
       coinTarget: 100000, diamondTarget: 10000, giftIds: [],
-      giftCategories: ['normal', 'lucky', 'cp'], levels: [],
+      giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', levels: [],
       rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '',
     };
     let config: any = defaults;
@@ -2116,7 +2116,7 @@ export class GiftsService implements OnModuleInit {
       return {
         type, amount: Math.max(1, Number(reward?.amount) || 1), itemId,
         name: item?.name || (type === 'coins' ? 'كوينزات' : type === 'diamonds' ? 'ماسات' : type.toUpperCase()),
-        imageUrl: item?.animationUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.iconUrl || null,
+        imageUrl: item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.animationUrl || null,
         iconUrl: item?.iconUrl || null, animationUrl: item?.animationUrl || null,
       };
     }));
