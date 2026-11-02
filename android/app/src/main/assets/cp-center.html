@@ -137,7 +137,7 @@ function renderRewardCard(r){
  const cosmeticCodes=Array.from(new Set([r.rewardCosmeticCode,...(Array.isArray(r.rewardCosmeticCodes)?r.rewardCosmeticCodes:[]),...benefits.map(x=>typeof x==="object"?(x.cosmeticCode||x.code):"")].map(x=>String(x||"").trim()).filter(Boolean)));
  const benefitText=benefits.map(x=>typeof x==="string"?x:(x.title||x.name||x.type||x.code||"ميزة")).filter(Boolean);
  const bg=p.cardBackgroundUrl?"background-image:linear-gradient(115deg,#21091a88,#21091a55),url(&quot;"+esc(p.cardBackgroundUrl)+"&quot;)":"";
- const title=r.name||p.title||("المستوى "+(r.level||1));
+ const title=r.name||r.title||p.title||("المستوى "+(r.level||1));
  const giftCount=Number(r.requiredGiftCount??r.giftsRequired??r.giftCountRequired??0);
  const daysRequired=Number(r.requiredDays??r.daysRequired??0);
  const rewardDays=Number(r.rewardDays||0);
