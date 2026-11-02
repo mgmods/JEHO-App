@@ -936,8 +936,21 @@ async function saveType(item) {
     } else if (item.priceCoins != null) {
       payload.priceCoins = 0
     }
-    await cpAdminApi.updateType(item.type, payload)
-    success.value = 'تم حفظ إعدادات ' + label(item.type) + '.'
+    // safeRequest resolves with { data, error } even when the API rejects the save.
+    // Check the normalized error explicitly; otherwise the dashboard reports success
+    // and reloads the old settings, making level rewards and artwork appear unsaved.
+    const response = await cpAdminApi.updateType(item.type, payload)
+    if (response?.error) {
+      throw new Error(response.error.message || 'رفض الخادم حفظ إعدادات المستوى.')
+    }
+    const savedConfig = payloadOf(response)
+    const savedType = Array.isArray(savedConfig?.types)
+      ? savedConfig.types.find(entry => entry.type === item.type)
+      : null
+    if (!savedType || !Array.isArray(savedType.levels)) {
+      throw new Error('لم يؤكد الخادم حفظ مستويات CP. لم يتم عرض رسالة نجاح.')
+    }
+    success.value = 'تم حفظ إعدادات ' + label(item.type) + ' والتحقق من رجوع المستويات من الخادم.'
     await load()
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات النوع' }
   finally { saving.value = false; savingType.value = '' }
