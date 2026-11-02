@@ -959,24 +959,29 @@ async function saveType(item) {
     if (response?.error) {
       throw new Error(response.error.message || 'رفض الخادم حفظ إعدادات المستوى.')
     }
-    const savedConfig = payloadOf(response)
-    const savedType = Array.isArray(savedConfig?.types)
-      ? savedConfig.types.find(entry => entry.type === item.type)
+    // Do not trust the PATCH response envelope for persistence verification:
+    // safeRequest/HTTP interceptors may wrap the returned object differently.
+    // Read the canonical config endpoint independently after the write.
+    const verifyResponse = await cpAdminApi.config()
+    if (verifyResponse?.error) {
+      throw new Error(verifyResponse.error.message || 'تم إرسال الحفظ لكن تعذرت إعادة قراءة إعدادات CB للتحقق.')
+    }
+    const persistedConfig = payloadOf(verifyResponse)
+    const persistedType = Array.isArray(persistedConfig?.types)
+      ? persistedConfig.types.find(entry => entry.type === item.type)
       : null
-    const expectedLevels = JSON.stringify(payload.levels)
-    if (!savedType || !Array.isArray(savedType.levels) ||
-        !sameJson(savedType.levels, payload.levels)) {
-      throw new Error('الخادم لم يُرجع نفس تفاصيل مستويات CB التي أرسلتها؛ لم يتم اعتماد الحفظ.')
+    if (!persistedType || !Array.isArray(persistedType.levels) ||
+        !sameJson(persistedType.levels, payload.levels)) {
+      throw new Error('وصلت عملية الحفظ إلى الخادم، لكن قراءة إعدادات CB المستقلة لم تُظهر نفس المستويات المحفوظة. لم نعرض نجاحاً غير مؤكد.')
     }
 
-    // Reload from the database, then verify the same type still contains the
-    // exact level definitions. Do not show success based only on the PATCH response.
+    // Refresh every dashboard field from the same authoritative GET endpoint.
     await load()
     const reloadedType = types.value.find(entry => entry.type === item.type)
     let reloadedLevels = []
     try { reloadedLevels = JSON.parse(reloadedType?.levelsText || '[]') } catch { reloadedLevels = [] }
     if (!sameJson(reloadedLevels, payload.levels)) {
-      throw new Error('تم إرسال الإعدادات لكن إعادة تحميلها من قاعدة البيانات أعادت قيماً مختلفة؛ راجع الحفظ قبل مغادرة الصفحة.')
+      throw new Error('تم حفظ المستويات، لكن إعادة تحميل واجهة الداشبورد أعادت قيماً مختلفة. راجع اتصال قراءة الإعدادات.')
     }
     success.value = 'تم حفظ مستويات ' + label(item.type) + ' والتحقق من تطابقها بعد إعادة التحميل من قاعدة البيانات.'
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات النوع' }
