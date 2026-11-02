@@ -33,7 +33,7 @@
       </div>
     </section>
     <section class="card p-4 mt-3">
-      <div class="levels-head"><div><h2>صفحات صناديق الدعم</h2><p class="muted">لكل مستوى صفحة HTML مستقلة وتصميم واسم وهدف وهدايا ومكافآت خاصة به. ينتقل الصندوق تلقائياً إلى الصفحة التالية.</p></div><button type="button" class="btn btn-secondary" @click="addLevel">إضافة مستوى</button></div>
+      <div class="levels-head"><div><h2>صفحات صناديق الدعم</h2><p class="muted">لكل مستوى صفحة HTML مستقلة وتصميم واسم وهدف وهدايا ومكافآت خاصة به. ينتقل الصندوق تلقائياً إلى الصفحة التالية.</p></div><button type="button" class="btn btn-secondary" :disabled="form.levels.length >= 2" @click="addLevel">إضافة المستوى الثاني</button></div>
       <article v-for="(level, index) in form.levels" :key="level.level" class="level-editor">
         <div class="levels-head"><h3>صفحة الصندوق · المستوى {{ level.level }}</h3><button v-if="form.levels.length > 1" type="button" class="btn btn-danger" @click="removeLevel(index)">حذف</button></div>
         <label class="field">اسم المستوى<input v-model="level.title" maxlength="80"></label>
@@ -80,7 +80,7 @@ function itemName(item){return item?.nameAr || item?.labelAr || item?.name || it
 function itemImage(item){return item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.animationUrl || item?.assetUrl || item?.url || ''}
 function assetUrl(value){return resolveAsset(value)}
 function isVideo(value){return /\.(mp4|webm)(\?|$)/i.test(String(value||''))}
-function addLevel(){const next=Math.max(0,...form.levels.map(x=>Number(x.level)||0))+1;form.levels.push({level:next,title:'المستوى '+next,goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:[...(form.giftCategories||['normal'])],giftSelectionMode:'all',giftIds:[],imageUrl:'',rewards:[{type:'coins',amount:5000,itemId:''}]})}
+function addLevel(){if(form.levels.length>=2){error.value='تم إعداد صفحتي الصندوق للمستوى الأول والثاني.';return}const next=Math.max(0,...form.levels.map(x=>Number(x.level)||0))+1;form.levels.push({level:next,title:'المستوى '+next,goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:[...(form.giftCategories||['normal'])],giftSelectionMode:'all',giftIds:[],imageUrl:'',rewards:[{type:'coins',amount:5000,itemId:''}]})}
 function removeLevel(index){form.levels.splice(index,1);form.levels.forEach((x,i)=>x.level=i+1)}
 function addReward(level){level.rewards=level.rewards||[];level.rewards.push({type:'coins',amount:1000,itemId:''})}
 function toggleLevelGift(level,id,checked){const key=String(id);level.giftIds=checked?[...new Set([...(level.giftIds||[]).map(String),key])]: (level.giftIds||[]).map(String).filter(x=>x!==key)}
