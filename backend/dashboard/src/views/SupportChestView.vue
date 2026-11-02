@@ -61,7 +61,7 @@
             <label v-else-if="reward.type === 'badge'" class="field">الشارة<select v-model="reward.itemId"><option value="">اختر الشارة</option><option v-for="badge in catalogBadges" :key="badge.id" :value="badge.id">{{ badge.name }}</option></select></label>
             <button type="button" class="btn btn-danger" @click="level.rewards.splice(rewardIndex,1)">إزالة</button>
           </div>
-          <p class="muted">معاينة الجوائز المتاحة للقرعة · سيحصل الفائز على جائزة واحدة عشوائية، ولن تتكرر حتى تُسحب بقية الجوائز:</p>
+          <p class="muted">معاينة جميع الجوائز التي سيحصل عليها مفجّر الصندوق عند اكتمال هذا المستوى:</p>
           <div class="preview-rewards"><div v-for="(reward, n) in level.rewards" :key="n" class="preview-reward-card"><video v-if="isVideo(rewardPreviewImage(reward))" :src="assetUrl(rewardPreviewImage(reward))" muted autoplay loop playsinline /><img v-else-if="rewardPreviewImage(reward)" :src="assetUrl(rewardPreviewImage(reward))" :alt="rewardLabel(reward)" loading="lazy"><span v-else class="preview-reward-icon">{{ rewardIcon(reward.type) }}</span><strong>{{ rewardLabel(reward) }}</strong><small>{{ reward.type === 'vip' ? (Number(reward.amount)||1)+' يوم' : (['coins','diamonds'].includes(reward.type) ? Number(reward.amount||1).toLocaleString() : '× '+(Number(reward.amount)||1)) }}</small></div><span v-if="!level.rewards.length" class="muted">لم تتم إضافة مكافآت.</span></div>
         </div>
       </article>
@@ -73,7 +73,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { supportChestApi, giftsApi, cosmeticsApi, vipApi, medalsApi } from '@/api'
 import { resolveAsset } from '@/utils/assets'
-const form = reactive({ enabled:false, iconVisible:true, soundEnabled:true, goalMode:'coins', coinTarget:100000, diamondTarget:10000, giftIds:[], giftSelectionMode:'all', giftCategories:['normal','lucky','cp'], levels:[{level:1,title:'الصندوق الذهبي',goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:['normal','lucky','cp'],giftSelectionMode:'all',giftIds:[],imageUrl:'',featuresText:'',rewards:[{type:'coins',amount:5000,itemId:''}]}], rewardType:'none', rewardItemId:'', rewardAmount:0, instructions:'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله تُفتح الصفحة وتُمنح جائزة واحدة عشوائية لمفجّر الصندوق تلقائياً.' })
+const form = reactive({ enabled:false, iconVisible:true, soundEnabled:true, goalMode:'coins', coinTarget:100000, diamondTarget:10000, giftIds:[], giftSelectionMode:'all', giftCategories:['normal','lucky','cp'], levels:[{level:1,title:'الصندوق الذهبي',goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:['normal','lucky','cp'],giftSelectionMode:'all',giftIds:[],imageUrl:'',featuresText:'',rewards:[{type:'coins',amount:5000,itemId:''}]}], rewardType:'none', rewardItemId:'', rewardAmount:0, instructions:'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله ينفجر الصندوق وتُمنح جميع المكافآت المحددة لمفجّر الصندوق تلقائياً.' })
 const catalogGifts=ref([]), catalogCosmetics=ref([]), catalogVipPlans=ref([]), catalogBadges=ref([]), catalogLoading=ref(false)
 const saving=ref(false), error=ref(''), notice=ref('')
 function unwrap(r){const d=r?.data?.data ?? r?.data ?? r;return Array.isArray(d)?d:(Array.isArray(d?.items)?d.items:(Array.isArray(d?.data)?d.data:[]))}
