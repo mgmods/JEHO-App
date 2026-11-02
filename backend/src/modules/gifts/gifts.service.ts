@@ -2285,7 +2285,7 @@ export class GiftsService implements OnModuleInit {
               currency: rewardType === 'coins' ? CurrencyType.COINS : CurrencyType.DIAMONDS,
               amount, balanceAfter: rewardType === 'coins' ? Number(wallet.coins) : Number(wallet.diamonds),
               referenceType: 'support_chest_reward',
-              referenceId: roomId + ':' + String(state.cycle || 1) + ':' + rewardIndex,
+              referenceId: 'support_chest:' + String(state.cycle || 1) + ':' + String(levelIndex + 1) + ':' + rewardIndex,
               description: 'JEHO support chest reward',
               metadata: { roomId, cycle: state.cycle || 1, giftId, level: levelIndex + 1 },
             }));
@@ -2408,40 +2408,42 @@ export class GiftsService implements OnModuleInit {
       }
       if (result.opened) {
         const win = result.opened;
-        const awardedGift = Array.isArray(win.rewards) ? win.rewards.find((entry: any) => entry?.type === 'gift') : null;
-        if (awardedGift) {
+        const awardedGifts = Array.isArray(win.rewards) ? win.rewards.filter((entry: any) => entry?.type === 'gift') : [];
+        if (awardedGifts.length) {
           const winnerUser = await this.usersRepo.findOne({ where: { id: win.winnerId } });
           const winnerProfile = await this.profilesRepo.findOne({ where: { userId: win.winnerId } });
-          const giftPayload = {
-            supportChestReward: true, giftId: awardedGift.itemId,
-            giftName: awardedGift.name, giftType: 'normal',
-            giftIconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
-            iconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
-            animationUrl: awardedGift.animationUrl || null,
-            senderId: win.winnerId, senderName: 'صندوق الدعم', senderAvatarUrl: null,
-            receiverId: win.winnerId,
-            receiverName: winnerUser?.displayName || winnerUser?.username || win.winnerName,
-            receiverAvatarUrl: winnerUser?.avatarUrl || null,
-            quantity: awardedGift.amount || 1, comboCount: awardedGift.amount || 1,
-            totalCoins: 0, diamondsAwarded: 0, roomId,
-            at: new Date().toISOString(),
-          };
-          this.realtime?.emitToUser(win.winnerId, 'gift:animation', giftPayload);
-          for (const targetRoomId of targetRoomIds) {
-            const roomGiftPayload = { ...giftPayload, roomId: targetRoomId };
-            this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-              roomId: targetRoomId, event: 'gift:animation', payload: roomGiftPayload,
-              from: { userId: win.winnerId }, at: giftPayload.at,
-            });
-            this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-              roomId: targetRoomId, event: 'gift:send', payload: roomGiftPayload,
-              from: { userId: win.winnerId }, at: giftPayload.at,
-            });
-            this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-              roomId: targetRoomId, event: 'support_chest:reward',
-              payload: { ...roomGiftPayload, profileId: winnerProfile?.userId || null },
-              at: giftPayload.at,
-            });
+          for (const awardedGift of awardedGifts) {
+            const giftPayload = {
+              supportChestReward: true, giftId: awardedGift.itemId,
+              giftName: awardedGift.name, giftType: 'normal',
+              giftIconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
+              iconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
+              animationUrl: awardedGift.animationUrl || null,
+              senderId: win.winnerId, senderName: 'صندوق الدعم', senderAvatarUrl: null,
+              receiverId: win.winnerId,
+              receiverName: winnerUser?.displayName || winnerUser?.username || win.winnerName,
+              receiverAvatarUrl: winnerUser?.avatarUrl || null,
+              quantity: awardedGift.amount || 1, comboCount: awardedGift.amount || 1,
+              totalCoins: 0, diamondsAwarded: 0, roomId,
+              at: new Date().toISOString(),
+            };
+            this.realtime?.emitToUser(win.winnerId, 'gift:animation', giftPayload);
+            for (const targetRoomId of targetRoomIds) {
+              const roomGiftPayload = { ...giftPayload, roomId: targetRoomId };
+              this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+                roomId: targetRoomId, event: 'gift:animation', payload: roomGiftPayload,
+                from: { userId: win.winnerId }, at: giftPayload.at,
+              });
+              this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+                roomId: targetRoomId, event: 'gift:send', payload: roomGiftPayload,
+                from: { userId: win.winnerId }, at: giftPayload.at,
+              });
+              this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+                roomId: targetRoomId, event: 'support_chest:reward',
+                payload: { ...roomGiftPayload, profileId: winnerProfile?.userId || null },
+                at: giftPayload.at,
+              });
+            }
           }
         }
         const rewardNames = (Array.isArray(win.rewards) ? win.rewards : [])
