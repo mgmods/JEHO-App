@@ -662,7 +662,11 @@ export class AdminService {
       const active = await this.vipRepo.find({ where: { id: In(vipIds), isActive: true } });
       if (active.length !== vipIds.length) throw new BadRequestException('تأكد أن كل خطط VIP المختارة موجودة وفعالة');
     }
-    const allGiftIds = [...new Set([...giftIds, ...levels.flatMap(x => x.giftIds), ...rewardGiftIds])];
+    const allGiftIds = [...new Set([
+      ...(giftSelectionMode === 'selected' ? giftIds : []),
+      ...levels.flatMap(x => x.giftSelectionMode === 'selected' ? x.giftIds : []),
+      ...rewardGiftIds,
+    ])];
     if (allGiftIds.length) {
       const activeGifts = await this.giftsRepo.find({ where: { isActive: true } });
       const valid = new Set(activeGifts.map(g => g.id));
