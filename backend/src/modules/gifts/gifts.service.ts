@@ -2265,37 +2265,10 @@ export class GiftsService implements OnModuleInit {
           ? levelCfg.rewards.filter((entry: any) => entry && String(entry.type || '') !== 'none')
           : [];
         if (!rewards.length) throw new BadRequestException('لا توجد جوائز محددة لهذا المستوى');
-        // Draw without replacement: every configured prize is awarded once before
-        // the deck is reshuffled, so consecutive winners do not receive the same prize.
-        const deckKey = String(levelIndex + 1);
-        const signature = JSON.stringify(rewards.map((entry: any) => ({
-          type: String(entry.type || ''), itemId: String(entry.itemId || ''),
-          amount: Math.max(1, Math.floor(Number(entry.amount) || 1)),
-        })));
-        const decks = state.rewardDecks && typeof state.rewardDecks === 'object' ? state.rewardDecks : {};
-        let deckState = decks[deckKey];
-        if (!deckState || deckState.signature !== signature || !Array.isArray(deckState.remaining)
-            || deckState.remaining.some((value: any) => !Number.isInteger(value) || value < 0 || value >= rewards.length)) {
-          const shuffled = rewards.map((_: any, index: number) => index);
-          for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = randomInt(i + 1);
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-          }
-          deckState = { signature, remaining: shuffled };
-        }
-        if (!deckState.remaining.length) {
-          const shuffled = rewards.map((_: any, index: number) => index);
-          for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = randomInt(i + 1);
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-          }
-          deckState.remaining = shuffled;
-        }
-        const rewardIndex = deckState.remaining.shift();
-        decks[deckKey] = deckState;
-        state.rewardDecks = decks;
-        const reward = rewards[Number(rewardIndex)] || rewards[0];
+        // Every reward configured for this level is granted to the final contributor.
         const granted: any[] = [];
+        for (let rewardIndex = 0; rewardIndex < rewards.length; rewardIndex++) {
+          const reward = rewards[rewardIndex];
         {
           const rewardType = String(reward.type || '');
           const amount = Math.max(1, Math.floor(Number(reward.amount) || 1));
@@ -2375,6 +2348,7 @@ export class GiftsService implements OnModuleInit {
             granted.push({ type: 'none', amount: 0, name: 'بدون مكافأة' });
           } else {
             throw new BadRequestException('Unsupported support chest reward type: ' + rewardType);
+          }
           }
         }
         const winner = await manager.getRepository(User).findOne({ where: { id: senderId } });
