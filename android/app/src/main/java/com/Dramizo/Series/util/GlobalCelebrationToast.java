@@ -226,7 +226,7 @@ public final class GlobalCelebrationToast {
             final float bodyY = giftSend ? remoteGiftBodyY : luckyRoomHigh ? remoteLuckyRoomHighBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
             final float countX = giftSend ? remoteGiftCountX : luckyRoomHigh ? remoteLuckyRoomHighCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
             final float countY = giftSend ? remoteGiftCountY : luckyRoomHigh ? remoteLuckyRoomHighCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
-            final int avatarSize = supportChest ? 56 : giftSend ? remoteGiftAvatarSizeDp : luckyRoomHigh ? remoteLuckyRoomHighAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyRoomHigh ? remoteLuckyRoomHighAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
             final float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyRoomHigh ? remoteLuckyRoomHighTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
             final float bodySize = giftSend ? remoteGiftBodySizeSp : luckyRoomHigh ? remoteLuckyRoomHighBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
             final float countSize = giftSend ? remoteGiftCountSizeSp : luckyRoomHigh ? remoteLuckyRoomHighCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
@@ -873,7 +873,7 @@ public final class GlobalCelebrationToast {
             final float bodyY = supportChest ? 65f : giftSend ? remoteGiftBodyY : luckyRoomHigh ? remoteLuckyRoomHighBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
             final float countX = giftSend ? remoteGiftCountX : luckyRoomHigh ? remoteLuckyRoomHighCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
             final float countY = giftSend ? remoteGiftCountY : luckyRoomHigh ? remoteLuckyRoomHighCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
-            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyRoomHigh ? remoteLuckyRoomHighAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final int avatarSize = supportChest ? 56 : giftSend ? remoteGiftAvatarSizeDp : luckyRoomHigh ? remoteLuckyRoomHighAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
             resizeAvatar(activity, avatar, avatarSize);
             banner.post(() -> {
                 if (banner.getParent() == null) return;
