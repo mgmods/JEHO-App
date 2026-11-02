@@ -902,68 +902,170 @@ public final class GlobalCelebrationToast {
     private static void showChestBurst(Activity activity, FrameLayout root) {
         if (activity == null || root == null || activity.isFinishing() || activity.isDestroyed()) return;
 
-        // Large center blast makes the completion unmistakable even if the optional toast is muted.
-        TextView blast = new TextView(activity);
-        blast.setText("💥");
-        blast.setTextSize(66f);
-        blast.setGravity(Gravity.CENTER);
-        blast.setClickable(false);
-        blast.setFocusable(false);
-        blast.setShadowLayer(dp(activity, 18), 0f, 0f, 0xCCFFD36A);
-        FrameLayout.LayoutParams blastParams = new FrameLayout.LayoutParams(
-                dp(activity, 116), dp(activity, 116), Gravity.CENTER);
-        root.addView(blast, blastParams);
-        android.animation.AnimatorSet blastAnimation = new android.animation.AnimatorSet();
-        blastAnimation.playTogether(
-                ObjectAnimator.ofFloat(blast, View.ALPHA, 0f, 1f, 0f),
-                ObjectAnimator.ofFloat(blast, View.SCALE_X, 0.25f, 1.35f, 1.9f),
-                ObjectAnimator.ofFloat(blast, View.SCALE_Y, 0.25f, 1.35f, 1.9f));
-        blastAnimation.setDuration(1250L);
-        blastAnimation.addListener(new android.animation.AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(android.animation.Animator animation) {
-                if (blast.getParent() == root) root.removeView(blast);
-            }
-            @Override public void onAnimationCancel(android.animation.Animator animation) {
-                if (blast.getParent() == root) root.removeView(blast);
-            }
-        });
-        blastAnimation.start();
+        final FrameLayout celebration = new FrameLayout(activity);
+        celebration.setClipChildren(false);
+        celebration.setClipToPadding(false);
+        celebration.setClickable(false);
+        celebration.setFocusable(false);
+        root.addView(celebration, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        final String[] symbols = { "🎁", "🪙", "💎", "✨", "🌟", "🪙", "💎", "🎁", "✨", "🪙", "💎", "🌟" };
+        final int width = Math.max(root.getWidth(), activity.getResources().getDisplayMetrics().widthPixels);
+        final int height = Math.max(root.getHeight(), activity.getResources().getDisplayMetrics().heightPixels);
+        final int dp8 = dp(activity, 8);
+
+        // A bright impact flash and expanding gold shockwaves.
+        View flash = new View(activity);
+        GradientDrawable flashShape = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[] { 0x00FFF4C5, 0x88FFE28A, 0x00FF9D36 });
+        flashShape.setShape(GradientDrawable.OVAL);
+        flash.setBackground(flashShape);
+        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(
+                dp(activity, 190), dp(activity, 190), Gravity.CENTER);
+        celebration.addView(flash, flashParams);
+        AnimatorSet flashAnim = new AnimatorSet();
+        flashAnim.playTogether(
+                ObjectAnimator.ofFloat(flash, View.ALPHA, 0f, 0.95f, 0f),
+                ObjectAnimator.ofFloat(flash, View.SCALE_X, 0.12f, 2.35f),
+                ObjectAnimator.ofFloat(flash, View.SCALE_Y, 0.12f, 2.35f));
+        flashAnim.setDuration(1050L);
+        flashAnim.start();
+
+        for (int ringIndex = 0; ringIndex < 3; ringIndex++) {
+            View ring = new View(activity);
+            GradientDrawable ringShape = new GradientDrawable();
+            ringShape.setShape(GradientDrawable.OVAL);
+            ringShape.setColor(0x00FFFFFF);
+            ringShape.setStroke(dp(activity, ringIndex == 0 ? 4 : 2),
+                    ringIndex == 1 ? 0xFFFFA94B : 0xFFFFE18A);
+            ring.setBackground(ringShape);
+            FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(
+                    dp(activity, 112), dp(activity, 112), Gravity.CENTER);
+            celebration.addView(ring, ringParams);
+            AnimatorSet ringAnim = new AnimatorSet();
+            ringAnim.playTogether(
+                    ObjectAnimator.ofFloat(ring, View.ALPHA, 0.95f, 0f),
+                    ObjectAnimator.ofFloat(ring, View.SCALE_X, 0.15f, 2.9f),
+                    ObjectAnimator.ofFloat(ring, View.SCALE_Y, 0.15f, 2.9f));
+            ringAnim.setStartDelay(ringIndex * 135L);
+            ringAnim.setDuration(1050L + ringIndex * 100L);
+            ringAnim.start();
+        }
+
+        // Golden coin and diamond rain falls from the top of every viewer's screen.
+        final String[] rainSymbols = { "🪙", "🪙", "💎", "🪙", "✨", "🪙", "🎁", "🪙" };
+        for (int i = 0; i < 32; i++) {
+            TextView coin = new TextView(activity);
+            coin.setText(rainSymbols[i % rainSymbols.length]);
+            coin.setTextSize(i % 5 == 0 ? 27f : 22f);
+            coin.setGravity(Gravity.CENTER);
+            coin.setClickable(false);
+            coin.setFocusable(false);
+            FrameLayout.LayoutParams coinParams = new FrameLayout.LayoutParams(
+                    dp(activity, 38), dp(activity, 42), Gravity.TOP | Gravity.LEFT);
+            coinParams.leftMargin = Math.max(0, Math.min(width - dp(activity, 38),
+                    (int) ((i * (width / 32f)) + ((i % 3) - 1) * dp8)));
+            celebration.addView(coin, coinParams);
+            coin.setTranslationY(-dp(activity, 35 + (i % 5) * 34));
+            coin.setRotation((i % 2 == 0 ? -1f : 1f) * (i % 4) * 18f);
+            AnimatorSet rain = new AnimatorSet();
+            rain.playTogether(
+                    ObjectAnimator.ofFloat(coin, View.TRANSLATION_Y, coin.getTranslationY(),
+                            height + dp(activity, 70 + (i % 4) * 30)),
+                    ObjectAnimator.ofFloat(coin, View.TRANSLATION_X, 0f,
+                            (i % 2 == 0 ? 1f : -1f) * dp(activity, 22 + (i % 5) * 12)),
+                    ObjectAnimator.ofFloat(coin, View.ROTATION, coin.getRotation(),
+                            coin.getRotation() + (i % 2 == 0 ? 420f : -420f)),
+                    ObjectAnimator.ofFloat(coin, View.ALPHA, 0f, 1f, 1f, 0f));
+            rain.setStartDelay((i % 8) * 72L);
+            rain.setDuration(1550L + (i % 4) * 180L);
+            rain.start();
+        }
+
+        // Radial reward burst: gift boxes, coins, diamonds and light particles.
+        final String[] symbols = { "🎁", "🪙", "💎", "✨", "🌟", "🪙", "💎", "🎁",
+                "✨", "🪙", "💎", "🌟", "🎁", "🪙", "💎", "✨", "🪙", "🎁", "💎", "🌟" };
         for (int i = 0; i < symbols.length; i++) {
             TextView particle = new TextView(activity);
             particle.setText(symbols[i]);
-            particle.setTextSize(22f + (i % 3) * 4f);
+            particle.setTextSize(23f + (i % 3) * 4f);
             particle.setGravity(Gravity.CENTER);
             particle.setClickable(false);
             particle.setFocusable(false);
             FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                     Gravity.CENTER);
-            root.addView(particle, params);
+            celebration.addView(particle, params);
             double angle = (Math.PI * 2d * i) / symbols.length;
-            float distance = dp(activity, 105 + (i % 4) * 28);
+            float distance = dp(activity, 115 + (i % 4) * 34);
             float dx = (float) Math.cos(angle) * distance;
             float dy = (float) Math.sin(angle) * distance;
-            android.animation.AnimatorSet burst = new android.animation.AnimatorSet();
+            AnimatorSet burst = new AnimatorSet();
             burst.playTogether(
                     ObjectAnimator.ofFloat(particle, View.TRANSLATION_X, 0f, dx),
                     ObjectAnimator.ofFloat(particle, View.TRANSLATION_Y, 0f, dy),
-                    ObjectAnimator.ofFloat(particle, View.ROTATION, 0f, (i % 2 == 0 ? 1f : -1f) * 260f),
+                    ObjectAnimator.ofFloat(particle, View.ROTATION, 0f,
+                            (i % 2 == 0 ? 1f : -1f) * 330f),
                     ObjectAnimator.ofFloat(particle, View.ALPHA, 0f, 1f, 0f),
-                    ObjectAnimator.ofFloat(particle, View.SCALE_X, 0.35f, 1.2f, 0.75f),
-                    ObjectAnimator.ofFloat(particle, View.SCALE_Y, 0.35f, 1.2f, 0.75f));
-            burst.setDuration(1200L + (i % 3) * 140L);
-            burst.addListener(new android.animation.AnimatorListenerAdapter() {
-                @Override public void onAnimationEnd(android.animation.Animator animation) {
-                    if (particle.getParent() == root) root.removeView(particle);
-                }
-                @Override public void onAnimationCancel(android.animation.Animator animation) {
-                    if (particle.getParent() == root) root.removeView(particle);
-                }
-            });
+                    ObjectAnimator.ofFloat(particle, View.SCALE_X, 0.2f, 1.25f, 0.7f),
+                    ObjectAnimator.ofFloat(particle, View.SCALE_Y, 0.2f, 1.25f, 0.7f));
+            burst.setStartDelay((i % 5) * 35L);
+            burst.setDuration(1350L + (i % 3) * 120L);
             burst.start();
         }
+
+        // High-contrast in-room celebration toast, centered over the room content.
+        TextView banner = new TextView(activity);
+        banner.setText("💥  انفجار صندوق الدعم  💎");
+        banner.setTextColor(0xFFFFE9B0);
+        banner.setTextSize(16f);
+        banner.setTypeface(null, android.graphics.Typeface.BOLD);
+        banner.setGravity(Gravity.CENTER);
+        banner.setPadding(dp(activity, 20), dp(activity, 13), dp(activity, 20), dp(activity, 13));
+        GradientDrawable bannerBg = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[] { 0xF52C1D16, 0xF55A3B18, 0xF52C1D16 });
+        bannerBg.setCornerRadius(dp(activity, 28));
+        bannerBg.setStroke(dp(activity, 1), 0xFFFFD36A);
+        banner.setBackground(bannerBg);
+        banner.setElevation(dp(activity, 18));
+        FrameLayout.LayoutParams bannerParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER);
+        bannerParams.topMargin = dp(activity, 155);
+        celebration.addView(banner, bannerParams);
+        AnimatorSet bannerAnim = new AnimatorSet();
+        bannerAnim.playTogether(
+                ObjectAnimator.ofFloat(banner, View.ALPHA, 0f, 1f, 1f, 0f),
+                ObjectAnimator.ofFloat(banner, View.TRANSLATION_Y, dp(activity, 24), 0f, 0f, -dp(activity, 12)),
+                ObjectAnimator.ofFloat(banner, View.SCALE_X, 0.82f, 1.04f, 1f, 0.98f),
+                ObjectAnimator.ofFloat(banner, View.SCALE_Y, 0.82f, 1.04f, 1f, 0.98f));
+        bannerAnim.setDuration(2450L);
+        bannerAnim.start();
+
+        TextView blast = new TextView(activity);
+        blast.setText("💥");
+        blast.setTextSize(76f);
+        blast.setGravity(Gravity.CENTER);
+        blast.setClickable(false);
+        blast.setFocusable(false);
+        blast.setShadowLayer(dp(activity, 20), 0f, 0f, 0xFFFFD36A);
+        FrameLayout.LayoutParams blastParams = new FrameLayout.LayoutParams(
+                dp(activity, 132), dp(activity, 132), Gravity.CENTER);
+        celebration.addView(blast, blastParams);
+        AnimatorSet blastAnimation = new AnimatorSet();
+        blastAnimation.playTogether(
+                ObjectAnimator.ofFloat(blast, View.ALPHA, 0f, 1f, 1f, 0f),
+                ObjectAnimator.ofFloat(blast, View.SCALE_X, 0.12f, 1.3f, 1.7f, 1.95f),
+                ObjectAnimator.ofFloat(blast, View.SCALE_Y, 0.12f, 1.3f, 1.7f, 1.95f),
+                ObjectAnimator.ofFloat(blast, View.ROTATION, -22f, 8f, -4f, 0f));
+        blastAnimation.setDuration(1450L);
+        blastAnimation.start();
+
+        MAIN.postDelayed(() -> {
+            if (celebration.getParent() == root) root.removeView(celebration);
+        }, 2850L);
     }
 
     private static String formatMultiplier(double multiplier) {
