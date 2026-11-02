@@ -834,6 +834,7 @@ public final class GlobalCelebrationToast {
         } else if (sheen != null) sheen.setVisibility(View.GONE);
         root.addView(banner);
         current = new WeakReference<>(banner);
+        if ("support_chest".equalsIgnoreCase(kind)) showChestBurst(activity, root);
 
         banner.animate()
                 .alpha(1f)
@@ -885,6 +886,46 @@ public final class GlobalCelebrationToast {
         MAIN.postDelayed(hideRunnable, customToastStyle
                 ? Math.max(1, Math.min(12, customDuration)) * 1000L
                 : (canOpenRoom ? 6200L : 5200L));
+    }
+
+    /** Room-wide reward burst for a completed support-chest level. */
+    private static void showChestBurst(Activity activity, FrameLayout root) {
+        if (activity == null || root == null || activity.isFinishing() || activity.isDestroyed()) return;
+        final String[] symbols = { "🎁", "🪙", "💎", "✨", "🌟", "🪙", "💎", "🎁", "✨", "🪙", "💎", "🌟" };
+        for (int i = 0; i < symbols.length; i++) {
+            TextView particle = new TextView(activity);
+            particle.setText(symbols[i]);
+            particle.setTextSize(22f + (i % 3) * 4f);
+            particle.setGravity(Gravity.CENTER);
+            particle.setClickable(false);
+            particle.setFocusable(false);
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER);
+            root.addView(particle, params);
+            double angle = (Math.PI * 2d * i) / symbols.length;
+            float distance = dp(activity, 90 + (i % 4) * 24);
+            float dx = (float) Math.cos(angle) * distance;
+            float dy = (float) Math.sin(angle) * distance;
+            android.animation.AnimatorSet burst = new android.animation.AnimatorSet();
+            burst.playTogether(
+                    ObjectAnimator.ofFloat(particle, View.TRANSLATION_X, 0f, dx),
+                    ObjectAnimator.ofFloat(particle, View.TRANSLATION_Y, 0f, dy),
+                    ObjectAnimator.ofFloat(particle, View.ROTATION, 0f, (i % 2 == 0 ? 1f : -1f) * 240f),
+                    ObjectAnimator.ofFloat(particle, View.ALPHA, 0f, 1f, 0f),
+                    ObjectAnimator.ofFloat(particle, View.SCALE_X, 0.35f, 1.15f, 0.75f),
+                    ObjectAnimator.ofFloat(particle, View.SCALE_Y, 0.35f, 1.15f, 0.75f));
+            burst.setDuration(1150L + (i % 3) * 120L);
+            burst.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(android.animation.Animator animation) {
+                    if (particle.getParent() == root) root.removeView(particle);
+                }
+                @Override public void onAnimationCancel(android.animation.Animator animation) {
+                    if (particle.getParent() == root) root.removeView(particle);
+                }
+            });
+            burst.start();
+        }
     }
 
     private static String formatMultiplier(double multiplier) {
