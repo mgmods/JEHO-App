@@ -18,6 +18,7 @@ public final class RoomSoundFx {
     private static int joinId;
     private static int muteId;
     private static int chestExplosionId;
+    private static volatile boolean chestExplosionLoaded;
     private static boolean ready;
     private static boolean loading;
 
@@ -41,12 +42,16 @@ public final class RoomSoundFx {
                     .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build();
-            pool = new SoundPool.Builder().setMaxStreams(6).setAudioAttributes(attrs).build();
+            pool = new SoundPool.Builder().setMaxStreams(10).setAudioAttributes(attrs).build();
             clapId = loadRaw(context, "sfx_clap");
             giftId = loadRaw(context, "sfx_gift");
             joinId = loadRaw(context, "sfx_join");
             muteId = loadRaw(context, "sfx_mute");
             chestExplosionId = loadRaw(context, "sfx_chest_explosion");
+            chestExplosionLoaded = false;
+            pool.setOnLoadCompleteListener((soundPool, sampleId, status) -> {
+                if (sampleId == chestExplosionId) chestExplosionLoaded = status == 0;
+            });
             ready = clapId != 0 || giftId != 0 || joinId != 0 || muteId != 0 || chestExplosionId != 0;
         } catch (Exception ignored) {
             ready = false;
@@ -113,6 +118,8 @@ public final class RoomSoundFx {
             playChestFallbackTone();
             return;
         }
+        // Wait for Android's asynchronous WAV decode; never replace a real blast
+        // with the short fallback beep merely because the first frame arrived early.
         playChestExplosionAttempt(0);
     }
 
@@ -122,14 +129,16 @@ public final class RoomSoundFx {
             SoundPool currentPool = pool;
             int currentSoundId = chestExplosionId;
             if (currentPool != null && currentSoundId != 0) {
-                int streamId = currentPool.play(currentSoundId, 1f, 1f, 2, 0, 1f);
-                if (streamId != 0) return;
+                if (chestExplosionLoaded) {
+                    int streamId = currentPool.play(currentSoundId, 1f, 1f, 3, 0, 1f);
+                    if (streamId != 0) return;
+                }
             }
         } catch (Exception ignored) {
         }
-        if (attempt < 5) {
+        if (attempt < 20) {
             new Handler(Looper.getMainLooper()).postDelayed(
-                    () -> playChestExplosionAttempt(attempt + 1), 120L);
+                    () -> playChestExplosionAttempt(attempt + 1), 100L);
         } else {
             playChestFallbackTone();
         }
