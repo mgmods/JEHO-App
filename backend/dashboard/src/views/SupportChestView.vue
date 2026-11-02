@@ -90,7 +90,7 @@ function rewardPreviewImage(r){const item=rewardCatalogItem(r);return item?itemI
 function rewardIcon(type){return ({gift:'🎁',coins:'🪙',diamonds:'💎',vip:'👑',frame:'🖼️',badge:'🏅'})[type]||'🎁'}
 function rewardLabel(r){const names={gift:'هدية',coins:'كوينزات',diamonds:'ماسات',vip:'VIP',frame:'إطار',badge:'شارة'};const item=rewardCatalogItem(r);return (item?itemName(item):(names[r.type]||r.type||'مكافأة'))+' × '+(Number(r.amount)||1)}
 function toggleGift(id, checked){const key=String(id);form.giftIds=checked?[...new Set([...(form.giftIds||[]).map(String),key])]: (form.giftIds||[]).map(String).filter(x=>x!==key)}
-const frameItems = computed(()=>catalogCosmetics.value.filter(x=>/frame/i.test(String(x.type||x.category||''))))
+const frameItems = computed(()=>catalogCosmetics.value.filter(x=>{const type=String(x.type||'').toLowerCase();const category=String(x.category||x.meta?.category||x.meta?.type||'').toLowerCase();return /frame|vip_badge|host_badge/.test(type)||/frame|vip_badge|host_badge/.test(category)}))
 const rewardItems = computed(()=> {
   const all=catalogCosmetics.value
   if(form.rewardType==='gift')return catalogGifts.value
