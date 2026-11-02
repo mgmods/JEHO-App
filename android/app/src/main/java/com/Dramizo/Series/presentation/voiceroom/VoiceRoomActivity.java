@@ -478,6 +478,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private WebView musicYoutubeWebView;
     @Nullable private WebView activeSupportChestWeb;
     @Nullable private String activeSupportChestRoomId;
+    @Nullable private String activeSupportChestAsset;
     private final Runnable supportChestEventRefresh = () -> {
         WebView chestWeb = activeSupportChestWeb;
         String chestRoom = activeSupportChestRoomId;
@@ -1856,6 +1857,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private boolean chestRoomIdMatches(@NonNull String targetRoomId) {
+        return targetRoomId.equals(activeSupportChestRoomId) && targetRoomId.equals(roomId);
+    }
+
     private void loadSupportChestState(@NonNull WebView web, @NonNull String targetRoomId) {
         if (isFinishing() || isDestroyed()) return;
         try {
@@ -1872,6 +1877,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             Object rawConfig = data.get("config");
                             Object rawState = data.get("state");
                             Object rawLevel = data.get("currentLevel");
+                            int chestLevel = rawState instanceof Map
+                                    ? (int) numberForChest(((Map<?, ?>) rawState).get("level"), 1L) : 1;
+                            String desiredAsset = chestLevel >= 2
+                                    ? "support-chest-level-2.html" : "support-chest-level-1.html";
+                            if (!desiredAsset.equals(activeSupportChestAsset)) {
+                                activeSupportChestAsset = desiredAsset;
+                                runOnUiThread(() -> {
+                                    if (!isFinishing() && !isDestroyed() && web != null
+                                            && chestRoomIdMatches(targetRoomId)) {
+                                        web.loadUrl("file:///android_asset/" + desiredAsset);
+                                    }
+                                });
+                                return;
+                            }
                             Map<String, Object> mergedConfig = new HashMap<>();
                             if (rawConfig instanceof Map) {
                                 for (Map.Entry<?, ?> entry : ((Map<?, ?>) rawConfig).entrySet()) {
@@ -1953,6 +1972,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (activeSupportChestWeb == web) {
                 activeSupportChestWeb = null;
                 activeSupportChestRoomId = null;
+                activeSupportChestAsset = null;
             }
             web.stopLoading();
             web.loadUrl("about:blank");
@@ -1973,7 +1993,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 behavior.setHideable(true);
                 behavior.setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
             }
-            web.loadUrl("file:///android_asset/support-chest.html");
+            activeSupportChestAsset = null;
+            loadSupportChestState(web, chestRoomId);
             handler.removeCallbacks(refreshChest);
             handler.postDelayed(refreshChest, 5000L);
         });
@@ -15212,6 +15233,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         if ("support_chest:opened".equals(event)) {
+            WebView chestWeb = activeSupportChestWeb;
+            if (chestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
+                final String winJson = payload.toString();
+                chestWeb.post(() -> chestWeb.evaluateJavascript(
+                        "window.applySupportChestWin && window.applySupportChestWin(" + winJson + ");", null));
+            }
             String winner = memberStr(payload, "winnerName");
             if (winner == null || winner.trim().isEmpty()) winner = "أحد الداعمين";
             String levelTitle = memberStr(payload, "levelTitle");
