@@ -85,7 +85,7 @@ const filteredCosmetics = computed(() => {
   return cosmetics.value.filter(x => x.isActive !== false && (!q || [x.name,x.code,x.type,x.description].filter(Boolean).join(' ').toLocaleLowerCase().includes(q)))
 })
 function cosmetic(code) { return cosmetics.value.find(x => x.code === code) || null }
-function cosmeticImage(item) { return item?.previewUrl || item?.imageUrl || item?.iconUrl || item?.meta?.previewUrl || item?.meta?.iconUrl || item?.meta?.imageUrl || item?.animationUrl || item?.meta?.animationUrl || item?.meta?.gifUrl || item?.assetUrl || item?.url || '' }
+function cosmeticImage(item) { return item?.meta?.previewUrl || item?.meta?.iconUrl || item?.meta?.imageUrl || item?.previewUrl || item?.imageUrl || item?.iconUrl || item?.meta?.animationUrl || item?.meta?.gifUrl || item?.animationUrl || item?.assetUrl || item?.url || '' }
 function isVideo(value) { return /\.(mp4|webm)(\?|$)/i.test(String(value || '')) }
 function cosmeticTypeLabel(type) {
   const labels = { frame:'إطار', avatar_frame:'إطار صورة', profile_frame:'إطار ملف شخصي', profile_card:'بطاقة الملف الشخصي', entry_effect:'دخولية', entrance:'دخولية', entrance_effect:'دخولية', entry:'دخولية', join_toast:'دخولية', name_card:'كرت اسم', namecard:'كرت اسم', name_plate:'كرت اسم', nameplate:'كرت اسم', title_card:'كرت اسم', badge:'شارة', vip_badge:'شارة VIP', level_badge:'شارة مستوى', host_badge:'شارة مضيف', room_card:'بطاقة غرفة', room_background:'خلفية غرفة', chat_bubble:'فقاعة محادثة' }
