@@ -81,7 +81,7 @@ function itemName(item){return item?.nameAr || item?.labelAr || item?.name || it
 function itemImage(item){return item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.animationUrl || item?.assetUrl || item?.url || ''}
 function assetUrl(value){return resolveAsset(value)}
 function isVideo(value){return /\.(mp4|webm)(\?|$)/i.test(String(value||''))}
-function addLevel(){if(form.levels.length>=3){error.value='تم الوصول إلى الحد الأقصى: ثلاثة مستويات مستقلة.';return}const next=Math.max(0,...form.levels.map(x=>Number(x.level)||0))+1;form.levels.push({level:next,title:'المستوى '+next,goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:[...(form.giftCategories||['normal'])],giftSelectionMode:'all',giftIds:[],imageUrl:'',rewards:[{type:'coins',amount:5000,itemId:''}]})}
+function addLevel(){if(form.levels.length>=3){error.value='تم الوصول إلى الحد الأقصى: ثلاثة مستويات مستقلة.';return}const next=Math.max(0,...form.levels.map(x=>Number(x.level)||0))+1;form.levels.push({level:next,title:'المستوى '+next,goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:[...(form.giftCategories||['normal'])],giftSelectionMode:'all',giftIds:[],imageUrl:'',featuresText:'',rewards:[{type:'coins',amount:5000,itemId:''}]})}
 function removeLevel(index){form.levels.splice(index,1);form.levels.forEach((x,i)=>x.level=i+1)}
 function addReward(level){level.rewards=level.rewards||[];level.rewards.push({type:'coins',amount:1000,itemId:''})}
 function toggleLevelGift(level,id,checked){const key=String(id);level.giftIds=checked?[...new Set([...(level.giftIds||[]).map(String),key])]: (level.giftIds||[]).map(String).filter(x=>x!==key)}
