@@ -12,6 +12,7 @@ import android.widget.FrameLayout;
 import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
+import androidx.activity.OnBackPressedCallback;
 
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.di.AppContainer;
@@ -45,6 +46,9 @@ public class CpCenterActivity extends ThemedActivity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() { handleCpSystemBack(); }
+        });
         c = ContainerProvider.from(this);
         initialView = safeView(getIntent().getStringExtra(EXTRA_VIEW));
         initialType = safeType(getIntent().getStringExtra(EXTRA_TYPE));
@@ -363,12 +367,12 @@ public class CpCenterActivity extends ThemedActivity {
 
     @Override protected boolean wantsContentSystemPadding() { return false; }
 
-    @Override public void onBackPressed() {
+    private void handleCpSystemBack() {
         if (web == null || !pageReady) { finish(); return; }
         web.evaluateJavascript(
-                "(window.getCpView && window.getCpView() !== 'home') ? (window.setCpView && window.setCpView('home'), 'handled') : 'finish'",
+                "window.handleCpSystemBack ? window.handleCpSystemBack() : ((window.getCpView && window.getCpView() !== 'home') ? (window.setCpView && window.setCpView('home'), 'handled') : 'finish')",
                 value -> {
-                    if ("\"finish\"".equals(value)) finish();
+                    if ("\\\"finish\\\"".equals(value)) finish();
                 });
     }
 
