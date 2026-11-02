@@ -2179,7 +2179,7 @@ export class GiftsService implements OnModuleInit {
             const ownership = manager.getRepository(UserBadge);
             const owned = await ownership.findOne({ where: { userId: senderId, badgeId: badge.id } });
             if (!owned) await ownership.save(ownership.create({ userId: senderId, badgeId: badge.id, grantedByAdminId: null, source: 'support_chest' }));
-            granted.push({ type: 'badge', itemId: badge.id, name: badge.name, imageUrl: badge.iconUrl || null });
+            granted.push({ type: 'badge', itemId: badge.id, name: badge.name, imageUrl: badge.imageUrl || null });
           } else if (rewardType === 'vip') {
             if (!itemId) throw new BadRequestException('Support chest VIP reward requires a VIP plan ID');
             const plan = await manager.getRepository(VipPlan).findOne({ where: { id: itemId, isActive: true } });
