@@ -2077,19 +2077,20 @@ export class GiftsService implements OnModuleInit {
     try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
     const levelIndex = Math.max(0, Math.min(config.levels.length - 1, Number(state.level || 1) - 1));
     const currentLevel = config.levels[levelIndex] || config.levels[0];
-    const allowedCategories = Array.isArray(currentLevel?.giftCategories)
-      ? currentLevel.giftCategories.map(String)
-      : (Array.isArray(config.giftCategories) ? config.giftCategories.map(String) : ['normal', 'lucky', 'cp']);
-    const selectedGiftIds = Array.isArray(currentLevel?.giftIds) && currentLevel.giftIds.length
-      ? currentLevel.giftIds.map(String)
-      : (Array.isArray(config.giftIds) ? config.giftIds.map(String) : []);
+    const globalAllowedCategories = Array.isArray(config.giftCategories) ? config.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
+    const levelAllowedCategories = Array.isArray(currentLevel?.giftCategories)
+      ? currentLevel.giftCategories.map(String) : globalAllowedCategories;
+    const allowedCategories = levelAllowedCategories.filter(category => globalAllowedCategories.includes(category));
+    const globalGiftIds = Array.isArray(config.giftIds) ? config.giftIds.map(String) : [];
+    const levelGiftIds = Array.isArray(currentLevel?.giftIds) ? currentLevel.giftIds.map(String) : [];
+    const selectedGiftIds = [...new Set([...globalGiftIds, ...levelGiftIds])];
     const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
     const eligibleGifts = allGifts.filter(gift => {
       const rawCategory = String(gift.category || '').toLowerCase();
       const cat = rawCategory === 'cp' ? 'cp'
         : (String(gift.type || '').toLowerCase() === 'lucky' || rawCategory === 'lucky') ? 'lucky'
         : rawCategory === 'normal' ? 'normal' : 'other';
-      return allowedCategories.includes(cat) && (!selectedGiftIds.length || selectedGiftIds.includes(String(gift.id)));
+      return allowedCategories.includes(cat) && (!globalGiftIds.length || globalGiftIds.includes(String(gift.id))) && (!levelGiftIds.length || levelGiftIds.includes(String(gift.id)));
     }).map(gift => ({
       id: gift.id, name: gift.name, iconUrl: gift.iconUrl,
       coinPrice: Number(gift.coinPrice) || 0,
