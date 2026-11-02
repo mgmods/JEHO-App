@@ -2084,17 +2084,21 @@ export class GiftsService implements OnModuleInit {
     const globalGiftIds = Array.isArray(config.giftIds) ? config.giftIds.map(String) : [];
     const levelGiftIds = Array.isArray(currentLevel?.giftIds) ? currentLevel.giftIds.map(String) : [];
     const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
-    const eligibleGifts = allGifts.filter(gift => {
+    const classifySupportGift = (gift: Gift): 'normal' | 'lucky' | 'cp' | 'other' => {
       const rawCategory = String(gift.category || '').toLowerCase();
-      const cat = rawCategory === 'cp' ? 'cp'
-        : (String(gift.type || '').toLowerCase() === 'lucky' || rawCategory === 'lucky') ? 'lucky'
-        : rawCategory === 'normal' ? 'normal' : 'other';
-      return allowedCategories.includes(cat) && (!globalGiftIds.length || globalGiftIds.includes(String(gift.id))) && (!levelGiftIds.length || levelGiftIds.includes(String(gift.id)));
+      const rawType = String(gift.type || '').toLowerCase();
+      if (rawCategory === 'cp' || rawType === 'cp') return 'cp';
+      if (rawType === 'lucky' || rawCategory === 'lucky') return 'lucky';
+      if (rawCategory === 'normal' || rawType === 'normal' || !rawCategory) return 'normal';
+      return 'other';
+    };
+    const eligibleGifts = allGifts.filter(gift => {
+      const category = classifySupportGift(gift);
+      return allowedCategories.includes(category) && (!globalGiftIds.length || globalGiftIds.includes(String(gift.id))) && (!levelGiftIds.length || levelGiftIds.includes(String(gift.id)));
     }).map(gift => ({
       id: gift.id, name: gift.name, iconUrl: gift.iconUrl,
       coinPrice: Number(gift.coinPrice) || 0,
-      category: String(gift.category || '').toLowerCase() === 'cp' ? 'cp'
-        : (String(gift.type || '').toLowerCase() === 'lucky' || String(gift.category || '').toLowerCase() === 'lucky') ? 'lucky' : 'normal',
+      category: classifySupportGift(gift),
     }));
     const rewards = Array.isArray(currentLevel?.rewards) ? currentLevel.rewards.filter((reward: any) => String(reward?.type || '') !== 'none') : [];
     const rewardPreview = await Promise.all(rewards.map(async (reward: any) => {
