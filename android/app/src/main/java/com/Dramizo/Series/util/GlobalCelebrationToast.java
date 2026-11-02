@@ -219,14 +219,14 @@ public final class GlobalCelebrationToast {
             TextView title = active.findViewById(R.id.tvCelebrationTitle);
             TextView body = active.findViewById(R.id.tvCelebrationBody);
             final float avatarX = giftSend ? remoteGiftAvatarX : luckyRoomHigh ? remoteLuckyRoomHighAvatarX : luckyHigh ? remoteLuckyHighAvatarX : luckyReturn ? remoteLuckyReturnAvatarX : remoteLuckyNormalAvatarX;
-            final float avatarY = giftSend ? remoteGiftAvatarY : luckyRoomHigh ? remoteLuckyRoomHighAvatarY : luckyHigh ? remoteLuckyHighAvatarY : luckyReturn ? remoteLuckyReturnAvatarY : remoteLuckyNormalAvatarY;
-            final float textX = giftSend ? remoteGiftTextX : luckyRoomHigh ? remoteLuckyRoomHighTextX : luckyHigh ? remoteLuckyHighTextX : luckyReturn ? remoteLuckyReturnTextX : remoteLuckyNormalTextX;
-            final float textY = giftSend ? remoteGiftTextY : luckyRoomHigh ? remoteLuckyRoomHighTextY : luckyHigh ? remoteLuckyHighTextY : luckyReturn ? remoteLuckyReturnTextY : remoteLuckyNormalTextY;
-            final float bodyX = giftSend ? remoteGiftBodyX : luckyRoomHigh ? remoteLuckyRoomHighBodyX : luckyHigh ? remoteLuckyHighBodyX : luckyReturn ? remoteLuckyReturnBodyX : remoteLuckyNormalBodyX;
-            final float bodyY = giftSend ? remoteGiftBodyY : luckyRoomHigh ? remoteLuckyRoomHighBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
+            final float avatarY = supportChest ? 50f : giftSend ? remoteGiftAvatarY : luckyRoomHigh ? remoteLuckyRoomHighAvatarY : luckyHigh ? remoteLuckyHighAvatarY : luckyReturn ? remoteLuckyReturnAvatarY : remoteLuckyNormalAvatarY;
+            final float textX = supportChest ? 28f : giftSend ? remoteGiftTextX : luckyRoomHigh ? remoteLuckyRoomHighTextX : luckyHigh ? remoteLuckyHighTextX : luckyReturn ? remoteLuckyReturnTextX : remoteLuckyNormalTextX;
+            final float textY = supportChest ? 38f : giftSend ? remoteGiftTextY : luckyRoomHigh ? remoteLuckyRoomHighTextY : luckyHigh ? remoteLuckyHighTextY : luckyReturn ? remoteLuckyReturnTextY : remoteLuckyNormalTextY;
+            final float bodyX = supportChest ? 28f : giftSend ? remoteGiftBodyX : luckyRoomHigh ? remoteLuckyRoomHighBodyX : luckyHigh ? remoteLuckyHighBodyX : luckyReturn ? remoteLuckyReturnBodyX : remoteLuckyNormalBodyX;
+            final float bodyY = supportChest ? 65f : giftSend ? remoteGiftBodyY : luckyRoomHigh ? remoteLuckyRoomHighBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
             final float countX = giftSend ? remoteGiftCountX : luckyRoomHigh ? remoteLuckyRoomHighCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
             final float countY = giftSend ? remoteGiftCountY : luckyRoomHigh ? remoteLuckyRoomHighCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
-            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyRoomHigh ? remoteLuckyRoomHighAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final int avatarSize = supportChest ? 56 : giftSend ? remoteGiftAvatarSizeDp : luckyRoomHigh ? remoteLuckyRoomHighAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
             final float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyRoomHigh ? remoteLuckyRoomHighTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
             final float bodySize = giftSend ? remoteGiftBodySizeSp : luckyRoomHigh ? remoteLuckyRoomHighBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
             final float countSize = giftSend ? remoteGiftCountSizeSp : luckyRoomHigh ? remoteLuckyRoomHighCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
@@ -601,6 +601,7 @@ public final class GlobalCelebrationToast {
         View sheen = banner.findViewById(R.id.viewCelebrationSheen);
 
         boolean planet = kind != null && "planet_summon".equalsIgnoreCase(kind);
+        boolean supportChest = kind != null && "support_chest".equalsIgnoreCase(kind);
         boolean gameOrLucky = kind != null && (
                 "game_win".equalsIgnoreCase(kind) || isLuckyToastKind(kind));
         boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
@@ -620,12 +621,12 @@ public final class GlobalCelebrationToast {
         boolean luckyHigh = luckyWin && !luckyReturn
                 && (explicitHigh || multiplier >= 10d || coinsWon >= 1000L);
         boolean luckyRoomHigh = luckyHigh && centerPlacement;
-        String toastKindTag = giftSend ? "gift_send" : luckyWin ? (luckyRoomHigh ? "lucky_hit_high_room" : luckyReturn ? "lucky_hit_return" : luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
+        String toastKindTag = supportChest ? "support_chest" : giftSend ? "gift_send" : luckyWin ? (luckyRoomHigh ? "lucky_hit_high_room" : luckyReturn ? "lucky_hit_return" : luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
         banner.setTag(toastKindTag);
-        boolean customToastStyle = giftSend || luckyWin;
-        boolean remoteShine = giftSend ? remoteShineEnabled : luckyRoomHigh ? remoteLuckyRoomHighShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : luckyReturn ? remoteLuckyReturnShineEnabled : remoteLuckyNormalShineEnabled;
-        boolean remoteGlow = giftSend ? remoteFrameGlowEnabled : luckyRoomHigh ? remoteLuckyRoomHighGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : luckyReturn ? remoteLuckyReturnGlowEnabled : remoteLuckyNormalGlowEnabled;
-        int customDuration = giftSend ? remoteDurationSeconds : luckyRoomHigh ? remoteLuckyRoomHighDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
+        boolean customToastStyle = giftSend || luckyWin || supportChest;
+        boolean remoteShine = !supportChest && (giftSend ? remoteShineEnabled : luckyRoomHigh ? remoteLuckyRoomHighShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : luckyReturn ? remoteLuckyReturnShineEnabled : remoteLuckyNormalShineEnabled);
+        boolean remoteGlow = !supportChest && (giftSend ? remoteFrameGlowEnabled : luckyRoomHigh ? remoteLuckyRoomHighGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : luckyReturn ? remoteLuckyReturnGlowEnabled : remoteLuckyNormalGlowEnabled);
+        int customDuration = supportChest ? 6 : giftSend ? remoteDurationSeconds : luckyRoomHigh ? remoteLuckyRoomHighDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
         if (planet) {
             banner.setBackgroundResource(R.drawable.bg_planet_go_banner);
         }
@@ -651,9 +652,9 @@ public final class GlobalCelebrationToast {
             tvBody.setSelected(true);
         }
         if (customToastStyle) {
-            float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyRoomHigh ? remoteLuckyRoomHighTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
-            float bodySize = giftSend ? remoteGiftBodySizeSp : luckyRoomHigh ? remoteLuckyRoomHighBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
-            float countSize = giftSend ? remoteGiftCountSizeSp : luckyRoomHigh ? remoteLuckyRoomHighCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
+            float titleSize = supportChest ? 17f : giftSend ? remoteGiftTitleSizeSp : luckyRoomHigh ? remoteLuckyRoomHighTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
+            float bodySize = supportChest ? 14f : giftSend ? remoteGiftBodySizeSp : luckyRoomHigh ? remoteLuckyRoomHighBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
+            float countSize = supportChest ? 12f : giftSend ? remoteGiftCountSizeSp : luckyRoomHigh ? remoteLuckyRoomHighCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
             if (tvTitle != null) tvTitle.setTextSize(titleSize);
             if (tvBody != null) tvBody.setTextSize(bodySize);
             if (tvTimes != null) tvTimes.setTextSize(countSize);
@@ -768,9 +769,9 @@ public final class GlobalCelebrationToast {
                 : luckyRoomHigh ? remoteLuckyRoomHighHeightDp : luckyHigh ? remoteLuckyHighHeightDp
                 : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
         int maxToastWidth = Math.max(dp(activity, 220), screenWidth - dp(activity, 24));
-        int toastWidth = Math.min(dp(activity, Math.max(220, Math.min(360, requestedWidthDp))), maxToastWidth);
+        int toastWidth = Math.min(dp(activity, supportChest ? 360 : Math.max(220, Math.min(360, requestedWidthDp))), maxToastWidth);
         int toastHeight = customToastStyle
-                ? dp(activity, Math.max(60, Math.min(180, requestedHeightDp)))
+                ? dp(activity, supportChest ? 126 : Math.max(60, Math.min(180, requestedHeightDp)))
                 : ViewGroup.LayoutParams.WRAP_CONTENT;
         // Keep the text elements content-sized like the dashboard's draggable preview.
         // Full-width TextViews cannot be positioned by their left-edge percentage.
@@ -864,7 +865,7 @@ public final class GlobalCelebrationToast {
                     .start();
         }
         if (customToastStyle) {
-            final float avatarX = giftSend ? remoteGiftAvatarX : luckyRoomHigh ? remoteLuckyRoomHighAvatarX : luckyHigh ? remoteLuckyHighAvatarX : luckyReturn ? remoteLuckyReturnAvatarX : remoteLuckyNormalAvatarX;
+            final float avatarX = supportChest ? 10f : giftSend ? remoteGiftAvatarX : luckyRoomHigh ? remoteLuckyRoomHighAvatarX : luckyHigh ? remoteLuckyHighAvatarX : luckyReturn ? remoteLuckyReturnAvatarX : remoteLuckyNormalAvatarX;
             final float avatarY = giftSend ? remoteGiftAvatarY : luckyRoomHigh ? remoteLuckyRoomHighAvatarY : luckyHigh ? remoteLuckyHighAvatarY : luckyReturn ? remoteLuckyReturnAvatarY : remoteLuckyNormalAvatarY;
             final float textX = giftSend ? remoteGiftTextX : luckyRoomHigh ? remoteLuckyRoomHighTextX : luckyHigh ? remoteLuckyHighTextX : luckyReturn ? remoteLuckyReturnTextX : remoteLuckyNormalTextX;
             final float textY = giftSend ? remoteGiftTextY : luckyRoomHigh ? remoteLuckyRoomHighTextY : luckyHigh ? remoteLuckyHighTextY : luckyReturn ? remoteLuckyReturnTextY : remoteLuckyNormalTextY;
