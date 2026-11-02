@@ -423,7 +423,37 @@ export class TasksService {
   private defaultDailyLoginConfig() {
     return {
       enabled: true,
-      theme: { backgroundColor:'#f5f0e8', backgroundImageUrl:'', overlayColor:'#ffffff', overlayOpacity:0.12, logoUrl:'', title:'مكافآت تسجيل الدخول لمدة 7 أيام', subtitle:'سجّل دخولك يومياً واحصل على مكافأتك', titleColor:'#3d3158', subtitleColor:'#766b80', cardsPerRow:4, buttonText:'استلام المكافأة', buttonColor:'#7652a5', buttonTextColor:'#ffffff' },
+      theme: {
+        backgroundColor: '#f5f0e8',
+        backgroundImageUrl: '',
+        overlayColor: '#ffffff',
+        overlayOpacity: 0.12,
+        logoUrl: '',
+        title: 'مكافآت تسجيل الدخول لمدة 7 أيام',
+        subtitle: 'سجّل دخولك يومياً واحصل على مكافأتك',
+        titleColor: '#3d3158',
+        subtitleColor: '#766b80',
+        cardsPerRow: 4,
+        buttonText: 'استلام المكافأة',
+        buttonColor: '#7652a5',
+        buttonTextColor: '#ffffff',
+        titleSize: 28,
+        titleTop: 24,
+        headerGap: 14,
+        cardColor: '#fffef4',
+        cardBorderColor: '#e8efcf',
+        cardRadius: 20,
+        cardGap: 12,
+        cardImageSize: 76,
+        cardLabelSize: 16,
+        buttonRadius: 64,
+        buttonHeight: 64,
+        buttonBottom: 20,
+        contentTop: 18,
+        contentGap: 16,
+        fontFamily: 'default',
+        cardBackgroundColor: '#fffef4',
+      },
       days: [
         { day: 1, type: 'coins', amount: 100, label: 'عملات ذهبية' },
         { day: 2, type: 'coins', amount: 150, label: 'مكافأة يومية' },
@@ -477,40 +507,44 @@ export class TasksService {
     const rawTheme = input.theme && typeof input.theme === 'object' ? input.theme : {};
     const safeColor = (value: unknown, fallback: string) => /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : fallback;
     const safeOpacity = Number(rawTheme.overlayOpacity);
+    const numeric = (value: unknown, fallback: number, min: number, max: number) => {
+      const parsed = Number(value);
+      const selected = value === null || value === undefined || value === '' || !Number.isFinite(parsed)
+        ? fallback
+        : parsed;
+      return Math.max(min, Math.min(max, selected));
+    };
     const theme = {
       backgroundColor: safeColor(rawTheme.backgroundColor, defaults.backgroundColor),
-      backgroundImageUrl: String(rawTheme.backgroundImageUrl || '').slice(0, 2048),
+      backgroundImageUrl: String(rawTheme.backgroundImageUrl ?? '').slice(0, 2048),
       overlayColor: safeColor(rawTheme.overlayColor, defaults.overlayColor),
-      overlayOpacity: Number.isFinite(safeOpacity) ? Math.max(0, Math.min(1, safeOpacity)) : defaults.overlayOpacity,
-      logoUrl: String(rawTheme.logoUrl || '').slice(0, 2048),
-      title: String(rawTheme.title || defaults.title).slice(0, 80),
-      subtitle: String(rawTheme.subtitle || defaults.subtitle).slice(0, 120),
+      overlayOpacity: numeric(rawTheme.overlayOpacity, defaults.overlayOpacity, 0, 1),
+      logoUrl: String(rawTheme.logoUrl ?? '').slice(0, 2048),
+      title: String(rawTheme.title ?? defaults.title).slice(0, 80),
+      subtitle: String(rawTheme.subtitle ?? defaults.subtitle).slice(0, 120),
       titleColor: safeColor(rawTheme.titleColor, defaults.titleColor),
       subtitleColor: safeColor(rawTheme.subtitleColor, defaults.subtitleColor),
       cardsPerRow: 4,
-      buttonText: String(rawTheme.buttonText || defaults.buttonText).slice(0, 40),
+      buttonText: String(rawTheme.buttonText ?? defaults.buttonText).slice(0, 40),
       buttonColor: safeColor(rawTheme.buttonColor, defaults.buttonColor),
       buttonTextColor: safeColor(rawTheme.buttonTextColor, defaults.buttonTextColor),
-      // Persist the full dashboard visual editor configuration, not only its
-      // legacy subset; otherwise layout edits silently revert after refresh.
-      subtitle: String(rawTheme.subtitle || defaults.subtitle || '').slice(0, 120),
-      subtitleColor: safeColor(rawTheme.subtitleColor, defaults.subtitleColor || '#176b32'),
-      titleSize: Math.max(12, Math.min(64, Number(rawTheme.titleSize) || defaults.titleSize || 28)),
-      titleTop: Math.max(0, Math.min(300, Number(rawTheme.titleTop) || defaults.titleTop || 24)),
-      headerGap: Math.max(0, Math.min(100, Number(rawTheme.headerGap) || defaults.headerGap || 14)),
-      cardColor: safeColor(rawTheme.cardColor, defaults.cardColor || '#fffef4'),
-      cardBorderColor: safeColor(rawTheme.cardBorderColor, defaults.cardBorderColor || '#e8efcf'),
-      cardRadius: Math.max(0, Math.min(48, Number(rawTheme.cardRadius) || defaults.cardRadius || 20)),
-      cardGap: Math.max(0, Math.min(60, Number(rawTheme.cardGap) || defaults.cardGap || 12)),
-      cardImageSize: Math.max(24, Math.min(180, Number(rawTheme.cardImageSize) || defaults.cardImageSize || 76)),
-      cardLabelSize: Math.max(10, Math.min(32, Number(rawTheme.cardLabelSize) || defaults.cardLabelSize || 16)),
-      buttonRadius: Math.max(0, Math.min(100, Number(rawTheme.buttonRadius) || defaults.buttonRadius || 64)),
-      buttonHeight: Math.max(32, Math.min(120, Number(rawTheme.buttonHeight) || defaults.buttonHeight || 64)),
-      buttonBottom: Math.max(0, Math.min(300, Number(rawTheme.buttonBottom) || defaults.buttonBottom || 20)),
-      contentTop: Math.max(0, Math.min(300, Number(rawTheme.contentTop) || defaults.contentTop || 18)),
-      contentGap: Math.max(0, Math.min(100, Number(rawTheme.contentGap) || defaults.contentGap || 16)),
-      fontFamily: String(rawTheme.fontFamily || defaults.fontFamily || 'default').slice(0, 40),
-      cardBackgroundColor: safeColor(rawTheme.cardBackgroundColor, defaults.cardBackgroundColor || '#fffef4'),
+      // Persist every supported visual-editor field so dashboard edits survive reloads.
+      titleSize: numeric(rawTheme.titleSize, defaults.titleSize, 12, 64),
+      titleTop: numeric(rawTheme.titleTop, defaults.titleTop, 0, 300),
+      headerGap: numeric(rawTheme.headerGap, defaults.headerGap, 0, 100),
+      cardColor: safeColor(rawTheme.cardColor, defaults.cardColor),
+      cardBorderColor: safeColor(rawTheme.cardBorderColor, defaults.cardBorderColor),
+      cardRadius: numeric(rawTheme.cardRadius, defaults.cardRadius, 0, 48),
+      cardGap: numeric(rawTheme.cardGap, defaults.cardGap, 0, 60),
+      cardImageSize: numeric(rawTheme.cardImageSize, defaults.cardImageSize, 24, 180),
+      cardLabelSize: numeric(rawTheme.cardLabelSize, defaults.cardLabelSize, 10, 32),
+      buttonRadius: numeric(rawTheme.buttonRadius, defaults.buttonRadius, 0, 100),
+      buttonHeight: numeric(rawTheme.buttonHeight, defaults.buttonHeight, 32, 120),
+      buttonBottom: numeric(rawTheme.buttonBottom, defaults.buttonBottom, 0, 300),
+      contentTop: numeric(rawTheme.contentTop, defaults.contentTop, 0, 300),
+      contentGap: numeric(rawTheme.contentGap, defaults.contentGap, 0, 100),
+      fontFamily: String(rawTheme.fontFamily ?? defaults.fontFamily).slice(0, 40),
+      cardBackgroundColor: safeColor(rawTheme.cardBackgroundColor, defaults.cardBackgroundColor),
     };
     const value = JSON.stringify({ enabled: input.enabled !== false, theme, days });
     let row = await this.settings.findOne({ where: { key: TasksService.DAILY_LOGIN_KEY } });
