@@ -808,7 +808,7 @@ public final class GlobalCelebrationToast {
         banner.setScaleY(0.985f);
         banner.setTranslationX(dp(activity, 140));
         if (toastBackground != null) {
-            String selectedBackground = giftSend ? remoteBackgroundUrl : luckyRoomHigh ? remoteLuckyRoomHighBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
+            String selectedBackground = supportChest ? "" : giftSend ? remoteBackgroundUrl : luckyRoomHigh ? remoteLuckyRoomHighBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
             String imageUrl = customToastStyle ? toastBackgroundUrl(selectedBackground) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 // The uploaded artwork owns its pixels, edges and alpha channel. Do not add
@@ -823,7 +823,7 @@ public final class GlobalCelebrationToast {
                 toastBackground.setVisibility(View.GONE);
             }
         }
-        banner.setElevation(dp(activity, customToastStyle && remoteGlow ? 20 : 14));
+        banner.setElevation(dp(activity, supportChest ? 28 : customToastStyle && remoteGlow ? 20 : 14));
         if (sheen != null && customToastStyle && remoteShine) {
             sheen.setVisibility(View.VISIBLE);
             GradientDrawable shine = new GradientDrawable(
