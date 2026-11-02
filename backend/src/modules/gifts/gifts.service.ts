@@ -2389,7 +2389,7 @@ export class GiftsService implements OnModuleInit {
       return { config: cfg, state, opened, contribution };
     });
     if (result) {
-      const liveRooms = await this.roomsRepo.find({ where: { status: RoomStatus.OPEN }, select: { id: true } as any });
+      const liveRooms = await this.roomsRepo.find({ where: [{ status: RoomStatus.OPEN }, { status: RoomStatus.LOCKED }], select: { id: true } as any });
       const targetRoomIds = [...new Set([roomId, ...liveRooms.map(room => room.id)])];
       const at = new Date().toISOString();
       for (const targetRoomId of targetRoomIds) {
