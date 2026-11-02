@@ -15192,9 +15192,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String winner = memberStr(payload, "winnerName");
             if (winner == null || winner.trim().isEmpty()) winner = "أحد الداعمين";
             String levelTitle = memberStr(payload, "levelTitle");
-            String message = "💥 انفجر صندوق الدعم! " + winner + " أكمل الهدف وفاز بالمكافأة"
-                    + (levelTitle == null ? "" : " · " + levelTitle);
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+            String message = winner + " أكمل الهدف وفاز بمكافآت الصندوق";
+            String roomEventId = memberStr(payload, "cycle");
+            String levelId = memberStr(payload, "level");
+            GlobalCelebrationToast.showRoomCenter(
+                    this, "💥 انفجار صندوق الدعم!", message, null, null,
+                    "support-chest:" + roomId + ":" + (roomEventId == null ? "1" : roomEventId)
+                            + ":" + (levelId == null ? "1" : levelId),
+                    0d, 0L, winner, "support_chest", roomId);
             RoomSoundFx.playLuckyGold(this, 2);
             return;
         }
