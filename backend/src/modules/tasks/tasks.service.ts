@@ -671,7 +671,25 @@ export class TasksService {
         if (!owned) owned = manager.create(UserCosmetic, { userId, cosmeticId: cosmetic.id, equipped: false, expiresAt: expiry });
         else if (owned.expiresAt !== null) owned.expiresAt = new Date(Math.max(now.getTime(), new Date(owned.expiresAt || 0).getTime()) + Math.max(1, Number(reward.durationDays) || 7) * 86400000);
         await manager.save(owned);
-        rewardResult = { type: 'cosmetic', code: cosmetic.code, name: cosmetic.name, previewUrl: cosmetic.previewUrl, expiresAt: owned.expiresAt };
+        const cosmeticMeta = cosmetic.meta && typeof cosmetic.meta === 'object'
+          ? cosmetic.meta as Record<string, unknown>
+          : {};
+        const artwork = (...values: unknown[]) => {
+          for (const value of values) {
+            const candidate = String(value ?? '').trim();
+            if (candidate) return candidate;
+          }
+          return null;
+        };
+        rewardResult = {
+          type: 'cosmetic',
+          code: cosmetic.code,
+          name: cosmetic.name,
+          cosmeticType: cosmetic.type,
+          previewUrl: artwork(cosmetic.previewUrl, cosmeticMeta.previewUrl, cosmeticMeta.iconUrl, cosmeticMeta.imageUrl),
+          animationUrl: artwork(cosmetic.animationUrl, cosmeticMeta.animationUrl, cosmeticMeta.svgaUrl, cosmeticMeta.gifUrl),
+          expiresAt: owned.expiresAt,
+        };
       }
       const nextState = { lastClaimDate: today, streak: dayNo };
       if (!stateRow) stateRow = manager.create(AppSetting, { key: stateKey, value: JSON.stringify(nextState), description: `Daily login streak for ${userId}` });
