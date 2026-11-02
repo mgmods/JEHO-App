@@ -349,7 +349,7 @@ public class CpCenterActivity extends ThemedActivity {
                     message("تم إنهاء العلاقة.");
                     loadHome();
                     loadDiscover("");
-                } else message(r.error != null ? r.error : "تعذر إنهاء العلاقة");
+                } else { message(r.error != null ? r.error : "تعذر إنهاء العلاقة"); loadHome(); }
             });
         }
 
@@ -372,7 +372,7 @@ public class CpCenterActivity extends ThemedActivity {
         web.evaluateJavascript(
                 "window.handleCpSystemBack ? window.handleCpSystemBack() : ((window.getCpView && window.getCpView() !== 'home') ? (window.setCpView && window.setCpView('home'), 'handled') : 'finish')",
                 value -> {
-                    if ("\\\"finish\\\"".equals(value)) finish();
+                    if ("\"finish\"".equals(value)) finish();
                 });
     }
 
