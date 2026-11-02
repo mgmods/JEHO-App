@@ -480,6 +480,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private WebView activeSupportChestWeb;
     @Nullable private String activeSupportChestRoomId;
     @Nullable private String activeSupportChestAsset;
+    /** Dedupe repeated realtime delivery so one completed chest creates one room-wide blast. */
+    @Nullable private String lastSupportChestOpenedKey;
+    private long lastSupportChestOpenedAtMs;
     private final Runnable supportChestEventRefresh = () -> {
         WebView chestWeb = activeSupportChestWeb;
         String chestRoom = activeSupportChestRoomId;
@@ -15271,6 +15274,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         if ("support_chest:opened".equals(event)) {
+            String openedCycle = memberStr(payload, "cycle");
+            String openedLevel = memberStr(payload, "level");
+            String openedEventKey = "support-chest:" + String.valueOf(roomId) + ":"
+                    + (openedCycle == null ? memberStr(payload, "eventId") : openedCycle)
+                    + ":" + String.valueOf(openedLevel);
+            long openedAtMs = android.os.SystemClock.elapsedRealtime();
+            if (openedEventKey.equals(lastSupportChestOpenedKey)
+                    && openedAtMs - lastSupportChestOpenedAtMs < 12000L) {
+                return;
+            }
+            lastSupportChestOpenedKey = openedEventKey;
+            lastSupportChestOpenedAtMs = openedAtMs;
             View openedChestIcon = findViewById(R.id.btnRoomSupportChest);
             if (openedChestIcon != null) {
                 openedChestIcon.animate().cancel();
