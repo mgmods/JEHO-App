@@ -2,6 +2,10 @@ package com.Dramizo.Series.presentation.wallet;
 
 import android.app.Dialog;
 import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Picture;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -23,6 +27,10 @@ import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentManager;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
+import com.caverock.androidsvg.SVG;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.DialogSignInBinding;
@@ -36,12 +44,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 /** Native seven-day login rewards; configuration and claims are server-backed. */
 public class SignInDialog extends DialogFragment {
     private static final int GREEN = Color.rgb(33, 134, 83);
     private static final int DARK = Color.rgb(35, 45, 40);
     private static final int MUTED = Color.rgb(112, 122, 116);
+    private static final OkHttpClient SVG_HTTP = new OkHttpClient.Builder()
+            .callTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build();
 
     public static void show(@Nullable FragmentManager fm) {
         if (fm == null || fm.isStateSaved()) return;
@@ -144,13 +162,14 @@ public class SignInDialog extends DialogFragment {
                     ImageView image = rewardImages.get(i);
                     TextView label = rewardLabels.get(i);
                     if (day != null && "cosmetic".equalsIgnoreCase(day.type)) {
-                        String url = nonEmpty(day.previewUrl) ? day.previewUrl : day.animationUrl;
-                        url = AssetCatalog.absoluteUrl(url);
-                        // The selected catalogue item supplies its own artwork URL (frame, entry effect, etc.).
-                        if (nonEmpty(url)) {
-                            Glide.with(this).load(url).placeholder(R.drawable.ic_gold_coin)
-                                    .error(R.drawable.ic_gold_coin).into(image);
-                        } else image.setImageResource(R.drawable.ic_gold_coin);
+                        // Try the catalogue thumbnail first, then its animation artwork if
+                        // the thumbnail URL is missing or the server returns an error.
+                        if (nonEmpty(day.previewUrl) || nonEmpty(day.animationUrl)) {
+                            loadDashboardArtwork(image, day.previewUrl, day.animationUrl,
+                                    R.drawable.ic_gold_coin, ImageView.ScaleType.FIT_CENTER);
+                        } else {
+                            image.setImageResource(R.drawable.ic_gold_coin);
+                        }
                         label.setText(nonEmpty(day.name) ? day.name : (nonEmpty(day.label) ? day.label : "عنصر تجميلي"));
                         if (day.durationDays > 0) label.setText(label.getText() + "\n" + day.durationDays + " يوم");
                     } else {
@@ -188,10 +207,11 @@ public class SignInDialog extends DialogFragment {
         int panelColor = blend(backgroundColor, overlayColor, overlayOpacity);
         if (nonEmpty(backgroundUrl)) {
             binding.imgDialogBackground.setVisibility(View.VISIBLE);
-            Glide.with(this).load(AssetCatalog.absoluteUrl(backgroundUrl))
-                    .centerCrop().into(binding.imgDialogBackground);
+            loadDashboardArtwork(binding.imgDialogBackground, backgroundUrl, null,
+                    R.drawable.bg_sign_in_panel, ImageView.ScaleType.CENTER_CROP);
+            // Keep the uploaded wallpaper visible beneath a readable translucent panel.
             GradientDrawable panel = new GradientDrawable();
-            panel.setColor(Color.argb(224, Color.red(panelColor), Color.green(panelColor), Color.blue(panelColor)));
+            panel.setColor(Color.argb(144, Color.red(panelColor), Color.green(panelColor), Color.blue(panelColor)));
             panel.setCornerRadius(dp(22));
             binding.clSignIn.setBackground(panel);
         } else {
@@ -203,8 +223,8 @@ public class SignInDialog extends DialogFragment {
         }
         if (nonEmpty(logoUrl)) {
             binding.imgSignLogo.setVisibility(View.VISIBLE);
-            Glide.with(this).load(AssetCatalog.absoluteUrl(logoUrl))
-                    .fitCenter().into(binding.imgSignLogo);
+            loadDashboardArtwork(binding.imgSignLogo, logoUrl, null,
+                    R.drawable.ic_tab_me, ImageView.ScaleType.FIT_CENTER);
         } else {
             binding.imgSignLogo.setVisibility(View.GONE);
             binding.imgSignLogo.setImageDrawable(null);
@@ -221,6 +241,126 @@ public class SignInDialog extends DialogFragment {
         button.setCornerRadius(dp(64));
         binding.bltvCheckIn.setBackground(button);
         binding.bltvCheckIn.setTextColor(themeColor(theme, "buttonTextColor", Color.WHITE));
+    }
+
+    /** Resolve dashboard paths and load either raster artwork or SVG uploads. */
+    private void loadDashboardArtwork(ImageView target, @Nullable String primary,
+                                      @Nullable String fallback, int placeholder,
+                                      ImageView.ScaleType scaleType) {
+        if (target == null) return;
+        target.setScaleType(scaleType);
+        target.setImageResource(placeholder);
+        List<String> candidates = new ArrayList<>();
+        addArtworkCandidate(candidates, primary);
+        addArtworkCandidate(candidates, fallback);
+        if (candidates.isEmpty()) return;
+        loadDashboardArtworkCandidate(target, candidates, 0, placeholder);
+    }
+
+    private void addArtworkCandidate(List<String> candidates, @Nullable String raw) {
+        if (!nonEmpty(raw)) return;
+        String absolute = AssetCatalog.absoluteUrl(raw.trim());
+        String resolved = com.Dramizo.Series.util.MediaAssetSync.bust(absolute);
+        if (nonEmpty(resolved) && !candidates.contains(resolved)) candidates.add(resolved);
+    }
+
+    private boolean isSvgArtwork(String url) {
+        String clean = url == null ? "" : url;
+        int query = clean.indexOf('?');
+        if (query >= 0) clean = clean.substring(0, query);
+        return clean.toLowerCase(Locale.ROOT).endsWith(".svg");
+    }
+
+    private void loadDashboardArtworkCandidate(ImageView target, List<String> candidates,
+                                               int index, int placeholder) {
+        if (!isAdded() || binding == null || target == null) return;
+        if (index >= candidates.size()) {
+            target.setImageResource(placeholder);
+            return;
+        }
+        String url = candidates.get(index);
+        if (isSvgArtwork(url)) {
+            loadSvgArtwork(target, candidates, index, placeholder);
+            return;
+        }
+        Glide.with(this).load(url)
+                .placeholder(placeholder)
+                .error(placeholder)
+                .listener(new RequestListener<Drawable>() {
+                    @Override
+                    public boolean onLoadFailed(@Nullable GlideException error, Object model,
+                                                Target<Drawable> glideTarget, boolean first) {
+                        if (index + 1 < candidates.size()) {
+                            loadDashboardArtworkCandidate(target, candidates, index + 1, placeholder);
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onResourceReady(Drawable resource, Object model,
+                                                   Target<Drawable> glideTarget,
+                                                   com.bumptech.glide.load.DataSource source,
+                                                   boolean first) {
+                        return false;
+                    }
+                })
+                .into(target);
+    }
+
+    private void loadSvgArtwork(ImageView target, List<String> candidates, int index, int placeholder) {
+        final String url = candidates.get(index);
+        AppContainer container;
+        try {
+            container = ContainerProvider.from(requireActivity());
+        } catch (Exception error) {
+            loadDashboardArtworkCandidate(target, candidates, index + 1, placeholder);
+            return;
+        }
+        container.getIoExecutor().execute(() -> {
+            Bitmap bitmap = null;
+            try (Response response = SVG_HTTP.newCall(new Request.Builder().url(url).get().build()).execute()) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    throw new IllegalStateException("SVG image request failed: " + response.code());
+                }
+                SVG svg = SVG.getFromInputStream(response.body().byteStream());
+                float docWidth = svg.getDocumentWidth();
+                float docHeight = svg.getDocumentHeight();
+                if (!(docWidth > 0f) || !(docHeight > 0f)
+                        || Float.isInfinite(docWidth) || Float.isInfinite(docHeight)
+                        || Float.isNaN(docWidth) || Float.isNaN(docHeight)) {
+                    docWidth = 512f;
+                    docHeight = 512f;
+                }
+                float scale = Math.min(1f, 1200f / Math.max(docWidth, docHeight));
+                int width = Math.max(1, Math.round(docWidth * scale));
+                int height = Math.max(1, Math.round(docHeight * scale));
+                Picture picture = svg.renderToPicture(width, height);
+                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                Canvas canvas = new Canvas(bitmap);
+                picture.draw(canvas);
+            } catch (Exception error) {
+                android.util.Log.w("SignInDialog", "Dashboard SVG artwork failed: " + url, error);
+            }
+            final Bitmap result = bitmap;
+            if (!isAdded()) {
+                if (result != null && !result.isRecycled()) result.recycle();
+                return;
+            }
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || !isAdded()) {
+                    if (result != null && !result.isRecycled()) result.recycle();
+                    return;
+                }
+                if (result != null) {
+                    target.setImageBitmap(result);
+                } else if (index + 1 < candidates.size()) {
+                    loadDashboardArtworkCandidate(target, candidates, index + 1, placeholder);
+                } else {
+                    target.setImageResource(placeholder);
+                }
+            });
+        });
     }
 
     private String themeString(Map<String, Object> theme, String key) {
