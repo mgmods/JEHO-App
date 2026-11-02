@@ -463,21 +463,23 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           WHERE ${whereSql}
        GROUP BY g."senderId", u."displayName", u.username, u."avatarUrl", p."hostBadgeUrl"
        ORDER BY score DESC
-          LIMIT 3`,
+          LIMIT 30`,
         params,
       );
-      return Promise.all(rows.map(async (row: Record<string, unknown>, index: number) => {
+      const visible = await Promise.all(rows.map(async (row: Record<string, unknown>) => {
         const anonymous = await this.mysteriousRoomIdentity(String(row.userId || ''));
+        if (anonymous) return null; // Hidden-mode accounts never enter room supporter rankings.
         return {
-          rank: index + 1,
           userId: row.userId,
-          displayName: anonymous ? 'الرجل الغامض' : row.displayName,
-          avatarUrl: anonymous ? null : row.avatarUrl,
-          hostBadgeUrl: anonymous ? ((anonymous as any).vipBadgeUrl || null) : row.hostBadgeUrl,
-          mysteriousMan: !!anonymous,
+          displayName: row.displayName,
+          avatarUrl: row.avatarUrl,
+          hostBadgeUrl: row.hostBadgeUrl,
           score: Number(row.score || 0),
         };
       }));
+      return visible.filter((item): item is NonNullable<typeof item> => !!item)
+        .slice(0, 3)
+        .map((item, index) => ({ ...item, rank: index + 1 }));
     };
     // Room header tops are session-scoped: cleared when live ends.
     const roomTop =
@@ -550,7 +552,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     } else if (periodKind === 'month') {
       timeSql = ` AND g."createdAt" >= NOW() - INTERVAL '30 days'`;
     }
-    params.push(n);
+    params.push(Math.min(500, n * 5));
     const rows = await this.dataSource.query(
       `SELECT ${userCol} AS "userId",
               COALESCE(u."displayName", u.username, 'مستخدم') AS "displayName",
@@ -564,17 +566,19 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         LIMIT $${params.length}`,
       params,
     );
-    const items = await Promise.all(rows.map(async (row: Record<string, unknown>, index: number) => {
+    const visible = await Promise.all(rows.map(async (row: Record<string, unknown>) => {
       const anonymous = await this.mysteriousRoomIdentity(String(row.userId || ''));
+      if (anonymous) return null; // Keep mysterious-mode activity out of wealth/charm boards.
       return {
-        rank: index + 1,
         userId: row.userId,
-        displayName: anonymous ? 'الرجل الغامض' : row.displayName,
-        avatarUrl: anonymous ? null : row.avatarUrl,
-        mysteriousMan: !!anonymous,
+        displayName: row.displayName,
+        avatarUrl: row.avatarUrl,
         score: Number(row.score || 0),
       };
     }));
+    const items = visible.filter((item): item is NonNullable<typeof item> => !!item)
+      .slice(0, n)
+      .map((item, index) => ({ ...item, rank: index + 1 }));
     const dayGold = await this.roomDayGold(roomId);
     return {
       roomId,
