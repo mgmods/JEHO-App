@@ -466,20 +466,20 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           LIMIT 30`,
         params,
       );
-      const visible = await Promise.all(rows.map(async (row: Record<string, unknown>) => {
-        const anonymous = await this.mysteriousRoomIdentity(String(row.userId || ''));
-        if (anonymous) return null; // Hidden-mode accounts never enter room supporter rankings.
-        return {
+      const hiddenIds = await this.mysteriousModeUserIds(
+        rows.map((row: Record<string, unknown>) => String(row.userId || '')),
+      );
+      return rows
+        .filter((row: Record<string, unknown>) => !hiddenIds.has(String(row.userId || '')))
+        .slice(0, 3)
+        .map((row: Record<string, unknown>, index: number) => ({
+          rank: index + 1,
           userId: row.userId,
           displayName: row.displayName,
           avatarUrl: row.avatarUrl,
           hostBadgeUrl: row.hostBadgeUrl,
           score: Number(row.score || 0),
-        };
-      }));
-      return visible.filter((item): item is NonNullable<typeof item> => !!item)
-        .slice(0, 3)
-        .map((item, index) => ({ ...item, rank: index + 1 }));
+        }));
     };
     // Room header tops are session-scoped: cleared when live ends.
     const roomTop =
@@ -566,19 +566,19 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         LIMIT $${params.length}`,
       params,
     );
-    const visible = await Promise.all(rows.map(async (row: Record<string, unknown>) => {
-      const anonymous = await this.mysteriousRoomIdentity(String(row.userId || ''));
-      if (anonymous) return null; // Keep mysterious-mode activity out of wealth/charm boards.
-      return {
+    const hiddenIds = await this.mysteriousModeUserIds(
+      rows.map((row: Record<string, unknown>) => String(row.userId || '')),
+    );
+    const items = rows
+      .filter((row: Record<string, unknown>) => !hiddenIds.has(String(row.userId || '')))
+      .slice(0, n)
+      .map((row: Record<string, unknown>, index: number) => ({
+        rank: index + 1,
         userId: row.userId,
         displayName: row.displayName,
         avatarUrl: row.avatarUrl,
         score: Number(row.score || 0),
-      };
-    }));
-    const items = visible.filter((item): item is NonNullable<typeof item> => !!item)
-      .slice(0, n)
-      .map((item, index) => ({ ...item, rank: index + 1 }));
+      }));
     const dayGold = await this.roomDayGold(roomId);
     return {
       roomId,
@@ -1555,6 +1555,36 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
     return Array.isArray(extra) && extra.includes('mysterious_man');
+  }
+
+  /** Resolve active mysterious-mode users in batches so ranking reads stay bounded. */
+  private async mysteriousModeUserIds(userIds: string[]): Promise<Set<string>> {
+    const ids = [...new Set((userIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+    if (!ids.length) return new Set<string>();
+    const users = await this.usersRepo.find({
+      where: { id: In(ids), mysteriousMode: true },
+    });
+    if (!users.length) return new Set<string>();
+    const vipRows = await this.userVipsRepo.find({
+      where: {
+        userId: In(users.map((user) => user.id)),
+        isActive: true,
+        expiresAt: MoreThan(new Date()),
+      },
+      relations: ['vipPlan'],
+      order: { level: 'DESC' },
+    });
+    const vipByUser = new Map<string, UserVip>();
+    for (const vip of vipRows) {
+      if (!vipByUser.has(vip.userId)) vipByUser.set(vip.userId, vip);
+    }
+    const hidden = new Set<string>();
+    await Promise.all(users.map(async (user) => {
+      if (await this.isMysteriousModeEligible(user, vipByUser.get(user.id))) {
+        hidden.add(user.id);
+      }
+    }));
+    return hidden;
   }
 
   /** Return room-only anonymous presentation only for an eligible, unexpired VIP. */
