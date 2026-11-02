@@ -99,7 +99,7 @@ function isVideo(value){return /\.(mp4|webm)(\?|$)/i.test(String(value||''))}
 function addLevel(){const next=Math.max(0,...form.levels.map(x=>Number(x.level)||0))+1;form.levels.push({level:next,title:'المستوى '+next,goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:[...(form.giftCategories||['normal'])],giftIds:[],imageUrl:'',rewards:[{type:'coins',amount:5000,itemId:''}]})}
 function removeLevel(index){form.levels.splice(index,1);form.levels.forEach((x,i)=>x.level=i+1)}
 function addReward(level){level.rewards=level.rewards||[];level.rewards.push({type:'coins',amount:1000,itemId:''})}
-function rewardLabel(r){const names={coins:'كوينزات',diamonds:'ماسات',vip:'VIP',frame:'إطار',badge:'شارة'};const item=r.type==='frame'?frameItems.value.find(x=>String(x.id)===String(r.itemId)):r.type==='vip'?catalogVipPlans.value.find(x=>String(x.id)===String(r.itemId)):null;return (itemName(item)||names[r.type]||r.type)+' × '+(Number(r.amount)||1)}
+function rewardLabel(r){const names={coins:'كوينزات',diamonds:'ماسات',vip:'VIP',frame:'إطار',badge:'شارة'};const item=r.type==='frame'?frameItems.value.find(x=>String(x.id)===String(r.itemId)):r.type==='vip'?catalogVipPlans.value.find(x=>String(x.id)===String(r.itemId)):null;return (item?itemName(item):(names[r.type]||r.type))+' × '+(Number(r.amount)||1)}
 function toggleGift(id, checked){const key=String(id);form.giftIds=checked?[...new Set([...(form.giftIds||[]).map(String),key])]: (form.giftIds||[]).map(String).filter(x=>x!==key)}
 const frameItems = computed(()=>catalogCosmetics.value.filter(x=>/frame/i.test(String(x.type||x.category||''))))
 const rewardItems = computed(()=> {
