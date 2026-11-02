@@ -607,7 +607,7 @@ export class AdminService {
     const giftSelectionMode = String(input.giftSelectionMode || (giftIds.length ? 'selected' : 'all')) === 'selected' ? 'selected' : 'all';
     if (giftSelectionMode === 'selected' && !giftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل أو اختر جميع الهدايا');
     const rawLevels = Array.isArray(input.levels) ? input.levels as Record<string, any>[] : [];
-    if (rawLevels.length > 2) throw new BadRequestException('صندوق الدعم يدعم صفحتين فقط حالياً: المستوى الأول والمستوى الثاني');
+    if (rawLevels.length !== 3) throw new BadRequestException('يجب إعداد المستويات الثلاثة لصندوق الدعم قبل الحفظ');
     const levels = rawLevels.map((level, index) => {
       const mode = String(level.goalMode || 'coins');
       if (!allowedModes.has(mode)) throw new BadRequestException('نوع هدف غير صالح في مستوى الصندوق');
@@ -624,6 +624,9 @@ export class AdminService {
       const levelGiftIds = Array.isArray(level.giftIds) ? [...new Set(level.giftIds.map(String).map(x => x.trim()).filter(Boolean))] : [];
       const levelGiftSelectionMode = String(level.giftSelectionMode || (levelGiftIds.length ? 'selected' : 'all')) === 'selected' ? 'selected' : 'all';
       if (levelGiftSelectionMode === 'selected' && !levelGiftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل لهذا المستوى أو اختر جميع الهدايا');
+      const features = Array.isArray(level.features)
+        ? [...new Set(level.features.map((value: any) => String(value || '').trim()).filter(Boolean))].slice(0, 20)
+        : String(level.featuresText || '').split(/\\r?\\n/).map(value => value.trim()).filter(Boolean).slice(0, 20);
       const rewards = Array.isArray(level.rewards) ? level.rewards.map((reward: any) => {
         const type = String(reward?.type || '');
         if (!allowedRewards.has(type) || type === 'none') throw new BadRequestException('نوع مكافأة غير صالح في مستوى الصندوق');
@@ -642,6 +645,7 @@ export class AdminService {
         giftSelectionMode: levelGiftSelectionMode,
         giftIds: levelGiftIds,
         imageUrl: String(level.imageUrl || '').trim().slice(0, 2048),
+        features,
         rewards,
       };
     });
@@ -683,6 +687,7 @@ export class AdminService {
       rewardItemId: String(input.rewardItemId || '').trim(),
       rewardAmount: Math.max(0, Math.floor(Number(input.rewardAmount) || 0)),
       instructions: String(input.instructions || '').slice(0, 3000),
+      soundEnabled: input.soundEnabled !== false,
     };
     const existing = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     if (existing) {
