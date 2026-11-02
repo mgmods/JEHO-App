@@ -386,9 +386,9 @@
           </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-aurora" :disabled="saving" @click="saveType(item)">
-            <span v-if="savingType === item.type" class="spinner-border spinner-border-sm me-1" />
-            حفظ {{ label(item.type) }}
+          <button class="btn btn-aurora" :disabled="saving || Number(item.uploadingLevelAssets || 0) > 0" @click="saveType(item)">
+            <span v-if="savingType === item.type || Number(item.uploadingLevelAssets || 0) > 0" class="spinner-border spinner-border-sm me-1" />
+            {{ Number(item.uploadingLevelAssets || 0) > 0 ? 'انتظر اكتمال رفع صور المستويات…' : savingType === item.type ? 'جارٍ حفظ إعدادات ' + label(item.type) + '…' : 'حفظ ' + label(item.type) }}
           </button>
         </div>
       </section>
@@ -920,6 +920,7 @@ async function uploadLevelAsset(item, level, field, event) {
   if (!allowed) { error.value = 'صيغة الصورة غير مدعومة لهذا الحقل.'; event.target.value = ''; return }
   if (file.size > 40 * 1024 * 1024) { error.value = 'حجم الصورة يجب ألا يتجاوز 40 ميغابايت.'; event.target.value = ''; return }
   error.value = ''
+  item.uploadingLevelAssets = Number(item.uploadingLevelAssets || 0) + 1
   try {
     const response = await uploadsApi.upload(file)
     if (response?.error) throw new Error(response.error.message || 'تعذر رفع صورة المستوى')
@@ -934,7 +935,10 @@ async function uploadLevelAsset(item, level, field, event) {
     success.value = 'تم رفع أصل المستوى. احفظ إعدادات النوع لاعتماده.'
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر رفع أصل المستوى'
-  } finally { if (event?.target) event.target.value = '' }
+  } finally {
+    item.uploadingLevelAssets = Math.max(0, Number(item.uploadingLevelAssets || 1) - 1)
+    if (event?.target) event.target.value = ''
+  }
 }
 
 function refreshLevelEditor(item) {
@@ -950,6 +954,10 @@ function refreshLevelEditor(item) {
 }
 
 async function saveType(item) {
+  if (Number(item.uploadingLevelAssets || 0) > 0) {
+    error.value = 'انتظر حتى يكتمل رفع جميع صور وملفات المستوى قبل الحفظ.'
+    return
+  }
   error.value = ''; success.value = ''; saving.value = true; savingType.value = item.type
   try {
     syncLevelEditor(item)
