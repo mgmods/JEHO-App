@@ -144,12 +144,19 @@ final class RelationshipSeatEffectsOverlay {
             // each endpoint by user ID on every frame, including while RecyclerView rebinds seats.
 
             String type = firstValue(relation, "type", "relationshipType", "relationType", "bondType");
-            Map<String, Object> effect = findEffect(type);
-            if (effect != null && Boolean.FALSE.equals(effect.get("enabled"))) continue;
-            String url = effect == null ? "" : firstValue(effect, "url", "imageUrl", "assetUrl", "effectUrl", "iconUrl");
-            int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 28, 20, 36);
-            long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
-            addEffect(a, b, type, url, sizeDp, duration);
+            // The active level owns the preferred effect. Keep the legacy type-wide
+            // effect as a fallback so existing dashboard settings continue to work.
+            Map<String, Object> levelConfig = relation.get("currentLevelConfig") instanceof Map
+                    ? (Map<String, Object>) relation.get("currentLevelConfig") : null;
+            Map<String, Object> effect = levelConfig != null && levelConfig.get("seatEffect") instanceof Map
+                    ? (Map<String, Object>) levelConfig.get("seatEffect") : findEffect(type);
+            boolean effectEnabled = effect == null || !Boolean.FALSE.equals(effect.get("enabled"));
+            if (effectEnabled) {
+                String url = effect == null ? "" : firstValue(effect, "url", "imageUrl", "assetUrl", "effectUrl", "iconUrl");
+                int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 28, 20, 72);
+                long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
+                addEffect(a, b, type, url, sizeDp, duration);
+            }
             addLevelBadge(a, b, relation);
         }
         if (running.isEmpty()) retryIfNoParticles();
@@ -256,7 +263,7 @@ final class RelationshipSeatEffectsOverlay {
 
     private void addEffect(@NonNull String userA, @NonNull String userB,
                            String type, String url, int sizeDp, long duration) {
-        final int iconSize = dp(Math.max(20, Math.min(36, sizeDp)));
+        final int iconSize = dp(Math.max(20, Math.min(72, sizeDp)));
         final boolean hasAsset = !url.trim().isEmpty()
                 && (url.startsWith("https://") || url.startsWith("http://"));
         final RibbonFallbackView fallback = new RibbonFallbackView(context);
