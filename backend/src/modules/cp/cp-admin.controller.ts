@@ -8,6 +8,15 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators';
 import { CpType } from '../../database/entities/cp-relationship.entity';
 
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(item => canonicalJson(item)).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 class CpTypeConfigDto {
   type?: CpType;
   @IsOptional() @IsInt() @Min(0) @Max(1000000000) priceCoins?: number;
@@ -321,7 +330,7 @@ export class CpAdminController {
     const savedType = savedConfig.types.find((entry: Record<string, any>) => entry.type === type);
     if (body.levels !== undefined) {
       if (!savedType || !Array.isArray(savedType.levels) ||
-          JSON.stringify(savedType.levels) !== JSON.stringify(body.levels)) {
+          canonicalJson(savedType.levels) !== canonicalJson(body.levels)) {
         throw new InternalServerErrorException('لم تتطابق مستويات CB بعد إعادة قراءتها من قاعدة البيانات؛ لم يتم تأكيد الحفظ.');
       }
     }
