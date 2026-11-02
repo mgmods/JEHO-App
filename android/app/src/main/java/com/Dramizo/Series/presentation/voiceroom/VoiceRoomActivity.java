@@ -11078,18 +11078,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (otherRoom) {
                 // Other room summons keep a Go chip — still not a system Toast.
                 GlobalCelebrationToast.show(
-                        this, title, line, avatarUrl, badgeUrl, dedupeKey,
+                        this, title, line, safeAvatar, badgeUrl, dedupeKey,
                         56, 0, 0L, who, kind, targetRoomId);
             } else if (bubbleFx != null) {
                 String msg = title != null && !title.isEmpty() ? title : line;
-                bubbleFx.showRoomEventBubble(who, avatarUrl, msg, badgeUrl);
+                bubbleFx.showRoomEventBubble(who, safeAvatar, msg, badgeUrl);
                 if (binding != null && binding.giftChatEffects != null) {
                     binding.giftChatEffects.setVisibility(View.VISIBLE);
                     binding.giftChatEffects.bringToFront();
                 }
             }
             if (roomBannerEnabled()) {
-                appendChatLine(who, line, 0, 1, null, null, avatarUrl, badgeUrl);
+                appendChatLine(who, line, 0, 1, null, null, safeAvatar, badgeUrl);
             }
             return;
         }
@@ -11153,7 +11153,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             chat = line;
         }
         if (bubbleFx != null) {
-            bubbleFx.showRoomEventBubble(who, avatarUrl, toastMsg, badgeUrl);
+            bubbleFx.showRoomEventBubble(who, safeAvatar, toastMsg, badgeUrl);
             if (binding != null && binding.giftChatEffects != null) {
                 binding.giftChatEffects.setVisibility(View.VISIBLE);
                 binding.giftChatEffects.bringToFront();
