@@ -2083,7 +2083,6 @@ export class GiftsService implements OnModuleInit {
     const allowedCategories = levelAllowedCategories.filter(category => globalAllowedCategories.includes(category));
     const globalGiftIds = Array.isArray(config.giftIds) ? config.giftIds.map(String) : [];
     const levelGiftIds = Array.isArray(currentLevel?.giftIds) ? currentLevel.giftIds.map(String) : [];
-    const selectedGiftIds = [...new Set([...globalGiftIds, ...levelGiftIds])];
     const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
     const eligibleGifts = allGifts.filter(gift => {
       const rawCategory = String(gift.category || '').toLowerCase();
