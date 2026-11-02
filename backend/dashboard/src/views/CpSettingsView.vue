@@ -998,7 +998,7 @@ async function saveFeatures() {
     if (response?.error) throw new Error(response.error.message || 'رفض الخادم حفظ إعدادات CP والمهمات.')
     await load()
     const savedTasks = Object.fromEntries(cpFeatures.value.tasks.map(task => [task.id, task]))
-    if (cpFeatures.value.globallyEnabled !== !!responsePayload(response).globallyEnabled || cpFeatures.value.giftTabEnabled !== !!responsePayload(response).giftTabEnabled || Object.keys(tasks).some(id => !savedTasks[id] || savedTasks[id].enabled !== tasks[id].enabled || savedTasks[id].title !== tasks[id].title || savedTasks[id].condition !== tasks[id].condition || Number(savedTasks[id].target) !== tasks[id].target || Number(savedTasks[id].rewardPoints) !== tasks[id].rewardPoints || String(savedTasks[id].rewardCosmeticCode || '') !== tasks[id].rewardCosmeticCode)) throw new Error('لم تتطابق إعدادات CP والمهمات بعد إعادة تحميلها من الخادم.')
+    if (cpFeatures.value.globallyEnabled !== !!payloadOf(response).globallyEnabled || cpFeatures.value.giftTabEnabled !== !!payloadOf(response).giftTabEnabled || Object.keys(tasks).some(id => !savedTasks[id] || savedTasks[id].enabled !== tasks[id].enabled || savedTasks[id].title !== tasks[id].title || savedTasks[id].condition !== tasks[id].condition || Number(savedTasks[id].target) !== tasks[id].target || Number(savedTasks[id].rewardPoints) !== tasks[id].rewardPoints || String(savedTasks[id].rewardCosmeticCode || '') !== tasks[id].rewardCosmeticCode)) throw new Error('لم تتطابق إعدادات CP والمهمات بعد إعادة تحميلها من الخادم.')
     success.value = 'تم حفظ إعدادات CP والمهمات والتحقق منها بعد إعادة التحميل.'
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات المهمات'
