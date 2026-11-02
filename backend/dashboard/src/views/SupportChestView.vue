@@ -5,11 +5,6 @@
     <section class="card p-4"><h2>الإعداد العام</h2>
       <label class="switchrow"><span><b>تفعيل صندوق الدعم</b><small>يظهر الصندوق في الرومات عند التفعيل.</small></span><input v-model="form.enabled" type="checkbox"></label>
       <label class="switchrow"><span><b>إظهار الأيقونة</b><small>إخفاء الأيقونة لا يحذف الإعدادات.</small></span><input v-model="form.iconVisible" type="checkbox"></label>
-      <label class="field">نوع الهدف<select v-model="form.goalMode"><option value="coins">كوينزات فقط</option><option value="diamonds">ماسات فقط</option></select></label>
-      <div class="grid2">
-        <label v-if="form.goalMode !== 'diamonds'" class="field">هدف الكوينزات<input v-model.number="form.coinTarget" type="number" min="0"></label>
-        <label v-if="form.goalMode !== 'coins'" class="field">هدف الماسات<input v-model.number="form.diamondTarget" type="number" min="0"></label>
-      </div>
       <div class="field">
         <span>الهدايا المسموح بها في الصندوق</span>
         <p class="muted">اختر الهدية من صورتها واسمها الحقيقيين؛ لا حاجة لكتابة المعرّف يدويًا.</p>
