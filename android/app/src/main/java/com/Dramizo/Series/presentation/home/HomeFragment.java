@@ -1,8 +1,10 @@
 package com.Dramizo.Series.presentation.home;
 
 import com.Dramizo.Series.util.ImagePlaceholder;
+import com.Dramizo.Series.util.ApiCall;
 
 import android.content.Intent;
+import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -64,6 +66,7 @@ import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 
 public class HomeFragment extends Fragment {
@@ -438,13 +441,276 @@ public class HomeFragment extends Fragment {
             act.rankBannerFlip.addView(wealth);
         }
         // The CP promo under the home banners opens the native CP center directly.
-        act.cpBannerCard.setOnClickListener(v -> {
-            Intent cp = new Intent(requireContext(),
-                    com.Dramizo.Series.presentation.cp.CpCenterActivity.class);
-            cp.putExtra(com.Dramizo.Series.presentation.cp.CpCenterActivity.EXTRA_VIEW, "home");
-            startActivity(cp);
-        });
+        act.cpBannerCard.setOnClickListener(v -> openCpCenter("home"));
+        View cpPanel = binding.getRoot().findViewById(R.id.homeCpSummary);
+        if (cpPanel != null) {
+            View more = cpPanel.findViewById(R.id.cpHomeMoreButton);
+            if (more != null) more.setOnClickListener(v -> openCpCenter("home"));
+            refreshHomeCpSummary();
+        }
         applyTasksFeatureVisibility();
+    }
+
+    private void openCpCenter(String view) {
+        if (!isAdded()) return;
+        Intent cp = new Intent(requireContext(),
+                com.Dramizo.Series.presentation.cp.CpCenterActivity.class);
+        cp.putExtra(com.Dramizo.Series.presentation.cp.CpCenterActivity.EXTRA_VIEW, view);
+        startActivity(cp);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void refreshHomeCpSummary() {
+        if (binding == null || !isAdded()) return;
+        final android.app.Activity host = getActivity();
+        if (host == null || host.isFinishing()) return;
+        final AppContainer container;
+        try { container = ContainerProvider.from(host); } catch (Exception ignored) { return; }
+        container.getIoExecutor().execute(() -> {
+            List<Map<String, Object>> relationships = Collections.emptyList();
+            List<Map<String, Object>> leaderboard = Collections.emptyList();
+            List<Map<String, Object>> rewards = Collections.emptyList();
+            List<Map<String, Object>> requests = Collections.emptyList();
+            try {
+                com.Dramizo.Series.domain.model.Result<List<Map<String, Object>>> relResult =
+                        ApiCall.execute(container.getUserApi().myCpRelationships());
+                if (relResult.success && relResult.data != null) relationships = relResult.data;
+            } catch (Exception ignored) {}
+            try {
+                com.Dramizo.Series.domain.model.Result<List<Map<String, Object>>> boardResult =
+                        ApiCall.execute(container.getUserApi().cpLeaderboard("weekly"));
+                if (boardResult.success && boardResult.data != null) leaderboard = boardResult.data;
+            } catch (Exception ignored) {}
+            try {
+                com.Dramizo.Series.domain.model.Result<List<Map<String, Object>>> rewardResult =
+                        ApiCall.execute(container.getUserApi().cpRewards());
+                if (rewardResult.success && rewardResult.data != null) rewards = rewardResult.data;
+            } catch (Exception ignored) {}
+            try {
+                com.Dramizo.Series.domain.model.Result<List<Map<String, Object>>> requestResult =
+                        ApiCall.execute(container.getUserApi().cpRequests());
+                if (requestResult.success && requestResult.data != null) requests = requestResult.data;
+            } catch (Exception ignored) {}
+            final List<Map<String, Object>> relRows = relationships;
+            final List<Map<String, Object>> boardRows = leaderboard;
+            final List<Map<String, Object>> rewardRows = rewards;
+            final List<Map<String, Object>> requestRows = requests;
+            if (host.isFinishing()) return;
+            host.runOnUiThread(() -> {
+                if (binding == null || !isAdded() || getActivity() != host) return;
+                renderHomeCpSummary(host, relRows, boardRows, rewardRows, requestRows, container);
+            });
+        });
+    }
+
+    private static Map<?, ?> cpMap(Object value) {
+        return value instanceof Map ? (Map<?, ?>) value : Collections.emptyMap();
+    }
+
+    private static String cpText(Object value, String fallback) {
+        if (value == null) return fallback;
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() || "null".equalsIgnoreCase(text) ? fallback : text;
+    }
+
+    private static long cpLong(Object value) {
+        try { return Math.max(0L, Math.round(Double.parseDouble(String.valueOf(value)))); }
+        catch (Exception ignored) { return 0L; }
+    }
+
+    private void renderHomeCpSummary(android.app.Activity host,
+                                     List<Map<String, Object>> relationships,
+                                     List<Map<String, Object>> leaderboard,
+                                     List<Map<String, Object>> rewards,
+                                     List<Map<String, Object>> requests,
+                                     AppContainer container) {
+        if (binding == null) return;
+        View panel = binding.getRoot().findViewById(R.id.homeCpSummary);
+        if (panel == null) return;
+        TextView status = panel.findViewById(R.id.cpHomeStatus);
+        View active = panel.findViewById(R.id.cpHomeActive);
+        ImageView avatar = panel.findViewById(R.id.cpHomePartnerAvatar);
+        TextView partnerName = panel.findViewById(R.id.cpHomePartnerName);
+        TextView levelView = panel.findViewById(R.id.cpHomeLevel);
+        TextView pointsView = panel.findViewById(R.id.cpHomePoints);
+        android.widget.ProgressBar progress = panel.findViewById(R.id.cpHomeProgress);
+        TextView stats = panel.findViewById(R.id.cpHomeStats);
+        TextView requestBadge = panel.findViewById(R.id.cpHomeRequests);
+        TextView endButton = panel.findViewById(R.id.cpHomeEndButton);
+        LinearLayout rewardStrip = panel.findViewById(R.id.cpHomeRewards);
+        LinearLayout leaderboardBox = panel.findViewById(R.id.cpHomeLeaderboard);
+
+        Map<String, Object> relationship = null;
+        if (relationships != null) {
+            for (Map<String, Object> row : relationships) {
+                if (row != null && "active".equalsIgnoreCase(String.valueOf(row.get("status")))) {
+                    relationship = row;
+                    break;
+                }
+            }
+        }
+        int pending = 0;
+        if (requests != null) for (Map<String, Object> request : requests) {
+            if (request != null && "pending".equalsIgnoreCase(String.valueOf(request.get("status")))) pending++;
+        }
+        requestBadge.setText("الطلبات " + pending);
+        endButton.setVisibility(relationship == null ? View.GONE : View.VISIBLE);
+        if (relationship == null) {
+            active.setVisibility(View.GONE);
+            progress.setVisibility(View.GONE);
+            stats.setVisibility(View.GONE);
+            status.setText("لا يوجد ارتباط نشط حالياً. أرسل هدية ارتباط CP من داخل الروم ليصل طلب الموافقة، وتظهر هنا مستوياتك ومكافآتك.");
+            endButton.setOnClickListener(null);
+        } else {
+            Map<?, ?> partner = cpMap(relationship.get("partner"));
+            String name = cpText(partner.get("displayName"), cpText(partner.get("username"), "الشريك"));
+            String avatarUrl = cpText(partner.get("avatarUrl"), "");
+            long points = cpLong(relationship.get("points"));
+            long duration = cpLong(relationship.get("durationDays"));
+            int level = (int) Math.max(1, cpLong(relationship.get("level")));
+            String levelName = cpText(relationship.get("levelName"), "المستوى " + level);
+            partnerName.setText("مرتبط بـ " + name);
+            levelView.setText(levelName + " · المستوى " + level);
+            pointsView.setText(String.format(Locale.US, "%,d نقطة", points));
+            double percent = 0d;
+            try { percent = Double.parseDouble(String.valueOf(relationship.get("progressPercent"))); }
+            catch (Exception ignored) {}
+            progress.setProgress((int) Math.max(0, Math.min(100, Math.round(percent))));
+            active.setVisibility(View.VISIBLE);
+            progress.setVisibility(View.VISIBLE);
+            stats.setVisibility(View.VISIBLE);
+            stats.setText("مدة الارتباط: " + cpText(relationship.get("durationLabel"), duration + " يوم")
+                    + "   ·   الهدف التالي: " + String.format(Locale.US, "%,d", cpLong(relationship.get("nextLevelAt")))
+                    + " نقطة   ·   التقدم: " + Math.round(percent) + "%");
+            status.setText("مستوى علاقتك الحالي ومؤشر التقدم والمكافآت المتاحة يظهرون هنا مباشرة.");
+            if (!avatarUrl.isEmpty()) {
+                Glide.with(host).load(AssetCatalog.absoluteUrl(avatarUrl))
+                        .placeholder(R.drawable.ic_tab_me).error(R.drawable.ic_tab_me).into(avatar);
+            } else avatar.setImageResource(R.drawable.ic_tab_me);
+            final String relationId = cpText(relationship.get("id"), "");
+            endButton.setOnClickListener(v -> {
+                if (relationId.isEmpty()) {
+                    Toast.makeText(host, "تعذر تحديد الارتباط الحالي.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                new AlertDialog.Builder(host)
+                        .setTitle("إلغاء الارتباط")
+                        .setMessage("هل تريد إنهاء ارتباط CP الحالي؟")
+                        .setNegativeButton("رجوع", null)
+                        .setPositiveButton("إلغاء الارتباط", (dialog, which) -> container.getIoExecutor().execute(() -> {
+                            com.Dramizo.Series.domain.model.Result<Map<String, Object>> ended =
+                                    ApiCall.execute(container.getUserApi().endCpRelationship(relationId));
+                            host.runOnUiThread(() -> {
+                                if (binding == null || !isAdded() || getActivity() != host) return;
+                                Toast.makeText(host, ended.success ? "تم إلغاء الارتباط." :
+                                        cpText(ended.error, "تعذر إلغاء الارتباط."), Toast.LENGTH_SHORT).show();
+                                refreshHomeCpSummary();
+                            });
+                        })).show();
+            });
+        }
+
+        rewardStrip.removeAllViews();
+        int rewardCount = 0;
+        if (rewards != null) for (Map<String, Object> group : rewards) {
+            if (group == null) continue;
+            Object levelsValue = group.get("levels");
+            if (!(levelsValue instanceof List)) continue;
+            for (Object levelValue : (List<?>) levelsValue) {
+                Map<?, ?> levelRow = cpMap(levelValue);
+                int rewardLevel = (int) Math.max(1, cpLong(levelRow.get("level")));
+                String title = cpText(levelRow.get("name"), "المستوى " + rewardLevel);
+                long threshold = cpLong(levelRow.get("pointsRequired"));
+                LinearLayout card = new LinearLayout(host);
+                card.setOrientation(LinearLayout.VERTICAL);
+                card.setPadding(dp(10), dp(9), dp(10), dp(9));
+                android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+                bg.setColor(0xFFFFF0F7); bg.setCornerRadius(dp(12)); bg.setStroke(dp(1), 0xFFEBC6D9);
+                card.setBackground(bg);
+                LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(dp(156), ViewGroup.LayoutParams.WRAP_CONTENT);
+                cardLp.setMargins(0, 0, dp(8), 0);
+                rewardStrip.addView(card, cardLp);
+                TextView heading = new TextView(host);
+                heading.setText("المستوى " + rewardLevel + " · " + title);
+                heading.setTextColor(0xFF7E2355); heading.setTextSize(12); heading.setTypeface(null, android.graphics.Typeface.BOLD);
+                card.addView(heading);
+                TextView required = new TextView(host);
+                required.setText(String.format(Locale.US, "%,d نقطة", threshold));
+                required.setTextColor(0xFF8D657B); required.setTextSize(10);
+                card.addView(required);
+                Object giftsValue = levelRow.get("rewardGifts");
+                if (!(giftsValue instanceof List) || ((List<?>) giftsValue).isEmpty()) {
+                    Object oneGift = levelRow.get("rewardGift");
+                    if (oneGift instanceof Map) giftsValue = Collections.singletonList(oneGift);
+                }
+                if (giftsValue instanceof List) for (Object giftValue : (List<?>) giftsValue) {
+                    Map<?, ?> gift = cpMap(giftValue);
+                    String giftName = cpText(gift.get("name"), "");
+                    String giftUrl = cpText(gift.get("animationUrl"), cpText(gift.get("iconUrl"), ""));
+                    if (giftName.isEmpty() && giftUrl.isEmpty()) continue;
+                    LinearLayout giftRow = new LinearLayout(host);
+                    giftRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                    giftRow.setOrientation(LinearLayout.HORIZONTAL);
+                    giftRow.setPadding(0, dp(5), 0, 0);
+                    ImageView giftImage = new ImageView(host);
+                    giftImage.setLayoutParams(new LinearLayout.LayoutParams(dp(34), dp(34)));
+                    giftImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    if (!giftUrl.isEmpty()) Glide.with(host).load(AssetCatalog.absoluteUrl(giftUrl)).into(giftImage);
+                    giftRow.addView(giftImage);
+                    TextView giftLabel = new TextView(host);
+                    giftLabel.setText(giftName.isEmpty() ? "هدية المستوى" : giftName);
+                    giftLabel.setTextColor(0xFF65344F); giftLabel.setTextSize(10);
+                    LinearLayout.LayoutParams giftTextLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                    giftTextLp.setMarginStart(dp(5));
+                    giftRow.addView(giftLabel, giftTextLp);
+                    card.addView(giftRow);
+                }
+                List<?> cosmeticCodes = levelRow.get("rewardCosmeticCodes") instanceof List
+                        ? (List<?>) levelRow.get("rewardCosmeticCodes") : Collections.emptyList();
+                if (!cosmeticCodes.isEmpty() || levelRow.get("rewardCosmeticCode") != null) {
+                    TextView cosmetic = new TextView(host);
+                    cosmetic.setText("✨ مكافآت تجميلية: " + (cosmeticCodes.isEmpty()
+                            ? cpText(levelRow.get("rewardCosmeticCode"), "") : cosmeticCodes.toString()));
+                    cosmetic.setTextColor(0xFF8D3B6A); cosmetic.setTextSize(10);
+                    card.addView(cosmetic);
+                }
+                rewardCount++;
+            }
+        }
+        if (rewardCount == 0) {
+            TextView empty = new TextView(host);
+            empty.setText("لم تُضبط مكافآت المستويات بعد.");
+            empty.setTextColor(0xFF8D657B); empty.setTextSize(11);
+            rewardStrip.addView(empty);
+        }
+
+        leaderboardBox.removeAllViews();
+        int rank = 0;
+        if (leaderboard != null) for (Map<String, Object> row : leaderboard) {
+            if (row == null || rank >= 3) break;
+            Map<?, ?> a = cpMap(row.get("userA"));
+            Map<?, ?> b = cpMap(row.get("userB"));
+            String aName = cpText(a.get("displayName"), cpText(a.get("username"), "عضو"));
+            String bName = cpText(b.get("displayName"), cpText(b.get("username"), "عضو"));
+            long weeklyPoints = cpLong(row.get("weeklyPoints"));
+            TextView line = new TextView(host);
+            line.setText((rank + 1) + ". " + aName + " ♥ " + bName + "   ·   "
+                    + String.format(Locale.US, "%,d", weeklyPoints) + " نقطة");
+            line.setTextColor(0xFF70485D); line.setTextSize(11);
+            line.setPadding(0, dp(4), 0, dp(4));
+            leaderboardBox.addView(line);
+            rank++;
+        }
+        if (rank == 0) {
+            TextView empty = new TextView(host);
+            empty.setText("لا يوجد متصدرون لهذا الأسبوع حتى الآن.");
+            empty.setTextColor(0xFF8D657B); empty.setTextSize(11);
+            leaderboardBox.addView(empty);
+        }
+    }
+
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void openInsights(String mode) {
@@ -1277,6 +1543,7 @@ public class HomeFragment extends Fragment {
     public void onResume() {
         super.onResume();
         refreshLocationTabChrome();
+        refreshHomeCpSummary();
         AppContainer c = ContainerProvider.from(requireActivity());
             c.getIoExecutor().execute(() -> {
             AppFeatures.refresh(c);
