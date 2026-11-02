@@ -15271,6 +15271,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         if ("support_chest:opened".equals(event)) {
+            View openedChestIcon = findViewById(R.id.btnRoomSupportChest);
+            if (openedChestIcon != null) {
+                openedChestIcon.animate().cancel();
+                openedChestIcon.setRotation(0f);
+                android.animation.ObjectAnimator blastShake = android.animation.ObjectAnimator.ofFloat(
+                        openedChestIcon, "rotation", 0f, -18f, 18f, -12f, 12f, 0f);
+                blastShake.setDuration(780L);
+                blastShake.start();
+                openedChestIcon.animate().scaleX(1.25f).scaleY(1.25f).setDuration(260L)
+                        .withEndAction(() -> {
+                            if (!isFinishing() && !isDestroyed()) {
+                                openedChestIcon.animate().scaleX(1f).scaleY(1f).setDuration(220L).start();
+                            }
+                        }).start();
+            }
             handler.removeCallbacks(supportChestEventRefresh);
             handler.postDelayed(supportChestEventRefresh, 3700L);
             WebView chestWeb = activeSupportChestWeb;
