@@ -717,6 +717,14 @@ function addCpTask() {
 function removeCpTask(id) {
   cpFeatures.value.tasks = cpFeatures.value.tasks.filter(task => task.id !== id)
 }
+function canonicalJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalJson)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalJson(value[key])]))
+  }
+  return value
+}
+function sameJson(a, b) { return JSON.stringify(canonicalJson(a)) === JSON.stringify(canonicalJson(b)) }
 function payloadOf(response) { return response?.data?.data ?? response?.data ?? response ?? {} }
 
 async function load() {
@@ -957,7 +965,7 @@ async function saveType(item) {
       : null
     const expectedLevels = JSON.stringify(payload.levels)
     if (!savedType || !Array.isArray(savedType.levels) ||
-        JSON.stringify(savedType.levels) !== expectedLevels) {
+        !sameJson(savedType.levels, payload.levels)) {
       throw new Error('الخادم لم يُرجع نفس تفاصيل مستويات CB التي أرسلتها؛ لم يتم اعتماد الحفظ.')
     }
 
@@ -967,7 +975,7 @@ async function saveType(item) {
     const reloadedType = types.value.find(entry => entry.type === item.type)
     let reloadedLevels = []
     try { reloadedLevels = JSON.parse(reloadedType?.levelsText || '[]') } catch { reloadedLevels = [] }
-    if (JSON.stringify(reloadedLevels) !== expectedLevels) {
+    if (!sameJson(reloadedLevels, payload.levels)) {
       throw new Error('تم إرسال الإعدادات لكن إعادة تحميلها من قاعدة البيانات أعادت قيماً مختلفة؛ راجع الحفظ قبل مغادرة الصفحة.')
     }
     success.value = 'تم حفظ مستويات ' + label(item.type) + ' والتحقق من تطابقها بعد إعادة التحميل من قاعدة البيانات.'
