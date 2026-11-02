@@ -2096,7 +2096,7 @@ export class GiftsService implements OnModuleInit {
       const category = classifySupportGift(gift);
       return allowedCategories.includes(category) && (!globalGiftIds.length || globalGiftIds.includes(String(gift.id))) && (!levelGiftIds.length || levelGiftIds.includes(String(gift.id)));
     }).map(gift => ({
-      id: gift.id, name: gift.name, iconUrl: gift.iconUrl,
+      id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl || null,
       coinPrice: Number(gift.coinPrice) || 0,
       category: classifySupportGift(gift),
     }));
@@ -2112,12 +2112,12 @@ export class GiftsService implements OnModuleInit {
       return {
         type, amount: Math.max(1, Number(reward?.amount) || 1), itemId,
         name: item?.name || (type === 'coins' ? 'كوينزات' : type === 'diamonds' ? 'ماسات' : type.toUpperCase()),
-        imageUrl: item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.iconUrl || null,
+        imageUrl: item?.animationUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.iconUrl || null,
       };
     }));
-    const enrichedLevel = { ...currentLevel, rewards: rewardPreview, eligibleGifts };
+    const enrichedLevel = { ...currentLevel, rewards: rewardPreview, rewardCount: rewardPreview.length, eligibleGifts, eligibleGiftCount: eligibleGifts.length };
     return {
-      config: { ...config, eligibleGifts },
+      config: { ...config, eligibleGifts, eligibleGiftCount: eligibleGifts.length },
       state: { ...state, level: levelIndex + 1, currentLevel: currentLevel?.title || ('المستوى ' + (levelIndex + 1)) },
       currentLevel: enrichedLevel,
     };
