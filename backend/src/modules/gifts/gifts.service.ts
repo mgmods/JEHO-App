@@ -2218,7 +2218,7 @@ export class GiftsService implements OnModuleInit {
       ];
       while (levels.length < 3) levels.push({ ...fallbackLevels[levels.length] });
       let row = await repo.findOne({ where: { key } });
-      let state: any = { coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
+      let state: any = { roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
       try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
       let levelIndex = Math.max(0, Math.min(levels.length - 1, Number(state.level || 1) - 1));
       state.level = levelIndex + 1;
