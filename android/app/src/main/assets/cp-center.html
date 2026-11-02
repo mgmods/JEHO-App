@@ -132,7 +132,7 @@ function pair(p,noWings=false){const emblem=noWings?'<span class="core">❤️</
 function row(r,i){const a=r.a?.name||"مستخدم",b=r.b?.name||"مستخدم";const crown=r.isWeeklyChampion?'👑 بطل الأسبوع ':r.isWorld&&i===1?'👑 ':'';const level=r.level?'<div class="task-meta">'+(window.JehoCB?window.JehoCB.renderLevelBadge({level:r.level,levelName:r.levelName,presentation:r.presentation}):'مستوى CB '+esc(r.level))+'</div>':'';return '<div class="row"><div class="score">'+score(r.score)+'</div><div class="names"><button class="username-btn" data-user-id="'+esc(r.a?.id||"")+'" data-user-name="'+esc(a)+'">'+esc(a)+'</button><div class="name-heart">♥</div><button class="username-btn" data-user-id="'+esc(r.b?.id||"")+'" data-user-name="'+esc(b)+'">'+esc(b)+'</button>'+level+(r.days?'<div class="task-meta">❤️ '+score(r.days)+' يوم معاً</div>':'')+'</div><div class="rank">'+crown+i+'</div></div>';}
 function rewardImage(url,alt,cls){return url?'<img class="'+cls+'" src="'+esc(url)+'" alt="'+esc(alt||"")+'" loading="lazy" onerror="this.onerror=null;this.src=\''+fallback+'\'">':'';}
 function renderRewardCard(r){
- const p=r.presentation||{},gift=r.giftPresentation||{},levelGift=r.rewardGift||null;
+ const p=r.presentation||{},gift=r.giftPresentation||{},levelGift=r.rewardGift||null,levelGifts=Array.isArray(r.rewardGifts)&&r.rewardGifts.length?r.rewardGifts:(levelGift?[levelGift]:[]);
  const benefits=Array.isArray(r.benefits)?r.benefits:[];
  const cosmeticCodes=Array.from(new Set([r.rewardCosmeticCode,...(Array.isArray(r.rewardCosmeticCodes)?r.rewardCosmeticCodes:[]),...benefits.map(x=>typeof x==="object"?(x.cosmeticCode||x.code):"")].map(x=>String(x||"").trim()).filter(Boolean)));
  const benefitText=benefits.map(x=>typeof x==="string"?x:(x.title||x.name||x.type||x.code||"ميزة")).filter(Boolean);
@@ -155,7 +155,7 @@ function renderRewardCard(r){
    (giftCount>0?'<span>🎁 '+score(giftCount)+' هدية مطلوبة</span>':'')+
    (rewardDays>0?'<span>⏳ '+(permanent?'دائمة':score(rewardDays)+' يوم')+'</span>':'')+
    '</div>'+
-   (levelGift?'<div class="cp-reward-item">'+rewardImage(levelGift.animationUrl||levelGift.iconUrl||fallback,levelGift.name||"هدية المستوى","cp-reward-item-image")+'<div><small>هدية المستوى</small><strong>'+esc(levelGift.name||"هدية CP")+'</strong></div></div>':'')+
+   (levelGifts.length?'<div class="cp-reward-section"><strong>🎁 هدايا مكافأة المستوى ('+levelGifts.length+')</strong>'+levelGifts.map((gift,index)=>'<div class="cp-reward-item">'+rewardImage(gift.animationUrl||gift.iconUrl||fallback,gift.name||"هدية المستوى","cp-reward-item-image")+'<div><small>هدية '+(index+1)+'</small><strong>'+esc(gift.name||"هدية CP")+'</strong>'+(Number(gift.coinPrice)>0?'<div class="note">'+score(gift.coinPrice)+' عملة</div>':'')+'</div></div>').join("")+'</div>':'')+
    (cosmeticCodes.length?'<div class="cp-reward-section"><strong>✨ المكافآت التجميلية</strong><div class="cp-reward-chips">'+cosmeticCodes.map(code=>'<span>'+esc(code)+'</span>').join("")+'</div></div>':'')+
    (p.frameUrl?'<div class="cp-reward-item">'+rewardImage(p.frameUrl,"إطار بطاقة المستوى","cp-reward-item-image")+'<div><small>إطار المستوى</small><strong>إطار خاص للمستوى</strong></div></div>':'')+
    (p.badgeUrl?'<div class="cp-reward-item">'+rewardImage(p.badgeUrl,"شارة المستوى","cp-reward-item-image")+'<div><small>شارة المستوى</small><strong>شارة CP</strong></div></div>':'')+
