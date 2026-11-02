@@ -211,7 +211,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         @Override public void run() {
             if (isFinishing() || exiting || !isOwner || roomId == null || roomId.isEmpty()) return;
             loadRoomPkInvitations();
-            handler.postDelayed(this, 5000L);
+            handler.postDelayed(this, 15000L);
         }
     };
     private final Set<String> shownRoomPkInvites = new HashSet<>();
