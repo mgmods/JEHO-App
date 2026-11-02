@@ -29,6 +29,8 @@ public final class MiscDtos {
         @SerializedName("durationDays") public int durationDays;
         @SerializedName("previewUrl") public String previewUrl;
         @SerializedName("animationUrl") public String animationUrl;
+        @SerializedName("imageUrl") public String imageUrl;
+        @SerializedName("iconUrl") public String iconUrl;
         @SerializedName("cosmeticType") public String cosmeticType;
         @SerializedName("claimed") public boolean claimed;
     }
