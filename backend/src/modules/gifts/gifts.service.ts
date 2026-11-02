@@ -2297,7 +2297,7 @@ export class GiftsService implements OnModuleInit {
               description: 'JEHO support chest reward',
               metadata: { roomId, cycle: state.cycle || 1, giftId, level: levelIndex + 1 },
             }));
-            granted.push({ type: rewardType, amount });
+            granted.push({ type: rewardType, amount, name: rewardType === 'coins' ? 'كوينزات' : 'ماسات' });
           } else if (rewardType === 'frame') {
             if (!itemId) throw new BadRequestException('Support chest frame reward requires an item ID');
             const cosmetic = await manager.getRepository(Cosmetic).findOne({ where: { id: itemId, isActive: true } });
