@@ -2137,7 +2137,7 @@ export class GiftsService implements OnModuleInit {
       try { cfg = JSON.parse(cfgRow.value); } catch { return null; }
       if (cfg.enabled !== true) return null;
       const categoryRaw = String(giftCategory || '').toLowerCase();
-      const category = String(giftType || '').toLowerCase() === 'lucky'
+      const category = (String(giftType || '').toLowerCase() === 'lucky' || categoryRaw === 'lucky')
         ? 'lucky'
         : categoryRaw === 'cp' ? 'cp' : 'normal';
       const globalCategories = Array.isArray(cfg.giftCategories) ? cfg.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
@@ -2228,6 +2228,7 @@ export class GiftsService implements OnModuleInit {
             if (active) {
               active.expiresAt = new Date(Math.max(Date.now(), new Date(active.expiresAt).getTime()) + amount * 24 * 60 * 60 * 1000);
               active.level = Math.max(Number(active.level) || 0, Number(plan.level) || 0);
+              active.vipPlanId = plan.id;
               await userVipRepo.save(active);
             } else {
               await userVipRepo.save(userVipRepo.create({
