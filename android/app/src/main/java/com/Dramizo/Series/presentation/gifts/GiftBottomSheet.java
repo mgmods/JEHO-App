@@ -89,6 +89,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private GiftViewModel vm;
     @Nullable private GiftCategoryPagerAdapter giftPageAdapter;
     @Nullable private TabLayoutMediator tabMediator;
+    @Nullable private ViewPager2.OnPageChangeCallback giftPageChangeCallback;
+    @Nullable private TabLayout.OnTabSelectedListener giftTabListener;
     private boolean syncingTabs;
     @Nullable private ProgressBar loadingBar;
     @Nullable private PopupWindow qtyPopup;
@@ -446,7 +448,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void refreshCpBanner() {
-        if (binding == null) return;
+        if (binding == null || !isAdded()) return;
         boolean isCpTab = giftTypeFilter != null
                 && "cp".equalsIgnoreCase(giftTypeFilter.trim());
         if (!isCpTab) {
@@ -457,12 +459,15 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             return;
         }
         if (binding.flTop != null) binding.flTop.setVisibility(View.GONE);
-        AppContainer c = ContainerProvider.from(requireActivity());
+        final android.app.Activity host = getActivity();
+        if (host == null || host.isFinishing()) return;
+        final AppContainer c;
+        try { c = ContainerProvider.from(host); } catch (Exception ignored) { return; }
         c.getIoExecutor().execute(() -> {
             Result<MiscDtos.CpStatusDto> r = ApiCall.execute(c.getUserApi().myCp());
-            if (!isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
-                if (binding == null || !isAdded()) return;
+            if (host.isFinishing()) return;
+            host.runOnUiThread(() -> {
+                if (binding == null || !isAdded() || getActivity() != host) return;
                 boolean has = r.success && r.data != null && r.data.hasCp && r.data.partner != null;
                 if (noCpLayout != null) noCpLayout.setVisibility(has ? View.GONE : View.VISIBLE);
                 if (hascpLayout != null) hascpLayout.setVisibility(has ? View.VISIBLE : View.GONE);
@@ -592,7 +597,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         styleGiftTab(tabs.getTabAt(0), true);
 
         // Do NOT clearOnTabSelectedListeners — that kills TabLayoutMediator sync.
-        tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+        giftTabListener = new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 styleGiftTab(tab, true);
@@ -608,21 +613,22 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 styleGiftTab(tab, false);
             }
             @Override public void onTabReselected(TabLayout.Tab tab) {}
-        });
+        };
+        tabs.addOnTabSelectedListener(giftTabListener);
 
-        binding.vpGiftListContainer.registerOnPageChangeCallback(
-                new ViewPager2.OnPageChangeCallback() {
-                    @Override
-                    public void onPageSelected(int position) {
-                        giftTypeFilter = typeForTab(position);
-                        styleGiftTab(tabs.getTabAt(position), true);
-                        if (giftPageAdapter != null) {
-                            giftPageAdapter.setSelectedId(
-                                    selected != null ? selected.id : null);
-                        }
-                        refreshCpBanner();
-                    }
-                });
+        giftPageChangeCallback = new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                if (binding == null || position < 0 || position >= tabKeys.length) return;
+                giftTypeFilter = typeForTab(position);
+                styleGiftTab(tabs.getTabAt(position), true);
+                if (giftPageAdapter != null) {
+                    giftPageAdapter.setSelectedId(selected != null ? selected.id : null);
+                }
+                refreshCpBanner();
+            }
+        };
+        binding.vpGiftListContainer.registerOnPageChangeCallback(giftPageChangeCallback);
     }
 
     private void styleGiftTab(@Nullable TabLayout.Tab tab, boolean selected) {
@@ -1244,6 +1250,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         } catch (Exception ignored) {
             return;
         }
+        final android.app.Activity host = getActivity();
+        if (host == null || host.isFinishing()) return;
         container.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> result = ApiCall.execute(container.getUserApi().cpCatalog());
             Map<String, String> mappings = new LinkedHashMap<>();
@@ -1273,10 +1281,10 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     }
                 }
             }
-            if (result.success && isAdded()) {
+            if (result.success && !host.isFinishing()) {
                 final boolean resolvedGiftTabEnabled = configuredGiftTabEnabled;
-                requireActivity().runOnUiThread(() -> {
-                    if (!isAdded()) return;
+                host.runOnUiThread(() -> {
+                    if (!isAdded() || getActivity() != host || binding == null) return;
                     cpGiftTabEnabled = resolvedGiftTabEnabled;
                     cpGiftTypes.clear();
                     cpGiftTypes.putAll(mappings);
@@ -1756,6 +1764,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     public void onDestroyView() {
         dismissQtyPopup();
         clearSeatGiftSelection();
+        if (binding != null && giftPageChangeCallback != null) {
+            try { binding.vpGiftListContainer.unregisterOnPageChangeCallback(giftPageChangeCallback); } catch (Exception ignored) {}
+        }
+        giftPageChangeCallback = null;
+        if (binding != null && giftTabListener != null) {
+            try { binding.miGiftCategory.removeOnTabSelectedListener(giftTabListener); } catch (Exception ignored) {}
+        }
+        giftTabListener = null;
         if (tabMediator != null) {
             try { tabMediator.detach(); } catch (Exception ignored) {}
             tabMediator = null;
