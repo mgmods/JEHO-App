@@ -55,7 +55,7 @@
           <div v-for="(reward, rewardIndex) in level.rewards" :key="rewardIndex" class="reward-line">
             <label class="field">نوع المكافأة<select v-model="reward.type"><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="vip">VIP</option><option value="frame">إطار</option><option value="badge">شارة</option></select></label>
             <label class="field">الكمية / المدة<input v-model.number="reward.amount" type="number" min="1"></label>
-            <label class="field">معرّف العنصر أو كود VIP<input v-model="reward.itemId" placeholder="اختياري حسب نوع المكافأة"></label>
+            <label class="field">معرّف العنصر أو VIP Plan ID<input v-model="reward.itemId" placeholder="معرّف الإطار أو الشارة أو خطة VIP"></label>
             <button type="button" class="btn btn-danger" @click="level.rewards.splice(rewardIndex,1)">إزالة</button>
           </div>
           <p class="muted">المعاينة:</p>
