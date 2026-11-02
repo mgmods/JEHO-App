@@ -2357,7 +2357,7 @@ export class GiftsService implements OnModuleInit {
             giftIconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
             iconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
             animationUrl: awardedGift.animationUrl || awardedGift.imageUrl || null,
-            senderId: null, senderName: 'صندوق الدعم', senderAvatarUrl: null,
+            senderId: win.winnerId, senderName: 'صندوق الدعم', senderAvatarUrl: null,
             receiverId: win.winnerId,
             receiverName: winnerUser?.displayName || winnerUser?.username || win.winnerName,
             receiverAvatarUrl: winnerUser?.avatarUrl || null,
