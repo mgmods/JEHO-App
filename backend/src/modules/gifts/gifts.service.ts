@@ -2156,8 +2156,8 @@ export class GiftsService implements OnModuleInit {
       let row = await repo.findOne({ where: { key } });
       let state: any = { roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
       try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
-      let levelIndex = Math.max(0, Number(state.level || 1) - 1);
-      if (levelIndex >= levels.length) levelIndex = 0;
+      let levelIndex = Math.max(0, Math.min(levels.length - 1, Number(state.level || 1) - 1));
+      state.level = levelIndex + 1;
       const levelCfg = levels[levelIndex];
       const allowedCategories = Array.isArray(levelCfg.giftCategories)
         ? levelCfg.giftCategories.map(String) : globalCategories;
