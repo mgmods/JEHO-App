@@ -6,6 +6,9 @@ import { Gift } from '../../database/entities/gift.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { Cosmetic } from '../../database/entities/cosmetic.entity';
+import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
+import { Badge } from '../../database/entities/badge.entity';
+import { UserBadge } from '../../database/entities/user-badge.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
 import { User } from '../../database/entities/user.entity';
@@ -31,6 +34,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
       GiftCategory,
       GiftSend,
       Cosmetic,
+      UserCosmetic,
+      Badge,
+      UserBadge,
       Wallet,
       WalletTransaction,
       UserProfile,
