@@ -701,7 +701,7 @@ export class AdminService {
         description: 'JEHO support chest multi-level configuration',
       }));
     }
-    const liveRooms = await this.roomsRepo.find({ where: { status: RoomStatus.OPEN }, select: { id: true } as any });
+    const liveRooms = await this.roomsRepo.find({ where: [{ status: RoomStatus.OPEN }, { status: RoomStatus.LOCKED }], select: { id: true } as any });
     const configAt = new Date().toISOString();
     for (const room of liveRooms) {
       this.realtimeGateway.emitToRoom(room.id, 'room:event', {
