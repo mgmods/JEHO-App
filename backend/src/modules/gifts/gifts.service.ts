@@ -2238,10 +2238,15 @@ export class GiftsService implements OnModuleInit {
       const mode = String(levelCfg.goalMode || cfg.goalMode || 'coins');
       const coinTarget = Math.max(0, Number(levelCfg.coinTarget ?? cfg.coinTarget) || 0);
       const diamondTarget = Math.max(0, Number(levelCfg.diamondTarget ?? cfg.diamondTarget) || 0);
+      // In "both" mode a zero target means that currency is not required.
+      // Keep this identical to support-chest.html, which treats a zero side as 100%.
       const coinReached = coinTarget > 0 && state.coins >= coinTarget;
       const diamondReached = diamondTarget > 0 && state.diamonds >= diamondTarget;
       const countReached = state.giftCount >= Math.max(1, Number(levelCfg.giftCount) || 1);
-      const targetReached = mode === 'both' ? coinReached && diamondReached
+      const targetReached = mode === 'both'
+        ? (coinTarget > 0 || diamondTarget > 0)
+          && (coinTarget <= 0 || coinReached)
+          && (diamondTarget <= 0 || diamondReached)
         : mode === 'diamonds' ? diamondReached : coinReached;
       state.goalReached = targetReached && countReached;
       const contributor = await manager.getRepository(User).findOne({ where: { id: senderId } });
