@@ -1008,9 +1008,18 @@ async function saveType(item) {
     const persistedType = Array.isArray(persistedConfig?.types)
       ? persistedConfig.types.find(entry => entry.type === item.type)
       : null
-    if (!persistedType || !Array.isArray(persistedType.levels) ||
-        !sameJson(persistedType.levels, payload.levels)) {
-      throw new Error('وصلت عملية الحفظ إلى الخادم، لكن قراءة إعدادات CB المستقلة لم تُظهر نفس المستويات المحفوظة. لم نعرض نجاحاً غير مؤكد.')
+    const persistedMatches =
+      persistedType &&
+      Array.isArray(persistedType.levels) &&
+      sameJson(persistedType.levels, payload.levels) &&
+      String(persistedType.giftId || persistedType.gift?.id || '') === String(payload.giftId || '') &&
+      Number(persistedType.giftPoints || 0) === Number(payload.giftPoints || 0) &&
+      Number(persistedType.giftInteractionPoints || 0) === Number(payload.giftInteractionPoints || 0) &&
+      (payload.maxLevel === undefined || Number(persistedType.maxLevel || 0) === Number(payload.maxLevel)) &&
+      (payload.priceCoins === undefined || Number(persistedType.priceCoins || 0) === Number(payload.priceCoins)) &&
+      sameJson(persistedType.rules || {}, payload.rules || {})
+    if (!persistedMatches) {
+      throw new Error('أعاد الخادم إعدادات CP لا تطابق ما أرسلناه (المستويات أو الهدية أو النقاط أو السعر أو التصميم). لم نعرض نجاحاً غير مؤكد؛ أعد المحاولة بعد مراجعة البيانات.')
     }
 
     // Update this editor from the verified authoritative response. Do not call
