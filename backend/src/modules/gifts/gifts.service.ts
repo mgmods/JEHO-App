@@ -2094,9 +2094,9 @@ export class GiftsService implements OnModuleInit {
       id: gift.id, name: gift.name, iconUrl: gift.iconUrl,
       coinPrice: Number(gift.coinPrice) || 0,
       category: String(gift.category || '').toLowerCase() === 'cp' ? 'cp'
-        : String(gift.type || '').toLowerCase() === 'lucky' ? 'lucky' : 'normal',
+        : (String(gift.type || '').toLowerCase() === 'lucky' || String(gift.category || '').toLowerCase() === 'lucky') ? 'lucky' : 'normal',
     }));
-    const rewards = Array.isArray(currentLevel?.rewards) ? currentLevel.rewards : [];
+    const rewards = Array.isArray(currentLevel?.rewards) ? currentLevel.rewards.filter((reward: any) => String(reward?.type || '') !== 'none') : [];
     const rewardPreview = await Promise.all(rewards.map(async (reward: any) => {
       const type = String(reward?.type || '');
       const itemId = String(reward?.itemId || '');
