@@ -136,7 +136,7 @@ async function uploadImage(event,kind){
 }
 function reset(){Object.assign(draft,defaults);backgroundUrlInput.value='';logoUrlInput.value='';flush()}
 function cosmetic(code){return props.cosmetics.find(x=>x.code===code)}
-function image(d){const x=cosmetic(d.cosmeticCode);return x?.previewUrl||x?.imageUrl||x?.iconUrl||x?.animationUrl||x?.assetUrl||x?.url||d.previewUrl||d.imageUrl||d.animationUrl||''}
+function image(d){const x=cosmetic(d.cosmeticCode);return x?.previewUrl||x?.imageUrl||x?.iconUrl||x?.meta?.previewUrl||x?.meta?.iconUrl||x?.meta?.imageUrl||x?.animationUrl||x?.meta?.animationUrl||x?.meta?.gifUrl||x?.assetUrl||x?.url||d.previewUrl||d.imageUrl||d.animationUrl||''}
 function isVideo(value){return /\.(mp4|webm)(\?|$)/i.test(String(value||''))}
 function label(d){return cosmetic(d.cosmeticCode)?.name||d.label||'هدية'}
 defineExpose({flush})
