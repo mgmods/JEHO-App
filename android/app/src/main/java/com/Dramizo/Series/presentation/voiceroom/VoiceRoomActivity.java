@@ -15267,7 +15267,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     + ":" + memberStr(payload, "giftCount");
             GlobalCelebrationToast.showRoomCenter(
                     this, "🎁 صندوق الدعم يتحرّك!", sender + " ساهم في " + levelTitle,
-                    null, null, eventId, 0d, 0L, sender, "support_chest", roomId);
+                    null, null, eventId, 0d, 0L, sender, "support_chest_progress", roomId);
             return;
         }
         if ("support_chest:opened".equals(event)) {
