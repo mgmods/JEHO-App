@@ -148,9 +148,15 @@ final class RelationshipSeatEffectsOverlay {
             // effect as a fallback so existing dashboard settings continue to work.
             Map<String, Object> levelConfig = relation.get("currentLevelConfig") instanceof Map
                     ? (Map<String, Object>) relation.get("currentLevelConfig") : null;
-            Map<String, Object> effect = levelConfig != null && levelConfig.get("seatEffect") instanceof Map
-                    ? (Map<String, Object>) levelConfig.get("seatEffect") : findEffect(type);
-            boolean effectEnabled = effect == null || !Boolean.FALSE.equals(effect.get("enabled"));
+            Map<String, Object> levelEffect = levelConfig != null && levelConfig.get("seatEffect") instanceof Map
+                    ? (Map<String, Object>) levelConfig.get("seatEffect") : null;
+            // A level with no custom artwork inherits the legacy type-wide artwork;
+            // an explicit disabled flag always suppresses the ribbon.
+            Map<String, Object> effect = levelEffect != null
+                    && (Boolean.FALSE.equals(levelEffect.get("enabled"))
+                        || !firstValue(levelEffect, "url", "imageUrl", "assetUrl", "effectUrl", "iconUrl").isEmpty())
+                    ? levelEffect : findEffect(type);
+            boolean effectEnabled = levelEffect == null || !Boolean.FALSE.equals(levelEffect.get("enabled"));
             if (effectEnabled) {
                 String url = effect == null ? "" : firstValue(effect, "url", "imageUrl", "assetUrl", "effectUrl", "iconUrl");
                 int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 28, 20, 72);
