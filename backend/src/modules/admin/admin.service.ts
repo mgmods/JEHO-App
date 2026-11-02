@@ -578,7 +578,7 @@ export class AdminService {
 
   async patchSupportChestConfig(input: Record<string, unknown>) {
     const allowedModes = new Set(['coins', 'diamonds', 'both']);
-    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge', 'gift', 'entry_effect', 'vip']);
+    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge', 'vip']);
     const allowedCategories = new Set(['normal', 'lucky', 'cp']);
     const goalMode = String(input.goalMode || 'coins');
     const rewardType = String(input.rewardType || 'none');
