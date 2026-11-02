@@ -2237,6 +2237,8 @@ export class GiftsService implements OnModuleInit {
               }));
             }
             granted.push({ type: 'vip', amount, itemId: plan.id, name: plan.name, imageUrl: plan.badgeUrl || null });
+          } else if (rewardType === 'none') {
+            granted.push({ type: 'none', amount: 0, name: 'بدون مكافأة' });
           } else {
             throw new BadRequestException('Unsupported support chest reward type: ' + rewardType);
           }
