@@ -2167,7 +2167,7 @@ export class GiftsService implements OnModuleInit {
     giftType?: string | null,
     quantity = 1,
   ) {
-    const key = 'support_chest_room:' + roomId;
+    const key = 'support_chest_global';
     const result = await this.dataSource.transaction(async manager => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
       const repo = manager.getRepository(AppSetting);
@@ -2196,7 +2196,7 @@ export class GiftsService implements OnModuleInit {
         rewards: [{ type: cfg.rewardType || 'none', amount: cfg.rewardAmount || 0, itemId: cfg.rewardItemId || '' }],
       }];
       let row = await repo.findOne({ where: { key } });
-      let state: any = { roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
+      let state: any = { coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
       try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
       let levelIndex = Math.max(0, Math.min(levels.length - 1, Number(state.level || 1) - 1));
       state.level = levelIndex + 1;
@@ -2222,6 +2222,13 @@ export class GiftsService implements OnModuleInit {
       const targetReached = mode === 'both' ? coinReached && diamondReached
         : mode === 'diamonds' ? diamondReached : coinReached;
       state.goalReached = targetReached && countReached;
+      const contributor = await manager.getRepository(User).findOne({ where: { id: senderId } });
+      const contribution = {
+        senderId, senderName: contributor?.displayName || contributor?.username || 'مستخدم',
+        roomId, level: levelIndex + 1, levelTitle: levelCfg.title || ('المستوى ' + (levelIndex + 1)),
+        coins: state.coins, diamonds: state.diamonds, giftCount: state.giftCount,
+        goalReached: state.goalReached, cycle: Math.max(1, Number(state.cycle) || 1),
+      };
       let opened: any = null;
       if (state.goalReached) {
         const rewards = Array.isArray(levelCfg.rewards)
@@ -2366,18 +2373,37 @@ export class GiftsService implements OnModuleInit {
         }
       }
       if (row) { row.value = JSON.stringify(state); await repo.save(row); }
-      else await repo.save(repo.create({ key, value: JSON.stringify(state), description: 'Room support chest state' }));
-      return { config: cfg, state, opened };
+      else await repo.save(repo.create({ key, value: JSON.stringify(state), description: 'Global support chest state shared by every room' }));
+      return { config: cfg, state, opened, contribution };
     });
     if (result) {
-      this.realtime?.emitToRoom(roomId, 'room:event', {
-        roomId, event: 'support_chest:updated', payload: result, at: new Date().toISOString(),
-      });
+      const liveRooms = await this.roomsRepo.find({ where: { status: RoomStatus.OPEN } });
+      const targetRoomIds = [...new Set([roomId, ...liveRooms.map(room => room.id)])];
+      const at = new Date().toISOString();
+      for (const targetRoomId of targetRoomIds) {
+        const roomState = { ...result.state, roomId: targetRoomId };
+        this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+          roomId: targetRoomId, event: 'support_chest:updated',
+          payload: { config: result.config, state: roomState, contribution: result.contribution },
+          at,
+        });
+        if (result.contribution) {
+          this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+            roomId: targetRoomId, event: 'support_chest:contribution',
+            payload: { ...result.contribution, roomId: targetRoomId },
+            at,
+          });
+        }
+        if (result.opened) {
+          this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+            roomId: targetRoomId, event: 'support_chest:opened',
+            payload: { ...result.opened, roomId: targetRoomId, sourceRoomId: roomId },
+            at,
+          });
+        }
+      }
       if (result.opened) {
         const win = result.opened;
-        this.realtime?.emitToRoom(roomId, 'room:event', {
-          roomId, event: 'support_chest:opened', payload: win, at: new Date().toISOString(),
-        });
         const awardedGift = Array.isArray(win.rewards) ? win.rewards.find((entry: any) => entry?.type === 'gift') : null;
         if (awardedGift) {
           const winnerUser = await this.usersRepo.findOne({ where: { id: win.winnerId } });
@@ -2397,24 +2423,29 @@ export class GiftsService implements OnModuleInit {
             at: new Date().toISOString(),
           };
           this.realtime?.emitToUser(win.winnerId, 'gift:animation', giftPayload);
-          this.realtime?.emitToRoom(roomId, 'room:event', {
-            roomId, event: 'gift:animation', payload: giftPayload,
-            from: { userId: win.winnerId }, at: giftPayload.at,
-          });
-          this.realtime?.emitToRoom(roomId, 'room:event', {
-            roomId, event: 'gift:send', payload: giftPayload,
-            from: { userId: win.winnerId }, at: giftPayload.at,
-          });
-          this.realtime?.emitToRoom(roomId, 'room:event', {
-            roomId, event: 'support_chest:reward',
-            payload: { ...giftPayload, profileId: winnerProfile?.userId || null },
-            at: giftPayload.at,
-          });
+          for (const targetRoomId of targetRoomIds) {
+            const roomGiftPayload = { ...giftPayload, roomId: targetRoomId };
+            this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+              roomId: targetRoomId, event: 'gift:animation', payload: roomGiftPayload,
+              from: { userId: win.winnerId }, at: giftPayload.at,
+            });
+            this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+              roomId: targetRoomId, event: 'gift:send', payload: roomGiftPayload,
+              from: { userId: win.winnerId }, at: giftPayload.at,
+            });
+            this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+              roomId: targetRoomId, event: 'support_chest:reward',
+              payload: { ...roomGiftPayload, profileId: winnerProfile?.userId || null },
+              at: giftPayload.at,
+            });
+          }
         }
+        const rewardNames = (Array.isArray(win.rewards) ? win.rewards : [])
+          .map((reward: any) => String(reward?.name || reward?.type || 'جائزة')).filter(Boolean).join('، ');
         await this.notifications?.notifyUser(
           win.winnerId, NotificationType.SYSTEM,
-          '🎁 تم فتح صندوق الدعم!',
-          'أنت آخر من ساهم في اكتمال الهدف، وتم إرسال مكافآت الصندوق إلى حسابك.',
+          '🎁 مبروك! فجّرت صندوق الدعم',
+          'حصلت على: ' + (rewardNames || 'مكافآت صندوق الدعم'),
           { type: 'support_chest_reward', roomId, level: win.level, rewards: win.rewards },
         ).catch(error => this.log.warn('Support chest winner notification failed: ' + String(error?.message || error)));
       }
