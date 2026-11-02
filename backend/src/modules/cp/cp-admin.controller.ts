@@ -228,6 +228,24 @@ export class CpAdminController {
           );
           if (!rewardCosmetic) throw new BadRequestException('اختر مكافأة تجميلية نشطة من كتالوج المتجر');
         }
+        if (level.rewardCosmeticCodes !== undefined) {
+          if (!Array.isArray(level.rewardCosmeticCodes) || level.rewardCosmeticCodes.length > 30) {
+            throw new BadRequestException('قائمة المكافآت التجميلية للمستوى غير صالحة');
+          }
+          const codes = Array.from(new Set(level.rewardCosmeticCodes.map((code: any) => String(code || '').trim()).filter(Boolean)));
+          if (codes.some((code: string) => !/^[a-zA-Z0-9_-]{2,64}$/.test(code))) {
+            throw new BadRequestException('أحد رموز المكافآت التجميلية للمستوى غير صالح');
+          }
+          if (codes.length) {
+            const activeItems = await this.dataSource.query(
+              'SELECT code FROM cosmetics WHERE code=ANY($1::text[]) AND "isActive"=true',
+              [codes],
+            );
+            if (activeItems.length !== codes.length) {
+              throw new BadRequestException('كل المكافآت التجميلية للمستوى يجب أن تكون عناصر نشطة');
+            }
+          }
+        }
         const extraRewards = [
           ...(Array.isArray(level.benefits) ? level.benefits : []),
           ...(Array.isArray(level.rewards) ? level.rewards : []),
