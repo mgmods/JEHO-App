@@ -2224,11 +2224,13 @@ export class GiftsService implements OnModuleInit {
             const startsAt = new Date();
             const expiresAt = new Date(startsAt.getTime() + amount * 24 * 60 * 60 * 1000);
             const userVipRepo = manager.getRepository(UserVip);
-            const active = await userVipRepo.findOne({ where: { userId: senderId, isActive: true } });
+            const active = await userVipRepo.findOne({ where: { userId: senderId, isActive: true, expiresAt: MoreThan(new Date()) } });
             if (active) {
               active.expiresAt = new Date(Math.max(Date.now(), new Date(active.expiresAt).getTime()) + amount * 24 * 60 * 60 * 1000);
-              active.level = Math.max(Number(active.level) || 0, Number(plan.level) || 0);
-              active.vipPlanId = plan.id;
+              if (Number(plan.level) >= Number(active.level || 0)) {
+                active.level = Number(plan.level) || Number(active.level) || 0;
+                active.vipPlanId = plan.id;
+              }
               await userVipRepo.save(active);
             } else {
               await userVipRepo.save(userVipRepo.create({
