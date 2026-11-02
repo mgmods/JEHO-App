@@ -1,6 +1,7 @@
 package com.Dramizo.Series.util;
 
 import android.app.Activity;
+import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.graphics.drawable.GradientDrawable;
