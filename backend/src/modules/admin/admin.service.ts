@@ -672,9 +672,13 @@ export class AdminService {
       ...rewardGiftIds,
     ])];
     if (allGiftIds.length) {
-      const activeGifts = await this.giftsRepo.find({ where: { isActive: true } });
-      const valid = new Set(activeGifts.map(g => g.id));
-      if (allGiftIds.some(id => !valid.has(id))) {
+      // Validate only the gift IDs referenced by this configuration. Loading the
+      // entire active gift catalogue on every save needlessly increases latency.
+      const activeGifts = await this.giftsRepo.find({
+        where: { id: In(allGiftIds), isActive: true },
+        select: { id: true } as any,
+      });
+      if (activeGifts.length !== allGiftIds.length) {
         throw new BadRequestException('يوجد معرّف هدية غير صالح أو غير فعال في إعدادات الصندوق');
       }
     }
