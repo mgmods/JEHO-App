@@ -852,8 +852,8 @@ function syncLevelEditor(item) {
     presentation: { ...(level.presentation || {}) },
     giftPresentation: { ...(level.giftPresentation || {}) },
     giftBonusPercent: Math.max(0, Math.min(500, Number(level.giftBonusPercent) || 0)),
-    rewardGiftId: String(level.rewardGiftId || ''),
-    rewardGiftIds: Array.from(new Set([...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []), level.rewardGiftId || ''].map(id => String(id || '').trim()).filter(Boolean))),
+    rewardGiftIds: Array.from(new Set((Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []).map(id => String(id || '').trim()).filter(Boolean))),
+    rewardGiftId: String((Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds[0] : '') || ''),
     rewardCosmeticCode: String(level.rewardCosmeticCode || ''),
     rewardCosmeticCodes: Array.from(new Set((Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []).map(code => String(code || '').trim()).filter(Boolean))),
     benefits: [
