@@ -70,18 +70,32 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
   private async enrichLevelRewards(levels: any[]) {
     const safeLevels = Array.isArray(levels) ? levels : [];
-    const giftIds = Array.from(new Set(
-      safeLevels.map(item => String(item?.rewardGiftId || '').trim()).filter(id => UUID_REGEX.test(id)),
-    ));
+    const giftIds = Array.from(new Set(safeLevels.flatMap(item => {
+      const ids = [
+        ...(Array.isArray(item?.rewardGiftIds) ? item.rewardGiftIds : []),
+        item?.rewardGiftId,
+      ];
+      return ids.map(id => String(id || '').trim()).filter(id => UUID_REGEX.test(id));
+    })));
     const gifts = giftIds.length ? await this.dataSource.query(
       'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true',
       [giftIds],
     ) : [];
     const giftsById = new Map(gifts.map((gift: any) => [String(gift.id), gift]));
-    return safeLevels.map(item => ({
-      ...item,
-      rewardGift: giftsById.get(String(item?.rewardGiftId || '')) || null,
-    }));
+    return safeLevels.map(item => {
+      const rewardGiftIds = Array.from(new Set([
+        ...(Array.isArray(item?.rewardGiftIds) ? item.rewardGiftIds : []),
+        item?.rewardGiftId,
+      ].map(id => String(id || '').trim()).filter(id => UUID_REGEX.test(id))));
+      const rewardGifts = rewardGiftIds.map(id => giftsById.get(id)).filter(Boolean);
+      return {
+        ...item,
+        rewardGiftIds,
+        rewardGifts,
+        // Backward compatibility for APK builds that still read one gift.
+        rewardGift: rewardGifts[0] || giftsById.get(String(item?.rewardGiftId || '')) || null,
+      };
+    });
   }
 
   private async grantLevelCosmeticRewards(
