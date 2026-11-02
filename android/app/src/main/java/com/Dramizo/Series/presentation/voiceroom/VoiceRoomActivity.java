@@ -15244,11 +15244,28 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String winner = memberStr(payload, "winnerName");
             if (winner == null || winner.trim().isEmpty()) winner = "أحد الداعمين";
             String levelTitle = memberStr(payload, "levelTitle");
-            String message = winner + " أكمل الهدف وفاز بمكافآت الصندوق";
+            String rewardName = null;
+            String rewardImage = null;
+            try {
+                if (payload.has("rewards") && payload.get("rewards").isJsonArray()
+                        && payload.getAsJsonArray("rewards").size() > 0) {
+                    JsonElement rewardElement = payload.getAsJsonArray("rewards").get(0);
+                    if (rewardElement != null && rewardElement.isJsonObject()) {
+                        JsonObject reward = rewardElement.getAsJsonObject();
+                        rewardName = memberStr(reward, "name");
+                        rewardImage = memberStr(reward, "imageUrl");
+                        if (rewardImage == null || rewardImage.trim().isEmpty()) {
+                            rewardImage = memberStr(reward, "iconUrl");
+                        }
+                    }
+                }
+            } catch (Exception ignored) { }
+            String message = winner + " فاز بـ " + (rewardName == null || rewardName.trim().isEmpty()
+                    ? "جائزة صندوق الدعم" : rewardName);
             String roomEventId = memberStr(payload, "cycle");
             String levelId = memberStr(payload, "level");
             GlobalCelebrationToast.showRoomCenter(
-                    this, "💥 انفجار صندوق الدعم!", message, null, null,
+                    this, "💥 انفجار صندوق الدعم!", message, null, rewardImage,
                     "support-chest:" + roomId + ":" + (roomEventId == null ? "1" : roomEventId)
                             + ":" + (levelId == null ? "1" : levelId),
                     0d, 0L, winner, "support_chest", roomId);
