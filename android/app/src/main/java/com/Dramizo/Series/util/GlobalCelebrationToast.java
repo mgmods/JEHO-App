@@ -500,6 +500,25 @@ public final class GlobalCelebrationToast {
                 multiplier, coinsWon, displayName, kind, roomId, true);
     }
 
+    /** Room-wide top banner for chest openings; matches the normal high-return toast lane. */
+    public static void showRoomTop(
+            @Nullable Activity activity,
+            @Nullable String title,
+            @Nullable String body,
+            @Nullable String avatarUrl,
+            @Nullable String badgeUrl,
+            @Nullable String dedupeKey,
+            double multiplier,
+            long coinsWon,
+            @Nullable String displayName,
+            @Nullable String kind,
+            @Nullable String roomId
+    ) {
+        if ("gift_send".equalsIgnoreCase(kind)) return;
+        enqueueToast(activity, title, body, avatarUrl, badgeUrl, dedupeKey, 72,
+                multiplier, coinsWon, displayName, kind, roomId, false);
+    }
+
     private static void enqueueToast(
             @Nullable Activity activity,
             @Nullable String title,
@@ -930,10 +949,10 @@ public final class GlobalCelebrationToast {
                 ObjectAnimator.ofFloat(flash, View.ALPHA, 0f, 0.95f, 0f),
                 ObjectAnimator.ofFloat(flash, View.SCALE_X, 0.12f, 2.35f),
                 ObjectAnimator.ofFloat(flash, View.SCALE_Y, 0.12f, 2.35f));
-        flashAnim.setDuration(1050L);
+        flashAnim.setDuration(1450L);
         flashAnim.start();
 
-        for (int ringIndex = 0; ringIndex < 3; ringIndex++) {
+        for (int ringIndex = 0; ringIndex < 4; ringIndex++) {
             View ring = new View(activity);
             GradientDrawable ringShape = new GradientDrawable();
             ringShape.setShape(GradientDrawable.OVAL);
@@ -949,14 +968,14 @@ public final class GlobalCelebrationToast {
                     ObjectAnimator.ofFloat(ring, View.ALPHA, 0.95f, 0f),
                     ObjectAnimator.ofFloat(ring, View.SCALE_X, 0.15f, 2.9f),
                     ObjectAnimator.ofFloat(ring, View.SCALE_Y, 0.15f, 2.9f));
-            ringAnim.setStartDelay(ringIndex * 135L);
-            ringAnim.setDuration(1050L + ringIndex * 100L);
+            ringAnim.setStartDelay(ringIndex * 220L);
+            ringAnim.setDuration(1450L + ringIndex * 180L);
             ringAnim.start();
         }
 
         // Golden coin and diamond rain falls from the top of every viewer's screen.
         final String[] rainSymbols = { "🪙", "🪙", "💎", "🪙", "✨", "🪙", "🎁", "🪙" };
-        for (int i = 0; i < 32; i++) {
+        for (int i = 0; i < 42; i++) {
             TextView coin = new TextView(activity);
             coin.setText(rainSymbols[i % rainSymbols.length]);
             coin.setTextSize(i % 5 == 0 ? 27f : 22f);
@@ -979,14 +998,15 @@ public final class GlobalCelebrationToast {
                     ObjectAnimator.ofFloat(coin, View.ROTATION, coin.getRotation(),
                             coin.getRotation() + (i % 2 == 0 ? 420f : -420f)),
                     ObjectAnimator.ofFloat(coin, View.ALPHA, 0f, 1f, 1f, 0f));
-            rain.setStartDelay((i % 8) * 72L);
-            rain.setDuration(1550L + (i % 4) * 180L);
+            rain.setStartDelay((i % 8) * 110L);
+            rain.setDuration(2500L + (i % 4) * 240L);
             rain.start();
         }
 
         // Radial reward burst: gift boxes, coins, diamonds and light particles.
         final String[] symbols = { "🎁", "🪙", "💎", "✨", "🌟", "🪙", "💎", "🎁",
-                "✨", "🪙", "💎", "🌟", "🎁", "🪙", "💎", "✨", "🪙", "🎁", "💎", "🌟" };
+                "✨", "🪙", "💎", "🌟", "🎁", "🪙", "💎", "✨", "🪙", "🎁", "💎", "🌟",
+                "🪙", "💎", "🎁", "✨" };
         for (int i = 0; i < symbols.length; i++) {
             TextView particle = new TextView(activity);
             particle.setText(symbols[i]);
@@ -1011,8 +1031,8 @@ public final class GlobalCelebrationToast {
                     ObjectAnimator.ofFloat(particle, View.ALPHA, 0f, 1f, 0f),
                     ObjectAnimator.ofFloat(particle, View.SCALE_X, 0.2f, 1.25f, 0.7f),
                     ObjectAnimator.ofFloat(particle, View.SCALE_Y, 0.2f, 1.25f, 0.7f));
-            burst.setStartDelay((i % 5) * 35L);
-            burst.setDuration(1350L + (i % 3) * 120L);
+            burst.setStartDelay(180L + (i % 5) * 65L);
+            burst.setDuration(1950L + (i % 3) * 210L);
             burst.start();
         }
 
@@ -1042,7 +1062,8 @@ public final class GlobalCelebrationToast {
                 ObjectAnimator.ofFloat(banner, View.TRANSLATION_Y, dp(activity, 24), 0f, 0f, -dp(activity, 12)),
                 ObjectAnimator.ofFloat(banner, View.SCALE_X, 0.82f, 1.04f, 1f, 0.98f),
                 ObjectAnimator.ofFloat(banner, View.SCALE_Y, 0.82f, 1.04f, 1f, 0.98f));
-        bannerAnim.setDuration(2450L);
+        bannerAnim.setStartDelay(320L);
+        bannerAnim.setDuration(3400L);
         bannerAnim.start();
 
         TextView blast = new TextView(activity);
@@ -1061,12 +1082,13 @@ public final class GlobalCelebrationToast {
                 ObjectAnimator.ofFloat(blast, View.SCALE_X, 0.12f, 1.3f, 1.7f, 1.95f),
                 ObjectAnimator.ofFloat(blast, View.SCALE_Y, 0.12f, 1.3f, 1.7f, 1.95f),
                 ObjectAnimator.ofFloat(blast, View.ROTATION, -22f, 8f, -4f, 0f));
-        blastAnimation.setDuration(1450L);
+        blastAnimation.setStartDelay(180L);
+        blastAnimation.setDuration(2150L);
         blastAnimation.start();
 
         MAIN.postDelayed(() -> {
             if (celebration.getParent() == root) root.removeView(celebration);
-        }, 2850L);
+        }, 4550L);
     }
 
     private static String formatMultiplier(double multiplier) {
