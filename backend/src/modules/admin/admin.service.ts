@@ -572,7 +572,7 @@ export class AdminService {
         rewards: [{ type: 'coins', amount: 5000, itemId: '' }],
       }],
       rewardType: 'none', rewardItemId: '', rewardAmount: 0,
-      instructions: 'تساهم الهدايا المؤهلة في هدف عالمي مشترك بين جميع الرومات. عند اكتمال المستوى ينفجر الصندوق وتُمنح جميع مكافآته لمفجّر الصندوق.',
+      instructions: 'لكل روم تقدم مستقل لا يتأثر بمساهمات الرومات الأخرى. عند اكتمال هدف الروم ينفجر صندوقه وتُمنح جميع مكافآته لمفجّر الصندوق.',
     };
     if (!row) return defaults;
     try {
