@@ -10,13 +10,14 @@ import android.os.Looper;
 
 /** Lightweight room sound FX (clap / gift / join / mute). */
 public final class RoomSoundFx {
-    private enum Kind { CLAP, GIFT, JOIN, MUTE }
+    private enum Kind { CLAP, GIFT, JOIN, MUTE, CHEST }
 
     private static SoundPool pool;
     private static int clapId;
     private static int giftId;
     private static int joinId;
     private static int muteId;
+    private static int chestExplosionId;
     private static boolean ready;
     private static boolean loading;
 
@@ -45,7 +46,8 @@ public final class RoomSoundFx {
             giftId = loadRaw(context, "sfx_gift");
             joinId = loadRaw(context, "sfx_join");
             muteId = loadRaw(context, "sfx_mute");
-            ready = clapId != 0 || giftId != 0 || joinId != 0 || muteId != 0;
+            chestExplosionId = loadRaw(context, "sfx_chest_explosion");
+            ready = clapId != 0 || giftId != 0 || joinId != 0 || muteId != 0 || chestExplosionId != 0;
         } catch (Exception ignored) {
             ready = false;
         } finally {
@@ -103,6 +105,7 @@ public final class RoomSoundFx {
     }
     public static void playJoin(Context c) { play(c, Kind.JOIN, joinId, 0.8f); }
     public static void playMute(Context c) { play(c, Kind.MUTE, muteId, 0.7f); }
+    public static void playChestExplosion(Context c) { play(c, Kind.CHEST, chestExplosionId, 1f); }
 
     private static void play(Context c, Kind kind, int soundId, float vol) {
         if (mutedFx) return;
@@ -131,6 +134,10 @@ public final class RoomSoundFx {
                     tone = ToneGenerator.TONE_PROP_NACK;
                     durationMs = 160;
                     break;
+                case CHEST:
+                    tone = ToneGenerator.TONE_PROP_NACK;
+                    durationMs = 420;
+                    break;
                 case JOIN:
                     tone = ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD;
                     durationMs = 200;
@@ -153,6 +160,6 @@ public final class RoomSoundFx {
         }
         ready = false;
         loading = false;
-        clapId = giftId = joinId = muteId = 0;
+        clapId = giftId = joinId = muteId = chestExplosionId = 0;
     }
 }
