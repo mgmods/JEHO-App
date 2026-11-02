@@ -2247,7 +2247,7 @@ export class GiftsService implements OnModuleInit {
         opened = {
           winnerId: senderId,
           winnerName: winner?.displayName || winner?.username || 'مستخدم',
-          roomId, level: levelIndex + 1, levelTitle: levelCfg.title || ('المستوى ' + (levelIndex + 1)),
+          roomId, level: levelIndex + 1, cycle: Math.max(1, Number(state.cycle) || 1), levelTitle: levelCfg.title || ('المستوى ' + (levelIndex + 1)),
           rewards: granted, giftId, category,
         };
         state.lastWinnerId = senderId;
