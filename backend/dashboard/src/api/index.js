@@ -373,8 +373,8 @@ export const rankingApi = {
 
 
 export const supportChestApi = {
-  getConfig: () => safeRequest(() => api.get('/admin/support-chest/config')),
-  saveConfig: (payload) => safeRequest(() => api.patch('/admin/support-chest/config', payload)),
+  getConfig: () => safeRequest(() => api.get('/admin/support-chest/config', { timeout: 12000 })),
+  saveConfig: (payload) => safeRequest(() => api.patch('/admin/support-chest/config', payload, { timeout: 20000 })),
 }
 
 export const medalsApi = {
