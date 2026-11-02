@@ -1046,6 +1046,48 @@
                 android:background="#FFF0EDF4" />
 
             <!-- Mikoo services list — each row has its own unique icon (hardcoded) -->
+                <LinearLayout
+                    android:id="@+id/rowMysteriousModeShortcut"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="6dp"
+                    android:minHeight="54dp"
+                    android:background="@android:color/transparent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="10dp"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="🕵️ الرجل الغامض"
+                            android:textColor="#FF806A22"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/tvMysteriousModeShortcutHint"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="إخفاء هويتك داخل الغرف"
+                            android:textColor="#FF777777"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                    <Switch
+                        android:id="@+id/switchMysteriousModeShortcut"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="تفعيل أو إلغاء الرجل الغامض"
+                        android:showText="false" />
+                </LinearLayout>
+
             <LinearLayout
                 android:id="@+id/profileServicesGrid"
                 android:layout_width="match_parent"
@@ -1450,45 +1492,7 @@
                         app:tint="#FFB5AFC8" />
                 </LinearLayout>
 
-                <LinearLayout
-                    android:id="@+id/rowMysteriousModeShortcut"
-                    android:layout_width="0dp"
-                    android:layout_height="96dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@android:color/transparent"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp"
-                    android:visibility="gone" android:layout_columnWeight="1" android:layout_gravity="center">
 
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="🕵️ الرجل الغامض"
-                            android:textColor="#FF806A22"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:id="@+id/tvMysteriousModeShortcutHint"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="إخفاء هويتك داخل الغرف"
-                            android:textColor="#FF777777"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-                    <Switch
-                        android:id="@+id/switchMysteriousModeShortcut"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:contentDescription="تفعيل أو إلغاء الرجل الغامض"
-                        android:showText="false" />
-                </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/btnSettingsQuick"
