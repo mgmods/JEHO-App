@@ -2047,55 +2047,59 @@ export class GiftsService implements OnModuleInit {
       throw new BadRequestException('A valid roomId is required');
     }
     const configRow = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
+    const defaultLevels = [
+      { level: 1, title: 'الصندوق الذهبي', goalMode: 'coins', coinTarget: 100000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 5000, itemId: '' }] },
+      { level: 2, title: 'الصندوق الملكي', goalMode: 'coins', coinTarget: 200000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 10000, itemId: '' }] },
+      { level: 3, title: 'الصندوق الأسطوري', goalMode: 'coins', coinTarget: 300000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 20000, itemId: '' }] },
+    ];
     const defaults: any = {
-      enabled: false, iconVisible: true, goalMode: 'coins',
+      enabled: false, iconVisible: true, soundEnabled: true, goalMode: 'coins',
       coinTarget: 100000, diamondTarget: 10000, giftIds: [],
-      giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', levels: [],
-      rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '',
+      giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all',
+      levels: defaultLevels, rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '',
     };
     let config: any = defaults;
     try {
       if (configRow?.value) {
         const parsed = JSON.parse(configRow.value);
         config = {
-          ...defaults,
-          ...parsed,
+          ...defaults, ...parsed,
           giftSelectionMode: parsed.giftSelectionMode
             || (Array.isArray(parsed.giftIds) && parsed.giftIds.length ? 'selected' : 'all'),
         };
       }
     } catch {}
-    if (!Array.isArray(config.levels) || !config.levels.length) {
-      config.levels = [{
-        level: 1, title: 'الصندوق الذهبي', goalMode: config.goalMode || 'coins',
-        coinTarget: config.coinTarget, diamondTarget: config.diamondTarget,
-        giftCount: 1, giftCategories: config.giftCategories || ['normal', 'lucky', 'cp'],
-        giftSelectionMode: config.giftSelectionMode || ((config.giftIds || []).length ? 'selected' : 'all'),
-        giftIds: config.giftIds || [], imageUrl: '',
-        rewards: [{ type: config.rewardType || 'none', amount: config.rewardAmount || 0, itemId: config.rewardItemId || '' }],
-      }];
+    const configuredLevels = Array.isArray(config.levels) ? config.levels.slice(0, 3) : [];
+    while (configuredLevels.length < 3) {
+      const next = configuredLevels.length;
+      configuredLevels.push({ ...defaultLevels[next], giftCategories: [...(config.giftCategories || defaultLevels[next].giftCategories)] });
     }
-    const key = 'support_chest_room:' + roomId;
+    const levels = configuredLevels.map((level: any, index: number) => ({
+      ...defaultLevels[index], ...level, level: index + 1,
+      features: Array.isArray(level.features) ? level.features.map((x: any) => String(x || '').trim()).filter(Boolean)
+        : String(level.featuresText || '').split(/\\r?\\n/).map((x: string) => x.trim()).filter(Boolean),
+      rewards: Array.isArray(level.rewards) ? level.rewards : [],
+    }));
+
+    const key = 'support_chest_global';
     let row = await this.settingsRepo.findOne({ where: { key } });
     if (!row) {
-      await this.dataSource.query(
-        'INSERT INTO app_settings ("key", "value", "description") VALUES ($1, $2, $3) ON CONFLICT ("key") DO NOTHING',
-        [key, JSON.stringify({ roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 }), 'Room support chest state'],
-      );
+      await this.dataSource.transaction(async manager => {
+        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+        await manager.query(
+          'INSERT INTO app_settings ("key", "value", "description") VALUES ($1, $2, $3) ON CONFLICT ("key") DO NOTHING',
+          [key, JSON.stringify({ coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 }), 'Global support chest state shared by every room'],
+        );
+      });
       row = await this.settingsRepo.findOne({ where: { key } });
     }
-    let state: any = { roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
+    let state: any = { coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
     try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
-    const levelIndex = Math.max(0, Math.min(config.levels.length - 1, Number(state.level || 1) - 1));
-    const currentLevel = config.levels[levelIndex] || config.levels[0];
-    const globalAllowedCategories = Array.isArray(config.giftCategories) ? config.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
-    const levelAllowedCategories = Array.isArray(currentLevel?.giftCategories)
-      ? currentLevel.giftCategories.map(String) : globalAllowedCategories;
-    const allowedCategories = levelAllowedCategories.filter(category => globalAllowedCategories.includes(category));
+
+    const globalAllowedCategories = Array.isArray(config.giftCategories)
+      ? config.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
     const globalGiftIds = Array.isArray(config.giftIds) ? config.giftIds.map(String) : [];
     const globalGiftSelectionMode = String(config.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'));
-    const levelGiftIds = Array.isArray(currentLevel?.giftIds) ? currentLevel.giftIds.map(String) : [];
-    const levelGiftSelectionMode = String(currentLevel?.giftSelectionMode || (levelGiftIds.length ? 'selected' : 'all'));
     const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
     const classifySupportGift = (gift: Gift): 'normal' | 'lucky' | 'cp' | 'other' => {
       const rawCategory = String(gift.category || '').toLowerCase();
@@ -2105,37 +2109,51 @@ export class GiftsService implements OnModuleInit {
       if (rawCategory === 'normal' || rawType === 'normal' || !rawCategory) return 'normal';
       return 'other';
     };
-    const eligibleGifts = allGifts.filter(gift => {
-      const category = classifySupportGift(gift);
-      return allowedCategories.includes(category)
-        && (globalGiftSelectionMode !== 'selected' || globalGiftIds.includes(String(gift.id)))
-        && (levelGiftSelectionMode !== 'selected' || levelGiftIds.includes(String(gift.id)));
-    }).map(gift => ({
-      id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl || null,
-      coinPrice: Number(gift.coinPrice) || 0,
-      category: classifySupportGift(gift),
+    const enrichedLevels = await Promise.all(levels.map(async (level: any, index: number) => {
+      const levelCategories = Array.isArray(level.giftCategories)
+        ? level.giftCategories.map(String) : globalAllowedCategories;
+      const allowedCategories = levelCategories.filter((category: string) => globalAllowedCategories.includes(category));
+      const levelGiftIds = Array.isArray(level.giftIds) ? level.giftIds.map(String) : [];
+      const levelGiftSelectionMode = String(level.giftSelectionMode || (levelGiftIds.length ? 'selected' : 'all'));
+      const eligibleGifts = allGifts.filter(gift => {
+        const category = classifySupportGift(gift);
+        return allowedCategories.includes(category)
+          && (globalGiftSelectionMode !== 'selected' || globalGiftIds.includes(String(gift.id)))
+          && (levelGiftSelectionMode !== 'selected' || levelGiftIds.includes(String(gift.id)));
+      }).map(gift => ({
+        id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl || null,
+        coinPrice: Number(gift.coinPrice) || 0, category: classifySupportGift(gift),
+      }));
+      const rawRewards = Array.isArray(level.rewards) ? level.rewards.filter((reward: any) => reward && String(reward.type || '') !== 'none') : [];
+      const rewards = await Promise.all(rawRewards.map(async (reward: any) => {
+        const type = String(reward?.type || '');
+        const itemId = String(reward?.itemId || '');
+        let item: any = null;
+        if (type === 'frame' && itemId) item = await this.cosmeticsRepo.findOne({ where: { id: itemId } });
+        else if (type === 'badge' && itemId) item = await this.dataSource.getRepository(Badge).findOne({ where: { id: itemId } });
+        else if (type === 'vip' && itemId) item = await this.dataSource.getRepository(VipPlan).findOne({ where: { id: itemId } });
+        else if (type === 'gift' && itemId) item = await this.giftsRepo.findOne({ where: { id: itemId } });
+        return {
+          type, amount: Math.max(1, Number(reward?.amount) || 1), itemId,
+          name: item?.name || (type === 'coins' ? 'كوينزات' : type === 'diamonds' ? 'ماسات' : type.toUpperCase()),
+          imageUrl: item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.animationUrl || null,
+          iconUrl: item?.iconUrl || null, animationUrl: item?.animationUrl || null,
+        };
+      }));
+      return { ...level, level: index + 1, eligibleGifts, eligibleGiftCount: eligibleGifts.length, rewards, rewardCount: rewards.length };
     }));
-    const rewards = Array.isArray(currentLevel?.rewards) ? currentLevel.rewards.filter((reward: any) => String(reward?.type || '') !== 'none') : [];
-    const rewardPreview = await Promise.all(rewards.map(async (reward: any) => {
-      const type = String(reward?.type || '');
-      const itemId = String(reward?.itemId || '');
-      let item: any = null;
-      if (type === 'frame' && itemId) item = await this.cosmeticsRepo.findOne({ where: { id: itemId } });
-      else if (type === 'badge' && itemId) item = await this.dataSource.getRepository(Badge).findOne({ where: { id: itemId } });
-      else if (type === 'vip' && itemId) item = await this.dataSource.getRepository(VipPlan).findOne({ where: { id: itemId } });
-      else if (type === 'gift' && itemId) item = await this.giftsRepo.findOne({ where: { id: itemId } });
-      return {
-        type, amount: Math.max(1, Number(reward?.amount) || 1), itemId,
-        name: item?.name || (type === 'coins' ? 'كوينزات' : type === 'diamonds' ? 'ماسات' : type.toUpperCase()),
-        imageUrl: item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.animationUrl || null,
-        iconUrl: item?.iconUrl || null, animationUrl: item?.animationUrl || null,
-      };
-    }));
-    const enrichedLevel = { ...currentLevel, rewards: rewardPreview, rewardCount: rewardPreview.length, eligibleGifts, eligibleGiftCount: eligibleGifts.length };
+
+    const levelIndex = Math.max(0, Math.min(2, Number(state.level || 1) - 1));
+    const currentLevel = enrichedLevels[levelIndex];
     return {
-      config: { ...config, eligibleGifts, eligibleGiftCount: eligibleGifts.length },
-      state: { ...state, level: levelIndex + 1, currentLevel: currentLevel?.title || ('المستوى ' + (levelIndex + 1)) },
-      currentLevel: enrichedLevel,
+      config: {
+        ...config, levels: enrichedLevels,
+        eligibleGifts: currentLevel.eligibleGifts,
+        eligibleGiftCount: currentLevel.eligibleGiftCount,
+        currentLevel,
+      },
+      state: { ...state, roomId, level: levelIndex + 1, currentLevel: currentLevel.title || ('المستوى ' + (levelIndex + 1)) },
+      currentLevel,
     };
   }
 
