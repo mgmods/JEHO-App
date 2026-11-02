@@ -105,7 +105,45 @@ public final class RoomSoundFx {
     }
     public static void playJoin(Context c) { play(c, Kind.JOIN, joinId, 0.8f); }
     public static void playMute(Context c) { play(c, Kind.MUTE, muteId, 0.7f); }
-    public static void playChestExplosion(Context c) { play(c, Kind.CHEST, chestExplosionId, 1f); }
+    /** Plays the chest WAV after SoundPool finishes decoding; retries before using a tone fallback. */
+    public static void playChestExplosion(Context c) {
+        if (mutedFx || c == null) return;
+        init(c.getApplicationContext());
+        if (pool == null || chestExplosionId == 0) {
+            playChestFallbackTone();
+            return;
+        }
+        playChestExplosionAttempt(0);
+    }
+
+    private static void playChestExplosionAttempt(int attempt) {
+        if (mutedFx) return;
+        try {
+            SoundPool currentPool = pool;
+            int currentSoundId = chestExplosionId;
+            if (currentPool != null && currentSoundId != 0) {
+                int streamId = currentPool.play(currentSoundId, 1f, 1f, 2, 0, 1f);
+                if (streamId != 0) return;
+            }
+        } catch (Exception ignored) {
+        }
+        if (attempt < 5) {
+            new Handler(Looper.getMainLooper()).postDelayed(
+                    () -> playChestExplosionAttempt(attempt + 1), 120L);
+        } else {
+            playChestFallbackTone();
+        }
+    }
+
+    private static void playChestFallbackTone() {
+        if (mutedFx) return;
+        try {
+            ToneGenerator generator = new ToneGenerator(AudioManager.STREAM_MUSIC, 90);
+            generator.startTone(ToneGenerator.TONE_PROP_NACK, 420);
+            new Handler(Looper.getMainLooper()).postDelayed(generator::release, 520L);
+        } catch (Exception ignored) {
+        }
+    }
 
     private static void play(Context c, Kind kind, int soundId, float vol) {
         if (mutedFx) return;
