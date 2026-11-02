@@ -183,12 +183,17 @@
                     <input v-model.trim="level.presentation.cardBackgroundUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط الخلفية" @change="syncLevelEditor(item)">
                   </div>
                   <div class="col-md-4">
-                    <label class="form-label">هدية مكافأة المستوى من الهدايا العادية</label>
-                    <select v-model="level.rewardGiftId" class="form-select" @change="syncLevelEditor(item)">
-                      <option value="">بدون هدية تلقائية</option>
+                    <label class="form-label">هدايا مكافأة المستوى (يمكن اختيار عدة هدايا)</label>
+                    <select v-model="level.rewardGiftIds" class="form-select" multiple size="5" @change="syncLevelEditor(item)">
                       <option v-for="gift in normalGifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
                     </select>
-                    <div v-if="selectedGift({giftId:level.rewardGiftId})" class="small mt-1">{{ selectedGift({giftId:level.rewardGiftId}).name }}</div>
+                    <div class="form-text">يمكن تحديد أكثر من هدية باستخدام الاختيار المتعدد. ستظهر كل الهدايا المختارة في معاينة مكافآت هذا المستوى داخل التطبيق.</div>
+                    <div v-if="(level.rewardGiftIds || []).length" class="d-flex flex-wrap gap-2 mt-2">
+                      <div v-for="giftId in level.rewardGiftIds" :key="giftId" v-if="selectedGift({giftId})" class="d-flex align-items-center gap-2 border rounded-3 p-2">
+                        <img :src="selectedGift({giftId}).animationUrl || selectedGift({giftId}).iconUrl" :alt="selectedGift({giftId}).name" width="42" height="42" style="object-fit:contain">
+                        <span class="small">{{ selectedGift({giftId}).name }}</span>
+                      </div>
+                    </div>
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">مكافأة تجميلية تلقائية عند بلوغ المستوى</label>
@@ -689,6 +694,7 @@ function addLevel(item) {
     presentation: { title: '', levelLogoUrl: '', frameUrl: '', cardBackgroundUrl: '', nameColor: '#ffffff', nameGlow: false },
     giftPresentation: { animationUrl: '', showPartnerAvatars: true },
     rewardGiftId: '',
+    rewardGiftIds: [],
     rewardCosmeticCode: '',
     rewardCosmeticCodes: [],
     rewardDays: 30,
@@ -748,7 +754,7 @@ async function load() {
       levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => {
         const benefits = [...(Array.isArray(level.benefits) ? level.benefits : []), ...(Array.isArray(level.rewards) ? level.rewards : [])]
         const rewardCosmeticCodes = Array.from(new Set([level.rewardCosmeticCode, ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
-        return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
+        return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardGiftIds: Array.from(new Set([...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []), level.rewardGiftId || level.giftId || ''].map(id => String(id || '').trim()).filter(Boolean))), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
       }),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
       seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
@@ -847,6 +853,7 @@ function syncLevelEditor(item) {
     giftPresentation: { ...(level.giftPresentation || {}) },
     giftBonusPercent: Math.max(0, Math.min(500, Number(level.giftBonusPercent) || 0)),
     rewardGiftId: String(level.rewardGiftId || ''),
+    rewardGiftIds: Array.from(new Set([...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []), level.rewardGiftId || ''].map(id => String(id || '').trim()).filter(Boolean))),
     rewardCosmeticCode: String(level.rewardCosmeticCode || ''),
     rewardCosmeticCodes: Array.from(new Set((Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []).map(code => String(code || '').trim()).filter(Boolean))),
     benefits: [
@@ -891,7 +898,7 @@ function refreshLevelEditor(item) {
     item.levelsEditor = levels.map(level => {
       const benefits = [...(Array.isArray(level.benefits) ? level.benefits : []), ...(Array.isArray(level.rewards) ? level.rewards : [])]
       const rewardCosmeticCodes = Array.from(new Set([level.rewardCosmeticCode, ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
-      return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
+      return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardGiftIds: Array.from(new Set([...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []), level.rewardGiftId || level.giftId || ''].map(id => String(id || '').trim()).filter(Boolean))), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
     })
   } catch (e) { error.value = e?.message || 'تعذر قراءة جدول المستويات.' }
 }
