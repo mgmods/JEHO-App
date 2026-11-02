@@ -55,8 +55,6 @@ h1{font-size:18px;margin:0;font-weight:850;letter-spacing:.1px}.sub{font-size:11
 <section class="stats"><div class="stathead"><strong id="metricTitle">تقدّم الكوينزات</strong><span class="percent" id="percent">0%</span></div><div class="track"><div class="fill" id="fill" style="width:0%"></div></div><div class="details"><span>المجموع: <b id="current">0</b></span><span>الهدف: <b id="target">—</b></span><span>المتبقي: <b id="remaining">—</b></span><span>الهدايا: <b id="giftCountProgress">0 / 1</b></span></div></section>
 <div class="sectiontitle"><span>مميزات هذا المستوى</span><span class="hint">مزايا المستوى الحالي</span></div>
 <section class="feature-list" id="levelFeatures"><div class="feature-chip">تظهر المميزات المحددة من لوحة الإدارة</div></section>
-<div class="sectiontitle"><span>الهدايا التي تساهم بالصندوق</span><span class="hint" id="eligibleGiftCount">0 هدية</span></div>
-<section class="gifts" id="eligibleGifts"><div class="giftcard"><div class="giftname">جارٍ تحميل الهدايا…</div></div></section>
 <div class="sectiontitle"><span>🎁 جوائز مفجّر الصندوق</span><span class="hint" id="rewardCount">0 مكافأة</span></div>
 <section class="gifts" id="rewardPreviews"><div class="giftcard"><div class="giftname">تظهر الجوائز المحددة من الداشبورد</div></div></section>
 <p class="footnote" id="connectionStatus">بانتظار بيانات الصندوق الحقيقية من الخادم. لا توجد مساهمات معروضة حالياً.</p>
@@ -102,8 +100,12 @@ function setChestArt(url){
  node.src=source;
 }
 function renderLevelFeatures(items){const root=document.getElementById('levelFeatures'),rows=Array.isArray(items)?items.map(x=>String(x||'').trim()).filter(Boolean):[];root.innerHTML=rows.length?rows.map(x=>'<span class="feature-chip">'+escHtml(x)+'</span>').join(''):'<span class="feature-chip">لا توجد مميزات إضافية محددة لهذا المستوى</span>';}
-function renderGiftCards(items){const root=document.getElementById('eligibleGifts'),rows=Array.isArray(items)?items:[];document.getElementById('eligibleGiftCount').textContent=rows.length+' هدية';root.innerHTML=rows.length?rows.map(g=>{const media=String(g.iconUrl||g.animationUrl||'');const visual=/\.(mp4|webm)(\?|$)/i.test(media)?'<video src="'+escHtml(media)+'" muted autoplay loop playsinline></video>':media?'<img src="'+escHtml(media)+'" alt="">':'<div style="font-size:34px">🎁</div>';return '<div class="giftcard">'+visual+'<div class="giftname">'+escHtml(g.name||'هدية')+'</div><div class="value">'+formatNum(g.coinPrice||0)+' كوين</div></div>';}).join(''):'<div class="giftcard"><div class="giftname">لا توجد هدايا مؤهلة لهذا المستوى</div></div>';}
-function renderRewardCards(items){const root=document.getElementById('rewardPreviews'),rows=Array.isArray(items)?items:[];document.getElementById('rewardCount').textContent=rows.length+' مكافآت';root.innerHTML=rows.length?rows.map(r=>{const image=String(r.imageUrl||r.iconUrl||r.animationUrl||'');const visual=/\.(mp4|webm)(\?|$)/i.test(image)?'<video src="'+escHtml(image)+'" muted autoplay loop playsinline></video>':image?'<img src="'+escHtml(image)+'" alt="">':'<div style="font-size:34px">'+(r.type==='coins'?'🪙':r.type==='diamonds'?'💎':r.type==='vip'?'👑':r.type==='frame'?'🖼️':r.type==='badge'?'🏅':'🎁')+'</div>';return '<div class="giftcard">'+visual+'<div class="giftname">'+escHtml(r.name||r.type||'مكافأة')+'</div><div class="value">'+escHtml(r.type==='vip'?'VIP · '+(r.amount||1)+' يوم':(['coins','diamonds'].includes(r.type)?formatNum(r.amount)+' '+(r.type==='coins'?'كوينز':'ماسات'):'× '+(r.amount||1)))+'</div></div>';}).join(''):'<div class="giftcard"><div class="giftname">لم يحدد الأدمن مكافآت لهذا المستوى</div></div>';}
+function rewardMedia(r){
+ const item=r?.item||r?.catalogItem||r?.rewardItem||{};
+ const candidates=[r?.imageUrl,r?.iconUrl,r?.previewUrl,r?.thumbnailUrl,r?.badgeUrl,r?.frameImageUrl,r?.animationUrl,r?.assetUrl,r?.url,r?.image,item?.iconUrl,item?.previewUrl,item?.imageUrl,item?.badgeUrl,item?.animationUrl,item?.assetUrl,item?.url];
+ return String(candidates.find(v=>typeof v==='string'&&v.trim())||'').trim();
+}
+function renderRewardCards(items){const root=document.getElementById('rewardPreviews'),rows=Array.isArray(items)?items:[];document.getElementById('rewardCount').textContent=rows.length+' مكافآت';root.innerHTML=rows.length?rows.map(r=>{const image=rewardMedia(r);const video=/\.(mp4|webm)(\?|$)/i.test(image);const fallback=(r.type==='coins'?'🪙':r.type==='diamonds'?'💎':r.type==='vip'?'👑':r.type==='frame'?'🖼️':r.type==='badge'?'🏅':'🎁');const visual=image?(video?'<video src="'+escHtml(image)+'" muted autoplay loop playsinline></video>':'<img src="'+escHtml(image)+'" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:'+JSON.stringify(fallback)+',style:\'font-size:34px\'}))">'):'<div style="font-size:34px">'+fallback+'</div>';return '<div class="giftcard">'+visual+'<div class="giftname">'+escHtml(r.name||r.type||'مكافأة')+'</div><div class="value">'+escHtml(r.type==='vip'?'VIP · '+(r.amount||1)+' يوم':(['coins','diamonds'].includes(r.type)?formatNum(r.amount)+' '+(r.type==='coins'?'كوينز':'ماسات'):'× '+(r.amount||1)))+'</div></div>';}).join(''):'<div class="giftcard"><div class="giftname">لم يحدد الأدمن مكافآت لهذا المستوى</div></div>';}
 function renderLevelTabs(levels){
  const root=document.getElementById('levelSelector'),rows=Array.isArray(levels)?levels.slice(0,3):[];
  root.innerHTML=rows.map((lv,i)=>{const locked=i>currentLevelIndex,done=i<currentLevelIndex;return '<button type="button" class="level-tab '+(i===selectedLevelIndex?'active ':'')+(locked?'locked':'')+'" data-level="'+i+'">'+(locked?'🔒 ':done?'✓ ':'🎁 ')+escHtml(lv.title||('المستوى '+(i+1)))+'<small>'+(locked?'مقفل':done?'مكتمل':'المستوى الحالي')+'</small></button>';}).join('');
@@ -116,11 +118,9 @@ function selectLevel(index){
  const locked=selectedLevelIndex>currentLevelIndex;
  const stage=document.querySelector('.stage');stage.classList.toggle('preview-locked',locked);
  document.getElementById('lockedOverlay').classList.toggle('show',locked);
- document.getElementById('eligibleGifts').classList.toggle('locked-preview',locked);
  document.getElementById('rewardPreviews').classList.toggle('locked-preview',locked);
  document.querySelector('h1').textContent='🎁 '+String(lv.title||'صندوق الدعم');
  renderLevelFeatures(lv.features||[]);
- renderGiftCards(lv.eligibleGifts||[]);
  renderRewardCards(lv.rewards||[]);
  setChestArt(lv.imageUrl);
  const mode=lv.goalMode||'coins';selectedMode=mode==='diamonds'?'diamonds':'coins';
@@ -144,7 +144,7 @@ window.applySupportChestWin=function(win){
  try{
   const overlay=document.getElementById('explosionOverlay'),winner=String(win?.winnerName||'أحد الداعمين'),rewards=Array.isArray(win?.rewards)?win.rewards:[];
   document.getElementById('blastWinner').textContent=winner+' فجّر '+String(win?.levelTitle||('المستوى '+(win?.level||'')));
-  document.getElementById('blastPrize').innerHTML=rewards.map(reward=>{const image=String(reward?.imageUrl||reward?.iconUrl||'');const visual=image?'<img src="'+escHtml(image)+'" alt="">':'<span style="font-size:36px">🎁</span>';return '<div>'+visual+'<strong>'+escHtml(reward?.name||reward?.type||'مكافأة')+'</strong><small>'+escHtml(reward?.type==='vip'?'VIP':reward?.type==='coins'?'كوينزات':reward?.type==='diamonds'?'ماسات':'مكافأة')+' × '+escHtml(reward?.amount||1)+'</small></div>';}).join('')||'🎁 تم فتح الصندوق';
+  document.getElementById('blastPrize').innerHTML=rewards.map(reward=>{const image=rewardMedia(reward);const visual=image?'<img src="'+escHtml(image)+'" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'🎁\',style:\'font-size:36px\'}))">':'<span style="font-size:36px">🎁</span>';return '<div>'+visual+'<strong>'+escHtml(reward?.name||reward?.type||'مكافأة')+'</strong><small>'+escHtml(reward?.type==='vip'?'VIP':reward?.type==='coins'?'كوينزات':reward?.type==='diamonds'?'ماسات':'مكافأة')+' × '+escHtml(reward?.amount||1)+'</small></div>';}).join('')||'🎁 تم فتح الصندوق';
   const burst=document.getElementById('burstParticles');burst.innerHTML='';
   const particles=['🎁','🪙','💎','✨','🌟','🪙','💎','🎁','✨','🪙','💎','🌟','🎁','🪙','💎','✨'];
   particles.forEach((symbol,index)=>{const node=document.createElement('span');node.className='burst-particle';node.textContent=symbol;const angle=(Math.PI*2*index)/particles.length;const distance=90+(index%4)*24;node.style.setProperty('--dx',Math.round(Math.cos(angle)*distance)+'px');node.style.setProperty('--dy',Math.round(Math.sin(angle)*distance)+'px');node.style.animationDelay=(index%4)*35+'ms';burst.appendChild(node);});
