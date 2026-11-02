@@ -849,10 +849,11 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         List<GiftDtos.GiftDto> out = new ArrayList<>();
         for (GiftDtos.GiftDto g : allGifts) {
             if (g == null || isLuckyBoxGift(g)) continue;
-            boolean isCpGift = "cp".equals(giftBucket(g));
+            boolean isCpGift = "cp".equals(giftBucket(g))
+                    || (g.id != null && cpGiftTypes.containsKey(g.id));
             if ("cp".equals(want)) {
-                // Every active dashboard gift classified as CP is visible, even if it is
-                // not the single starter gift configured for a CP relationship type.
+                // Show CP-category gifts and the exact gift selected in the live dashboard
+                // configuration, even when that gift's general catalog category differs.
                 if (isCpGift) out.add(g);
                 continue;
             }
@@ -1306,6 +1307,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     cpGiftPrices.putAll(prices);
                     cpCatalogLoaded = true;
                     applyCpGiftPrices();
+                    // Revalidate the catalog as well: a newly selected dashboard gift may
+                    // have been added or reclassified while this sheet was already open.
+                    if (vm != null) vm.load();
                     // Rebuild the tabs now that the live CP catalog is known.
                     applyCategories(new ArrayList<>(tabCategories));
                     applyFilter();
