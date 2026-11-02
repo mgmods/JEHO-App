@@ -595,7 +595,7 @@ const uploadingCpStorePreview = ref(false)
 const cpStoreForm = ref({ code: '', name: '', type: 'profile_card', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 })
 
 function label(type) {
-  return ({ friendship: 'الصداقة', brotherhood: 'الأخوّة', love: 'الحب', engagement: 'الخطوبة', marriage: 'الزواج' })[type] || type
+  return type === 'relationship' ? 'نظام الارتباط الموحد' : 'نظام الارتباط الموحد'
 }
 function format(value) { return Number(value || 0).toLocaleString('ar') }
 function cosmeticTypeLabel(type) {
