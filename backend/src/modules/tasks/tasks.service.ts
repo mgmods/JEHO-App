@@ -530,15 +530,32 @@ export class TasksService {
     const cosmetic = day?.type === 'cosmetic' && day.cosmeticCode
       ? await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: day.cosmeticCode } })
       : null;
+    const cosmeticArtwork = (item: Cosmetic | null) => {
+      const meta = item?.meta && typeof item.meta === 'object'
+        ? item.meta as Record<string, unknown>
+        : {};
+      const pick = (...values: unknown[]) => {
+        for (const value of values) {
+          const candidate = String(value ?? '').trim();
+          if (candidate) return candidate;
+        }
+        return null;
+      };
+      return {
+        previewUrl: pick(item?.previewUrl, meta.previewUrl, meta.iconUrl, meta.imageUrl),
+        animationUrl: pick(item?.animationUrl, meta.animationUrl, meta.svgaUrl, meta.gifUrl),
+      };
+    };
     const dayCards = await Promise.all(config.days.map(async (d: any) => {
       const item = d.type === 'cosmetic' && d.cosmeticCode
         ? await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: d.cosmeticCode } })
         : null;
+      const artwork = cosmeticArtwork(item);
       return {
         ...d,
         name: item?.name || d.label,
-        previewUrl: item?.previewUrl || null,
-        animationUrl: item?.animationUrl || null,
+        previewUrl: artwork.previewUrl,
+        animationUrl: artwork.animationUrl,
         cosmeticType: item?.type || null,
         claimed: activeStreak > 0 && d.day <= activeStreak,
       };
@@ -551,7 +568,12 @@ export class TasksService {
       streak: activeStreak,
       currentDay: nextDay,
       today,
-      reward: day ? { ...day, previewUrl: cosmetic?.previewUrl || null, animationUrl: cosmetic?.animationUrl || null, cosmeticType: cosmetic?.type || null, name: cosmetic?.name || day.label } : null,
+      reward: day ? {
+        ...day,
+        ...cosmeticArtwork(cosmetic),
+        cosmeticType: cosmetic?.type || null,
+        name: cosmetic?.name || day.label,
+      } : null,
       days: dayCards,
     };
   }
