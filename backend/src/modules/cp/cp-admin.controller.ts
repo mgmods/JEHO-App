@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Param, UseGuards, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Param, UseGuards, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { DataSource } from 'typeorm';
@@ -33,8 +33,10 @@ export class CpAdminController {
     const rows = await this.dataSource.query(
       `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%' ORDER BY key`,
     );
-    const settings = Object.fromEntries(rows.map((row: { key: string; value: string }) => {
-      try { return [row.key, JSON.parse(row.value)]; } catch { return [row.key, row.value]; }
+    const settings = Object.fromEntries(rows.map((row: { key: string; value: unknown }) => {
+      const raw = row.value;
+      if (typeof raw !== 'string') return [row.key, raw];
+      try { return [row.key, JSON.parse(raw)]; } catch { return [row.key, raw]; }
     }));
     const types: Array<Record<string, unknown>> = [];
     for (const type of Object.values(CpType)) {
@@ -311,7 +313,19 @@ export class CpAdminController {
         [adminId, type, JSON.stringify({ keys: Object.keys(config) })],
       );
     });
-    return this.getConfig();
+
+    // Read the persisted JSON back from app_settings before reporting success.
+    // This catches silent schema/serialization mismatches that otherwise make the
+    // dashboard reload an older level configuration after a successful-looking save.
+    const savedConfig = await this.getConfig();
+    const savedType = savedConfig.types.find((entry: Record<string, any>) => entry.type === type);
+    if (body.levels !== undefined) {
+      if (!savedType || !Array.isArray(savedType.levels) ||
+          JSON.stringify(savedType.levels) !== JSON.stringify(body.levels)) {
+        throw new InternalServerErrorException('لم تتطابق مستويات CB بعد إعادة قراءتها من قاعدة البيانات؛ لم يتم تأكيد الحفظ.');
+      }
+    }
+    return savedConfig;
   }
 
 
