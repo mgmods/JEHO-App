@@ -249,16 +249,22 @@ export class CpAdminController {
         if (level.rewardPermanent !== undefined && typeof level.rewardPermanent !== 'boolean') {
           throw new BadRequestException('خيار ديمومة مكافأة مستوى CB غير صالح');
         }
-        if (level.rewardGiftId) {
-          if (typeof level.rewardGiftId !== 'string' ||
-              !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(level.rewardGiftId)) {
-            throw new BadRequestException('معرّف هدية مكافأة المستوى غير صالح');
-          }
-          const [rewardGift] = await this.dataSource.query(
-            'SELECT id FROM gifts WHERE id=$1 AND "isActive"=true LIMIT 1',
-            [String(level.rewardGiftId)],
+        const rewardGiftIds = Array.from(new Set([
+          ...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []),
+          level.rewardGiftId,
+        ].map((id: any) => String(id || '').trim()).filter(Boolean)));
+        if (rewardGiftIds.length > 30 || rewardGiftIds.some((id: string) =>
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
+          throw new BadRequestException('قائمة هدايا مكافأة المستوى غير صالحة');
+        }
+        if (rewardGiftIds.length) {
+          const activeGifts = await this.dataSource.query(
+            'SELECT id FROM gifts WHERE id=ANY($1::uuid[]) AND "isActive"=true',
+            [rewardGiftIds],
           );
-          if (!rewardGift) throw new BadRequestException('هدية مكافأة المستوى يجب أن تكون هدية نشطة من الكتالوج');
+          if (activeGifts.length !== rewardGiftIds.length) {
+            throw new BadRequestException('كل هدايا مكافأة المستوى يجب أن تكون هدايا نشطة من الكتالوج');
+          }
         }
         if (level.giftPresentation !== undefined) {
           if (!level.giftPresentation || typeof level.giftPresentation !== 'object' || Array.isArray(level.giftPresentation)) {
