@@ -3298,10 +3298,9 @@ export class GiftsService implements OnModuleInit {
       return result;
     });
 
-    // Apply support-chest progress only after the gift wallet transaction commits.
-    // The previous nested transaction tried to lock the sender wallet while the
-    // outer gift transaction still held that same wallet lock. At the goal this
-    // blocked reward granting and prevented the room opening event from being sent.
+    // Process support-chest progress after the gift transaction and gift fan-out
+    // complete. This keeps the room reward/opening flow isolated from gift delivery
+    // and ensures a chest-side failure cannot roll back or interrupt the sent gift.
     if (dto.roomId && !sendResult?.alreadyProcessed) {
       try {
         await this.applySupportChestGift(
