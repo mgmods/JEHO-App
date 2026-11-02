@@ -3646,7 +3646,7 @@ export class GiftsService implements OnModuleInit {
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
       return result;
     });
-    if (dto.roomId) {
+    if (dto.roomId && !sendResult?.alreadyProcessed) {
       try {
         await this.applySupportChestGift(
           dto.roomId, String(gift.id), totalCoins,
