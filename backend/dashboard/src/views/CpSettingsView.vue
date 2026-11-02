@@ -264,7 +264,8 @@
                         <img v-if="level.presentation.levelLogoUrl" class="cp-level-preview-logo" :src="level.presentation.levelLogoUrl" alt="أيقونة CP">
                         <div class="cp-level-preview-copy">
                           <strong :style="{color:level.presentation.nameColor || '#ffffff',textShadow:level.presentation.nameGlow ? '0 0 10px currentColor' : 'none'}">{{ level.name || level.presentation.title || ('CP · المستوى ' + level.level) }}</strong>
-                          <span>معاً · مستوى {{ level.level }}</span>
+                          <span v-if="level.presentation.title">{{ level.presentation.title }}</span>
+                          <span v-else>معاً · مستوى {{ level.level }}</span>
                         </div>
                         <img v-if="level.giftPresentation.animationUrl" class="cp-level-preview-gift" :src="level.giftPresentation.animationUrl" alt="معاينة هدية CP">
                       </div>
@@ -947,11 +948,22 @@ async function saveType(item) {
     const savedType = Array.isArray(savedConfig?.types)
       ? savedConfig.types.find(entry => entry.type === item.type)
       : null
-    if (!savedType || !Array.isArray(savedType.levels)) {
-      throw new Error('لم يؤكد الخادم حفظ مستويات CP. لم يتم عرض رسالة نجاح.')
+    const expectedLevels = JSON.stringify(payload.levels)
+    if (!savedType || !Array.isArray(savedType.levels) ||
+        JSON.stringify(savedType.levels) !== expectedLevels) {
+      throw new Error('الخادم لم يُرجع نفس تفاصيل مستويات CB التي أرسلتها؛ لم يتم اعتماد الحفظ.')
     }
-    success.value = 'تم حفظ إعدادات ' + label(item.type) + ' والتحقق من رجوع المستويات من الخادم.'
+
+    // Reload from the database, then verify the same type still contains the
+    // exact level definitions. Do not show success based only on the PATCH response.
     await load()
+    const reloadedType = types.value.find(entry => entry.type === item.type)
+    let reloadedLevels = []
+    try { reloadedLevels = JSON.parse(reloadedType?.levelsText || '[]') } catch { reloadedLevels = [] }
+    if (JSON.stringify(reloadedLevels) !== expectedLevels) {
+      throw new Error('تم إرسال الإعدادات لكن إعادة تحميلها من قاعدة البيانات أعادت قيماً مختلفة؛ راجع الحفظ قبل مغادرة الصفحة.')
+    }
+    success.value = 'تم حفظ مستويات ' + label(item.type) + ' والتحقق من تطابقها بعد إعادة التحميل من قاعدة البيانات.'
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات النوع' }
   finally { saving.value = false; savingType.value = '' }
 }
