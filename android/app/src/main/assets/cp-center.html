@@ -135,6 +135,7 @@ function renderRewardCard(r){
  const p=r.presentation||{},gift=r.giftPresentation||{},levelGift=r.rewardGift||null,levelGifts=Array.isArray(r.rewardGifts)&&r.rewardGifts.length?r.rewardGifts:(levelGift?[levelGift]:[]);
  const benefits=Array.isArray(r.benefits)?r.benefits:[];
  const cosmeticCodes=Array.from(new Set([r.rewardCosmeticCode,...(Array.isArray(r.rewardCosmeticCodes)?r.rewardCosmeticCodes:[]),...benefits.map(x=>typeof x==="object"?(x.cosmeticCode||x.code):"")].map(x=>String(x||"").trim()).filter(Boolean)));
+ const cosmetics=Array.isArray(r.rewardCosmetics)?r.rewardCosmetics:[];
  const benefitText=benefits.map(x=>typeof x==="string"?x:(x.title||x.name||x.type||x.code||"ميزة")).filter(Boolean);
  const bg=p.cardBackgroundUrl?"background-image:linear-gradient(115deg,#21091a88,#21091a55),url(&quot;"+esc(p.cardBackgroundUrl)+"&quot;)":"";
  const title=r.name||r.title||p.title||("المستوى "+(r.level||1));
@@ -156,7 +157,7 @@ function renderRewardCard(r){
    (rewardDays>0?'<span>⏳ '+(permanent?'دائمة':score(rewardDays)+' يوم')+'</span>':'')+
    '</div>'+
    (levelGifts.length?'<div class="cp-reward-section"><strong>🎁 هدايا مكافأة المستوى ('+levelGifts.length+')</strong>'+levelGifts.map((gift,index)=>'<div class="cp-reward-item">'+rewardImage(gift.animationUrl||gift.iconUrl||fallback,gift.name||"هدية المستوى","cp-reward-item-image")+'<div><small>هدية '+(index+1)+'</small><strong>'+esc(gift.name||"هدية CP")+'</strong>'+(Number(gift.coinPrice)>0?'<div class="note">'+score(gift.coinPrice)+' عملة</div>':'')+'</div></div>').join("")+'</div>':'')+
-   (cosmeticCodes.length?'<div class="cp-reward-section"><strong>✨ المكافآت التجميلية</strong><div class="cp-reward-chips">'+cosmeticCodes.map(code=>'<span>'+esc(code)+'</span>').join("")+'</div></div>':'')+
+   (cosmetics.length?'<div class="cp-reward-section"><strong>✨ المكافآت التجميلية</strong>'+cosmetics.map(item=>'<div class="cp-reward-item">'+rewardImage(item.animationUrl||item.previewUrl,item.name||item.code,"cp-reward-item-image")+'<div><small>'+esc(item.type||"مكافأة")+'</small><strong>'+esc(item.name||item.code||"مكافأة CP")+'</strong></div></div>').join("")+'</div>':(cosmeticCodes.length?'<div class="cp-reward-section"><strong>✨ المكافآت التجميلية</strong><div class="cp-reward-chips">'+cosmeticCodes.map(code=>'<span>'+esc(code)+'</span>').join("")+'</div></div>':''))+
    (p.frameUrl?'<div class="cp-reward-item">'+rewardImage(p.frameUrl,"إطار بطاقة المستوى","cp-reward-item-image")+'<div><small>إطار المستوى</small><strong>إطار خاص للمستوى</strong></div></div>':'')+
    (p.badgeUrl?'<div class="cp-reward-item">'+rewardImage(p.badgeUrl,"شارة المستوى","cp-reward-item-image")+'<div><small>شارة المستوى</small><strong>شارة CP</strong></div></div>':'')+
    (gift.animationUrl&&window.JehoCB&&window.JehoCB.renderDuoGift?'<div class="cp-reward-section"><strong>💞 هدية الثنائي</strong>'+window.JehoCB.renderDuoGift({giftPresentation:gift,level:r.level})+'</div>':'')+
