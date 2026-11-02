@@ -401,11 +401,40 @@ export class CpAdminController {
     // dashboard reload an older level configuration after a successful-looking save.
     const savedConfig = await this.getConfig();
     const savedType = savedConfig.types.find((entry: Record<string, any>) => entry.type === type);
-    if (body.levels !== undefined) {
-      if (!savedType || !Array.isArray(savedType.levels) ||
-          canonicalJson(savedType.levels) !== canonicalJson(body.levels)) {
-        throw new InternalServerErrorException('لم تتطابق مستويات CB بعد إعادة قراءتها من قاعدة البيانات؛ لم يتم تأكيد الحفظ.');
-      }
+    const mismatches: string[] = [];
+    if (body.levels !== undefined &&
+        (!savedType || !Array.isArray(savedType.levels) ||
+         canonicalJson(savedType.levels) !== canonicalJson(body.levels))) {
+      mismatches.push('المستويات والصور والمكافآت');
+    }
+    if (body.giftId !== undefined &&
+        String(savedType?.giftId || savedType?.gift?.id || '') !== String(body.giftId || '')) {
+      mismatches.push('هدية CP');
+    }
+    if (body.giftPoints !== undefined &&
+        Number(savedType?.giftPoints || 0) !== Number(body.giftPoints)) {
+      mismatches.push('نقاط الهدية');
+    }
+    if (body.giftInteractionPoints !== undefined &&
+        Number(savedType?.giftInteractionPoints || 0) !== Number(body.giftInteractionPoints)) {
+      mismatches.push('نقاط التفاعل');
+    }
+    if (body.maxLevel !== undefined &&
+        Number(savedType?.maxLevel || 0) !== Number(body.maxLevel)) {
+      mismatches.push('الحد الأعلى للمستوى');
+    }
+    if (body.priceCoins !== undefined) {
+      const expectedPrice = body.priceCoins > 0 ? body.priceCoins : null;
+      if ((savedType?.priceCoins ?? null) !== expectedPrice) mismatches.push('السعر');
+    }
+    if (body.rules !== undefined &&
+        canonicalJson(savedType?.rules || {}) !== canonicalJson(body.rules)) {
+      mismatches.push('التصميم والمؤثرات');
+    }
+    if (mismatches.length) {
+      throw new InternalServerErrorException(
+        'تعذر تأكيد حفظ إعدادات CP بعد إعادة قراءتها من قاعدة البيانات: ' + mismatches.join('، ') + '.',
+      );
     }
     this.realtime.emitToAll('cp:config-updated', { scope: 'cp', updatedAt: new Date().toISOString() });
     return savedConfig;
