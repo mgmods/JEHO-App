@@ -1863,12 +1863,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             Object rawConfig = data.get("config");
                             Object rawState = data.get("state");
                             Object rawLevel = data.get("currentLevel");
-                            org.json.JSONObject configObject = rawConfig instanceof Map
-                                    ? new org.json.JSONObject((Map<?, ?>) rawConfig) : new org.json.JSONObject();
-                            if (rawLevel instanceof Map) {
-                                configObject.put("currentLevel", new org.json.JSONObject((Map<?, ?>) rawLevel));
+                            Map<String, Object> mergedConfig = new HashMap<>();
+                            if (rawConfig instanceof Map) {
+                                for (Map.Entry<?, ?> entry : ((Map<?, ?>) rawConfig).entrySet()) {
+                                    mergedConfig.put(String.valueOf(entry.getKey()), entry.getValue());
+                                }
                             }
-                            String configJson = configObject.toString();
+                            if (rawLevel instanceof Map) mergedConfig.put("currentLevel", rawLevel);
+                            String configJson = new org.json.JSONObject(mergedConfig).toString();
                             String stateJson = rawState instanceof Map
                                     ? new org.json.JSONObject((Map<?, ?>) rawState).toString() : "{}";
                             String script = "window.applySupportChestData && window.applySupportChestData("
