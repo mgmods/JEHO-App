@@ -15282,24 +15282,27 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String winner = memberStr(payload, "winnerName");
             if (winner == null || winner.trim().isEmpty()) winner = "أحد الداعمين";
             String levelTitle = memberStr(payload, "levelTitle");
-            String rewardName = null;
+            java.util.ArrayList<String> rewardNames = new java.util.ArrayList<>();
             String rewardImage = null;
             try {
-                if (payload.has("rewards") && payload.get("rewards").isJsonArray()
-                        && payload.getAsJsonArray("rewards").size() > 0) {
-                    JsonElement rewardElement = payload.getAsJsonArray("rewards").get(0);
-                    if (rewardElement != null && rewardElement.isJsonObject()) {
+                if (payload.has("rewards") && payload.get("rewards").isJsonArray()) {
+                    for (JsonElement rewardElement : payload.getAsJsonArray("rewards")) {
+                        if (rewardElement == null || !rewardElement.isJsonObject()) continue;
                         JsonObject reward = rewardElement.getAsJsonObject();
-                        rewardName = memberStr(reward, "name");
-                        rewardImage = memberStr(reward, "imageUrl");
+                        String rewardName = memberStr(reward, "name");
+                        if (rewardName == null || rewardName.trim().isEmpty()) rewardName = memberStr(reward, "type");
+                        if (rewardName != null && !rewardName.trim().isEmpty()) rewardNames.add(rewardName);
                         if (rewardImage == null || rewardImage.trim().isEmpty()) {
-                            rewardImage = memberStr(reward, "iconUrl");
+                            rewardImage = memberStr(reward, "imageUrl");
+                            if (rewardImage == null || rewardImage.trim().isEmpty()) {
+                                rewardImage = memberStr(reward, "iconUrl");
+                            }
                         }
                     }
                 }
             } catch (Exception ignored) { }
-            String message = winner + " فاز بـ " + (rewardName == null || rewardName.trim().isEmpty()
-                    ? "جائزة صندوق الدعم" : rewardName);
+            String message = winner + " فجّر الصندوق وحصل على "
+                    + (rewardNames.isEmpty() ? "جوائز صندوق الدعم" : android.text.TextUtils.join("، ", rewardNames));
             String roomEventId = memberStr(payload, "cycle");
             String levelId = memberStr(payload, "level");
             GlobalCelebrationToast.showRoomCenter(
