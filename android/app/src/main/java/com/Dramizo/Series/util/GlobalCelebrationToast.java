@@ -785,8 +785,8 @@ public final class GlobalCelebrationToast {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(toastWidth, toastHeight);
         if (centerPlacement) {
             lp.gravity = Gravity.TOP | Gravity.LEFT;
-            final float placementX = Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementX)) / 100f;
-            final float placementY = Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementY)) / 100f;
+            final float placementX = (supportChest ? 50f : Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementX))) / 100f;
+            final float placementY = (supportChest ? 50f : Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementY))) / 100f;
             banner.post(() -> {
                 if (banner.getParent() == null) return;
                 int maxLeft = Math.max(0, root.getWidth() - banner.getWidth());
