@@ -288,12 +288,18 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const durationDays = Number.isNaN(startedAt.getTime()) ? 0 : Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 86400000));
       const unlockedLevels = levels.filter(item => Number(item.level) <= Number(row.level));
       const rewardsUnlocked = unlockedLevels
-        .filter(item => item.reward || item.rewards || item.benefits || item.presentation || item.giftPresentation)
+        // A level with only a selected gift/cosmetic is still a reward level and
+        // must be returned to the APK even when it has no separate presentation block.
+        .filter(item => item.reward || item.rewards || item.benefits || item.presentation ||
+          item.giftPresentation || item.rewardGiftId || item.rewardCosmeticCode || item.rewardCosmeticCodes?.length)
         .map(item => ({
           ...item,
           level: Number(item.level),
           reward: item.reward ?? null,
           benefits: item.benefits ?? item.rewards ?? [],
+          rewardGift: item.rewardGift ?? null,
+          rewardCosmeticCode: item.rewardCosmeticCode ?? null,
+          rewardCosmeticCodes: Array.isArray(item.rewardCosmeticCodes) ? item.rewardCosmeticCodes : [],
           presentation: item.presentation ?? null,
           giftPresentation: item.giftPresentation ?? null,
           giftBonusPercent: Number(item.giftBonusPercent || 0) || 0,
