@@ -94,7 +94,7 @@ const catalogGifts=ref([]), catalogCosmetics=ref([]), catalogVipPlans=ref([]), c
 const saving=ref(false), error=ref(''), notice=ref('')
 function unwrap(r){const d=r?.data?.data ?? r?.data ?? r;return Array.isArray(d)?d:(Array.isArray(d?.items)?d.items:(Array.isArray(d?.data)?d.data:[]))}
 function itemName(item){return item?.nameAr || item?.labelAr || item?.name || item?.title || item?.code || 'عنصر'}
-function itemImage(item){return item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.animationUrl || item?.assetUrl || item?.url || ''}
+function itemImage(item){return item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.animationUrl || item?.assetUrl || item?.url || ''}
 function assetUrl(value){return resolveAsset(value)}
 function isVideo(value){return /\.(mp4|webm)(\?|$)/i.test(String(value||''))}
 function addLevel(){const next=Math.max(0,...form.levels.map(x=>Number(x.level)||0))+1;form.levels.push({level:next,title:'المستوى '+next,goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:[...(form.giftCategories||['normal'])],giftIds:[],imageUrl:'',rewards:[{type:'coins',amount:5000,itemId:''}]})}
