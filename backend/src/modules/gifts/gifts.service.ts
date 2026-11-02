@@ -2086,10 +2086,40 @@ export class GiftsService implements OnModuleInit {
     if (!row) {
       await this.dataSource.transaction(async manager => {
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
-        await manager.query(
-          'INSERT INTO app_settings ("key", "value", "description") VALUES ($1, $2, $3) ON CONFLICT ("key") DO NOTHING',
-          [key, JSON.stringify({ coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 }), 'Global support chest state shared by every room'],
+        const stateRepo = manager.getRepository(AppSetting);
+        const existingGlobal = await stateRepo.findOne({ where: { key }, lock: { mode: 'pessimistic_write' } });
+        if (existingGlobal) return;
+        const legacyRows = await manager.query(
+          'SELECT value FROM app_settings WHERE "key" LIKE $1',
+          ['support_chest_room:%'],
         );
+        const legacyStates = (Array.isArray(legacyRows) ? legacyRows : []).map((legacy: any) => {
+          try { return JSON.parse(String(legacy.value || '{}')); } catch { return null; }
+        }).filter((value: any) => value && typeof value === 'object');
+        let migrated: any = { coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
+        if (legacyStates.length) {
+          legacyStates.sort((a: any, b: any) =>
+            (Number(b.cycle) || 1) - (Number(a.cycle) || 1)
+            || (Number(b.level) || 1) - (Number(a.level) || 1)
+            || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+          const furthest = legacyStates[0];
+          const stage = legacyStates.filter((value: any) =>
+            (Number(value.cycle) || 1) === (Number(furthest.cycle) || 1)
+            && (Number(value.level) || 1) === (Number(furthest.level) || 1));
+          migrated = {
+            ...furthest,
+            coins: stage.reduce((sum: number, value: any) => sum + Math.max(0, Number(value.coins) || 0), 0),
+            diamonds: stage.reduce((sum: number, value: any) => sum + Math.max(0, Number(value.diamonds) || 0), 0),
+            giftCount: stage.reduce((sum: number, value: any) => sum + Math.max(0, Number(value.giftCount) || 0), 0),
+            level: Math.max(1, Math.min(3, Number(furthest.level) || 1)),
+            cycle: Math.max(1, Number(furthest.cycle) || 1),
+          };
+          delete migrated.roomId;
+        }
+        await stateRepo.save(stateRepo.create({
+          key, value: JSON.stringify(migrated),
+          description: 'Global support chest state shared by every room',
+        }));
       });
       row = await this.settingsRepo.findOne({ where: { key } });
     }
