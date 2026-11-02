@@ -15377,11 +15377,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     + (rewardNames.isEmpty() ? "جوائز صندوق الدعم" : android.text.TextUtils.join("، ", rewardNames));
             String roomEventId = memberStr(payload, "cycle");
             String levelId = memberStr(payload, "level");
-            boolean chestSoundEnabled = !payload.has("soundEnabled")
-                    || payload.get("soundEnabled").isJsonNull()
-                    || payload.get("soundEnabled").getAsBoolean();
-            if (chestSoundEnabled) RoomSoundFx.playChestExplosion(this);
-            GlobalCelebrationToast.showRoomCenter(
+            // Every connected room member plays the same bundled local explosion.
+            // Do not gate playback on optional/missing backend soundEnabled payload fields.
+            RoomSoundFx.playChestExplosion(this);
+            GlobalCelebrationToast.showRoomTop(
                     this, "💥 انفجار صندوق الدعم!", message, null, rewardImage,
                     "support-chest:" + roomId + ":" + (roomEventId == null ? "1" : roomEventId)
                             + ":" + (levelId == null ? "1" : levelId),
