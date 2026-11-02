@@ -1933,7 +1933,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (!dialog.isShowing() || isFinishing() || isDestroyed()
                         || !chestRoomId.equals(roomId)) return;
                 if (web.getProgress() >= 100) loadSupportChestState(web, chestRoomId);
-                handler.postDelayed(this, 15000L);
+                handler.postDelayed(this, 5000L);
             }
         };
         dialog.setOnDismissListener(d -> {
@@ -1959,7 +1959,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             web.loadUrl("file:///android_asset/support-chest.html");
             handler.removeCallbacks(refreshChest);
-            handler.postDelayed(refreshChest, 15000L);
+            handler.postDelayed(refreshChest, 5000L);
         });
         dialog.show();
     }
