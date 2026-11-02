@@ -16,6 +16,8 @@ import { RoomSeat, SeatStatus } from '../../database/entities/room-seat.entity';
 import { RoomModerator, ModeratorRole } from '../../database/entities/room-moderator.entity';
 import { RoomAccess } from '../../database/entities/room-access.entity';
 import { Gift } from '../../database/entities/gift.entity';
+import { Cosmetic } from '../../database/entities/cosmetic.entity';
+import { Badge } from '../../database/entities/badge.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { RechargeOrder, RechargeStatus } from '../../database/entities/recharge-order.entity';
 import { WithdrawRequest, WithdrawStatus } from '../../database/entities/withdraw-request.entity';
@@ -612,8 +614,10 @@ export class AdminService {
       const rewards = Array.isArray(level.rewards) ? level.rewards.map((reward: any) => {
         const type = String(reward?.type || '');
         if (!allowedRewards.has(type) || type === 'none') throw new BadRequestException('نوع مكافأة غير صالح في مستوى الصندوق');
-        const amount = Math.max(1, Math.floor(Number(reward?.amount) || 1));
-        return { type, amount, itemId: String(reward?.itemId || '').trim().slice(0, 160) };
+        const amount = ['frame', 'badge'].includes(type) ? 1 : Math.max(1, Math.floor(Number(reward?.amount) || 1));
+        const itemId = String(reward?.itemId || '').trim().slice(0, 160);
+        if (['frame', 'badge', 'vip'].includes(type) && !itemId) throw new BadRequestException('حدد العنصر المطلوب لكل مكافأة تجميلية أو VIP');
+        return { type, amount, itemId };
       }) : [];
       if (!rewards.length) throw new BadRequestException('أضف مكافأة واحدة على الأقل لكل مستوى');
       return {
@@ -628,6 +632,21 @@ export class AdminService {
       };
     });
     if (!levels.length) throw new BadRequestException('أضف مستوى واحداً على الأقل للصندوق');
+    const frameIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'frame').map(r => r.itemId)))];
+    const badgeIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'badge').map(r => r.itemId)))];
+    const vipIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'vip').map(r => r.itemId)))];
+    if (frameIds.length) {
+      const active = await this.dataSource.getRepository(Cosmetic).find({ where: { id: In(frameIds), isActive: true } });
+      if (active.length !== frameIds.length) throw new BadRequestException('تأكد أن كل الإطارات المختارة موجودة وفعالة');
+    }
+    if (badgeIds.length) {
+      const active = await this.dataSource.getRepository(Badge).find({ where: { id: In(badgeIds), isActive: true } });
+      if (active.length !== badgeIds.length) throw new BadRequestException('تأكد أن كل الشارات المختارة موجودة وفعالة');
+    }
+    if (vipIds.length) {
+      const active = await this.vipRepo.find({ where: { id: In(vipIds), isActive: true } });
+      if (active.length !== vipIds.length) throw new BadRequestException('تأكد أن كل خطط VIP المختارة موجودة وفعالة');
+    }
     const allGiftIds = [...new Set([...giftIds, ...levels.flatMap(x => x.giftIds)])];
     if (allGiftIds.length) {
       const activeGifts = await this.giftsRepo.find({ where: { isActive: true } });
