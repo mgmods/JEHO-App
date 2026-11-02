@@ -2216,15 +2216,23 @@ export class GiftsService implements OnModuleInit {
       const globalGiftIds = Array.isArray(cfg.giftIds) ? cfg.giftIds.map(String) : [];
       const globalGiftSelectionMode = String(cfg.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'));
       if (globalGiftSelectionMode === 'selected' && !globalGiftIds.includes(String(giftId))) return null;
-      let levels = Array.isArray(cfg.levels) ? cfg.levels : [];
-      if (!levels.length) levels = [{
-        level: 1, title: 'الصندوق الذهبي', goalMode: cfg.goalMode || 'coins',
-        coinTarget: cfg.coinTarget, diamondTarget: cfg.diamondTarget,
-        giftCount: 1, giftCategories: globalCategories,
-        giftSelectionMode: cfg.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'),
-        giftIds: globalGiftIds,
-        rewards: [{ type: cfg.rewardType || 'none', amount: cfg.rewardAmount || 0, itemId: cfg.rewardItemId || '' }],
-      }];
+      let levels = Array.isArray(cfg.levels) ? cfg.levels.slice(0, 3) : [];
+      if (!levels.length) {
+        levels.push({
+          level: 1, title: 'الصندوق الذهبي', goalMode: cfg.goalMode || 'coins',
+          coinTarget: cfg.coinTarget || 100000, diamondTarget: cfg.diamondTarget || 0,
+          giftCount: 1, giftCategories: globalCategories,
+          giftSelectionMode: cfg.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'),
+          giftIds: globalGiftIds,
+          rewards: [{ type: cfg.rewardType || 'coins', amount: cfg.rewardAmount || 5000, itemId: cfg.rewardItemId || '' }],
+        });
+      }
+      const fallbackLevels = [
+        { level: 1, title: 'الصندوق الذهبي', goalMode: 'coins', coinTarget: 100000, diamondTarget: 0, giftCount: 1, giftCategories: globalCategories, giftSelectionMode: 'all', giftIds: [], rewards: [{ type: 'coins', amount: 5000, itemId: '' }] },
+        { level: 2, title: 'الصندوق الملكي', goalMode: 'coins', coinTarget: 200000, diamondTarget: 0, giftCount: 1, giftCategories: globalCategories, giftSelectionMode: 'all', giftIds: [], rewards: [{ type: 'coins', amount: 10000, itemId: '' }] },
+        { level: 3, title: 'الصندوق الأسطوري', goalMode: 'coins', coinTarget: 300000, diamondTarget: 0, giftCount: 1, giftCategories: globalCategories, giftSelectionMode: 'all', giftIds: [], rewards: [{ type: 'coins', amount: 20000, itemId: '' }] },
+      ];
+      while (levels.length < 3) levels.push({ ...fallbackLevels[levels.length] });
       let row = await repo.findOne({ where: { key } });
       let state: any = { coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
       try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
