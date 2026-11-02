@@ -93,8 +93,12 @@ public class CpCenterActivity extends ThemedActivity {
                 ? value : "home";
     }
     private String safeType(String value) {
-        for (String allowed : new String[]{"brotherhood", "friendship", "love", "engagement", "marriage"}) {
-            if (allowed.equals(value)) return value;
+        // Old APK links may still pass a legacy subtype; all CP invitations now
+        // resolve to the single canonical relationship type.
+        if ("relationship".equals(value) || "brotherhood".equals(value)
+                || "friendship".equals(value) || "love".equals(value)
+                || "engagement".equals(value) || "marriage".equals(value)) {
+            return "relationship";
         }
         return "";
     }
@@ -106,14 +110,7 @@ public class CpCenterActivity extends ThemedActivity {
     }
     private void message(String text) { js("window.showCpMessage && window.showCpMessage(" + gson.toJson(text) + ")"); }
     private String nameFor(String type) {
-        switch (type == null ? "" : type) {
-            case "brotherhood": return "الأخوّة";
-            case "friendship": return "الصداقة";
-            case "love": return "الحب";
-            case "engagement": return "الخطوبة";
-            case "marriage": return "الزواج";
-            default: return "علاقة CP";
-        }
+        return "مرتبط";
     }
 
     @SuppressWarnings("unchecked")
