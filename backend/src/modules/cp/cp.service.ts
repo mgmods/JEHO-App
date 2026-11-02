@@ -230,6 +230,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     ];
     const candidates = [
       ...(typeof levelConfig.rewardCosmeticCode === 'string' ? [{ code: levelConfig.rewardCosmeticCode, days: levelConfig.rewardDays, permanent: levelConfig.rewardPermanent }] : []),
+      ...(Array.isArray(levelConfig.rewardCosmeticCodes) ? levelConfig.rewardCosmeticCodes.map((code: string) => ({ code, days: levelConfig.rewardDays, permanent: levelConfig.rewardPermanent })) : []),
       ...benefits.filter((item: any) => item && typeof item === 'object' && typeof (item.cosmeticCode || item.code) === 'string')
         .map((item: any) => ({ code: item.cosmeticCode || item.code, days: item.days, permanent: item.permanent })),
     ];
