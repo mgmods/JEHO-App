@@ -2076,8 +2076,45 @@ export class GiftsService implements OnModuleInit {
     let state: any = { roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
     try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
     const levelIndex = Math.max(0, Math.min(config.levels.length - 1, Number(state.level || 1) - 1));
-    const currentLevel = config.levels[levelIndex];
-    return { config, state: { ...state, currentLevel: currentLevel?.title || ('المستوى ' + (levelIndex + 1)) }, currentLevel };
+    const currentLevel = config.levels[levelIndex] || config.levels[0];
+    const allowedCategories = Array.isArray(currentLevel?.giftCategories)
+      ? currentLevel.giftCategories.map(String)
+      : (Array.isArray(config.giftCategories) ? config.giftCategories.map(String) : ['normal', 'lucky', 'cp']);
+    const selectedGiftIds = Array.isArray(currentLevel?.giftIds) && currentLevel.giftIds.length
+      ? currentLevel.giftIds.map(String)
+      : (Array.isArray(config.giftIds) ? config.giftIds.map(String) : []);
+    const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
+    const eligibleGifts = allGifts.filter(gift => {
+      const cat = String(gift.category || '').toLowerCase() === 'cp' ? 'cp'
+        : String(gift.type || '').toLowerCase() === 'lucky' ? 'lucky' : 'normal';
+      return allowedCategories.includes(cat) && (!selectedGiftIds.length || selectedGiftIds.includes(String(gift.id)));
+    }).map(gift => ({
+      id: gift.id, name: gift.name, iconUrl: gift.iconUrl,
+      coinPrice: Number(gift.coinPrice) || 0,
+      category: String(gift.category || '').toLowerCase() === 'cp' ? 'cp'
+        : String(gift.type || '').toLowerCase() === 'lucky' ? 'lucky' : 'normal',
+    }));
+    const rewards = Array.isArray(currentLevel?.rewards) ? currentLevel.rewards : [];
+    const rewardPreview = await Promise.all(rewards.map(async (reward: any) => {
+      const type = String(reward?.type || '');
+      const itemId = String(reward?.itemId || '');
+      let item: any = null;
+      if (type === 'frame' && itemId) item = await this.cosmeticsRepo.findOne({ where: { id: itemId } });
+      else if (type === 'badge' && itemId) item = await this.dataSource.getRepository(Badge).findOne({ where: { id: itemId } });
+      else if (type === 'vip' && itemId) item = await this.dataSource.getRepository(VipPlan).findOne({ where: { id: itemId } });
+      else if (type === 'gift' && itemId) item = await this.giftsRepo.findOne({ where: { id: itemId } });
+      return {
+        type, amount: Math.max(1, Number(reward?.amount) || 1), itemId,
+        name: item?.name || (type === 'coins' ? 'كوينزات' : type === 'diamonds' ? 'ماسات' : type.toUpperCase()),
+        imageUrl: item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.iconUrl || null,
+      };
+    }));
+    const enrichedLevel = { ...currentLevel, rewards: rewardPreview, eligibleGifts };
+    return {
+      config: { ...config, eligibleGifts },
+      state: { ...state, currentLevel: currentLevel?.title || ('المستوى ' + (levelIndex + 1)) },
+      currentLevel: enrichedLevel,
+    };
   }
 
   async applySupportChestGift(
