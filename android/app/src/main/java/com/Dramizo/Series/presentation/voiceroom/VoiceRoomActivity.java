@@ -15323,15 +15323,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean chestSoundEnabled = !payload.has("soundEnabled")
                     || payload.get("soundEnabled").isJsonNull()
                     || payload.get("soundEnabled").getAsBoolean();
-            // The burst is a dedicated room overlay, not tied to the optional celebration toast
-            // or to whether the support-chest WebView happens to be open.
-            GlobalCelebrationToast.showSupportChestBurst(this);
             if (chestSoundEnabled) RoomSoundFx.playChestExplosion(this);
             GlobalCelebrationToast.showRoomCenter(
                     this, "💥 انفجار صندوق الدعم!", message, null, rewardImage,
                     "support-chest:" + roomId + ":" + (roomEventId == null ? "1" : roomEventId)
                             + ":" + (levelId == null ? "1" : levelId),
                     0d, 0L, null, "support_chest", roomId);
+            // Dedicated full-room blast is independent of the optional toast and WebView.
+            GlobalCelebrationToast.showSupportChestBurst(this);
             return;
         }
         if ("challenge:wheel:closed".equals(event)) {
