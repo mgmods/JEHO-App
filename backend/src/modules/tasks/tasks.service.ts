@@ -596,8 +596,10 @@ export class TasksService {
         return null;
       };
       return {
-        previewUrl: pick(item?.previewUrl, meta.previewUrl, meta.iconUrl, meta.imageUrl),
-        animationUrl: pick(item?.animationUrl, meta.animationUrl, meta.svgaUrl, meta.gifUrl),
+        previewUrl: pick(meta.previewUrl, meta.iconUrl, meta.imageUrl, item?.previewUrl),
+        animationUrl: pick(meta.animationUrl, meta.svgaUrl, meta.gifUrl, item?.animationUrl),
+        imageUrl: pick(meta.imageUrl, meta.iconUrl, meta.previewUrl, item?.previewUrl),
+        iconUrl: pick(meta.iconUrl, meta.previewUrl, item?.previewUrl),
       };
     };
     const dayCards = await Promise.all(config.days.map(async (d: any) => {
@@ -610,6 +612,8 @@ export class TasksService {
         name: item?.name || d.label,
         previewUrl: artwork.previewUrl,
         animationUrl: artwork.animationUrl,
+        imageUrl: artwork.imageUrl,
+        iconUrl: artwork.iconUrl,
         cosmeticType: item?.type || null,
         claimed: activeStreak > 0 && d.day <= activeStreak,
       };
@@ -686,8 +690,10 @@ export class TasksService {
           code: cosmetic.code,
           name: cosmetic.name,
           cosmeticType: cosmetic.type,
-          previewUrl: artwork(cosmetic.previewUrl, cosmeticMeta.previewUrl, cosmeticMeta.iconUrl, cosmeticMeta.imageUrl),
-          animationUrl: artwork(cosmetic.animationUrl, cosmeticMeta.animationUrl, cosmeticMeta.svgaUrl, cosmeticMeta.gifUrl),
+          previewUrl: artwork(cosmeticMeta.previewUrl, cosmeticMeta.iconUrl, cosmeticMeta.imageUrl, cosmetic.previewUrl),
+          animationUrl: artwork(cosmeticMeta.animationUrl, cosmeticMeta.svgaUrl, cosmeticMeta.gifUrl, cosmetic.animationUrl),
+          imageUrl: artwork(cosmeticMeta.imageUrl, cosmeticMeta.iconUrl, cosmeticMeta.previewUrl, cosmetic.previewUrl),
+          iconUrl: artwork(cosmeticMeta.iconUrl, cosmeticMeta.previewUrl, cosmetic.previewUrl),
           expiresAt: owned.expiresAt,
         };
       }
