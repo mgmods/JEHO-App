@@ -2070,6 +2070,7 @@ export class GiftsService implements OnModuleInit {
         level: 1, title: 'الصندوق الذهبي', goalMode: config.goalMode || 'coins',
         coinTarget: config.coinTarget, diamondTarget: config.diamondTarget,
         giftCount: 1, giftCategories: config.giftCategories || ['normal', 'lucky', 'cp'],
+        giftSelectionMode: config.giftSelectionMode || ((config.giftIds || []).length ? 'selected' : 'all'),
         giftIds: config.giftIds || [], imageUrl: '',
         rewards: [{ type: config.rewardType || 'none', amount: config.rewardAmount || 0, itemId: config.rewardItemId || '' }],
       }];
@@ -2171,7 +2172,9 @@ export class GiftsService implements OnModuleInit {
       if (!levels.length) levels = [{
         level: 1, title: 'الصندوق الذهبي', goalMode: cfg.goalMode || 'coins',
         coinTarget: cfg.coinTarget, diamondTarget: cfg.diamondTarget,
-        giftCount: 1, giftCategories: globalCategories, giftIds: globalGiftIds,
+        giftCount: 1, giftCategories: globalCategories,
+        giftSelectionMode: cfg.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'),
+        giftIds: globalGiftIds,
         rewards: [{ type: cfg.rewardType || 'none', amount: cfg.rewardAmount || 0, itemId: cfg.rewardItemId || '' }],
       }];
       let row = await repo.findOne({ where: { key } });
