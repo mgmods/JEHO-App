@@ -1862,8 +1862,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             Map<String, Object> data = response.body().data;
                             Object rawConfig = data.get("config");
                             Object rawState = data.get("state");
-                            String configJson = rawConfig instanceof Map
-                                    ? new org.json.JSONObject((Map<?, ?>) rawConfig).toString() : "{}";
+                            Object rawLevel = data.get("currentLevel");
+                            org.json.JSONObject configObject = rawConfig instanceof Map
+                                    ? new org.json.JSONObject((Map<?, ?>) rawConfig) : new org.json.JSONObject();
+                            if (rawLevel instanceof Map) {
+                                configObject.put("currentLevel", new org.json.JSONObject((Map<?, ?>) rawLevel));
+                            }
+                            String configJson = configObject.toString();
                             String stateJson = rawState instanceof Map
                                     ? new org.json.JSONObject((Map<?, ?>) rawState).toString() : "{}";
                             String script = "window.applySupportChestData && window.applySupportChestData("
@@ -15181,6 +15186,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
+        if ("support_chest:opened".equals(event)) {
+            String winner = memberStr(payload, "winnerName");
+            if (winner == null || winner.trim().isEmpty()) winner = "أحد الداعمين";
+            String levelTitle = memberStr(payload, "levelTitle");
+            String message = "💥 انفجر صندوق الدعم! " + winner + " أكمل الهدف وفاز بالمكافأة"
+                    + (levelTitle == null ? "" : " · " + levelTitle);
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+            RoomSoundFx.playLuckyGold(this, 2);
+            return;
+        }
         if ("challenge:wheel:closed".equals(event)) {
             dismissChallengeWheelDialog();
             return;
