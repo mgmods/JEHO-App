@@ -2086,7 +2086,7 @@ export class GiftsService implements OnModuleInit {
     const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
     const eligibleGifts = allGifts.filter(gift => {
       const cat = String(gift.category || '').toLowerCase() === 'cp' ? 'cp'
-        : String(gift.type || '').toLowerCase() === 'lucky' ? 'lucky' : 'normal';
+        : (String(gift.type || '').toLowerCase() === 'lucky' || String(gift.category || '').toLowerCase() === 'lucky') ? 'lucky' : 'normal';
       return allowedCategories.includes(cat) && (!selectedGiftIds.length || selectedGiftIds.includes(String(gift.id)));
     }).map(gift => ({
       id: gift.id, name: gift.name, iconUrl: gift.iconUrl,
