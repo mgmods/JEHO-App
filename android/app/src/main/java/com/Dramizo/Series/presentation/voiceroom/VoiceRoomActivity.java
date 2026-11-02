@@ -1880,9 +1880,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             Object rawLevel = data.get("currentLevel");
                             int chestLevel = rawState instanceof Map
                                     ? (int) numberForChest(((Map<?, ?>) rawState).get("level"), 1L) : 1;
-                            String desiredAsset = chestLevel >= 3
-                                    ? "support-chest-level-3.html"
-                                    : (chestLevel >= 2 ? "support-chest-level-2.html" : "support-chest-level-1.html");
+                            // One lightweight HTML document renders all three levels.
+                            // The level selector and lock previews are driven by server config.
+                            String desiredAsset = "support-chest.html";
                             if (!desiredAsset.equals(activeSupportChestAsset)) {
                                 activeSupportChestAsset = desiredAsset;
                                 runOnUiThread(() -> {
@@ -15232,6 +15232,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 handler.removeCallbacks(supportChestEventRefresh);
                 handler.postDelayed(supportChestEventRefresh, 350L);
             }
+            return;
+        }
+        if ("support_chest:contribution".equals(event)) {
+            String sender = memberStr(payload, "senderName");
+            if (sender == null || sender.trim().isEmpty()) sender = "أحد الداعمين";
+            String levelTitle = memberStr(payload, "levelTitle");
+            if (levelTitle == null || levelTitle.trim().isEmpty()) levelTitle = "صندوق الدعم";
+            View chestIcon = findViewById(R.id.btnRoomSupportChest);
+            if (chestIcon != null) {
+                chestIcon.animate().cancel();
+                chestIcon.setRotation(0f);
+                android.animation.ObjectAnimator shake = android.animation.ObjectAnimator.ofFloat(
+                        chestIcon, "rotation", 0f, -13f, 13f, -9f, 9f, 0f);
+                shake.setDuration(620L);
+                shake.start();
+                chestIcon.animate().scaleX(1.12f).scaleY(1.12f).setDuration(180L)
+                        .withEndAction(() -> {
+                            if (!isFinishing() && !isDestroyed()) {
+                                chestIcon.animate().scaleX(1f).scaleY(1f).setDuration(180L).start();
+                            }
+                        }).start();
+            }
+            String eventId = "support-chest-progress:" + roomId + ":"
+                    + memberStr(payload, "senderId") + ":" + memberStr(payload, "cycle")
+                    + ":" + memberStr(payload, "giftCount");
+            GlobalCelebrationToast.showRoomCenter(
+                    this, "🎁 صندوق الدعم يتحرّك!", sender + " ساهم في " + levelTitle,
+                    null, null, eventId, 0d, 0L, sender, "support_chest", roomId);
             return;
         }
         if ("support_chest:opened".equals(event)) {
