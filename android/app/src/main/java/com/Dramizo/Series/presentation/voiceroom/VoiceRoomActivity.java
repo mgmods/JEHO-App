@@ -15233,6 +15233,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         if ("support_chest:opened".equals(event)) {
+            handler.removeCallbacks(supportChestEventRefresh);
+            handler.postDelayed(supportChestEventRefresh, 3700L);
             WebView chestWeb = activeSupportChestWeb;
             if (chestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
                 final String winJson = payload.toString();
