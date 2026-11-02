@@ -43,11 +43,28 @@ export class CpAdminController {
     const rows = await this.dataSource.query(
       `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%' ORDER BY key`,
     );
-    const settings = Object.fromEntries(rows.map((row: { key: string; value: unknown }) => {
-      const raw = row.value;
-      if (typeof raw !== 'string') return [row.key, raw];
-      try { return [row.key, JSON.parse(raw)]; } catch { return [row.key, raw]; }
-    }));
+    // app_settings.value is TEXT. Older CP writers and migration paths have
+    // occasionally persisted JSON values that were JSON-encoded more than once.
+    // Decode only the setting's outer value (never nested user strings) so legacy
+    // rows such as a JSON-encoded JSON array are read as the same array the editor sent.
+    const decodeSettingValue = (raw: unknown): unknown => {
+      let value = raw;
+      for (let depth = 0; depth < 3 && typeof value === 'string'; depth += 1) {
+        const candidate = value.trim();
+        if (!candidate) break;
+        try {
+          const decoded = JSON.parse(candidate);
+          if (decoded === value) break;
+          value = decoded;
+        } catch {
+          break;
+        }
+      }
+      return value;
+    };
+    const settings = Object.fromEntries(rows.map((row: { key: string; value: unknown }) =>
+      [row.key, decodeSettingValue(row.value)],
+    ));
     const types: Array<Record<string, unknown>> = [];
     for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] ?? null;
