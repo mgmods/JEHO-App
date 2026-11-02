@@ -689,27 +689,47 @@ export class AdminService {
       instructions: String(input.instructions || '').slice(0, 3000),
       soundEnabled: input.soundEnabled !== false,
     };
-    const existing = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
-    if (existing) {
-      existing.value = JSON.stringify(current);
-      existing.description = 'JEHO support chest multi-level configuration';
-      await this.settingsRepo.save(existing);
-    } else {
-      await this.settingsRepo.save(this.settingsRepo.create({
-        key: 'support_chest_config',
-        value: JSON.stringify(current),
-        description: 'JEHO support chest multi-level configuration',
-      }));
-    }
+    // Serialize admin saves and verify the exact value read back from PostgreSQL
+    // in the same transaction. This prevents concurrent saves from silently
+    // overwriting one another and avoids reporting success for an unpersisted value.
+    const persisted = await this.dataSource.transaction(async manager => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['support_chest_config']);
+      const repo = manager.getRepository(AppSetting);
+      let existing = await repo.findOne({
+        where: { key: 'support_chest_config' },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (existing) {
+        existing.value = JSON.stringify(current);
+        existing.description = 'JEHO support chest multi-level configuration';
+        await repo.save(existing);
+      } else {
+        existing = repo.create({
+          key: 'support_chest_config',
+          value: JSON.stringify(current),
+          description: 'JEHO support chest multi-level configuration',
+        });
+        await repo.save(existing);
+      }
+      const verified = await repo.findOne({ where: { key: 'support_chest_config' } });
+      if (!verified?.value) throw new InternalServerErrorException('تعذّر تأكيد حفظ إعدادات صندوق الدعم في قاعدة البيانات');
+      let readBack: any;
+      try { readBack = JSON.parse(verified.value); }
+      catch { throw new InternalServerErrorException('تعذّرت قراءة إعدادات صندوق الدعم بعد الحفظ'); }
+      if (JSON.stringify(readBack) !== JSON.stringify(current)) {
+        throw new InternalServerErrorException('لم تتطابق إعدادات صندوق الدعم مع النسخة المحفوظة في قاعدة البيانات');
+      }
+      return readBack;
+    });
     const liveRooms = await this.roomsRepo.find({ where: [{ status: RoomStatus.OPEN }, { status: RoomStatus.LOCKED }], select: { id: true } as any });
     const configAt = new Date().toISOString();
     for (const room of liveRooms) {
       this.realtimeGateway.emitToRoom(room.id, 'room:event', {
         roomId: room.id, event: 'support_chest:config_updated',
-        payload: { config: current }, at: configAt,
+        payload: { config: persisted }, at: configAt,
       });
     }
-    return current;
+    return persisted;
   }
 
   async dashboard() {
