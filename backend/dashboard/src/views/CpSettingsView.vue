@@ -305,9 +305,9 @@
                         </div>
                         <img v-if="level.giftPresentation.animationUrl" class="cp-level-preview-gift" :src="level.giftPresentation.animationUrl" alt="معاينة هدية CP">
                       </div>
-                      <div v-if="selectedGift({giftId:level.rewardGiftId})" class="d-flex align-items-center gap-2 mt-2 small">
-                        <img :src="selectedGift({giftId:level.rewardGiftId}).animationUrl || selectedGift({giftId:level.rewardGiftId}).iconUrl" :alt="selectedGift({giftId:level.rewardGiftId}).name" style="width:48px;height:48px;object-fit:contain">
-                        <span>هدية المستوى: <strong>{{ selectedGift({giftId:level.rewardGiftId}).name }}</strong></span>
+                      <div v-for="gift in selectedGifts(level)" :key="gift.id" class="d-flex align-items-center gap-2 mt-2 small">
+                        <img :src="gift.animationUrl || gift.iconUrl" :alt="gift.name" style="width:48px;height:48px;object-fit:contain">
+                        <span>هدية المستوى: <strong>{{ gift.name }}</strong></span>
                       </div>
                       <div v-for="reward in rewardCosmetics.filter(entry => level.rewardCosmeticCodes.includes(entry.code) || entry.code === level.rewardCosmeticCode)" :key="reward.code" class="d-inline-flex align-items-center gap-2 mt-2 me-3 small">
                         <img :src="reward.animationUrl || reward.previewUrl" :alt="reward.name" style="width:42px;height:42px;object-fit:contain">
@@ -708,6 +708,10 @@ async function saveCpStoreItem(item) {
 }
 function date(value) { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('ar') }
 function selectedGift(item) { return gifts.value.find(g => String(g.id) === String(item.giftId)) || null }
+function selectedGifts(level) {
+  const ids = Array.from(new Set([...(Array.isArray(level?.rewardGiftIds) ? level.rewardGiftIds : []), level?.rewardGiftId].map(id => String(id || '').trim()).filter(Boolean)))
+  return ids.map(id => gifts.value.find(gift => String(gift.id) === id)).filter(Boolean)
+}
 function selectedCpReward(code) { return rewardCosmetics.value.find(item => item.code === code) || null }
 function normalizeCpTaskTarget(task) {
   if (task?.condition === 'gift_exchange_today') task.target = 2
