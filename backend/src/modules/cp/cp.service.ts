@@ -51,6 +51,19 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       )
     `).catch(() => undefined);
     await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS cp_level_gift_reward_claims (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "relationshipId" uuid NOT NULL REFERENCES cp_relationships(id) ON DELETE CASCADE,
+        "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        level integer NOT NULL,
+        "giftId" uuid NOT NULL REFERENCES gifts(id) ON DELETE CASCADE,
+        status varchar(16) NOT NULL DEFAULT 'pending',
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "grantedAt" timestamptz,
+        UNIQUE ("relationshipId", level, "userId", "giftId")
+      )
+    `).catch(() => undefined);
+    await this.dataSource.query(`
       CREATE INDEX IF NOT EXISTS idx_cp_memories_relationship_created
       ON cp_memories ("relationshipId", "createdAt" DESC)
     `).catch(() => undefined);
@@ -82,20 +95,89 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       [giftIds],
     ) : [];
     const giftsById = new Map(gifts.map((gift: any) => [String(gift.id), gift]));
+    const cosmeticCodes = Array.from(new Set(safeLevels.flatMap(item => [
+      item?.rewardCosmeticCode,
+      ...(Array.isArray(item?.rewardCosmeticCodes) ? item.rewardCosmeticCodes : []),
+      ...(Array.isArray(item?.benefits) ? item.benefits : []).map((entry: any) => entry?.cosmeticCode || entry?.code),
+      ...(Array.isArray(item?.rewards) ? item.rewards : []).map((entry: any) => entry?.cosmeticCode || entry?.code),
+    ]).map(code => String(code || '').trim()).filter(code => /^[a-zA-Z0-9_-]{2,64}$/.test(code))));
+    const cosmetics = cosmeticCodes.length ? await this.dataSource.query(
+      'SELECT code,name,type,"previewUrl","animationUrl" FROM cosmetics WHERE code=ANY($1::text[]) AND "isActive"=true',
+      [cosmeticCodes],
+    ) : [];
+    const cosmeticsByCode = new Map(cosmetics.map((item: any) => [String(item.code), item]));
     return safeLevels.map(item => {
       const rewardGiftIds = Array.from(new Set([
         ...(Array.isArray(item?.rewardGiftIds) ? item.rewardGiftIds : []),
         item?.rewardGiftId,
       ].map(id => String(id || '').trim()).filter(id => UUID_REGEX.test(id))));
       const rewardGifts = rewardGiftIds.map(id => giftsById.get(id)).filter(Boolean);
+      const rewardCosmeticCodes = Array.from(new Set([
+        item?.rewardCosmeticCode,
+        ...(Array.isArray(item?.rewardCosmeticCodes) ? item.rewardCosmeticCodes : []),
+        ...(Array.isArray(item?.benefits) ? item.benefits : []).map((entry: any) => entry?.cosmeticCode || entry?.code),
+        ...(Array.isArray(item?.rewards) ? item.rewards : []).map((entry: any) => entry?.cosmeticCode || entry?.code),
+      ].map(code => String(code || '').trim()).filter(code => /^[a-zA-Z0-9_-]{2,64}$/.test(code))));
+      const rewardCosmetics = rewardCosmeticCodes.map(code => cosmeticsByCode.get(code)).filter(Boolean);
       return {
         ...item,
         rewardGiftIds,
         rewardGifts,
-        // Backward compatibility for APK builds that still read one gift.
+        rewardCosmeticCodes,
+        rewardCosmetics,
+        // Backward compatibility for older Android builds that read one gift.
         rewardGift: rewardGifts[0] || giftsById.get(String(item?.rewardGiftId || '')) || null,
       };
     });
+  }
+
+  private async grantLevelGiftRewards(
+    relationshipId: string,
+    level: number,
+    userIds: string[],
+    levelConfig: Record<string, any> | null,
+  ) {
+    if (!levelConfig) return;
+    const giftIds = Array.from(new Set([
+      ...(Array.isArray(levelConfig.rewardGiftIds) ? levelConfig.rewardGiftIds : []),
+      levelConfig.rewardGiftId,
+      levelConfig.giftId,
+    ].map(id => String(id || '').trim()).filter(id => UUID_REGEX.test(id))));
+    if (!giftIds.length) return;
+    for (const userId of userIds) {
+      for (const giftId of giftIds) {
+        await this.dataSource.transaction(async manager => {
+          const [claim] = await manager.query(
+            `INSERT INTO cp_level_gift_reward_claims ("relationshipId","userId",level,"giftId",status)
+             VALUES ($1,$2,$3,$4,'pending')
+             ON CONFLICT ("relationshipId",level,"userId","giftId") DO NOTHING
+             RETURNING id`,
+            [relationshipId, userId, level, giftId],
+          );
+          if (!claim?.id) return;
+          const [gift] = await manager.query(
+            'SELECT id,name,"iconUrl" FROM gifts WHERE id=$1 AND "isActive"=true LIMIT 1',
+            [giftId],
+          );
+          if (!gift) {
+            await manager.query('DELETE FROM cp_level_gift_reward_claims WHERE id=$1', [claim.id]);
+            return;
+          }
+          // Mirror other free system gift grants (e.g. Support Chest): persist a
+          // zero-cost self-delivered gift history row so it appears in the user's bag/history.
+          await manager.query(
+            `INSERT INTO gift_sends
+              ("giftId","giftName","giftIconUrl","senderId","receiverId","roomId",quantity,"comboCount","totalCoins","diamondsAwarded","luckyMultiplier")
+             VALUES ($1,$2,$3,$4,$4,NULL,1,1,0,0,NULL)`,
+            [gift.id, gift.name, gift.iconUrl || null, userId],
+          );
+          await manager.query(
+            'UPDATE cp_level_gift_reward_claims SET status=$1,"grantedAt"=now() WHERE id=$2',
+            ['granted', claim.id],
+          );
+        });
+      }
+    }
   }
 
   private async grantLevelCosmeticRewards(
@@ -1465,11 +1547,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           .filter(item => Number(item?.level) > Number(result.previousLevel) && Number(item?.level) <= Number(result.level))
           .sort((a, b) => Number(a.level) - Number(b.level));
         for (const unlockedLevel of crossedLevels) {
+          const members = [relationship.userAId, relationship.userBId].filter(Boolean);
+          await this.grantLevelGiftRewards(
+            relationshipId, Number(unlockedLevel.level), members, unlockedLevel,
+          );
           await this.grantLevelCosmeticRewards(
-            relationshipId,
-            Number(unlockedLevel.level),
-            [relationship.userAId, relationship.userBId].filter(Boolean),
-            unlockedLevel,
+            relationshipId, Number(unlockedLevel.level), members, unlockedLevel,
           );
         }
       } catch (error) {
