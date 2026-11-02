@@ -1429,8 +1429,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       if ('name' in output) output.name = identity.displayName;
       if ('username' in output) output.username = identity.username;
       if ('avatarUrl' in output) output.avatarUrl = null;
+      if ('avatar' in output) output.avatar = null;
       if ('imageUrl' in output) output.imageUrl = null;
+      if ('image' in output) output.image = null;
       if ('photoUrl' in output) output.photoUrl = null;
+      if ('photo' in output) output.photo = null;
       if ('profileImageUrl' in output) output.profileImageUrl = null;
       if ('mysteriousMan' in output) output.mysteriousMan = true;
       if ('frameUrl' in output) output.frameUrl = identity.frameUrl;
@@ -1444,6 +1447,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (sender) {
       if ('senderName' in output) output.senderName = sender.displayName;
       if ('senderAvatarUrl' in output) output.senderAvatarUrl = null;
+      if ('senderAvatar' in output) output.senderAvatar = null;
       if ('senderImageUrl' in output) output.senderImageUrl = null;
       if ('senderMysteriousMan' in output) output.senderMysteriousMan = true;
       if ('senderHostBadgeUrl' in output) output.senderHostBadgeUrl = null;
@@ -1453,6 +1457,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (receiver) {
       if ('receiverName' in output) output.receiverName = receiver.displayName;
       if ('receiverAvatarUrl' in output) output.receiverAvatarUrl = null;
+      if ('receiverAvatar' in output) output.receiverAvatar = null;
       if ('receiverImageUrl' in output) output.receiverImageUrl = null;
       if ('receiverMysteriousMan' in output) output.receiverMysteriousMan = true;
       if ('receiverHostBadgeUrl' in output) output.receiverHostBadgeUrl = null;
