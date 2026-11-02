@@ -2391,7 +2391,7 @@ export class GiftsService implements OnModuleInit {
           payload: { config: result.config, state: roomState, contribution: result.contribution },
           at,
         });
-        if (result.contribution) {
+        if (result.contribution && !result.contribution.goalReached) {
           this.realtime?.emitToRoom(targetRoomId, 'room:event', {
             roomId: targetRoomId, event: 'support_chest:contribution',
             payload: { ...result.contribution, roomId: targetRoomId },
