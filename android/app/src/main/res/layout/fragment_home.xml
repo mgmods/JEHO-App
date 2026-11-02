@@ -312,6 +312,12 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp" />
 
+                <include
+                    android:id="@+id/homeCpSummary"
+                    layout="@layout/include_home_cp_summary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
                 <!-- Worldwide popular rooms + quick country filters -->
                 <HorizontalScrollView
                     android:id="@+id/hotCountryBar"
