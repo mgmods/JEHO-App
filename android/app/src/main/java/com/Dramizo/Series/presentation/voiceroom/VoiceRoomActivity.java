@@ -476,6 +476,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private WebView roomGameWebView;
     /** Lazy: YouTube embed disc WebView. */
     @Nullable private WebView musicYoutubeWebView;
+    @Nullable private WebView activeSupportChestWeb;
+    @Nullable private String activeSupportChestRoomId;
     /** Lazy media3 PlayerViews (PlayerView in XML freezes inflate). */
     @Nullable private androidx.media3.ui.PlayerView musicVideoPlayerView;
     @Nullable private androidx.media3.ui.PlayerView musicFloatPlayerView;
@@ -1901,6 +1903,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Restore the original rich HTML chest UI. The WebView is created only
         // after the user taps the chest, so it does not slow down room startup.
         WebView web = new WebView(this);
+        activeSupportChestWeb = web;
+        activeSupportChestRoomId = chestRoomId;
         web.setBackgroundColor(Color.TRANSPARENT);
         web.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         WebSettings settings = web.getSettings();
@@ -1938,6 +1942,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         };
         dialog.setOnDismissListener(d -> {
             handler.removeCallbacks(refreshChest);
+            if (activeSupportChestWeb == web) {
+                activeSupportChestWeb = null;
+                activeSupportChestRoomId = null;
+            }
             web.stopLoading();
             web.loadUrl("about:blank");
             web.destroy();
@@ -15188,6 +15196,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
+        if ("support_chest:updated".equals(event)) {
+            WebView chestWeb = activeSupportChestWeb;
+            if (chestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
+                loadSupportChestState(chestWeb, roomId);
+            }
+            return;
+        }
         if ("support_chest:opened".equals(event)) {
             String winner = memberStr(payload, "winnerName");
             if (winner == null || winner.trim().isEmpty()) winner = "أحد الداعمين";
