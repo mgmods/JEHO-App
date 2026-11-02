@@ -359,12 +359,17 @@ export class CpAdminController {
     if (body.enabled !== undefined) config[`cp.enabled.${type}`] = String(body.enabled);
     if (body.rules !== undefined) config[`cp.rules.${type}`] = JSON.stringify(body.rules);
     await this.dataSource.transaction(async manager => {
-      for (const [key, value] of Object.entries(config)) {
+      const entries = Object.entries(config);
+      if (entries.length) {
+        // Persist all CP fields with one database round-trip. The previous
+        // per-key loop made a single Save wait on several sequential writes.
         await manager.query(
           `INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
-           VALUES (gen_random_uuid(),$1,$2,$3,now(),now())
-           ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,description=EXCLUDED.description,"updatedAt"=now()`,
-          [key, value, 'CP settings configured through the protected admin API'],
+           SELECT gen_random_uuid(), item.key, item.value, $3, now(), now()
+           FROM unnest($1::text[], $2::text[]) AS item(key, value)
+           ON CONFLICT (key) DO UPDATE
+             SET value=EXCLUDED.value, description=EXCLUDED.description, "updatedAt"=now()`,
+          [entries.map(([key]) => key), entries.map(([, value]) => String(value)), 'CP settings configured through the protected admin API'],
         );
       }
       await manager.query(
