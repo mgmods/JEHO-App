@@ -709,10 +709,6 @@ public class HomeFragment extends Fragment {
         }
     }
 
-    private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
-
     private void openInsights(String mode) {
         Intent intent = new Intent(requireContext(),
                 com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.class);
