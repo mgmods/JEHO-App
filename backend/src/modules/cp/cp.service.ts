@@ -1150,11 +1150,29 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   async end(userId: string, relationshipId: string) {
     const result = await this.dataSource.query(
       `UPDATE cp_relationships SET status='ended',"endedAt"=now(),"endedByUserId"=$1,"updatedAt"=now()
-       WHERE id=$2 AND status='active' AND ($1 = "userAId" OR $1 = "userBId") RETURNING id,type,status,"endedAt"`,
+       WHERE id=$2 AND status='active' AND ($1 = "userAId" OR $1 = "userBId")
+       RETURNING id,type,status,"endedAt","userAId","userBId"`,
       [userId, relationshipId],
     );
     if (!result.length) throw new NotFoundException('العلاقة غير موجودة أو منتهية');
-    return result[0];
+    const ended = result[0];
+    const payload = {
+      type: 'cp_relationship_ended',
+      notificationKind: 'cp_relationship_ended',
+      relationshipId: ended.id,
+      relationshipType: ended.type,
+      endedByUserId: userId,
+      route: 'cp',
+    };
+    for (const memberId of [ended.userAId, ended.userBId].filter(Boolean)) {
+      await this.notifications.notifyUser(
+        memberId, NotificationType.SYSTEM, 'تم إلغاء ارتباط CP',
+        memberId === userId ? 'تم إنهاء علاقتك بنجاح.' : 'قام الطرف الآخر بإنهاء علاقة CP.',
+        payload,
+      ).catch(error => console.warn('[CP] end notification delivery failed', error));
+      this.realtime.emitToUser(memberId, 'cp:ended', payload);
+    }
+    return { id: ended.id, type: ended.type, status: ended.status, endedAt: ended.endedAt };
   }
 
 
