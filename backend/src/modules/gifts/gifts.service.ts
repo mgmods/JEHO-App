@@ -2208,7 +2208,7 @@ export class GiftsService implements OnModuleInit {
             const ownership = manager.getRepository(UserCosmetic);
             const owned = await ownership.findOne({ where: { userId: senderId, cosmeticId: cosmetic.id } });
             if (!owned) await ownership.save(ownership.create({ userId: senderId, cosmeticId: cosmetic.id, equipped: false, expiresAt: null }));
-            granted.push({ type: 'frame', itemId: cosmetic.id, name: cosmetic.name, imageUrl: cosmetic.previewUrl || cosmetic.imageUrl || null });
+            granted.push({ type: 'frame', itemId: cosmetic.id, name: cosmetic.name, imageUrl: cosmetic.previewUrl || null });
           } else if (rewardType === 'badge') {
             if (!itemId) throw new BadRequestException('Support chest badge reward requires an item ID');
             const badge = await manager.getRepository(Badge).findOne({ where: { id: itemId, isActive: true } });
