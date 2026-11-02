@@ -13072,6 +13072,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 @Override
                 public void onUserEvent(String event, JsonObject payload) {
                     if (event == null) return;
+                    if ("cp:request".equals(event)) {
+                        String targetRoomId = memberStr(payload, "roomId");
+                        if (targetRoomId != null && targetRoomId.equals(roomId)) {
+                            handler.post(() -> showCpRoomRequestDialog(payload));
+                        }
+                        return;
+                    }
                     if ("config:updated".equals(event)) {
                         String scope = payload != null && payload.has("scope")
                                 && !payload.get("scope").isJsonNull()
@@ -14538,6 +14545,152 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    /** Shows CP gift requests as an in-room modal; the same request may arrive on both
+     * the room channel and the user channel, so requestId is deduplicated here. */
+    private void showCpRoomRequestDialog(@Nullable JsonObject payload) {
+        if (payload == null || isFinishing() || isDestroyed() || exiting) return;
+        String targetUserId = memberStr(payload, "targetUserId");
+        if (targetUserId == null || targetUserId.isEmpty()) targetUserId = memberStr(payload, "recipientId");
+        String requestId = memberStr(payload, "requestId");
+        if (myUserId == null || !myUserId.equals(targetUserId)
+                || requestId == null || requestId.isEmpty()
+                || !shownCpRoomRequests.add(requestId)) return;
+
+        String senderName = firstNonEmpty(memberStr(payload, "senderName"), "أحد الموجودين");
+        String giftName = firstNonEmpty(memberStr(payload, "giftName"), "هدية ارتباط");
+        String giftIconUrl = firstNonEmpty(memberStr(payload, "giftIconUrl"), memberStr(payload, "giftAnimationUrl"));
+        String relation = memberStr(payload, "relationshipType");
+        String relationLabel;
+        if ("love".equalsIgnoreCase(relation)) relationLabel = "الحب";
+        else if ("friendship".equalsIgnoreCase(relation)) relationLabel = "الصداقة";
+        else if ("brotherhood".equalsIgnoreCase(relation)) relationLabel = "الأخوّة";
+        else if ("engagement".equalsIgnoreCase(relation)) relationLabel = "الخطوبة";
+        else if ("marriage".equalsIgnoreCase(relation)) relationLabel = "الزواج";
+        else relationLabel = relation == null || relation.isEmpty() ? "CP" : relation;
+
+        Dialog dialog = new Dialog(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(dp(22), dp(20), dp(22), dp(18));
+        GradientDrawable panel = new GradientDrawable();
+        panel.setColor(0xFF21182E);
+        panel.setCornerRadius(dp(24));
+        panel.setStroke(dp(1), 0xFFB987D8);
+        root.setBackground(panel);
+
+        TextView heart = new TextView(this);
+        heart.setText("❤️");
+        heart.setTextSize(30);
+        heart.setGravity(Gravity.CENTER);
+        root.addView(heart, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+
+        TextView title = new TextView(this);
+        title.setText("طلب ارتباط جديد");
+        title.setTextColor(0xFFFFD6F0);
+        title.setTextSize(20);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleLp.topMargin = dp(5);
+        root.addView(title, titleLp);
+
+        ImageView gift = new ImageView(this);
+        gift.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams giftLp = new LinearLayout.LayoutParams(dp(92), dp(92));
+        giftLp.topMargin = dp(12);
+        giftLp.bottomMargin = dp(8);
+        root.addView(gift, giftLp);
+        if (giftIconUrl != null && !giftIconUrl.trim().isEmpty()) {
+            Glide.with(this).load(AssetCatalog.absoluteUrl(giftIconUrl))
+                    .placeholder(R.drawable.ic_screen_chat_lottery)
+                    .error(R.drawable.ic_screen_chat_lottery).into(gift);
+        } else {
+            gift.setImageResource(R.drawable.ic_screen_chat_lottery);
+        }
+
+        TextView message = new TextView(this);
+        message.setText(senderName + " أرسل لك " + giftName + " لبدء علاقة " + relationLabel
+                + ". هل توافق على الارتباط؟");
+        message.setTextColor(0xFFF4EDF8);
+        message.setTextSize(15);
+        message.setGravity(Gravity.CENTER);
+        message.setLineSpacing(dp(3), 1f);
+        root.addView(message, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        actionsLp.topMargin = dp(20);
+        root.addView(actions, actionsLp);
+
+        TextView reject = new TextView(this);
+        reject.setText("رفض");
+        reject.setTextColor(0xFFFFFFFF);
+        reject.setTextSize(15);
+        reject.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        reject.setGravity(Gravity.CENTER);
+        GradientDrawable rejectBg = new GradientDrawable();
+        rejectBg.setColor(0xFF57475F);
+        rejectBg.setCornerRadius(dp(14));
+        reject.setBackground(rejectBg);
+        actions.addView(reject, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+
+        View actionGap = new View(this);
+        actions.addView(actionGap, new LinearLayout.LayoutParams(dp(10), 1));
+
+        TextView accept = new TextView(this);
+        accept.setText("قبول ❤️");
+        accept.setTextColor(0xFF35142D);
+        accept.setTextSize(15);
+        accept.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        accept.setGravity(Gravity.CENTER);
+        GradientDrawable acceptBg = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFFFFB5D9, 0xFFFFD98C});
+        acceptBg.setCornerRadius(dp(14));
+        accept.setBackground(acceptBg);
+        actions.addView(accept, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+
+        final boolean[] answered = {false};
+        reject.setOnClickListener(v -> {
+            if (answered[0]) return;
+            answered[0] = true;
+            dialog.dismiss();
+            respondToCpRoomRequest(requestId, false);
+        });
+        accept.setOnClickListener(v -> {
+            if (answered[0]) return;
+            answered[0] = true;
+            dialog.dismiss();
+            respondToCpRoomRequest(requestId, true);
+        });
+        dialog.setContentView(root);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setOnCancelListener(d -> {
+            if (!answered[0]) {
+                answered[0] = true;
+                respondToCpRoomRequest(requestId, false);
+            }
+        });
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            int screen = getResources().getDisplayMetrics().widthPixels;
+            window.setLayout(Math.min(screen - dp(40), dp(380)), ViewGroup.LayoutParams.WRAP_CONTENT);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attrs = window.getAttributes();
+            attrs.dimAmount = 0.58f;
+            window.setAttributes(attrs);
+        }
+    }
+
     @SuppressLint("NewApi")
     private void respondToCpRoomRequest(String requestId, boolean accept) {
         if (requestId == null || requestId.isEmpty()) return;
@@ -15100,26 +15253,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         if ("cp:request".equals(event)) {
-            String targetUserId = memberStr(payload, "targetUserId");
-            String requestId = memberStr(payload, "requestId");
-            if (myUserId == null || !myUserId.equals(targetUserId) || requestId == null || requestId.isEmpty()
-                    || !shownCpRoomRequests.add(requestId)) return;
-            String senderName = memberStr(payload, "senderName");
-            String giftName = memberStr(payload, "giftName");
-            String typeLabel = memberStr(payload, "relationshipType");
-            String title = memberStr(payload, "title");
-            if (title == null || title.isEmpty()) title = "هدية ارتباط";
-            String message = (senderName == null ? "أحد الموجودين" : senderName)
-                    + " أرسل لك " + (giftName == null || giftName.isEmpty() ? "هدية ارتباط" : giftName)
-                    + (typeLabel == null || typeLabel.isEmpty() ? "" : " لبدء علاقة " + typeLabel)
-                    + ". هل توافق على الارتباط؟";
-            new AlertDialog.Builder(this)
-                    .setTitle(title)
-                    .setMessage(message)
-                    .setNegativeButton("رفض", (dialog, which) -> respondToCpRoomRequest(requestId, false))
-                    .setPositiveButton("قبول", (dialog, which) -> respondToCpRoomRequest(requestId, true))
-                    .setOnCancelListener(dialog -> respondToCpRoomRequest(requestId, false))
-                    .show();
+            showCpRoomRequestDialog(payload);
             return;
         }
         if ("room:music_volume".equals(event)) {
