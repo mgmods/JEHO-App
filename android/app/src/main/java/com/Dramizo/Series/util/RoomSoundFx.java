@@ -117,7 +117,11 @@ public final class RoomSoundFx {
         if (soundRes != 0) {
             MediaPlayer player = null;
             try {
-                player = MediaPlayer.create(app, soundRes);
+                AudioAttributes chestAttributes = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build();
+                player = MediaPlayer.create(app, soundRes, chestAttributes, 0);
                 if (player != null) {
                     player.setVolume(1.0f, 1.0f);
                     player.setOnCompletionListener(MediaPlayer::release);
