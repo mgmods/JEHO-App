@@ -975,15 +975,26 @@ async function saveType(item) {
       throw new Error('وصلت عملية الحفظ إلى الخادم، لكن قراءة إعدادات CB المستقلة لم تُظهر نفس المستويات المحفوظة. لم نعرض نجاحاً غير مؤكد.')
     }
 
-    // Refresh every dashboard field from the same authoritative GET endpoint.
-    await load()
-    const reloadedType = types.value.find(entry => entry.type === item.type)
-    let reloadedLevels = []
-    try { reloadedLevels = JSON.parse(reloadedType?.levelsText || '[]') } catch { reloadedLevels = [] }
-    if (!sameJson(reloadedLevels, payload.levels)) {
-      throw new Error('تم حفظ المستويات، لكن إعادة تحميل واجهة الداشبورد أعادت قيماً مختلفة. راجع اتصال قراءة الإعدادات.')
-    }
-    success.value = 'تم حفظ مستويات ' + label(item.type) + ' والتحقق من تطابقها بعد إعادة التحميل من قاعدة البيانات.'
+    // Update this editor from the verified authoritative response. Do not call
+    // load() here: it also waits for unrelated request/audit logs and the cosmetic
+    // catalog, so a successful CP write could leave the save spinner running.
+    item.levelsText = JSON.stringify(persistedType.levels, null, 2)
+    item.levelsEditor = (persistedType.levels || []).map(level => ({
+      ...level,
+      presentation: { ...(level.presentation || {}) },
+      giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) },
+      rewardGiftIds: Array.from(new Set([
+        ...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []),
+        level.rewardGiftId || level.giftId || '',
+      ].map(id => String(id || '').trim()).filter(Boolean))),
+      rewardCosmeticCodes: Array.from(new Set([
+        level.rewardCosmeticCode,
+        ...(Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []),
+      ].map(code => String(code || '').trim()).filter(Boolean))),
+    }))
+    success.value = 'تم حفظ إعدادات CP والتحقق من تطابقها مع البيانات المقروءة من قاعدة البيانات.'
+    // Refresh logs in the background; log latency must not block the save action.
+    void loadLogs()
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات النوع' }
   finally { saving.value = false; savingType.value = '' }
 }
