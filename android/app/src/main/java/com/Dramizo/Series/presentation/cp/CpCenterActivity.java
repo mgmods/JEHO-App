@@ -343,13 +343,18 @@ public class CpCenterActivity extends ThemedActivity {
         }
 
         @JavascriptInterface public void endRelationship(String relationshipId) {
+            String id = relationshipId == null ? "" : relationshipId.trim();
+            if (id.isEmpty()) {
+                js("window.onCpRelationshipEnded && window.onCpRelationshipEnded(false," + gson.toJson("تعذر تحديد علاقة CP الحالية.") + ")");
+                return;
+            }
             c.getIoExecutor().execute(() -> {
-                Result<Map<String, Object>> r = ApiCall.execute(c.getUserApi().endCpRelationship(relationshipId));
+                Result<Map<String, Object>> r = ApiCall.execute(c.getUserApi().endCpRelationship(id));
                 if (r.success) {
-                    message("تم إنهاء العلاقة.");
-                    loadHome();
-                    loadDiscover("");
-                } else { message(r.error != null ? r.error : "تعذر إنهاء العلاقة"); loadHome(); }
+                    js("window.onCpRelationshipEnded && window.onCpRelationshipEnded(true," + gson.toJson("تم إلغاء ارتباط CP بنجاح.") + ")");
+                } else {
+                    js("window.onCpRelationshipEnded && window.onCpRelationshipEnded(false," + gson.toJson(r.error != null ? r.error : "تعذر إلغاء العلاقة") + ")");
+                }
             });
         }
 
