@@ -2054,7 +2054,17 @@ export class GiftsService implements OnModuleInit {
       rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '',
     };
     let config: any = defaults;
-    try { if (configRow?.value) config = { ...defaults, ...JSON.parse(configRow.value) }; } catch {}
+    try {
+      if (configRow?.value) {
+        const parsed = JSON.parse(configRow.value);
+        config = {
+          ...defaults,
+          ...parsed,
+          giftSelectionMode: parsed.giftSelectionMode
+            || (Array.isArray(parsed.giftIds) && parsed.giftIds.length ? 'selected' : 'all'),
+        };
+      }
+    } catch {}
     if (!Array.isArray(config.levels) || !config.levels.length) {
       config.levels = [{
         level: 1, title: 'الصندوق الذهبي', goalMode: config.goalMode || 'coins',
