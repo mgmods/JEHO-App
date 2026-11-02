@@ -491,6 +491,26 @@ export class TasksService {
       buttonText: String(rawTheme.buttonText || defaults.buttonText).slice(0, 40),
       buttonColor: safeColor(rawTheme.buttonColor, defaults.buttonColor),
       buttonTextColor: safeColor(rawTheme.buttonTextColor, defaults.buttonTextColor),
+      // Persist the full dashboard visual editor configuration, not only its
+      // legacy subset; otherwise layout edits silently revert after refresh.
+      subtitle: String(rawTheme.subtitle || defaults.subtitle || '').slice(0, 120),
+      subtitleColor: safeColor(rawTheme.subtitleColor, defaults.subtitleColor || '#176b32'),
+      titleSize: Math.max(12, Math.min(64, Number(rawTheme.titleSize) || defaults.titleSize || 28)),
+      titleTop: Math.max(0, Math.min(300, Number(rawTheme.titleTop) || defaults.titleTop || 24)),
+      headerGap: Math.max(0, Math.min(100, Number(rawTheme.headerGap) || defaults.headerGap || 14)),
+      cardColor: safeColor(rawTheme.cardColor, defaults.cardColor || '#fffef4'),
+      cardBorderColor: safeColor(rawTheme.cardBorderColor, defaults.cardBorderColor || '#e8efcf'),
+      cardRadius: Math.max(0, Math.min(48, Number(rawTheme.cardRadius) || defaults.cardRadius || 20)),
+      cardGap: Math.max(0, Math.min(60, Number(rawTheme.cardGap) || defaults.cardGap || 12)),
+      cardImageSize: Math.max(24, Math.min(180, Number(rawTheme.cardImageSize) || defaults.cardImageSize || 76)),
+      cardLabelSize: Math.max(10, Math.min(32, Number(rawTheme.cardLabelSize) || defaults.cardLabelSize || 16)),
+      buttonRadius: Math.max(0, Math.min(100, Number(rawTheme.buttonRadius) || defaults.buttonRadius || 64)),
+      buttonHeight: Math.max(32, Math.min(120, Number(rawTheme.buttonHeight) || defaults.buttonHeight || 64)),
+      buttonBottom: Math.max(0, Math.min(300, Number(rawTheme.buttonBottom) || defaults.buttonBottom || 20)),
+      contentTop: Math.max(0, Math.min(300, Number(rawTheme.contentTop) || defaults.contentTop || 18)),
+      contentGap: Math.max(0, Math.min(100, Number(rawTheme.contentGap) || defaults.contentGap || 16)),
+      fontFamily: String(rawTheme.fontFamily || defaults.fontFamily || 'default').slice(0, 40),
+      cardBackgroundColor: safeColor(rawTheme.cardBackgroundColor, defaults.cardBackgroundColor || '#fffef4'),
     };
     const value = JSON.stringify({ enabled: input.enabled !== false, theme, days });
     let row = await this.settings.findOne({ where: { key: TasksService.DAILY_LOGIN_KEY } });
