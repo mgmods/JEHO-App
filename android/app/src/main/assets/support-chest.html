@@ -70,9 +70,11 @@ function formatNum(n){return Math.max(0,Number(n)||0).toLocaleString('en-US')}
 function escHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function setMode(key){
  selectedMode=key;modes.forEach(b=>b.classList.toggle('active',b.dataset.mode===key));
- const cfg=liveConfig||{},lv=activePreviewLevel||cfg.currentLevel||{},locked=selectedLevelIndex>currentLevelIndex;
+ const cfg=liveConfig||{},lv=activePreviewLevel||cfg.currentLevel||{},locked=selectedLevelIndex>currentLevelIndex,done=selectedLevelIndex<currentLevelIndex;
  const st=locked?{}:(liveState||{}),mode=lv.goalMode||cfg.goalMode||'coins';
- const coinNow=Number(st.coins)||0,diamondNow=Number(st.diamonds)||0,coinMax=Number(lv.coinTarget??cfg.coinTarget)||0,diamondMax=Number(lv.diamondTarget??cfg.diamondTarget)||0,countNow=Number(st.giftCount)||0,countMax=Math.max(1,Number(lv.giftCount)||1);
+ const coinMax=Number(lv.coinTarget??cfg.coinTarget)||0,diamondMax=Number(lv.diamondTarget??cfg.diamondTarget)||0,countMax=Math.max(1,Number(lv.giftCount)||1);
+ // Completed levels are previews of a finished stage, not the current room's new progress.
+ const coinNow=done?coinMax:(Number(st.coins)||0),diamondNow=done?diamondMax:(Number(st.diamonds)||0),countNow=done?countMax:(Number(st.giftCount)||0);
  let p=0;
  if(mode==='both'){
   const cp=coinMax>0?coinNow/coinMax*100:100,dp=diamondMax>0?diamondNow/diamondMax*100:100;
