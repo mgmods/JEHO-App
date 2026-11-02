@@ -2,6 +2,7 @@ package com.Dramizo.Series.presentation.wallet;
 
 import android.app.Dialog;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -29,6 +30,7 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.util.ApiCall;
+import com.Dramizo.Series.util.AssetCatalog;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -135,6 +137,7 @@ public class SignInDialog extends DialogFragment {
                     binding.bltvCheckIn.setText("غير متاح");
                     return;
                 }
+                applyTheme(status.theme);
                 List<MiscDtos.DailyLoginRewardDto> days = status.days;
                 for (int i = 0; i < 7; i++) {
                     MiscDtos.DailyLoginRewardDto day = days != null && i < days.size() ? days.get(i) : null;
@@ -142,6 +145,7 @@ public class SignInDialog extends DialogFragment {
                     TextView label = rewardLabels.get(i);
                     if (day != null && "cosmetic".equalsIgnoreCase(day.type)) {
                         String url = nonEmpty(day.previewUrl) ? day.previewUrl : day.animationUrl;
+                        url = AssetCatalog.absoluteUrl(url);
                         // The selected catalogue item supplies its own artwork URL (frame, entry effect, etc.).
                         if (nonEmpty(url)) {
                             Glide.with(this).load(url).placeholder(R.drawable.ic_gold_coin)
@@ -170,6 +174,80 @@ public class SignInDialog extends DialogFragment {
                 binding.bltvCheckIn.setTextColor(GREEN);
             });
         });
+    }
+
+
+    /** Apply dashboard-owned artwork and styling to the actual user dialog. */
+    private void applyTheme(Map<String, Object> theme) {
+        if (binding == null || theme == null) return;
+        String backgroundUrl = themeString(theme, "backgroundImageUrl");
+        String logoUrl = themeString(theme, "logoUrl");
+        int backgroundColor = themeColor(theme, "backgroundColor", Color.rgb(245, 240, 232));
+        int overlayColor = themeColor(theme, "overlayColor", Color.WHITE);
+        float overlayOpacity = Math.max(0f, Math.min(1f, themeFloat(theme, "overlayOpacity", 0.12f)));
+        int panelColor = blend(backgroundColor, overlayColor, overlayOpacity);
+        if (nonEmpty(backgroundUrl)) {
+            binding.imgDialogBackground.setVisibility(View.VISIBLE);
+            Glide.with(this).load(AssetCatalog.absoluteUrl(backgroundUrl))
+                    .centerCrop().into(binding.imgDialogBackground);
+            GradientDrawable panel = new GradientDrawable();
+            panel.setColor(Color.argb(224, Color.red(panelColor), Color.green(panelColor), Color.blue(panelColor)));
+            panel.setCornerRadius(dp(22));
+            binding.clSignIn.setBackground(panel);
+        } else {
+            binding.imgDialogBackground.setVisibility(View.GONE);
+            GradientDrawable panel = new GradientDrawable();
+            panel.setColor(panelColor);
+            panel.setCornerRadius(dp(22));
+            binding.clSignIn.setBackground(panel);
+        }
+        if (nonEmpty(logoUrl)) {
+            binding.imgSignLogo.setVisibility(View.VISIBLE);
+            Glide.with(this).load(AssetCatalog.absoluteUrl(logoUrl))
+                    .fitCenter().into(binding.imgSignLogo);
+        } else {
+            binding.imgSignLogo.setVisibility(View.GONE);
+            binding.imgSignLogo.setImageDrawable(null);
+        }
+        String title = themeString(theme, "title");
+        if (nonEmpty(title)) binding.tvTitle2.setText(title);
+        String titleColor = themeString(theme, "titleColor");
+        if (nonEmpty(titleColor)) binding.tvTitle2.setTextColor(parseColor(titleColor, Color.WHITE));
+        String buttonText = themeString(theme, "buttonText");
+        if (nonEmpty(buttonText)) binding.bltvCheckIn.setText(buttonText);
+        int buttonColor = themeColor(theme, "buttonColor", GREEN);
+        GradientDrawable button = new GradientDrawable();
+        button.setColor(buttonColor);
+        button.setCornerRadius(dp(64));
+        binding.bltvCheckIn.setBackground(button);
+        binding.bltvCheckIn.setTextColor(themeColor(theme, "buttonTextColor", Color.WHITE));
+    }
+
+    private String themeString(Map<String, Object> theme, String key) {
+        Object value = theme.get(key);
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private float themeFloat(Map<String, Object> theme, String key, float fallback) {
+        try { return Float.parseFloat(String.valueOf(theme.get(key))); }
+        catch (Exception ignored) { return fallback; }
+    }
+
+    private int themeColor(Map<String, Object> theme, String key, int fallback) {
+        return parseColor(themeString(theme, key), fallback);
+    }
+
+    private int parseColor(String value, int fallback) {
+        try { return Color.parseColor(value); }
+        catch (Exception ignored) { return fallback; }
+    }
+
+    private int blend(int base, int overlay, float amount) {
+        float inverse = 1f - amount;
+        return Color.rgb(
+                Math.round(Color.red(base) * inverse + Color.red(overlay) * amount),
+                Math.round(Color.green(base) * inverse + Color.green(overlay) * amount),
+                Math.round(Color.blue(base) * inverse + Color.blue(overlay) * amount));
     }
 
     private void claimToday() {
