@@ -67,6 +67,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       CREATE INDEX IF NOT EXISTS idx_cp_memories_relationship_created
       ON cp_memories ("relationshipId", "createdAt" DESC)
     `).catch(() => undefined);
+    await this.migrateUnifiedRelationshipType();
     // Expiry processing only touches CP requests and their wallet ledger rows.
     this.expiryTimer = setInterval(() => {
       void this.expireDueRequests().catch(() => undefined);
@@ -80,6 +81,42 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     this.expiryTimer = null;
   }
 
+  private async migrateUnifiedRelationshipType() {
+    const rows = await this.dataSource.query(
+      `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%'`,
+    );
+    const settings = new Map<string, string>(rows.map((row: any) => [String(row.key), String(row.value ?? '')]));
+    const legacyTypes = ['love', 'engagement', 'friendship', 'brotherhood', 'marriage'];
+    const suffixes = ['gift', 'price', 'gift_points', 'points.gift_send', 'max_level', 'levels', 'enabled', 'rules'];
+    const sourceType = legacyTypes
+      .map(type => ({ type, score: suffixes.filter(suffix => settings.has(`cp.${suffix}.${type}`)).length }))
+      .sort((a, b) => b.score - a.score)[0]?.type;
+    if (sourceType) {
+      await this.dataSource.transaction(async manager => {
+        for (const suffix of suffixes) {
+          const canonicalKey = `cp.${suffix}.relationship`;
+          if (settings.has(canonicalKey)) continue;
+          const legacyValue = settings.get(`cp.${suffix}.${sourceType}`);
+          if (legacyValue === undefined) continue;
+          await manager.query(
+            `INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
+             VALUES (gen_random_uuid(),$1,$2,$3,now(),now())
+             ON CONFLICT (key) DO NOTHING`,
+            [canonicalKey, legacyValue, 'Migrated from legacy CP relationship type'],
+          );
+        }
+      });
+    }
+    // Preserve all history, points and requests while removing user-visible subtypes.
+    await this.dataSource.query(
+      `UPDATE cp_relationships SET type=$1 WHERE type<>$1`,
+      [CpType.RELATIONSHIP],
+    );
+    await this.dataSource.query(
+      `UPDATE cp_requests SET type=$1 WHERE type<>$1`,
+      [CpType.RELATIONSHIP],
+    );
+  }
 
   private async enrichLevelRewards(levels: any[]) {
     const safeLevels = Array.isArray(levels) ? levels : [];
@@ -242,7 +279,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const globallyEnabled = settings['cp.enabled.global'] !== 'false';
     const catalog: Array<Record<string, unknown>> = [];
     const giftTabEnabled = settings['cp.gift_tab.enabled'] !== 'false';
-    for (const type of Object.values(CpType)) {
+    for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] || null;
       const [gift] = giftId ? await this.dataSource.query(
         'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id=$1 AND "isActive"=true',
@@ -327,7 +364,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const configs: Array<{ type: string; levels: any[] }> = [];
     for (const row of rows) {
       const type = String(row.key).slice('cp.levels.'.length);
-      if (!TYPES.has(type)) continue;
+      if (type !== CpType.RELATIONSHIP) continue;
       let levels: any[] = [];
       try {
         const parsed = JSON.parse(String(row.value || '[]'));
@@ -824,8 +861,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   async createProfileRequest(userId: string, input: { recipientId: string; type: CpType; idempotencyKey: string }) {
     const recipientId = String(input?.recipientId || '');
     const key = String(input?.idempotencyKey || '').trim();
-    const type = input?.type;
-    if (!UUID_REGEX.test(recipientId) || !key || key.length > 128 || !TYPES.has(type)) {
+    const type = CpType.RELATIONSHIP;
+    if (!UUID_REGEX.test(recipientId) || !key || key.length > 128) {
       throw new BadRequestException('بيانات هدية CP غير مكتملة');
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إرسال هدية ارتباط إلى حسابك');
@@ -957,8 +994,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const recipientId = String(input?.recipientId || '');
     const roomId = String(input?.roomId || '');
     const key = String(input?.idempotencyKey || '').trim();
-    const type = input?.type;
-    if (!UUID_REGEX.test(recipientId) || !UUID_REGEX.test(roomId) || !key || key.length > 128 || !TYPES.has(type)) {
+    const type = CpType.RELATIONSHIP;
+    if (!UUID_REGEX.test(recipientId) || !UUID_REGEX.test(roomId) || !key || key.length > 128) {
       throw new BadRequestException('بيانات طلب CP غير مكتملة');
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء CP مع حسابك');
@@ -1296,8 +1333,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     // Prefer the legacy explicit gift-to-type mapping; otherwise use the type saved
     // directly on any dashboard gift classified as CP.
     const configured = await this.dataSource.query(
-      'SELECT key FROM app_settings WHERE key LIKE $1 AND value=$2 ORDER BY key LIMIT 1',
-      ['cp.gift.%', giftId],
+      'SELECT key FROM app_settings WHERE key=$1 AND value=$2 LIMIT 1',
+      ['cp.gift.relationship', giftId],
     );
     const [giftConfig] = await this.dataSource.query(
       'SELECT category, \"cpRelationshipType\" FROM gifts WHERE id=$1 AND \"isActive\"=true LIMIT 1',
@@ -1313,8 +1350,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     // relationship type stored on the CP gift row.
     const isCpGift = String(giftConfig?.category || '').toLowerCase() === 'cp' || !!mappedType;
     if (!isCpGift) return null;
-    const type = String(mappedType || giftConfig?.cpRelationshipType || 'love') as CpType;
-    if (!TYPES.has(type)) return null;
+    // Every CP-classified gift creates the same relationship type. Old gift
+    // metadata is ignored for new invitations; existing pairs were migrated above.
+    const type = CpType.RELATIONSHIP;
     const [globalSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.enabled.global']);
     const [typeSetting] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
     if (String(globalSetting?.value || 'true').toLowerCase() === 'false' ||
