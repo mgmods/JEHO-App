@@ -701,6 +701,14 @@ export class AdminService {
         description: 'JEHO support chest multi-level configuration',
       }));
     }
+    const liveRooms = await this.roomsRepo.find({ where: { status: RoomStatus.OPEN } });
+    const configAt = new Date().toISOString();
+    for (const room of liveRooms) {
+      this.realtimeGateway.emitToRoom(room.id, 'room:event', {
+        roomId: room.id, event: 'support_chest:config_updated',
+        payload: { config: current }, at: configAt,
+      });
+    }
     return current;
   }
 
