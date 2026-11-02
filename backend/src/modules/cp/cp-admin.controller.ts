@@ -270,6 +270,28 @@ export class CpAdminController {
             throw new BadRequestException('خيار صور الشريكين في هدية CB غير صالح');
           }
         }
+        if (level.seatEffect !== undefined) {
+          const effect = level.seatEffect;
+          if (!effect || typeof effect !== 'object' || Array.isArray(effect)) {
+            throw new BadRequestException('إعدادات مؤثر مقاعد مستوى CB غير صالحة');
+          }
+          if (effect.enabled !== undefined && typeof effect.enabled !== 'boolean') {
+            throw new BadRequestException('حالة مؤثر مقاعد المستوى غير صالحة');
+          }
+          if (effect.url !== undefined && effect.url !== '' &&
+              (typeof effect.url !== 'string' || effect.url.length > 2048 ||
+               !(effect.url.startsWith('https://') || effect.url.startsWith('http://')))) {
+            throw new BadRequestException('رابط مؤثر مقاعد المستوى غير صالح');
+          }
+          if (effect.sizeDp !== undefined &&
+              (!Number.isInteger(Number(effect.sizeDp)) || Number(effect.sizeDp) < 20 || Number(effect.sizeDp) > 72)) {
+            throw new BadRequestException('حجم مؤثر مقاعد المستوى يجب أن يكون بين 20 و72');
+          }
+          if (effect.durationMs !== undefined &&
+              (!Number.isInteger(Number(effect.durationMs)) || Number(effect.durationMs) < 500 || Number(effect.durationMs) > 10000)) {
+            throw new BadRequestException('مدة مؤثر مقاعد المستوى يجب أن تكون بين 500 و10000 مللي ثانية');
+          }
+        }
         if (level.presentation !== undefined) {
           if (!level.presentation || typeof level.presentation !== 'object' || Array.isArray(level.presentation)) {
             throw new BadRequestException('إعدادات عرض مستوى CB غير صالحة');
