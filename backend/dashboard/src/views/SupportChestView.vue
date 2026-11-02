@@ -53,7 +53,7 @@
         <div class="reward-editor">
           <div class="levels-head"><strong>مكافآت مفجّر الصندوق</strong><button type="button" class="btn btn-secondary" @click="addReward(level)">إضافة مكافأة</button></div>
           <div v-for="(reward, rewardIndex) in level.rewards" :key="rewardIndex" class="reward-line">
-            <label class="field">نوع المكافأة<select v-model="reward.type"><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="vip">VIP</option><option value="frame">إطار</option><option value="badge">شارة</option><option value="gift">هدية</option></select></label>
+            <label class="field">نوع المكافأة<select v-model="reward.type"><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="vip">VIP</option><option value="frame">إطار</option><option value="badge">شارة</option></select></label>
             <label class="field">الكمية / المدة<input v-model.number="reward.amount" type="number" min="1"></label>
             <label class="field">معرّف العنصر أو كود VIP<input v-model="reward.itemId" placeholder="اختياري حسب نوع المكافأة"></label>
             <button type="button" class="btn btn-danger" @click="level.rewards.splice(rewardIndex,1)">إزالة</button>
@@ -64,7 +64,7 @@
       </article>
     </section>
     <section class="card p-4 mt-3"><h2>مكافأة الفائز</h2>
-      <label class="field">نوع المكافأة<select v-model="form.rewardType" @change="form.rewardItemId = ''"><option value="none">بدون مكافأة تلقائية</option><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="frame">إطار ملف شخصي</option><option value="badge">شارة</option><option value="gift">هدية من الكتالوج</option><option value="entry_effect">دخولية من الكتالوج</option></select></label>
+      <label class="field">نوع المكافأة<select v-model="form.rewardType" @change="form.rewardItemId = ''"><option value="none">بدون مكافأة تلقائية</option><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="frame">إطار ملف شخصي</option><option value="badge">شارة</option><option value="gift">هدية من الكتالوج</option></select></label>
       <div v-if="['frame','badge','gift','entry_effect'].includes(form.rewardType)" class="field">
         <span>اختر المكافأة المرئية</span>
         <div v-if="catalogLoading" class="muted">جارٍ تحميل الكتالوج…</div>
