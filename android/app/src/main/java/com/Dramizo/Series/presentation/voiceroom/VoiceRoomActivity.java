@@ -15407,9 +15407,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Show the same configured gift toast to every room member, including the
             // sender. There is no separate local-send toast path; the room event is canonical.
             // This is after recentGiftEffects dedupe, so the room/user echo cannot double-show it.
-            String senderAvatar = firstNonEmpty(
-                    memberStr(payload, "senderAvatarUrl"),
-                    memberStr(payload, "avatarUrl"));
+            boolean senderMysteriousMan = memberBool(payload, "senderMysteriousMan", false)
+                    || "الرجل الغامض".equals(sender);
+            String senderAvatar = senderMysteriousMan
+                    ? configuredMysteriousAvatarUrl()
+                    : firstNonEmpty(memberStr(payload, "senderAvatarUrl"),
+                            memberStr(payload, "avatarUrl"));
             // Gift-send top toast removed by request. Keep the in-room gift animation.
 
             // A single-recipient gift must name the receiver in the room chat. Group gifts
@@ -15459,7 +15462,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 announceLuckyGiftChat(
                         name, icon, sender, 1, senderId, senderVipChat,
-                        memberStr(payload, "senderAvatarUrl"), senderLevelChat, senderFrameChat);
+                        senderAvatar, senderLevelChat, senderFrameChat);
             } else if (allMic && !allReceivers.isEmpty()) {
                 // Mikoo: center gift → simultaneous clones to every target mic.
                 String sendName = sender != null && !sender.isEmpty() ? sender : "مستخدم";
@@ -15507,7 +15510,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         .senderUserId(senderId)
                         .senderVipLevel(senderVip)
                         .userLevel(senderLevel)
-                        .avatarUrl(memberStr(payload, "senderAvatarUrl"))
+                        .avatarUrl(senderAvatar)
                         .hostBadgeUrl(senderFrame)
                         .supporterTier(tier)
                         .giftName(name)
@@ -15528,7 +15531,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 int senderVip = Math.max(0, memberInt(payload, "senderVipLevel", 0));
                 int senderLevel = Math.max(1, memberInt(payload, "senderUserLevel", 1));
                 playGiftAnimationRemote(name, icon, anim, sender, combo, senderId, senderVip,
-                        memberStr(payload, "senderAvatarUrl"), senderLevel,
+                        senderAvatar, senderLevel,
                         memberStr(payload, "senderHostBadgeUrl"));
                 for (String rid : allReceivers) {
                     if (perSeatCoins > 0) applyGiftToSeat(rid, perSeatCoins, 0L);
