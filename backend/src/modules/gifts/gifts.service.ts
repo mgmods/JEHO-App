@@ -2082,7 +2082,9 @@ export class GiftsService implements OnModuleInit {
       ? currentLevel.giftCategories.map(String) : globalAllowedCategories;
     const allowedCategories = levelAllowedCategories.filter(category => globalAllowedCategories.includes(category));
     const globalGiftIds = Array.isArray(config.giftIds) ? config.giftIds.map(String) : [];
+    const globalGiftSelectionMode = String(config.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'));
     const levelGiftIds = Array.isArray(currentLevel?.giftIds) ? currentLevel.giftIds.map(String) : [];
+    const levelGiftSelectionMode = String(currentLevel?.giftSelectionMode || (levelGiftIds.length ? 'selected' : 'all'));
     const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
     const classifySupportGift = (gift: Gift): 'normal' | 'lucky' | 'cp' | 'other' => {
       const rawCategory = String(gift.category || '').toLowerCase();
@@ -2094,7 +2096,9 @@ export class GiftsService implements OnModuleInit {
     };
     const eligibleGifts = allGifts.filter(gift => {
       const category = classifySupportGift(gift);
-      return allowedCategories.includes(category) && (!globalGiftIds.length || globalGiftIds.includes(String(gift.id))) && (!levelGiftIds.length || levelGiftIds.includes(String(gift.id)));
+      return allowedCategories.includes(category)
+        && (globalGiftSelectionMode !== 'selected' || globalGiftIds.includes(String(gift.id)))
+        && (levelGiftSelectionMode !== 'selected' || levelGiftIds.includes(String(gift.id)));
     }).map(gift => ({
       id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl || null,
       coinPrice: Number(gift.coinPrice) || 0,
@@ -2113,6 +2117,7 @@ export class GiftsService implements OnModuleInit {
         type, amount: Math.max(1, Number(reward?.amount) || 1), itemId,
         name: item?.name || (type === 'coins' ? 'كوينزات' : type === 'diamonds' ? 'ماسات' : type.toUpperCase()),
         imageUrl: item?.animationUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.iconUrl || null,
+        iconUrl: item?.iconUrl || null, animationUrl: item?.animationUrl || null,
       };
     }));
     const enrichedLevel = { ...currentLevel, rewards: rewardPreview, rewardCount: rewardPreview.length, eligibleGifts, eligibleGiftCount: eligibleGifts.length };
@@ -2150,7 +2155,8 @@ export class GiftsService implements OnModuleInit {
       const globalCategories = Array.isArray(cfg.giftCategories) ? cfg.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
       if (!globalCategories.includes(category)) return null;
       const globalGiftIds = Array.isArray(cfg.giftIds) ? cfg.giftIds.map(String) : [];
-      if (globalGiftIds.length && !globalGiftIds.includes(String(giftId))) return null;
+      const globalGiftSelectionMode = String(cfg.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'));
+      if (globalGiftSelectionMode === 'selected' && !globalGiftIds.includes(String(giftId))) return null;
       let levels = Array.isArray(cfg.levels) ? cfg.levels : [];
       if (!levels.length) levels = [{
         level: 1, title: 'الصندوق الذهبي', goalMode: cfg.goalMode || 'coins',
@@ -2164,11 +2170,13 @@ export class GiftsService implements OnModuleInit {
       let levelIndex = Math.max(0, Math.min(levels.length - 1, Number(state.level || 1) - 1));
       state.level = levelIndex + 1;
       const levelCfg = levels[levelIndex];
-      const allowedCategories = Array.isArray(levelCfg.giftCategories)
-        ? levelCfg.giftCategories.map(String) : globalCategories;
+      const allowedCategories = (Array.isArray(levelCfg.giftCategories)
+        ? levelCfg.giftCategories.map(String) : globalCategories).filter(value => globalCategories.includes(value));
       const configuredLevelGiftIds = Array.isArray(levelCfg.giftIds) ? levelCfg.giftIds.map(String) : [];
-      const levelGiftIds = configuredLevelGiftIds.length ? configuredLevelGiftIds : globalGiftIds;
-      if (!allowedCategories.includes(category) || (levelGiftIds.length && !levelGiftIds.includes(String(giftId)))) return null;
+      const levelGiftSelectionMode = String(levelCfg.giftSelectionMode || (configuredLevelGiftIds.length ? 'selected' : 'all'));
+      const levelGiftIds = configuredLevelGiftIds;
+      if (!allowedCategories.includes(category)
+          || (levelGiftSelectionMode === 'selected' && !levelGiftIds.includes(String(giftId)))) return null;
       state.coins = (Number(state.coins) || 0) + Math.max(0, Number(coins) || 0);
       state.diamonds = (Number(state.diamonds) || 0) + Math.max(0, Number(diamonds) || 0);
       state.giftCount = (Number(state.giftCount) || 0) + Math.max(1, Math.floor(Number(quantity) || 1));
@@ -2185,10 +2193,42 @@ export class GiftsService implements OnModuleInit {
       state.goalReached = targetReached && countReached;
       let opened: any = null;
       if (state.goalReached) {
-        const rewards = Array.isArray(levelCfg.rewards) ? levelCfg.rewards : [];
+        const rewards = Array.isArray(levelCfg.rewards)
+          ? levelCfg.rewards.filter((entry: any) => entry && String(entry.type || '') !== 'none')
+          : [];
+        if (!rewards.length) throw new BadRequestException('لا توجد جوائز محددة لهذا المستوى');
+        // Draw without replacement: every configured prize is awarded once before
+        // the deck is reshuffled, so consecutive winners do not receive the same prize.
+        const deckKey = String(levelIndex + 1);
+        const signature = JSON.stringify(rewards.map((entry: any) => ({
+          type: String(entry.type || ''), itemId: String(entry.itemId || ''),
+          amount: Math.max(1, Math.floor(Number(entry.amount) || 1)),
+        })));
+        const decks = state.rewardDecks && typeof state.rewardDecks === 'object' ? state.rewardDecks : {};
+        let deckState = decks[deckKey];
+        if (!deckState || deckState.signature !== signature || !Array.isArray(deckState.remaining)
+            || deckState.remaining.some((value: any) => !Number.isInteger(value) || value < 0 || value >= rewards.length)) {
+          const shuffled = rewards.map((_: any, index: number) => index);
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = randomInt(i + 1);
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          deckState = { signature, remaining: shuffled };
+        }
+        if (!deckState.remaining.length) {
+          const shuffled = rewards.map((_: any, index: number) => index);
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = randomInt(i + 1);
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          deckState.remaining = shuffled;
+        }
+        const rewardIndex = deckState.remaining.shift();
+        decks[deckKey] = deckState;
+        state.rewardDecks = decks;
+        const reward = rewards[Number(rewardIndex)] || rewards[0];
         const granted: any[] = [];
-        for (let rewardIndex = 0; rewardIndex < rewards.length; rewardIndex++) {
-          const reward = rewards[rewardIndex] || {};
+        {
           const rewardType = String(reward.type || '');
           const amount = Math.max(1, Math.floor(Number(reward.amount) || 1));
           const itemId = String(reward.itemId || '').trim();
@@ -2225,6 +2265,22 @@ export class GiftsService implements OnModuleInit {
             const owned = await ownership.findOne({ where: { userId: senderId, badgeId: badge.id } });
             if (!owned) await ownership.save(ownership.create({ userId: senderId, badgeId: badge.id, grantedByAdminId: null, source: 'support_chest' }));
             granted.push({ type: 'badge', itemId: badge.id, name: badge.name, imageUrl: badge.imageUrl || null });
+          } else if (rewardType === 'gift') {
+            if (!itemId) throw new BadRequestException('Support chest gift reward requires a gift ID');
+            const gift = await manager.getRepository(Gift).findOne({ where: { id: itemId, isActive: true } });
+            if (!gift) throw new BadRequestException('Support chest gift reward is not active');
+            // Persist the free prize in gift history as a self-delivered system reward.
+            await manager.getRepository(GiftSend).save(manager.getRepository(GiftSend).create({
+              giftId: gift.id, giftName: gift.name, giftIconUrl: gift.iconUrl || null,
+              senderId, receiverId: senderId, roomId,
+              quantity: amount, comboCount: amount, totalCoins: 0, diamondsAwarded: 0,
+              luckyMultiplier: null,
+            }));
+            granted.push({
+              type: 'gift', itemId: gift.id, amount, name: gift.name,
+              imageUrl: gift.animationUrl || gift.iconUrl || null,
+              iconUrl: gift.iconUrl || null, animationUrl: gift.animationUrl || null,
+            });
           } else if (rewardType === 'vip') {
             if (!itemId) throw new BadRequestException('Support chest VIP reward requires a VIP plan ID');
             const plan = await manager.getRepository(VipPlan).findOne({ where: { id: itemId, isActive: true } });
@@ -2263,6 +2319,7 @@ export class GiftsService implements OnModuleInit {
         state.lastWinnerId = senderId;
         state.lastWinnerName = opened.winnerName;
         state.lastRewards = granted;
+        state.lastReward = granted[0] || null;
         state.lastRewardType = granted[0]?.type || 'none';
         state.lastRewardAmount = granted[0]?.amount || 1;
         state.lastGiftId = giftId;
@@ -2290,6 +2347,30 @@ export class GiftsService implements OnModuleInit {
         this.realtime?.emitToRoom(roomId, 'room:event', {
           roomId, event: 'support_chest:opened', payload: win, at: new Date().toISOString(),
         });
+        const awardedGift = Array.isArray(win.rewards) ? win.rewards.find((entry: any) => entry?.type === 'gift') : null;
+        if (awardedGift) {
+          const winnerUser = await this.usersRepo.findOne({ where: { id: win.winnerId } });
+          const winnerProfile = await this.profilesRepo.findOne({ where: { userId: win.winnerId } });
+          const giftPayload = {
+            supportChestReward: true, giftId: awardedGift.itemId,
+            giftName: awardedGift.name, giftType: 'normal',
+            giftIconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
+            iconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
+            animationUrl: awardedGift.animationUrl || awardedGift.imageUrl || null,
+            senderId: null, senderName: 'صندوق الدعم', senderAvatarUrl: null,
+            receiverId: win.winnerId,
+            receiverName: winnerUser?.displayName || winnerUser?.username || win.winnerName,
+            receiverAvatarUrl: winnerUser?.avatarUrl || null,
+            quantity: awardedGift.amount || 1, comboCount: awardedGift.amount || 1,
+            totalCoins: 0, diamondsAwarded: 0, roomId,
+            at: new Date().toISOString(),
+          };
+          this.realtime?.emitToUser(win.winnerId, 'gift:animation', giftPayload);
+          this.realtime?.emitToRoom(roomId, 'room:event', {
+            roomId, event: 'support_chest:reward', payload: { ...giftPayload, profileId: winnerProfile?.userId || null },
+            at: giftPayload.at,
+          });
+        }
         await this.notifications?.notifyUser(
           win.winnerId, NotificationType.SYSTEM,
           '🎁 تم فتح صندوق الدعم!',
