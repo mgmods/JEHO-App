@@ -1936,6 +1936,37 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    /** Resolve uploaded chest reward media against the active JEHO API host. */
+    @Nullable
+    private String resolveSupportChestMediaUrl(@Nullable String raw) {
+        if (raw == null || raw.trim().isEmpty()) return null;
+        String value = raw.trim();
+        try {
+            Uri api = Uri.parse(com.Dramizo.Series.BuildConfig.API_BASE_URL);
+            if (api.getScheme() == null || api.getAuthority() == null) return value;
+            String origin = api.getScheme() + "://" + api.getAuthority();
+            if (value.startsWith("data:") || value.startsWith("file:")
+                    || value.startsWith("content:") || value.startsWith("blob:")) return value;
+            if (value.startsWith("http://") || value.startsWith("https://")) {
+                Uri media = Uri.parse(value);
+                String mediaPath = media.getEncodedPath() == null ? "" : media.getEncodedPath();
+                mediaPath = mediaPath.replaceFirst("^/api/v\\d+(?=/uploads/)", "");
+                if (mediaPath.startsWith("/uploads/") || mediaPath.startsWith("/assets/")) {
+                    return origin + mediaPath
+                            + (media.getEncodedQuery() == null ? "" : "?" + media.getEncodedQuery())
+                            + (media.getEncodedFragment() == null ? "" : "#" + media.getEncodedFragment());
+                }
+                return value;
+            }
+            String normalized = value.replaceFirst("^/?api/v\\d+(?=/uploads/)", "");
+            if (normalized.startsWith("/")) return origin + normalized;
+            if (normalized.startsWith("uploads/") || normalized.startsWith("assets/")) {
+                return origin + "/" + normalized;
+            }
+        } catch (Exception ignored) { }
+        return value;
+    }
+
     private void showSupportChestSheet() {
         if (isFinishing() || isDestroyed() || roomId == null || roomId.isEmpty()) return;
         final String chestRoomId = roomId;
@@ -15341,6 +15372,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                 }
             } catch (Exception ignored) { }
+            rewardImage = resolveSupportChestMediaUrl(rewardImage);
             String message = winner + " فجّر الصندوق وحصل على "
                     + (rewardNames.isEmpty() ? "جوائز صندوق الدعم" : android.text.TextUtils.join("، ", rewardNames));
             String roomEventId = memberStr(payload, "cycle");
