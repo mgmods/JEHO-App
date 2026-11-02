@@ -478,6 +478,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private WebView musicYoutubeWebView;
     @Nullable private WebView activeSupportChestWeb;
     @Nullable private String activeSupportChestRoomId;
+    private final Runnable supportChestEventRefresh = () -> {
+        WebView chestWeb = activeSupportChestWeb;
+        String chestRoom = activeSupportChestRoomId;
+        if (chestWeb != null && chestRoom != null && chestRoom.equals(roomId) && !isFinishing()) {
+            loadSupportChestState(chestWeb, chestRoom);
+        }
+    };
     /** Lazy media3 PlayerViews (PlayerView in XML freezes inflate). */
     @Nullable private androidx.media3.ui.PlayerView musicVideoPlayerView;
     @Nullable private androidx.media3.ui.PlayerView musicFloatPlayerView;
@@ -1942,6 +1949,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         };
         dialog.setOnDismissListener(d -> {
             handler.removeCallbacks(refreshChest);
+            handler.removeCallbacks(supportChestEventRefresh);
             if (activeSupportChestWeb == web) {
                 activeSupportChestWeb = null;
                 activeSupportChestRoomId = null;
@@ -15197,9 +15205,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
         if ("support_chest:updated".equals(event)) {
-            WebView chestWeb = activeSupportChestWeb;
-            if (chestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
-                loadSupportChestState(chestWeb, roomId);
+            if (activeSupportChestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
+                handler.removeCallbacks(supportChestEventRefresh);
+                handler.postDelayed(supportChestEventRefresh, 350L);
             }
             return;
         }
