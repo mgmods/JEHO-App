@@ -100,12 +100,24 @@ function setChestArt(url){
  node.src=source;
 }
 function renderLevelFeatures(items){const root=document.getElementById('levelFeatures'),rows=Array.isArray(items)?items.map(x=>String(x||'').trim()).filter(Boolean):[];root.innerHTML=rows.length?rows.map(x=>'<span class="feature-chip">'+escHtml(x)+'</span>').join(''):'<span class="feature-chip">لا توجد مميزات إضافية محددة لهذا المستوى</span>';}
+function resolveChestMedia(value){
+ const raw=String(value||'').trim();if(!raw)return '';
+ if(/^(data|blob|file|content):/i.test(raw))return raw;
+ const base=String(liveConfig?.assetBaseUrl||'').replace(/\/$/,'');
+ if(/^https?:\/\//i.test(raw)){
+  try{const u=new URL(raw);const normalized=u.pathname.replace(/^\/api\/v\d+(?=\/uploads\/)/i,'');if(/^\/uploads\//i.test(normalized)&&base)return base+normalized+u.search+u.hash;return raw;}catch(e){return raw;}
+ }
+ const normalized=raw.replace(/^\/?api\/v\d+(?=\/uploads\/)/i,'');
+ if(normalized.startsWith('/'))return base?base+normalized:normalized;
+ if(/^(assets|uploads)\//i.test(normalized))return base?base+'/'+normalized:normalized;
+ return raw;
+}
 function rewardMedia(r){
  const item=r?.item||r?.catalogItem||r?.rewardItem||{};
  const candidates=[r?.imageUrl,r?.iconUrl,r?.previewUrl,r?.thumbnailUrl,r?.badgeUrl,r?.frameImageUrl,r?.animationUrl,r?.assetUrl,r?.url,r?.image,item?.iconUrl,item?.previewUrl,item?.imageUrl,item?.badgeUrl,item?.animationUrl,item?.assetUrl,item?.url];
- return String(candidates.find(v=>typeof v==='string'&&v.trim())||'').trim();
+ return resolveChestMedia(candidates.find(v=>typeof v==='string'&&v.trim())||'');
 }
-function renderRewardCards(items){const root=document.getElementById('rewardPreviews'),rows=Array.isArray(items)?items:[];document.getElementById('rewardCount').textContent=rows.length+' مكافآت';root.innerHTML=rows.length?rows.map(r=>{const image=rewardMedia(r);const video=/\.(mp4|webm)(\?|$)/i.test(image);const fallback=(r.type==='coins'?'🪙':r.type==='diamonds'?'💎':r.type==='vip'?'👑':r.type==='frame'?'🖼️':r.type==='badge'?'🏅':'🎁');const visual=image?(video?'<video src="'+escHtml(image)+'" muted autoplay loop playsinline></video>':'<img src="'+escHtml(image)+'" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:'+JSON.stringify(fallback)+',style:\'font-size:34px\'}))">'):'<div style="font-size:34px">'+fallback+'</div>';return '<div class="giftcard">'+visual+'<div class="giftname">'+escHtml(r.name||r.type||'مكافأة')+'</div><div class="value">'+escHtml(r.type==='vip'?'VIP · '+(r.amount||1)+' يوم':(['coins','diamonds'].includes(r.type)?formatNum(r.amount)+' '+(r.type==='coins'?'كوينز':'ماسات'):'× '+(r.amount||1)))+'</div></div>';}).join(''):'<div class="giftcard"><div class="giftname">لم يحدد الأدمن مكافآت لهذا المستوى</div></div>';}
+function renderRewardCards(items){const root=document.getElementById('rewardPreviews'),rows=Array.isArray(items)?items:[];document.getElementById('rewardCount').textContent=rows.length+' مكافآت';root.innerHTML=rows.length?rows.map(r=>{const image=rewardMedia(r);const video=/\.(mp4|webm)(\?|$)/i.test(image);const fallback=(r.type==='coins'?'🪙':r.type==='diamonds'?'💎':r.type==='vip'?'👑':r.type==='frame'?'🖼️':r.type==='badge'?'🏅':'🎁');const visual=image?(video?'<video src="'+escHtml(image)+'" muted autoplay loop playsinline></video>':'<img src="'+escHtml(image)+'" alt="" loading="lazy" onerror="this.outerHTML=\'<span style=&quot;font-size:34px&quot;>'+fallback+'</span>\'">'):'<div style="font-size:34px">'+fallback+'</div>';return '<div class="giftcard">'+visual+'<div class="giftname">'+escHtml(r.name||r.type||'مكافأة')+'</div><div class="value">'+escHtml(r.type==='vip'?'VIP · '+(r.amount||1)+' يوم':(['coins','diamonds'].includes(r.type)?formatNum(r.amount)+' '+(r.type==='coins'?'كوينز':'ماسات'):'× '+(r.amount||1)))+'</div></div>';}).join(''):'<div class="giftcard"><div class="giftname">لم يحدد الأدمن مكافآت لهذا المستوى</div></div>';}
 function renderLevelTabs(levels){
  const root=document.getElementById('levelSelector'),rows=Array.isArray(levels)?levels.slice(0,3):[];
  root.innerHTML=rows.map((lv,i)=>{const locked=i>currentLevelIndex,done=i<currentLevelIndex;return '<button type="button" class="level-tab '+(i===selectedLevelIndex?'active ':'')+(locked?'locked':'')+'" data-level="'+i+'">'+(locked?'🔒 ':done?'✓ ':'🎁 ')+escHtml(lv.title||('المستوى '+(i+1)))+'<small>'+(locked?'مقفل':done?'مكتمل':'المستوى الحالي')+'</small></button>';}).join('');
