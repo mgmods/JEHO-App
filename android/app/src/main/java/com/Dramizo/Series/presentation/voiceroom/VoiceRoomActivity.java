@@ -17697,13 +17697,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String rewardLabel = reward != null
                             ? ("ربحت: " + reward.amount + " " + reward.type)
                             : "تم فتح الصندوق";
-                    String me = ContainerProvider.from(this).getSessionManager().getDisplayName();
+                    boolean mysteriousEnabled = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                            .getBoolean("enabled", false);
+                    String me = mysteriousEnabled
+                            ? "الرجل الغامض"
+                            : ContainerProvider.from(this).getSessionManager().getDisplayName();
                     if (me == null || me.isEmpty()) me = "أنا";
                     showLuckyWinOverlay(me, rewardLabel);
                     hideLuckyFloat();
                     JsonObject payload = new JsonObject();
                     payload.addProperty("userId", myUserId != null ? myUserId : "");
                     payload.addProperty("displayName", me);
+                    payload.addProperty("mysteriousMan", mysteriousEnabled);
                     payload.addProperty("rewardLabel", rewardLabel);
                     if (reward != null) {
                         payload.addProperty("coins", reward.amount);
