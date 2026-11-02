@@ -1880,8 +1880,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             Object rawLevel = data.get("currentLevel");
                             int chestLevel = rawState instanceof Map
                                     ? (int) numberForChest(((Map<?, ?>) rawState).get("level"), 1L) : 1;
-                            String desiredAsset = chestLevel >= 2
-                                    ? "support-chest-level-2.html" : "support-chest-level-1.html";
+                            String desiredAsset = chestLevel >= 3
+                                    ? "support-chest-level-3.html"
+                                    : (chestLevel >= 2 ? "support-chest-level-2.html" : "support-chest-level-1.html");
                             if (!desiredAsset.equals(activeSupportChestAsset)) {
                                 activeSupportChestAsset = desiredAsset;
                                 runOnUiThread(() -> {
