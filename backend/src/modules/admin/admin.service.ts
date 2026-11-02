@@ -562,8 +562,15 @@ export class AdminService {
     const defaults = {
       enabled: false, iconVisible: true, goalMode: 'coins',
       coinTarget: 100000, diamondTarget: 10000, giftIds: [],
+      giftCategories: ['normal', 'lucky', 'cp'],
+      levels: [{
+        level: 1, title: 'الصندوق الذهبي', goalMode: 'coins',
+        coinTarget: 100000, diamondTarget: 0, giftCount: 1,
+        giftCategories: ['normal', 'lucky', 'cp'], giftIds: [], imageUrl: '',
+        rewards: [{ type: 'coins', amount: 5000, itemId: '' }],
+      }],
       rewardType: 'none', rewardItemId: '', rewardAmount: 0,
-      instructions: 'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله يحصل مرسل الهدية الأخيرة على المكافأة.',
+      instructions: 'كل هدية مؤهلة تساهم في هدف الصندوق. آخر هدية تكمل الهدف تفتح الصندوق وتمنح المكافأة تلقائياً.',
     };
     if (!row) return defaults;
     try { return { ...defaults, ...JSON.parse(row.value) }; } catch { return defaults; }
@@ -571,7 +578,8 @@ export class AdminService {
 
   async patchSupportChestConfig(input: Record<string, unknown>) {
     const allowedModes = new Set(['coins', 'diamonds', 'both']);
-    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge']);
+    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge', 'gift', 'entry_effect', 'vip']);
+    const allowedCategories = new Set(['normal', 'lucky', 'cp']);
     const goalMode = String(input.goalMode || 'coins');
     const rewardType = String(input.rewardType || 'none');
     if (!allowedModes.has(goalMode)) throw new BadRequestException('Invalid support chest goal mode');
@@ -581,17 +589,58 @@ export class AdminService {
     if (goalMode === 'coins' && coinTarget < 1) throw new BadRequestException('Coin target must be positive');
     if (goalMode === 'diamonds' && diamondTarget < 1) throw new BadRequestException('Diamond target must be positive');
     if (goalMode === 'both' && (coinTarget < 1 || diamondTarget < 1)) throw new BadRequestException('Both targets must be positive');
+    const giftCategories = Array.isArray(input.giftCategories)
+      ? [...new Set(input.giftCategories.map(String).filter(x => allowedCategories.has(x)))]
+      : ['normal', 'lucky', 'cp'];
+    if (!giftCategories.length) throw new BadRequestException('اختر قسماً واحداً على الأقل من أقسام الهدايا');
     const giftIds = Array.isArray(input.giftIds) ? [...new Set(input.giftIds.map(String).map(x => x.trim()).filter(Boolean))] : [];
-    if (giftIds.length) {
+    const rawLevels = Array.isArray(input.levels) ? input.levels as Record<string, any>[] : [];
+    if (rawLevels.length > 20) throw new BadRequestException('لا يمكن إعداد أكثر من 20 مستوى للصندوق');
+    const levels = rawLevels.map((level, index) => {
+      const mode = String(level.goalMode || 'coins');
+      if (!allowedModes.has(mode)) throw new BadRequestException('نوع هدف غير صالح في مستوى الصندوق');
+      const levelCoins = Math.max(0, Math.floor(Number(level.coinTarget) || 0));
+      const levelDiamonds = Math.max(0, Math.floor(Number(level.diamondTarget) || 0));
+      if ((mode === 'coins' && levelCoins < 1) || (mode === 'diamonds' && levelDiamonds < 1)
+          || (mode === 'both' && (levelCoins < 1 || levelDiamonds < 1))) {
+        throw new BadRequestException('يجب تحديد هدف صحيح لكل مستوى');
+      }
+      const categories = Array.isArray(level.giftCategories)
+        ? [...new Set(level.giftCategories.map(String).filter(x => allowedCategories.has(x)))]
+        : giftCategories;
+      if (!categories.length) throw new BadRequestException('اختر قسم هدايا لكل مستوى');
+      const rewards = Array.isArray(level.rewards) ? level.rewards.map((reward: any) => {
+        const type = String(reward?.type || '');
+        if (!allowedRewards.has(type) || type === 'none') throw new BadRequestException('نوع مكافأة غير صالح في مستوى الصندوق');
+        const amount = Math.max(1, Math.floor(Number(reward?.amount) || 1));
+        return { type, amount, itemId: String(reward?.itemId || '').trim().slice(0, 160) };
+      }) : [];
+      if (!rewards.length) throw new BadRequestException('أضف مكافأة واحدة على الأقل لكل مستوى');
+      return {
+        level: index + 1,
+        title: String(level.title || ('المستوى ' + (index + 1))).slice(0, 80),
+        goalMode: mode, coinTarget: levelCoins, diamondTarget: levelDiamonds,
+        giftCount: Math.max(1, Math.min(100000, Math.floor(Number(level.giftCount) || 1))),
+        giftCategories: categories,
+        giftIds: Array.isArray(level.giftIds) ? [...new Set(level.giftIds.map(String).filter(Boolean))] : [],
+        imageUrl: String(level.imageUrl || '').trim().slice(0, 2048),
+        rewards,
+      };
+    });
+    if (!levels.length) throw new BadRequestException('أضف مستوى واحداً على الأقل للصندوق');
+    const allGiftIds = [...new Set([...giftIds, ...levels.flatMap(x => x.giftIds)])];
+    if (allGiftIds.length) {
       const activeGifts = await this.giftsRepo.find({ where: { isActive: true } });
       const valid = new Set(activeGifts.map(g => g.id));
-      const invalid = giftIds.filter(id => !valid.has(id));
-      if (invalid.length) throw new BadRequestException('One or more gift IDs are not active JEHO catalog gifts');
+      if (allGiftIds.some(id => !valid.has(id))) {
+        throw new BadRequestException('يوجد معرّف هدية غير صالح أو غير فعال في إعدادات الصندوق');
+      }
     }
     const current = {
       enabled: input.enabled === true,
-      iconVisible: input.iconVisible === true,
+      iconVisible: input.iconVisible !== false,
       goalMode, coinTarget, diamondTarget, giftIds,
+      giftCategories, levels,
       rewardType,
       rewardItemId: String(input.rewardItemId || '').trim(),
       rewardAmount: Math.max(0, Math.floor(Number(input.rewardAmount) || 0)),
@@ -600,13 +649,13 @@ export class AdminService {
     const existing = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     if (existing) {
       existing.value = JSON.stringify(current);
-      existing.description = 'JEHO support chest configuration';
+      existing.description = 'JEHO support chest multi-level configuration';
       await this.settingsRepo.save(existing);
     } else {
       await this.settingsRepo.save(this.settingsRepo.create({
         key: 'support_chest_config',
         value: JSON.stringify(current),
-        description: 'JEHO support chest configuration',
+        description: 'JEHO support chest multi-level configuration',
       }));
     }
     return current;
