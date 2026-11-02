@@ -562,7 +562,7 @@ export class AdminService {
   async getSupportChestConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     const defaults = {
-      enabled: false, iconVisible: true, goalMode: 'coins',
+      enabled: false, iconVisible: true, soundEnabled: true, goalMode: 'coins',
       coinTarget: 100000, diamondTarget: 10000, giftIds: [], giftSelectionMode: 'all',
       giftCategories: ['normal', 'lucky', 'cp'],
       levels: [{
