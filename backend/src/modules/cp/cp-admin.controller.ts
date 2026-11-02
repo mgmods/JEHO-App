@@ -408,7 +408,7 @@ export class CpAdminController {
       mismatches.push('المستويات والصور والمكافآت');
     }
     if (body.giftId !== undefined &&
-        String(savedType?.giftId || savedType?.gift?.id || '') !== String(body.giftId || '')) {
+        String(savedType?.giftId || (savedType?.gift as Record<string, any> | undefined)?.id || '') !== String(body.giftId || '')) {
       mismatches.push('هدية CP');
     }
     if (body.giftPoints !== undefined &&
