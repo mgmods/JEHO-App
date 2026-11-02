@@ -2114,13 +2114,17 @@ export class GiftsService implements OnModuleInit {
     const globalGiftIds = Array.isArray(config.giftIds) ? config.giftIds.map(String) : [];
     const globalGiftSelectionMode = String(config.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'));
     const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
-    const classifySupportGift = (gift: Gift): 'normal' | 'lucky' | 'cp' | 'other' => {
-      const rawCategory = String(gift.category || '').toLowerCase();
-      const rawType = String(gift.type || '').toLowerCase();
+    // The dashboard exposes three support-chest sections: normal, lucky and CP.
+    // In the actual gift catalog, ordinary gifts use tab categories such as
+    // basic/fancy/luxury/bag/friend/country/agency/premium rather than "normal".
+    // Treat every non-CP, non-lucky catalog gift as a normal gift so those tabs
+    // are not silently excluded from room support progress.
+    const classifySupportGift = (gift: Gift): 'normal' | 'lucky' | 'cp' => {
+      const rawCategory = String(gift.category || '').trim().toLowerCase();
+      const rawType = String(gift.type || '').trim().toLowerCase();
       if (rawCategory === 'cp' || rawType === 'cp') return 'cp';
       if (rawType === 'lucky' || rawCategory === 'lucky') return 'lucky';
-      if (rawCategory === 'normal' || rawType === 'normal' || !rawCategory) return 'normal';
-      return 'other';
+      return 'normal';
     };
     const enrichedLevels = await Promise.all(levels.map(async (level: any, index: number) => {
       const levelCategories = Array.isArray(level.giftCategories)
@@ -2190,11 +2194,14 @@ export class GiftsService implements OnModuleInit {
       let cfg: any;
       try { cfg = JSON.parse(cfgRow.value); } catch { return null; }
       if (cfg.enabled !== true) return null;
-      const categoryRaw = String(giftCategory || '').toLowerCase();
-      const typeRaw = String(giftType || '').toLowerCase();
+      const categoryRaw = String(giftCategory || '').trim().toLowerCase();
+      const typeRaw = String(giftType || '').trim().toLowerCase();
+      // Match getSupportChestState(): catalog tab names (basic, fancy, bag,
+      // premium, etc.) all belong to the normal-gifts section unless explicitly
+      // marked lucky or CP.
       const category = categoryRaw === 'cp' || typeRaw === 'cp' ? 'cp'
         : (typeRaw === 'lucky' || categoryRaw === 'lucky') ? 'lucky'
-        : (categoryRaw === 'normal' || typeRaw === 'normal' || !categoryRaw) ? 'normal' : 'other';
+        : 'normal';
       const globalCategories = Array.isArray(cfg.giftCategories) ? cfg.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
       if (!globalCategories.includes(category)) return null;
       const globalGiftIds = Array.isArray(cfg.giftIds) ? cfg.giftIds.map(String) : [];
