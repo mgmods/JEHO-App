@@ -787,7 +787,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           roomId: data.roomId,
           event: 'challenge:wheel:closed',
           payload: { roomId: data.roomId, userId: client.userId, closedAt: new Date().toISOString() },
-          from: { userId: client.userId, username: client.username },
+          from: { userId: client.userId, username: String(profile.username || client.username || '') },
           at: new Date().toISOString(),
         });
         return { ok: true, closed: true };
@@ -811,7 +811,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         roomId: data.roomId,
         event: 'challenge:wheel:result',
         payload: wheelPayload,
-        from: { userId: client.userId, username: client.username },
+        from: { userId: client.userId, username: String(profile.username || client.username || '') },
         at: new Date().toISOString(),
       });
       return { ok: true, ...wheelPayload };
@@ -1035,6 +1035,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       payload = {
         userId: client.userId,
         displayName: profile.displayName || client.username || 'User',
+        username: profile.username || 'mysterious_man',
+        avatarUrl: profile.avatarUrl || null,
+        mysteriousMan: profile.mysteriousMan === true,
         rewardLabel: String(incoming.rewardLabel || 'جائزة').slice(0, 80),
       };
     } else if (data.event === 'room:typing') {
@@ -1045,7 +1048,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       roomId: data.roomId,
       event: data.event,
       payload,
-      from: { userId: client.userId, username: client.username },
+      from: { userId: client.userId, username: String(profile.username || client.username || '') },
       at: new Date().toISOString(),
     });
 
