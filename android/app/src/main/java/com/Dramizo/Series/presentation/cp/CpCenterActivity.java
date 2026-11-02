@@ -56,9 +56,14 @@ public class CpCenterActivity extends ThemedActivity {
                 if (!"cp:config-updated".equals(event)) return;
                 runOnUiThread(() -> {
                     if (isFinishing() || web == null || !pageReady) return;
+                    // A dashboard CP edit changes both relationship presentation/rewards
+                    // and the selectable CP catalog. Refresh every CP-backed dataset so an
+                    // already-open APK screen cannot keep showing the previous configuration.
                     loadHome();
                     loadRequests();
                     loadTasks();
+                    loadRewards();
+                    loadCatalog();
                 });
             }
         };
@@ -88,6 +93,9 @@ public class CpCenterActivity extends ThemedActivity {
                 loadHome();
                 loadRequests();
                 loadTasks();
+                // Load dashboard-managed level names, artwork and rewards on first open.
+                loadRewards();
+                loadCatalog();
             }
         });
         web.addJavascriptInterface(new CpBridge(), "JehoCP");
