@@ -3,6 +3,7 @@ package com.Dramizo.Series.util;
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.media.SoundPool;
 import android.media.ToneGenerator;
 import android.os.Handler;
@@ -17,8 +18,6 @@ public final class RoomSoundFx {
     private static int giftId;
     private static int joinId;
     private static int muteId;
-    private static int chestExplosionId;
-    private static volatile boolean chestExplosionLoaded;
     private static boolean ready;
     private static boolean loading;
 
@@ -47,12 +46,7 @@ public final class RoomSoundFx {
             giftId = loadRaw(context, "sfx_gift");
             joinId = loadRaw(context, "sfx_join");
             muteId = loadRaw(context, "sfx_mute");
-            chestExplosionId = loadRaw(context, "sfx_chest_explosion");
-            chestExplosionLoaded = false;
-            pool.setOnLoadCompleteListener((soundPool, sampleId, status) -> {
-                if (sampleId == chestExplosionId) chestExplosionLoaded = status == 0;
-            });
-            ready = clapId != 0 || giftId != 0 || joinId != 0 || muteId != 0 || chestExplosionId != 0;
+            ready = clapId != 0 || giftId != 0 || joinId != 0 || muteId != 0;
         } catch (Exception ignored) {
             ready = false;
         } finally {
@@ -110,46 +104,46 @@ public final class RoomSoundFx {
     }
     public static void playJoin(Context c) { play(c, Kind.JOIN, joinId, 0.8f); }
     public static void playMute(Context c) { play(c, Kind.MUTE, muteId, 0.7f); }
-    /** Plays the chest WAV after SoundPool finishes decoding; retries before using a tone fallback. */
+    /**
+     * Plays the bundled chest explosion directly with MediaPlayer.
+     * Unlike SoundPool, MediaPlayer prepares this short local WAV synchronously,
+     * so the first chest event cannot race asynchronous sample decoding.
+     */
     public static void playChestExplosion(Context c) {
         if (mutedFx || c == null) return;
-        init(c.getApplicationContext());
-        if (pool == null || chestExplosionId == 0) {
-            playChestFallbackTone();
-            return;
-        }
-        // Wait for Android's asynchronous WAV decode; never replace a real blast
-        // with the short fallback beep merely because the first frame arrived early.
-        playChestExplosionAttempt(0);
-    }
-
-    private static void playChestExplosionAttempt(int attempt) {
-        if (mutedFx) return;
-        try {
-            SoundPool currentPool = pool;
-            int currentSoundId = chestExplosionId;
-            if (currentPool != null && currentSoundId != 0) {
-                if (chestExplosionLoaded) {
-                    int streamId = currentPool.play(currentSoundId, 1f, 1f, 3, 0, 1f);
-                    if (streamId != 0) return;
+        Context app = c.getApplicationContext();
+        int soundRes = app.getResources().getIdentifier(
+                "sfx_chest_explosion", "raw", app.getPackageName());
+        if (soundRes != 0) {
+            MediaPlayer player = null;
+            try {
+                player = MediaPlayer.create(app, soundRes);
+                if (player != null) {
+                    player.setVolume(1.0f, 1.0f);
+                    player.setOnCompletionListener(MediaPlayer::release);
+                    player.setOnErrorListener((mp, what, extra) -> {
+                        try { mp.release(); } catch (Exception ignored) { }
+                        return true;
+                    });
+                    player.start();
+                    return;
+                }
+            } catch (Exception ignored) {
+                if (player != null) {
+                    try { player.release(); } catch (Exception ignoredAgain) { }
                 }
             }
-        } catch (Exception ignored) {
         }
-        if (attempt < 20) {
-            new Handler(Looper.getMainLooper()).postDelayed(
-                    () -> playChestExplosionAttempt(attempt + 1), 100L);
-        } else {
-            playChestFallbackTone();
-        }
+        playChestFallbackTone();
     }
 
+    /** Last-resort audible signal only if the bundled explosion file cannot be opened. */
     private static void playChestFallbackTone() {
         if (mutedFx) return;
         try {
-            ToneGenerator generator = new ToneGenerator(AudioManager.STREAM_MUSIC, 90);
-            generator.startTone(ToneGenerator.TONE_PROP_NACK, 420);
-            new Handler(Looper.getMainLooper()).postDelayed(generator::release, 520L);
+            ToneGenerator generator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
+            generator.startTone(ToneGenerator.TONE_PROP_NACK, 650);
+            new Handler(Looper.getMainLooper()).postDelayed(generator::release, 760L);
         } catch (Exception ignored) {
         }
     }
@@ -207,6 +201,6 @@ public final class RoomSoundFx {
         }
         ready = false;
         loading = false;
-        clapId = giftId = joinId = muteId = chestExplosionId = 0;
+        clapId = giftId = joinId = muteId = 0;
     }
 }
