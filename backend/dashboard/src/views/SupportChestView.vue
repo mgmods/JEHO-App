@@ -64,8 +64,8 @@
       </article>
     </section>
     <section class="card p-4 mt-3"><h2>مكافأة الفائز</h2>
-      <label class="field">نوع المكافأة<select v-model="form.rewardType" @change="form.rewardItemId = ''"><option value="none">بدون مكافأة تلقائية</option><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="frame">إطار ملف شخصي</option><option value="badge">شارة</option><option value="gift">هدية من الكتالوج</option></select></label>
-      <div v-if="['frame','badge','gift','entry_effect'].includes(form.rewardType)" class="field">
+      <label class="field">نوع المكافأة<select v-model="form.rewardType" @change="form.rewardItemId = ''"><option value="none">بدون مكافأة تلقائية</option><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="frame">إطار ملف شخصي</option><option value="badge">شارة</option><option value="vip">VIP</option></select></label>
+      <div v-if="['frame','badge'].includes(form.rewardType)" class="field">
         <span>اختر المكافأة المرئية</span>
         <div v-if="catalogLoading" class="muted">جارٍ تحميل الكتالوج…</div>
         <div v-else class="item-picker">
@@ -80,6 +80,7 @@
           <div v-if="!rewardItems.length" class="muted">لا توجد عناصر من هذا النوع في الكتالوج.</div>
         </div>
       </div>
+      <label v-if="form.rewardType === 'vip'" class="field">معرّف خطة VIP<input v-model="form.rewardItemId" placeholder="VIP Plan ID"></label>
       <label class="field">كمية المكافأة<input v-model.number="form.rewardAmount" type="number" min="0"></label>
       <label class="field">تعليمات الصندوق<textarea v-model="form.instructions" rows="4"></textarea></label>
     </section>
