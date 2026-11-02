@@ -2288,7 +2288,7 @@ export class GiftsService implements OnModuleInit {
             }));
             granted.push({
               type: 'gift', itemId: gift.id, amount, name: gift.name,
-              imageUrl: gift.animationUrl || gift.iconUrl || null,
+              imageUrl: gift.iconUrl || gift.animationUrl || null,
               iconUrl: gift.iconUrl || null, animationUrl: gift.animationUrl || null,
             });
           } else if (rewardType === 'vip') {
@@ -2366,7 +2366,7 @@ export class GiftsService implements OnModuleInit {
             giftName: awardedGift.name, giftType: 'normal',
             giftIconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
             iconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
-            animationUrl: awardedGift.animationUrl || awardedGift.imageUrl || null,
+            animationUrl: awardedGift.animationUrl || null,
             senderId: win.winnerId, senderName: 'صندوق الدعم', senderAvatarUrl: null,
             receiverId: win.winnerId,
             receiverName: winnerUser?.displayName || winnerUser?.username || win.winnerName,
