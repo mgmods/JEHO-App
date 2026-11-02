@@ -2256,7 +2256,8 @@ export class GiftsService implements OnModuleInit {
         const rewards = Array.isArray(levelCfg.rewards)
           ? levelCfg.rewards.filter((entry: any) => entry && String(entry.type || '') !== 'none')
           : [];
-        if (!rewards.length) throw new BadRequestException('لا توجد جوائز محددة لهذا المستوى');
+        // An empty reward list must not block the completed level from opening.
+        // The room still receives the opening event and the next level can start.
         // Every reward configured for this level is granted to the final contributor.
         const granted: any[] = [];
         for (let rewardIndex = 0; rewardIndex < rewards.length; rewardIndex++) {
