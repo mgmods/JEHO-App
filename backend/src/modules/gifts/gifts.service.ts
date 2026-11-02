@@ -2077,7 +2077,7 @@ export class GiftsService implements OnModuleInit {
     const levels = configuredLevels.map((level: any, index: number) => ({
       ...defaultLevels[index], ...level, level: index + 1,
       features: Array.isArray(level.features) ? level.features.map((x: any) => String(x || '').trim()).filter(Boolean)
-        : String(level.featuresText || '').split(/\\r?\\n/).map((x: string) => x.trim()).filter(Boolean),
+        : String(level.featuresText || '').split(/\r?\n/).map((x: string) => x.trim()).filter(Boolean),
       rewards: Array.isArray(level.rewards) ? level.rewards : [],
     }));
 
