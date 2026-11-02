@@ -259,6 +259,37 @@
                     <input v-model.number="level.giftBonusPercent" class="form-control" type="number" min="0" max="500" @change="syncLevelEditor(item)">
                   </div>
                   <div class="col-12">
+                    <div class="border rounded-3 p-3">
+                      <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+                        <strong>مؤثر المقاعد لهذا المستوى</strong>
+                        <label class="form-check form-switch mb-0">
+                          <input v-model="level.seatEffect.enabled" class="form-check-input" type="checkbox" @change="syncLevelEditor(item)">
+                          <span class="form-check-label">{{ level.seatEffect.enabled ? 'مفعّل' : 'متوقف' }}</span>
+                        </label>
+                      </div>
+                      <p class="form-text">يظهر هذا المؤثر المتحرك بين مقعدي الشريكين فقط عندما يجلسان معاً في الروم، ويُختار حسب مستوى العلاقة الحالي.</p>
+                      <div class="row g-2 align-items-end">
+                        <div class="col-md-6">
+                          <label class="form-label">صورة أو GIF أو WebP للمؤثر</label>
+                          <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" @change="uploadLevelAsset(item,level,'seatEffectUrl',$event)">
+                          <input v-model.trim="level.seatEffect.url" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط مؤثر هذا المستوى" @change="syncLevelEditor(item)">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label">حجم الحركة (dp)</label>
+                          <input v-model.number="level.seatEffect.sizeDp" class="form-control" type="number" min="20" max="72" @change="syncLevelEditor(item)">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label">سرعة الدورة (ms)</label>
+                          <input v-model.number="level.seatEffect.durationMs" class="form-control" type="number" min="500" max="10000" step="100" @change="syncLevelEditor(item)">
+                        </div>
+                        <div v-if="level.seatEffect.url" class="col-12 d-flex align-items-center gap-3">
+                          <img :src="level.seatEffect.url" alt="معاينة مؤثر مقاعد المستوى" style="width:72px;height:72px;object-fit:contain;background:#111;border-radius:12px;padding:6px">
+                          <span class="small text-secondary">معاينة المؤثر الخاص بالمستوى {{ level.level }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-12">
                     <div class="cp-level-live-preview border rounded-3 p-3">
                       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                         <strong>معاينة مباشرة للمستوى {{ level.level }}</strong>
@@ -693,6 +724,7 @@ function addLevel(item) {
     name: '',
     presentation: { title: '', levelLogoUrl: '', frameUrl: '', cardBackgroundUrl: '', nameColor: '#ffffff', nameGlow: false },
     giftPresentation: { animationUrl: '', showPartnerAvatars: true },
+    seatEffect: { enabled: true, url: '', sizeDp: 28, durationMs: 1800 },
     rewardGiftId: '',
     rewardGiftIds: [],
     rewardCosmeticCode: '',
@@ -762,7 +794,7 @@ async function load() {
       levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => {
         const benefits = [...(Array.isArray(level.benefits) ? level.benefits : []), ...(Array.isArray(level.rewards) ? level.rewards : [])]
         const rewardCosmeticCodes = Array.from(new Set([level.rewardCosmeticCode, ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
-        return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardGiftIds: Array.from(new Set([...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []), level.rewardGiftId || level.giftId || ''].map(id => String(id || '').trim()).filter(Boolean))), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
+        return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, seatEffect: { enabled: true, sizeDp: 28, durationMs: 1800, ...(level.seatEffect || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardGiftIds: Array.from(new Set([...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []), level.rewardGiftId || level.giftId || ''].map(id => String(id || '').trim()).filter(Boolean))), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
       }),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
       seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
@@ -859,6 +891,7 @@ function syncLevelEditor(item) {
     name: String(level.name ?? '').trim(),
     presentation: { ...(level.presentation || {}) },
     giftPresentation: { ...(level.giftPresentation || {}) },
+    seatEffect: { enabled: true, sizeDp: 28, durationMs: 1800, ...(level.seatEffect || {}) },
     giftBonusPercent: Math.max(0, Math.min(500, Number(level.giftBonusPercent) || 0)),
     rewardGiftIds: Array.from(new Set((Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []).map(id => String(id || '').trim()).filter(Boolean))),
     rewardGiftId: String((Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds[0] : '') || ''),
@@ -891,6 +924,7 @@ async function uploadLevelAsset(item, level, field, event) {
     if (!uploadedUrl) throw new Error('رد رفع الصورة غير مكتمل.')
     const finalUrl = /^https?:\/\//i.test(uploadedUrl) ? uploadedUrl : new URL(uploadedUrl, window.location.origin).toString()
     if (field === 'giftAnimationUrl') level.giftPresentation = { ...(level.giftPresentation || {}), animationUrl: finalUrl }
+    else if (field === 'seatEffectUrl') level.seatEffect = { enabled: true, sizeDp: 28, durationMs: 1800, ...(level.seatEffect || {}), url: finalUrl }
     else level.presentation = { ...(level.presentation || {}), [field]: finalUrl }
     syncLevelEditor(item)
     success.value = 'تم رفع أصل المستوى. احفظ إعدادات النوع لاعتماده.'
@@ -983,6 +1017,7 @@ async function saveType(item) {
       ...level,
       presentation: { ...(level.presentation || {}) },
       giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) },
+      seatEffect: { enabled: true, sizeDp: 28, durationMs: 1800, ...(level.seatEffect || {}) },
       rewardGiftIds: Array.from(new Set([
         ...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []),
         level.rewardGiftId || level.giftId || '',
