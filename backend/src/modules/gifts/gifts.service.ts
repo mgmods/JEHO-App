@@ -2687,7 +2687,7 @@ export class GiftsService implements OnModuleInit {
     // No platform commission fields are returned to gift clients.
     // The host payout and any agency bonus are independent credits.
 
-    return this.runGiftTransaction(async (manager) => {
+    const sendResult = await this.runGiftTransaction(async (manager) => {
       // Lock both accounts in deterministic order before taking row-level wallet locks.
       await this.lockGiftWalletUsers(manager, [senderId, dto.receiverId]);
       const wallet = await manager.findOne(Wallet, {
@@ -3294,16 +3294,31 @@ export class GiftsService implements OnModuleInit {
         }
       }
       this.realtime?.emitToUser(dto.receiverId, 'gift:animation', animationPayload);
-      if (dto.roomId) {
-        try {
-          await this.applySupportChestGift(dto.roomId, String(dto.giftId), Number(result.totalCoins || 0), Number(result.hostDiamonds || 0), senderId, gift.category, gift.type, qty);
-        } catch (error) {
-          this.log.error('Support chest progress update failed', error instanceof Error ? error.stack : String(error));
-        }
-      }
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
       return result;
     });
+
+    // Apply support-chest progress only after the gift wallet transaction commits.
+    // The previous nested transaction tried to lock the sender wallet while the
+    // outer gift transaction still held that same wallet lock. At the goal this
+    // blocked reward granting and prevented the room opening event from being sent.
+    if (dto.roomId && !sendResult?.alreadyProcessed) {
+      try {
+        await this.applySupportChestGift(
+          dto.roomId,
+          String(dto.giftId),
+          Number(sendResult?.totalCoins || 0),
+          Number(sendResult?.hostDiamonds || 0),
+          senderId,
+          gift.category,
+          gift.type,
+          qty,
+        );
+      } catch (error) {
+        this.log.error('Support chest progress update failed after gift commit', error instanceof Error ? error.stack : String(error));
+      }
+    }
+    return sendResult;
   }
 
   /**
