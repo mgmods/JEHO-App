@@ -90,7 +90,6 @@ function setMode(key){
  }
  percent.textContent=p+'%';fill.style.width=p+'%';
  document.getElementById('giftCountProgress').textContent=formatNum(countNow)+' / '+formatNum(countMax);
- document.getElementById('level').textContent=String(selectedLevelIndex+1);
  document.querySelector('.level').innerHTML='المستوى '+(selectedLevelIndex+1)+' · '+escHtml(lv.title||'صندوق الدعم')+(locked?' · 🔒 مقفول':(selectedLevelIndex<currentLevelIndex?' · مكتمل':' · الحالي'));
 }
 function setChestArt(url){
