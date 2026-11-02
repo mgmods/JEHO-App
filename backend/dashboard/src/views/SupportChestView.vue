@@ -107,7 +107,63 @@ onMounted(async()=>{
   catch(e){if(!error.value)error.value='تعذّر تحميل كتالوج الهدايا والإطارات: '+String(e?.message||'خطأ غير معروف')}
   finally{catalogLoading.value=false}
 })
-async function save(){saving.value=true;error.value='';notice.value='';try{const payload={...form,giftIds:(form.giftIds||[]).map(String),giftSelectionMode:form.giftSelectionMode||'all',giftCategories:(form.giftCategories||[]).map(String),levels:(form.levels||[]).map((x,i)=>({...x,level:i+1,giftIds:(x.giftIds||[]).map(String),giftSelectionMode:x.giftSelectionMode||((x.giftIds||[]).length?'selected':'all'),giftCategories:(x.giftCategories||[]).map(String),features:String(x.featuresText||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean),rewards:(x.rewards||[]).map(r=>({...r,amount:['frame','badge'].includes(String(r.type))?1:Math.max(1,Math.floor(Number(r.amount)||1)),itemId:String(r.itemId||'').trim()}))}))};const result=await supportChestApi.saveConfig(payload);if(result?.error)throw result.error;const saved=result?.data;if(!saved||!Array.isArray(saved.levels)||saved.levels.length!==payload.levels.length||saved.enabled!==payload.enabled||Boolean(saved.soundEnabled!==false)!==Boolean(payload.soundEnabled!==false)||String(saved.giftSelectionMode||'all')!==String(payload.giftSelectionMode)||JSON.stringify(saved.giftIds||[])!==JSON.stringify(payload.giftIds)||JSON.stringify(saved.giftCategories||[])!==JSON.stringify(payload.giftCategories)||payload.levels.some((level,i)=>{const actual=saved.levels[i];return !actual||Number(actual.level)!==Number(level.level)||String(actual.title||'')!==String(level.title||'')||String(actual.goalMode)!==String(level.goalMode)||Number(actual.coinTarget)!==Number(level.coinTarget)||Number(actual.diamondTarget)!==Number(level.diamondTarget)||Number(actual.giftCount)!==Number(level.giftCount)||String(actual.giftSelectionMode||'all')!==String(level.giftSelectionMode||'all')||JSON.stringify([...(actual.giftIds||[])].map(String).sort())!==JSON.stringify([...(level.giftIds||[])].map(String).sort())||JSON.stringify([...(actual.giftCategories||[])].map(String).sort())!==JSON.stringify([...(level.giftCategories||[])].map(String).sort())||String(actual.imageUrl||'')!==String(level.imageUrl||'')||JSON.stringify(actual.features||[])!==JSON.stringify(level.features||[])||JSON.stringify(actual.rewards||[])!==JSON.stringify(level.rewards||[])}))throw new Error('لم تتطابق إعدادات الصندوق بعد إعادة قراءتها من الخادم.');Object.assign(form,saved);form.giftIds=Array.isArray(saved.giftIds)?saved.giftIds.map(String):[];form.giftCategories=Array.isArray(saved.giftCategories)?saved.giftCategories.map(String):[];form.levels=(saved.levels||[]).map(level=>({...level,featuresText:String(level.featuresText||(Array.isArray(level.features)?level.features.join('\n'):'')||''),giftIds:Array.isArray(level.giftIds)?level.giftIds.map(String):[],giftSelectionMode:String(level.giftSelectionMode||((level.giftIds||[]).length?'selected':'all')),giftCategories:Array.isArray(level.giftCategories)?level.giftCategories.map(String):[...form.giftCategories],rewards:Array.isArray(level.rewards)?level.rewards:[]}));notice.value='تم حفظ إعدادات صندوق الدعم بنجاح.'}catch(e){error.value='فشل الحفظ أو التحقق من إعدادات صندوق الدعم: '+String(e?.response?.data?.message||e?.message||'خطأ غير معروف')}finally{saving.value=false}}
+function canonicalLevel(level){
+  const uniqueStrings=(values)=>[...new Set((Array.isArray(values)?values:[]).map(v=>String(v??'').trim()).filter(Boolean))];
+  return {
+    level:Number(level?.level)||0,
+    title:String(level?.title||'').slice(0,80),
+    goalMode:String(level?.goalMode||'coins'),
+    coinTarget:Math.max(0,Math.floor(Number(level?.coinTarget)||0)),
+    diamondTarget:Math.max(0,Math.floor(Number(level?.diamondTarget)||0)),
+    giftCount:Math.max(1,Math.min(100000,Math.floor(Number(level?.giftCount)||1))),
+    giftCategories:uniqueStrings(level?.giftCategories).sort(),
+    giftSelectionMode:String(level?.giftSelectionMode||((level?.giftIds||[]).length?'selected':'all')),
+    giftIds:uniqueStrings(level?.giftIds).sort(),
+    imageUrl:String(level?.imageUrl||'').trim().slice(0,2048),
+    features:uniqueStrings(level?.features ?? String(level?.featuresText||'').split(/\r?\n/)).slice(0,20),
+    rewards:(Array.isArray(level?.rewards)?level.rewards:[]).map(r=>({
+      type:String(r?.type||''),
+      amount:['frame','badge'].includes(String(r?.type))?1:Math.max(1,Math.floor(Number(r?.amount)||1)),
+      itemId:String(r?.itemId||'').trim().slice(0,160),
+    })),
+  };
+}
+function canonicalConfig(config){
+  const uniqueStrings=(values)=>[...new Set((Array.isArray(values)?values:[]).map(v=>String(v??'').trim()).filter(Boolean))];
+  return {
+    enabled:config?.enabled===true,
+    iconVisible:config?.iconVisible!==false,
+    soundEnabled:config?.soundEnabled!==false,
+    goalMode:String(config?.goalMode||'coins'),
+    coinTarget:Math.max(0,Math.floor(Number(config?.coinTarget)||0)),
+    diamondTarget:Math.max(0,Math.floor(Number(config?.diamondTarget)||0)),
+    giftIds:uniqueStrings(config?.giftIds).sort(),
+    giftSelectionMode:String(config?.giftSelectionMode||((config?.giftIds||[]).length?'selected':'all')),
+    giftCategories:uniqueStrings(config?.giftCategories).sort(),
+    rewardType:String(config?.rewardType||'none'),
+    rewardItemId:String(config?.rewardItemId||'').trim(),
+    rewardAmount:Math.max(0,Math.floor(Number(config?.rewardAmount)||0)),
+    instructions:String(config?.instructions||'').slice(0,3000),
+    levels:(Array.isArray(config?.levels)?config.levels:[]).map(canonicalLevel),
+  };
+}
+async function save(){
+  saving.value=true;error.value='';notice.value='';
+  try{
+    const payload={...form,giftIds:(form.giftIds||[]).map(String),giftSelectionMode:form.giftSelectionMode||'all',giftCategories:(form.giftCategories||[]).map(String),levels:(form.levels||[]).map((x,i)=>({...x,level:i+1,giftIds:(x.giftIds||[]).map(String),giftSelectionMode:x.giftSelectionMode||((x.giftIds||[]).length?'selected':'all'),giftCategories:(x.giftCategories||[]).map(String),features:String(x.featuresText||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean),rewards:(x.rewards||[]).map(r=>({type:String(r.type||''),amount:['frame','badge'].includes(String(r.type))?1:Math.max(1,Math.floor(Number(r.amount)||1)),itemId:String(r.itemId||'').trim()}))}))};
+    const result=await supportChestApi.saveConfig(payload);
+    if(result?.error)throw result.error;
+    const saved=result?.data;
+    if(!saved||!Array.isArray(saved.levels)||saved.levels.length!==3)throw new Error('الخادم لم يُرجع نسخة الإعدادات المحفوظة كاملة؛ لم نعرض نجاحاً غير مؤكد.');
+    if(JSON.stringify(canonicalConfig(saved))!==JSON.stringify(canonicalConfig(payload)))throw new Error('الخادم حفظ نسخة مختلفة عن الإعدادات المرسلة. لم نعرض نجاحاً غير مؤكد.');
+    Object.assign(form,saved);
+    form.giftIds=Array.isArray(saved.giftIds)?saved.giftIds.map(String):[];
+    form.giftCategories=Array.isArray(saved.giftCategories)?saved.giftCategories.map(String):[];
+    form.levels=(saved.levels||[]).map(level=>({...level,featuresText:String(level.featuresText||(Array.isArray(level.features)?level.features.join('\n'):'')||''),giftIds:Array.isArray(level.giftIds)?level.giftIds.map(String):[],giftSelectionMode:String(level.giftSelectionMode||((level.giftIds||[]).length?'selected':'all')),giftCategories:Array.isArray(level.giftCategories)?level.giftCategories.map(String):[...form.giftCategories],rewards:Array.isArray(level.rewards)?level.rewards:[]}));
+    notice.value='تم حفظ إعدادات صندوق الدعم والتحقق من النسخة المحفوظة بنجاح.';
+  }catch(e){error.value='فشل حفظ إعدادات صندوق الدعم: '+String(e?.response?.data?.message||e?.message||'خطأ غير معروف')}
+  finally{saving.value=false}
+}
 </script>
 <style scoped>
 .page-shell{max-width:980px;margin:auto;padding:22px}.page-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}.page-header h1{margin:0 0 5px}.page-header p,.muted{color:var(--text-muted,#888);font-size:13px}.card{background:var(--surface,#fff);border:1px solid var(--border,#ddd);border-radius:16px;margin-bottom:14px}.card h2{font-size:17px;margin:0 0 16px}.switchrow{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border,#eee)}.switchrow span{display:grid;gap:4px}.switchrow small{color:var(--text-muted,#888)}.field{display:grid;gap:7px;margin:15px 0;font-weight:600}.field input,.field select,.field textarea{width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--border,#ccc);background:var(--surface,#fff);color:inherit}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.foot{line-height:1.7}.category-picks{display:flex;gap:18px;flex-wrap:wrap;padding:10px 0}.category-picks label{display:flex;align-items:center;gap:7px}.levels-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.level-editor{border:1px solid var(--border,#ddd);border-radius:13px;padding:14px;margin:12px 0}.level-art-preview{display:flex;align-items:center;gap:12px;margin:8px 0 14px;padding:10px;border:1px dashed var(--border,#bbb);border-radius:12px}.level-art-preview img,.level-art-preview video{width:76px;height:76px;object-fit:contain;border-radius:10px;background:#171724}.level-art-preview span{font-size:12px;color:var(--text-muted,#888)}.reward-editor{background:var(--surface-alt,#f7f7f7);padding:12px;border-radius:12px}.reward-line{display:grid;grid-template-columns:1fr 1fr 1.5fr auto;gap:10px;align-items:end;border-bottom:1px solid var(--border,#ddd);padding:8px 0}.preview-rewards{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px}.preview-reward-card{display:flex;min-width:0;min-height:112px;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;border:1px solid var(--border,#ddd);border-radius:12px;background:var(--surface,#fff);text-align:center}.preview-reward-card img,.preview-reward-card video{width:52px;height:52px;object-fit:contain}.preview-reward-card strong{font-size:12px;overflow-wrap:anywhere}.preview-reward-card small{font-size:11px;color:var(--text-muted,#888)}.preview-reward-icon{display:grid;place-items:center;width:52px;height:52px;font-size:30px}.item-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}.pick-card{position:relative;display:flex;min-width:0;flex-direction:column;align-items:center;gap:6px;padding:10px;border:1px solid var(--border,#ddd);border-radius:12px;cursor:pointer;text-align:center;background:var(--surface,#fff)}.pick-card.selected{border-color:#35a7e6;box-shadow:0 0 0 2px #35a7e622}.pick-card input{align-self:flex-start}.pick-card img,.pick-card video{width:62px;height:62px;object-fit:contain}.pick-card strong{font-size:12px;overflow-wrap:anywhere}.pick-card small{font-size:11px;color:var(--text-muted,#888)}.pick-placeholder{display:grid;place-items:center;width:62px;height:62px;font-size:30px}@media(max-width:650px){.page-header{align-items:flex-start;flex-direction:column}.grid2,.reward-line{grid-template-columns:1fr}.levels-head{align-items:flex-start;flex-wrap:wrap}}
