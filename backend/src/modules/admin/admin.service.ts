@@ -563,12 +563,12 @@ export class AdminService {
     const row = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     const defaults = {
       enabled: false, iconVisible: true, goalMode: 'coins',
-      coinTarget: 100000, diamondTarget: 10000, giftIds: [],
+      coinTarget: 100000, diamondTarget: 10000, giftIds: [], giftSelectionMode: 'all',
       giftCategories: ['normal', 'lucky', 'cp'],
       levels: [{
         level: 1, title: 'الصندوق الذهبي', goalMode: 'coins',
         coinTarget: 100000, diamondTarget: 0, giftCount: 1,
-        giftCategories: ['normal', 'lucky', 'cp'], giftIds: [], imageUrl: '',
+        giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '',
         rewards: [{ type: 'coins', amount: 5000, itemId: '' }],
       }],
       rewardType: 'none', rewardItemId: '', rewardAmount: 0,
@@ -599,7 +599,7 @@ export class AdminService {
     const giftSelectionMode = String(input.giftSelectionMode || (giftIds.length ? 'selected' : 'all')) === 'selected' ? 'selected' : 'all';
     if (giftSelectionMode === 'selected' && !giftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل أو اختر جميع الهدايا');
     const rawLevels = Array.isArray(input.levels) ? input.levels as Record<string, any>[] : [];
-    if (rawLevels.length > 20) throw new BadRequestException('لا يمكن إعداد أكثر من 20 مستوى للصندوق');
+    if (rawLevels.length > 2) throw new BadRequestException('صندوق الدعم يدعم صفحتين فقط حالياً: المستوى الأول والمستوى الثاني');
     const levels = rawLevels.map((level, index) => {
       const mode = String(level.goalMode || 'coins');
       if (!allowedModes.has(mode)) throw new BadRequestException('نوع هدف غير صالح في مستوى الصندوق');
