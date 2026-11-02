@@ -65,27 +65,6 @@
         </div>
       </article>
     </section>
-    <section class="card p-4 mt-3"><h2>مكافأة الفائز</h2>
-      <label class="field">نوع المكافأة<select v-model="form.rewardType" @change="form.rewardItemId = ''"><option value="none">بدون مكافأة تلقائية</option><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="frame">إطار ملف شخصي</option><option value="badge">شارة</option><option value="vip">VIP</option></select></label>
-      <div v-if="['frame','badge'].includes(form.rewardType)" class="field">
-        <span>اختر المكافأة المرئية</span>
-        <div v-if="catalogLoading" class="muted">جارٍ تحميل الكتالوج…</div>
-        <div v-else class="item-picker">
-          <label v-for="item in rewardItems" :key="item.id || item.code" class="pick-card" :class="{ selected: String(form.rewardItemId) === String(item.id || item.code) }">
-            <input type="radio" name="support-reward-item" :checked="String(form.rewardItemId) === String(item.id || item.code)" @change="form.rewardItemId = String(item.id || item.code)">
-            <video v-if="isVideo(itemImage(item))" :src="assetUrl(itemImage(item))" muted autoplay loop playsinline />
-            <img v-else-if="itemImage(item)" :src="assetUrl(itemImage(item))" :alt="itemName(item)" loading="lazy">
-            <span v-else class="pick-placeholder">{{ form.rewardType === 'badge' ? '🏅' : '🎁' }}</span>
-            <strong>{{ itemName(item) }}</strong>
-            <small>{{ item.type || item.category || form.rewardType }}</small>
-          </label>
-          <div v-if="!rewardItems.length" class="muted">لا توجد عناصر من هذا النوع في الكتالوج.</div>
-        </div>
-      </div>
-      <label v-if="form.rewardType === 'vip'" class="field">معرّف خطة VIP<input v-model="form.rewardItemId" placeholder="VIP Plan ID"></label>
-      <label class="field">كمية المكافأة<input v-model.number="form.rewardAmount" type="number" min="0"></label>
-      <label class="field">تعليمات الصندوق<textarea v-model="form.instructions" rows="4"></textarea></label>
-    </section>
     <p class="muted foot">يعرض كل مستوى جميع الجوائز المحددة للمعاينة، ثم يسحب الخادم جائزة واحدة عشوائياً دون تكرار حتى تُسحب بقية جوائز المستوى. تُسجّل الهدية المجانية في سجل هدايا الفائز وتصل إليه بإشعار ومؤثر داخل الروم.</p>
   </div>
 </template>
@@ -98,7 +77,7 @@ const catalogGifts=ref([]), catalogCosmetics=ref([]), catalogVipPlans=ref([]), c
 const saving=ref(false), error=ref(''), notice=ref('')
 function unwrap(r){const d=r?.data?.data ?? r?.data ?? r;return Array.isArray(d)?d:(Array.isArray(d?.items)?d.items:(Array.isArray(d?.data)?d.data:[]))}
 function itemName(item){return item?.nameAr || item?.labelAr || item?.name || item?.title || item?.code || 'عنصر'}
-function itemImage(item){return item?.animationUrl || item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.assetUrl || item?.url || ''}
+function itemImage(item){return item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.animationUrl || item?.assetUrl || item?.url || ''}
 function assetUrl(value){return resolveAsset(value)}
 function isVideo(value){return /\.(mp4|webm)(\?|$)/i.test(String(value||''))}
 function addLevel(){const next=Math.max(0,...form.levels.map(x=>Number(x.level)||0))+1;form.levels.push({level:next,title:'المستوى '+next,goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:[...(form.giftCategories||['normal'])],giftSelectionMode:'all',giftIds:[],imageUrl:'',rewards:[{type:'coins',amount:5000,itemId:''}]})}
