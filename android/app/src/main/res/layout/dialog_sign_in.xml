@@ -5,6 +5,14 @@
     android:paddingHorizontal="16dp"
     android:paddingVertical="12dp">
 
+    <ImageView
+        android:id="@+id/imgDialogBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:contentDescription="@null" />
+
     <LinearLayout
         android:id="@+id/clSignIn"
         android:layout_width="match_parent"
@@ -16,16 +24,32 @@
         android:orientation="vertical"
         android:paddingBottom="20dp">
 
-        <TextView
-            android:id="@+id/tvTitle2"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:background="@drawable/bg_sign_in_header"
-            android:gravity="center"
-            android:text="@string/check_in_title"
-            android:textColor="#FFFFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:layout_height="76dp"
+            android:background="@drawable/bg_sign_in_header">
+
+            <TextView
+                android:id="@+id/tvTitle2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingHorizontal="64dp"
+                android:text="@string/check_in_title"
+                android:textColor="#FFFFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/imgSignLogo"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_gravity="start|center_vertical"
+                android:layout_marginStart="14dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone"
+                android:contentDescription="شعار مكافآت تسجيل الدخول" />
+        </FrameLayout>
 
         <TextView
             android:layout_width="match_parent"
