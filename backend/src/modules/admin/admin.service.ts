@@ -580,7 +580,7 @@ export class AdminService {
 
   async patchSupportChestConfig(input: Record<string, unknown>) {
     const allowedModes = new Set(['coins', 'diamonds', 'both']);
-    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge', 'vip']);
+    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge', 'vip', 'gift']);
     const allowedCategories = new Set(['normal', 'lucky', 'cp']);
     const goalMode = String(input.goalMode || 'coins');
     const rewardType = String(input.rewardType || 'none');
@@ -596,6 +596,8 @@ export class AdminService {
       : ['normal', 'lucky', 'cp'];
     if (!giftCategories.length) throw new BadRequestException('اختر قسماً واحداً على الأقل من أقسام الهدايا');
     const giftIds = Array.isArray(input.giftIds) ? [...new Set(input.giftIds.map(String).map(x => x.trim()).filter(Boolean))] : [];
+    const giftSelectionMode = String(input.giftSelectionMode || (giftIds.length ? 'selected' : 'all')) === 'selected' ? 'selected' : 'all';
+    if (giftSelectionMode === 'selected' && !giftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل أو اختر جميع الهدايا');
     const rawLevels = Array.isArray(input.levels) ? input.levels as Record<string, any>[] : [];
     if (rawLevels.length > 20) throw new BadRequestException('لا يمكن إعداد أكثر من 20 مستوى للصندوق');
     const levels = rawLevels.map((level, index) => {
@@ -608,15 +610,18 @@ export class AdminService {
         throw new BadRequestException('يجب تحديد هدف صحيح لكل مستوى');
       }
       const categories = Array.isArray(level.giftCategories)
-        ? [...new Set(level.giftCategories.map(String).filter(x => allowedCategories.has(x)))]
+        ? [...new Set(level.giftCategories.map(String).filter(x => allowedCategories.has(x) && giftCategories.includes(x)))]
         : giftCategories;
-      if (!categories.length) throw new BadRequestException('اختر قسم هدايا لكل مستوى');
+      if (!categories.length) throw new BadRequestException('اختر قسماً مشتركاً واحداً على الأقل للهدايا العامة ولهذا المستوى');
+      const levelGiftIds = Array.isArray(level.giftIds) ? [...new Set(level.giftIds.map(String).map(x => x.trim()).filter(Boolean))] : [];
+      const levelGiftSelectionMode = String(level.giftSelectionMode || (levelGiftIds.length ? 'selected' : 'all')) === 'selected' ? 'selected' : 'all';
+      if (levelGiftSelectionMode === 'selected' && !levelGiftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل لهذا المستوى أو اختر جميع الهدايا');
       const rewards = Array.isArray(level.rewards) ? level.rewards.map((reward: any) => {
         const type = String(reward?.type || '');
         if (!allowedRewards.has(type) || type === 'none') throw new BadRequestException('نوع مكافأة غير صالح في مستوى الصندوق');
         const amount = ['frame', 'badge'].includes(type) ? 1 : Math.max(1, Math.floor(Number(reward?.amount) || 1));
         const itemId = String(reward?.itemId || '').trim().slice(0, 160);
-        if (['frame', 'badge', 'vip'].includes(type) && !itemId) throw new BadRequestException('حدد العنصر المطلوب لكل مكافأة تجميلية أو VIP');
+        if (['frame', 'badge', 'vip', 'gift'].includes(type) && !itemId) throw new BadRequestException('حدد العنصر المطلوب لكل مكافأة');
         return { type, amount, itemId };
       }) : [];
       if (!rewards.length) throw new BadRequestException('أضف مكافأة واحدة على الأقل لكل مستوى');
@@ -626,7 +631,8 @@ export class AdminService {
         goalMode: mode, coinTarget: levelCoins, diamondTarget: levelDiamonds,
         giftCount: Math.max(1, Math.min(100000, Math.floor(Number(level.giftCount) || 1))),
         giftCategories: categories,
-        giftIds: Array.isArray(level.giftIds) ? [...new Set(level.giftIds.map(String).filter(Boolean))] : [],
+        giftSelectionMode: levelGiftSelectionMode,
+        giftIds: levelGiftIds,
         imageUrl: String(level.imageUrl || '').trim().slice(0, 2048),
         rewards,
       };
@@ -635,6 +641,7 @@ export class AdminService {
     const frameIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'frame').map(r => r.itemId)))];
     const badgeIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'badge').map(r => r.itemId)))];
     const vipIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'vip').map(r => r.itemId)))];
+    const rewardGiftIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'gift').map(r => r.itemId)))];
     if (frameIds.length) {
       const active = await this.dataSource.getRepository(Cosmetic).find({ where: { id: In(frameIds), isActive: true } });
       if (active.length !== frameIds.length) throw new BadRequestException('تأكد أن كل الإطارات المختارة موجودة وفعالة');
@@ -647,7 +654,7 @@ export class AdminService {
       const active = await this.vipRepo.find({ where: { id: In(vipIds), isActive: true } });
       if (active.length !== vipIds.length) throw new BadRequestException('تأكد أن كل خطط VIP المختارة موجودة وفعالة');
     }
-    const allGiftIds = [...new Set([...giftIds, ...levels.flatMap(x => x.giftIds)])];
+    const allGiftIds = [...new Set([...giftIds, ...levels.flatMap(x => x.giftIds), ...rewardGiftIds])];
     if (allGiftIds.length) {
       const activeGifts = await this.giftsRepo.find({ where: { isActive: true } });
       const valid = new Set(activeGifts.map(g => g.id));
@@ -658,7 +665,7 @@ export class AdminService {
     const current = {
       enabled: input.enabled === true,
       iconVisible: input.iconVisible !== false,
-      goalMode, coinTarget, diamondTarget, giftIds,
+      goalMode, coinTarget, diamondTarget, giftIds, giftSelectionMode,
       giftCategories, levels,
       rewardType,
       rewardItemId: String(input.rewardItemId || '').trim(),
