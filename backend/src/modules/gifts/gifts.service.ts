@@ -2081,49 +2081,32 @@ export class GiftsService implements OnModuleInit {
       rewards: Array.isArray(level.rewards) ? level.rewards : [],
     }));
 
-    const key = 'support_chest_global';
+    // Each room owns an independent progress record. Keep the historical per-room
+    // key so any valid room-specific progress from older builds remains intact.
+    const key = `support_chest_room:${roomId}`;
     let row = await this.settingsRepo.findOne({ where: { key } });
     if (!row) {
       await this.dataSource.transaction(async manager => {
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
         const stateRepo = manager.getRepository(AppSetting);
-        const existingGlobal = await stateRepo.findOne({ where: { key }, lock: { mode: 'pessimistic_write' } });
-        if (existingGlobal) return;
-        const legacyRows = await manager.query(
-          'SELECT value FROM app_settings WHERE "key" LIKE $1',
-          ['support_chest_room:%'],
-        );
-        const legacyStates = (Array.isArray(legacyRows) ? legacyRows : []).map((legacy: any) => {
-          try { return JSON.parse(String(legacy.value || '{}')); } catch { return null; }
-        }).filter((value: any) => value && typeof value === 'object');
-        let migrated: any = { coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
-        if (legacyStates.length) {
-          legacyStates.sort((a: any, b: any) =>
-            (Number(b.cycle) || 1) - (Number(a.cycle) || 1)
-            || (Number(b.level) || 1) - (Number(a.level) || 1)
-            || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-          const furthest = legacyStates[0];
-          const stage = legacyStates.filter((value: any) =>
-            (Number(value.cycle) || 1) === (Number(furthest.cycle) || 1)
-            && (Number(value.level) || 1) === (Number(furthest.level) || 1));
-          migrated = {
-            ...furthest,
-            coins: stage.reduce((sum: number, value: any) => sum + Math.max(0, Number(value.coins) || 0), 0),
-            diamonds: stage.reduce((sum: number, value: any) => sum + Math.max(0, Number(value.diamonds) || 0), 0),
-            giftCount: stage.reduce((sum: number, value: any) => sum + Math.max(0, Number(value.giftCount) || 0), 0),
-            level: Math.max(1, Math.min(3, Number(furthest.level) || 1)),
-            cycle: Math.max(1, Number(furthest.cycle) || 1),
+        const existingRoomState = await stateRepo.findOne({
+          where: { key },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!existingRoomState) {
+          const initialState = {
+            roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1,
           };
-          delete migrated.roomId;
+          await stateRepo.save(stateRepo.create({
+            key,
+            value: JSON.stringify(initialState),
+            description: `Independent support chest progress for room ${roomId}`,
+          }));
         }
-        await stateRepo.save(stateRepo.create({
-          key, value: JSON.stringify(migrated),
-          description: 'Global support chest state shared by every room',
-        }));
       });
       row = await this.settingsRepo.findOne({ where: { key } });
     }
-    let state: any = { coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
+    let state: any = { roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
     try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
 
     const globalAllowedCategories = Array.isArray(config.giftCategories)
@@ -2197,7 +2180,8 @@ export class GiftsService implements OnModuleInit {
     giftType?: string | null,
     quantity = 1,
   ) {
-    const key = 'support_chest_global';
+    // Serialize contributions only within this room; other rooms never share progress.
+    const key = `support_chest_room:${roomId}`;
     const result = await this.dataSource.transaction(async manager => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
       const repo = manager.getRepository(AppSetting);
@@ -2293,7 +2277,7 @@ export class GiftsService implements OnModuleInit {
               currency: rewardType === 'coins' ? CurrencyType.COINS : CurrencyType.DIAMONDS,
               amount, balanceAfter: rewardType === 'coins' ? Number(wallet.coins) : Number(wallet.diamonds),
               referenceType: 'support_chest_reward',
-              referenceId: 'support_chest:' + String(state.cycle || 1) + ':' + String(levelIndex + 1) + ':' + rewardIndex,
+              referenceId: 'support_chest:' + roomId + ':' + String(state.cycle || 1) + ':' + String(levelIndex + 1) + ':' + rewardIndex,
               description: 'JEHO support chest reward',
               metadata: { roomId, cycle: state.cycle || 1, giftId, level: levelIndex + 1 },
             }));
@@ -2385,12 +2369,12 @@ export class GiftsService implements OnModuleInit {
         }
       }
       if (row) { row.value = JSON.stringify(state); await repo.save(row); }
-      else await repo.save(repo.create({ key, value: JSON.stringify(state), description: 'Global support chest state shared by every room' }));
+      else await repo.save(repo.create({ key, value: JSON.stringify(state), description: `Independent support chest progress for room ${roomId}` }));
       return { config: cfg, state, opened, contribution };
     });
     if (result) {
-      const liveRooms = await this.roomsRepo.find({ where: [{ status: RoomStatus.OPEN }, { status: RoomStatus.LOCKED }], select: { id: true } as any });
-      const targetRoomIds = [...new Set([roomId, ...liveRooms.map(room => room.id)])];
+      // Progress, level transitions, chest openings and reward animations are room-local.
+      const targetRoomIds = [roomId];
       const at = new Date().toISOString();
       for (const targetRoomId of targetRoomIds) {
         const roomState = { ...result.state, roomId: targetRoomId };
