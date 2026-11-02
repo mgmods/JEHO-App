@@ -1,6 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 export enum CpType {
+  // One user-facing relationship type. Legacy values remain readable so
+  // old rows can be migrated without breaking rolling deployments.
+  RELATIONSHIP = 'relationship',
   FRIENDSHIP = 'friendship',
   BROTHERHOOD = 'brotherhood',
   LOVE = 'love',
