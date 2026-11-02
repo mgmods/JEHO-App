@@ -19,8 +19,10 @@ export const operatorsApi = {
 }
 
 export const cpAdminApi = {
-  config: () => safeRequest(() => api.get('/admin/cp/config')),
-  updateType: (type, payload) => safeRequest(() => api.patch(`/admin/cp/config/${encodeURIComponent(type)}`, payload)),
+  // CP editor requests use bounded timeouts so a stalled backend cannot leave
+  // the dashboard's save controls spinning indefinitely.
+  config: () => safeRequest(() => api.get('/admin/cp/config', { timeout: 20000 })),
+  updateType: (type, payload) => safeRequest(() => api.patch(`/admin/cp/config/${encodeURIComponent(type)}`, payload, { timeout: 30000 })),
   updatePolicy: (payload) => safeRequest(() => api.patch('/admin/cp/policy', payload)),
   updateFeatures: (payload) => safeRequest(() => api.patch('/admin/cp/features', payload)),
   adjustPoints: (payload) => safeRequest(() => api.post('/admin/cp/relationships/points', payload)),
