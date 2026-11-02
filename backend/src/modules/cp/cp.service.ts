@@ -970,9 +970,15 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       ).catch(error => console.warn('[CP] room request notification delivery failed', error));
       this.realtime.emitToUser(recipientId, 'cp:request', {
         requestId: outcome.request.id,
+        roomId,
+        recipientId,
         senderId: userId,
         senderName,
         relationshipType: type,
+        giftId: outcome.request.giftId,
+        giftName: outcome.request.giftName,
+        giftIconUrl: outcome.request.giftIconUrl,
+        giftAnimationUrl: outcome.request.giftAnimationUrl,
         title: 'طلب ارتباط جديد',
         body: `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}.`,
         actions: ['accept', 'reject'],
