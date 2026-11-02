@@ -626,7 +626,7 @@ export class AdminService {
       if (levelGiftSelectionMode === 'selected' && !levelGiftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل لهذا المستوى أو اختر جميع الهدايا');
       const features = Array.isArray(level.features)
         ? [...new Set(level.features.map((value: any) => String(value || '').trim()).filter(Boolean))].slice(0, 20)
-        : String(level.featuresText || '').split(/\\r?\\n/).map(value => value.trim()).filter(Boolean).slice(0, 20);
+        : String(level.featuresText || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean).slice(0, 20);
       const rewards = Array.isArray(level.rewards) ? level.rewards.map((reward: any) => {
         const type = String(reward?.type || '');
         if (!allowedRewards.has(type) || type === 'none') throw new BadRequestException('نوع مكافأة غير صالح في مستوى الصندوق');
