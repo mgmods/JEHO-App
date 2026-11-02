@@ -700,6 +700,16 @@ public class HomeFragment extends Fragment {
                         card.addView(cosmetic);
                     }
                 }
+                Map<?, ?> presentation = cpMap(levelRow.get("presentation"));
+                for (String artField : new String[]{"levelLogoUrl", "badgeUrl", "frameUrl"}) {
+                    String artUrl = cpText(presentation.get(artField), "");
+                    if (artUrl.isEmpty()) continue;
+                    ImageView art = new ImageView(host);
+                    art.setLayoutParams(new LinearLayout.LayoutParams(dp(42), dp(42)));
+                    art.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    Glide.with(host).load(AssetCatalog.absoluteUrl(artUrl)).into(art);
+                    card.addView(art);
+                }
                 rewardCount++;
             }
         }
