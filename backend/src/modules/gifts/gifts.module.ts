@@ -10,6 +10,7 @@ import { Wallet } from '../../database/entities/wallet.entity';
 import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
 import { User } from '../../database/entities/user.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
+import { VipPlan } from '../../database/entities/vip-plan.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
 import { Agency } from '../../database/entities/agency.entity';
 import { AgencyMember } from '../../database/entities/agency-member.entity';
@@ -21,6 +22,7 @@ import { ContestsModule } from '../contests/contests.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { HostTargetModule } from '../host-target/host-target.module';
 import { CpModule } from '../cp/cp.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -34,6 +36,7 @@ import { CpModule } from '../cp/cp.module';
       UserProfile,
       User,
       UserVip,
+      VipPlan,
       Agency,
       AgencyMember,
       AppSetting,
@@ -45,6 +48,7 @@ import { CpModule } from '../cp/cp.module';
     RealtimeModule,
     HostTargetModule,
     CpModule,
+    NotificationsModule,
   ],
   controllers: [GiftsController],
   providers: [GiftsService],
