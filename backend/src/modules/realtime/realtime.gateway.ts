@@ -87,6 +87,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   private readonly roomChallengeWheelLocks = new Map<string, number>();
   private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
   private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
+  /** Last server-authoritative room alias per connected account; refreshed on join/toggle. */
+  private readonly mysteriousIdentityCache = new Map<string, {
+    displayName: string;
+    username: string;
+    frameUrl: string | null;
+  }>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -461,6 +467,15 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     const mysteriousMode = await this.isMysteriousModeEligible(user, vip);
     const visuals = benefits?.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
     const mysteriousFrameUrl = visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null);
+    if (mysteriousMode) {
+      this.mysteriousIdentityCache.set(userId, {
+        displayName: 'الرجل الغامض',
+        username: 'mysterious_man',
+        frameUrl: mysteriousFrameUrl || null,
+      });
+    } else {
+      this.mysteriousIdentityCache.delete(userId);
+    }
     const spent = await this.roomSpendCoins(userId, roomId);
     const supporterTier = await this.resolveSupporterTier(vipLevel, spent);
     const displayName = mysteriousMode ? 'الرجل الغامض' : (user?.displayName || user?.username || 'User');
@@ -1395,13 +1410,64 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  /**
+   * Sanitize every room/global event from the current server-side identity cache.
+   * This is the final guard for event types emitted by independent modules (gifts,
+   * games, seats, PK, lucky wins, and room notices), not just chat messages.
+   */
+  private maskMysteriousEventValue(value: any): any {
+    if (Array.isArray(value)) return value.map((item) => this.maskMysteriousEventValue(item));
+    if (!value || typeof value !== 'object' || value instanceof Date) return value;
+    const output: Record<string, any> = {};
+    for (const [key, child] of Object.entries(value)) {
+      output[key] = this.maskMysteriousEventValue(child);
+    }
+    const identityFor = (id: unknown) =>
+      typeof id === 'string' && id ? this.mysteriousIdentityCache.get(id) : undefined;
+    const applyActor = (identity: { displayName: string; username: string; frameUrl: string | null }) => {
+      if ('displayName' in output) output.displayName = identity.displayName;
+      if ('name' in output) output.name = identity.displayName;
+      if ('username' in output) output.username = identity.username;
+      if ('avatarUrl' in output) output.avatarUrl = null;
+      if ('imageUrl' in output) output.imageUrl = null;
+      if ('photoUrl' in output) output.photoUrl = null;
+      if ('profileImageUrl' in output) output.profileImageUrl = null;
+      if ('mysteriousMan' in output) output.mysteriousMan = true;
+      if ('frameUrl' in output) output.frameUrl = identity.frameUrl;
+      if ('vipBadgeUrl' in output) output.vipBadgeUrl = identity.frameUrl;
+      if ('hostBadgeUrl' in output) output.hostBadgeUrl = null;
+      if ('isHost' in output) output.isHost = false;
+    };
+    const actor = identityFor(output.userId);
+    if (actor) applyActor(actor);
+    const sender = identityFor(output.senderId);
+    if (sender) {
+      if ('senderName' in output) output.senderName = sender.displayName;
+      if ('senderAvatarUrl' in output) output.senderAvatarUrl = null;
+      if ('senderImageUrl' in output) output.senderImageUrl = null;
+      if ('senderMysteriousMan' in output) output.senderMysteriousMan = true;
+      if ('senderHostBadgeUrl' in output) output.senderHostBadgeUrl = null;
+      if ('senderVipBadgeUrl' in output) output.senderVipBadgeUrl = sender.frameUrl;
+    }
+    const receiver = identityFor(output.receiverId);
+    if (receiver) {
+      if ('receiverName' in output) output.receiverName = receiver.displayName;
+      if ('receiverAvatarUrl' in output) output.receiverAvatarUrl = null;
+      if ('receiverImageUrl' in output) output.receiverImageUrl = null;
+      if ('receiverMysteriousMan' in output) output.receiverMysteriousMan = true;
+      if ('receiverHostBadgeUrl' in output) output.receiverHostBadgeUrl = null;
+      if ('receiverVipBadgeUrl' in output) output.receiverVipBadgeUrl = receiver.frameUrl;
+    }
+    return output;
+  }
+
   emitToRoom(roomId: string, event: string, payload: unknown) {
-    this.server.to(`room:${roomId}`).emit(event, payload);
+    this.server.to(`room:${roomId}`).emit(event, this.maskMysteriousEventValue(payload));
   }
 
   /** Fan-out to every connected socket (Mikoo-style global celebration toasts). */
   emitToAll(event: string, payload: unknown) {
-    this.server.emit(event, payload);
+    this.server.emit(event, this.maskMysteriousEventValue(payload));
   }
 
   async ejectRoom(roomId: string, reason: string) {
