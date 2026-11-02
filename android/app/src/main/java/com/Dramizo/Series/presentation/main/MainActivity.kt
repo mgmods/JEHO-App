@@ -61,6 +61,7 @@ import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity
 import com.Dramizo.Series.realtime.RealtimeClient
 import com.Dramizo.Series.rtc.RoomRtcEngine
 import com.Dramizo.Series.service.VoiceRoomForegroundService
+import com.Dramizo.Series.util.ApiOrigin
 import com.Dramizo.Series.util.ApiCall
 import com.Dramizo.Series.util.AppFeatures
 import com.Dramizo.Series.util.AppLoadingOverlay
@@ -500,6 +501,19 @@ class MainActivity : ThemedActivity() {
         }
     }
 
+    /**
+     * Dashboard uploads may return a path relative to the JEHO host.
+     * Glide requires an absolute URL, so resolve relative reward artwork
+     * against the one authoritative JEHO-OWN origin used by this APK.
+     */
+    private fun resolveDailyLoginImageUrl(rawUrl: String?): String {
+        val value = rawUrl?.trim().orEmpty()
+        if (value.isEmpty()) return ""
+        if (value.startsWith("https://", true) || value.startsWith("http://", true)) return value
+        if (value.startsWith("//")) return "https:$value"
+        return ApiOrigin.origin().trimEnd('/') + "/" + value.trimStart('/')
+    }
+
     private fun dailyLoginThemeColor(status: MiscDtos.DailyLoginStatusDto, key: String, fallback: Int): Int {
         val raw = status.theme?.get(key)?.toString() ?: return fallback
         return try { android.graphics.Color.parseColor(raw) } catch (_: Throwable) { fallback }
@@ -526,7 +540,7 @@ class MainActivity : ThemedActivity() {
         if (bgUrl.isNotEmpty()) {
             val overlayColor = dailyLoginThemeColor(status, "overlayColor", Color.WHITE)
             val opacity = dailyLoginThemeNumber(status, "overlayOpacity", 0).coerceIn(0f, 1f)
-            Glide.with(this).load(bgUrl).into(object : com.bumptech.glide.request.target.CustomTarget<Drawable>() {
+            Glide.with(this).load(resolveDailyLoginImageUrl(bgUrl)).into(object : com.bumptech.glide.request.target.CustomTarget<Drawable>() {
                 override fun onResourceReady(resource: Drawable, transition: com.bumptech.glide.request.transition.Transition<in Drawable>?) {
                     val tint = ColorDrawable(Color.argb((opacity * 255).toInt(), Color.red(overlayColor), Color.green(overlayColor), Color.blue(overlayColor)))
                     root.background = LayerDrawable(arrayOf(resource, tint))
@@ -549,7 +563,7 @@ class MainActivity : ThemedActivity() {
                 }
                 scaleType = ImageView.ScaleType.FIT_CENTER
             }
-            Glide.with(this).load(logoUrl).placeholder(android.R.drawable.ic_menu_gallery).into(logo)
+            Glide.with(this).load(resolveDailyLoginImageUrl(logoUrl)).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(logo)
             top.addView(logo)
         }
         val heading = TextView(this).apply {
@@ -626,7 +640,7 @@ class MainActivity : ThemedActivity() {
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     contentDescription = day.name ?: "مكافأة اليوم"
                 }
-                Glide.with(this).load(dayPreview).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(dayImage)
+                Glide.with(this).load(resolveDailyLoginImageUrl(dayPreview)).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(dayImage)
                 tile.addView(dayImage)
             } else {
                 tile.addView(TextView(this).apply {
