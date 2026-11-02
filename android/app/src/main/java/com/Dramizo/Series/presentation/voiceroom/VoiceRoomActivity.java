@@ -1889,57 +1889,35 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void showSupportChestSheet() {
         if (isFinishing() || isDestroyed() || roomId == null || roomId.isEmpty()) return;
         final String chestRoomId = roomId;
-        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        final BottomSheetDialog dialog = new BottomSheetDialog(this);
 
-        // Native views avoid constructing a cold WebView on the room's main thread.
-        // The previous WebView initialization could stall the entire voice-room UI.
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(chestDp(18), chestDp(14), chestDp(18), chestDp(22));
-        GradientDrawable panel = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFF29243A, 0xFF151622});
-        panel.setCornerRadii(new float[]{chestDp(22), chestDp(22), chestDp(22), chestDp(22),
-                0, 0, 0, 0});
-        panel.setStroke(chestDp(1), 0xFF80663B);
-        root.setBackground(panel);
+        // Restore the original rich HTML chest UI. The WebView is created only
+        // after the user taps the chest, so it does not slow down room startup.
+        WebView web = new WebView(this);
+        web.setBackgroundColor(Color.TRANSPARENT);
+        web.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        WebSettings settings = web.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setBlockNetworkImage(false);
+        settings.setDefaultTextEncodingName("UTF-8");
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        web.setVerticalScrollBarEnabled(false);
+        web.setHorizontalScrollBarEnabled(false);
+        web.setWebViewClient(new android.webkit.WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (!isFinishing() && !isDestroyed() && dialog.isShowing()
+                        && chestRoomId.equals(roomId)) {
+                    loadSupportChestState(view, chestRoomId);
+                }
+            }
+        });
 
-        TextView title = chestText("🎁 صندوق الدعم", 19f, 0xFFFFE4A0, true);
-        root.addView(title, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0));
-        TextView subtitle = chestText("كل هدية تقرّب الروم من فتح الكنز", 12f, 0xFFD4C5A4, false);
-        root.addView(subtitle, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 4));
-
-        TextView level = chestText("المستوى 1 · صندوق الروم", 14f, 0xFFFFE4A0, true);
-        root.addView(level, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 14));
-
-        TextView metric = chestText("بانتظار بيانات الصندوق من الخادم…", 13f, 0xFFFFFFFF, true);
-        root.addView(metric, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 10));
-
-        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(100);
-        progress.setProgress(0);
-        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(0xFF69DDEB));
-        progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF414052));
-        root.addView(progress, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, chestDp(12), 9));
-
-        TextView stats = chestText("المجموع: —     الهدف: —     المتبقي: —", 12f, 0xFFE8E5F0, false);
-        root.addView(stats, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 9));
-
-        TextView instructions = chestText("تعتمد قواعد الصندوق ومكافآته على إعدادات الداشبورد.", 11f, 0xFFB8B8C8, false);
-        root.addView(instructions, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 13));
-
-        TextView close = chestText("إغلاق", 14f, 0xFFFFE4A0, true);
-        close.setGravity(Gravity.CENTER);
-        GradientDrawable closeBg = new GradientDrawable();
-        closeBg.setColor(0xFF40344D);
-        closeBg.setCornerRadius(chestDp(13));
-        closeBg.setStroke(chestDp(1), 0xFFB9944B);
-        close.setBackground(closeBg);
-        close.setPadding(0, chestDp(12), 0, chestDp(12));
-        root.addView(close, chestParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 16));
-        close.setOnClickListener(v -> dialog.dismiss());
-
-        dialog.setContentView(root);
+        dialog.setContentView(web);
         dialog.setCancelable(true);
         dialog.setCanceledOnTouchOutside(true);
 
@@ -1947,17 +1925,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override public void run() {
                 if (!dialog.isShowing() || isFinishing() || isDestroyed()
                         || !chestRoomId.equals(roomId)) return;
-                loadSupportChestStateNative(chestRoomId, level, metric, progress, stats, instructions);
+                if (web.getProgress() >= 100) loadSupportChestState(web, chestRoomId);
                 handler.postDelayed(this, 15000L);
             }
         };
-        dialog.setOnDismissListener(d -> handler.removeCallbacks(refreshChest));
+        dialog.setOnDismissListener(d -> {
+            handler.removeCallbacks(refreshChest);
+            web.stopLoading();
+            web.loadUrl("about:blank");
+            web.destroy();
+        });
         dialog.setOnShowListener(d -> {
             android.view.View bottomSheet = dialog.findViewById(
                     com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
                 bottomSheet.setBackground(new ColorDrawable(Color.TRANSPARENT));
-                int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.58f);
+                int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.76f);
                 bottomSheet.getLayoutParams().height = height;
                 bottomSheet.requestLayout();
                 com.google.android.material.bottomsheet.BottomSheetBehavior<?> behavior =
@@ -1967,8 +1950,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 behavior.setHideable(true);
                 behavior.setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
             }
+            web.loadUrl("file:///android_asset/support-chest.html");
             handler.removeCallbacks(refreshChest);
-            handler.post(refreshChest);
+            handler.postDelayed(refreshChest, 15000L);
         });
         dialog.show();
     }
