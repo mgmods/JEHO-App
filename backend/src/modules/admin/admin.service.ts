@@ -575,7 +575,15 @@ export class AdminService {
       instructions: 'كل هدية مؤهلة تساهم في هدف الصندوق. آخر هدية تكمل الهدف تفتح الصندوق وتمنح المكافأة تلقائياً.',
     };
     if (!row) return defaults;
-    try { return { ...defaults, ...JSON.parse(row.value) }; } catch { return defaults; }
+    try {
+      const parsed = JSON.parse(row.value);
+      return {
+        ...defaults,
+        ...parsed,
+        giftSelectionMode: parsed.giftSelectionMode
+          || (Array.isArray(parsed.giftIds) && parsed.giftIds.length ? 'selected' : 'all'),
+      };
+    } catch { return defaults; }
   }
 
   async patchSupportChestConfig(input: Record<string, unknown>) {
