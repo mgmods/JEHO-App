@@ -2139,9 +2139,10 @@ export class GiftsService implements OnModuleInit {
       try { cfg = JSON.parse(cfgRow.value); } catch { return null; }
       if (cfg.enabled !== true) return null;
       const categoryRaw = String(giftCategory || '').toLowerCase();
-      const category = categoryRaw === 'cp' ? 'cp'
-        : (String(giftType || '').toLowerCase() === 'lucky' || categoryRaw === 'lucky') ? 'lucky'
-        : categoryRaw === 'normal' ? 'normal' : 'other';
+      const typeRaw = String(giftType || '').toLowerCase();
+      const category = categoryRaw === 'cp' || typeRaw === 'cp' ? 'cp'
+        : (typeRaw === 'lucky' || categoryRaw === 'lucky') ? 'lucky'
+        : (categoryRaw === 'normal' || typeRaw === 'normal' || !categoryRaw) ? 'normal' : 'other';
       const globalCategories = Array.isArray(cfg.giftCategories) ? cfg.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
       if (!globalCategories.includes(category)) return null;
       const globalGiftIds = Array.isArray(cfg.giftIds) ? cfg.giftIds.map(String) : [];
@@ -2161,7 +2162,8 @@ export class GiftsService implements OnModuleInit {
       const levelCfg = levels[levelIndex];
       const allowedCategories = Array.isArray(levelCfg.giftCategories)
         ? levelCfg.giftCategories.map(String) : globalCategories;
-      const levelGiftIds = Array.isArray(levelCfg.giftIds) ? levelCfg.giftIds.map(String) : [];
+      const configuredLevelGiftIds = Array.isArray(levelCfg.giftIds) ? levelCfg.giftIds.map(String) : [];
+      const levelGiftIds = configuredLevelGiftIds.length ? configuredLevelGiftIds : globalGiftIds;
       if (!allowedCategories.includes(category) || (levelGiftIds.length && !levelGiftIds.includes(String(giftId)))) return null;
       state.coins = (Number(state.coins) || 0) + Math.max(0, Number(coins) || 0);
       state.diamonds = (Number(state.diamonds) || 0) + Math.max(0, Number(diamonds) || 0);
@@ -2289,7 +2291,7 @@ export class GiftsService implements OnModuleInit {
           '🎁 تم فتح صندوق الدعم!',
           'أنت آخر من ساهم في اكتمال الهدف، وتم إرسال مكافآت الصندوق إلى حسابك.',
           { type: 'support_chest_reward', roomId, level: win.level, rewards: win.rewards },
-        );
+        ).catch(error => this.log.warn('Support chest winner notification failed: ' + String(error?.message || error)));
       }
     }
     return result;
@@ -3235,7 +3237,7 @@ export class GiftsService implements OnModuleInit {
       micShares.set(rid, baseMic + extra);
     }
 
-    return this.runGiftTransaction(async (manager) => {
+    const sendResult = await this.runGiftTransaction(async (manager) => {
       // Lock every wallet participating in the split in sorted order. This prevents
       // overlapping all-mic sends from acquiring the same wallets in opposite orders.
       await this.lockGiftWalletUsers(manager, [senderId, ...receiverIds, roomHostId]);
@@ -3644,6 +3646,18 @@ export class GiftsService implements OnModuleInit {
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
       return result;
     });
+    if (dto.roomId) {
+      try {
+        await this.applySupportChestGift(
+          dto.roomId, String(gift.id), totalCoins,
+          Number(sendResult.hostDiamonds || hostDiamonds || 0),
+          senderId, gift.category, gift.type, qty * personCount,
+        );
+      } catch (error) {
+        this.log.error('Support chest all-mic progress update failed', error instanceof Error ? error.stack : String(error));
+      }
+    }
+    return sendResult;
   }
 
   /**
