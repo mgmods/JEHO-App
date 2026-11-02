@@ -442,11 +442,6 @@ public class HomeFragment extends Fragment {
         }
         // The CP promo under the home banners opens the native CP center directly.
         act.cpBannerCard.setOnClickListener(v -> openCpCenter("home"));
-        View cpPanel = binding.getRoot().findViewById(R.id.homeCpSummary);
-        if (cpPanel != null) {
-            View more = cpPanel.findViewById(R.id.cpHomeMoreButton);
-            if (more != null) more.setOnClickListener(v -> openCpCenter("home"));
-        }
         applyTasksFeatureVisibility();
     }
 
