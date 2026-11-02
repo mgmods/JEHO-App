@@ -665,14 +665,39 @@ public class HomeFragment extends Fragment {
                     giftRow.addView(giftLabel, giftTextLp);
                     card.addView(giftRow);
                 }
-                List<?> cosmeticCodes = levelRow.get("rewardCosmeticCodes") instanceof List
-                        ? (List<?>) levelRow.get("rewardCosmeticCodes") : Collections.emptyList();
-                if (!cosmeticCodes.isEmpty() || levelRow.get("rewardCosmeticCode") != null) {
-                    TextView cosmetic = new TextView(host);
-                    cosmetic.setText("✨ مكافآت تجميلية: " + (cosmeticCodes.isEmpty()
-                            ? cpText(levelRow.get("rewardCosmeticCode"), "") : cosmeticCodes.toString()));
-                    cosmetic.setTextColor(0xFF8D3B6A); cosmetic.setTextSize(10);
-                    card.addView(cosmetic);
+                Object cosmeticsValue = levelRow.get("rewardCosmetics");
+                if (cosmeticsValue instanceof List && !((List<?>) cosmeticsValue).isEmpty()) {
+                    for (Object cosmeticValue : (List<?>) cosmeticsValue) {
+                        Map<?, ?> cosmetic = cpMap(cosmeticValue);
+                        String cosmeticName = cpText(cosmetic.get("name"), cpText(cosmetic.get("code"), "مكافأة"));
+                        String cosmeticUrl = cpText(cosmetic.get("animationUrl"), cpText(cosmetic.get("previewUrl"), ""));
+                        LinearLayout cosmeticRow = new LinearLayout(host);
+                        cosmeticRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                        cosmeticRow.setOrientation(LinearLayout.HORIZONTAL);
+                        cosmeticRow.setPadding(0, dp(5), 0, 0);
+                        ImageView cosmeticImage = new ImageView(host);
+                        cosmeticImage.setLayoutParams(new LinearLayout.LayoutParams(dp(34), dp(34)));
+                        cosmeticImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        if (!cosmeticUrl.isEmpty()) Glide.with(host).load(AssetCatalog.absoluteUrl(cosmeticUrl)).into(cosmeticImage);
+                        cosmeticRow.addView(cosmeticImage);
+                        TextView cosmeticLabel = new TextView(host);
+                        cosmeticLabel.setText(cosmeticName);
+                        cosmeticLabel.setTextColor(0xFF8D3B6A); cosmeticLabel.setTextSize(10);
+                        LinearLayout.LayoutParams cosmeticTextLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                        cosmeticTextLp.setMarginStart(dp(5));
+                        cosmeticRow.addView(cosmeticLabel, cosmeticTextLp);
+                        card.addView(cosmeticRow);
+                    }
+                } else {
+                    List<?> cosmeticCodes = levelRow.get("rewardCosmeticCodes") instanceof List
+                            ? (List<?>) levelRow.get("rewardCosmeticCodes") : Collections.emptyList();
+                    if (!cosmeticCodes.isEmpty() || levelRow.get("rewardCosmeticCode") != null) {
+                        TextView cosmetic = new TextView(host);
+                        cosmetic.setText("✨ مكافآت تجميلية: " + (cosmeticCodes.isEmpty()
+                                ? cpText(levelRow.get("rewardCosmeticCode"), "") : cosmeticCodes.toString()));
+                        cosmetic.setTextColor(0xFF8D3B6A); cosmetic.setTextSize(10);
+                        card.addView(cosmetic);
+                    }
                 }
                 rewardCount++;
             }
