@@ -15309,7 +15309,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     this, "💥 انفجار صندوق الدعم!", message, null, rewardImage,
                     "support-chest:" + roomId + ":" + (roomEventId == null ? "1" : roomEventId)
                             + ":" + (levelId == null ? "1" : levelId),
-                    0d, 0L, winner, "support_chest", roomId);
+                    0d, 0L, null, "support_chest", roomId);
             RoomSoundFx.playChestExplosion(this);
             return;
         }
