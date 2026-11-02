@@ -633,7 +633,7 @@ class MainActivity : ThemedActivity() {
                 setTextColor(if (day.day == 7) Color.rgb(143, 99, 13) else Color.rgb(57, 49, 34))
                 typeface = Typeface.DEFAULT_BOLD
             })
-            val dayPreview = day.previewUrl ?: day.animationUrl
+            val dayPreview = day.previewUrl ?: day.imageUrl ?: day.iconUrl ?: day.animationUrl
             if (day.type == "cosmetic" && !dayPreview.isNullOrBlank()) {
                 val dayImage = ImageView(this).apply {
                     layoutParams = LinearLayout.LayoutParams((48 * resources.displayMetrics.density).toInt(), (dailyLoginThemeNumber(status, "cardImageSize", 76) * resources.displayMetrics.density).toInt())
