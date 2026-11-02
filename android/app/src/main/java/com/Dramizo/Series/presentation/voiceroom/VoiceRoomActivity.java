@@ -15227,6 +15227,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
+        if ("support_chest:config_updated".equals(event)) {
+            refreshSupportChestIcon();
+            if (activeSupportChestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
+                handler.removeCallbacks(supportChestEventRefresh);
+                handler.postDelayed(supportChestEventRefresh, 120L);
+            }
+            return;
+        }
         if ("support_chest:updated".equals(event)) {
             if (activeSupportChestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
                 handler.removeCallbacks(supportChestEventRefresh);
