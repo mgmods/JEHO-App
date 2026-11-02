@@ -23,7 +23,8 @@ h1{font-size:18px;margin:0;font-weight:850;letter-spacing:.1px}.sub{font-size:11
 .level-tab.locked{border-color:#55536a;color:#aaa9bd;background:#191a28}
 .level-tab small{display:block;font-size:9px;font-weight:600;margin-top:3px;opacity:.8}
 .locked-overlay{display:none;position:absolute;z-index:4;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:5px;background:#090a13a8;border-radius:18px;color:#ffe5a1;font-weight:900;font-size:17px;backdrop-filter:blur(2px)}
-.locked-overlay.show{display:flex}.stage.preview-locked .chest{filter:grayscale(.55) brightness(.65)}
+.locked-overlay.show{display:flex}.stage.preview-locked .chest{filter:grayscale(.55) brightness(.65)}.locked-preview .giftcard{position:relative;opacity:.78;filter:saturate(.65)}
+.locked-preview .giftcard:after{content:"🔒";position:absolute;top:4px;right:4px;font-size:12px;background:#10111ccc;border:1px solid #82734d;border-radius:99px;padding:2px 4px;}
 .levelrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:-2px}.level{font-size:13px;font-weight:800;color:#ffe4a0}.tag{font-size:10px;color:#a6f5ff;border:1px solid #367f88;background:#123039;padding:4px 8px;border-radius:99px}
 .modes{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0}
 .mode{border:1px solid #444456;background:#222333;color:#d8d8e6;padding:8px 4px;border-radius:11px;font-size:12px;font-weight:700}.mode.active{border-color:#d6ad50;background:linear-gradient(135deg,#5a4526,#332c28);color:#ffe4a0}
@@ -114,6 +115,8 @@ function selectLevel(index){
  const locked=selectedLevelIndex>currentLevelIndex;
  const stage=document.querySelector('.stage');stage.classList.toggle('preview-locked',locked);
  document.getElementById('lockedOverlay').classList.toggle('show',locked);
+ document.getElementById('eligibleGifts').classList.toggle('locked-preview',locked);
+ document.getElementById('rewardPreviews').classList.toggle('locked-preview',locked);
  document.querySelector('h1').textContent='🎁 '+String(lv.title||'صندوق الدعم');
  renderLevelFeatures(lv.features||[]);
  renderGiftCards(lv.eligibleGifts||[]);
