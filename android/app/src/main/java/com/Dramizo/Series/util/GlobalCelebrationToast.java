@@ -665,7 +665,7 @@ public final class GlobalCelebrationToast {
                     GradientDrawable.Orientation.TL_BR,
                     new int[] { 0xF52A1B12, 0xF04A321B, 0xF51C1B2B });
             supportChestBackground.setCornerRadius(dp(activity, 18));
-            supportChestBackground.setStroke(dp(activity, 1.5f), 0xFFFFD36A);
+            supportChestBackground.setStroke(dp(activity, 2), 0xFFFFD36A);
             banner.setBackground(supportChestBackground);
             banner.setElevation(dp(activity, 24));
         }
