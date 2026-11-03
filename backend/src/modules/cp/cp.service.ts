@@ -11,6 +11,16 @@ const TYPES = new Set<string>(Object.values(CpType));
 const EXPIRY_MINUTES = 30;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function parseJsonSetting<T>(raw: unknown, fallback: T): T {
+  let value: unknown = raw;
+  for (let depth = 0; depth < 3 && typeof value === 'string'; depth += 1) {
+    const candidate = value.trim();
+    if (!candidate) return fallback;
+    try { value = JSON.parse(candidate); } catch { return fallback; }
+  }
+  return (value === undefined || value === null ? fallback : value) as T;
+}
+
 @Injectable()
 export class CpService implements OnModuleInit, OnModuleDestroy {
   private expiryTimer: ReturnType<typeof setInterval> | null = null;
@@ -295,11 +305,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const enabled = globallyEnabled && settings[`cp.enabled.${type}`] !== 'false'
         && !!gift && giftPrice > 0;
       let rules: Record<string, any> = {};
-      try { rules = JSON.parse(settings[`cp.rules.${type}`] || '{}'); } catch { rules = {}; }
+      try { rules = parseJsonSetting(settings[`cp.rules.${type}`], {}); } catch { rules = {}; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
       let levels: Array<Record<string, any>> = [];
       try {
-        const parsedLevels = JSON.parse(settings[`cp.levels.${type}`] || '[]');
+        const parsedLevels = parseJsonSetting(settings[`cp.levels.${type}`], []);
         if (Array.isArray(parsedLevels)) levels = parsedLevels
           .filter(item => item && Number.isInteger(Number(item.level)) && Number(item.level) >= 1)
           .sort((a, b) => Number(a.level) - Number(b.level));
@@ -368,7 +378,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (type !== CpType.RELATIONSHIP) continue;
       let levels: any[] = [];
       try {
-        const parsed = JSON.parse(String(row.value || '[]'));
+        const parsed = parseJsonSetting(row.value, []);
         if (Array.isArray(parsed)) levels = parsed
           .filter(item => item && Number.isFinite(Number(item.level)) && Number(item.level) >= 1)
           .sort((a, b) => Number(a.level) - Number(b.level));
@@ -405,7 +415,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         [`cp.levels.${itemType}`],
       );
       try {
-        const parsed = JSON.parse(setting?.value || '[]');
+        const parsed = parseJsonSetting(setting?.value, []);
         configs[itemType] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed : []);
       } catch { configs[itemType] = []; }
     }
@@ -478,9 +488,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${type}`]).then(rows => rows[0]),
       ]);
       let rules: Record<string, any> = {};
-      try { rules = JSON.parse(String(setting?.value || '{}')); } catch { rules = {}; }
+      try { rules = parseJsonSetting(setting?.value, {}); } catch { rules = {}; }
       try {
-        const parsed = JSON.parse(String(levelSetting?.value || '[]'));
+        const parsed = parseJsonSetting(levelSetting?.value, []);
         levelConfigs[type] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed : []);
       } catch { levelConfigs[type] = []; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
@@ -550,7 +560,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     );
     const [taskConfigRow] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
     let taskConfig: Record<string, any> = {};
-    try { taskConfig = JSON.parse(taskConfigRow?.value || '{}'); } catch { taskConfig = {}; }
+    try { taskConfig = parseJsonSetting(taskConfigRow?.value, {}); } catch { taskConfig = {}; }
     const defaults: Record<string, any> = {
       memory_today: { title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', condition: 'memory_count', target: 1, rewardPoints: 10 },
       earn_points_today: { title: 'نشاط مشترك', description: 'اجمعوا نقاط العلاقة اليوم', condition: 'points_today', target: 10, rewardPoints: 15 },
@@ -607,7 +617,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     if (!/^[a-zA-Z0-9_-]{2,64}$/.test(taskId)) throw new BadRequestException('معرّف مهمة CP غير صالح');
     const [taskConfigRow] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', ['cp.tasks.config']);
     let taskConfig: Record<string, any> = {};
-    try { taskConfig = JSON.parse(taskConfigRow?.value || '{}'); } catch { taskConfig = {}; }
+    try { taskConfig = parseJsonSetting(taskConfigRow?.value, {}); } catch { taskConfig = {}; }
     const builtInIds = ['memory_today', 'earn_points_today'];
     if (!builtInIds.includes(taskId) && !Object.prototype.hasOwnProperty.call(taskConfig, taskId)) {
       throw new BadRequestException('مهمة CP غير معروفة');
@@ -763,7 +773,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         [`cp.levels.${type}`],
       );
       try {
-        const parsed = JSON.parse(setting?.value || '[]');
+        const parsed = parseJsonSetting(setting?.value, []);
         configs[type] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed : []);
       } catch { configs[type] = []; }
     }
@@ -1197,7 +1207,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         const [levelsSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${request.type}`]);
         let computedLevel = 1;
         try {
-          const levels = JSON.parse(levelsSetting?.value || '[]') as Array<{ level: number; pointsRequired: number }>;
+          const levels = parseJsonSetting(levelsSetting?.value, []) as Array<{ level: number; pointsRequired: number }>;
           for (const item of levels) if (Number(item.pointsRequired) <= initialPoints) computedLevel = Math.max(computedLevel, Number(item.level) || 1);
         } catch { /* keep safe baseline level */ }
         const [maxSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.max_level.${request.type}`]);
@@ -1224,19 +1234,25 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       );
       let levels: any[] = [];
       try {
-        const parsed = JSON.parse(levelsSetting?.value || '[]');
+        const parsed = parseJsonSetting(levelsSetting?.value, []);
         levels = Array.isArray(parsed) ? parsed : [];
       } catch { levels = []; }
       const reachedLevels = levels
         .filter(item => Number(item?.level) >= 1 && Number(item?.level) <= Number(outcome.relationship.level || 1))
         .sort((a, b) => Number(a.level) - Number(b.level));
       for (const levelConfig of reachedLevels) {
+        await this.grantLevelGiftRewards(
+          outcome.relationship.id,
+          Number(levelConfig.level),
+          [outcome.senderId, outcome.receiverId],
+          levelConfig,
+        ).catch(error => console.warn('[CB] initial level gift delivery failed', levelConfig.level, error));
         await this.grantLevelCosmeticRewards(
           outcome.relationship.id,
           Number(levelConfig.level),
           [outcome.senderId, outcome.receiverId],
           levelConfig,
-        ).catch(error => console.warn('[CP] initial level reward delivery failed', levelConfig.level, error));
+        ).catch(error => console.warn('[CB] initial level cosmetic reward delivery failed', levelConfig.level, error));
       }
       const currentLevelConfig = reachedLevels.find(item => Number(item.level) === Number(outcome.relationship.level || 1)) || null;
       const levelName = currentLevelConfig?.name || currentLevelConfig?.title || currentLevelConfig?.presentation?.title || null;
@@ -1510,7 +1526,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       );
       let levelConfig: any = null;
       try {
-        const levelRows = JSON.parse(levelSetting?.value || '[]');
+        const levelRows = parseJsonSetting(levelSetting?.value, []);
         if (Array.isArray(levelRows)) levelConfig = levelRows.find(item => Number(item?.level) === Number(relationship.level)) || null;
       } catch { levelConfig = null; }
       const bonusPercent = Math.max(0, Math.min(500, Number(levelConfig?.giftBonusPercent) || 0));
@@ -1552,7 +1568,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const [levelConfig] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${relationship.type}`]);
       let level = 1;
       try {
-        const levels = JSON.parse(levelConfig?.value || '[]') as Array<{ level: number; pointsRequired: number }>;
+        const levels = parseJsonSetting(levelConfig?.value, []) as Array<{ level: number; pointsRequired: number }>;
         for (const item of levels) if (Number(item.pointsRequired) <= Number(total)) level = Math.max(level, Number(item.level) || 1);
       } catch { /* malformed admin config never blocks point ledger writes */ }
       const [maxRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.max_level.${relationship.type}`]);
@@ -1577,7 +1593,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         : [];
       let levels: any[] = [];
       try {
-        const parsed = JSON.parse(levelsSetting?.value || '[]');
+        const parsed = parseJsonSetting(levelsSetting?.value, []);
         levels = Array.isArray(parsed) ? parsed : [];
       } catch { levels = []; }
       const currentLevelConfig = levels.find(item => Number(item?.level) === Number(result.level)) || null;

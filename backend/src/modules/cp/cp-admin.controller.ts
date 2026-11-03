@@ -231,6 +231,9 @@ export class CpAdminController {
         if (level.name !== undefined && (typeof level.name !== 'string' || level.name.length > 100)) {
           throw new BadRequestException('اسم مستوى CB غير صالح');
         }
+        if (level.description !== undefined && (typeof level.description !== 'string' || level.description.length > 500)) {
+          throw new BadRequestException('تفاصيل مستوى CB غير صالحة؛ الحد الأقصى 500 حرف');
+        }
         if (level.giftBonusPercent !== undefined &&
             (!Number.isFinite(Number(level.giftBonusPercent)) || Number(level.giftBonusPercent) < 0 || Number(level.giftBonusPercent) > 500)) {
           throw new BadRequestException('نسبة نقاط هدايا المستوى يجب أن تكون بين 0 و500');

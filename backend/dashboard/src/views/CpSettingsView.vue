@@ -1,6 +1,6 @@
 <template>
   <div class="cp-admin-page">
-    <PageHeader title="إعدادات CP" subtitle="إدارة الأنواع والهدايا والأسعار والمستويات والمكافآت وسجل العمليات. لا توجد أسعار افتراضية." >
+    <PageHeader title="إعدادات CB" subtitle="إدارة الأنواع والهدايا والأسعار والمستويات والمكافآت وسجل العمليات. لا توجد أسعار افتراضية." >
       <template #actions>
         <button class="btn btn-outline-secondary btn-sm" :disabled="loading || saving" @click="load">تحديث البيانات</button>
       </template>
@@ -15,7 +15,7 @@
     <LoadingSpinner v-if="loading" />
 
     <template v-else>
-      <nav class="nav nav-pills cp-admin-tabs mb-3" aria-label="أقسام إعدادات CP">
+      <nav class="nav nav-pills cp-admin-tabs mb-3" aria-label="أقسام إعدادات CB">
         <button type="button" class="nav-link" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">النظرة العامة والمهام</button>
         <button type="button" class="nav-link" :class="{ active: activeTab === 'levels' }" @click="activeTab = 'levels'">الأنواع والمستويات</button>
         <button type="button" class="nav-link" :class="{ active: activeTab === 'store' }" @click="activeTab = 'store'">المتجر والمكافآت</button>
@@ -24,8 +24,8 @@
       <section v-show="activeTab === 'overview'" class="settings-card mb-3 cp-feature-control">
         <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
           <div>
-            <h3 class="settings-card-title mb-1">تشغيل قسم CP/CP والمهمات</h3>
-            <p class="form-text mb-0">إيقاف القسم يمنع بدء علاقات جديدة ويوقف عرض مهمات CP والمطالبة بمكافآتها. تبقى العلاقات والسجلات السابقة محفوظة.</p>
+            <h3 class="settings-card-title mb-1">تشغيل قسم CB والمهمات</h3>
+            <p class="form-text mb-0">إيقاف القسم يمنع بدء علاقات جديدة ويوقف عرض مهمات CB والمطالبة بمكافآتها. تبقى العلاقات والسجلات السابقة محفوظة.</p>
           </div>
           <label class="form-check form-switch mb-0">
             <input v-model="cpFeatures.globallyEnabled" class="form-check-input" type="checkbox" role="switch">
@@ -34,8 +34,8 @@
         </div>
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap border rounded-3 p-3 mb-3">
           <div>
-            <div class="fw-semibold">تبويب هدايا CP في نافذة الهدايا</div>
-            <div class="form-text">تحكم مستقل بإظهار أو إخفاء تبويب هدايا CP للمستخدمين، دون إيقاف نظام علاقات CP بالكامل.</div>
+            <div class="fw-semibold">تبويب هدايا CB في نافذة الهدايا</div>
+            <div class="form-text">تحكم مستقل بإظهار أو إخفاء تبويب هدايا CB للمستخدمين، دون إيقاف نظام علاقات CB بالكامل.</div>
           </div>
           <label class="form-check form-switch mb-0">
             <input v-model="cpFeatures.giftTabEnabled" class="form-check-input" type="checkbox" role="switch">
@@ -46,7 +46,7 @@
           <div v-for="(task, taskIndex) in cpFeatures.tasks" :key="task.id" class="col-12 col-xl-6">
             <div class="border rounded-3 p-3 h-100">
               <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-                <h4 class="h6 mb-0">مهمة CP {{ taskIndex + 1 }}</h4>
+                <h4 class="h6 mb-0">مهمة CB {{ taskIndex + 1 }}</h4>
                 <div class="d-flex align-items-center gap-2">
                   <label class="form-check form-switch mb-0">
                     <input v-model="task.enabled" class="form-check-input" type="checkbox" role="switch">
@@ -76,7 +76,7 @@
                   <input v-model.number="task.rewardPoints" class="form-control" type="number" min="0" max="1000000" step="1">
                 </div>
               </div>
-              <label class="form-label mt-3">هدية المكافأة من متجر CP</label>
+              <label class="form-label mt-3">هدية المكافأة من متجر CB</label>
               <select v-model="task.rewardCosmeticCode" class="form-select">
                 <option value="">بدون هدية إضافية</option>
                 <option v-for="gift in cpStoreItems.filter(item => item.isActive)" :key="gift.code" :value="gift.code">{{ gift.name }} · {{ format(gift.coinPrice) }} عملة</option>
@@ -119,7 +119,7 @@
           <div class="col-sm-6 col-xl-3">
             <label class="form-label">هدية بدء العلاقة</label>
             <select v-model="item.giftId" class="form-select">
-              <option value="">اختر هدية CP مصنّفة من قسم الهدايا</option>
+              <option value="">اختر هدية CB مصنّفة من قسم الهدايا</option>
               <option v-for="gift in cpGifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
             </select>
             <div v-if="selectedGift(item)" class="d-flex align-items-center gap-2 mt-2 small">
@@ -151,7 +151,7 @@
           </div>
           <div class="col-12">
             <div class="border rounded-3 p-3">
-              <h4 class="h6 mb-2">تصميم المستويات ومكافآت CP من الداشبورد</h4>
+              <h4 class="h6 mb-2">تصميم المستويات ومكافآت CB من الداشبورد</h4>
               <p class="form-text">ارفع أيقونة أفقية تظهر بجانب VIP والثروة والشعبية، وإطاراً وخلفية لكل مستوى، واختر هدية مكافأة من كتالوج الهدايا العادي. التغييرات تُحفظ ضمن إعدادات المستوى وتصل للواجهات عبر API.</p>
               <div v-for="level in item.levelsEditor" :key="level.level" class="border rounded-3 p-3 mb-3">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -170,9 +170,11 @@
                     <input v-model.trim="level.name" class="form-control" maxlength="100" @change="syncLevelEditor(item)">
                     <label class="form-label mt-2">عنوان يظهر في الملف الشخصي</label>
                     <input v-model.trim="level.presentation.title" class="form-control" maxlength="100" @change="syncLevelEditor(item)">
+                    <label class="form-label mt-2">تفاصيل المستوى التي تظهر في التطبيق</label>
+                    <textarea v-model.trim="level.description" class="form-control" rows="2" maxlength="500" placeholder="اكتب تفاصيل ومزايا هذا المستوى للمستخدمين" @change="syncLevelEditor(item)"></textarea>
                   </div>
                   <div class="col-md-4">
-                    <label class="form-label">أيقونة CP العرضية بجانب VIP والثروة والشعبية (صورة أو GIF)</label>
+                    <label class="form-label">أيقونة CB العرضية بجانب VIP والثروة والشعبية (صورة أو GIF)</label>
                     <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" @change="uploadLevelAsset(item,level,'levelLogoUrl',$event)">
                     <input v-model.trim="level.presentation.levelLogoUrl" class="form-control mt-2" type="url" dir="ltr" placeholder="رابط الشعار" @change="syncLevelEditor(item)">
                     <img v-if="level.presentation.levelLogoUrl" :src="level.presentation.levelLogoUrl" alt="شعار المستوى" width="54" height="54" class="mt-2" style="object-fit:contain">
@@ -218,7 +220,7 @@
                         </label>
                       </div>
                     </div>
-                    <div v-if="!rewardCosmetics.length" class="form-text">لا توجد عناصر تجميلية نشطة. أضف إطاراً أو شارة من قسم متجر CP أولاً.</div>
+                    <div v-if="!rewardCosmetics.length" class="form-text">لا توجد عناصر تجميلية نشطة. أضف إطاراً أو شارة من قسم متجر CB أولاً.</div>
                   </div>
                   <div class="col-md-3">
                     <label class="form-label">مدة المكافأة (يوم)</label>
@@ -297,13 +299,13 @@
                       </div>
                       <div class="cp-level-preview-card" :style="{ backgroundImage: level.presentation.cardBackgroundUrl ? 'url(' + level.presentation.cardBackgroundUrl + ')' : 'linear-gradient(135deg,#24182f,#56304b)' }">
                         <img v-if="level.presentation.frameUrl" class="cp-level-preview-frame" :src="level.presentation.frameUrl" alt="إطار المستوى">
-                        <img v-if="level.presentation.levelLogoUrl" class="cp-level-preview-logo" :src="level.presentation.levelLogoUrl" alt="أيقونة CP">
+                        <img v-if="level.presentation.levelLogoUrl" class="cp-level-preview-logo" :src="level.presentation.levelLogoUrl" alt="أيقونة CB">
                         <div class="cp-level-preview-copy">
-                          <strong :style="{color:level.presentation.nameColor || '#ffffff',textShadow:level.presentation.nameGlow ? '0 0 10px currentColor' : 'none'}">{{ level.name || level.presentation.title || ('CP · المستوى ' + level.level) }}</strong>
+                          <strong :style="{color:level.presentation.nameColor || '#ffffff',textShadow:level.presentation.nameGlow ? '0 0 10px currentColor' : 'none'}">{{ level.name || level.presentation.title || ('CB · المستوى ' + level.level) }}</strong>
                           <span v-if="level.presentation.title">{{ level.presentation.title }}</span>
                           <span v-else>معاً · مستوى {{ level.level }}</span>
                         </div>
-                        <img v-if="level.giftPresentation.animationUrl" class="cp-level-preview-gift" :src="level.giftPresentation.animationUrl" alt="معاينة هدية CP">
+                        <img v-if="level.giftPresentation.animationUrl" class="cp-level-preview-gift" :src="level.giftPresentation.animationUrl" alt="معاينة هدية CB">
                       </div>
                       <div v-for="gift in selectedGifts(level)" :key="gift.id" class="d-flex align-items-center gap-2 mt-2 small">
                         <img :src="gift.animationUrl || gift.iconUrl" :alt="gift.name" style="width:48px;height:48px;object-fit:contain">
@@ -365,7 +367,7 @@
           </div>
           <div class="col-12">
             <div class="border rounded-3 p-3">
-              <h4 class="h6 mb-1">خلفية بطاقة CP في الملف الشخصي</h4>
+              <h4 class="h6 mb-1">خلفية بطاقة CB في الملف الشخصي</h4>
               <p class="form-text">تُطبّق على بطاقة العلاقة فقط، مع الحفاظ على أبعادها ومواقع الصور والقلب والنصوص.</p>
               <div class="row g-3 align-items-end">
                 <div class="col-md-6">
@@ -396,12 +398,12 @@
       <section v-show="activeTab === 'store'" class="settings-card mb-3 cp-store-admin">
         <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-2">
           <div>
-            <h3 class="settings-card-title mb-1">متجر CP · الهدايا والمكافآت</h3>
-            <p class="form-text mb-0">أنشئ عناصر خاصة بعالم CP، وحدد السعر والمدة والصورة. العناصر المحفوظة هنا تظهر في متجر CP داخل تطبيق Android.</p>
+            <h3 class="settings-card-title mb-1">متجر CB · الهدايا والمكافآت</h3>
+            <p class="form-text mb-0">أنشئ عناصر خاصة بعالم CB، وحدد السعر والمدة والصورة. العناصر المحفوظة هنا تظهر في متجر CB داخل تطبيق Android.</p>
           </div>
           <span class="badge rounded-pill text-bg-light border">متصل بكتالوج المتجر</span>
         </div>
-        <div class="alert alert-info small">الشراء وخصم العملات وارتداء العنصر يتم عبر الخادم. لا تضفوا عناصر CP بإعدادات شكلية فقط؛ يجب حفظ صورة معاينة صالحة وسعر واضح.</div>
+        <div class="alert alert-info small">الشراء وخصم العملات وارتداء العنصر يتم عبر الخادم. لا تضفوا عناصر CB بإعدادات شكلية فقط؛ يجب حفظ صورة معاينة صالحة وسعر واضح.</div>
         <div class="row g-3">
           <div class="col-sm-6 col-xl-3">
             <label class="form-label">رمز العنصر (فريد)</label>
@@ -434,7 +436,7 @@
           <div class="col-md-6">
             <label class="form-label">رابط صورة المعاينة</label>
             <input v-model.trim="cpStoreForm.previewUrl" class="form-control" dir="ltr" placeholder="https://…">
-            <div v-if="cpStoreForm.previewUrl" class="mt-2"><img :src="cpStoreForm.previewUrl" alt="معاينة عنصر CP" style="width:72px;height:72px;object-fit:contain;border-radius:12px;border:1px solid #e7c9d8;background:#fff;padding:5px"></div>
+            <div v-if="cpStoreForm.previewUrl" class="mt-2"><img :src="cpStoreForm.previewUrl" alt="معاينة عنصر CB" style="width:72px;height:72px;object-fit:contain;border-radius:12px;border:1px solid #e7c9d8;background:#fff;padding:5px"></div>
           </div>
           <div class="col-md-6">
             <label class="form-label">رابط الحركة (اختياري)</label>
@@ -450,7 +452,7 @@
           </div>
           <div class="col-md-3 d-flex align-items-end">
             <button class="btn btn-aurora w-100" :disabled="savingCpStore" @click="createCpStoreItem">
-              <span v-if="savingCpStore" class="spinner-border spinner-border-sm me-1" />إضافة إلى متجر CP
+              <span v-if="savingCpStore" class="spinner-border spinner-border-sm me-1" />إضافة إلى متجر CB
             </button>
           </div>
         </div>
@@ -459,8 +461,8 @@
           <h4 class="h6 mb-0">العناصر المنشورة ({{ cpStoreItems.length }})</h4>
           <button class="btn btn-outline-secondary btn-sm" :disabled="loadingCpStore" @click="loadCpStoreItems">تحديث عناصر المتجر</button>
         </div>
-        <div v-if="loadingCpStore" class="text-secondary small py-3">جارٍ تحميل عناصر متجر CP…</div>
-        <div v-else-if="!cpStoreItems.length" class="text-secondary small py-3">لا توجد عناصر CP خاصة بعد. أضف أول عنصر من النموذج أعلاه.</div>
+        <div v-if="loadingCpStore" class="text-secondary small py-3">جارٍ تحميل عناصر متجر CB…</div>
+        <div v-else-if="!cpStoreItems.length" class="text-secondary small py-3">لا توجد عناصر CB خاصة بعد. أضف أول عنصر من النموذج أعلاه.</div>
         <div v-for="item in cpStoreItems" :key="item.id" class="d-flex align-items-center gap-3 py-3 border-top flex-wrap">
           <img :src="item.previewUrl" :alt="item.name" width="58" height="58" class="rounded-3 border" style="object-fit:contain;background:#fff">
           <div class="flex-grow-1" style="min-width:210px">
@@ -514,7 +516,7 @@
       <section v-show="activeTab === 'operations'" class="settings-card mb-3">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
           <div>
-            <h3 class="settings-card-title mb-1">طلبات CP وسجل الاسترداد</h3>
+            <h3 class="settings-card-title mb-1">طلبات CB وسجل الاسترداد</h3>
             <p class="form-text mb-0">يعرض آخر الطلبات وحالاتها؛ لا تُعرض بيانات المحافظ الخاصة.</p>
           </div>
           <button class="btn btn-outline-secondary btn-sm" :disabled="loadingLogs" @click="loadLogs">تحديث السجلات</button>
@@ -537,7 +539,7 @@
 
       <section v-show="activeTab === 'operations'" class="settings-card mb-3">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
-          <div><h3 class="settings-card-title mb-1">سجل تدقيق CP</h3><p class="form-text mb-0">تغييرات الإعدادات وتعديلات النقاط الإدارية.</p></div>
+          <div><h3 class="settings-card-title mb-1">سجل تدقيق CB</h3><p class="form-text mb-0">تغييرات الإعدادات وتعديلات النقاط الإدارية.</p></div>
           <button class="btn btn-outline-secondary btn-sm" :disabled="loadingLogs" @click="loadLogs">تحديث</button>
         </div>
         <div class="table-responsive">
@@ -608,12 +610,12 @@ async function loadCpStoreItems() {
   loadingCpStore.value = true
   try {
     const response = await cosmeticsApi.adminList()
-    if (response?.error) throw new Error(response.error.message || 'تعذر تحميل عناصر متجر CP')
+    if (response?.error) throw new Error(response.error.message || 'تعذر تحميل عناصر متجر CB')
     const allItems = extractList(payloadOf(response)).filter(item => item && item.isActive !== false)
     rewardCosmetics.value = allItems
     cpStoreItems.value = allItems.filter(isCpStoreItem).map(item => ({ ...item, meta: { ...(item.meta || {}), leaseDays: Number(item.meta?.leaseDays || 30) } }))
   } catch (e) {
-    error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل عناصر متجر CP'
+    error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل عناصر متجر CB'
   } finally { loadingCpStore.value = false }
 }
 async function uploadCpStorePreview(event) {
@@ -640,7 +642,7 @@ async function uploadCpStorePreview(event) {
     cpStoreForm.value.previewUrl = /^https?:\/\//i.test(uploadedUrl)
       ? uploadedUrl
       : new URL(uploadedUrl, window.location.origin).toString()
-    success.value = 'تم رفع صورة المعاينة. أكمل بيانات العنصر ثم أضفه إلى متجر CP.'
+    success.value = 'تم رفع صورة المعاينة. أكمل بيانات العنصر ثم أضفه إلى متجر CB.'
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر رفع صورة المعاينة'
   } finally {
@@ -679,10 +681,10 @@ async function createCpStoreItem() {
       meta: { cpStore: true, leaseDays: Number(form.leaseDays) },
     })
     if (response?.error) throw new Error(response.error.message || 'تعذر إضافة العنصر')
-    success.value = 'تمت إضافة العنصر إلى كتالوج متجر CP.'
+    success.value = 'تمت إضافة العنصر إلى كتالوج متجر CB.'
     cpStoreForm.value = { code: '', name: '', type: 'profile_card', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 }
     await loadCpStoreItems()
-  } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر إضافة عنصر متجر CP' }
+  } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر إضافة عنصر متجر CB' }
   finally { savingCpStore.value = false }
 }
 async function saveCpStoreItem(item) {
@@ -776,7 +778,7 @@ function payloadOf(response) {
   let value = response
   // safeRequest already unwraps the normal Nest envelope, but accept one or
   // more legacy { data: ... } wrappers so a transport envelope is never
-  // mistaken for the persisted CP configuration itself.
+  // mistaken for the persisted CB configuration itself.
   for (let depth = 0; depth < 3 && value && typeof value === 'object'; depth += 1) {
     if (value.error) return value
     if (value.success === true && 'data' in value) { value = value.data; continue }
@@ -840,7 +842,7 @@ async function load() {
       rulesText: JSON.stringify(config.policy?.rules || {}, null, 2),
     }
     await Promise.all([loadLogs(), loadCpStoreItems()])
-  } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل إعدادات CP' }
+  } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل إعدادات CB' }
   finally { loading.value = false }
 }
 
@@ -1046,14 +1048,14 @@ async function saveType(item) {
     const persistedRules = decodeOuterJson(persistedType?.rules || {})
     const mismatches = []
     if (!Array.isArray(persistedLevels) || !sameJson(persistedLevels, payload.levels)) mismatches.push('المستويات والصور والمكافآت')
-    if (String(persistedType?.giftId || persistedType?.gift?.id || '') !== String(payload.giftId || '')) mismatches.push('هدية CP')
+    if (String(persistedType?.giftId || persistedType?.gift?.id || '') !== String(payload.giftId || '')) mismatches.push('هدية CB')
     if (Number(persistedType?.giftPoints || 0) !== Number(payload.giftPoints || 0)) mismatches.push('نقاط الهدية')
     if (Number(persistedType?.giftInteractionPoints || 0) !== Number(payload.giftInteractionPoints || 0)) mismatches.push('نقاط التفاعل')
     if (payload.maxLevel !== undefined && Number(persistedType?.maxLevel || 0) !== Number(payload.maxLevel)) mismatches.push('الحد الأعلى للمستوى')
     if (payload.priceCoins !== undefined && Number(persistedType?.priceCoins || 0) !== Number(payload.priceCoins > 0 ? payload.priceCoins : 0)) mismatches.push('السعر')
     if (!sameJson(persistedRules || {}, payload.rules || {})) mismatches.push('التصميم والمؤثرات')
     if (!persistedType || mismatches.length) {
-      throw new Error('تعذر تأكيد حفظ إعدادات CP. الحقول التي لم تتطابق بعد إعادة القراءة: ' + (mismatches.join('، ') || 'نوع CP') + '. لم نعرض نجاحاً غير مؤكد.')
+      throw new Error('تعذر تأكيد حفظ إعدادات CB. الحقول التي لم تتطابق بعد إعادة القراءة: ' + (mismatches.join('، ') || 'نوع CB') + '. لم نعرض نجاحاً غير مؤكد.')
     }
     // Use the decoded canonical values for the editor after a verified save.
     persistedType.levels = persistedLevels
@@ -1061,7 +1063,7 @@ async function saveType(item) {
 
     // Update this editor from the verified authoritative response. Do not call
     // load() here: it also waits for unrelated request/audit logs and the cosmetic
-    // catalog, so a successful CP write could leave the save spinner running.
+    // catalog, so a successful CB write could leave the save spinner running.
     item.levelsText = JSON.stringify(persistedType.levels, null, 2)
     item.levelsEditor = (persistedType.levels || []).map(level => ({
       ...level,
@@ -1077,7 +1079,7 @@ async function saveType(item) {
         ...(Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []),
       ].map(code => String(code || '').trim()).filter(Boolean))),
     }))
-    success.value = 'تم حفظ إعدادات CP والتحقق من تطابقها مع البيانات المقروءة من قاعدة البيانات.'
+    success.value = 'تم حفظ إعدادات CB والتحقق من تطابقها مع البيانات المقروءة من قاعدة البيانات.'
     // Refresh logs in the background; log latency must not block the save action.
     void loadLogs()
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات النوع' }
@@ -1104,11 +1106,11 @@ async function saveFeatures() {
       tasks[id] = { enabled: !!task.enabled, title: task.title.trim(), description: String(task.description || '').trim().slice(0, 240), condition: task.condition, target, rewardPoints, rewardCosmeticCode: String(task.rewardCosmeticCode || '').trim() }
     }
     const response = await cpAdminApi.updateFeatures({ globallyEnabled: !!cpFeatures.value.globallyEnabled, giftTabEnabled: !!cpFeatures.value.giftTabEnabled, tasks })
-    if (response?.error) throw new Error(response.error.message || 'رفض الخادم حفظ إعدادات CP والمهمات.')
+    if (response?.error) throw new Error(response.error.message || 'رفض الخادم حفظ إعدادات CB والمهمات.')
     await load()
     const savedTasks = Object.fromEntries(cpFeatures.value.tasks.map(task => [task.id, task]))
-    if (cpFeatures.value.globallyEnabled !== !!payloadOf(response).globallyEnabled || cpFeatures.value.giftTabEnabled !== !!payloadOf(response).giftTabEnabled || Object.keys(tasks).some(id => !savedTasks[id] || savedTasks[id].enabled !== tasks[id].enabled || savedTasks[id].title !== tasks[id].title || savedTasks[id].condition !== tasks[id].condition || Number(savedTasks[id].target) !== tasks[id].target || Number(savedTasks[id].rewardPoints) !== tasks[id].rewardPoints || String(savedTasks[id].rewardCosmeticCode || '') !== tasks[id].rewardCosmeticCode)) throw new Error('لم تتطابق إعدادات CP والمهمات بعد إعادة تحميلها من الخادم.')
-    success.value = 'تم حفظ إعدادات CP والمهمات والتحقق منها بعد إعادة التحميل.'
+    if (cpFeatures.value.globallyEnabled !== !!payloadOf(response).globallyEnabled || cpFeatures.value.giftTabEnabled !== !!payloadOf(response).giftTabEnabled || Object.keys(tasks).some(id => !savedTasks[id] || savedTasks[id].enabled !== tasks[id].enabled || savedTasks[id].title !== tasks[id].title || savedTasks[id].condition !== tasks[id].condition || Number(savedTasks[id].target) !== tasks[id].target || Number(savedTasks[id].rewardPoints) !== tasks[id].rewardPoints || String(savedTasks[id].rewardCosmeticCode || '') !== tasks[id].rewardCosmeticCode)) throw new Error('لم تتطابق إعدادات CB والمهمات بعد إعادة تحميلها من الخادم.')
+    success.value = 'تم حفظ إعدادات CB والمهمات والتحقق منها بعد إعادة التحميل.'
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ إعدادات المهمات'
   } finally { savingFeatures.value = false }
@@ -1120,7 +1122,7 @@ async function savePolicy() {
     let rules
     try { rules = JSON.parse(policy.value.rulesText || '{}') } catch { throw new Error('قواعد السياسة ليست JSON صالحاً.') }
     const response = await cpAdminApi.updatePolicy({ requestExpiryMinutes: Number(policy.value.requestExpiryMinutes), rules })
-    if (response?.error) throw new Error(response.error.message || 'رفض الخادم حفظ سياسة CP.')
+    if (response?.error) throw new Error(response.error.message || 'رفض الخادم حفظ سياسة CB.')
     await load()
     success.value = 'تم حفظ سياسة الطلبات وإعادة تحميلها من الخادم.'
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ السياسة' }
