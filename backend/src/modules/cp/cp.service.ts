@@ -159,13 +159,19 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         item?.rewardGiftId,
       ].map(id => String(id || '').trim()).filter(id => UUID_REGEX.test(id))));
       const rewardGifts = rewardGiftIds.map(id => giftsById.get(id)).filter(Boolean);
+      // Keep the single primary reward separate from the additional reward list.
+      // Otherwise changing the primary reward in the dashboard leaves the old code
+      // inside rewardCosmeticCodes and silently grants it as an extra reward forever.
       const rewardCosmeticCodes = Array.from(new Set([
-        item?.rewardCosmeticCode,
         ...(Array.isArray(item?.rewardCosmeticCodes) ? item.rewardCosmeticCodes : []),
         ...(Array.isArray(item?.benefits) ? item.benefits : []).map((entry: any) => entry?.cosmeticCode || entry?.code),
         ...(Array.isArray(item?.rewards) ? item.rewards : []).map((entry: any) => entry?.cosmeticCode || entry?.code),
       ].map(code => String(code || '').trim()).filter(code => /^[a-zA-Z0-9_-]{2,64}$/.test(code))));
-      const rewardCosmetics = rewardCosmeticCodes.map(code => cosmeticsByCode.get(code)).filter(Boolean);
+      const allCosmeticCodes = Array.from(new Set([
+        item?.rewardCosmeticCode,
+        ...rewardCosmeticCodes,
+      ].map(code => String(code || '').trim()).filter(code => /^[a-zA-Z0-9_-]{2,64}$/.test(code))));
+      const rewardCosmetics = allCosmeticCodes.map(code => cosmeticsByCode.get(code)).filter(Boolean);
       return {
         ...item,
         rewardGiftIds,
