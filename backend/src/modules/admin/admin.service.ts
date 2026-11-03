@@ -543,6 +543,7 @@ export class AdminService {
       enabled: input.enabled === true,
       durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(input.durationSeconds) || 2))),
       soundEnabled: input.soundEnabled !== false,
+      explosionEffect,
     };
     const existing = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } });
     if (existing) {
@@ -682,6 +683,28 @@ export class AdminService {
         throw new BadRequestException('يوجد معرّف هدية غير صالح أو غير فعال في إعدادات الصندوق');
       }
     }
+    const rawEffect = input.explosionEffect && typeof input.explosionEffect === 'object'
+      ? input.explosionEffect as Record<string, unknown> : {};
+    const mediaUrl = String(rawEffect.mediaUrl || '').trim().slice(0, 2048);
+    if (mediaUrl && !(/^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(mediaUrl))) {
+      throw new BadRequestException('رابط مؤثر الانفجار يجب أن يكون HTTPS أو ملفاً داخل /uploads');
+    }
+    const bounded = (value: unknown, fallback: number, min: number, max: number) => {
+      const n = Number(value);
+      return Math.max(min, Math.min(max, Number.isFinite(n) ? n : fallback));
+    };
+    const explosionEffect = {
+      enabled: rawEffect.enabled === true,
+      mediaUrl,
+      width: bounded(rawEffect.width, 100, 10, 180),
+      height: bounded(rawEffect.height, 100, 10, 180),
+      startX: bounded(rawEffect.startX, 50, 0, 100),
+      startY: bounded(rawEffect.startY, 46, 0, 100),
+      endX: bounded(rawEffect.endX, 50, 0, 100),
+      endY: bounded(rawEffect.endY, 50, 0, 100),
+      durationMs: Math.floor(bounded(rawEffect.durationMs, 1800, 400, 8000)),
+      opacity: bounded(rawEffect.opacity, 100, 10, 100),
+    };
     const current = {
       enabled: input.enabled === true,
       iconVisible: input.iconVisible !== false,
