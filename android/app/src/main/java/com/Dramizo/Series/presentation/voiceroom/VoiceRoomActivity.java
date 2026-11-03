@@ -14658,7 +14658,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         else if ("brotherhood".equalsIgnoreCase(relation)) relationLabel = "الأخوّة";
         else if ("engagement".equalsIgnoreCase(relation)) relationLabel = "الخطوبة";
         else if ("marriage".equalsIgnoreCase(relation)) relationLabel = "الزواج";
-        else relationLabel = relation == null || relation.isEmpty() ? "CP" : relation;
+        else relationLabel = relation == null || relation.isEmpty() ? "CB" : relation;
 
         Dialog dialog = new Dialog(this);
         LinearLayout root = new LinearLayout(this);
