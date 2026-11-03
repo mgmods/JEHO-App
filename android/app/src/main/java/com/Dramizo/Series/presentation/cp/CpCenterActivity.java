@@ -295,6 +295,9 @@ public class CpCenterActivity extends ThemedActivity {
                             : "تم استلام مكافأة المهمة والهدية: " + rewardName);
                     loadTasks();
                 } else {
+                    // Re-fetch task state after a rejected claim so the button does not
+                    // remain disabled from the initial tap.
+                    loadTasks();
                     message(result.error == null ? "تعذر استلام مكافأة المهمة." : result.error);
                 }
             });
