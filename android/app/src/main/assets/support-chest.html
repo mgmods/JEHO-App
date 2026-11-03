@@ -15,6 +15,8 @@ h1{font-size:18px;margin:0;font-weight:850;letter-spacing:.1px}.sub{font-size:11
 .stage{position:relative;text-align:center;margin:7px auto 0;max-width:360px;padding:0 0 2px;min-height:160px}
 .glow{position:absolute;left:50%;top:47px;transform:translateX(-50%);width:170px;height:95px;background:#ffc74b33;filter:blur(22px);border-radius:50%}
 .chest{position:relative;z-index:1;width:148px;height:148px;object-fit:contain;filter:drop-shadow(0 9px 10px #0009);animation:float 3s ease-in-out infinite}
+.chest.preblast{animation:chestPreBlast 2s cubic-bezier(.2,.7,.25,1) forwards;filter:drop-shadow(0 0 22px #ffd36a) drop-shadow(0 9px 10px #0009)}
+@keyframes chestPreBlast{0%{transform:translateY(0) scale(1) rotate(0)}18%{transform:translateY(-3px) scale(1.04) rotate(-2deg)}38%{transform:translateY(1px) scale(1.01) rotate(2deg)}58%{transform:translateY(-2px) scale(1.06) rotate(-3deg)}78%{transform:translateY(0) scale(1.10) rotate(3deg)}92%{transform:translateY(0) scale(1.15) rotate(-2deg)}100%{transform:translateY(0) scale(1.18) rotate(0)}}
 .coin{position:absolute;z-index:2;font-size:22px;filter:drop-shadow(0 2px 3px #000);animation:coin 2.6s ease-in-out infinite}.c1{left:15%;top:48px}.c2{right:15%;top:62px;animation-delay:.5s}.c3{left:24%;top:105px;animation-delay:1s}.gift{position:absolute;font-size:24px;z-index:2;animation:float 2.3s ease-in-out infinite}.g1{right:19%;top:15px}.g2{left:18%;top:18px;animation-delay:.6s}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes coin{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-8px) rotate(12deg)}}
 .level-selector{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:4px 0 10px}
@@ -63,7 +65,7 @@ h1{font-size:18px;margin:0;font-weight:850;letter-spacing:.1px}.sub{font-size:11
 </main>
 <script>
 const modes=document.querySelectorAll('.mode'),fill=document.getElementById('fill'),percent=document.getElementById('percent'),title=document.getElementById('metricTitle'),current=document.getElementById('current'),target=document.getElementById('target'),remaining=document.getElementById('remaining');
-let liveConfig=null,liveState=null,selectedMode='coins',selectedLevelIndex=0,currentLevelIndex=0,activePreviewLevel=null;
+let liveConfig=null,liveState=null,selectedMode='coins',selectedLevelIndex=0,currentLevelIndex=0,activePreviewLevel=null,chestBlastTimer=null;
 function formatNum(n){return Math.max(0,Number(n)||0).toLocaleString('en-US')}
 function escHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function setMode(key){
@@ -155,12 +157,20 @@ window.applySupportChestData=applyLiveData;
 window.applySupportChestWin=function(win){
  try{
   const overlay=document.getElementById('explosionOverlay'),winner=String(win?.winnerName||'أحد الداعمين'),rewards=Array.isArray(win?.rewards)?win.rewards:[];
+  const chest=document.querySelector('.chest');
+  if(chest){chest.classList.remove('preblast');void chest.offsetWidth;chest.classList.add('preblast');}
   document.getElementById('blastWinner').textContent=winner+' فجّر '+String(win?.levelTitle||('المستوى '+(win?.level||'')));
   document.getElementById('blastPrize').innerHTML=rewards.map(reward=>{const image=rewardMedia(reward);const visual=image?'<img src="'+escHtml(image)+'" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'🎁\',style:\'font-size:36px\'}))">':'<span style="font-size:36px">🎁</span>';return '<div>'+visual+'<strong>'+escHtml(reward?.name||reward?.type||'مكافأة')+'</strong><small>'+escHtml(reward?.type==='vip'?'VIP':reward?.type==='coins'?'كوينزات':reward?.type==='diamonds'?'ماسات':'مكافأة')+' × '+escHtml(reward?.amount||1)+'</small></div>';}).join('')||'🎁 تم فتح الصندوق';
   const burst=document.getElementById('burstParticles');burst.innerHTML='';
-  const particles=['🎁','🪙','💎','✨','🌟','🪙','💎','🎁','✨','🪙','💎','🌟','🎁','🪙','💎','✨'];
+  const particles=['🎁','🪙','💎','✨','🌟','🪙','💎','🎁','✨','🪙','💎','🌟','🎁','🪙','💎','✨','🎁','🪙','💎','✨','🌟','🎁','🪙','💎'];
   particles.forEach((symbol,index)=>{const node=document.createElement('span');node.className='burst-particle';node.textContent=symbol;const angle=(Math.PI*2*index)/particles.length;const distance=90+(index%4)*24;node.style.setProperty('--dx',Math.round(Math.cos(angle)*distance)+'px');node.style.setProperty('--dy',Math.round(Math.sin(angle)*distance)+'px');node.style.animationDelay=(index%4)*35+'ms';burst.appendChild(node);});
-  overlay.classList.remove('show');void overlay.offsetWidth;overlay.classList.add('show');setTimeout(()=>overlay.classList.remove('show'),3600);
+  clearTimeout(chestBlastTimer);
+  overlay.classList.remove('show');
+  chestBlastTimer=setTimeout(()=>{
+   if(chest)chest.classList.remove('preblast');
+   void overlay.offsetWidth;overlay.classList.add('show');
+   setTimeout(()=>overlay.classList.remove('show'),3600);
+  },2000);
  }catch(e){console.warn('Support chest celebration failed',e);}
 };
 const help=document.getElementById('helpPanel'),helpBtn=document.getElementById('helpBtn'),closeTop=document.getElementById('closeHelp'),closeHelp=document.getElementById('helpClose');
