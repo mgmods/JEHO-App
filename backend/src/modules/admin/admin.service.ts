@@ -568,7 +568,7 @@ export class AdminService {
       coinTarget: 100000, diamondTarget: 10000, giftIds: [], giftSelectionMode: 'all',
       giftCategories: ['normal', 'lucky', 'cp'],
       levels: [{
-        level: 1, title: 'الصندوق الذهبي', goalMode: 'coins',
+        level: 1, title: 'الصندوق الذهبي', goalMode: 'coins', rewardDays: 0,
         coinTarget: 100000, diamondTarget: 0, giftCount: 1,
         giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '',
         rewards: [{ type: 'coins', amount: 5000, itemId: '' }],
