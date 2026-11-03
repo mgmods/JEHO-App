@@ -130,6 +130,20 @@ const entityList = Object.values(entities).filter(
           connectTimeoutMS: 8000,
         } as any).initialize();
 
+        // Additive support-chest gift expiry column for existing JEHO databases.
+        // Permanent gift history remains unchanged because expiresAt stays NULL.
+        try {
+          await appDataSource.query(
+            'ALTER TABLE "jeho_own"."gift_sends" ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz',
+          );
+          await appDataSource.query(
+            'CREATE INDEX IF NOT EXISTS "IDX_gift_sends_expiresAt" ON "jeho_own"."gift_sends" ("expiresAt")',
+          );
+        } catch (error) {
+          console.error('[SupportChestExpiryBootstrap] Could not initialize gift expiry column.', error instanceof Error ? error.message : String(error));
+        }
+
+
         // Create only the additive badge tables missing from older deployments.
         // This never touches voice, Redis, user records, or existing badge data.
         try {
