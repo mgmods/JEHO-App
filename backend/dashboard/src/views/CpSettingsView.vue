@@ -1079,9 +1079,6 @@ async function saveType(item) {
     persistedType.levels = wirePayload.levels
     persistedType.rules = wirePayload.rules || {}
 
-    // Use the values verified by the API for the editor after saving.
-    persistedType.levels = persistedLevels
-    persistedType.rules = persistedRules
 
     // Update this editor from the verified authoritative response. Do not call
     // load() here: it also waits for unrelated request/audit logs and the cosmetic
