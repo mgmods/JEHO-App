@@ -343,7 +343,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   async leaderboard(period: 'weekly' | 'world' = 'weekly') {
     if (period === 'world') return this.discover();
     if (period !== 'weekly') throw new BadRequestException('فترة ترتيب CP غير صالحة');
-    return this.dataSource.query(
+    const rows = await this.dataSource.query(
       `WITH weekly_totals AS (
          SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
            COALESCE(SUM(e.points::numeric), 0) AS weekly_points,
@@ -372,6 +372,23 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
        ORDER BY weekly_rank
        LIMIT 100`,
     );
+    // The weekly ranking uses the same dashboard-controlled level artwork and
+    // names as the worldwide ranking and the rewards catalog.
+    const [levelSetting] = await this.dataSource.query(
+      'SELECT value FROM app_settings WHERE key=$1',
+      [`cp.levels.${CpType.RELATIONSHIP}`],
+    );
+    const parsedLevels = parseJsonSetting(levelSetting?.value, []);
+    const levels = await this.enrichLevelRewards(Array.isArray(parsedLevels) ? parsedLevels : []);
+    const levelsByNumber = new Map(levels.map(level => [Number(level.level), level]));
+    return rows.map((row: any) => {
+      const config = levelsByNumber.get(Number(row.level));
+      return {
+        ...row,
+        levelName: config?.name || config?.title || config?.presentation?.title || null,
+        presentation: config?.presentation || null,
+      };
+    });
   }
 
   async rewards() {
