@@ -1261,7 +1261,7 @@ public class ProfileActivity extends ThemedActivity {
         com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpSelfFrame, ownFrameUrl);
         com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpPartnerFrame, partnerFrameUrl);
         binding.tvProfileCpLabel.setVisibility(View.GONE);
-        binding.tvProfileCpCvType.setText("♥ علاقة CP");
+        binding.tvProfileCpCvType.setText("♥ علاقة CB");
         binding.tvProfileCpCvHeart.setText("♥");
         binding.tvProfileCpCvLevel.setText("Lv." + Math.max(1, level));
         binding.tvProfileCpCvDays.setText("علاقة نشطة");
@@ -1385,7 +1385,7 @@ public class ProfileActivity extends ThemedActivity {
             case "love": return "♥ علاقة حب";
             case "engagement": return "💍 علاقة خطوبة";
             case "marriage": return "💞 علاقة زواج";
-            default: return "علاقة CP";
+            default: return "علاقة CB";
         }
     }
 
