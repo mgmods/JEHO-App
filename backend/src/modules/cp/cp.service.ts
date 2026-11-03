@@ -11,7 +11,7 @@ const TYPES = new Set<string>(Object.values(CpType));
 const EXPIRY_MINUTES = 30;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function parseJsonSetting<T>(raw: unknown, fallback: T): T {
+function parseJsonSetting(raw: unknown, fallback: any): any {
   let value: unknown = raw;
   for (let depth = 0; depth < 3 && typeof value === 'string'; depth += 1) {
     const candidate = value.trim();
