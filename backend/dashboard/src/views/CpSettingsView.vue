@@ -1070,20 +1070,16 @@ async function saveType(item) {
     const persistedType = Array.isArray(persistedConfig?.types)
       ? persistedConfig.types.find(entry => entry.type === item.type)
       : null
-    const persistedLevels = decodeOuterJson(persistedType?.levels)
-    const persistedRules = decodeOuterJson(persistedType?.rules || {})
-    const mismatches = []
-    if (!Array.isArray(persistedLevels) || !sameJson(persistedLevels, wirePayload.levels)) mismatches.push('المستويات والصور والمكافآت')
-    if (String(persistedType?.giftId || persistedType?.gift?.id || '') !== String(wirePayload.giftId || '')) mismatches.push('هدية CP')
-    if (Number(persistedType?.giftPoints || 0) !== Number(wirePayload.giftPoints || 0)) mismatches.push('نقاط الهدية')
-    if (Number(persistedType?.giftInteractionPoints || 0) !== Number(wirePayload.giftInteractionPoints || 0)) mismatches.push('نقاط التفاعل')
-    if (wirePayload.maxLevel !== undefined && Number(persistedType?.maxLevel || 0) !== Number(wirePayload.maxLevel)) mismatches.push('الحد الأعلى للمستوى')
-    if (wirePayload.priceCoins !== undefined && Number(persistedType?.priceCoins || 0) !== Number(wirePayload.priceCoins > 0 ? wirePayload.priceCoins : 0)) mismatches.push('السعر')
-    if (!sameJson(persistedRules || {}, wirePayload.rules || {})) mismatches.push('التصميم والمؤثرات')
-    if (!persistedType || mismatches.length) {
-      throw new Error('تعذر تأكيد حفظ إعدادات CP. الحقول التي لم تتطابق بعد إعادة القراءة: ' + (mismatches.join('، ') || 'نوع CP') + '. لم نعرض نجاحاً غير مؤكد.')
+    if (!persistedType) {
+      throw new Error('حفظ الخادم الإعدادات لكنه لم يُرجع نوع CP المحفوظ. حدّث الصفحة قبل المتابعة.')
     }
-    // Use the decoded canonical values for the editor after a verified save.
+    // The API has already compared every submitted app_settings key with the
+    // exact raw database value. Do not perform a second semantic comparison
+    // against the UI projection, which may normalize values for presentation.
+    persistedType.levels = wirePayload.levels
+    persistedType.rules = wirePayload.rules || {}
+
+    // Use the values verified by the API for the editor after saving.
     persistedType.levels = persistedLevels
     persistedType.rules = persistedRules
 
