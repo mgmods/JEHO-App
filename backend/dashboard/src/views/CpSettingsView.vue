@@ -1061,14 +1061,12 @@ async function saveType(item) {
     if (response?.error) {
       throw new Error(response.error.message || 'رفض الخادم حفظ إعدادات المستوى.')
     }
-    // Do not trust the PATCH response envelope for persistence verification:
-    // safeRequest/HTTP interceptors may wrap the returned object differently.
-    // Read the canonical config endpoint independently after the write.
-    const verifyResponse = await cpAdminApi.config()
-    if (verifyResponse?.error) {
-      throw new Error(verifyResponse.error.message || 'تم إرسال الحفظ لكن تعذرت إعادة قراءة إعدادات CP للتحقق.')
-    }
-    const persistedConfig = payloadOf(verifyResponse)
+    // The protected PATCH endpoint already commits the settings, reads them
+    // back from the database, and rejects the request if that read-back differs.
+    // Use that authoritative response instead of issuing a second GET: a
+    // separate request can hit another backend instance/read path and return an
+    // older snapshot, falsely reporting that a successful save did not persist.
+    const persistedConfig = payloadOf(response)
     const persistedType = Array.isArray(persistedConfig?.types)
       ? persistedConfig.types.find(entry => entry.type === item.type)
       : null
