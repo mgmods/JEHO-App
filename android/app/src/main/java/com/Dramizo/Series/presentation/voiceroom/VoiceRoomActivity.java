@@ -15392,11 +15392,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             final String chestToastKey = "support-chest:" + roomId + ":"
                     + (roomEventId == null ? "1" : roomEventId)
                     + ":" + (levelId == null ? "1" : levelId);
+            final String chestRewardImage = rewardImage;
             handler.postDelayed(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 RoomSoundFx.playChestExplosion(this);
                 GlobalCelebrationToast.showRoomTop(
-                        this, "💥 انفجار صندوق الدعم!", message, null, rewardImage,
+                        this, "💥 انفجار صندوق الدعم!", message, null, chestRewardImage,
                         chestToastKey, 0d, 0L, null, "support_chest", roomId);
                 GlobalCelebrationToast.showSupportChestBurst(this);
             }, 2000L);
