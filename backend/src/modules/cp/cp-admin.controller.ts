@@ -142,10 +142,10 @@ export class CpAdminController {
           if (code && !/^[a-zA-Z0-9_-]{2,64}$/.test(code)) throw new BadRequestException('رمز هدية المهمة غير صالح');
           if (code) {
             const [item] = await this.dataSource.query(
-              'SELECT id FROM cosmetics WHERE code=$1 AND code LIKE \'cp_%\' AND "isActive"=true LIMIT 1',
+              'SELECT id FROM cosmetics WHERE code=$1 AND "isActive"=true LIMIT 1',
               [code],
             );
-            if (!item) throw new BadRequestException('هدية المهمة يجب أن تكون عنصراً مفعّلاً من متجر CP');
+            if (!item) throw new BadRequestException('مكافأة المهمة يجب أن تكون عنصراً تجميلياً مفعّلاً');
           }
           task.rewardCosmeticCode = code;
         }
