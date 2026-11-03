@@ -18,7 +18,7 @@ function parseJsonSetting(raw: unknown, fallback: any): any {
     if (!candidate) return fallback;
     try { value = JSON.parse(candidate); } catch { return fallback; }
   }
-  return (value === undefined || value === null ? fallback : value) as T;
+  return value === undefined || value === null ? fallback : value;
 }
 
 @Injectable()
