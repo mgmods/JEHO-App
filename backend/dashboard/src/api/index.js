@@ -21,7 +21,13 @@ export const operatorsApi = {
 export const cpAdminApi = {
   // CP editor requests use bounded timeouts so a stalled backend cannot leave
   // the dashboard's save controls spinning indefinitely.
-  config: () => safeRequest(() => api.get('/admin/cp/config', { timeout: 20000 })),
+  config: () => safeRequest(() => api.get('/admin/cp/config', {
+    timeout: 20000,
+    // CP settings are edited immediately before read-back verification. A cached
+    // GET can return the previous levels and falsely report that a saved write failed.
+    params: { _cpReadAt: Date.now() },
+    headers: { 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' },
+  })),
   updateType: (type, payload) => safeRequest(() => api.patch(`/admin/cp/config/${encodeURIComponent(type)}`, payload, { timeout: 30000 })),
   updatePolicy: (payload) => safeRequest(() => api.patch('/admin/cp/policy', payload)),
   updateFeatures: (payload) => safeRequest(() => api.patch('/admin/cp/features', payload)),
