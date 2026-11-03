@@ -590,7 +590,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const rewardCodes = definitions.map(task => String(task.rewardCosmeticCode || '').trim()).filter(Boolean);
     const rewardRows: Array<{ code: string; name: string; previewUrl: string; type: string }> = rewardCodes.length
       ? await this.dataSource.query(
-          'SELECT code,name,"previewUrl","animationUrl",type FROM cosmetics WHERE code = ANY($1::text[]) AND code LIKE \'cp_%\' AND "isActive"=true',
+          'SELECT code,name,"previewUrl","animationUrl",type FROM cosmetics WHERE code = ANY($1::text[]) AND "isActive"=true',
           [rewardCodes],
         )
       : [];
@@ -678,7 +678,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     let rewardItem: Record<string, unknown> | null = null;
     if (configuredCode) {
       const [cosmetic] = await this.dataSource.query(
-        'SELECT id,code,name,type,"previewUrl","animationUrl" FROM cosmetics WHERE code=$1 AND "isActive"=true AND code LIKE \'cp_%\' LIMIT 1',
+        'SELECT id,code,name,type,"previewUrl","animationUrl" FROM cosmetics WHERE code=$1 AND "isActive"=true LIMIT 1',
         [configuredCode],
       );
       if (cosmetic) {
