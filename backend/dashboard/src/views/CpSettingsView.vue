@@ -1076,7 +1076,8 @@ async function saveType(item) {
     // Never replace the server read-back with the submitted browser payload.
     // A successful HTTP response is not enough: compare the persisted values
     // returned by the API before showing a success message.
-    const sameJson = (left, right) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null)
+    // Use the shared canonical JSON comparator so object-key order does not
+    // create false mismatches in nested level presentation assets and rewards.
     const savedTypePayload = {
       enabled: !!wirePayload.enabled,
       giftId: wirePayload.giftId || '',
