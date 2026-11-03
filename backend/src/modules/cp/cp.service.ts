@@ -711,7 +711,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           rewardPoints, rewardItem,
           imageUrl: (rewardItem as any)?.animationUrl || (rewardItem as any)?.previewUrl || null,
         },
-      );
+      ).catch(error => console.warn('[CP] task reward notification delivery failed', taskId, error));
     }
     return {
       taskId, taskTitle, taskDescription, claimed: true,
