@@ -543,7 +543,6 @@ export class AdminService {
       enabled: input.enabled === true,
       durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(input.durationSeconds) || 2))),
       soundEnabled: input.soundEnabled !== false,
-      explosionEffect,
     };
     const existing = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } });
     if (existing) {
@@ -650,6 +649,7 @@ export class AdminService {
         imageUrl: String(level.imageUrl || '').trim().slice(0, 2048),
         features,
         rewards,
+        rewardDays: Math.max(0, Math.min(3650, Math.floor(Number(level.rewardDays) || 0))),
       };
     });
     if (!levels.length) throw new BadRequestException('أضف مستوى واحداً على الأقل للصندوق');
@@ -717,6 +717,7 @@ export class AdminService {
       rewardAmount: Math.max(0, Math.floor(Number(input.rewardAmount) || 0)),
       instructions: String(input.instructions || '').slice(0, 3000),
       soundEnabled: input.soundEnabled !== false,
+      explosionEffect,
     };
     // Serialize admin saves and verify the exact value read back from PostgreSQL
     // in the same transaction. This prevents concurrent saves from silently
