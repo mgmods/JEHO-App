@@ -186,7 +186,7 @@
                   </div>
                   <div class="col-md-4">
                     <label class="form-label">هدايا مكافأة المستوى (يمكن اختيار عدة هدايا)</label>
-                    <select v-model="level.rewardGiftIds" class="form-select" multiple size="5" @input="syncLevelEditor(item)">
+                    <select v-model="level.rewardGiftIds" class="form-select" multiple size="5" @change="syncLevelEditor(item)">
                       <option v-for="gift in normalGifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
                     </select>
                     <div class="form-text">يمكن تحديد أكثر من هدية باستخدام الاختيار المتعدد. ستظهر كل الهدايا المختارة في معاينة مكافآت هذا المستوى داخل التطبيق.</div>
@@ -201,7 +201,7 @@
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">مكافأة تجميلية تلقائية عند بلوغ المستوى</label>
-                    <select v-model="level.rewardCosmeticCode" class="form-select" @input="syncLevelEditor(item)">
+                    <select v-model="level.rewardCosmeticCode" class="form-select" @change="syncLevelEditor(item)">
                       <option value="">بدون مكافأة تجميلية تلقائية</option>
                       <option v-for="cosmetic in rewardCosmetics" :key="cosmetic.code" :value="cosmetic.code">{{ cosmetic.name }} · {{ cosmeticTypeLabel(cosmetic.type) }}</option>
                     </select>
@@ -216,7 +216,7 @@
                     <div class="row g-2">
                       <div v-for="cosmetic in rewardCosmetics" :key="cosmetic.code" class="col-sm-6 col-lg-4">
                         <label class="d-flex align-items-center gap-2 border rounded-3 p-2 h-100">
-                          <input class="form-check-input flex-shrink-0" type="checkbox" :value="cosmetic.code" v-model="level.rewardCosmeticCodes" @input="syncLevelEditor(item)">
+                          <input class="form-check-input flex-shrink-0" type="checkbox" :value="cosmetic.code" v-model="level.rewardCosmeticCodes" @change="syncLevelEditor(item)">
                           <img :src="cosmetic.animationUrl || cosmetic.previewUrl" :alt="cosmetic.name" style="width:44px;height:44px;object-fit:contain">
                           <span class="small">{{ cosmetic.name }}<span class="d-block text-secondary">{{ cosmeticTypeLabel(cosmetic.type) }}</span></span>
                         </label>
@@ -226,11 +226,11 @@
                   </div>
                   <div class="col-md-3">
                     <label class="form-label">مدة المكافأة (يوم)</label>
-                    <input v-model.number="level.rewardDays" class="form-control" type="number" min="1" max="365" @input="syncLevelEditor(item)">
+                    <input v-model.number="level.rewardDays" class="form-control" type="number" min="1" max="365" @change="syncLevelEditor(item)">
                   </div>
                   <div class="col-md-3">
                     <label class="form-check mt-4">
-                      <input v-model="level.rewardPermanent" class="form-check-input" type="checkbox" @input="syncLevelEditor(item)">
+                      <input v-model="level.rewardPermanent" class="form-check-input" type="checkbox" @change="syncLevelEditor(item)">
                       <span class="form-check-label">مكافأة دائمة</span>
                     </label>
                   </div>
@@ -245,7 +245,7 @@
                   </div>
                   <div class="col-md-4">
                     <label class="form-check mt-4">
-                      <input v-model="level.presentation.nameGlow" class="form-check-input" type="checkbox" @input="syncLevelEditor(item)">
+                      <input v-model="level.presentation.nameGlow" class="form-check-input" type="checkbox" @change="syncLevelEditor(item)">
                       <span class="form-check-label">توهج اسم الثنائي</span>
                     </label>
                   </div>
