@@ -201,7 +201,7 @@
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">مكافأة تجميلية تلقائية عند بلوغ المستوى</label>
-                    <select v-model="level.rewardCosmeticCode" class="form-select" @change="syncLevelEditor(item)">
+                    <select v-model="level.rewardCosmeticCode" class="form-select" @focus="$event.target.dataset.previousValue = level.rewardCosmeticCode || ''" @change="onPrimaryRewardChange(item, level, $event)">
                       <option value="">بدون مكافأة تجميلية تلقائية</option>
                       <option v-for="cosmetic in rewardCosmetics" :key="cosmetic.code" :value="cosmetic.code">{{ cosmetic.name }} · {{ cosmeticTypeLabel(cosmetic.type) }}</option>
                     </select>
@@ -717,6 +717,19 @@ function selectedGifts(level) {
   return ids.map(id => gifts.value.find(gift => String(gift.id) === id)).filter(Boolean)
 }
 function selectedCpReward(code) { return rewardCosmetics.value.find(item => item.code === code) || null }
+function onPrimaryRewardChange(item, level, event) {
+  const previous = String(event?.target?.dataset?.previousValue || '').trim()
+  const current = String(level.rewardCosmeticCode || '').trim()
+  if (previous && previous !== current) {
+    // The primary reward is separate from the additional reward checklist.
+    // Remove its previous selection so changing the primary reward cannot
+    // leave the old cosmetic silently granted as an extra reward.
+    level.rewardCosmeticCodes = (Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : [])
+      .filter(code => String(code || '').trim() !== previous)
+  }
+  if (event?.target) event.target.dataset.previousValue = current
+  syncLevelEditor(item)
+}
 function normalizeCpTaskTarget(task) {
   if (task?.condition === 'gift_exchange_today') task.target = 2
 }
@@ -827,7 +840,7 @@ async function load() {
       levelsText: JSON.stringify(item.levels || [], null, 2),
       levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => {
         const benefits = [...(Array.isArray(level.benefits) ? level.benefits : []), ...(Array.isArray(level.rewards) ? level.rewards : [])]
-        const rewardCosmeticCodes = Array.from(new Set([level.rewardCosmeticCode, ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
+        const rewardCosmeticCodes = Array.from(new Set([...(Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []), ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
         return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, seatEffect: { enabled: true, sizeDp: 28, durationMs: 1800, ...(level.seatEffect || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardGiftIds: Array.from(new Set([...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []), level.rewardGiftId || level.giftId || ''].map(id => String(id || '').trim()).filter(Boolean))), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
       }),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
@@ -977,7 +990,7 @@ function refreshLevelEditor(item) {
     if (!Array.isArray(levels)) throw new Error('يجب أن يكون جدول المستويات قائمة JSON.')
     item.levelsEditor = levels.map(level => {
       const benefits = [...(Array.isArray(level.benefits) ? level.benefits : []), ...(Array.isArray(level.rewards) ? level.rewards : [])]
-      const rewardCosmeticCodes = Array.from(new Set([level.rewardCosmeticCode, ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
+      const rewardCosmeticCodes = Array.from(new Set([...(Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []), ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
       return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardGiftIds: Array.from(new Set([...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []), level.rewardGiftId || level.giftId || ''].map(id => String(id || '').trim()).filter(Boolean))), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
     })
   } catch (e) { error.value = e?.message || 'تعذر قراءة جدول المستويات.' }
@@ -1086,7 +1099,6 @@ async function saveType(item) {
         level.rewardGiftId || level.giftId || '',
       ].map(id => String(id || '').trim()).filter(Boolean))),
       rewardCosmeticCodes: Array.from(new Set([
-        level.rewardCosmeticCode,
         ...(Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []),
       ].map(code => String(code || '').trim()).filter(Boolean))),
     }))
