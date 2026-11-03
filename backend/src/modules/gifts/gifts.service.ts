@@ -2414,6 +2414,18 @@ export class GiftsService implements OnModuleInit {
             payload: { ...result.opened, roomId: targetRoomId, sourceRoomId: roomId },
             at,
           });
+          // Dedicated room-wide blast signal for every connected room member.
+          this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+            roomId: targetRoomId, event: 'support_chest:blast',
+            payload: {
+              roomId: targetRoomId,
+              cycle: result.opened.cycle,
+              level: result.opened.level,
+              eventId: result.opened.eventId || null,
+              delayMs: 2000,
+            },
+            at,
+          });
         }
       }
       if (result.opened) {
