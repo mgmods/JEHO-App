@@ -2278,7 +2278,7 @@ export class GiftsService implements OnModuleInit {
           const rewardType = String(reward.type || '');
           const amount = Math.max(1, Math.floor(Number(reward.amount) || 1));
           const itemId = String(reward.itemId || '').trim();
-          const rewardDays = Math.max(0, Math.min(3650, Math.floor(Number(levelCfg.rewardDays) || 0)));
+          const rewardDays = Math.max(0, Math.min(3650, Math.floor(Number(reward.durationDays ?? levelCfg.rewardDays) || 0)));
           const rewardExpiresAt = rewardDays > 0 ? new Date(Date.now() + rewardDays * 24 * 60 * 60 * 1000) : null;
           if (rewardType === 'coins' || rewardType === 'diamonds') {
             const walletRepo = manager.getRepository(Wallet);
@@ -2304,7 +2304,8 @@ export class GiftsService implements OnModuleInit {
             const ownership = manager.getRepository(UserCosmetic);
             const owned = await ownership.findOne({ where: { userId: senderId, cosmeticId: cosmetic.id } });
             if (!owned) await ownership.save(ownership.create({ userId: senderId, cosmeticId: cosmetic.id, equipped: false, expiresAt: rewardExpiresAt }));
-            else if (owned.expiresAt && (!rewardExpiresAt || owned.expiresAt < rewardExpiresAt)) { owned.expiresAt = rewardExpiresAt; await ownership.save(owned); }
+            else if (rewardDays <= 0) { if (owned.expiresAt) { owned.expiresAt = null; await ownership.save(owned); } }
+            else if (owned.expiresAt) { owned.expiresAt = new Date(Math.max(Date.now(), new Date(owned.expiresAt).getTime()) + rewardDays * 24 * 60 * 60 * 1000); await ownership.save(owned); }
             granted.push({ type: 'frame', itemId: cosmetic.id, name: cosmetic.name, imageUrl: cosmetic.previewUrl || null });
           } else if (rewardType === 'badge') {
             if (!itemId) throw new BadRequestException('Support chest badge reward requires an item ID');
@@ -2313,7 +2314,8 @@ export class GiftsService implements OnModuleInit {
             const ownership = manager.getRepository(UserBadge);
             const owned = await ownership.findOne({ where: { userId: senderId, badgeId: badge.id } });
             if (!owned) await ownership.save(ownership.create({ userId: senderId, badgeId: badge.id, grantedByAdminId: null, source: 'support_chest', expiresAt: rewardExpiresAt }));
-            else if (rewardExpiresAt && (!owned.expiresAt || owned.expiresAt < rewardExpiresAt)) { owned.expiresAt = rewardExpiresAt; await ownership.save(owned); }
+            else if (rewardDays <= 0) { if (owned.expiresAt) { owned.expiresAt = null; await ownership.save(owned); } }
+            else if (owned.expiresAt) { owned.expiresAt = new Date(Math.max(Date.now(), new Date(owned.expiresAt).getTime()) + rewardDays * 24 * 60 * 60 * 1000); await ownership.save(owned); }
             granted.push({ type: 'badge', itemId: badge.id, name: badge.name, imageUrl: badge.imageUrl || null });
           } else if (rewardType === 'gift') {
             if (!itemId) throw new BadRequestException('Support chest gift reward requires a gift ID');
