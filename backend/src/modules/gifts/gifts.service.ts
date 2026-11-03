@@ -9,7 +9,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {DataSource, MoreThan, Repository, Or, IsNull, MoreThan} from 'typeorm';
+import { DataSource, MoreThan, Repository, Or, IsNull } from 'typeorm';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomInt } from 'crypto';
@@ -2304,7 +2304,7 @@ export class GiftsService implements OnModuleInit {
             const ownership = manager.getRepository(UserCosmetic);
             const owned = await ownership.findOne({ where: { userId: senderId, cosmeticId: cosmetic.id } });
             if (!owned) await ownership.save(ownership.create({ userId: senderId, cosmeticId: cosmetic.id, equipped: false, expiresAt: rewardExpiresAt }));
-            else if (rewardExpiresAt && (!owned.expiresAt || owned.expiresAt < rewardExpiresAt)) { owned.expiresAt = rewardExpiresAt; await ownership.save(owned); }
+            else if (owned.expiresAt && rewardExpiresAt && owned.expiresAt < rewardExpiresAt) { owned.expiresAt = rewardExpiresAt; await ownership.save(owned); }
             granted.push({ type: 'frame', itemId: cosmetic.id, name: cosmetic.name, imageUrl: cosmetic.previewUrl || null });
           } else if (rewardType === 'badge') {
             if (!itemId) throw new BadRequestException('Support chest badge reward requires an item ID');
