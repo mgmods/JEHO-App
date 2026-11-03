@@ -1031,10 +1031,16 @@ async function saveType(item) {
     } else if (item.priceCoins != null) {
       payload.priceCoins = 0
     }
+    // Compare exactly what HTTP JSON can transmit. Vue editor objects may contain
+    // undefined fields; Axios/JSON.stringify omits those object keys (and converts
+    // undefined array entries to null). Comparing the richer in-memory object with
+    // the server's JSON response falsely reports that levels/images/rewards were
+    // not saved even when PostgreSQL contains the submitted configuration.
+    const wirePayload = JSON.parse(JSON.stringify(payload))
+
     // safeRequest resolves with { data, error } even when the API rejects the save.
-    // Check the normalized error explicitly; otherwise the dashboard reports success
-    // and reloads the old settings, making level rewards and artwork appear unsaved.
-    const response = await cpAdminApi.updateType(item.type, payload)
+    // Check the normalized error explicitly; never report success for a rejected write.
+    const response = await cpAdminApi.updateType(item.type, wirePayload)
     if (response?.error) {
       throw new Error(response.error.message || 'رفض الخادم حفظ إعدادات المستوى.')
     }
@@ -1052,13 +1058,13 @@ async function saveType(item) {
     const persistedLevels = decodeOuterJson(persistedType?.levels)
     const persistedRules = decodeOuterJson(persistedType?.rules || {})
     const mismatches = []
-    if (!Array.isArray(persistedLevels) || !sameJson(persistedLevels, payload.levels)) mismatches.push('المستويات والصور والمكافآت')
-    if (String(persistedType?.giftId || persistedType?.gift?.id || '') !== String(payload.giftId || '')) mismatches.push('هدية CP')
-    if (Number(persistedType?.giftPoints || 0) !== Number(payload.giftPoints || 0)) mismatches.push('نقاط الهدية')
-    if (Number(persistedType?.giftInteractionPoints || 0) !== Number(payload.giftInteractionPoints || 0)) mismatches.push('نقاط التفاعل')
-    if (payload.maxLevel !== undefined && Number(persistedType?.maxLevel || 0) !== Number(payload.maxLevel)) mismatches.push('الحد الأعلى للمستوى')
-    if (payload.priceCoins !== undefined && Number(persistedType?.priceCoins || 0) !== Number(payload.priceCoins > 0 ? payload.priceCoins : 0)) mismatches.push('السعر')
-    if (!sameJson(persistedRules || {}, payload.rules || {})) mismatches.push('التصميم والمؤثرات')
+    if (!Array.isArray(persistedLevels) || !sameJson(persistedLevels, wirePayload.levels)) mismatches.push('المستويات والصور والمكافآت')
+    if (String(persistedType?.giftId || persistedType?.gift?.id || '') !== String(wirePayload.giftId || '')) mismatches.push('هدية CP')
+    if (Number(persistedType?.giftPoints || 0) !== Number(wirePayload.giftPoints || 0)) mismatches.push('نقاط الهدية')
+    if (Number(persistedType?.giftInteractionPoints || 0) !== Number(wirePayload.giftInteractionPoints || 0)) mismatches.push('نقاط التفاعل')
+    if (wirePayload.maxLevel !== undefined && Number(persistedType?.maxLevel || 0) !== Number(wirePayload.maxLevel)) mismatches.push('الحد الأعلى للمستوى')
+    if (wirePayload.priceCoins !== undefined && Number(persistedType?.priceCoins || 0) !== Number(wirePayload.priceCoins > 0 ? wirePayload.priceCoins : 0)) mismatches.push('السعر')
+    if (!sameJson(persistedRules || {}, wirePayload.rules || {})) mismatches.push('التصميم والمؤثرات')
     if (!persistedType || mismatches.length) {
       throw new Error('تعذر تأكيد حفظ إعدادات CP. الحقول التي لم تتطابق بعد إعادة القراءة: ' + (mismatches.join('، ') || 'نوع CP') + '. لم نعرض نجاحاً غير مؤكد.')
     }
