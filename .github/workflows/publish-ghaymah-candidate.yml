@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: jeho-ghaymah-candidate
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   checks:
@@ -59,15 +59,24 @@ jobs:
           VITE_API_URL: /api/v1
           VITE_BASE: /admin/
         run: npm run build
+      - name: Set up Docker Buildx for cached image validation
+        uses: docker/setup-buildx-action@v3
       - name: Build combined API and dashboard image
-        run: docker build --tag jeho-ghaymah-api:ci ./backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: jeho-ghaymah-api:ci
+          cache-from: type=gha,scope=jeho-ghaymah
+          cache-to: type=gha,mode=max,scope=jeho-ghaymah
 
   build-and-publish:
     needs: checks
     outputs:
       image_digest: ${{ steps.push.outputs.digest }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 35
     steps:
       - name: Check out the exact MG-JEHO commit that passed backend, dashboard and Docker checks
         uses: actions/checkout@v5
@@ -81,6 +90,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and publish isolated Ghaymah candidate (backend + Vue admin dashboard)
         id: push
+        timeout-minutes: 25
         uses: docker/build-push-action@v6
         with:
           context: ./backend
@@ -93,8 +103,12 @@ jobs:
             org.opencontainers.image.source=https://github.com/mgmods/JEHO-App
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=JEHO Ghaymah candidate (backend and dashboard)
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=jeho-ghaymah
+          cache-to: type=gha,mode=max,scope=jeho-ghaymah
+          outputs: type=image
+          provenance: false
+          sbom: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-jeho-own:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_to_cumin == true }}
