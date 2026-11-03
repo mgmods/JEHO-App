@@ -2401,13 +2401,8 @@ export class GiftsService implements OnModuleInit {
           payload: { config: result.config, state: roomState, contribution: result.contribution },
           at,
         });
-        if (result.contribution && !result.contribution.goalReached) {
-          this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-            roomId: targetRoomId, event: 'support_chest:contribution',
-            payload: { ...result.contribution, roomId: targetRoomId },
-            at,
-          });
-        }
+        // Do not broadcast a live contribution toast. Progress is already included in
+        // support_chest:updated; the room celebration is reserved for support_chest:opened.
         if (result.opened) {
           this.realtime?.emitToRoom(targetRoomId, 'room:event', {
             roomId: targetRoomId, event: 'support_chest:opened',
