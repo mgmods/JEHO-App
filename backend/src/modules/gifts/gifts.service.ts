@@ -9,7 +9,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, MoreThan, Repository } from 'typeorm';
+import {DataSource, MoreThan, Repository, Or, IsNull, MoreThan} from 'typeorm';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomInt } from 'crypto';
@@ -2278,6 +2278,8 @@ export class GiftsService implements OnModuleInit {
           const rewardType = String(reward.type || '');
           const amount = Math.max(1, Math.floor(Number(reward.amount) || 1));
           const itemId = String(reward.itemId || '').trim();
+          const rewardDays = Math.max(0, Math.min(3650, Math.floor(Number(levelCfg.rewardDays) || 0)));
+          const rewardExpiresAt = rewardDays > 0 ? new Date(Date.now() + rewardDays * 24 * 60 * 60 * 1000) : null;
           if (rewardType === 'coins' || rewardType === 'diamonds') {
             const walletRepo = manager.getRepository(Wallet);
             const wallet = await walletRepo.findOne({ where: { userId: senderId }, lock: { mode: 'pessimistic_write' } });
@@ -2301,7 +2303,8 @@ export class GiftsService implements OnModuleInit {
             if (!cosmetic) throw new BadRequestException('Support chest frame reward is not active');
             const ownership = manager.getRepository(UserCosmetic);
             const owned = await ownership.findOne({ where: { userId: senderId, cosmeticId: cosmetic.id } });
-            if (!owned) await ownership.save(ownership.create({ userId: senderId, cosmeticId: cosmetic.id, equipped: false, expiresAt: null }));
+            if (!owned) await ownership.save(ownership.create({ userId: senderId, cosmeticId: cosmetic.id, equipped: false, expiresAt: rewardExpiresAt }));
+            else if (rewardExpiresAt && (!owned.expiresAt || owned.expiresAt < rewardExpiresAt)) { owned.expiresAt = rewardExpiresAt; await ownership.save(owned); }
             granted.push({ type: 'frame', itemId: cosmetic.id, name: cosmetic.name, imageUrl: cosmetic.previewUrl || null });
           } else if (rewardType === 'badge') {
             if (!itemId) throw new BadRequestException('Support chest badge reward requires an item ID');
@@ -2309,7 +2312,8 @@ export class GiftsService implements OnModuleInit {
             if (!badge) throw new BadRequestException('Support chest badge reward is not active');
             const ownership = manager.getRepository(UserBadge);
             const owned = await ownership.findOne({ where: { userId: senderId, badgeId: badge.id } });
-            if (!owned) await ownership.save(ownership.create({ userId: senderId, badgeId: badge.id, grantedByAdminId: null, source: 'support_chest' }));
+            if (!owned) await ownership.save(ownership.create({ userId: senderId, badgeId: badge.id, grantedByAdminId: null, source: 'support_chest', expiresAt: rewardExpiresAt }));
+            else if (rewardExpiresAt && (!owned.expiresAt || owned.expiresAt < rewardExpiresAt)) { owned.expiresAt = rewardExpiresAt; await ownership.save(owned); }
             granted.push({ type: 'badge', itemId: badge.id, name: badge.name, imageUrl: badge.imageUrl || null });
           } else if (rewardType === 'gift') {
             if (!itemId) throw new BadRequestException('Support chest gift reward requires a gift ID');
@@ -2321,6 +2325,7 @@ export class GiftsService implements OnModuleInit {
               senderId, receiverId: senderId, roomId,
               quantity: amount, comboCount: amount, totalCoins: 0, diamondsAwarded: 0,
               luckyMultiplier: null,
+              expiresAt: rewardExpiresAt,
             }));
             granted.push({
               type: 'gift', itemId: gift.id, amount, name: gift.name,
@@ -3897,7 +3902,10 @@ export class GiftsService implements OnModuleInit {
 
   async history(userId: string, query: PaginationDto) {
     const [items, total] = await this.sendsRepo.findAndCount({
-      where: [{ senderId: userId }, { receiverId: userId }],
+      where: [
+        { senderId: userId, expiresAt: Or(IsNull(), MoreThan(new Date())) },
+        { receiverId: userId, expiresAt: Or(IsNull(), MoreThan(new Date())) },
+      ],
       relations: ['gift', 'sender', 'receiver'],
       skip: query.skip,
       take: query.limit || 20,
