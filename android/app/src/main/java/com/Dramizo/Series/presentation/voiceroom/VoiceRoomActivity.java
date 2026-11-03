@@ -15331,16 +15331,27 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (openedChestIcon != null) {
                 openedChestIcon.animate().cancel();
                 openedChestIcon.setRotation(0f);
-                android.animation.ObjectAnimator blastShake = android.animation.ObjectAnimator.ofFloat(
-                        openedChestIcon, "rotation", 0f, -18f, 18f, -12f, 12f, 0f);
-                blastShake.setDuration(780L);
-                blastShake.start();
-                openedChestIcon.animate().scaleX(1.25f).scaleY(1.25f).setDuration(260L)
-                        .withEndAction(() -> {
-                            if (!isFinishing() && !isDestroyed()) {
-                                openedChestIcon.animate().scaleX(1f).scaleY(1f).setDuration(220L).start();
-                            }
-                        }).start();
+                openedChestIcon.setScaleX(1f);
+                openedChestIcon.setScaleY(1f);
+                // Two-second suspense: the chest swells and trembles before bursting.
+                android.animation.ObjectAnimator chargeShake = android.animation.ObjectAnimator.ofFloat(
+                        openedChestIcon, "rotation", 0f, -2f, 2f, -3f, 3f, -4f, 4f, -2f, 0f);
+                chargeShake.setDuration(1900L);
+                chargeShake.start();
+                openedChestIcon.animate().scaleX(1.14f).scaleY(1.14f)
+                        .setDuration(1950L)
+                        .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator())
+                        .start();
+                handler.postDelayed(() -> {
+                    if (isFinishing() || isDestroyed() || openedChestIcon.getParent() == null) return;
+                    android.animation.ObjectAnimator blastShake = android.animation.ObjectAnimator.ofFloat(
+                            openedChestIcon, "rotation", 0f, -22f, 22f, -16f, 16f, 0f);
+                    blastShake.setDuration(520L);
+                    blastShake.start();
+                    openedChestIcon.animate().scaleX(1.30f).scaleY(1.30f).setDuration(180L)
+                            .withEndAction(() -> openedChestIcon.animate().scaleX(1f).scaleY(1f)
+                                    .setDuration(260L).start()).start();
+                }, 2000L);
             }
             handler.removeCallbacks(supportChestEventRefresh);
             handler.postDelayed(supportChestEventRefresh, 3700L);
@@ -15377,16 +15388,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     + (rewardNames.isEmpty() ? "جوائز صندوق الدعم" : android.text.TextUtils.join("، ", rewardNames));
             String roomEventId = memberStr(payload, "cycle");
             String levelId = memberStr(payload, "level");
-            // Every connected room member plays the same bundled local explosion.
-            // Do not gate playback on optional/missing backend soundEnabled payload fields.
-            RoomSoundFx.playChestExplosion(this);
-            GlobalCelebrationToast.showRoomTop(
-                    this, "💥 انفجار صندوق الدعم!", message, null, rewardImage,
-                    "support-chest:" + roomId + ":" + (roomEventId == null ? "1" : roomEventId)
-                            + ":" + (levelId == null ? "1" : levelId),
-                    0d, 0L, null, "support_chest", roomId);
-            // Dedicated full-room blast is independent of the optional toast and WebView.
-            GlobalCelebrationToast.showSupportChestBurst(this);
+            // Wait for the two-second chest charge-up before the shared room blast.
+            final String chestToastKey = "support-chest:" + roomId + ":"
+                    + (roomEventId == null ? "1" : roomEventId)
+                    + ":" + (levelId == null ? "1" : levelId);
+            handler.postDelayed(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                RoomSoundFx.playChestExplosion(this);
+                GlobalCelebrationToast.showRoomTop(
+                        this, "💥 انفجار صندوق الدعم!", message, null, rewardImage,
+                        chestToastKey, 0d, 0L, null, "support_chest", roomId);
+                GlobalCelebrationToast.showSupportChestBurst(this);
+            }, 2000L);
             return;
         }
         if ("challenge:wheel:closed".equals(event)) {
