@@ -944,6 +944,10 @@ function syncLevelEditor(item) {
     rewardGiftId: String((Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds[0] : '') || ''),
     rewardCosmeticCode: String(level.rewardCosmeticCode || ''),
     rewardCosmeticCodes: Array.from(new Set((Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []).map(code => String(code || '').trim()).filter(Boolean))),
+    // Keep legacy cosmetic entries out of both legacy rewards and benefits;
+    // otherwise an unchecked/changed reward can still be granted from the old array.
+    rewards: (Array.isArray(level.rewards) ? level.rewards : [])
+      .filter(entry => !(entry && typeof entry === 'object' && (entry.cosmeticCode || entry.code))),
     benefits: [
       ...(Array.isArray(level.benefits) ? level.benefits : []).filter(entry => !(entry && typeof entry === 'object' && (entry.cosmeticCode || entry.code))),
       ...Array.from(new Set((Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []).map(code => String(code || '').trim()).filter(Boolean))).map(code => ({ type: 'cosmetic', code, days: Number(level.rewardDays) || 30, permanent: level.rewardPermanent === true })),
