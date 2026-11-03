@@ -62,6 +62,7 @@ public class CpCenterActivity extends ThemedActivity {
                     loadHome();
                     loadRequests();
                     loadTasks();
+                    loadRewards();
                     loadCatalog();
                 });
             }
