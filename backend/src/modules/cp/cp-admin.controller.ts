@@ -332,9 +332,11 @@ export class CpAdminController {
                !(effect.url.startsWith('https://') || effect.url.startsWith('http://')))) {
             throw new BadRequestException('رابط مؤثر مقاعد المستوى غير صالح');
           }
+          // Keep the API validation aligned with the dashboard's 10–36 dp control.
+          // A valid value from the admin UI must never be rejected on save.
           if (effect.sizeDp !== undefined &&
-              (!Number.isInteger(Number(effect.sizeDp)) || Number(effect.sizeDp) < 20 || Number(effect.sizeDp) > 72)) {
-            throw new BadRequestException('حجم مؤثر مقاعد المستوى يجب أن يكون بين 20 و72');
+              (!Number.isInteger(Number(effect.sizeDp)) || Number(effect.sizeDp) < 10 || Number(effect.sizeDp) > 36)) {
+            throw new BadRequestException('حجم مؤثر مقاعد المستوى يجب أن يكون بين 10 و36');
           }
           if (effect.durationMs !== undefined &&
               (!Number.isInteger(Number(effect.durationMs)) || Number(effect.durationMs) < 500 || Number(effect.durationMs) > 10000)) {
