@@ -275,7 +275,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         } catch (error) {
           await this.dataSource.query('DELETE FROM cp_level_reward_claims WHERE id=$1', [claim.id]).catch(() => undefined);
           // A cosmetic reward must never roll back the already-earned relationship points.
-          console.warn('[CB] level cosmetic reward delivery failed', code, error);
+          console.warn('[CP] level cosmetic reward delivery failed', code, error);
         }
       }
 
@@ -590,7 +590,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const rewardCodes = definitions.map(task => String(task.rewardCosmeticCode || '').trim()).filter(Boolean);
     const rewardRows: Array<{ code: string; name: string; previewUrl: string; type: string }> = rewardCodes.length
       ? await this.dataSource.query(
-          'SELECT code,name,"previewUrl",type FROM cosmetics WHERE code = ANY($1::text[]) AND code LIKE \'cp_%\' AND "isActive"=true',
+          'SELECT code,name,"previewUrl","animationUrl",type FROM cosmetics WHERE code = ANY($1::text[]) AND code LIKE \'cp_%\' AND "isActive"=true',
           [rewardCodes],
         )
       : [];
@@ -676,9 +676,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       { taskId, userId, day, rewardCosmeticCode: configuredCode || null },
     );
     let rewardItem: Record<string, unknown> | null = null;
-    if (!(result as any).duplicate && configuredCode) {
+    if (configuredCode) {
       const [cosmetic] = await this.dataSource.query(
-        'SELECT id,code,name,type,"previewUrl" FROM cosmetics WHERE code=$1 AND "isActive"=true AND code LIKE \'cp_%\' LIMIT 1',
+        'SELECT id,code,name,type,"previewUrl","animationUrl" FROM cosmetics WHERE code=$1 AND "isActive"=true AND code LIKE \'cp_%\' LIMIT 1',
         [configuredCode],
       );
       if (cosmetic) {
@@ -686,16 +686,38 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           'SELECT id FROM user_cosmetics WHERE "userId"=$1 AND "cosmeticId"=$2 LIMIT 1',
           [userId, cosmetic.id],
         );
-        if (!owned) {
-          await this.dataSource.query(
-            'INSERT INTO user_cosmetics (id,"userId","cosmeticId",equipped,"createdAt","updatedAt") VALUES (gen_random_uuid(),$1,$2,false,now(),now())',
-            [userId, cosmetic.id],
-          );
-        }
-        rewardItem = { code: cosmetic.code, name: cosmetic.name, type: cosmetic.type, previewUrl: cosmetic.previewUrl, alreadyOwned: !!owned };
+        // A retry may arrive after the points ledger committed but before the
+        // cosmetic grant completed. Re-apply the idempotent permanent grant.
+        await this.cosmetics.grantTemporary(userId, configuredCode, 365, { permanent: true });
+        rewardItem = {
+          code: cosmetic.code, name: cosmetic.name, type: cosmetic.type,
+          previewUrl: cosmetic.previewUrl, animationUrl: cosmetic.animationUrl,
+          alreadyOwned: !!owned,
+        };
       }
     }
-    return { taskId, claimed: true, duplicate: !!(result as any).duplicate, rewardPoints, rewardItem, points: (result as any).points, level: (result as any).level };
+    const taskTitle = String(taskDefinition.title || taskId).slice(0, 100);
+    const taskDescription = String(taskDefinition.description || '').slice(0, 240);
+    if (!(result as any).duplicate) {
+      await this.notifications.notifyUser(
+        userId,
+        NotificationType.SYSTEM,
+        'مكافأة CP وصلت إليك!',
+        rewardItem?.name
+          ? `أكملت مهمة «${taskTitle}» واستلمت ${String(rewardItem.name)}.`
+          : `أكملت مهمة «${taskTitle}» واستلمت ${rewardPoints} نقطة CP.`,
+        {
+          source: 'cp_task_reward', taskId, taskTitle, taskDescription,
+          rewardPoints, rewardItem,
+          imageUrl: (rewardItem as any)?.animationUrl || (rewardItem as any)?.previewUrl || null,
+        },
+      );
+    }
+    return {
+      taskId, taskTitle, taskDescription, claimed: true,
+      duplicate: !!(result as any).duplicate, rewardPoints, rewardItem,
+      points: (result as any).points, level: (result as any).level,
+    };
   }
 
   async memories(userId: string) {
@@ -1246,13 +1268,13 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           Number(levelConfig.level),
           [outcome.senderId, outcome.receiverId],
           levelConfig,
-        ).catch(error => console.warn('[CB] initial level gift delivery failed', levelConfig.level, error));
+        ).catch(error => console.warn('[CP] initial level gift delivery failed', levelConfig.level, error));
         await this.grantLevelCosmeticRewards(
           outcome.relationship.id,
           Number(levelConfig.level),
           [outcome.senderId, outcome.receiverId],
           levelConfig,
-        ).catch(error => console.warn('[CB] initial level cosmetic reward delivery failed', levelConfig.level, error));
+        ).catch(error => console.warn('[CP] initial level cosmetic reward delivery failed', levelConfig.level, error));
       }
       const currentLevelConfig = reachedLevels.find(item => Number(item.level) === Number(outcome.relationship.level || 1)) || null;
       const levelName = currentLevelConfig?.name || currentLevelConfig?.title || currentLevelConfig?.presentation?.title || null;
@@ -1613,7 +1635,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       } catch (error) {
         // Cosmetic delivery is best-effort and must never suppress the level-up event
         // or make a successful gift transaction appear to have failed.
-        console.warn('[CB] level reward processing failed', relationshipId, result.level, error);
+        console.warn('[CP] level reward processing failed', relationshipId, result.level, error);
       }
       const payload = {
         type: 'cp_level_up', relationshipId, level: result.level,
@@ -1622,7 +1644,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         presentation: currentLevelConfig?.presentation || null,
         benefits: currentLevelConfig?.benefits || currentLevelConfig?.rewards || [],
       };
-      const title = 'ارتفع مستوى CB!';
+      const title = 'ارتفع مستوى CP!';
       const body = payload.levelName ? `وصلتما إلى مستوى ${payload.levelName}` : `وصلتما إلى المستوى ${result.level}`;
       for (const memberId of [relationship?.userAId, relationship?.userBId].filter(Boolean)) {
         await this.notifications.notifyUser(memberId, NotificationType.SYSTEM, title, body, payload).catch(() => undefined);
