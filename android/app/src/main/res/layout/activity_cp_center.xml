@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="مساحة CP"
+            android:text="مساحة CB"
             android:textColor="#222222"
             android:textSize="18sp"
             android:textStyle="bold" />
@@ -62,7 +62,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:gravity="center"
-                    android:text="كيف تصبح CP؟"
+                    android:text="كيف تصبح CB؟"
                     android:textColor="#FFFFFF"
                     android:textSize="22sp"
                     android:textStyle="bold" />
@@ -109,7 +109,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="شريك CP"
+                        android:text="شريك CB"
                         android:textColor="#888888"
                         android:textSize="12sp" />
 
@@ -131,7 +131,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
                 android:lineSpacingExtra="4dp"
-                android:text="CP هو رابط خاص بينك وبين صديق/صديقة.\nأدخل معرّف الصديق لإرسال طلب CP، وبعد القبول تظهر مساحتكما هنا."
+                android:text="CB هو رابط خاص بينك وبين صديق/صديقة.\nأدخل معرّف الصديق لإرسال طلب CB، وبعد القبول تظهر مساحتكما هنا."
                 android:textColor="#444444"
                 android:textSize="14sp" />
 
@@ -229,7 +229,7 @@
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_lucky_win_btn"
                 android:gravity="center"
-                android:text="طلبات علاقات CP"
+                android:text="طلبات علاقات CB"
                 android:textColor="#FFFFFF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
@@ -241,7 +241,7 @@
                 android:layout_marginTop="20dp"
                 android:background="@drawable/bg_lucky_win_btn"
                 android:gravity="center"
-                android:text="أصبح CP · دعوة صديق"
+                android:text="أصبح CB · دعوة صديق"
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -265,7 +265,7 @@
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_profile_lux_chip"
                 android:gravity="center"
-                android:text="🏆  اكتشف علاقات CP الأكثر تفاعلاً"
+                android:text="🏆  اكتشف علاقات CB الأكثر تفاعلاً"
                 android:textColor="#6F4A14"
                 android:textSize="15sp"
                 android:textStyle="bold" />
