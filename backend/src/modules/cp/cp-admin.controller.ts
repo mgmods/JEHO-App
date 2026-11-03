@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Param, UseGuards, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Param, UseGuards, BadRequestException, InternalServerErrorException, Header } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { DataSource } from 'typeorm';
@@ -38,6 +38,9 @@ export class CpAdminController {
   constructor(private readonly dataSource: DataSource, private readonly cp: CpService, private readonly realtime: RealtimeGateway) {}
 
   @Get('config')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   @ApiOperation({ summary: 'Read CP types and admin-configured prices, gifts, levels and rules' })
   async getConfig() {
     const rows = await this.dataSource.query(
