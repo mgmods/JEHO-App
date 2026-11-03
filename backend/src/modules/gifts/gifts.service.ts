@@ -2048,9 +2048,9 @@ export class GiftsService implements OnModuleInit {
     }
     const configRow = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     const defaultLevels = [
-      { level: 1, title: 'الصندوق الذهبي', goalMode: 'coins', coinTarget: 100000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 5000, itemId: '' }] },
-      { level: 2, title: 'الصندوق الملكي', goalMode: 'coins', coinTarget: 200000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 10000, itemId: '' }] },
-      { level: 3, title: 'الصندوق الأسطوري', goalMode: 'coins', coinTarget: 300000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 20000, itemId: '' }] },
+      { level: 1, title: 'الصندوق الذهبي', goalMode: 'coins', rewardDays: 0, coinTarget: 100000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 5000, itemId: '' }] },
+      { level: 2, title: 'الصندوق الملكي', goalMode: 'coins', rewardDays: 0, coinTarget: 200000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 10000, itemId: '' }] },
+      { level: 3, title: 'الصندوق الأسطوري', goalMode: 'coins', rewardDays: 0, coinTarget: 300000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 20000, itemId: '' }] },
     ];
     const defaults: any = {
       enabled: false, iconVisible: true, soundEnabled: true, goalMode: 'coins',
