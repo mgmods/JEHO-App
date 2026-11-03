@@ -147,7 +147,7 @@ public final class RoomSoundFx {
             double boom = 0.72 * Math.sin(2.0 * Math.PI * (48.0 * t - 9.0 * t * t)) * boomEnv
                     + 1.26 * lowNoise * boomEnv;
             double crack = 0.23 * (noise - highNoiseLow) * Math.exp(-t * 10.0);
-            double transient = 0.42 * Math.exp(-Math.pow((t - 0.018) / 0.012, 2.0))
+            double transientHit = 0.42 * Math.exp(-Math.pow((t - 0.018) / 0.012, 2.0))
                     * Math.sin(2.0 * Math.PI * 95.0 * t);
             double tailEnv = Math.max(0.0, Math.min(1.0, (t - 0.12) / 0.18))
                     * Math.exp(-Math.max(0.0, t - 0.12) * 2.1);
@@ -164,7 +164,7 @@ public final class RoomSoundFx {
             }
             double whoosh = 0.035 * (noise - highNoiseLow)
                     * Math.max(0.0, Math.min(1.0, t / 0.12)) * Math.exp(-t * 2.0);
-            double value = Math.tanh((boom + crack + transient + debris + coins + whoosh) * 1.45);
+            double value = Math.tanh((boom + crack + transientHit + debris + coins + whoosh) * 1.45);
             mix[i] = value;
             peak = Math.max(peak, Math.abs(value));
         }
