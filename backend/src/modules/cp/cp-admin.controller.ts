@@ -9,15 +9,6 @@ import { CurrentUser } from '../../common/decorators';
 import { CpType } from '../../database/entities/cp-relationship.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(item => canonicalJson(item)).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
-}
-
 class CpTypeConfigDto {
   type?: CpType;
   @IsOptional() @IsInt() @Min(0) @Max(1000000000) priceCoins?: number;
@@ -405,46 +396,29 @@ export class CpAdminController {
       );
     });
 
-    // Read the persisted JSON back from app_settings before reporting success.
-    // This catches silent schema/serialization mismatches that otherwise make the
-    // dashboard reload an older level configuration after a successful-looking save.
-    const savedConfig = await this.getConfig();
-    const savedType = savedConfig.types.find((entry: Record<string, any>) => entry.type === type);
-    const mismatches: string[] = [];
-    if (body.levels !== undefined &&
-        (!savedType || !Array.isArray(savedType.levels) ||
-         canonicalJson(savedType.levels) !== canonicalJson(body.levels))) {
-      mismatches.push('المستويات والصور والمكافآت');
-    }
-    if (body.giftId !== undefined &&
-        String(savedType?.giftId || (savedType?.gift as Record<string, any> | undefined)?.id || '') !== String(body.giftId || '')) {
-      mismatches.push('هدية CP');
-    }
-    if (body.giftPoints !== undefined &&
-        Number(savedType?.giftPoints || 0) !== Number(body.giftPoints)) {
-      mismatches.push('نقاط الهدية');
-    }
-    if (body.giftInteractionPoints !== undefined &&
-        Number(savedType?.giftInteractionPoints || 0) !== Number(body.giftInteractionPoints)) {
-      mismatches.push('نقاط التفاعل');
-    }
-    if (body.maxLevel !== undefined &&
-        Number(savedType?.maxLevel || 0) !== Number(body.maxLevel)) {
-      mismatches.push('الحد الأعلى للمستوى');
-    }
-    if (body.priceCoins !== undefined) {
-      const expectedPrice = body.priceCoins > 0 ? body.priceCoins : null;
-      if ((savedType?.priceCoins ?? null) !== expectedPrice) mismatches.push('السعر');
-    }
-    if (body.rules !== undefined &&
-        canonicalJson(savedType?.rules || {}) !== canonicalJson(body.rules)) {
-      mismatches.push('التصميم والمؤثرات');
-    }
+    // Verify the exact persisted app_settings rows, not the public getConfig()
+    // projection. getConfig() intentionally normalizes values for the UI (for
+    // example null/default values and active-gift joins); comparing that projection
+    // with the raw PATCH DTO can report a false mismatch even when the write is sound.
+    const expectedEntries = Object.entries(config).map(([key, value]) => [key, String(value)] as const);
+    const persistedRows = expectedEntries.length
+      ? await this.dataSource.query(
+          'SELECT key,value FROM app_settings WHERE key = ANY($1::text[])',
+          [expectedEntries.map(([key]) => key)],
+        )
+      : [];
+    const persistedValues = new Map(
+      persistedRows.map((row: { key: string; value: unknown }) => [row.key, String(row.value ?? '')]),
+    );
+    const mismatches = expectedEntries
+      .filter(([key, expected]) => persistedValues.get(key) !== expected)
+      .map(([key]) => key);
     if (mismatches.length) {
       throw new InternalServerErrorException(
-        'تعذر تأكيد حفظ إعدادات CP بعد إعادة قراءتها من قاعدة البيانات: ' + mismatches.join('، ') + '.',
+        'تعذر تأكيد حفظ إعدادات CP في قاعدة البيانات. المفاتيح التي لم تتطابق: ' + mismatches.join('، ') + '.',
       );
     }
+    const savedConfig = await this.getConfig();
     this.realtime.emitToAll('cp:config-updated', { scope: 'cp', updatedAt: new Date().toISOString() });
     return savedConfig;
   }
