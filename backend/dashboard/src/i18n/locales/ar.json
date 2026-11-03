@@ -94,7 +94,7 @@
     "settings": "الإعدادات العامة",
     "logs": "السجلات",
     "policyBrochure": "سياسة المنصة PDF",
-    "cpSettings": "إعدادات علاقات CP"
+    "cpSettings": "إعدادات علاقات CB"
   },
   "routes": {
     "login": "تسجيل الدخول",
@@ -133,7 +133,7 @@
     "reports": "البلاغات",
     "genderVerifications": "تحقق المضيفات",
     "notifications": "الإشعارات",
-    "cpSettings": "إعدادات علاقات CP",
+    "cpSettings": "إعدادات علاقات CB",
   "settings": "الإعدادات",
     "logs": "السجلات",
     "policyBrochure": "سياسة المنصة PDF"

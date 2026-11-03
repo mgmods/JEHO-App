@@ -94,7 +94,7 @@
     "settings": "General settings",
     "logs": "Logs",
     "policyBrochure": "Platform policy PDF",
-    "cpSettings": "CP relationship settings"
+    "cpSettings": "CB relationship settings"
   },
   "routes": {
     "login": "Login",
@@ -132,7 +132,7 @@
     "reports": "Reports",
     "genderVerifications": "Hostess verification",
     "notifications": "Notifications",
-    "cpSettings": "CP Relationship Settings",
+    "cpSettings": "CB Relationship Settings",
   "settings": "Settings",
     "logs": "Logs",
     "policyBrochure": "Platform policy PDF"
