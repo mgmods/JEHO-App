@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** All CP screens are rendered in the local HTML page; API and identity remain native-side. */
+/** All CB screens are rendered in the local HTML page; API and identity remain native-side. */
 public class CpCenterActivity extends ThemedActivity {
     public static final String EXTRA_VIEW = "cp_html_view";
     public static final String EXTRA_TYPE = "cp_html_type";
@@ -56,8 +56,8 @@ public class CpCenterActivity extends ThemedActivity {
                 if (!"cp:config-updated".equals(event)) return;
                 runOnUiThread(() -> {
                     if (isFinishing() || web == null || !pageReady) return;
-                    // A dashboard CP edit changes both relationship presentation/rewards
-                    // and the selectable CP catalog. Refresh every CP-backed dataset so an
+                    // A dashboard CB edit changes both relationship presentation/rewards
+                    // and the selectable CB catalog. Refresh every CB-backed dataset so an
                     // already-open APK screen cannot keep showing the previous configuration.
                     loadHome();
                     loadRequests();
@@ -114,7 +114,7 @@ public class CpCenterActivity extends ThemedActivity {
                 ? value : "home";
     }
     private String safeType(String value) {
-        // Old APK links may still pass a legacy subtype; all CP invitations now
+        // Old APK links may still pass a legacy subtype; all CB invitations now
         // resolve to the single canonical relationship type.
         if ("relationship".equals(value) || "brotherhood".equals(value)
                 || "friendship".equals(value) || "love".equals(value)
@@ -172,7 +172,7 @@ public class CpCenterActivity extends ThemedActivity {
                 return;
             }
 
-            // Older installations stored accepted CP pairs in social_requests rather than
+            // Older installations stored accepted CB pairs in social_requests rather than
             // cp_relationships. Read the legacy endpoint as a fallback; never rewrite or
             // charge for the existing relationship just to make it visible again.
             Result<com.Dramizo.Series.data.remote.dto.MiscDtos.CpStatusDto> legacy =
@@ -280,7 +280,7 @@ public class CpCenterActivity extends ThemedActivity {
         @JavascriptInterface public void claimTask(String taskId) {
             String safeId = taskId == null ? "" : taskId.trim();
             if (!"memory_today".equals(safeId) && !"earn_points_today".equals(safeId)) {
-                message("مهمة CP غير معروفة.");
+                message("مهمة CB غير معروفة.");
                 return;
             }
             c.getIoExecutor().execute(() -> {
@@ -363,13 +363,13 @@ public class CpCenterActivity extends ThemedActivity {
         @JavascriptInterface public void endRelationship(String relationshipId) {
             String id = relationshipId == null ? "" : relationshipId.trim();
             if (id.isEmpty()) {
-                js("window.onCpRelationshipEnded && window.onCpRelationshipEnded(false," + gson.toJson("تعذر تحديد علاقة CP الحالية.") + ")");
+                js("window.onCpRelationshipEnded && window.onCpRelationshipEnded(false," + gson.toJson("تعذر تحديد علاقة CB الحالية.") + ")");
                 return;
             }
             c.getIoExecutor().execute(() -> {
                 Result<Map<String, Object>> r = ApiCall.execute(c.getUserApi().endCpRelationship(id));
                 if (r.success) {
-                    js("window.onCpRelationshipEnded && window.onCpRelationshipEnded(true," + gson.toJson("تم إلغاء ارتباط CP بنجاح.") + ")");
+                    js("window.onCpRelationshipEnded && window.onCpRelationshipEnded(true," + gson.toJson("تم إلغاء ارتباط CB بنجاح.") + ")");
                 } else {
                     js("window.onCpRelationshipEnded && window.onCpRelationshipEnded(false," + gson.toJson(r.error != null ? r.error : "تعذر إلغاء العلاقة") + ")");
                 }

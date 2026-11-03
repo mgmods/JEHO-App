@@ -110,7 +110,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable private android.widget.ImageView wealthLevelFrame;
     @Nullable private View noCpLayout;
     @Nullable private View hascpLayout;
-    // CP level strip is hosted as a sibling overlay above the bottom-sheet surface.
+    // CB level strip is hosted as a sibling overlay above the bottom-sheet surface.
     @Nullable private FrameLayout cpOverlayHost;
     @Nullable private PopupWindow cpProgressPopup;
     @Nullable private android.view.ViewTreeObserver.OnGlobalLayoutListener cpOverlayPositionListener;
@@ -372,7 +372,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     /**
-     * Show CP progress in a separate PopupWindow attached to the dialog window token.
+     * Show CB progress in a separate PopupWindow attached to the dialog window token.
      * This is deliberately NOT added to the BottomSheet decor/content hierarchy.
      */
     private void attachCpProgressOverlay(BottomSheetDialog dialog, FrameLayout sheet) {
@@ -458,7 +458,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         binding.giftNumberRv.setVisibility(View.GONE);
         if (noCpLayout != null) noCpLayout.setVisibility(View.GONE);
         if (hascpLayout != null) hascpLayout.setVisibility(View.GONE);
-        // Promotional top band used only for CP tab banner.
+        // Promotional top band used only for CB tab banner.
         if (binding.flTop != null) binding.flTop.setVisibility(View.GONE);
     }
 
@@ -491,13 +491,13 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     if (cpOverlayPositionListener != null) cpOverlayPositionListener.onGlobalLayout();
                 });
                 if (!has && noCpLayout != null) {
-                    // CP relationship requests are only created by sending a CP gift in-room.
+                    // CB relationship requests are only created by sending a CB gift in-room.
                     noCpLayout.setOnClickListener(null);
                     noCpLayout.setClickable(false);
                     View marquee = noCpLayout.findViewById(R.id.marquee_view);
                     if (marquee instanceof android.widget.TextView) {
                         ((android.widget.TextView) marquee).setText(
-                                "لا توجد علاقة CP — أرسل هدية ارتباط من تبويب CP داخل الروم لطلب الارتباط");
+                                "لا توجد علاقة CB — أرسل هدية ارتباط من تبويب CB داخل الروم لطلب الارتباط");
                     }
                 }
                 if (has) {
@@ -666,7 +666,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 active.add(c);
             }
         }
-        // The CP tab is controlled by the dashboard setting returned by /cp/catalog.
+        // The CB tab is controlled by the dashboard setting returned by /cp/catalog.
         // Remove any stale category entry when the administrator switches it off.
         for (int i = active.size() - 1; i >= 0; i--) {
             if ("cp".equalsIgnoreCase(active.get(i).key)) active.remove(i);
@@ -674,8 +674,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         if (cpGiftTabEnabled) {
             GiftDtos.GiftCategoryDto cpTab = new GiftDtos.GiftCategoryDto();
             cpTab.key = "cp";
-            cpTab.labelAr = "هدايا CP";
-            cpTab.labelEn = "CP Gifts";
+            cpTab.labelAr = "هدايا CB";
+            cpTab.labelEn = "CB Gifts";
             cpTab.sortOrder = Integer.MAX_VALUE;
             cpTab.isActive = true;
             active.add(cpTab);
@@ -853,12 +853,12 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             boolean isCpGift = "cp".equals(giftBucket(g))
                     || (g.id != null && cpGiftTypes.containsKey(g.id));
             if ("cp".equals(want)) {
-                // Show CP-category gifts and the exact gift selected in the live dashboard
+                // Show CB-category gifts and the exact gift selected in the live dashboard
                 // configuration, even when that gift's general catalog category differs.
                 if (isCpGift) out.add(g);
                 continue;
             }
-            // CP category gifts must never be duplicated in ordinary tabs.
+            // CB category gifts must never be duplicated in ordinary tabs.
             if (isCpGift) continue;
             if (want.equals(giftBucket(g))) out.add(g);
         }
@@ -1229,7 +1229,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         }
 
         int qty = effectiveQty();
-        // CP gifts use the exact same committed gift pipeline as every other gift.
+        // CB gifts use the exact same committed gift pipeline as every other gift.
         // The backend decides whether this gift opens a relationship request:
         // unlinked users trigger a request; users already linked simply gift normally.
         long need = (long) selected.coinPrice * qty * targets.size();
@@ -1242,7 +1242,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             return;
         }
 
-        // CP gift mappings are loaded from the dashboard catalog before sending.
+        // CB gift mappings are loaded from the dashboard catalog before sending.
         if (!cpCatalogLoaded) {
             Toast.makeText(requireContext(), "جارٍ التحقق من إعدادات هدية الارتباط، أعد الضغط بعد لحظة", Toast.LENGTH_SHORT).show();
             loadCpGiftMappings();
@@ -1311,7 +1311,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     // Revalidate the catalog as well: a newly selected dashboard gift may
                     // have been added or reclassified while this sheet was already open.
                     if (vm != null) vm.load();
-                    // Rebuild the tabs now that the live CP catalog is known.
+                    // Rebuild the tabs now that the live CB catalog is known.
                     applyCategories(new ArrayList<>(tabCategories));
                     applyFilter();
                     refreshSendBtn();
@@ -1321,7 +1321,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
-    /** CP gift prices are controlled by the dashboard and override the normal gift-card price in this sheet. */
+    /** CB gift prices are controlled by the dashboard and override the normal gift-card price in this sheet. */
     private void applyCpGiftPrices() {
         if (allGifts == null || allGifts.isEmpty() || cpGiftPrices.isEmpty()) return;
         for (GiftDtos.GiftDto gift : allGifts) {

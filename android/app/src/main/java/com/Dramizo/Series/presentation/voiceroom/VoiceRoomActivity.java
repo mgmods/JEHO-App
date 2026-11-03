@@ -8051,7 +8051,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             case "love": return "♥ علاقة حب";
             case "engagement": return "💍 علاقة خطوبة";
             case "marriage": return "💞 علاقة زواج";
-            default: return "علاقة CP";
+            default: return "علاقة CB";
         }
     }
 
@@ -8261,12 +8261,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             com.Dramizo.Series.presentation.common.UserSocialNav.wireUserCard(
                     this, sheet, userId, myUserId, dialog::dismiss);
         }
-        // CP initiation is room-only: the selected CP gift creates a pending request.
+        // CB initiation is room-only: the selected CB gift creates a pending request.
         if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
         if (cpTopPartnerWrap != null) cpTopPartnerWrap.setVisibility(View.GONE);
         if (tvCpTopHeart != null) tvCpTopHeart.setVisibility(View.GONE);
         AppContainer cpContainer = ContainerProvider.from(this);
-        // CP relationship requests must originate from sending a CP gift in the gift sheet.
+        // CB relationship requests must originate from sending a CB gift in the gift sheet.
         if (actCpRequest != null) {
             actCpRequest.setVisibility(View.GONE);
             actCpRequest.setOnClickListener(null);
@@ -14637,7 +14637,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
-    /** Shows CP gift requests as an in-room modal; the same request may arrive on both
+    /** Shows CB gift requests as an in-room modal; the same request may arrive on both
      * the room channel and the user channel, so requestId is deduplicated here. */
     private void showCpRoomRequestDialog(@Nullable JsonObject payload) {
         if (payload == null || isFinishing() || isDestroyed() || exiting) return;
