@@ -270,6 +270,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private RelationshipSeatEffectsOverlay relationshipSeatEffectsOverlay;
     private volatile boolean relationshipEffectsFetchInFlight;
     @Nullable private List<RoomDtos.SeatDto> pendingRelationshipEffectsSeats;
+    @Nullable private List<RoomDtos.SeatDto> lastRelationshipEffectsSeats;
     @Nullable private String pendingRelationshipEffectsSeatSignature;
     private long lastRelationshipEffectsFetchMs;
     @Nullable private String lastRelationshipEffectsSeatSignature;
@@ -13164,6 +13165,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 @Override
                 public void onUserEvent(String event, JsonObject payload) {
                     if (event == null) return;
+                    if ("cp:config-updated".equals(event)) {
+                        handler.post(() -> {
+                            if (isFinishing() || isDestroyed() || exiting) return;
+                            // Dashboard CP artwork/level changes must refresh the live room
+                            // without waiting for another seat event or disturbing RTC state.
+                            lastRelationshipEffectsSeatSignature = null;
+                            lastRelationshipEffectsFetchMs = 0L;
+                            List<RoomDtos.SeatDto> latestSeats = lastRelationshipEffectsSeats;
+                            if (latestSeats != null) refreshRoomRelationshipEffects(latestSeats);
+                        });
+                        return;
+                    }
                     if ("cp:request".equals(event)) {
                         String targetRoomId = memberStr(payload, "roomId");
                         if (targetRoomId != null && targetRoomId.equals(roomId)) {
@@ -17287,6 +17300,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * deliberately isolated from all RTC, microphone, ZEGO and Redis flows.
      */
     private void refreshRoomRelationshipEffects(@Nullable List<RoomDtos.SeatDto> seats) {
+        lastRelationshipEffectsSeats = seats == null ? null : new ArrayList<>(seats);
         if (seats == null || seats.isEmpty() || relationshipSeatEffectsOverlay == null
                 || isFinishing() || exiting) {
             if (relationshipSeatEffectsOverlay != null) relationshipSeatEffectsOverlay.clear();
