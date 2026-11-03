@@ -389,6 +389,7 @@ export class CpAdminController {
           `INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
            SELECT gen_random_uuid(), item.key, item.value, $3, now(), now()
            FROM unnest($1::text[], $2::text[]) AS item(key, value)
+           WHERE true
            ON CONFLICT (key) DO UPDATE
              SET value=EXCLUDED.value, description=EXCLUDED.description, "updatedAt"=now()`,
           [entries.map(([key]) => key), entries.map(([, value]) => String(value)), 'CP settings configured through the protected admin API'],
