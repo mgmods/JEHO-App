@@ -1073,12 +1073,31 @@ async function saveType(item) {
     if (!persistedType) {
       throw new Error('حفظ الخادم الإعدادات لكنه لم يُرجع نوع CP المحفوظ. حدّث الصفحة قبل المتابعة.')
     }
-    // The API has already compared every submitted app_settings key with the
-    // exact raw database value. Do not perform a second semantic comparison
-    // against the UI projection, which may normalize values for presentation.
-    persistedType.levels = wirePayload.levels
-    persistedType.rules = wirePayload.rules || {}
-
+    // Never replace the server read-back with the submitted browser payload.
+    // A successful HTTP response is not enough: compare the persisted values
+    // returned by the API before showing a success message.
+    const sameJson = (left, right) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null)
+    const savedTypePayload = {
+      enabled: !!wirePayload.enabled,
+      giftId: wirePayload.giftId || '',
+      giftPoints: Number(wirePayload.giftPoints || 0),
+      giftInteractionPoints: Number(wirePayload.giftInteractionPoints || 0),
+      maxLevel: wirePayload.maxLevel ?? null,
+      levels: wirePayload.levels || [],
+      rules: wirePayload.rules || {},
+    }
+    const savedTypeResponse = {
+      enabled: !!persistedType.enabled,
+      giftId: persistedType.giftId || '',
+      giftPoints: Number(persistedType.giftPoints || 0),
+      giftInteractionPoints: Number(persistedType.giftInteractionPoints || 0),
+      maxLevel: persistedType.maxLevel ?? null,
+      levels: persistedType.levels || [],
+      rules: persistedType.rules || {},
+    }
+    if (!sameJson(savedTypeResponse, savedTypePayload)) {
+      throw new Error('الخادم لم يُرجع نفس إعدادات CP التي أرسلتها بعد قراءتها من قاعدة البيانات. لم يتم اعتماد الحفظ؛ راجع اتصال قاعدة البيانات وسجلات الخادم.')
+    }
 
     // Update this editor from the verified authoritative response. Do not call
     // load() here: it also waits for unrelated request/audit logs and the cosmetic
