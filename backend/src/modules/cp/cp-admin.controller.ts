@@ -165,6 +165,26 @@ export class CpAdminController {
         [adminId, JSON.stringify({ keys: Object.keys(values), globallyEnabled: body.globallyEnabled ?? null })],
       );
     });
+    // Verify the exact feature-setting rows after the transaction commits.
+    // Do not return success if the database read-back differs from the request.
+    const expectedEntries = Object.entries(values);
+    const persistedRows = expectedEntries.length
+      ? await this.dataSource.query(
+          'SELECT key,value FROM app_settings WHERE key = ANY($1::text[])',
+          [expectedEntries.map(([key]) => key)],
+        )
+      : [];
+    const persistedValues = new Map(
+      persistedRows.map((row: { key: string; value: unknown }) => [row.key, String(row.value ?? '')]),
+    );
+    const mismatches = expectedEntries
+      .filter(([key, expected]) => persistedValues.get(key) !== expected)
+      .map(([key]) => key);
+    if (mismatches.length) {
+      throw new InternalServerErrorException(
+        'تعذر تأكيد حفظ إعدادات CP في قاعدة البيانات. المفاتيح التي لم تتطابق: ' + mismatches.join('، ') + '.',
+      );
+    }
     const saved = await this.getConfig();
     this.realtime.emitToAll('cp:config-updated', { scope: 'cp', updatedAt: new Date().toISOString() });
     return saved;
