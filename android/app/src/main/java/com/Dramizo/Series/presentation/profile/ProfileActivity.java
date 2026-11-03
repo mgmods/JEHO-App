@@ -82,6 +82,14 @@ public class ProfileActivity extends ThemedActivity {
     };
     private AnimatorSet cpHeartAnimator;
     private String loadedProfileId = "";
+    private com.Dramizo.Series.realtime.RealtimeClient.UserListener cpConfigListener;
+    private String cpProfileTargetId = "";
+    private String cpProfileOwnAvatarUrl = "";
+    private String cpProfileOwnFrameUrl = "";
+    private int cpProfileOwnVipLevel = 0;
+    private String cpProfileOwnVipTouUrl = "";
+    private String cpProfileOwnHostBadgeUrl = "";
+    private Map<String, Object> cpProfileOwnHostBadgeMeta;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,6 +106,21 @@ public class ProfileActivity extends ThemedActivity {
         });
         EdgeToEdgeHelper.padBottom(binding.contentRoot);
         container = ContainerProvider.from(this);
+        cpConfigListener = new com.Dramizo.Series.realtime.RealtimeClient.UserListener() {
+            @Override public void onUserEvent(String event, com.google.gson.JsonObject payload) {
+                if (!"cp:config-updated".equals(event)) return;
+                runOnUiThread(() -> {
+                    if (binding == null || isFinishing() || isDestroyed()
+                            || cpProfileTargetId == null || cpProfileTargetId.trim().isEmpty()) return;
+                    // Re-read the authoritative CP profile data so dashboard-edited
+                    // level names, backgrounds and logos update without reopening the profile.
+                    loadPublicCpRelationship(cpProfileTargetId, cpProfileOwnAvatarUrl,
+                            cpProfileOwnFrameUrl, cpProfileOwnVipLevel, cpProfileOwnVipTouUrl,
+                            cpProfileOwnHostBadgeUrl, cpProfileOwnHostBadgeMeta);
+                });
+            }
+        };
+        com.Dramizo.Series.realtime.RealtimeClient.getInstance().addUserListener(cpConfigListener);
         ProfileViewModel vm = new ViewModelProvider(this, new ViewModelFactory(container))
                 .get(ProfileViewModel.class);
         String userId = getIntent().getStringExtra(EXTRA_USER_ID);
@@ -962,6 +985,13 @@ public class ProfileActivity extends ThemedActivity {
     private void loadPublicCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl,
             int ownVipLevel, String ownVipTouUrl, String ownHostBadgeUrl,
             Map<String, Object> ownHostBadgeMeta) {
+        cpProfileTargetId = targetId == null ? "" : targetId;
+        cpProfileOwnAvatarUrl = ownAvatarUrl == null ? "" : ownAvatarUrl;
+        cpProfileOwnFrameUrl = ownFrameUrl == null ? "" : ownFrameUrl;
+        cpProfileOwnVipLevel = ownVipLevel;
+        cpProfileOwnVipTouUrl = ownVipTouUrl == null ? "" : ownVipTouUrl;
+        cpProfileOwnHostBadgeUrl = ownHostBadgeUrl == null ? "" : ownHostBadgeUrl;
+        cpProfileOwnHostBadgeMeta = ownHostBadgeMeta;
         if (targetId == null || targetId.trim().isEmpty()) {
             hideProfileCpRelationship();
             return;
@@ -1554,6 +1584,10 @@ public class ProfileActivity extends ThemedActivity {
     @Override
     protected void onDestroy() {
         profileHandler.removeCallbacks(mysteriousModeRefresh);
+        if (cpConfigListener != null) {
+            com.Dramizo.Series.realtime.RealtimeClient.getInstance().removeUserListener(cpConfigListener);
+            cpConfigListener = null;
+        }
         if (cpHeartAnimator != null) {
             cpHeartAnimator.cancel();
             cpHeartAnimator = null;
