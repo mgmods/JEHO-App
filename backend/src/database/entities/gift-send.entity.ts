@@ -67,6 +67,9 @@ export class GiftSend {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   luckyMultiplier: number | null;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  expiresAt: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }
