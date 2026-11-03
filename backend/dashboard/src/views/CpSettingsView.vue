@@ -191,10 +191,12 @@
                     </select>
                     <div class="form-text">يمكن تحديد أكثر من هدية باستخدام الاختيار المتعدد. ستظهر كل الهدايا المختارة في معاينة مكافآت هذا المستوى داخل التطبيق.</div>
                     <div v-if="(level.rewardGiftIds || []).length" class="d-flex flex-wrap gap-2 mt-2">
-                      <div v-for="giftId in level.rewardGiftIds" :key="giftId" v-if="selectedGift({giftId})" class="d-flex align-items-center gap-2 border rounded-3 p-2">
-                        <img :src="selectedGift({giftId}).animationUrl || selectedGift({giftId}).iconUrl" :alt="selectedGift({giftId}).name" width="42" height="42" style="object-fit:contain">
-                        <span class="small">{{ selectedGift({giftId}).name }}</span>
-                      </div>
+                      <template v-for="giftId in level.rewardGiftIds" :key="giftId">
+                        <div v-if="selectedGift({giftId})" class="d-flex align-items-center gap-2 border rounded-3 p-2">
+                          <img :src="selectedGift({giftId}).animationUrl || selectedGift({giftId}).iconUrl" :alt="selectedGift({giftId}).name" width="42" height="42" style="object-fit:contain">
+                          <span class="small">{{ selectedGift({giftId}).name }}</span>
+                        </div>
+                      </template>
                     </div>
                   </div>
                   <div class="col-md-6">
