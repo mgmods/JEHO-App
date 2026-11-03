@@ -635,7 +635,8 @@ export class AdminService {
         const amount = ['frame', 'badge'].includes(type) ? 1 : Math.max(1, Math.floor(Number(reward?.amount) || 1));
         const itemId = String(reward?.itemId || '').trim().slice(0, 160);
         if (['frame', 'badge', 'vip', 'gift'].includes(type) && !itemId) throw new BadRequestException('حدد العنصر المطلوب لكل مكافأة');
-        return { type, amount, itemId };
+        const durationDays = Math.max(0, Math.min(3650, Math.floor(Number(reward?.durationDays ?? level.rewardDays) || 0)));
+        return { type, amount, itemId, durationDays };
       }) : [];
       if (!rewards.length) throw new BadRequestException('أضف مكافأة واحدة على الأقل لكل مستوى');
       return {
