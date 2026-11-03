@@ -17356,6 +17356,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             List<RoomDtos.SeatDto> pending = pendingRelationshipEffectsSeats;
             pendingRelationshipEffectsSeats = null;
             if (pending != null) {
+                // A pending grid can represent either changed seat occupants or a forced
+                // refresh after a dashboard CP configuration event. Do not let the normal
+                // 15-second same-grid throttle suppress that newer authoritative read.
+                lastRelationshipEffectsFetchMs = 0L;
                 runOnUiThread(() -> {
                     if (!isFinishing() && !isDestroyed()) refreshRoomRelationshipEffects(pending);
                 });
