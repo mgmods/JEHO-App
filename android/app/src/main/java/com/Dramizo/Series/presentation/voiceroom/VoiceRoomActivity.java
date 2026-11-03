@@ -480,9 +480,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private WebView activeSupportChestWeb;
     @Nullable private String activeSupportChestRoomId;
     @Nullable private String activeSupportChestAsset;
-    /** Dedupe repeated realtime delivery so one completed chest creates one room-wide blast. */
+    /** Dedupe opened UI and the dedicated room-wide explosion audio event independently. */
     @Nullable private String lastSupportChestOpenedKey;
     private long lastSupportChestOpenedAtMs;
+    @Nullable private String lastSupportChestBlastKey;
+    private long lastSupportChestBlastAtMs;
     private final Runnable supportChestEventRefresh = () -> {
         WebView chestWeb = activeSupportChestWeb;
         String chestRoom = activeSupportChestRoomId;
@@ -15309,9 +15311,33 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String eventId = "support-chest-progress:" + roomId + ":"
                     + memberStr(payload, "senderId") + ":" + memberStr(payload, "cycle")
                     + ":" + memberStr(payload, "giftCount");
-            GlobalCelebrationToast.showRoomCenter(
-                    this, "🎁 صندوق الدعم يتحرّك!", sender + " ساهم في " + levelTitle,
-                    null, null, eventId, 0d, 0L, sender, "support_chest_progress", roomId);
+            // Contributions update the chest progress and icon only. No center-screen live toast.
+            return;
+        }
+        if ("support_chest:blast".equals(event)) {
+            String blastRoomId = memberStr(payload, "roomId");
+            if (blastRoomId == null || blastRoomId.trim().isEmpty()) blastRoomId = roomId;
+            if (roomId == null || !roomId.equals(blastRoomId)) return;
+            String blastKey = "support-chest-blast:" + blastRoomId + ":"
+                    + memberStr(payload, "cycle") + ":" + memberStr(payload, "level");
+            long blastAtMs = android.os.SystemClock.elapsedRealtime();
+            if (blastKey.equals(lastSupportChestBlastKey)
+                    && blastAtMs - lastSupportChestBlastAtMs < 12000L) return;
+            lastSupportChestBlastKey = blastKey;
+            lastSupportChestBlastAtMs = blastAtMs;
+            long delayMs = 2000L;
+            try {
+                if (payload.has("delayMs") && !payload.get("delayMs").isJsonNull()) {
+                    delayMs = Math.max(0L, Math.min(5000L, payload.get("delayMs").getAsLong()));
+                }
+            } catch (Exception ignored) { }
+            final String expectedRoomId = blastRoomId;
+            handler.postDelayed(() -> {
+                if (isFinishing() || isDestroyed() || !expectedRoomId.equals(roomId)) return;
+                // This dedicated room broadcast makes every connected room member play the blast,
+                // independently of who sent the gift or whether the support-chest sheet is open.
+                RoomSoundFx.playChestExplosion(this);
+            }, delayMs);
             return;
         }
         if ("support_chest:opened".equals(event)) {
@@ -15395,7 +15421,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             final String chestRewardImage = rewardImage;
             handler.postDelayed(() -> {
                 if (isFinishing() || isDestroyed()) return;
-                RoomSoundFx.playChestExplosion(this);
                 GlobalCelebrationToast.showRoomTop(
                         this, "💥 انفجار صندوق الدعم!", message, null, chestRewardImage,
                         chestToastKey, 0d, 0L, null, "support_chest", roomId);
