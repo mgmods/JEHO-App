@@ -229,10 +229,10 @@ export class CpAdminController {
         }
         previous = level.pointsRequired;
         if (level.name !== undefined && (typeof level.name !== 'string' || level.name.length > 100)) {
-          throw new BadRequestException('اسم مستوى CB غير صالح');
+          throw new BadRequestException('اسم مستوى CP غير صالح');
         }
         if (level.description !== undefined && (typeof level.description !== 'string' || level.description.length > 500)) {
-          throw new BadRequestException('تفاصيل مستوى CB غير صالحة؛ الحد الأقصى 500 حرف');
+          throw new BadRequestException('تفاصيل مستوى CP غير صالحة؛ الحد الأقصى 500 حرف');
         }
         if (level.giftBonusPercent !== undefined &&
             (!Number.isFinite(Number(level.giftBonusPercent)) || Number(level.giftBonusPercent) < 0 || Number(level.giftBonusPercent) > 500)) {
@@ -240,7 +240,7 @@ export class CpAdminController {
         }
         if (level.rewardCosmeticCode !== undefined && level.rewardCosmeticCode !== '') {
           if (typeof level.rewardCosmeticCode !== 'string' || !/^[a-zA-Z0-9_-]{2,64}$/.test(level.rewardCosmeticCode)) {
-            throw new BadRequestException('رمز المكافأة التجميلية لمستوى CB غير صالح');
+            throw new BadRequestException('رمز المكافأة التجميلية لمستوى CP غير صالح');
           }
           const [rewardCosmetic] = await this.dataSource.query(
             'SELECT id FROM cosmetics WHERE code=$1 AND "isActive"=true LIMIT 1',
@@ -282,10 +282,10 @@ export class CpAdminController {
           if (!activeReward) throw new BadRequestException('كل مكافآت المستوى يجب أن تكون عناصر تجميلية نشطة');
         }
         if (level.rewardDays !== undefined && (!Number.isInteger(Number(level.rewardDays)) || Number(level.rewardDays) < 1 || Number(level.rewardDays) > 365)) {
-          throw new BadRequestException('مدة مكافأة مستوى CB يجب أن تكون بين يوم و365 يوماً');
+          throw new BadRequestException('مدة مكافأة مستوى CP يجب أن تكون بين يوم و365 يوماً');
         }
         if (level.rewardPermanent !== undefined && typeof level.rewardPermanent !== 'boolean') {
-          throw new BadRequestException('خيار ديمومة مكافأة مستوى CB غير صالح');
+          throw new BadRequestException('خيار ديمومة مكافأة مستوى CP غير صالح');
         }
         const rewardGiftIds = Array.from(new Set([
           ...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []),
@@ -306,23 +306,23 @@ export class CpAdminController {
         }
         if (level.giftPresentation !== undefined) {
           if (!level.giftPresentation || typeof level.giftPresentation !== 'object' || Array.isArray(level.giftPresentation)) {
-            throw new BadRequestException('إعدادات هدية مستوى CB غير صالحة');
+            throw new BadRequestException('إعدادات هدية مستوى CP غير صالحة');
           }
           const animationUrl = level.giftPresentation.animationUrl;
           if (animationUrl !== undefined && animationUrl !== '' &&
               (typeof animationUrl !== 'string' || animationUrl.length > 2048 ||
                !(animationUrl.startsWith('https://') || animationUrl.startsWith('http://')))) {
-            throw new BadRequestException('رابط أنيميشن هدية CB غير صالح');
+            throw new BadRequestException('رابط أنيميشن هدية CP غير صالح');
           }
           if (level.giftPresentation.showPartnerAvatars !== undefined &&
               typeof level.giftPresentation.showPartnerAvatars !== 'boolean') {
-            throw new BadRequestException('خيار صور الشريكين في هدية CB غير صالح');
+            throw new BadRequestException('خيار صور الشريكين في هدية CP غير صالح');
           }
         }
         if (level.seatEffect !== undefined) {
           const effect = level.seatEffect;
           if (!effect || typeof effect !== 'object' || Array.isArray(effect)) {
-            throw new BadRequestException('إعدادات مؤثر مقاعد مستوى CB غير صالحة');
+            throw new BadRequestException('إعدادات مؤثر مقاعد مستوى CP غير صالحة');
           }
           if (effect.enabled !== undefined && typeof effect.enabled !== 'boolean') {
             throw new BadRequestException('حالة مؤثر مقاعد المستوى غير صالحة');
@@ -343,21 +343,21 @@ export class CpAdminController {
         }
         if (level.presentation !== undefined) {
           if (!level.presentation || typeof level.presentation !== 'object' || Array.isArray(level.presentation)) {
-            throw new BadRequestException('إعدادات عرض مستوى CB غير صالحة');
+            throw new BadRequestException('إعدادات عرض مستوى CP غير صالحة');
           }
           for (const field of ['frameUrl', 'levelLogoUrl', 'logoUrl', 'badgeUrl', 'cardBackgroundUrl']) {
             const url = level.presentation[field];
             if (url !== undefined && url !== '' &&
                 (typeof url !== 'string' || url.length > 2048 || !(url.startsWith('https://') || url.startsWith('http://')))) {
-              throw new BadRequestException('رابط صورة مستوى CB غير صالح: ' + field);
+              throw new BadRequestException('رابط صورة مستوى CP غير صالح: ' + field);
             }
           }
           if (level.presentation.nameColor !== undefined &&
               (typeof level.presentation.nameColor !== 'string' || !/^#[0-9a-f]{6}$/i.test(level.presentation.nameColor))) {
-            throw new BadRequestException('لون اسم مستوى CB غير صالح');
+            throw new BadRequestException('لون اسم مستوى CP غير صالح');
           }
           if (level.presentation.nameGlow !== undefined && typeof level.presentation.nameGlow !== 'boolean') {
-            throw new BadRequestException('خيار توهج اسم مستوى CB غير صالح');
+            throw new BadRequestException('خيار توهج اسم مستوى CP غير صالح');
           }
         }
       }

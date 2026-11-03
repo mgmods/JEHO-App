@@ -1,11 +1,11 @@
-# JEHO CB shared HTML renderer
+# JEHO CP shared HTML renderer
 
-The Android asset `cb-renderer.js` is the shared presentation layer for CB/CP relationship identity. It contains no hard-coded level artwork: all colors, titles, badges, frames and card backgrounds come from the current relationship payload returned by the backend.
+The Android asset `cp-renderer.js` is the shared presentation layer for CP/CP relationship identity. It contains no hard-coded level artwork: all colors, titles, badges, frames and card backgrounds come from the current relationship payload returned by the backend.
 
 ## Include it in an Android HTML asset
 
 ```html
-<script src="cb-renderer.js"></script>
+<script src="cp-renderer.js"></script>
 ```
 
 ## Load relationship data
@@ -42,7 +42,7 @@ All URLs are supplied by the API; do not hard-code image URLs in HTML pages. Kee
 
 ## Profile identity and relationship duration
 
-Add a profile mount point where the CB identity should appear:
+Add a profile mount point where the CP identity should appear:
 
 ```html
 <div data-cb-profile></div>
