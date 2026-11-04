@@ -366,13 +366,22 @@ public class CpCenterActivity extends ThemedActivity {
                 if (result.success) {
                     Object reward = result.data == null ? null : result.data.get("rewardItem");
                     String rewardName = null;
+                    String rewardImage = null;
                     if (reward instanceof Map) {
-                        Object name = ((Map<?, ?>) reward).get("name");
+                        Map<?, ?> rewardData = (Map<?, ?>) reward;
+                        Object name = rewardData.get("name");
                         if (name != null) rewardName = String.valueOf(name);
+                        Object image = rewardData.get("previewUrl");
+                        if (image == null) image = rewardData.get("animationUrl");
+                        if (image == null) image = rewardData.get("iconUrl");
+                        if (image != null) rewardImage = webImageUrl(String.valueOf(image));
                     }
-                    message(rewardName == null || rewardName.isEmpty()
-                            ? "تم استلام مكافأة المهمة بنجاح."
-                            : "تم استلام مكافأة المهمة والهدية: " + rewardName);
+                    String detail = rewardName == null || rewardName.isEmpty()
+                            ? "تم استلام مكافأة المهمة وإضافتها إلى حسابك بنجاح."
+                            : "تم استلام مكافأتك: " + rewardName + " وأُضيفت إلى حسابك.";
+                    js("window.showCpRewardPopup && window.showCpRewardPopup(" +
+                            gson.toJson("مبروك! استلمت مكافأتك") + "," +
+                            gson.toJson(detail) + "," + gson.toJson(rewardImage) + ")");
                     loadTasks();
                 } else {
                     // Re-fetch task state after a rejected claim so the button does not
