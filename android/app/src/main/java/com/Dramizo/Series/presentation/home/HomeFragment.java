@@ -201,10 +201,7 @@ public class HomeFragment extends Fragment {
         setupFeedPager();
         refreshLocationTabChrome();
         onLogicalTabSelected(activeTab);
-        // Home header icons from assets/icons by original file name.
-        AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
-        com.Dramizo.Series.util.RemoteNavIcons.bindHomeShortcut(binding.btnSearch, "search");
-        com.Dramizo.Series.util.RemoteNavIcons.bindHomeShortcut(binding.imgMyRoomShortcutIcon, "room");
+        refreshHeaderShortcutIcons();
         binding.btnMyRoomShortcut.setOnClickListener(v ->
                 com.Dramizo.Series.util.MyRoomLauncher.open(requireActivity()));
         binding.btnSearch.setOnClickListener(v ->
@@ -1410,8 +1407,19 @@ public class HomeFragment extends Fragment {
                 binding.imgHomeBg, url, R.drawable.home_page_bg);
     }
 
+    /**
+     * Rebind the two existing header shortcuts from the dashboard config.
+     * This updates the existing room icon beside Search only; it never adds a view.
+     */
+    public void refreshHeaderShortcutIcons() {
+        if (binding == null) return;
+        AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
+        com.Dramizo.Series.util.RemoteNavIcons.bindHomeShortcut(binding.btnSearch, "search");
+        com.Dramizo.Series.util.RemoteNavIcons.bindHomeShortcut(binding.imgMyRoomShortcutIcon, "room");
+    }
+
     private void applyRemoteHomeAssets() {
-        // Icons come from fragment_home.xml android:src — do not override in code.
+        // Header shortcut icons are bound explicitly by refreshHeaderShortcutIcons().
     }
 
     private void refreshMyRoomCard() {
