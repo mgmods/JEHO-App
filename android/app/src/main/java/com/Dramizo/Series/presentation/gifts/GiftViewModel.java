@@ -87,6 +87,7 @@ public class GiftViewModel extends ViewModel {
             gifts.postValue(new ArrayList<>(local));
         }
         if (loadInFlight) return;
+        final boolean hadUsableCatalog = hasGiftsNow() || (local != null && !local.isEmpty());
         loadInFlight = true;
         c.getIoExecutor().execute(() -> {
             try {
@@ -109,11 +110,24 @@ public class GiftViewModel extends ViewModel {
                     }
                 } else {
                     List<GiftDtos.GiftDto> current = gifts.getValue();
-                    if (current == null || current.isEmpty()) {
+                    if ((current == null || current.isEmpty()) && !hadUsableCatalog) {
                         gifts.postValue(Collections.emptyList());
-                        error.postValue(r.error != null ? r.error : "لا توجد هدايا");
+                        error.postValue("تعذر تحميل الهدايا من الخادم، حاول مجددًا بعد لحظات");
+                    } else {
+                        // A transient catalog request failure must not cover a valid
+                        // cached gift sheet with a false server-error toast.
+                        android.util.Log.w("GiftViewModel",
+                                "Gift catalog refresh failed; keeping cached catalog: " +
+                                        (r.error != null ? r.error : "unknown error"));
                     }
                 }
+            } catch (Exception failure) {
+                List<GiftDtos.GiftDto> current = gifts.getValue();
+                if ((current == null || current.isEmpty()) && !hadUsableCatalog) {
+                    gifts.postValue(Collections.emptyList());
+                    error.postValue("تعذر تحميل الهدايا من الخادم، حاول مجددًا بعد لحظات");
+                }
+                android.util.Log.w("GiftViewModel", "Gift catalog refresh exception", failure);
             } finally {
                 loadInFlight = false;
             }
