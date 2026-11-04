@@ -76,9 +76,9 @@ public final class GiftFlyAnimator {
     }
 
     /**
-     * Sends one lightweight copy to each target in a single AnimatorSet.
-     * Every copy starts and finishes on the same frame; no stagger, rotation,
-     * pulse, landing burst, or extra visual treatment is applied.
+     * Shows one large gift at the lower-center of the room, briefly pulsing in
+     * step with each accepted group send, while lightweight copies fly together
+     * from just below it to the occupied seats. The cannon control is not touched.
      */
     public static void flyTogether(
             @Nullable FrameLayout overlay,
@@ -93,15 +93,67 @@ public final class GiftFlyAnimator {
 
         float density = overlay.getResources().getDisplayMetrics().density;
         int size = Math.round(38f * density);
+        int heroSize = Math.round(86f * density);
+
+        // Reuse one hero view so rapid repeated presses never stack duplicate large gifts.
+        ImageView hero = null;
+        for (int i = 0; i < overlay.getChildCount(); i++) {
+            View child = overlay.getChildAt(i);
+            if (child instanceof ImageView && "jeho_group_gift_hero".equals(child.getTag())) {
+                hero = (ImageView) child;
+                break;
+            }
+        }
+        if (hero == null) {
+            hero = newImage(overlay, iconUrl, heroSize);
+            hero.setTag("jeho_group_gift_hero");
+            overlay.addView(hero);
+        } else if (iconUrl != null && !iconUrl.isEmpty()) {
+            try {
+                Glide.with(overlay.getContext().getApplicationContext())
+                        .load(AssetCatalog.absoluteUrl(iconUrl))
+                        .placeholder(ImagePlaceholder.gift())
+                        .error(ImagePlaceholder.gift())
+                        .into(hero);
+            } catch (Throwable ignored) {
+                hero.setImageResource(ImagePlaceholder.gift());
+            }
+        }
+        hero.getLayoutParams().width = heroSize;
+        hero.getLayoutParams().height = heroSize;
+        hero.setX(from.x - heroSize / 2f);
+        hero.setY(from.y - heroSize / 2f);
+        hero.setScaleX(1f);
+        hero.setScaleY(1f);
+        hero.setRotation(0f);
+        hero.animate().cancel();
+        hero.setAlpha(0f);
+
+        long pulseDuration = Math.max(360L, Math.min(900L, durationMs));
+        ObjectAnimator pulse = ObjectAnimator.ofFloat(hero, View.ALPHA,
+                0f, 1f, 0.12f, 1f, 0f);
+        pulse.setDuration(pulseDuration);
+        pulse.setInterpolator(new LinearInterpolator());
+        pulse.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationEnd(Animator animation) {
+                if (hero.getParent() != null) hero.setAlpha(0f);
+            }
+            @Override public void onAnimationCancel(Animator animation) {
+                if (hero.getParent() != null) hero.setAlpha(0f);
+            }
+        });
+
         List<ImageView> copies = new ArrayList<>(count);
         List<Animator> motions = new ArrayList<>(count * 2);
+        float copyStartY = Math.min(from.y + heroSize * 0.34f,
+                Math.max(heroSize / 2f, overlay.getHeight() - size / 2f));
 
         for (int i = 0; i < count; i++) {
             PointF to = destinations.get(i);
             if (to == null) continue;
             ImageView copy = newImage(overlay, iconUrl, size);
             copy.setX(from.x - size / 2f);
-            copy.setY(from.y - size / 2f);
+            copy.setY(copyStartY - size / 2f);
             copy.setAlpha(1f);
             copy.setScaleX(1f);
             copy.setScaleY(1f);
@@ -112,10 +164,13 @@ public final class GiftFlyAnimator {
             motions.add(ObjectAnimator.ofFloat(
                     copy, View.X, from.x - size / 2f, to.x - size / 2f));
             motions.add(ObjectAnimator.ofFloat(
-                    copy, View.Y, from.y - size / 2f, to.y - size / 2f));
+                    copy, View.Y, copyStartY - size / 2f, to.y - size / 2f));
         }
 
-        if (motions.isEmpty()) return;
+        if (motions.isEmpty()) {
+            pulse.start();
+            return;
+        }
         AnimatorSet together = new AnimatorSet();
         together.playTogether(motions);
         together.setDuration(Math.max(250L, durationMs));
@@ -124,7 +179,6 @@ public final class GiftFlyAnimator {
             @Override public void onAnimationEnd(Animator animation) {
                 for (ImageView copy : copies) remove(copy);
             }
-
             @Override public void onAnimationCancel(Animator animation) {
                 for (ImageView copy : copies) remove(copy);
             }
@@ -132,9 +186,15 @@ public final class GiftFlyAnimator {
         try {
             overlay.setVisibility(View.VISIBLE);
             overlay.bringToFront();
+            hero.bringToFront();
+            // Copies are placed above the room overlay but below the large hero marker.
+            for (ImageView copy : copies) copy.bringToFront();
+            hero.bringToFront();
+            pulse.start();
             together.start();
         } catch (OutOfMemoryError | RuntimeException error) {
             for (ImageView copy : copies) remove(copy);
+            hero.setAlpha(0f);
         }
     }
 
