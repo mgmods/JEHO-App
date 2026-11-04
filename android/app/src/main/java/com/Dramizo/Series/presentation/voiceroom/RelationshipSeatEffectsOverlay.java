@@ -157,8 +157,10 @@ final class RelationshipSeatEffectsOverlay {
                         || !firstValue(levelEffect, "url", "imageUrl", "assetUrl", "effectUrl", "iconUrl").isEmpty())
                     ? levelEffect : findEffect(type);
             boolean effectEnabled = levelEffect == null || !Boolean.FALSE.equals(levelEffect.get("enabled"));
-            if (effectEnabled) {
-                String url = effect == null ? "" : firstValue(effect, "url", "imageUrl", "assetUrl", "effectUrl", "iconUrl");
+            String url = effect == null ? "" : firstValue(effect, "url", "imageUrl", "assetUrl", "effectUrl", "iconUrl");
+            // Render only artwork explicitly uploaded/configured in the dashboard.
+            // Never invent a default ribbon when no dashboard asset is configured.
+            if (effectEnabled && !url.trim().isEmpty()) {
                 int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 28, 20, 72);
                 long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
                 addEffect(a, b, type, url, sizeDp, duration);
