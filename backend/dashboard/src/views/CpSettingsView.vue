@@ -732,9 +732,6 @@ function onPrimaryRewardChange(item, level, event) {
 function normalizeCpTaskTarget(task) {
   if (task?.condition === 'gift_exchange_today') task.target = 2
 }
-function addLevel(_item) { /* CP has one fixed level. */ }
-function removeLevel(_item, _levelNumber) { /* The single CP level cannot be removed. */ }
-
 function addCpTask() {
   const id = 'cp_task_' + Math.random().toString(36).slice(2, 10)
   cpFeatures.value.tasks.push({ id, enabled: true, title: '', description: '', condition: 'points_today', target: 10, rewardPoints: 0, rewardCosmeticCode: '' })
