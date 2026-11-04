@@ -1168,7 +1168,7 @@
 
         <SeekBar
             android:id="@+id/seekMusicVolume"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="30dp"
             android:layout_alignParentBottom="true"
             android:layout_marginStart="88dp"
