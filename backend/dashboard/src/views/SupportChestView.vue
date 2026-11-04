@@ -35,7 +35,7 @@
         <img v-else-if="form.explosionEffect.mediaUrl" :src="assetUrl(form.explosionEffect.mediaUrl)" alt="معاينة مؤثر الانفجار">
         <span v-else>💥 معاينة مؤثر الانفجار</span>
       </div>
-      <label class="field">صوت المؤثر (اختياري: MP3 / WAV / OGG)<input type="file" accept=".mp3,.wav,.ogg,.m4a,audio/*" :disabled="uploadingSound" @change="uploadExplosionSound"><small class="muted">{{ uploadingSound ? 'جارٍ رفع الصوت…' : (form.explosionEffect.soundUrl ? 'تم رفع صوت المؤثر.' : 'إذا كان الملف صورة، ارفع صوتاً منفصلاً هنا. صوت الفيديو المرفوع سيعمل أيضاً.') }}</small></label>
+      <label class="field">صوت المؤثر (اختياري: MP3 / WAV / OGG)<input type="file" accept=".mp3,.wav,.m4a,.aac,audio/*" :disabled="uploadingSound" @change="uploadExplosionSound"><small class="muted">{{ uploadingSound ? 'جارٍ رفع الصوت…' : (form.explosionEffect.soundUrl ? 'تم رفع صوت المؤثر.' : 'إذا كان الملف صورة، ارفع صوتاً منفصلاً هنا. صوت الفيديو المرفوع سيعمل أيضاً.') }}</small></label>
       <button v-if="form.explosionEffect.soundUrl" type="button" class="btn btn-secondary" :disabled="uploadingSound" @click="form.explosionEffect.soundUrl = ''">إزالة الصوت المخصص</button>
       <div class="grid2">
         <label class="field">العرض النهائي (%)<input v-model.number="form.explosionEffect.width" type="number" min="10" max="180"></label>
@@ -140,7 +140,7 @@ async function uploadExplosionEffect(event){
 async function uploadExplosionSound(event){
   const input=event?.target,file=input?.files?.[0];if(!file)return;
   effectUploadError.value='';
-  if(!/\.(mp3|wav|ogg|m4a)$/i.test(String(file.name||''))){effectUploadError.value='اختر ملف صوت MP3 أو WAV أو OGG أو M4A.';input.value='';return}
+  if(!/\.(mp3|wav|m4a|aac)$/i.test(String(file.name||''))){effectUploadError.value='اختر ملف صوت MP3 أو WAV أو M4A أو AAC.';input.value='';return}
   if(file.size>20*1024*1024){effectUploadError.value='حجم ملف الصوت يتجاوز 20 ميغابايت.';input.value='';return}
   uploadingSound.value=true;
   try{const result=await uploadsApi.upload(file);if(result?.error)throw result.error;const uploaded=result?.data;const url=String(uploaded?.url||uploaded?.path||'').trim();if(!url)throw new Error('الخادم لم يُرجع مسار الصوت.');form.explosionEffect.soundUrl=url;notice.value='تم رفع صوت الانفجار. احفظ الإعدادات لتفعيله.'}
