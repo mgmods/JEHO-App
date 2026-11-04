@@ -648,6 +648,16 @@ public final class GlobalCelebrationToast {
         TextView btnGo = banner.findViewById(R.id.btnCelebrationGo);
         ImageView toastBackground = banner.findViewById(R.id.imgToastBackground);
         View sheen = banner.findViewById(R.id.viewCelebrationSheen);
+        if (supportChest && avatar != null) {
+            int giftSize = dp(activity, Math.max(24, Math.min(120,
+                    (int) numberConfig(supportChestToastConfig, "giftSizeDp", 58))));
+            ViewGroup.LayoutParams imageParams = avatar.getLayoutParams();
+            if (imageParams != null) {
+                imageParams.width = giftSize;
+                imageParams.height = giftSize;
+                avatar.setLayoutParams(imageParams);
+            }
+        }
 
         boolean planet = kind != null && "planet_summon".equalsIgnoreCase(kind);
         boolean supportChest = kind != null && "support_chest".equalsIgnoreCase(kind);
