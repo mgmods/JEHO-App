@@ -120,6 +120,7 @@ export class GiftsService implements OnModuleInit {
   async onModuleInit() {
     // Schema-only fix is always safe. Catalog seeds never run against live DB.
     await this.ensureGiftCategoryColumn();
+    await this.ensureGiftBrandAgencyColumn();
     await this.ensureCpGiftColumns();
     await this.ensureGiftCategoriesTable();
     await this.ensureGiftSendIdempotencySchema();
@@ -250,6 +251,23 @@ export class GiftsService implements OnModuleInit {
     } catch (err) {
       this.log.warn(
         `ensureGiftCategoryColumn: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /** Keep the latest Gift entity column present on existing Cumin databases. */
+  private async ensureGiftBrandAgencyColumn() {
+    try {
+      await this.dataSource.query(
+        'ALTER TABLE gifts ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid NULL',
+      );
+      await this.dataSource.query(
+        'CREATE INDEX IF NOT EXISTS idx_gifts_brand_agency_id ON gifts ("brandAgencyId")',
+      );
+    } catch (err) {
+      this.log.warn(
+        'ensureGiftBrandAgencyColumn: ' +
+          (err instanceof Error ? err.message : String(err)),
       );
     }
   }
