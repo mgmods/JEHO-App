@@ -412,7 +412,8 @@ export class ConfigController {
         cfg = sanitizeNavIconsConfig(row.value);
       }
     }
-    return navIconsClientPayload(cfg);
+    // Resolve stored /uploads paths against the active Cumin API host, never a retired deployment.
+    return navIconsClientPayload(cfg, publicApiBase());
   }
 
   @Public()
