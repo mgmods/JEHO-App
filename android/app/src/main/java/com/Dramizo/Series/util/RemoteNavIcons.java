@@ -89,8 +89,15 @@ public final class RemoteNavIcons {
         if (view == null) return;
         MiscDtos.NavIconsDto cfg = cached;
         String raw = cfg != null && cfg.homeShortcuts != null && key != null ? cfg.homeShortcuts.get(key) : null;
+        final boolean roomShortcut = "room".equals(key);
+        final int fallbackRes = roomShortcut ? R.drawable.ic_tab_create_room : R.drawable.ic_search_home;
         if (raw == null || raw.trim().isEmpty()) {
-            if ("room".equals(key)) view.setVisibility(android.view.View.GONE);
+            view.setTag(R.id.tag_image_url, null);
+            view.setTag(R.id.tag_frame_url, null);
+            if (roomShortcut) {
+                view.setVisibility(android.view.View.VISIBLE);
+                view.setImageResource(fallbackRes);
+            }
             return;
         }
         view.setVisibility(android.view.View.VISIBLE);
@@ -103,8 +110,10 @@ public final class RemoteNavIcons {
         view.setTag(R.id.tag_image_url, url);
         try {
             Glide.with(view).load(url).apply(MediaAssetSync.requestOptions()).dontAnimate().fitCenter()
-                    .error(android.R.drawable.ic_menu_search).into(view);
-        } catch (Exception ignored) { view.setVisibility(android.view.View.GONE); }
+                    .error(fallbackRes).into(view);
+        } catch (Exception ignored) {
+            view.setImageResource(fallbackRes);
+        }
     }
 
     /** Bind an icon uploaded for one of the profile action tiles. */
