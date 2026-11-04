@@ -2070,6 +2070,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             duration = Math.max(6000L, Math.min(14000L,
                     2500L + (long) numberForChest(effect.get("durationMs"), 1800L)));
         } catch (Exception ignored) { }
+        // Give uploaded MP4/WebM media enough time to finish before destroying its WebView.
+        if (media != null && String.valueOf(media).matches("(?i).*\\.(mp4|webm|m4v)(\\?.*)?$")) {
+            duration = 15000L;
+        }
         final WebView overlayWeb = blastWeb;
         handler.postDelayed(() -> {
             try {
