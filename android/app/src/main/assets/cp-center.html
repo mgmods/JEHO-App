@@ -182,6 +182,49 @@ header button{font-size:25px}
  .cp-level-progress-head{font-size:9px}
 }
 
+
+/* Premium CP couple presentation: heart-framed portraits and compact ranking rows. */
+.avatar-heart-shell{position:relative;flex:0 0 auto;width:clamp(76px,22vw,116px);aspect-ratio:1;padding:5px;display:grid;place-items:center;background:linear-gradient(145deg,#fff0a8 0%,#ff73b5 48%,#a83a91 100%);filter:drop-shadow(0 5px 12px #ff62ad55);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='white' d='M50 91C43 84 8 59 8 32 8 15 20 5 35 5c7 0 13 4 15 11 3-7 9-11 16-11 15 0 27 10 27 27 0 27-35 52-43 59z'/%3E%3C/svg%3E") center/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='white' d='M50 91C43 84 8 59 8 32 8 15 20 5 35 5c7 0 13 4 15 11 3-7 9-11 16-11 15 0 27 10 27 27 0 27-35 52-43 59z'/%3E%3C/svg%3E") center/100% 100% no-repeat}
+.avatar-heart-shell img{width:100%;height:100%;object-fit:cover;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='white' d='M50 91C43 84 8 59 8 32 8 15 20 5 35 5c7 0 13 4 15 11 3-7 9-11 16-11 15 0 27 10 27 27 0 27-35 52-43 59z'/%3E%3C/svg%3E") center/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='white' d='M50 91C43 84 8 59 8 32 8 15 20 5 35 5c7 0 13 4 15 11 3-7 9-11 16-11 15 0 27 10 27 27 0 27-35 52-43 59z'/%3E%3C/svg%3E") center/100% 100% no-repeat}
+.avatar-heart-shell.pink{background:linear-gradient(145deg,#fff2ba,#ff4d9d 55%,#c13d92)}
+#featured .pair{grid-template-columns:minmax(0,1fr) 58px minmax(0,1fr);align-items:center;min-height:145px;gap:3px;padding:5px 0}
+#featured .avatar-heart-shell{width:clamp(72px,22vw,108px)}
+#featured .person{gap:4px}
+#featured .username-btn{font-size:10px;padding:5px 8px;max-width:100%}
+#featured .emblem{width:58px;height:70px}
+#featured .core{font-size:39px}
+#featured .ring{font-size:24px}
+#featured .featured-level{margin-top:0;display:flex;justify-content:center;max-width:100%}
+#featured .featured-level .jeho-cp-level{font-size:9px;padding:2px 6px;gap:3px;white-space:nowrap}
+#featured .featured-level .jeho-cp-level img{width:14px;height:14px}
+.featured-stats{gap:6px;margin-top:5px}
+.featured-stats .pill{font-size:10px;padding:5px 9px;line-height:1.2}
+.cp-rank-row{display:flex;direction:rtl;align-items:center;justify-content:space-between;gap:9px;padding:9px 10px;min-height:96px}
+.cp-rank-meta{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:6px;min-width:0;flex:1}
+.cp-rank-highlights{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.cp-champion{display:inline-flex;align-items:center;border-radius:20px;padding:5px 8px;background:linear-gradient(110deg,#ffe9a2,#e9ad4d);color:#5a173d;font-size:10px;font-weight:900;white-space:nowrap}
+.cp-rank-level .jeho-cp-level{font-size:9px;padding:3px 6px;gap:3px;white-space:nowrap}
+.cp-rank-level .jeho-cp-level img{width:14px;height:14px}
+.cp-rank-score{display:inline-flex;align-items:center;border:1px solid #ffda7280;background:#ffffff12;border-radius:20px;padding:5px 8px;color:#ffe6a0;font-size:10px;font-weight:900;direction:ltr;white-space:nowrap}
+.cp-rank-days{font-size:9px;color:#f4cfe0;white-space:nowrap}
+.cp-rank-position{font-size:9px;color:#e9cbdc;border:1px solid #ffffff30;border-radius:20px;padding:3px 7px}
+.cp-rank-duo{display:flex;align-items:center;justify-content:center;gap:2px;flex:0 0 auto}
+.cp-rank-person{display:flex;flex-direction:column;align-items:center;gap:1px;width:clamp(48px,16vw,66px);min-width:0}
+.cp-rank-person .avatar-heart-shell{width:clamp(45px,14vw,60px);padding:3px}
+.cp-rank-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;color:#fff4fb;font-size:9px;font-weight:800;padding:2px 0}
+.cp-rank-heart{font-size:19px;color:#ff78b5;text-shadow:0 0 9px #ff3d94;animation:pulse 1.3s infinite}
+#rankingView .cp-rank-row,#worldView .cp-rank-row{margin:8px 0}
+.cp-reward-popup-bg{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:22px;background:#13000fce;backdrop-filter:blur(7px);animation:cpPopupFade .2s ease}
+.cp-reward-popup{position:relative;width:min(360px,100%);padding:25px 20px 20px;border:1px solid #ffe39b;border-radius:28px;text-align:center;background:radial-gradient(circle at 50% 0,#ff82bd55,transparent 48%),linear-gradient(155deg,#8d205f,#320629);box-shadow:0 18px 60px #090007bb,0 0 25px #ff70ad44;animation:cpPopupIn .35s cubic-bezier(.2,.9,.25,1.2)}
+.cp-reward-popup .popup-spark{font-size:32px;filter:drop-shadow(0 0 8px #ffda72)}
+.cp-reward-popup h2{font-size:20px;color:#ffe4a0;margin:9px 0}
+.cp-reward-popup p{font-size:13px;line-height:1.7;color:#fff1f8;margin:6px 0 16px}
+.cp-reward-popup img{width:94px;height:94px;object-fit:contain;border-radius:20px;padding:8px;background:#ffffff16;border:1px solid #ffe5a455}
+.cp-reward-popup .action{min-width:130px}
+@keyframes cpPopupFade{from{opacity:0}to{opacity:1}}
+@keyframes cpPopupIn{from{opacity:0;transform:translateY(18px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:370px){.cp-rank-row{gap:5px;padding:8px 6px}.cp-rank-person{width:48px}.cp-rank-person .avatar-heart-shell{width:43px}.cp-champion{font-size:9px;padding:4px 6px}}
+
 </style>
 </head>
 <body>
@@ -199,7 +242,7 @@ header button{font-size:25px}
 <div class="panel">
 <h2 class="title">💞 ثنائي الأسبوع المميز 💞</h2>
 <div id="featured"><p class="empty">جارٍ تحميل البيانات…</p></div>
-<div class="pills"><span class="pill" id="featuredScore">🔥 —</span><span class="pill" id="featuredDays">❤️ —</span></div>
+<div class="pills featured-stats"><span class="pill" id="featuredScore">🔥 —</span><span class="pill" id="featuredDays">❤️ —</span></div>
 </div>
 <div class="panel">
 <h2 class="title">🏆 ترتيب الثنائيات</h2>
@@ -225,9 +268,10 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function score(n){n=Number(n)||0;if(n>=1000000)return(n/1000000).toFixed(1).replace(/\.0$/,"")+"M";if(n>=1000)return(n/1000).toFixed(1).replace(/\.0$/,"")+"K";return String(n);}
 const fallback="data:image/svg+xml;charset=UTF-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="a"><stop stop-color="#ffe5f4"/><stop offset="1" stop-color="#7c2459"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(#a)"/><circle cx="50" cy="37" r="18" fill="#fff1f9"/><path d="M15 96Q18 60 50 60T85 96" fill="#fff1f9"/></svg>');
-function person(p,pink=false){const name=p?.name||"مستخدم";const color=String(p?.nameColor||"").trim();const style=color?' style="color:'+esc(color)+';text-shadow:0 1px 5px #16001488"':'';return '<div class="person"><img class="avatar '+(pink?'pink':'')+'" src="'+esc(p?.avatar||fallback)+'" alt="صورة المستخدم" loading="eager" decoding="async" onerror="this.onerror=null;this.src=\''+fallback+'\'"><button class="username-btn" data-user-id="'+esc(p?.id||"")+'" data-user-name="'+esc(name)+'"'+style+'>'+esc(name)+'</button></div>';}
-function pair(p,noWings=false,featured=false){const emblem=noWings?'<span class="core">❤️</span><span class="ring">💍</span>':'<div class="top-symbols">❤ 💍 ❤</div><span class="core">❤️</span>';const level=p?.level&&window.JehoCPRenderer?window.JehoCPRenderer.renderLevelBadge(p):'';return '<div class="pair '+(featured?'featured-pair':'')+'">'+person(p.a)+'<div class="heart"><div class="emblem '+(noWings?'no-wings':'')+'">'+emblem+'</div>'+(level?'<div style="margin-top:8px">'+level+'</div>':'')+'</div>'+person(p.b,true)+'</div>';}
-function row(r,i){const a=r.a?.name||"مستخدم",b=r.b?.name||"مستخدم";const crown=r.isWeeklyChampion?'👑 بطل الأسبوع ':r.isWorld&&i===1?'👑 ':'';const level=r.level?'<div class="task-meta">'+(window.JehoCPRenderer?window.JehoCPRenderer.renderLevelBadge({level:r.level,levelName:r.levelName,presentation:r.presentation}):'مستوى CP '+esc(r.level))+'</div>':'';return '<div class="row"><div class="score">'+score(r.score)+'</div><div class="names"><button class="username-btn" data-user-id="'+esc(r.a?.id||"")+'" data-user-name="'+esc(a)+'">'+esc(a)+'</button><div class="name-heart">♥</div><button class="username-btn" data-user-id="'+esc(r.b?.id||"")+'" data-user-name="'+esc(b)+'">'+esc(b)+'</button>'+level+(r.days?'<div class="task-meta">❤️ '+score(r.days)+' يوم معاً</div>':'')+'</div><div class="rank">'+crown+i+'</div></div>';}
+function heartAvatar(p,pink=false){return '<div class="avatar-heart-shell '+(pink?'pink':'')+'"><img src="'+esc(p?.avatar||fallback)+'" alt="صورة المستخدم" loading="eager" decoding="async" onerror="this.onerror=null;this.src=\''+fallback+'\'"></div>';}
+function person(p,pink=false){const name=p?.name||"مستخدم";const color=String(p?.nameColor||"").trim();const style=color?' style="color:'+esc(color)+';text-shadow:0 1px 5px #16001488"':'';return '<div class="person">'+heartAvatar(p,pink)+'<button class="username-btn" data-user-id="'+esc(p?.id||"")+'" data-user-name="'+esc(name)+'"'+style+'>'+esc(name)+'</button></div>';}
+function pair(p,noWings=false,featured=false){const emblem=noWings?'<span class="core">❤️</span><span class="ring">💍</span>':'<div class="top-symbols">❤ 💍 ❤</div><span class="core">❤️</span>';const level=p?.level&&window.JehoCPRenderer?window.JehoCPRenderer.renderLevelBadge(p):'';return '<div class="pair '+(featured?'featured-pair':'')+'">'+person(p.a)+'<div class="heart"><div class="emblem '+(noWings?'no-wings':'')+'">'+emblem+'</div>'+(level?'<div class="featured-level">'+level+'</div>':'')+'</div>'+person(p.b,true)+'</div>';}
+function row(r,i){const a=r.a?.name||"مستخدم",b=r.b?.name||"مستخدم";const champion=r.isWeeklyChampion?'👑 بطل الأسبوع':r.isWorld&&i===1?'👑 بطل العالم':'ترتيب الثنائي';const level=r.level?(window.JehoCPRenderer?window.JehoCPRenderer.renderLevelBadge({level:r.level,levelName:r.levelName,presentation:r.presentation}):'مستوى '+esc(r.level)):'';const days=r.days?'<span class="cp-rank-days">❤️ '+score(r.days)+' يوم</span>':'';return '<div class="row cp-rank-row"><div class="cp-rank-meta"><div class="cp-rank-highlights"><span class="cp-champion">'+champion+'</span>'+(level?'<span class="cp-rank-level">'+level+'</span>':'')+'<span class="cp-rank-score">🔥 '+score(r.score)+'</span></div>'+days+'<span class="cp-rank-position">#'+i+'</span></div><div class="cp-rank-duo"><div class="cp-rank-person">'+heartAvatar(r.a)+'<button class="cp-rank-name" data-user-id="'+esc(r.a?.id||"")+'" data-user-name="'+esc(a)+'">'+esc(a)+'</button></div><span class="cp-rank-heart" aria-hidden="true">♥</span><div class="cp-rank-person">'+heartAvatar(r.b,true)+'<button class="cp-rank-name" data-user-id="'+esc(r.b?.id||"")+'" data-user-name="'+esc(b)+'">'+esc(b)+'</button></div></div></div>';}
 function rewardImage(url,alt,cls){return url?'<img class="'+cls+'" src="'+esc(url)+'" alt="'+esc(alt||"")+'" loading="lazy" onerror="this.onerror=null;this.src=\''+fallback+'\'">':'';}
 function renderRewardCard(r){
  const p=r.presentation||{},gift=r.giftPresentation||{},levelGift=r.rewardGift||null,levelGifts=Array.isArray(r.rewardGifts)&&r.rewardGifts.length?r.rewardGifts:(levelGift?[levelGift]:[]);
@@ -321,6 +365,7 @@ window.renderCpStore=function(rows){
   return '<article class="cp-store-card"><img class="cp-store-preview" src="'+esc(image)+'" alt="'+esc(item.name||"عنصر CP")+'" loading="lazy" onerror="this.onerror=null;this.src=\''+fallback+'\'"><div class="cp-store-kind">'+esc(kind)+'</div><h3>'+esc(item.name||"عنصر CP")+'</h3><p>'+esc(item.description||"عنصر تجميلي خاص بمتجر CP")+'</p><div class="cp-store-price">'+score(price)+' كوين · '+score(lease)+' يوم</div>'+button+'</article>';
  }).join("")+'</div>';
 };
+window.showCpRewardPopup=function(title,detail,imageUrl){const image=/^https?:\/\//i.test(String(imageUrl||""))?'<img src="'+esc(imageUrl)+'" alt="المكافأة" onerror="this.style.display=\'none\'">':'';$("modalRoot").innerHTML='<div class="cp-reward-popup-bg" id="cpRewardPopupBg"><section class="cp-reward-popup" role="dialog" aria-modal="true"><div class="popup-spark">🎁 ✨ 💖</div><h2>'+esc(title||"مبروك! استلمت مكافأتك")+'</h2>'+(image||'<div class="popup-spark">🏆</div>')+'<p>'+esc(detail||"تمت إضافة مكافأتك إلى حسابك بنجاح.")+'</p><button class="action" id="cpRewardPopupClose">رائع ❤️</button></section></div>';$("cpRewardPopupClose").onclick=()=>$("modalRoot").innerHTML="";$("cpRewardPopupBg").onclick=e=>{if(e.target.id==="cpRewardPopupBg")$("modalRoot").innerHTML="";};};
 window.showCpMessage=toast;window.showCpError=m=>toast(m||"حدث خطأ");
 window.setCpView=function(view){if(view==="home"||view==="weekly")page("weekly");else if(view==="incoming"||view==="sent"||view==="send")page("relationship");else if(view==="store")page("store");else if(view==="discover"){page("weekly");document.querySelector('[data-tab="world"]').click();}else if(view==="rules")page("rules");else if(view==="tasks")page("tasks");else page("relationship");};
 window.getCpView=()=> $("weekly").classList.contains("hidden")?(!$("relationship").classList.contains("hidden")?"relationship":!$("store").classList.contains("hidden")?"store":!$("tasks").classList.contains("hidden")?"tasks":"rules"):"home";
