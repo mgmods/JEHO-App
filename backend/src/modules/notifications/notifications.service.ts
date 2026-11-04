@@ -30,6 +30,14 @@ function isDirectMessageNotification(notification: Notification): boolean {
   return notification.type === NotificationType.CHAT && data.type === 'chat' && typeof data.conversationId === 'string';
 }
 
+/** Lucky-gift win celebrations stay in the live room/app; never send an external FCM push. */
+function isLuckyWinPayload(data?: Record<string, unknown>, title?: string, body?: string): boolean {
+  const markers = ['type', 'kind', 'notificationKind', 'event', 'source', 'reason']
+    .map(key => String(data?.[key] ?? '').toLowerCase()).join(' ');
+  const copy = `${String(title || '')} ${String(body || '')}`.toLowerCase();
+  return /lucky[ _:-]*(hit|win|gift|reward)|محظوظ|هدية\s*محظوظة|ربح\s*المحظوظ|حظ\s*سعيد/.test(markers + ' ' + copy);
+}
+
 export class CreateNotificationDto {
   @ApiProperty()
   @IsUUID()
@@ -149,7 +157,7 @@ export class NotificationsService {
     } catch (err) {
       this.logger.warn(`Realtime notification emit failed: ${(err as Error).message}`);
     }
-    if (dto.sendPush !== false) {
+    if (dto.sendPush !== false && !isLuckyWinPayload(dto.data, dto.title, dto.body)) {
       try {
         const sent = await this.sendFcm(dto.userId, dto.title, dto.body, {
           ...(dto.data || {}),
