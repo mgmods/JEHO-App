@@ -4480,11 +4480,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setVisibility(View.GONE);
         ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
                 luckyCannonDp(96), luckyCannonDp(96));
-        // Default position: bottom-center of the room content, with room for the control bar.
+        // Default position: horizontally centered, slightly below the room midpoint.
+        // Keep clear of the bottom controls while avoiding the old side placement near btnGift.
         lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID;
         lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
         lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
-        lp.bottomMargin = luckyCannonDp(104);
+        lp.verticalBias = 0.62f;
         root.addView(layer, lp);
         com.Dramizo.Series.util.LuckyCannonView cannon =
                 new com.Dramizo.Series.util.LuckyCannonView(this);
@@ -4507,25 +4509,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setElevation(luckyCannonDp(80));
         // INVISIBLE preserves measured bounds so the initial draggable position is stable.
         layer.setVisibility(View.INVISIBLE);
-        // Place the launcher just above the existing gift button on first use.
-        // It remains hidden until a lucky gift is selected and armed.
-        root.post(() -> {
-            if (binding == null || binding.btnGift == null
-                    || root.getWidth() <= 0 || root.getHeight() <= 0) return;
-            int[] rootLoc = new int[2];
-            int[] giftLoc = new int[2];
-            root.getLocationOnScreen(rootLoc);
-            binding.btnGift.getLocationOnScreen(giftLoc);
-            float launcherWidth = luckyCannonDp(96);
-            float launcherHeight = luckyCannonDp(96);
-            float x = giftLoc[0] - rootLoc[0] + binding.btnGift.getWidth() / 2f
-                    - launcherWidth / 2f;
-            float y = giftLoc[1] - rootLoc[1] - launcherHeight - luckyCannonDp(18);
-            x = Math.max(0f, Math.min(x, root.getWidth() - launcherWidth));
-            y = Math.max(0f, Math.min(y, root.getHeight() - launcherHeight));
-            layer.setTranslationX(x - layer.getLeft());
-            layer.setTranslationY(y - layer.getTop());
-        });
         // Hold-to-fire: send once immediately, then repeat only while the finger remains down.
         // Touch is consumed here so ACTION_UP cannot trigger a second click send.
         layer.setOnTouchListener(new View.OnTouchListener() {
