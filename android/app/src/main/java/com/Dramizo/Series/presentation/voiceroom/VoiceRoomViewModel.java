@@ -19,6 +19,7 @@ public class VoiceRoomViewModel extends ViewModel {
     private final MutableLiveData<Boolean> handRaised = new MutableLiveData<>(false);
     private final MutableLiveData<List<RoomDtos.SeatRequestDto>> seatRequests =
             new MutableLiveData<>(new ArrayList<>());
+    private final MutableLiveData<Boolean> seatRequestsLoading = new MutableLiveData<>(false);
     private final MutableLiveData<RoomDtos.SupportersResult> supporters = new MutableLiveData<>();
     private final MutableLiveData<String> info = new MutableLiveData<>();
 
@@ -29,6 +30,7 @@ public class VoiceRoomViewModel extends ViewModel {
     public LiveData<String> getError() { return error; }
     public LiveData<Boolean> getHandRaised() { return handRaised; }
     public LiveData<List<RoomDtos.SeatRequestDto>> getSeatRequests() { return seatRequests; }
+    public LiveData<Boolean> getSeatRequestsLoading() { return seatRequestsLoading; }
     public LiveData<RoomDtos.SupportersResult> getSupporters() { return supporters; }
     public LiveData<String> getInfo() { return info; }
 
@@ -109,6 +111,7 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void loadSeatRequests(String roomId) {
+        seatRequestsLoading.postValue(true);
         c.getIoExecutor().execute(() -> {
             Result<RoomDtos.SeatRequestsResult> r = c.getRoomRepository().seatRequests(roomId);
             if (r.success && r.data != null && r.data.items != null) {
@@ -116,6 +119,8 @@ public class VoiceRoomViewModel extends ViewModel {
             } else if (r.success) {
                 seatRequests.postValue(new ArrayList<>());
             }
+            // Always release the dialog's loading state, including API failures.
+            seatRequestsLoading.postValue(false);
         });
     }
 
