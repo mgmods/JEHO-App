@@ -4699,11 +4699,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        // Preserve every accepted press, but serialize economy requests to avoid wallet/DB lock bursts.
-        if (luckyCannonSending) {
-            if (queuedLuckyCannonPresses < Integer.MAX_VALUE) queuedLuckyCannonPresses++;
-            return;
-        }
+        // Never queue repeat ticks behind a slow network request. A tick that arrives
+        // while one gift is in flight is skipped; release therefore cannot leave a backlog.
+        if (luckyCannonSending) return;
         final AppContainer container;
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
         final String giftId = luckyCannonGiftId;
@@ -4770,14 +4768,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Server emits the canonical room gift event; animation is rendered locally by
                 // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                if (luckyCannonHoldActive && queuedLuckyCannonPresses > 0) {
-                    queuedLuckyCannonPresses--;
-                    handler.post(() -> {
-                        if (luckyCannonHoldActive) sendLuckyCannonGift(false);
-                    });
-                } else {
-                    queuedLuckyCannonPresses = 0;
-                }
+                // Repeats are driven only by the hold timer. Do not drain delayed
+                // sends after a slow response or after ACTION_UP.
             });
         });
     }
@@ -15976,8 +15968,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
                 // Only float/rain on the winner's seat when a payout actually occurred.
                 if (senderId != null && !senderId.isEmpty()) {
-                    showLuckyReturnOnMics(java.util.Collections.singletonList(senderId), won);
-                    playCoinRainToUsers(java.util.Collections.singletonList(senderId), 16);
+                    // Lucky wins are announced by the configured toast only.
+                    // Do not spawn coin rain or floating coin values across the room.
                 }
             }
         } else if ("game:update".equals(event) || "game:invite".equals(event)) {
@@ -18162,13 +18154,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         progress.setVisibility(View.VISIBLE);
         empty.setVisibility(View.GONE);
         recycler.setVisibility(View.GONE);
-        viewModel.loadSeatRequests(roomId);
+        // Bind the authoritative response when it arrives; a fixed 650ms delay
+        // could show an empty list while the request is still in flight.
+        androidx.lifecycle.Observer<List<RoomDtos.SeatRequestDto>> requestsObserver =
+                list -> {
+                    if (Boolean.FALSE.equals(viewModel.getSeatRequestsLoading().getValue())) {
+                        bindList.run();
+                    }
+                };
+        androidx.lifecycle.Observer<Boolean> loadingObserver = loading -> {
+            if (Boolean.FALSE.equals(loading)) bindList.run();
+        };
+        viewModel.getSeatRequests().observe(this, requestsObserver);
+        viewModel.getSeatRequestsLoading().observe(this, loadingObserver);
         List<RoomDtos.SeatRequestDto> cached = viewModel.getSeatRequests().getValue();
-        if (cached != null && !cached.isEmpty()) {
-            bindList.run();
-        } else {
-            handler.postDelayed(bindList, 650);
-        }
+        if (cached != null && !cached.isEmpty()) bindList.run();
+        dialog.setOnDismissListener(ignored -> {
+            viewModel.getSeatRequests().removeObserver(requestsObserver);
+            viewModel.getSeatRequestsLoading().removeObserver(loadingObserver);
+        });
+        viewModel.loadSeatRequests(roomId);
 
         btnClose.setOnClickListener(v -> dialog.dismiss());
         boolean canOpenSettings = canModerateRoom();
