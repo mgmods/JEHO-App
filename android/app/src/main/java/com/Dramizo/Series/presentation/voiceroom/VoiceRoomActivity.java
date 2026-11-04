@@ -322,7 +322,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int luckyCannonGiftQuantity = 1;
     private final List<String> luckyCannonTargets = new ArrayList<>();
     private boolean luckyCannonSending;
-    /** Pending repeat sends are valid only while the user's finger is held down. */
+    /** Accepted hold ticks are drained one-by-one after each confirmed economy send. */
     private int queuedLuckyCannonPresses;
     private boolean luckyCannonHoldActive;
     private static final long LUCKY_CANNON_REPEAT_MS = 280L;
@@ -4433,11 +4433,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_MS);
     }
 
-    /** Stop immediately on finger-up and discard repeats that have not started a request. */
+    /** Stop generating new hold ticks; already accepted sends remain queued and are drained. */
     private void stopLuckyCannonHold() {
         luckyCannonHoldActive = false;
         handler.removeCallbacks(luckyCannonRepeatRunnable);
-        queuedLuckyCannonPresses = 0;
     }
 
     /**
@@ -4461,11 +4460,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        // Never drop a tap because another send is in flight. The queue is client-side and
-        // drained sequentially, preventing a burst of simultaneous requests against Blitz.
+        // Preserve every accepted press, but serialize economy requests to avoid wallet/DB lock bursts.
         if (luckyCannonSending) {
-            // At most one pending repeat: don't flood Blitz while an economy request is in flight.
-            if (luckyCannonHoldActive) queuedLuckyCannonPresses = 1;
+            if (queuedLuckyCannonPresses < Integer.MAX_VALUE) queuedLuckyCannonPresses++;
             return;
         }
         final AppContainer container;
@@ -4474,7 +4471,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (luckyCannonRequestId == null) luckyCannonRequestId = java.util.UUID.randomUUID().toString();
         final String requestId = luckyCannonRequestId;
         final int quantity = luckyCannonGiftQuantity;
-        final List<String> targets = new ArrayList<>(luckyCannonTargets);
+        java.util.LinkedHashSet<String> liveTargets = new java.util.LinkedHashSet<>(collectOccupiedMicUserIds());
+        if (liveTargets.isEmpty()) liveTargets.addAll(luckyCannonTargets);
+        final List<String> targets = new ArrayList<>(liveTargets);
+        if (targets.isEmpty()) return;
         final String currentRoom = roomId;
         luckyCannonSending = true;
         if (luckyCannonView != null) luckyCannonView.setEnabled(true);
@@ -4531,11 +4531,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Server emits the canonical room gift event; animation is rendered locally by
                 // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                if (luckyCannonHoldActive && queuedLuckyCannonPresses > 0) {
-                    queuedLuckyCannonPresses = 0;
-                    handler.post(() -> {
-                        if (luckyCannonHoldActive) sendLuckyCannonGift(false);
-                    });
+                if (queuedLuckyCannonPresses > 0) {
+                    queuedLuckyCannonPresses--;
+                    handler.post(() -> sendLuckyCannonGift(false));
                 }
             });
         });
@@ -4544,25 +4542,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void playLuckyCannonEvent(@Nullable String icon, @NonNull List<String> targets,
                                       long totalCoins, int quantity, int personCount,
                                       boolean localSender) {
-        if (!luckyCannonEnabled || luckyCannonLayer == null || luckyCannonView == null) {
-            playLuckyGiftStage(icon, targets, Math.max(1L, totalCoins),
-                    Math.max(1, quantity), Math.max(1, personCount), null);
-            return;
-        }
-        // The draggable launcher is a private sender control, never a room-wide UI.
-        // Remote members render only the gift-flight celebration, not another tappable cannon.
+        if (!luckyCannonEnabled || binding == null || binding.giftOverlay == null) return;
+        // Keep the existing cannon control exactly as-is; only its gift-flight path is shared.
         boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
-        // A different sender's simultaneous event must never hide this device's own
-        // active launcher. The launcher is a local control; remote sends only animate flights.
-        if (localSender) {
+        if (localSender && luckyCannonLayer != null) {
             luckyCannonLayer.setVisibility(keepVisible ? View.VISIBLE : View.GONE);
         }
-        // The sender already received immediate local press feedback; other room members
-        // still animate the launch effect without exposing the launcher control.
-        if (!localSender && luckyCannonPulseEnabled) luckyCannonView.fire();
+        if (!localSender && luckyCannonPulseEnabled && luckyCannonView != null) {
+            luckyCannonView.fire();
+        }
         if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
         playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount);
-        if (!keepVisible) {
+        if (!keepVisible && luckyCannonLayer != null) {
             handler.postDelayed(() -> {
                 if (luckyCannonLayer != null && luckyCannonTargets.isEmpty()) {
                     luckyCannonLayer.setVisibility(View.GONE);
@@ -4573,35 +4564,30 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void playLuckyCannonFlights(@Nullable String icon, @NonNull List<String> targets,
                                         long totalCoins, int quantity, int personCount) {
-        if (binding == null || binding.giftOverlay == null || luckyCannonView == null) return;
+        if (binding == null || binding.giftOverlay == null || targets.isEmpty()) return;
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        for (String id : targets) {
+            if (id != null && !id.isEmpty()) unique.add(id);
+        }
+        if (unique.isEmpty()) return;
+        final List<String> recipients = new ArrayList<>(unique);
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        binding.giftOverlay.setElevation(36f);
-        markLuckyOverlayActive(3600L);
-        int[] cannonLoc = new int[2];
-        int[] overlayLoc = new int[2];
-        luckyCannonView.getLocationOnScreen(cannonLoc);
-        binding.giftOverlay.getLocationOnScreen(overlayLoc);
-        PointF from = new PointF(
-                cannonLoc[0] - overlayLoc[0] + luckyCannonView.getWidth() * 0.5f,
-                cannonLoc[1] - overlayLoc[1] + luckyCannonView.getHeight() * 0.5f);
-        boolean animated = false;
-        for (int i = 0; i < binding.recyclerSeats.getChildCount(); i++) {
-            View child = binding.recyclerSeats.getChildAt(i);
-            int position = binding.recyclerSeats.getChildAdapterPosition(child);
-            String uid = seatAdapter != null ? seatAdapter.getUserIdAtPosition(position) : null;
-            if (uid == null || !targets.contains(uid)) continue;
-            int[] seatLoc = new int[2];
-            child.getLocationOnScreen(seatLoc);
-            PointF to = new PointF(
-                    seatLoc[0] - overlayLoc[0] + child.getWidth() * 0.5f,
-                    seatLoc[1] - overlayLoc[1] + child.getHeight() * 0.5f);
-            GiftFlyAnimator.fly(binding.giftOverlay, icon, from, to, () -> {});
-            animated = true;
-        }
-        if (!animated) {
-            playLuckyGiftStage(icon, targets, Math.max(1L, totalCoins),
-                    Math.max(1, quantity), Math.max(1, personCount), null);
+        markLuckyOverlayActive(1500L);
+        Runnable launch = () -> {
+            if (binding == null || binding.giftOverlay == null) return;
+            List<PointF> destinations = resolveMicCenters(recipients);
+            if (destinations.isEmpty()) return;
+            int w = Math.max(binding.giftOverlay.getWidth(), 1);
+            int h = Math.max(binding.giftOverlay.getHeight(), 1);
+            // The existing cannon button is untouched; every gift copy starts at room bottom-center.
+            PointF from = new PointF(w / 2f, Math.max(h * 0.72f, h - luckyCannonDp(110)));
+            GiftFlyAnimator.flyTogether(binding.giftOverlay, icon, from, destinations, 620L);
+        };
+        if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
+            binding.giftOverlay.post(launch);
+        } else {
+            launch.run();
         }
     }
 
@@ -11454,75 +11440,35 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             return;
         }
-        List<String> ids = targetIds;
-        if (ids == null || ids.isEmpty()) {
-            ids = collectOccupiedMicUserIds();
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        if (targetIds != null) {
+            for (String id : targetIds) {
+                if (id != null && !id.isEmpty()) unique.add(id);
+            }
         }
-        final List<String> rainIds = ids != null ? new ArrayList<>(ids) : new ArrayList<>();
-        if (rainIds.isEmpty()) {
-            List<String> all = collectOccupiedMicUserIds();
-            if (all != null) rainIds.addAll(all);
-        }
+        if (unique.isEmpty()) unique.addAll(collectOccupiedMicUserIds());
+        final List<String> ids = new ArrayList<>(unique);
+        if (ids.isEmpty()) return;
 
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        binding.giftOverlay.setElevation(36f);
-        markLuckyOverlayActive(5600L);
-
-        final List<String> pulseIds = rainIds;
-        final int qtyShow = Math.max(1, quantity);
-        final int people = Math.max(1, rainIds.isEmpty() ? personCount : rainIds.size());
-        final long totalScore = Math.max(0L, coinsSpent > 0 ? coinsSpent : (long) qtyShow * people);
-        final long hold = Math.min(1600L, 620L + Math.max(1, quantity) * 70L);
-        final String who = senderName != null && !senderName.isEmpty()
-                ? senderName
-                : (myUserId != null ? displayNameForSeatUser(myUserId) : "مستخدم");
-        final String icon = giftIconUrl;
-        final Runnable scatterCb = onScatterStart;
-
-        Runnable startClone = () -> {
-            if (binding == null || binding.giftOverlay == null) {
-                if (scatterCb != null) {
-                    try { scatterCb.run(); } catch (Exception ignored) {}
-                }
-                return;
-            }
-            List<android.graphics.PointF> seatPts = resolveMicCenters(pulseIds);
-            if (seatPts.isEmpty()) {
-                List<String> all = collectOccupiedMicUserIds();
-                seatPts = resolveMicCenters(all);
-            }
+        markLuckyOverlayActive(1500L);
+        Runnable launch = () -> {
+            if (binding == null || binding.giftOverlay == null) return;
+            List<PointF> destinations = resolveMicCenters(ids);
+            if (destinations.isEmpty()) return;
             int w = Math.max(binding.giftOverlay.getWidth(), 1);
             int h = Math.max(binding.giftOverlay.getHeight(), 1);
-            android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
-            GiftFlyAnimator.allMicClone(
-                    binding.giftOverlay,
-                    icon,
-                    center,
-                    seatPts,
-                    qtyShow,
-                    totalScore,
-                    who,
-                    hold,
-                    () -> {
-                        if (scatterCb != null) {
-                            try { scatterCb.run(); } catch (Exception ignored) {}
-                        }
-                        for (String uid : pulseIds) {
-                            View seat = findSeatViewForUser(uid);
-                            if (seat != null) GiftFlyAnimator.pulseTarget(seat);
-                        }
-                    },
-                    () -> {
-                        if (coinsSpent >= 200 && !pulseIds.isEmpty()) {
-                            playCoinRainToUsers(pulseIds, 6);
-                        }
-                    });
+            PointF from = new PointF(w / 2f, Math.max(h * 0.72f, h - luckyCannonDp(110)));
+            GiftFlyAnimator.flyTogether(binding.giftOverlay, giftIconUrl, from, destinations, 620L);
+            if (onScatterStart != null) {
+                try { onScatterStart.run(); } catch (Exception ignored) {}
+            }
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
-            binding.giftOverlay.post(startClone);
+            binding.giftOverlay.post(launch);
         } else {
-            startClone.run();
+            launch.run();
         }
     }
 
@@ -11544,48 +11490,32 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String senderName
     ) {
         if (binding == null || binding.giftOverlay == null) return;
-        List<String> ids = targetIds != null && !targetIds.isEmpty()
-                ? targetIds : collectOccupiedMicUserIds();
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        if (targetIds != null) {
+            for (String id : targetIds) {
+                if (id != null && !id.isEmpty()) unique.add(id);
+            }
+        }
+        if (unique.isEmpty()) unique.addAll(collectOccupiedMicUserIds());
+        final List<String> ids = new ArrayList<>(unique);
+        if (ids.isEmpty()) return;
+
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        markLuckyOverlayActive(4800L);
-        final List<String> finalIds = ids;
-        final int qtyShow = Math.max(1, quantity > 1 ? quantity : Math.max(1, comboCount));
-        final long total = coinValuePerPerson > 0
-                ? coinValuePerPerson * Math.max(1, ids.size())
-                : (long) qtyShow * Math.max(1, ids.size());
-        final String who = senderName != null && !senderName.isEmpty()
-                ? senderName
-                : displayNameForSeatUser(myUserId);
-        final String icon = giftIconUrl;
-        Runnable startClone = () -> {
+        markLuckyOverlayActive(1500L);
+        Runnable launch = () -> {
             if (binding == null || binding.giftOverlay == null) return;
-            List<android.graphics.PointF> seats = resolveMicCenters(finalIds);
-            if (seats.isEmpty()) return;
+            List<PointF> destinations = resolveMicCenters(ids);
+            if (destinations.isEmpty()) return;
             int w = Math.max(binding.giftOverlay.getWidth(), 1);
             int h = Math.max(binding.giftOverlay.getHeight(), 1);
-            android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
-            GiftFlyAnimator.allMicClone(
-                    binding.giftOverlay,
-                    icon,
-                    center,
-                    seats,
-                    qtyShow,
-                    total,
-                    who,
-                    780L,
-                    () -> {
-                        for (String uid : finalIds) {
-                            View seat = findSeatViewForUser(uid);
-                            if (seat != null) GiftFlyAnimator.pulseTarget(seat);
-                        }
-                    },
-                    null);
+            PointF from = new PointF(w / 2f, Math.max(h * 0.72f, h - luckyCannonDp(110)));
+            GiftFlyAnimator.flyTogether(binding.giftOverlay, giftIconUrl, from, destinations, 620L);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
-            binding.giftOverlay.post(startClone);
+            binding.giftOverlay.post(launch);
         } else {
-            startClone.run();
+            launch.run();
         }
     }
 
@@ -11603,20 +11533,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                        String senderUserId, int senderVipLevel,
                                        String senderAvatarUrl, List<String> targetIds, long coinValue) {
         if (targetIds == null || targetIds.isEmpty()) return;
-        String playTo = null;
-        for (String tid : targetIds) {
-            if (tid == null || tid.isEmpty()) continue;
-            if (playTo == null) {
-                playTo = tid;
-            } else if (coinValue > 0) {
-                creditGiftCoinsOnSeat(tid, coinValue);
-            }
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        for (String id : targetIds) {
+            if (id != null && !id.isEmpty()) unique.add(id);
         }
-        if (playTo == null) return;
-        scatterGiftToMics(iconUrl, targetIds, comboCount, Math.max(1, quantity), coinValue, senderName);
-        // First target: seat credit + effect queue / media (clones already flying).
-        playGiftToRecipient(giftName, iconUrl, animationUrl, senderName, comboCount,
-                senderUserId, senderVipLevel, senderAvatarUrl, playTo, coinValue, true);
+        if (unique.isEmpty()) return;
+        List<String> recipients = new ArrayList<>(unique);
+        scatterGiftToMics(iconUrl, recipients, comboCount, Math.max(1, quantity),
+                coinValue, senderName);
+        // The group flight is the visual for every recipient; update seat totals once
+        // without enqueueing a second full-screen gift effect for the first seat.
+        if (coinValue > 0) {
+            for (String id : recipients) creditGiftCoinsOnSeat(id, coinValue);
+        }
     }
 
     /** @deprecated Big center ×N card removed. */
@@ -15904,8 +15833,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         ? RoomEffectQueue.EffectType.LEGENDARY_GIFT
                         : RoomEffectQueue.EffectType.GIFT;
                 String playTo = allReceivers.isEmpty() ? receiverId : allReceivers.get(0);
-                // Lucky stage already plays the visual — queue only chat/banner, no second Lottie.
-                if (!isLuckyGift) {
+                // Group gifts already have one synchronized flight per occupied seat.
+                // Do not queue a second full-screen media effect for the first recipient.
+                if (!isLuckyGift && !allMic) {
                 String playAnimRemote = anim;
                 String mappedRemote = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
                         name, icon, anim);
@@ -15940,7 +15870,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     applyGiftToSeat(rid, perSeatCoins,
                             rid.equals(playTo) ? receiverRoomGiftTotal : 0L);
                 }
-            } else if (!isLuckyGift) {
+            } else if (!isLuckyGift && !allMic) {
                 int senderVip = Math.max(0, memberInt(payload, "senderVipLevel", 0));
                 int senderLevel = Math.max(1, memberInt(payload, "senderUserLevel", 1));
                 playGiftAnimationRemote(name, icon, anim, sender, combo, senderId, senderVip,
