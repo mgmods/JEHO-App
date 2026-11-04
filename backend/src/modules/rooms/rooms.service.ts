@@ -2665,10 +2665,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       where: { roomId, kind: RoomSeatSignalKind.REQUEST },
       order: { createdAt: 'ASC' },
     });
-    return rows.map((row) => ({
+    const users = await Promise.all(
+      rows.map((row) => this.usersRepo.findOne({ where: { id: row.userId } })),
+    );
+    return rows.map((row, index) => ({
       userId: row.userId,
       seatIndex: row.seatIndex,
-      displayName: row.displayName || 'Guest',
+      displayName: row.displayName || users[index]?.displayName || users[index]?.username || 'Guest',
+      avatarUrl: users[index]?.avatarUrl || null,
       at: row.createdAt.toISOString(),
     }));
   }
