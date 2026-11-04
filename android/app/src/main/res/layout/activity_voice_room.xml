@@ -1169,16 +1169,20 @@
         <SeekBar
             android:id="@+id/seekMusicVolume"
             android:layout_width="0dp"
-            android:layout_height="22dp"
+            android:layout_height="30dp"
             android:layout_alignParentBottom="true"
             android:layout_marginStart="88dp"
             android:layout_marginEnd="38dp"
-            android:layout_marginBottom="3dp"
+            android:layout_marginBottom="0dp"
             android:max="100"
             android:progress="100"
-            android:progressTint="#34D399"
-            android:thumbTint="#FFFFFF"
-            android:contentDescription="مستوى صوت الموسيقى" />
+            android:progressDrawable="@drawable/music_voice_seekbar"
+            android:thumb="@drawable/thumb_seekbar_music_play_control"
+            android:thumbOffset="0dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
+            android:splitTrack="false"
+            android:contentDescription="اسحب الدائرة لرفع أو خفض صوت الموسيقى" />
 
         <TextView
             android:id="@+id/btnMusicVolumeDown"
