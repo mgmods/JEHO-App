@@ -39,6 +39,23 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     await this.dataSource.query('ALTER TABLE cp_requests ADD COLUMN IF NOT EXISTS "cpPoints" bigint NULL').catch(() => undefined);
     await this.dataSource.query('ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "cpBackgroundUrl" varchar(512)').catch(() => undefined);
     await this.dataSource.query('ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "cpLogoUrl" varchar(512)').catch(() => undefined);
+    // The cosmetics.type column is a PostgreSQL enum. Add CP-only cosmetic
+    // types at runtime so existing Cumin databases accept the new store items.
+    const cosmeticEnumRows = await this.dataSource.query(
+      `SELECT n.nspname, t.typname
+       FROM pg_type t
+       JOIN pg_attribute a ON a.atttypid=t.oid
+       JOIN pg_class c ON c.oid=a.attrelid
+       JOIN pg_namespace n ON n.oid=t.typnamespace
+       WHERE c.relname='cosmetics' AND a.attname='type' AND t.typtype='e'
+       LIMIT 1`,
+    ).catch(() => []);
+    const cosmeticEnumSchema = String(cosmeticEnumRows?.[0]?.nspname || '').replace(/"/g, '""');
+    const cosmeticEnumName = String(cosmeticEnumRows?.[0]?.typname || '').replace(/"/g, '""');
+    if (cosmeticEnumSchema && cosmeticEnumName) {
+      await this.dataSource.query(`ALTER TYPE "${cosmeticEnumSchema}"."${cosmeticEnumName}" ADD VALUE IF NOT EXISTS 'cp_background'`).catch(() => undefined);
+      await this.dataSource.query(`ALTER TYPE "${cosmeticEnumSchema}"."${cosmeticEnumName}" ADD VALUE IF NOT EXISTS 'cp_logo'`).catch(() => undefined);
+    }
     await this.dataSource.query(`
       CREATE TABLE IF NOT EXISTS cp_memories (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
