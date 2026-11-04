@@ -72,9 +72,9 @@ export class CpAdminController {
         gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
         giftPoints: settings[`cp.gift_points.${type}`] ?? 0,
         giftInteractionPoints: settings[`cp.points.gift_send.${type}`] ?? 0,
-        maxLevel: 1,
+        maxLevel: Array.isArray(settings[`cp.levels.${type}`]) ? settings[`cp.levels.${type}`].length : 0,
         levels: Array.isArray(settings[`cp.levels.${type}`])
-          ? settings[`cp.levels.${type}`].slice(0, 1).map((level: Record<string, any>) => ({ ...level, level: 1 }))
+          ? settings[`cp.levels.${type}`].slice(0, 100)
           : [],
         // CP types are enabled automatically; price and an active gift determine purchase readiness.
         enabled: globallyEnabled && settings[`cp.enabled.${type}`] !== false && settings[`cp.enabled.${type}`] !== 'false',
@@ -237,11 +237,11 @@ export class CpAdminController {
       throw new BadRequestException('سعر العملات يجب أن يكون عدداً صحيحاً غير سالب؛ الصفر يعطّل الشراء');
     }
     if (body.levels !== undefined) {
-      if (!Array.isArray(body.levels) || body.levels.length !== 1) throw new BadRequestException('يجب حفظ مستوى CP واحد فقط.');
+      if (!Array.isArray(body.levels) || body.levels.length < 1 || body.levels.length > 100) throw new BadRequestException('أضف مستوى واحداً على الأقل، والحد الأقصى 100 مستوى.');
       let previous = -1;
-      for (const level of body.levels) {
-        if (!Number.isInteger(level?.level) || level.level < 1 || !Number.isSafeInteger(level?.pointsRequired) || level.pointsRequired < 0 || level.pointsRequired < previous) {
-          throw new BadRequestException('تأكد أن أرقام المستويات والنقاط صحيحة ومرتبة تصاعدياً');
+      for (const [levelIndex, level] of body.levels.entries()) {
+        if (!Number.isInteger(level?.level) || level.level !== levelIndex + 1 || !Number.isSafeInteger(level?.pointsRequired) || level.pointsRequired < 0 || level.pointsRequired < previous) {
+          throw new BadRequestException('تأكد أن أرقام المستويات متسلسلة وأن نقاط كل مستوى لا تقل عن السابق');
         }
         previous = level.pointsRequired;
         if (level.name !== undefined && (typeof level.name !== 'string' || level.name.length > 100)) {
@@ -392,8 +392,8 @@ export class CpAdminController {
     if (body.giftId !== undefined) config[`cp.gift.${type}`] = body.giftId;
     if (body.giftPoints !== undefined) config[`cp.gift_points.${type}`] = String(body.giftPoints);
     if (body.giftInteractionPoints !== undefined) config[`cp.points.gift_send.${type}`] = String(body.giftInteractionPoints);
-    config[`cp.max_level.${type}`] = '1';
-    if (body.levels !== undefined) config[`cp.levels.${type}`] = JSON.stringify(body.levels.slice(0, 1).map(level => ({ ...level, level: 1 })));
+    config[`cp.max_level.${type}`] = String(body.levels?.length ?? 1);
+    if (body.levels !== undefined) config[`cp.levels.${type}`] = JSON.stringify(body.levels.map((level, index) => ({ ...level, level: index + 1 })));
     if (body.enabled !== undefined) config[`cp.enabled.${type}`] = String(body.enabled);
     if (body.rules !== undefined) config[`cp.rules.${type}`] = JSON.stringify(body.rules);
     await this.dataSource.transaction(async manager => {
