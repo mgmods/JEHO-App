@@ -481,6 +481,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private WebView activeSupportChestWeb;
     @Nullable private String activeSupportChestRoomId;
     @Nullable private String activeSupportChestAsset;
+    @Nullable private Map<String, Object> supportChestRuntimeConfig;
     /** Dedupe opened UI and the dedicated room-wide explosion audio event independently. */
     @Nullable private String lastSupportChestOpenedKey;
     private long lastSupportChestOpenedAtMs;
@@ -1882,6 +1883,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                     || isFinishing() || isDestroyed()) return;
                             Map<String, Object> data = response.body().data;
                             Object rawConfig = data.get("config");
+                            if (rawConfig instanceof Map) {
+                                supportChestRuntimeConfig = new HashMap<>((Map<String, Object>) rawConfig);
+                            }
                             Object rawState = data.get("state");
                             Object rawLevel = data.get("currentLevel");
                             int chestLevel = rawState instanceof Map
@@ -1968,6 +1972,83 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         } catch (Exception ignored) { }
         return value;
+    }
+
+    /**
+     * Plays the dashboard-selected support chest media for every room member,
+     * even when the support-chest bottom sheet is closed.
+     */
+    private void showSupportChestBlastOverlay(
+            @Nullable Map<String, Object> config,
+            @NonNull JsonObject winPayload
+    ) {
+        if (config == null || isFinishing() || isDestroyed()) return;
+        Object rawEffect = config.get("explosionEffect");
+        if (!(rawEffect instanceof Map)) return;
+        Map<?, ?> effect = (Map<?, ?>) rawEffect;
+        Object enabled = effect.get("enabled");
+        Object media = effect.get("mediaUrl");
+        Object sound = effect.get("soundUrl");
+        if (!Boolean.TRUE.equals(enabled)
+                || ((media == null || String.valueOf(media).trim().isEmpty())
+                && (sound == null || String.valueOf(sound).trim().isEmpty()))) return;
+        View content = findViewById(android.R.id.content);
+        if (!(content instanceof FrameLayout)) return;
+        FrameLayout root = (FrameLayout) content;
+        WebView blastWeb = new WebView(this);
+        blastWeb.setBackgroundColor(Color.TRANSPARENT);
+        blastWeb.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        WebSettings settings = blastWeb.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setBlockNetworkImage(false);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setDefaultTextEncodingName("UTF-8");
+        blastWeb.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        blastWeb.setVerticalScrollBarEnabled(false);
+        blastWeb.setHorizontalScrollBarEnabled(false);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        root.addView(blastWeb, params);
+        final boolean[] started = { false };
+        blastWeb.setWebViewClient(new android.webkit.WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                if (started[0] || isFinishing() || isDestroyed()) return;
+                started[0] = true;
+                try {
+                    String configJson = new org.json.JSONObject(config).toString();
+                    String winJson = winPayload.toString();
+                    String script = "window.setSupportChestBlastOnly&&window.setSupportChestBlastOnly(true);"
+                            + "window.applySupportChestData&&window.applySupportChestData("
+                            + configJson + ",{});"
+                            + "window.applySupportChestWin&&window.applySupportChestWin("
+                            + winJson + ");";
+                    view.evaluateJavascript(script, null);
+                } catch (Exception error) {
+                    android.util.Log.w("SupportChest", "Could not start custom chest blast", error);
+                }
+            }
+        });
+        blastWeb.loadUrl("file:///android_asset/support-chest.html");
+        long duration = 6000L;
+        try {
+            duration = Math.max(6000L, Math.min(14000L,
+                    2500L + (long) numberForChest(effect.get("durationMs"), 1800L)));
+        } catch (Exception ignored) { }
+        final WebView overlayWeb = blastWeb;
+        handler.postDelayed(() -> {
+            try {
+                if (overlayWeb.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) overlayWeb.getParent()).removeView(overlayWeb);
+                }
+                overlayWeb.stopLoading();
+                overlayWeb.loadUrl("about:blank");
+                overlayWeb.destroy();
+            } catch (Exception ignored) { }
+        }, duration);
     }
 
     private void showSupportChestSheet() {
@@ -15251,6 +15332,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
         if ("support_chest:config_updated".equals(event)) {
+            Object updatedConfig = payload.get("config");
+            if (updatedConfig != null && updatedConfig.isJsonObject()) {
+                try {
+                    supportChestRuntimeConfig = new HashMap<>(
+                            new com.google.gson.Gson().fromJson(updatedConfig, Map.class));
+                } catch (Exception ignored) { }
+            }
             refreshSupportChestIcon();
             if (activeSupportChestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
                 handler.removeCallbacks(supportChestEventRefresh);
@@ -15259,6 +15347,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         if ("support_chest:updated".equals(event)) {
+            JsonElement updatedConfig = payload.get("config");
+            if (updatedConfig != null && updatedConfig.isJsonObject()) {
+                try {
+                    supportChestRuntimeConfig = new HashMap<>(
+                            new com.google.gson.Gson().fromJson(updatedConfig, Map.class));
+                } catch (Exception ignored) { }
+            }
             if (activeSupportChestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
                 handler.removeCallbacks(supportChestEventRefresh);
                 handler.postDelayed(supportChestEventRefresh, 350L);
@@ -15311,9 +15406,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             final String expectedRoomId = blastRoomId;
             handler.postDelayed(() -> {
                 if (isFinishing() || isDestroyed() || !expectedRoomId.equals(roomId)) return;
-                // This dedicated room broadcast makes every connected room member play the blast,
-                // independently of who sent the gift or whether the support-chest sheet is open.
-                RoomSoundFx.playChestExplosion(this);
+                // The uploaded video/audio is played by the shared custom blast overlay.
+                // Keep the built-in explosion sound only as a fallback when no custom media is configured.
+                Map<String, Object> cfg = supportChestRuntimeConfig;
+                Map<?, ?> effect = cfg != null && cfg.get("explosionEffect") instanceof Map
+                        ? (Map<?, ?>) cfg.get("explosionEffect") : null;
+                String customMedia = effect == null ? null : String.valueOf(effect.get("mediaUrl"));
+                String customSound = effect == null ? null : String.valueOf(effect.get("soundUrl"));
+                boolean customEnabled = effect != null && Boolean.TRUE.equals(effect.get("enabled"))
+                        && ((customMedia != null && !customMedia.trim().isEmpty())
+                        || (customSound != null && !customSound.trim().isEmpty()));
+                if (!customEnabled) RoomSoundFx.playChestExplosion(this);
             }, delayMs);
             return;
         }
@@ -15363,6 +15466,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 final String winJson = payload.toString();
                 chestWeb.post(() -> chestWeb.evaluateJavascript(
                         "window.applySupportChestWin && window.applySupportChestWin(" + winJson + ");", null));
+            } else {
+                Map<String, Object> cachedConfig = supportChestRuntimeConfig;
+                if (cachedConfig != null) {
+                    showSupportChestBlastOverlay(cachedConfig, payload);
+                } else {
+                    final String expectedRoom = roomId;
+                    final JsonObject winPayload = payload.deepCopy();
+                    try {
+                        ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                                .supportChest(expectedRoom)
+                                .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                                    @Override public void onResponse(
+                                            retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                            retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                                        if (isFinishing() || isDestroyed() || !expectedRoom.equals(roomId)
+                                                || !response.isSuccessful() || response.body() == null
+                                                || response.body().data == null) return;
+                                        Object cfg = response.body().data.get("config");
+                                        if (cfg instanceof Map) {
+                                            supportChestRuntimeConfig = new HashMap<>((Map<String, Object>) cfg);
+                                            showSupportChestBlastOverlay(supportChestRuntimeConfig, winPayload);
+                                        }
+                                    }
+                                    @Override public void onFailure(
+                                            retrofit2.Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
+                                        android.util.Log.w("SupportChest", "Could not load custom blast config", error);
+                                    }
+                                });
+                    } catch (Exception error) {
+                        android.util.Log.w("SupportChest", "Could not request custom blast config", error);
+                    }
+                }
             }
             String winner = memberStr(payload, "winnerName");
             if (winner == null || winner.trim().isEmpty()) winner = "أحد الداعمين";
@@ -15401,7 +15536,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 GlobalCelebrationToast.showRoomTop(
                         this, "💥 انفجار صندوق الدعم!", message, null, chestRewardImage,
                         chestToastKey, 0d, 0L, null, "support_chest", roomId);
-                GlobalCelebrationToast.showSupportChestBurst(this);
+                // Custom room-wide media replaces the legacy built-in burst.
             }, 2000L);
             return;
         }
