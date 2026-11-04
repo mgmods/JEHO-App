@@ -76,6 +76,69 @@ public final class GiftFlyAnimator {
     }
 
     /**
+     * Sends one lightweight copy to each target in a single AnimatorSet.
+     * Every copy starts and finishes on the same frame; no stagger, rotation,
+     * pulse, landing burst, or extra visual treatment is applied.
+     */
+    public static void flyTogether(
+            @Nullable FrameLayout overlay,
+            @Nullable String iconUrl,
+            @Nullable PointF from,
+            @Nullable List<PointF> destinations,
+            long durationMs
+    ) {
+        if (overlay == null || from == null || destinations == null || destinations.isEmpty()) return;
+        int count = Math.min(20, destinations.size());
+        if (count <= 0) return;
+
+        float density = overlay.getResources().getDisplayMetrics().density;
+        int size = Math.round(38f * density);
+        List<ImageView> copies = new ArrayList<>(count);
+        List<Animator> motions = new ArrayList<>(count * 2);
+
+        for (int i = 0; i < count; i++) {
+            PointF to = destinations.get(i);
+            if (to == null) continue;
+            ImageView copy = newImage(overlay, iconUrl, size);
+            copy.setX(from.x - size / 2f);
+            copy.setY(from.y - size / 2f);
+            copy.setAlpha(1f);
+            copy.setScaleX(1f);
+            copy.setScaleY(1f);
+            copy.setRotation(0f);
+            overlay.addView(copy);
+            copies.add(copy);
+
+            motions.add(ObjectAnimator.ofFloat(
+                    copy, View.X, from.x - size / 2f, to.x - size / 2f));
+            motions.add(ObjectAnimator.ofFloat(
+                    copy, View.Y, from.y - size / 2f, to.y - size / 2f));
+        }
+
+        if (motions.isEmpty()) return;
+        AnimatorSet together = new AnimatorSet();
+        together.playTogether(motions);
+        together.setDuration(Math.max(250L, durationMs));
+        together.setInterpolator(new LinearInterpolator());
+        together.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationEnd(Animator animation) {
+                for (ImageView copy : copies) remove(copy);
+            }
+
+            @Override public void onAnimationCancel(Animator animation) {
+                for (ImageView copy : copies) remove(copy);
+            }
+        });
+        try {
+            overlay.setVisibility(View.VISIBLE);
+            overlay.bringToFront();
+            together.start();
+        } catch (OutOfMemoryError | RuntimeException error) {
+            for (ImageView copy : copies) remove(copy);
+        }
+    }
+
+    /**
      * @deprecated Prefer {@link #allMicClone} for full banner + simultaneous scatter.
      */
     @Deprecated
