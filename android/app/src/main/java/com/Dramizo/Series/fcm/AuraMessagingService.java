@@ -55,7 +55,30 @@ public class AuraMessagingService extends FirebaseMessagingService {
         }
 
         String type = data.containsKey("type") && data.get("type") != null ? data.get("type") : "system";
+        // Defensive client-side guard for older backend versions or queued FCM messages:
+        // lucky-win celebrations are room/in-app only and must never become Android push alerts.
+        if (isLuckyWinMessage(type, title, body, data)) return;
         showNotification(title, body, type, data);
+    }
+
+    private static boolean isLuckyWinMessage(String type, String title, String body,
+                                             Map<String, String> data) {
+        StringBuilder markers = new StringBuilder();
+        markers.append(type == null ? "" : type).append(' ')
+                .append(title == null ? "" : title).append(' ')
+                .append(body == null ? "" : body);
+        if (data != null) {
+            for (String key : new String[]{"type", "kind", "notificationKind", "event", "source", "reason"}) {
+                String value = data.get(key);
+                if (value != null) markers.append(' ').append(value);
+            }
+        }
+        String value = markers.toString().toLowerCase(java.util.Locale.ROOT);
+        return value.matches("(?s).*lucky[ _:-]*(hit|win|gift|reward).*")
+                || value.contains("محظوظ")
+                || value.contains("هدية محظوظة")
+                || value.contains("ربح المحظوظ")
+                || value.contains("حظ سعيد");
     }
 
     private void showNotification(String title, String body, String type, Map<String, String> data) {
