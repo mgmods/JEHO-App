@@ -568,8 +568,9 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 const activeTab = ref('overview')
 const types = ref([])
 const gifts = ref([])
-const cpGifts = computed(() => gifts.value.filter(gift => String(gift.category || '').toLowerCase() === 'cp'))
-const normalGifts = computed(() => gifts.value.filter(gift => String(gift.category || '').toLowerCase() !== 'cp'))
+const cpGifts = computed(() => gifts.value.filter(gift => String(gift.category || '').toLowerCase() === 'cp' && gift.isActive !== false && Number(gift.coinPrice ?? gift.price ?? 0) > 0))
+// The single CP level may reward any paid gift already present in the app, including CP-tab gifts.
+const normalGifts = computed(() => gifts.value.filter(gift => gift.isActive !== false && Number(gift.coinPrice ?? gift.price ?? 0) > 0))
 const requests = ref([])
 const audit = ref([])
 const loading = ref(false)
