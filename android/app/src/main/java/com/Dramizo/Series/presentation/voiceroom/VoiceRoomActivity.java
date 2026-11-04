@@ -4840,9 +4840,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (destinations.isEmpty()) return;
             int w = Math.max(binding.giftOverlay.getWidth(), 1);
             int h = Math.max(binding.giftOverlay.getHeight(), 1);
-            // The existing cannon button is untouched; every gift copy starts at room bottom-center.
-            PointF from = new PointF(w / 2f, Math.max(h * 0.72f, h - luckyCannonDp(110)));
-            GiftFlyAnimator.flyTogether(binding.giftOverlay, icon, from, destinations, 620L);
+            // Reveal one large gift below the seat grid, then fan gift copies toward occupied seats.
+            com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
+                    binding.giftOverlay, icon, destinations, totalCoins,
+                    Math.max(1, quantity), Math.max(1, recipients.size()), null, null);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
