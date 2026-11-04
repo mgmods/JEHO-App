@@ -137,13 +137,13 @@
             <div class="form-text">تُمنح بعد تسجيل الهدية بنجاح، وتُخصم مرة واحدة فقط لكل سجل هدية.</div>
           </div>
           <div class="col-sm-6 col-xl-3">
-            <label class="form-label">الحد الأقصى للمستوى</label>
-            <input v-model.number="item.maxLevel" class="form-control" type="number" min="1" max="1000" step="1" placeholder="حسب الجدول">
+            <label class="form-label">عدد مستويات CP</label>
+            <input class="form-control" type="number" value="1" disabled>
           </div>
           <div class="col-12">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border rounded-3 p-3 bg-light-subtle">
               <div>
-                <h4 class="h6 mb-1">مستويات العلاقة</h4>
+                <h4 class="h6 mb-1">مستوى العلاقة</h4>
                 <p class="form-text mb-0">إعداد مستوى CP واحد فقط؛ يمكنك إضافة الهدايا والمكافآت والصور الخاصة به دون مستويات متدرجة.</p>
               </div>
               <span class="badge text-bg-secondary">مستوى CP واحد فقط</span>
@@ -158,8 +158,7 @@
                   <strong>المستوى {{ level.level }} · {{ level.name || level.presentation?.title || 'بدون اسم' }}</strong>
                   <div class="d-flex align-items-end gap-2 flex-wrap">
                     <div>
-                      <label class="form-label small mb-1">النقاط المطلوبة لفتح المستوى</label>
-                      <input v-model.number="level.pointsRequired" class="form-control form-control-sm" type="number" min="0" max="1000000000" step="1" style="width:150px" @input="syncLevelEditor(item)">
+                      <span class="small text-secondary">نقاط العلاقة تتراكم ضمن هذا المستوى الواحد</span>
                     </div>
                     <span class="small text-secondary">المستوى الوحيد</span>
                   </div>
@@ -428,7 +427,7 @@
           </div>
           <div class="col-sm-6 col-xl-3">
             <label class="form-label">السعر بالعملات</label>
-            <input v-model.number="cpStoreForm.coinPrice" class="form-control" type="number" min="0" max="1000000000" step="1">
+            <input v-model.number="cpStoreForm.coinPrice" class="form-control" type="number" min="1" max="1000000000" step="1">
           </div>
           <div class="col-md-6">
             <label class="form-label">رفع صورة معاينة العنصر</label>
@@ -668,9 +667,9 @@ async function createCpStoreItem() {
     error.value = 'رابط المعاينة يجب أن يبدأ بـ https:// أو http://.'
     return
   }
-  if (!Number.isSafeInteger(Number(form.coinPrice)) || Number(form.coinPrice) < 0 ||
+  if (!Number.isSafeInteger(Number(form.coinPrice)) || Number(form.coinPrice) <= 0 ||
       !Number.isInteger(Number(form.leaseDays)) || Number(form.leaseDays) < 1 || Number(form.leaseDays) > 3650) {
-    error.value = 'تحقق من السعر ومدة الملكية.'
+    error.value = 'يجب أن يكون السعر أكبر من صفر، وتكون مدة الملكية بين يوم و3650 يوماً.'
     return
   }
   savingCpStore.value = true
@@ -694,7 +693,7 @@ async function saveCpStoreItem(item) {
   try {
     const price = Number(item.coinPrice)
     const leaseDays = Number(item.meta?.leaseDays || 30)
-    if (!item.name?.trim() || !Number.isSafeInteger(price) || price < 0 ||
+    if (!item.name?.trim() || !Number.isSafeInteger(price) || price <= 0 ||
         !Number.isInteger(leaseDays) || leaseDays < 1 || leaseDays > 3650) {
       throw new Error('تحقق من اسم العنصر والسعر والمدة.')
     }
@@ -988,7 +987,7 @@ async function saveType(item) {
       rules = JSON.parse(item.rulesText || '{}')
     } catch { throw new Error('تحقق من صيغة JSON في المستويات أو القواعد.') }
     if (!Array.isArray(levels) || !rules || typeof rules !== 'object' || Array.isArray(rules)) throw new Error('تحقق من إعدادات المستويات والقواعد.')
-    if (levels.length > 1) throw new Error('نظام CP يعتمد مستوى واحداً فقط.')
+    if (levels.length !== 1) throw new Error('يجب ضبط مستوى CP واحد فقط قبل الحفظ.')
     levels = levels.slice(0, 1).map((level, index) => {
       const pointsRequired = parseLevelInteger(level.pointsRequired, 0)
       if (!Number.isSafeInteger(pointsRequired) || pointsRequired < 0 || pointsRequired > 1000000000) {

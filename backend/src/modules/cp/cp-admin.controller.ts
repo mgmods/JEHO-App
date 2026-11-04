@@ -237,7 +237,7 @@ export class CpAdminController {
       throw new BadRequestException('سعر العملات يجب أن يكون عدداً صحيحاً غير سالب؛ الصفر يعطّل الشراء');
     }
     if (body.levels !== undefined) {
-      if (!Array.isArray(body.levels) || body.levels.length > 1) throw new BadRequestException('نظام CP يعتمد مستوى واحداً فقط؛ احذف المستويات الإضافية.');
+      if (!Array.isArray(body.levels) || body.levels.length !== 1) throw new BadRequestException('يجب حفظ مستوى CP واحد فقط.');
       let previous = -1;
       for (const level of body.levels) {
         if (!Number.isInteger(level?.level) || level.level < 1 || !Number.isSafeInteger(level?.pointsRequired) || level.pointsRequired < 0 || level.pointsRequired < previous) {

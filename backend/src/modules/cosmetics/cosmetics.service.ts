@@ -167,6 +167,14 @@ export class CosmeticsService implements OnModuleInit {
     if (!code || !name || !dto.previewUrl) {
       throw new BadRequestException('type, code, name, previewUrl مطلوبة');
     }
+    if ((dto.meta as any)?.cpStore === true) {
+      if (!Number.isSafeInteger(Number(dto.coinPrice)) || Number(dto.coinPrice) <= 0) {
+        throw new BadRequestException('سعر عنصر متجر CP يجب أن يكون أكبر من صفر كوين.');
+      }
+      if (dto.type === CosmeticType.ROOM_BACKGROUND) {
+        throw new BadRequestException('خلفيات متجر CP تُحفظ كخلفية بطاقة الملف الشخصي حتى تُركّب تلقائياً.');
+      }
+    }
     const row = this.cosmeticsRepo.create({
       type: dto.type,
       code,
@@ -229,6 +237,14 @@ export class CosmeticsService implements OnModuleInit {
     if (dto.isActive != null) row.isActive = !!dto.isActive;
     if (dto.sortOrder != null) row.sortOrder = Number(dto.sortOrder);
     if (dto.meta !== undefined) row.meta = dto.meta;
+    if ((row.meta as any)?.cpStore === true) {
+      if (!Number.isSafeInteger(Number(row.coinPrice)) || Number(row.coinPrice) <= 0) {
+        throw new BadRequestException('سعر عنصر متجر CP يجب أن يكون أكبر من صفر كوين.');
+      }
+      if (row.type === CosmeticType.ROOM_BACKGROUND) {
+        throw new BadRequestException('خلفيات متجر CP تُحفظ كخلفية بطاقة الملف الشخصي حتى تُركّب تلقائياً.');
+      }
+    }
     return this.cosmeticsRepo.save(row);
   }
 
@@ -526,6 +542,11 @@ export class CosmeticsService implements OnModuleInit {
     await this.assertCosmeticRequirements(userId, cosmetic);
 
     const fullPrice = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
+    const isCpStoreItem = (cosmetic.meta as any)?.cpStore === true || String(cosmetic.code || '').startsWith('cp_');
+    if (isCpStoreItem && fullPrice <= 0) throw new BadRequestException('سعر عنصر متجر CP غير مضبوط.');
+    if (isCpStoreItem && cosmetic.type === CosmeticType.ROOM_BACKGROUND) {
+      throw new BadRequestException('هذا النوع لا يُركّب تلقائياً؛ اختر بطاقة الملف الشخصي لخلفيات CP.');
+    }
     const leaseDays = this.mallLeaseDays(cosmetic);
     const now = new Date();
 
@@ -594,7 +615,6 @@ export class CosmeticsService implements OnModuleInit {
     // CP Store items are purchased and equipped as one user action. Keep the
     // purchase transaction committed even if a legacy cosmetic cannot be worn;
     // return the explicit state so the APK can offer a manual equip retry.
-    const isCpStoreItem = (cosmetic.meta as any)?.cpStore === true || String(cosmetic.code || '').startsWith('cp_');
     if (isCpStoreItem) {
       try {
         const equipResult = await this.equip(userId, cosmeticId);
