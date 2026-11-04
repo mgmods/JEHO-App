@@ -140,7 +140,7 @@ public final class GiftFlyAnimator {
                 if (heroView.getParent() != null) heroView.setAlpha(0f);
             }
             @Override public void onAnimationCancel(Animator animation) {
-                if (hero.getParent() != null) hero.setAlpha(0f);
+                if (heroView.getParent() != null) heroView.setAlpha(0f);
             }
         });
 
