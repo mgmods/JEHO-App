@@ -2022,7 +2022,36 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (started[0] || isFinishing() || isDestroyed()) return;
                 started[0] = true;
                 try {
-                    String configJson = new org.json.JSONObject(config).toString();
+                    // The blast WebView is loaded from file:///android_asset, so a relative
+                    // /uploads/... URL would resolve to a local file and render as a blank white tile.
+                    // Normalize dashboard media against the same production API origin used by the APK.
+                    Map<String, Object> browserConfig = new java.util.HashMap<>(config);
+                    Map<String, Object> browserEffect = new java.util.HashMap<>();
+                    for (Map.Entry<?, ?> entry : effect.entrySet()) {
+                        browserEffect.put(String.valueOf(entry.getKey()), entry.getValue());
+                    }
+                    Object blastMediaUrl = browserEffect.get("mediaUrl");
+                    if (blastMediaUrl != null) {
+                        String rawUrl = String.valueOf(blastMediaUrl).trim();
+                        if (!rawUrl.isEmpty() && !rawUrl.startsWith("http://")
+                                && !rawUrl.startsWith("https://") && !rawUrl.startsWith("file:")
+                                && !rawUrl.startsWith("content:") && !rawUrl.startsWith("data:")) {
+                            browserEffect.put("mediaUrl",
+                                    com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rawUrl));
+                        }
+                    }
+                    Object blastSoundUrl = browserEffect.get("soundUrl");
+                    if (blastSoundUrl != null) {
+                        String rawUrl = String.valueOf(blastSoundUrl).trim();
+                        if (!rawUrl.isEmpty() && !rawUrl.startsWith("http://")
+                                && !rawUrl.startsWith("https://") && !rawUrl.startsWith("file:")
+                                && !rawUrl.startsWith("content:") && !rawUrl.startsWith("data:")) {
+                            browserEffect.put("soundUrl",
+                                    com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rawUrl));
+                        }
+                    }
+                    browserConfig.put("explosionEffect", browserEffect);
+                    String configJson = new org.json.JSONObject(browserConfig).toString();
                     String winJson = winPayload.toString();
                     String script = "window.setSupportChestBlastOnly&&window.setSupportChestBlastOnly(true);"
                             + "window.applySupportChestData&&window.applySupportChestData("
@@ -2783,9 +2812,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         ImageView giftIcon = row.findViewById(R.id.imgChatGift);
         TextView hostChip = row.findViewById(R.id.tvHostChip);
         TextView vipChip = row.findViewById(R.id.tvVipChip);
-        TextView levelChip = row.findViewById(R.id.tvLevelChip);
-        TextView charmChip = row.findViewById(R.id.tvCharmChip);
-        TextView wealthChip = row.findViewById(R.id.tvWealthChip);
         TextView nameView = row.findViewById(R.id.tvChatName);
         TextView meta = row.findViewById(R.id.tvChatMeta);
         TextView line = row.findViewById(R.id.tvChatLine);
@@ -2798,9 +2824,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (nameView != null) nameView.setVisibility(View.GONE);
             if (hostChip != null) hostChip.setVisibility(View.GONE);
             if (vipChip != null) vipChip.setVisibility(View.GONE);
-            if (levelChip != null) levelChip.setVisibility(View.GONE);
-            if (charmChip != null) charmChip.setVisibility(View.GONE);
-            if (wealthChip != null) wealthChip.setVisibility(View.GONE);
             HostSignalView hostSignal = row.findViewById(R.id.webChatHostSignal);
             if (hostSignal != null) {
                 hostSignal.clearSignal();
@@ -2873,26 +2896,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean creator = !mysteriousLine && !system && userId != null && roomHostId != null && userId.equals(roomHostId);
             if (hostChip != null) hostChip.setVisibility(creator ? View.VISIBLE : View.GONE);
 
-            if (vipLevel > 0 && !mysteriousLine) {
-                vipChip.setVisibility(View.VISIBLE);
-                vipChip.setText("VIP" + vipLevel);
-                VipStyle.applyChip(vipChip, vipLevel);
-                vipChip.setTextColor(VipStyle.chipTextColor(vipLevel));
-            } else {
-                vipChip.setVisibility(View.GONE);
-            }
-
-            if (system || mysteriousLine) {
-                levelChip.setVisibility(View.GONE);
-                charmChip.setVisibility(View.GONE);
-                wealthChip.setVisibility(View.GONE);
-            } else {
-                AvatarCosmetics.styleBadges(levelChip, charmChip, wealthChip, vipLevel, userLevel,
-                        Math.max(0L, charmScore), Math.max(0L, wealthScore));
-                if (!roomCharmEnabled() && charmChip != null) {
-                    charmChip.setVisibility(View.GONE);
-                }
-            }
+            // VIP/CP/ID/medals now sit inline beside the display name.
+            // Legacy moon/heart/level counters are intentionally not shown in chat.
+            if (vipChip != null) vipChip.setVisibility(View.GONE);
         }
         if (meta != null) meta.setVisibility(View.GONE);
         line.setText(text != null ? text : "");
@@ -2963,6 +2969,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 || (activeRoomFeed == 2 && "gift".equals(row.getTag()))
                 ? View.VISIBLE : View.GONE);
         binding.chatLog.addView(row);
+        if (!system && !gameCel && !mysteriousLine && userId != null && !userId.trim().isEmpty()) {
+            bindRoomChatDecorations(row, userId, vipLevel);
+        }
         // Keep all live-session messages — never drop mid-broadcast (only end live clears).
         if (roomId != null && !restoringRoomChat) {
             RoomChatMemory.append(roomId, new RoomChatMemory.Line(
@@ -2976,6 +2985,162 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         // TikTok-style: always stick to latest comments.
         scrollChatToBottom(true);
+    }
+
+    private static final class RoomChatDecoration {
+        String publicId;
+        String publicIdStyleMode;
+        String publicIdColor1;
+        String publicIdColor2;
+        String vipBadgeUrl;
+        boolean cpActive;
+        final List<String> medalUrls = new ArrayList<>();
+    }
+
+    private final java.util.Map<String, RoomChatDecoration> roomChatDecorationCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> roomChatDecorationLoading =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private void bindRoomChatDecorations(@NonNull View row, @NonNull String userId, int fallbackVip) {
+        RoomChatDecoration cached = roomChatDecorationCache.get(userId);
+        if (cached != null) {
+            applyRoomChatDecorations(row, cached, fallbackVip);
+            return;
+        }
+        if (!roomChatDecorationLoading.add(userId)) return;
+        final AppContainer container;
+        try {
+            container = ContainerProvider.from(this);
+        } catch (Exception error) {
+            roomChatDecorationLoading.remove(userId);
+            return;
+        }
+        container.getIoExecutor().execute(() -> {
+            RoomChatDecoration decoration = new RoomChatDecoration();
+            Result<AuthDtos.UserDto> profile = ApiCall.execute(container.getUserApi().getUser(userId));
+            if (profile != null && profile.success && profile.data != null) {
+                AuthDtos.UserDto user = profile.data;
+                decoration.publicId = user.publicId;
+                decoration.publicIdStyleMode = user.publicIdStyleMode;
+                decoration.publicIdColor1 = user.publicIdStyleColor1;
+                decoration.publicIdColor2 = user.publicIdStyleColor2;
+                decoration.vipBadgeUrl = user.vipBadgeUrl;
+                List<String> displayedIds = user.displayedMedalIds == null
+                        ? java.util.Collections.emptyList() : user.displayedMedalIds;
+                Result<List<com.Dramizo.Series.data.remote.dto.BadgeDto>> badges =
+                        ApiCall.execute(container.getUserApi().earnedBadges(userId));
+                if (badges != null && badges.success && badges.data != null) {
+                    for (String displayedId : displayedIds) {
+                        if (displayedId == null || decoration.medalUrls.size() >= 3) continue;
+                        for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges.data) {
+                            if (badge != null && displayedId.equals(badge.id)
+                                    && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) {
+                                decoration.medalUrls.add(badge.imageUrl);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            Result<List<Map<String, Object>>> cp =
+                    ApiCall.execute(container.getUserApi().cpProfileRelationships(userId));
+            if (cp != null && cp.success && cp.data != null) {
+                for (Map<String, Object> relation : cp.data) {
+                    if (relation == null) continue;
+                    Object rawStatus = relation.get("status");
+                    if (rawStatus == null) rawStatus = relation.get("state");
+                    String status = rawStatus == null ? "" : String.valueOf(rawStatus);
+                    if (status.isEmpty() || "active".equalsIgnoreCase(status)
+                            || "accepted".equalsIgnoreCase(status)
+                            || "approved".equalsIgnoreCase(status)) {
+                        decoration.cpActive = true;
+                        break;
+                    }
+                }
+            }
+            roomChatDecorationLoading.remove(userId);
+            roomChatDecorationCache.put(userId, decoration);
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed() && row.getParent() != null) {
+                    applyRoomChatDecorations(row, decoration, fallbackVip);
+                }
+            });
+        });
+    }
+
+    private void applyRoomChatDecorations(
+            @NonNull View row, @NonNull RoomChatDecoration decoration, int fallbackVip) {
+        ImageView vip = row.findViewById(R.id.imgChatVipBadge);
+        TextView cp = row.findViewById(R.id.tvChatCpChip);
+        TextView publicId = row.findViewById(R.id.tvChatPublicId);
+        LinearLayout badgesRow = row.findViewById(R.id.chatBadgesRow);
+        ImageView[] medals = new ImageView[] {
+                row.findViewById(R.id.imgChatMedal1),
+                row.findViewById(R.id.imgChatMedal2),
+                row.findViewById(R.id.imgChatMedal3)
+        };
+        boolean any = false;
+        if (vip != null && fallbackVip > 0) {
+            vip.setVisibility(View.VISIBLE);
+            if (decoration.vipBadgeUrl != null && !decoration.vipBadgeUrl.trim().isEmpty()) {
+                Glide.with(vip).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(
+                        decoration.vipBadgeUrl)).fitCenter().into(vip);
+            } else {
+                vip.setImageResource(com.Dramizo.Series.util.AssetCatalog.vipMedal(fallbackVip));
+            }
+            any = true;
+        } else if (vip != null) {
+            vip.setVisibility(View.GONE);
+            vip.setImageDrawable(null);
+        }
+        if (cp != null) {
+            cp.setVisibility(decoration.cpActive ? View.VISIBLE : View.GONE);
+            any |= decoration.cpActive;
+        }
+        if (publicId != null) {
+            boolean styledId = decoration.publicId != null && !decoration.publicId.trim().isEmpty()
+                    && decoration.publicIdStyleMode != null
+                    && !"none".equalsIgnoreCase(decoration.publicIdStyleMode);
+            if (styledId) {
+                publicId.setText("ID " + decoration.publicId);
+                try {
+                    int c1 = Color.parseColor(decoration.publicIdColor1 == null
+                            ? "#7C5CFF" : decoration.publicIdColor1);
+                    int c2 = Color.parseColor(decoration.publicIdColor2 == null
+                            ? "#D6A84B" : decoration.publicIdColor2);
+                    android.graphics.drawable.GradientDrawable chip =
+                            new android.graphics.drawable.GradientDrawable(
+                                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                                    new int[] { c1, c2 });
+                    chip.setCornerRadius(dp(5));
+                    publicId.setBackground(chip);
+                } catch (Exception ignored) {
+                    publicId.setBackgroundResource(R.drawable.bg_vanity_chip);
+                }
+                publicId.setVisibility(View.VISIBLE);
+                any = true;
+            } else {
+                publicId.setVisibility(View.GONE);
+            }
+        }
+        for (int i = 0; i < medals.length; i++) {
+            ImageView medal = medals[i];
+            if (medal == null) continue;
+            if (i < decoration.medalUrls.size()) {
+                medal.setVisibility(View.VISIBLE);
+                Glide.with(medal).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(
+                        decoration.medalUrls.get(i)))
+                        .placeholder(R.drawable.ic_medal_default)
+                        .error(R.drawable.ic_medal_default)
+                        .fitCenter().into(medal);
+                any = true;
+            } else {
+                medal.setVisibility(View.GONE);
+                medal.setImageDrawable(null);
+            }
+        }
+        if (badgesRow != null) badgesRow.setVisibility(any ? View.VISIBLE : View.GONE);
     }
 
     private boolean restoringRoomChat;
