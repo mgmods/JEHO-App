@@ -605,7 +605,7 @@ function label(type) {
 }
 function format(value) { return Number(value || 0).toLocaleString('ar') }
 function cosmeticTypeLabel(type) {
-  return ({ profile_card: 'بطاقة الملف الشخصي', entry_effect: 'تأثير دخول', room_card: 'بطاقة الروم', nameplate: 'لوحة الاسم', chat_bubble: 'فقاعة الدردشة', level_badge: 'شارة مستوى', vip_badge: 'شارة VIP', host_badge: 'شارة مضيف', room_background: 'خلفية روم', join_toast: 'تأثير دخول' })[type] || type
+  return ({ cp_background: 'خلفية CP', cp_logo: 'شعار CP', profile_card: 'بطاقة الملف الشخصي', entry_effect: 'تأثير دخول', room_card: 'بطاقة الروم', nameplate: 'لوحة الاسم', chat_bubble: 'فقاعة الدردشة', level_badge: 'شارة مستوى', vip_badge: 'شارة VIP', host_badge: 'شارة مضيف', room_background: 'خلفية روم', join_toast: 'تأثير دخول' })[type] || type
 }
 function isCpStoreItem(item) {
   return item && (item.meta?.cpStore === true || String(item.code || '').startsWith('cp_'))
