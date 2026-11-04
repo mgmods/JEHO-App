@@ -651,6 +651,7 @@ public final class GlobalCelebrationToast {
 
         boolean planet = kind != null && "planet_summon".equalsIgnoreCase(kind);
         boolean supportChest = kind != null && "support_chest".equalsIgnoreCase(kind);
+        Map<String, Object> chestToast = supportChest ? supportChestToastConfig : null;
         if (supportChest && avatar != null) {
             int giftSize = dp(activity, Math.max(24, Math.min(120,
                     (int) numberConfig(supportChestToastConfig, "giftSizeDp", 58))));
@@ -840,7 +841,6 @@ public final class GlobalCelebrationToast {
                 : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
         int maxToastWidth = Math.max(dp(activity, 220), screenWidth - dp(activity, 24));
         int toastWidth = Math.min(dp(activity, supportChest ? 360 : Math.max(220, Math.min(360, requestedWidthDp))), maxToastWidth);
-        Map<String, Object> chestToast = supportChest ? supportChestToastConfig : null;
         int toastHeight = customToastStyle
                 ? dp(activity, supportChest
                     ? Math.max(60, Math.min(240, (int) numberConfig(chestToast, "height", 104)))
