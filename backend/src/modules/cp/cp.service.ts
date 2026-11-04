@@ -145,11 +145,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       `UPDATE cp_requests SET type=$1 WHERE type<>$1`,
       [CpType.RELATIONSHIP],
     );
-    // CP now has one permanent level. Preserve relationship points and history,
-    // while normalizing old multi-level accounts to the single visible level.
-    await this.dataSource.query(
-      `UPDATE cp_relationships SET level=1 WHERE level<>1`,
-    );
+    // Preserve existing earned CP levels. Multi-level progression is configured
+    // through cp.levels.relationship; never reset user progress on application boot.
   }
 
   private async enrichLevelRewards(levels: any[]) {
@@ -346,8 +343,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       levels = await this.enrichLevelRewards(levels);
       catalog.push({
         type, enabled, priceCoins: enabled && giftPrice > 0 ? giftPrice : null,
-        maxLevel: 1,
-        levels: levels.slice(0, 1).map(level => ({ ...level, level: 1 })),
+        maxLevel: levels.length,
+        levels,
         gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl, coinPrice: giftPrice } : null,
         giftPoints: Number(settings[`cp.gift_points.${type}`] || 0) || 0,
         seatEffect: {
@@ -403,7 +400,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     );
     const parsedLevels = parseJsonSetting(levelSetting?.value, []);
     const levels = await this.enrichLevelRewards(Array.isArray(parsedLevels) ? parsedLevels : []);
-    const levelsByNumber = new Map(levels.slice(0, 1).map(level => [1, { ...level, level: 1 }]));
+    const levelsByNumber = new Map(levels.map(level => [Number(level.level), level]));
     return rows.map((row: any) => {
       const config = levelsByNumber.get(Number(row.level));
       return {
@@ -427,8 +424,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         const parsed = parseJsonSetting(row.value, []);
         if (Array.isArray(parsed)) levels = parsed
           .filter(item => item && Number.isFinite(Number(item.level)) && Number(item.level) >= 1)
-          .sort((a, b) => Number(a.level) - Number(b.level)).slice(0, 1)
-          .map(item => ({ ...item, level: 1 }));
+          .sort((a, b) => Number(a.level) - Number(b.level));
       } catch { levels = []; }
       configs.push({ type, levels: await this.enrichLevelRewards(levels) });
     }
@@ -468,7 +464,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     }
     return rows.map((row: any) => {
       const points = BigInt(String(row.points || 0));
-      const levels = (configs[row.type] || []).slice(0, 1).map(item => ({ ...item, level: 1 })).sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
+      const levels = (configs[row.type] || []).slice().sort((a, b) => Number(a.level) - Number(b.level));
       const currentThreshold = levels.filter(item => Number(item.level) <= Number(row.level)).reduce((max, item) => Math.max(max, Number(item.pointsRequired) || 0), 0);
       const next = levels.find(item => Number(item.level) > Number(row.level));
       const nextThreshold = next ? BigInt(Math.max(0, Number(next.pointsRequired) || 0)) : null;
@@ -538,7 +534,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       try { rules = parseJsonSetting(setting?.value, {}); } catch { rules = {}; }
       try {
         const parsed = parseJsonSetting(levelSetting?.value, []);
-        levelConfigs[type] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed.slice(0, 1).map(item => ({ ...item, level: 1 })) : []);
+        levelConfigs[type] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed : []);
       } catch { levelConfigs[type] = []; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
       effects[type] = {
@@ -1050,10 +1046,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         const [levelsSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${request.type}`]);
         let computedLevel = 1;
         try {
-          const levels = (parseJsonSetting(levelsSetting?.value, []) as Array<{ level: number; pointsRequired: number }>).slice(0, 1);
-          for (const item of levels) if (Number(item.pointsRequired) <= initialPoints) computedLevel = 1;
+          const levels = (parseJsonSetting(levelsSetting?.value, []) as Array<{ level: number; pointsRequired: number }>)
+            .slice().sort((a, b) => Number(a.level) - Number(b.level));
+          for (const item of levels) {
+            if (Number(item.pointsRequired) <= initialPoints) computedLevel = Math.max(computedLevel, Number(item.level) || 1);
+          }
         } catch { /* keep safe baseline level */ }
-        computedLevel = 1;
         await manager.query('UPDATE cp_relationships SET points=$1,level=$2,"updatedAt"=now() WHERE id=$3', [String(initialPoints), computedLevel, relationship.id]);
         relationship.points = String(initialPoints);
         relationship.level = computedLevel;
@@ -1410,14 +1408,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const [levelConfig] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${relationship.type}`]);
       let level = 1;
       try {
-        const levels = (parseJsonSetting(levelConfig?.value, []) as Array<{ level: number; pointsRequired: number }>).slice(0, 1);
-        for (const item of levels) if (Number(item.pointsRequired) <= Number(total)) level = 1;
+        const levels = (parseJsonSetting(levelConfig?.value, []) as Array<{ level: number; pointsRequired: number }>)
+          .slice().sort((a, b) => Number(a.level) - Number(b.level));
+        for (const item of levels) {
+          if (Number(item.pointsRequired) <= Number(total)) level = Math.max(level, Number(item.level) || 1);
+        }
       } catch { /* malformed admin config never blocks point ledger writes */ }
-      // The relationship has exactly one level; no legacy setting can add more.
-      level = 1;
-      // Permanent relationship levels are monotonic: changing dashboard thresholds
-      // or the weekly leaderboard can never lower an already-earned level.
-      level = 1;
+      // Permanent levels are monotonic: editing thresholds cannot downgrade users.
+      level = Math.max(previousLevel, level);
       await manager.query(
         'UPDATE cp_relationships SET points=$1,level=$2,"updatedAt"=now() WHERE id=$3',
         [total.toString(), level, relationshipId],
