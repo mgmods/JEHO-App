@@ -217,7 +217,7 @@ window.applySupportChestWin=function(win){
    if(chest)chest.classList.remove('preblast');
    void overlay.offsetWidth;overlay.classList.add('show');
    const media=document.getElementById('customBlastMedia'),audio=document.getElementById('customBlastAudio');
-   if(media&&media.tagName==='VIDEO'&&overlay.classList.contains('custom-effect')){try{const startVideo=()=>{try{media.currentTime=0;}catch(e){}const playback=media.play();if(playback&&playback.catch)playback.catch(()=>{media.muted=true;media.play().catch(()=>{});});};if(media.readyState>=2)startVideo();else media.addEventListener('canplay',startVideo,{once:true});media.load();}catch(e){console.warn('Support chest video playback failed',e);}}
+   if(media&&media.tagName==='VIDEO'&&overlay.classList.contains('custom-effect')){try{const startVideo=()=>{try{media.currentTime=0;}catch(e){}const playback=media.play();if(playback&&playback.catch)playback.catch(()=>{media.muted=true;media.play().catch(()=>{});});};media.load();if(media.readyState>=2)startVideo();else media.addEventListener('canplay',startVideo,{once:true});}catch(e){console.warn('Support chest video playback failed',e);}}
    if(audio&&overlay.classList.contains('custom-effect')){try{audio.currentTime=0;audio.play().catch(()=>{});}catch(e){}}
    const videoDuration=media&&media.tagName==='VIDEO'&&Number.isFinite(media.duration)?media.duration*1000:0;
    const visibleFor=Math.max(3600,Number(liveConfig?.explosionEffect?.durationMs)||0,videoDuration);
