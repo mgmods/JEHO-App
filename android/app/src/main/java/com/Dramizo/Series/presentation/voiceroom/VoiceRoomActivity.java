@@ -4686,9 +4686,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_MS);
     }
 
-    /** Stop generating new hold ticks; already accepted sends remain queued and are drained. */
+    /** Releasing the cannon cancels every not-yet-started repeat immediately. */
     private void stopLuckyCannonHold() {
         luckyCannonHoldActive = false;
+        queuedLuckyCannonPresses = 0;
         handler.removeCallbacks(luckyCannonRepeatRunnable);
     }
 
@@ -4697,6 +4698,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * simultaneous charges; pending ticks are discarded as soon as the finger is released.
      */
     private void sendLuckyCannonGift(boolean animatePress) {
+        // A repeat may have been posted just before ACTION_UP; never start it after release.
+        if (!animatePress && !luckyCannonHoldActive) return;
         if (!luckyCannonEnabled || luckyCannonGiftId == null
                 || luckyCannonTargets.isEmpty() || roomId == null || roomId.isEmpty()) return;
         if (animatePress) {
@@ -4784,9 +4787,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Server emits the canonical room gift event; animation is rendered locally by
                 // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                if (queuedLuckyCannonPresses > 0) {
+                if (luckyCannonHoldActive && queuedLuckyCannonPresses > 0) {
                     queuedLuckyCannonPresses--;
-                    handler.post(() -> sendLuckyCannonGift(false));
+                    handler.post(() -> {
+                        if (luckyCannonHoldActive) sendLuckyCannonGift(false);
+                    });
+                } else {
+                    queuedLuckyCannonPresses = 0;
                 }
             });
         });
