@@ -1617,9 +1617,10 @@
 
         <TextView
             android:id="@+id/tvMicRequestToast"
-            android:layout_width="156dp"
+            android:layout_width="210dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
+            android:layout_gravity="left"
+            android:layout_marginStart="2dp"
             android:layout_marginBottom="5dp"
             android:background="@drawable/bg_room_dialog_item"
             android:clickable="true"
@@ -1627,12 +1628,12 @@
             android:elevation="28dp"
             android:gravity="center"
             android:maxLines="2"
-            android:minHeight="34dp"
-            android:paddingHorizontal="9dp"
-            android:paddingVertical="7dp"
+            android:minHeight="42dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="9dp"
             android:text="✋ طلبات الصعود إلى المايك"
             android:textColor="#FFFFFFFF"
-            android:textSize="10sp"
+            android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />
 
