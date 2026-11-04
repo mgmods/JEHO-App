@@ -13,6 +13,8 @@ export enum CosmeticType {
   ROOM_CARD = 'room_card',
   ROOM_BACKGROUND = 'room_background',
   PROFILE_CARD = 'profile_card',
+  CP_BACKGROUND = 'cp_background',
+  CP_LOGO = 'cp_logo',
   CHAT_BUBBLE = 'chat_bubble',
   NAMEPLATE = 'nameplate',
   LEVEL_BADGE = 'level_badge',

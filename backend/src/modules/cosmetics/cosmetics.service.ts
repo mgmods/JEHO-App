@@ -694,6 +694,8 @@ export class CosmeticsService implements OnModuleInit {
         ).catch(() => undefined);
       }
       if (type === CosmeticType.PROFILE_CARD) profile.profileCardUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.CP_BACKGROUND) profile.cpBackgroundUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = owned.cosmetic.previewUrl || null;
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).

@@ -417,6 +417,8 @@
           <div class="col-sm-6 col-xl-3">
             <label class="form-label">الفئة</label>
             <select v-model="cpStoreForm.type" class="form-select">
+              <option value="cp_background">خلفية CP</option>
+              <option value="cp_logo">شعار CP</option>
               <option value="profile_card">بطاقة / إطار الملف الشخصي</option>
               <option value="level_badge">شارة مستوى</option>
               <option value="entry_effect">تأثير دخول</option>
@@ -596,7 +598,7 @@ const rewardCosmetics = ref([])
 const loadingCpStore = ref(false)
 const savingCpStore = ref(false)
 const uploadingCpStorePreview = ref(false)
-const cpStoreForm = ref({ code: '', name: '', type: 'profile_card', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 })
+const cpStoreForm = ref({ code: '', name: '', type: 'cp_background', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 })
 
 function label(type) {
   return type === 'relationship' ? 'نظام الارتباط الموحد' : 'نظام الارتباط الموحد'
@@ -684,7 +686,7 @@ async function createCpStoreItem() {
     })
     if (response?.error) throw new Error(response.error.message || 'تعذر إضافة العنصر')
     success.value = 'تمت إضافة العنصر إلى كتالوج متجر CP.'
-    cpStoreForm.value = { code: '', name: '', type: 'profile_card', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 }
+    cpStoreForm.value = { code: '', name: '', type: 'cp_background', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 }
     await loadCpStoreItems()
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر إضافة عنصر متجر CP' }
   finally { savingCpStore.value = false }

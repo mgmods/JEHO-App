@@ -45,7 +45,13 @@
     const avatar = safeUrl(relationship.partnerAvatarUrl || partner.avatarUrl);
     const title = relationship.profileTitle || relationship.levelName || '';
     const duration = relationship.durationLabel || (Number.isFinite(Number(relationship.durationDays)) ? Number(relationship.durationDays) + ' يوم' : '');
-    return '<section class="jeho-cp-profile-summary">' +
+    const self = relationship.self || {};
+    const presentation = relationship.presentation || {};
+    const background = safeUrl(self.cpBackgroundUrl || partner.cpBackgroundUrl || presentation.cardBackgroundUrl);
+    const logo = safeUrl(self.cpLogoUrl || partner.cpLogoUrl || presentation.levelLogoUrl || presentation.logoUrl);
+    const backgroundStyle = background ? 'background-image:linear-gradient(120deg,#1d0715bb,#1d071588),url("' + esc(background) + '");background-size:cover;background-position:center;' : '';
+    return '<section class="jeho-cp-profile-summary" style="' + backgroundStyle + '">' +
+      (logo ? '<img src="' + esc(logo) + '" alt="شعار CP" style="width:48px;height:48px;object-fit:contain;border-radius:14px;background:#ffffff22;padding:5px;margin-bottom:8px">' : '') +
       '<div class="jeho-cp-profile-partner">' + (avatar ? '<img src="' + esc(avatar) + '" alt="">' : '') +
       '<div><strong>' + esc(name) + '</strong>' + (title ? '<small>' + esc(title) + '</small>' : '') + '</div></div>' +
       '<div class="jeho-cp-profile-meta">' + renderLevelBadge(relationship) +

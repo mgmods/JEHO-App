@@ -59,6 +59,13 @@ export class UserProfile {
   @Column({ type: 'varchar', length: 512, nullable: true })
   profileCardUrl: string | null;
 
+  /** User-equipped visuals used only by the CP relationship card. */
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  cpBackgroundUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  cpLogoUrl: string | null;
+
   @Column({ type: 'varchar', length: 512, nullable: true })
   chatBubbleUrl: string | null;
 

@@ -37,6 +37,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
     await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "priceCoins" DROP NOT NULL').catch(() => undefined);
     await this.dataSource.query('ALTER TABLE cp_requests ADD COLUMN IF NOT EXISTS "cpPoints" bigint NULL').catch(() => undefined);
+    await this.dataSource.query('ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "cpBackgroundUrl" varchar(512)').catch(() => undefined);
+    await this.dataSource.query('ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "cpLogoUrl" varchar(512)').catch(() => undefined);
     await this.dataSource.query(`
       CREATE TABLE IF NOT EXISTS cp_memories (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -808,7 +810,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       `SELECT r.id,r.type,r.points::text AS points,r.level,r."startedAt",
        COALESCE((SELECT value::jsonb ->> 'cardBackgroundUrl' FROM app_settings WHERE key = 'cp.rules.' || r.type), '') AS "cardBackgroundUrl",
        json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl",'level',p.level,
-         'vipBadgeUrl',pp."vipBadgeUrl",'hostBadgeUrl',pp."hostBadgeUrl",'levelBadgeUrl',pp."levelBadgeUrl") AS partner
+         'vipBadgeUrl',pp."vipBadgeUrl",'hostBadgeUrl',pp."hostBadgeUrl",'levelBadgeUrl',pp."levelBadgeUrl",'cpBackgroundUrl',pp."cpBackgroundUrl",'cpLogoUrl',pp."cpLogoUrl") AS partner
        FROM cp_relationships r
        JOIN users p ON p.id=CASE WHEN r."userAId"=$1 THEN r."userBId" ELSE r."userAId" END
        LEFT JOIN user_profiles pp ON pp."userId" = p.id
@@ -877,10 +879,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       `SELECT r.*,
          json_build_object('id', me.id, 'username', me.username, 'displayName', me."displayName",
            'avatarUrl', me."avatarUrl", 'level', me.level,
-           'vipBadgeUrl', mp."vipBadgeUrl", 'hostBadgeUrl', mp."hostBadgeUrl", 'levelBadgeUrl', mp."levelBadgeUrl") AS self,
+           'vipBadgeUrl', mp."vipBadgeUrl", 'hostBadgeUrl', mp."hostBadgeUrl", 'levelBadgeUrl', mp."levelBadgeUrl",
+           'cpBackgroundUrl', mp."cpBackgroundUrl", 'cpLogoUrl', mp."cpLogoUrl") AS self,
          json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName",
            'avatarUrl', p."avatarUrl", 'level', p.level,
-           'vipBadgeUrl', pp."vipBadgeUrl", 'hostBadgeUrl', pp."hostBadgeUrl", 'levelBadgeUrl', pp."levelBadgeUrl") AS partner
+           'vipBadgeUrl', pp."vipBadgeUrl", 'hostBadgeUrl', pp."hostBadgeUrl", 'levelBadgeUrl', pp."levelBadgeUrl",
+           'cpBackgroundUrl', pp."cpBackgroundUrl", 'cpLogoUrl', pp."cpLogoUrl") AS partner
        FROM cp_relationships r
        JOIN users me ON me.id = $1
        JOIN users p ON p.id = CASE WHEN r."userAId" = $1 THEN r."userBId" ELSE r."userAId" END
