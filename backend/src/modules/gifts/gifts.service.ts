@@ -315,15 +315,23 @@ export class GiftsService implements OnModuleInit {
     try {
       const existing = await this.categoriesRepo.findOne({ where: { key: 'cp' } });
       if (!existing) {
-        await this.categoriesRepo.save(this.categoriesRepo.create({
+        existing = this.categoriesRepo.create({
           key: 'cp',
           labelAr: 'هدايا CP',
           labelEn: 'CP Gifts',
           sortOrder: 5,
           isActive: true,
           iconUrl: null,
-        }));
+        });
+      } else {
+        // CP is a reserved system tab: normalize old CB labels and recover it
+        // if an earlier dashboard edit accidentally hid the category.
+        existing.labelAr = 'هدايا CP';
+        existing.labelEn = 'CP Gifts';
+        existing.isActive = true;
+        existing.sortOrder = 5;
       }
+      await this.categoriesRepo.save(existing);
       // One-time migration only: legacy CP starter gifts become CP-category gifts.
       // After migration the dashboard category is authoritative and must never be
       // overwritten on later application starts.
@@ -1867,21 +1875,22 @@ export class GiftsService implements OnModuleInit {
     const categories = rows.map((r) => ({
       id: r.id,
       key: r.key,
-      labelAr: r.labelAr,
-      labelEn: r.labelEn,
+      labelAr: r.key === 'cp' ? 'هدايا CP' : r.labelAr,
+      labelEn: r.key === 'cp' ? 'CP Gifts' : r.labelEn,
       sortOrder: r.sortOrder,
       isActive: r.isActive,
       iconUrl: (r as any).iconUrl ?? null,
     }));
-    const [configuredCbGift] = await this.dataSource.query(
+    const [configuredCpGift] = await this.dataSource.query(
       "SELECT value FROM app_settings WHERE key LIKE 'cp.gift.%' LIMIT 1",
     ).catch(() => []);
-    if (configuredCbGift?.value && !categories.some(category => category.key === 'cp')) {
+    const activeCpGiftCount = await this.giftsRepo.count({ where: { category: 'cp', isActive: true } }).catch(() => 0);
+    if ((configuredCpGift?.value || activeCpGiftCount > 0) && !categories.some(category => category.key === 'cp')) {
       categories.push({
         id: 'cp',
         key: 'cp',
-        labelAr: 'CB',
-        labelEn: 'CB',
+        labelAr: 'هدايا CP',
+        labelEn: 'CP Gifts',
         sortOrder: 5,
         isActive: true,
         iconUrl: null,
