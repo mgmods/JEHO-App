@@ -74,11 +74,10 @@ public class AuraMessagingService extends FirebaseMessagingService {
             }
         }
         String value = markers.toString().toLowerCase(java.util.Locale.ROOT);
-        return value.matches("(?s).*lucky[ _:-]*(hit|win|gift|reward).*")
-                || value.contains("محظوظ")
-                || value.contains("هدية محظوظة")
-                || value.contains("ربح المحظوظ")
-                || value.contains("حظ سعيد");
+        boolean luckyKind = value.contains("lucky");
+        boolean winKind = value.matches("(?s).*(hit|win|reward|won|success).*");
+        boolean arabicWin = value.matches("(?s).*(حظ سعيد|ربح.{0,16}محظوظ|فاز.{0,16}محظوظ|ربحت.{0,16}حظ).*");
+        return (luckyKind && winKind) || arabicWin;
     }
 
     private void showNotification(String title, String body, String type, Map<String, String> data) {
