@@ -160,6 +160,10 @@ class MainActivity : ThemedActivity() {
             runOnUiThread {
                 if (binding == null) return@runOnUiThread
                 highlightPage(currentPage)
+                // The home fragment is kept warm in the pager; refresh its existing
+                // header shortcuts after the latest dashboard icon config is cached.
+                (supportFragmentManager.findFragmentByTag("f0") as? HomeFragment)
+                    ?.refreshHeaderShortcutIcons()
             }
         }
         RemoteTheme.applyActivityBackground(this, "home")
