@@ -95,30 +95,9 @@ public final class GiftFlyAnimator {
         int size = Math.round(38f * density);
         int heroSize = Math.round(86f * density);
 
-        // Reuse one hero view so rapid repeated presses never stack duplicate large gifts.
-        ImageView hero = null;
-        for (int i = 0; i < overlay.getChildCount(); i++) {
-            View child = overlay.getChildAt(i);
-            if (child instanceof ImageView && "jeho_group_gift_hero".equals(child.getTag())) {
-                hero = (ImageView) child;
-                break;
-            }
-        }
-        if (hero == null) {
-            hero = newImage(overlay, iconUrl, heroSize);
-            hero.setTag("jeho_group_gift_hero");
-            overlay.addView(hero);
-        } else if (iconUrl != null && !iconUrl.isEmpty()) {
-            try {
-                Glide.with(overlay.getContext().getApplicationContext())
-                        .load(AssetCatalog.absoluteUrl(iconUrl))
-                        .placeholder(ImagePlaceholder.gift())
-                        .error(ImagePlaceholder.gift())
-                        .into(hero);
-            } catch (Throwable ignored) {
-                hero.setImageResource(ImagePlaceholder.gift());
-            }
-        }
+        // One hero per accepted group send: rapid presses naturally create matching pulses.
+        ImageView hero = newImage(overlay, iconUrl, heroSize);
+        overlay.addView(hero);
         hero.getLayoutParams().width = heroSize;
         hero.getLayoutParams().height = heroSize;
         hero.setX(from.x - heroSize / 2f);
@@ -137,10 +116,10 @@ public final class GiftFlyAnimator {
         pulse.setInterpolator(new LinearInterpolator());
         pulse.addListener(new AnimatorListenerAdapter() {
             @Override public void onAnimationEnd(Animator animation) {
-                if (heroView.getParent() != null) heroView.setAlpha(0f);
+                remove(heroView);
             }
             @Override public void onAnimationCancel(Animator animation) {
-                if (heroView.getParent() != null) heroView.setAlpha(0f);
+                remove(heroView);
             }
         });
 
@@ -196,6 +175,7 @@ public final class GiftFlyAnimator {
         } catch (OutOfMemoryError | RuntimeException error) {
             for (ImageView copy : copies) remove(copy);
             heroView.setAlpha(0f);
+            remove(heroView);
         }
     }
 
