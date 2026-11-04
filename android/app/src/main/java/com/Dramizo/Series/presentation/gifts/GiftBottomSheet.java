@@ -428,7 +428,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (height <= 0) return;
             int x = sheetLocation[0] - decorLocation[0];
             int y = sheetLocation[1] - decorLocation[1] - height - dp(6);
-            cpOverlayHost.setLayoutParams(new ViewGroup.LayoutParams(width, height));
+            // PopupWindow content is hosted by a FrameLayout; its parent measures children
+            // with margins, so a generic ViewGroup.LayoutParams causes a ClassCastException.
+            cpOverlayHost.setLayoutParams(new FrameLayout.LayoutParams(width, height));
             if (cpProgressPopup.isShowing()) {
                 cpProgressPopup.update(x, y, width, height);
             } else {
