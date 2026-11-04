@@ -1611,6 +1611,27 @@
             android:src="@drawable/ic_asset_chest_gold"
             android:background="@android:color/transparent" />
 
+        <TextView
+            android:id="@+id/tvMicRequestToast"
+            android:layout_width="156dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="5dp"
+            android:background="@drawable/bg_room_dialog_item"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="28dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:minHeight="34dp"
+            android:paddingHorizontal="9dp"
+            android:paddingVertical="7dp"
+            android:text="✋ طلبات الصعود إلى المايك"
+            android:textColor="#FFFFFFFF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
         <ImageView
             android:id="@+id/btnRoomSideMusic"
             android:layout_width="46dp"
