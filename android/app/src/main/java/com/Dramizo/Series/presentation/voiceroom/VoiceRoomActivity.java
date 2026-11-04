@@ -1997,6 +1997,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         FrameLayout root = (FrameLayout) content;
         WebView blastWeb = new WebView(this);
         blastWeb.setBackgroundColor(Color.TRANSPARENT);
+        blastWeb.setClickable(false);
+        blastWeb.setFocusable(false);
+        blastWeb.setFocusableInTouchMode(false);
         blastWeb.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         WebSettings settings = blastWeb.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -15416,7 +15419,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 boolean customEnabled = effect != null && Boolean.TRUE.equals(effect.get("enabled"))
                         && ((customMedia != null && !customMedia.trim().isEmpty())
                         || (customSound != null && !customSound.trim().isEmpty()));
-                if (!customEnabled) RoomSoundFx.playChestExplosion(this);
+                boolean dashboardSoundEnabled = cfg == null || !Boolean.FALSE.equals(cfg.get("soundEnabled"));
+                if (!customEnabled && dashboardSoundEnabled) RoomSoundFx.playChestExplosion(this);
             }, delayMs);
             return;
         }
