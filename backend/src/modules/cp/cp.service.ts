@@ -824,7 +824,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.dataSource.query(
       `SELECT r.id,r.type,r.points::text AS points,r.level,r."startedAt",
        COALESCE((SELECT value::jsonb ->> 'cardBackgroundUrl' FROM app_settings WHERE key = 'cp.rules.' || r.type), '') AS "cardBackgroundUrl",
-       json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl",'level',p.level,
+       json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl",'level',p.level,'nameColor',pp."nameColor",
          'vipBadgeUrl',pp."vipBadgeUrl",'hostBadgeUrl',pp."hostBadgeUrl",'levelBadgeUrl',pp."levelBadgeUrl",
          'cpBackgroundUrl',CASE WHEN EXISTS (SELECT 1 FROM user_cosmetics ucp JOIN cosmetics ccp ON ccp.id=ucp."cosmeticId" WHERE ucp."userId"=p.id AND ucp.equipped=true AND ccp.type='cp_background' AND (ucp."expiresAt" IS NULL OR ucp."expiresAt">NOW()) AND ccp."previewUrl"=pp."cpBackgroundUrl") THEN pp."cpBackgroundUrl" ELSE NULL END,
          'cpLogoUrl',CASE WHEN EXISTS (SELECT 1 FROM user_cosmetics ucp JOIN cosmetics ccp ON ccp.id=ucp."cosmeticId" WHERE ucp."userId"=p.id AND ucp.equipped=true AND ccp.type='cp_logo' AND (ucp."expiresAt" IS NULL OR ucp."expiresAt">NOW()) AND ccp."previewUrl"=pp."cpLogoUrl") THEN pp."cpLogoUrl" ELSE NULL END) AS partner
@@ -895,12 +895,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.dataSource.query(
       `SELECT r.*,
          json_build_object('id', me.id, 'username', me.username, 'displayName', me."displayName",
-           'avatarUrl', me."avatarUrl", 'level', me.level,
+           'avatarUrl', me."avatarUrl", 'level', me.level, 'nameColor', mp."nameColor",
            'vipBadgeUrl', mp."vipBadgeUrl", 'hostBadgeUrl', mp."hostBadgeUrl", 'levelBadgeUrl', mp."levelBadgeUrl",
            'cpBackgroundUrl', CASE WHEN EXISTS (SELECT 1 FROM user_cosmetics ucp JOIN cosmetics ccp ON ccp.id=ucp."cosmeticId" WHERE ucp."userId"=me.id AND ucp.equipped=true AND ccp.type='cp_background' AND (ucp."expiresAt" IS NULL OR ucp."expiresAt">NOW()) AND ccp."previewUrl"=mp."cpBackgroundUrl") THEN mp."cpBackgroundUrl" ELSE NULL END,
            'cpLogoUrl', CASE WHEN EXISTS (SELECT 1 FROM user_cosmetics ucp JOIN cosmetics ccp ON ccp.id=ucp."cosmeticId" WHERE ucp."userId"=me.id AND ucp.equipped=true AND ccp.type='cp_logo' AND (ucp."expiresAt" IS NULL OR ucp."expiresAt">NOW()) AND ccp."previewUrl"=mp."cpLogoUrl") THEN mp."cpLogoUrl" ELSE NULL END) AS self,
          json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName",
-           'avatarUrl', p."avatarUrl", 'level', p.level,
+           'avatarUrl', p."avatarUrl", 'level', p.level, 'nameColor', pp."nameColor",
            'vipBadgeUrl', pp."vipBadgeUrl", 'hostBadgeUrl', pp."hostBadgeUrl", 'levelBadgeUrl', pp."levelBadgeUrl",
            'cpBackgroundUrl', CASE WHEN EXISTS (SELECT 1 FROM user_cosmetics ucp JOIN cosmetics ccp ON ccp.id=ucp."cosmeticId" WHERE ucp."userId"=p.id AND ucp.equipped=true AND ccp.type='cp_background' AND (ucp."expiresAt" IS NULL OR ucp."expiresAt">NOW()) AND ccp."previewUrl"=pp."cpBackgroundUrl") THEN pp."cpBackgroundUrl" ELSE NULL END,
            'cpLogoUrl', CASE WHEN EXISTS (SELECT 1 FROM user_cosmetics ucp JOIN cosmetics ccp ON ccp.id=ucp."cosmeticId" WHERE ucp."userId"=p.id AND ucp.equipped=true AND ccp.type='cp_logo' AND (ucp."expiresAt" IS NULL OR ucp."expiresAt">NOW()) AND ccp."previewUrl"=pp."cpLogoUrl") THEN pp."cpLogoUrl" ELSE NULL END) AS partner
