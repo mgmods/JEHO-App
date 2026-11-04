@@ -439,7 +439,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (roomId != null && !exiting) {
                 lastRoomRefreshAt = System.currentTimeMillis();
                 viewModel.refresh(roomId);
-                if (canInviteMic) viewModel.loadSeatRequests(roomId);
+                if (canReviewMicRequests()) viewModel.loadSeatRequests(roomId);
             }
             handler.postDelayed(this, 60_000L);
         }
@@ -9063,17 +9063,52 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private boolean canReviewMicRequests() {
+        return (canInviteMic || canManageSeats || isHost || isOwner)
+                && (!isFreeMicEnabled() || isMicRequestEnabled());
+    }
+
     private void updateSeatRequestBadge(List<RoomDtos.SeatRequestDto> list) {
-        // Header badge removed — mic requests open from أدوات → طلبات المايك.
         if (binding == null) return;
         if (binding.btnPlusWrap != null) binding.btnPlusWrap.setVisibility(View.GONE);
-        if (binding.tvSeatRequestBadge != null) {
-            binding.tvSeatRequestBadge.setVisibility(View.GONE);
-            int count = list != null ? list.size() : 0;
-            if (count > 0) {
-                binding.tvSeatRequestBadge.setText(count > 9 ? "9+" : String.valueOf(count));
-            }
+        if (binding.tvSeatRequestBadge != null) binding.tvSeatRequestBadge.setVisibility(View.GONE);
+
+        TextView requestToast = binding.tvMicRequestToast;
+        if (requestToast == null) return;
+        int count = list != null ? list.size() : 0;
+        boolean visible = canReviewMicRequests() && count > 0;
+        if (!visible) {
+            requestToast.animate().cancel();
+            requestToast.setVisibility(View.GONE);
+            requestToast.setOnClickListener(null);
+            return;
         }
+
+        RoomDtos.SeatRequestDto first = list.get(0);
+        String firstName = first != null && first.displayName != null
+                && !first.displayName.trim().isEmpty() ? first.displayName.trim() : "ضيف";
+        String label = count == 1
+                ? ("✋ " + firstName + " يطلب المايك")
+                : ("✋ " + count + " طلبات صعود للمايك");
+        requestToast.setText(label);
+        requestToast.setContentDescription("طلبات الصعود إلى المايك: " + count);
+        android.graphics.drawable.GradientDrawable surface =
+                new android.graphics.drawable.GradientDrawable();
+        surface.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        surface.setCornerRadius(getResources().getDisplayMetrics().density * 13f);
+        surface.setColor(Color.argb(238, 27, 31, 43));
+        surface.setStroke(Math.max(1, (int) (getResources().getDisplayMetrics().density * 1.2f)),
+                Color.rgb(224, 184, 91));
+        requestToast.setBackground(surface);
+        requestToast.setElevation(getResources().getDisplayMetrics().density * 12f);
+        requestToast.setVisibility(View.VISIBLE);
+        requestToast.setOnClickListener(v -> {
+            if (!canReviewMicRequests()) {
+                requestToast.setVisibility(View.GONE);
+                return;
+            }
+            showSeatRequestsDialog();
+        });
     }
 
     /**
@@ -16134,7 +16169,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             appendChatLine("النظام", name + " يطلب الانضمام للمايك ✋", 0, 1);
             if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) {
                 viewModel.loadSeatRequests(roomId);
-                Toast.makeText(this, name + " يطلب المايك — اضغط الجرس للموافقة", Toast.LENGTH_LONG).show();
+                // The persistent in-room request toast is driven by the authoritative pending list.
             }
         } else if ("room:hand_lowered".equals(event)) {
             if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) viewModel.loadSeatRequests(roomId);
@@ -17769,7 +17804,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void showSeatRequestsDialog() {
         if (roomId == null) return;
-        if (!(canInviteMic || canManageSeats || isHost || isOwner)) {
+        if (!canReviewMicRequests()) {
             Toast.makeText(this, R.string.host_mod_only_mic_requests, Toast.LENGTH_SHORT).show();
             return;
         }
