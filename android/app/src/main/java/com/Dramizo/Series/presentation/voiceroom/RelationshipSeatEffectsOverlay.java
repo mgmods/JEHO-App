@@ -163,7 +163,8 @@ final class RelationshipSeatEffectsOverlay {
                 long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
                 addEffect(a, b, type, url, sizeDp, duration);
             }
-            addLevelBadge(a, b, relation);
+            // The in-room level badge/ribbon is intentionally omitted. Only the
+            // relationship artwork configured and uploaded from the dashboard is rendered.
         }
         if (running.isEmpty()) retryIfNoParticles();
     }
