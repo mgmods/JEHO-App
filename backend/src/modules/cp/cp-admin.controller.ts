@@ -59,6 +59,7 @@ export class CpAdminController {
     const settings = Object.fromEntries(rows.map((row: { key: string; value: unknown }) =>
       [row.key, decodeSettingValue(row.value)],
     ));
+    const globallyEnabled = settings['cp.enabled.global'] !== false && settings['cp.enabled.global'] !== 'false';
     const types: Array<Record<string, unknown>> = [];
     for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] ?? null;
@@ -71,11 +72,12 @@ export class CpAdminController {
         gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
         giftPoints: settings[`cp.gift_points.${type}`] ?? 0,
         giftInteractionPoints: settings[`cp.points.gift_send.${type}`] ?? 0,
-        maxLevel: settings[`cp.max_level.${type}`] ?? null,
-        levels: settings[`cp.levels.${type}`] ?? [],
+        maxLevel: 1,
+        levels: Array.isArray(settings[`cp.levels.${type}`])
+          ? settings[`cp.levels.${type}`].slice(0, 1).map((level: Record<string, any>) => ({ ...level, level: 1 }))
+          : [],
         // CP types are enabled automatically; price and an active gift determine purchase readiness.
-        enabled: settings[`cp.enabled.${type}`] !== false && settings[`cp.enabled.${type}`] !== 'false'
-          && Number.isSafeInteger(price) && price > 0 && !!gift,
+        enabled: globallyEnabled && settings[`cp.enabled.${type}`] !== false && settings[`cp.enabled.${type}`] !== 'false',
         rules: settings[`cp.rules.${type}`] ?? {},
       });
     }
@@ -235,7 +237,7 @@ export class CpAdminController {
       throw new BadRequestException('سعر العملات يجب أن يكون عدداً صحيحاً غير سالب؛ الصفر يعطّل الشراء');
     }
     if (body.levels !== undefined) {
-      if (!Array.isArray(body.levels) || body.levels.length > 1000) throw new BadRequestException('قائمة المستويات غير صالحة');
+      if (!Array.isArray(body.levels) || body.levels.length > 1) throw new BadRequestException('نظام CP يعتمد مستوى واحداً فقط؛ احذف المستويات الإضافية.');
       let previous = -1;
       for (const level of body.levels) {
         if (!Number.isInteger(level?.level) || level.level < 1 || !Number.isSafeInteger(level?.pointsRequired) || level.pointsRequired < 0 || level.pointsRequired < previous) {
@@ -390,8 +392,8 @@ export class CpAdminController {
     if (body.giftId !== undefined) config[`cp.gift.${type}`] = body.giftId;
     if (body.giftPoints !== undefined) config[`cp.gift_points.${type}`] = String(body.giftPoints);
     if (body.giftInteractionPoints !== undefined) config[`cp.points.gift_send.${type}`] = String(body.giftInteractionPoints);
-    if (body.maxLevel !== undefined) config[`cp.max_level.${type}`] = String(body.maxLevel);
-    if (body.levels !== undefined) config[`cp.levels.${type}`] = JSON.stringify(body.levels);
+    config[`cp.max_level.${type}`] = '1';
+    if (body.levels !== undefined) config[`cp.levels.${type}`] = JSON.stringify(body.levels.slice(0, 1).map(level => ({ ...level, level: 1 })));
     if (body.enabled !== undefined) config[`cp.enabled.${type}`] = String(body.enabled);
     if (body.rules !== undefined) config[`cp.rules.${type}`] = JSON.stringify(body.rules);
     await this.dataSource.transaction(async manager => {

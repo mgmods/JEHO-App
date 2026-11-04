@@ -777,7 +777,7 @@ export class GiftsService implements OnModuleInit {
         {
           name: 'قلب CP',
           // CP initiation is a normal dashboard-managed gift item, not a separate gift tab.
-          category: 'premium',
+          category: 'cp',
           type: GiftType.PREMIUM,
           iconUrl: '/assets/gifts/mikoo/bg_cp_card.webp',
           coinPrice: 299,
@@ -881,7 +881,10 @@ export class GiftsService implements OnModuleInit {
           existing.iconUrl = seed.iconUrl;
           dirty = true;
         }
-        if (!isCpInitiationGift && (existing as any).category !== seed.category) {
+        if (isCpInitiationGift && (existing as any).category !== 'cp') {
+          (existing as any).category = 'cp';
+          dirty = true;
+        } else if (!isCpInitiationGift && (existing as any).category !== seed.category) {
           (existing as any).category = seed.category;
           dirty = true;
         }

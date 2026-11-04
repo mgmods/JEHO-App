@@ -126,6 +126,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       `UPDATE cp_requests SET type=$1 WHERE type<>$1`,
       [CpType.RELATIONSHIP],
     );
+    // CP now has one permanent level. Preserve relationship points and history,
+    // while normalizing old multi-level accounts to the single visible level.
+    await this.dataSource.query(
+      `UPDATE cp_relationships SET level=1 WHERE level<>1`,
+    );
   }
 
   private async enrichLevelRewards(levels: any[]) {
@@ -295,7 +300,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const settings: Record<string, string> = Object.fromEntries(rows.map((row: any) => [row.key, String(row.value)]));
     const globallyEnabled = settings['cp.enabled.global'] !== 'false';
     const catalog: Array<Record<string, unknown>> = [];
-    const giftTabEnabled = settings['cp.gift_tab.enabled'] !== 'false';
+    const giftTabEnabled = globallyEnabled && settings['cp.gift_tab.enabled'] !== 'false';
     for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] || null;
       const [gift] = giftId ? await this.dataSource.query(
@@ -308,8 +313,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         ? Number(gift?.coinPrice)
         : Number(settings[`cp.price.${type}`]);
       const giftPrice = Number.isSafeInteger(configuredPrice) && configuredPrice > 0 ? configuredPrice : 0;
-      const enabled = globallyEnabled && settings[`cp.enabled.${type}`] !== 'false'
-        && !!gift && giftPrice > 0;
+      const enabled = globallyEnabled && settings[`cp.enabled.${type}`] !== 'false';
       let rules: Record<string, any> = {};
       try { rules = parseJsonSetting(settings[`cp.rules.${type}`], {}); } catch { rules = {}; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
@@ -322,9 +326,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       } catch { levels = []; }
       levels = await this.enrichLevelRewards(levels);
       catalog.push({
-        type, enabled, priceCoins: enabled ? giftPrice : null,
-        maxLevel: Number(settings[`cp.max_level.${type}`] || 0) || null,
-        levels,
+        type, enabled, priceCoins: enabled && giftPrice > 0 ? giftPrice : null,
+        maxLevel: 1,
+        levels: levels.slice(0, 1).map(level => ({ ...level, level: 1 })),
         gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl, coinPrice: giftPrice } : null,
         giftPoints: Number(settings[`cp.gift_points.${type}`] || 0) || 0,
         seatEffect: {
@@ -380,7 +384,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     );
     const parsedLevels = parseJsonSetting(levelSetting?.value, []);
     const levels = await this.enrichLevelRewards(Array.isArray(parsedLevels) ? parsedLevels : []);
-    const levelsByNumber = new Map(levels.map(level => [Number(level.level), level]));
+    const levelsByNumber = new Map(levels.slice(0, 1).map(level => [1, { ...level, level: 1 }]));
     return rows.map((row: any) => {
       const config = levelsByNumber.get(Number(row.level));
       return {
@@ -404,7 +408,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         const parsed = parseJsonSetting(row.value, []);
         if (Array.isArray(parsed)) levels = parsed
           .filter(item => item && Number.isFinite(Number(item.level)) && Number(item.level) >= 1)
-          .sort((a, b) => Number(a.level) - Number(b.level));
+          .sort((a, b) => Number(a.level) - Number(b.level)).slice(0, 1)
+          .map(item => ({ ...item, level: 1 }));
       } catch { levels = []; }
       configs.push({ type, levels: await this.enrichLevelRewards(levels) });
     }
@@ -444,7 +449,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     }
     return rows.map((row: any) => {
       const points = BigInt(String(row.points || 0));
-      const levels = (configs[row.type] || []).slice().sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
+      const levels = (configs[row.type] || []).slice(0, 1).map(item => ({ ...item, level: 1 })).sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
       const currentThreshold = levels.filter(item => Number(item.level) <= Number(row.level)).reduce((max, item) => Math.max(max, Number(item.pointsRequired) || 0), 0);
       const next = levels.find(item => Number(item.level) > Number(row.level));
       const nextThreshold = next ? BigInt(Math.max(0, Number(next.pointsRequired) || 0)) : null;
@@ -514,7 +519,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       try { rules = parseJsonSetting(setting?.value, {}); } catch { rules = {}; }
       try {
         const parsed = parseJsonSetting(levelSetting?.value, []);
-        levelConfigs[type] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed : []);
+        levelConfigs[type] = await this.enrichLevelRewards(Array.isArray(parsed) ? parsed.slice(0, 1).map(item => ({ ...item, level: 1 })) : []);
       } catch { levelConfigs[type] = []; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
       effects[type] = {
@@ -823,7 +828,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       } catch { configs[type] = []; }
     }
     return rows.map((row: any) => {
-      const levels = (configs[row.type] || []).slice().sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
+      const levels = (configs[row.type] || []).slice(0, 1).map(item => ({ ...item, level: 1 })).sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
       const currentThreshold = levels.filter(item => Number(item.level) <= Number(row.level)).reduce((max, item) => Math.max(max, Number(item.pointsRequired) || 0), 0);
       const nextLevel = levels.find(item => Number(item.level) > Number(row.level));
       const nextThreshold = nextLevel ? Math.max(0, Number(nextLevel.pointsRequired) || 0) : null;
@@ -914,90 +919,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
 
-  async createProfileRequest(userId: string, input: { recipientId: string; type: CpType; idempotencyKey: string }) {
-    const recipientId = String(input?.recipientId || '');
-    const key = String(input?.idempotencyKey || '').trim();
-    const type = CpType.RELATIONSHIP;
-    if (!UUID_REGEX.test(recipientId) || !key || key.length > 128) {
-      throw new BadRequestException('بيانات هدية CP غير مكتملة');
-    }
-    if (recipientId === userId) throw new BadRequestException('لا يمكنك إرسال هدية ارتباط إلى حسابك');
-    const [typeEnabled] = await this.dataSource.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
-    if (String(typeEnabled?.value || 'true').toLowerCase() === 'false') {
-      throw new BadRequestException('هذا النوع من علاقات CP متوقف حالياً من لوحة التحكم');
-    }
-    const outcome = await this.dataSource.transaction(async manager => {
-      await this.lockRelationshipUsers(manager, [userId, recipientId]);
-      const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey"=$1 FOR UPDATE', [key]);
-      if (existing.length) {
-        if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId || existing[0].type !== type) {
-          throw new ConflictException('مفتاح العملية مستخدم لطلب آخر');
-        }
-        return { request: existing[0], created: false };
-      }
-      const [recipient] = await manager.query('SELECT id FROM users WHERE id=$1 AND status=$2', [recipientId, 'active']);
-      if (!recipient) throw new NotFoundException('المستخدم المستهدف غير موجود أو غير نشط');
-      const [active] = await manager.query(
-        `SELECT id FROM cp_relationships WHERE status='active'
-         AND ("userAId" = ANY($1::uuid[]) OR "userBId" = ANY($1::uuid[]))
-         LIMIT 1 FOR UPDATE`,
-        [[userId, recipientId]],
-      );
-      if (active) throw new ConflictException('أحد الحسابين مرتبط بالفعل؛ لا يمكن إنشاء ارتباط آخر');
-      const [pending] = await manager.query(
-        `SELECT id FROM cp_requests WHERE
-         (("fromUserId"=$1 AND "toUserId"=$2) OR ("fromUserId"=$2 AND "toUserId"=$1))
-         AND type=$3 AND status='pending' AND "expiresAt">now() LIMIT 1 FOR UPDATE`,
-        [userId, recipientId, type],
-      );
-      if (pending) throw new ConflictException('يوجد طلب هدية ارتباط معلّق بينكما');
-      const [priceRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.price.${type}`]);
-      const price = Number(priceRow?.value);
-      if (!Number.isSafeInteger(price) || price <= 0) throw new BadRequestException('سعر هدية هذا النوع غير محدد من لوحة التحكم');
-      const [giftSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.gift.${type}`]);
-      const [gift] = giftSetting?.value
-        ? await manager.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true', [giftSetting.value])
-        : [];
-      if (!gift) throw new BadRequestException('يجب تحديد هدية فعلية لهذا النوع من لوحة التحكم');
-      const [wallet] = await manager.query('SELECT id, coins FROM wallets WHERE "userId"=$1 FOR UPDATE', [userId]);
-      if (!wallet) throw new NotFoundException('المحفظة غير موجودة');
-      const balance = Number(wallet.coins);
-      if (balance < price) throw new BadRequestException('رصيد العملات غير كافٍ لإرسال هدية CP');
-      const [expiryRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', ['cp.policy.request_expiry_minutes']);
-      const configuredExpiry = Number(expiryRow?.value);
-      const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
-        ? configuredExpiry : EXPIRY_MINUTES;
-      const [request] = await manager.query(
-        `INSERT INTO cp_requests ("fromUserId","toUserId",type,status,"roomId","priceCoins","giftId","giftName","giftIconUrl","giftAnimationUrl","idempotencyKey","expiresAt","createdAt","updatedAt")
-         VALUES ($1,$2,$3,'pending',NULL,$4,$5,$6,$7,$8,$9,now()+($10 || ' minutes')::interval,now(),now()) RETURNING *`,
-        [userId, recipientId, type, String(price), gift.id, gift.name, gift.iconUrl, gift.animationUrl, key, String(expiryMinutes)],
-      );
-      await manager.query('UPDATE wallets SET coins=coins-$1,"updatedAt"=now() WHERE "userId"=$2', [price, userId]);
-      await manager.query(
-        `INSERT INTO wallet_transactions ("userId",type,currency,amount,"balanceAfter","referenceType","referenceId",description,metadata,"createdAt")
-         VALUES ($1,'gift_send','coins',$2,$3,'cp_request',$4,$5,$6,now())`,
-        [userId, -price, balance - price, request.id, `هدية بدء CP - ${type}`, JSON.stringify({ type, recipientId, giftId: gift.id, giftName: gift.name, source: 'cp_gift_page' })],
-      );
-      return { request, created: true };
-    });
-    if (outcome.created) {
-      const [sender] = await this.dataSource.query('SELECT "displayName", username FROM users WHERE id=$1', [userId]);
-      const senderName = String(sender?.displayName || sender?.username || 'أحد المستخدمين');
-      await this.notifications.notifyUser(
-        recipientId, NotificationType.SYSTEM, 'طلب ارتباط جديد',
-        `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}. وافق على الطلب لبدء العلاقة أو ارفضه.`,
-        { type: 'cp_relationship_request', notificationKind: 'cp_relationship_request', requestId: outcome.request.id,
-          relationshipType: type, senderId: userId, recipientId, route: 'cp', actions: ['accept', 'reject'], requestSource: 'cp_gift_page',
-          giftId: outcome.request.giftId, giftName: outcome.request.giftName, giftIconUrl: outcome.request.giftIconUrl,
-          priceCoins: outcome.request.priceCoins },
-      ).catch(error => console.warn('[CP] request notification delivery failed', error));
-      this.realtime.emitToUser(recipientId, 'cp:request', {
-        requestId: outcome.request.id, senderId: userId, senderName, relationshipType: type,
-        title: 'هدية وطلب ارتباط جديد', body: `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}.`,
-        actions: ['accept', 'reject'],
-      });
-    }
-    return outcome.request;
+  async createProfileRequest(_userId: string, _input: { recipientId: string; type: CpType; idempotencyKey: string }) {
+    throw new BadRequestException('يتم بدء ارتباط CP حصراً بإرسال هدية ارتباط من داخل الروم الصوتي.');
   }
 
   private cpTypeLabel(type: CpType): string {
@@ -1252,12 +1175,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         const [levelsSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${request.type}`]);
         let computedLevel = 1;
         try {
-          const levels = parseJsonSetting(levelsSetting?.value, []) as Array<{ level: number; pointsRequired: number }>;
-          for (const item of levels) if (Number(item.pointsRequired) <= initialPoints) computedLevel = Math.max(computedLevel, Number(item.level) || 1);
+          const levels = (parseJsonSetting(levelsSetting?.value, []) as Array<{ level: number; pointsRequired: number }>).slice(0, 1);
+          for (const item of levels) if (Number(item.pointsRequired) <= initialPoints) computedLevel = 1;
         } catch { /* keep safe baseline level */ }
-        const [maxSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.max_level.${request.type}`]);
-        const configuredMax = Number(maxSetting?.value);
-        if (Number.isInteger(configuredMax) && configuredMax > 0) computedLevel = Math.min(computedLevel, configuredMax);
+        computedLevel = 1;
         await manager.query('UPDATE cp_relationships SET points=$1,level=$2,"updatedAt"=now() WHERE id=$3', [String(initialPoints), computedLevel, relationship.id]);
         relationship.points = String(initialPoints);
         relationship.level = computedLevel;
@@ -1284,7 +1205,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       } catch { levels = []; }
       const reachedLevels = levels
         .filter(item => Number(item?.level) >= 1 && Number(item?.level) <= Number(outcome.relationship.level || 1))
-        .sort((a, b) => Number(a.level) - Number(b.level));
+        .sort((a, b) => Number(a.level) - Number(b.level)).slice(0, 1)
+        .map(item => ({ ...item, level: 1 }));
       for (const levelConfig of reachedLevels) {
         await this.grantLevelGiftRewards(
           outcome.relationship.id,
@@ -1613,15 +1535,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const [levelConfig] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${relationship.type}`]);
       let level = 1;
       try {
-        const levels = parseJsonSetting(levelConfig?.value, []) as Array<{ level: number; pointsRequired: number }>;
-        for (const item of levels) if (Number(item.pointsRequired) <= Number(total)) level = Math.max(level, Number(item.level) || 1);
+        const levels = (parseJsonSetting(levelConfig?.value, []) as Array<{ level: number; pointsRequired: number }>).slice(0, 1);
+        for (const item of levels) if (Number(item.pointsRequired) <= Number(total)) level = 1;
       } catch { /* malformed admin config never blocks point ledger writes */ }
-      const [maxRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.max_level.${relationship.type}`]);
-      const maxLevel = Number(maxRow?.value);
-      if (Number.isInteger(maxLevel) && maxLevel > 0) level = Math.min(level, maxLevel);
+      // The relationship has exactly one level; no legacy setting can add more.
+      level = 1;
       // Permanent relationship levels are monotonic: changing dashboard thresholds
       // or the weekly leaderboard can never lower an already-earned level.
-      level = Math.max(previousLevel, level);
+      level = 1;
       await manager.query(
         'UPDATE cp_relationships SET points=$1,level=$2,"updatedAt"=now() WHERE id=$3',
         [total.toString(), level, relationshipId],

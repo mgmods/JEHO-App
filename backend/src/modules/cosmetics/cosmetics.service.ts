@@ -591,8 +591,23 @@ export class CosmeticsService implements OnModuleInit {
       return { owned, renew, price, fullPrice, leaseDays, expiresAt: owned.expiresAt };
     });
 
-    // Buying only adds the item to the bag. Wearing is a separate explicit action.
-    // This keeps the mall button sequence deterministic: buy → wear → remove.
+    // CP Store items are purchased and equipped as one user action. Keep the
+    // purchase transaction committed even if a legacy cosmetic cannot be worn;
+    // return the explicit state so the APK can offer a manual equip retry.
+    const isCpStoreItem = (cosmetic.meta as any)?.cpStore === true || String(cosmetic.code || '').startsWith('cp_');
+    if (isCpStoreItem) {
+      try {
+        const equipResult = await this.equip(userId, cosmeticId);
+        return { ...result, equipped: true, autoEquipped: true, equipResult };
+      } catch (error) {
+        return {
+          ...result,
+          equipped: false,
+          autoEquipped: false,
+          equipError: error instanceof Error ? error.message : 'تعذر تركيب العنصر تلقائياً',
+        };
+      }
+    }
     return result;
   }
 

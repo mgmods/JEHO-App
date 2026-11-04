@@ -144,9 +144,9 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border rounded-3 p-3 bg-light-subtle">
               <div>
                 <h4 class="h6 mb-1">مستويات العلاقة</h4>
-                <p class="form-text mb-0">أضف حتى خمسة مستويات. لكل مستوى حد نقاطه ومكافآته وتصميمه الخاص. لا تحتاج إلى كتابة JSON.</p>
+                <p class="form-text mb-0">إعداد مستوى CP واحد فقط؛ يمكنك إضافة الهدايا والمكافآت والصور الخاصة به دون مستويات متدرجة.</p>
               </div>
-              <button class="btn btn-outline-primary" type="button" :disabled="item.levelsEditor.length >= 5" @click="addLevel(item)">＋ إضافة مستوى</button>
+              <span class="badge text-bg-secondary">مستوى CP واحد فقط</span>
             </div>
           </div>
           <div class="col-12">
@@ -161,7 +161,7 @@
                       <label class="form-label small mb-1">النقاط المطلوبة لفتح المستوى</label>
                       <input v-model.number="level.pointsRequired" class="form-control form-control-sm" type="number" min="0" max="1000000000" step="1" style="width:150px" @input="syncLevelEditor(item)">
                     </div>
-                    <button class="btn btn-sm btn-outline-danger" type="button" @click="removeLevel(item, level.level)">حذف المستوى</button>
+                    <span class="small text-secondary">المستوى الوحيد</span>
                   </div>
                 </div>
                 <div class="row g-3">
@@ -733,36 +733,9 @@ function onPrimaryRewardChange(item, level, event) {
 function normalizeCpTaskTarget(task) {
   if (task?.condition === 'gift_exchange_today') task.target = 2
 }
-function addLevel(item) {
-  const current = Array.isArray(item.levelsEditor) ? item.levelsEditor : []
-  if (current.length >= 5) return
-  const previous = current.slice().sort((a, b) => Number(a.level) - Number(b.level)).at(-1)
-  const nextLevel = Math.max(0, ...current.map(level => Number(level.level) || 0)) + 1
-  const previousPoints = Number(previous?.pointsRequired || 0)
-  current.push({
-    level: nextLevel,
-    pointsRequired: previous ? previousPoints + 1000 : 0,
-    name: '',
-    presentation: { title: '', levelLogoUrl: '', frameUrl: '', cardBackgroundUrl: '', nameColor: '#ffffff', nameGlow: false },
-    giftPresentation: { animationUrl: '', showPartnerAvatars: true },
-    seatEffect: { enabled: true, url: '', sizeDp: 28, durationMs: 1800 },
-    rewardGiftId: '',
-    rewardGiftIds: [],
-    rewardCosmeticCode: '',
-    rewardCosmeticCodes: [],
-    rewardDays: 30,
-    rewardPermanent: false,
-    giftBonusPercent: 0,
-  })
-  current.sort((a, b) => Number(a.level) - Number(b.level))
-  item.levelsEditor = current
-  syncLevelEditor(item)
-}
-function removeLevel(item, levelNumber) {
-  item.levelsEditor = (item.levelsEditor || []).filter(level => Number(level.level) !== Number(levelNumber))
-  item.levelsEditor.forEach((level, index) => { level.level = index + 1 })
-  syncLevelEditor(item)
-}
+function addLevel(_item) { /* CP has one fixed level. */ }
+function removeLevel(_item, _levelNumber) { /* The single CP level cannot be removed. */ }
+
 function addCpTask() {
   const id = 'cp_task_' + Math.random().toString(36).slice(2, 10)
   cpFeatures.value.tasks.push({ id, enabled: true, title: '', description: '', condition: 'points_today', target: 10, rewardPoints: 0, rewardCosmeticCode: '' })
@@ -837,8 +810,8 @@ async function load() {
       giftPoints: Number(item.giftPoints || 0),
       giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
-      levelsText: JSON.stringify(item.levels || [], null, 2),
-      levelsEditor: (Array.isArray(item.levels) ? item.levels : []).map(level => {
+      levelsText: JSON.stringify((Array.isArray(item.levels) ? item.levels.slice(0, 1) : []), null, 2),
+      levelsEditor: (Array.isArray(item.levels) && item.levels.length ? item.levels.slice(0, 1) : [{ level: 1, pointsRequired: 0, name: 'CP', presentation: { title: 'CP', levelLogoUrl: '', frameUrl: '', cardBackgroundUrl: '', nameColor: '#ffffff', nameGlow: false }, giftPresentation: { animationUrl: '', showPartnerAvatars: true }, seatEffect: { enabled: true, sizeDp: 28, durationMs: 1800 }, rewardGiftId: '', rewardGiftIds: [], rewardCosmeticCode: '', rewardCosmeticCodes: [], rewardDays: 30, rewardPermanent: false, giftBonusPercent: 0 }]).map(level => {
         const benefits = [...(Array.isArray(level.benefits) ? level.benefits : []), ...(Array.isArray(level.rewards) ? level.rewards : [])]
         const rewardCosmeticCodes = Array.from(new Set([...(Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []), ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))
         return { ...level, presentation: { ...(level.presentation || {}) }, giftPresentation: { showPartnerAvatars: true, ...(level.giftPresentation || {}) }, seatEffect: { enabled: true, sizeDp: 28, durationMs: 1800, ...(level.seatEffect || {}) }, giftBonusPercent: Number(level.giftBonusPercent || 0), rewardGiftId: String(level.rewardGiftId || level.giftId || ''), rewardGiftIds: Array.from(new Set([...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []), level.rewardGiftId || level.giftId || ''].map(id => String(id || '').trim()).filter(Boolean))), rewardCosmeticCode: String(level.rewardCosmeticCode || ''), rewardCosmeticCodes, rewardDays: Number(level.rewardDays || 30), rewardPermanent: level.rewardPermanent === true }
@@ -931,7 +904,7 @@ function parseLevelInteger(value, fallback = 0) {
 }
 
 function syncLevelEditor(item) {
-  const levels = (Array.isArray(item.levelsEditor) ? item.levelsEditor : []).map((level, index) => ({
+  const levels = (Array.isArray(item.levelsEditor) ? item.levelsEditor.slice(0, 1) : []).map((level, index) => ({
     ...level,
     level: index + 1,
     pointsRequired: parseLevelInteger(level.pointsRequired, 0),
@@ -1015,8 +988,8 @@ async function saveType(item) {
       rules = JSON.parse(item.rulesText || '{}')
     } catch { throw new Error('تحقق من صيغة JSON في المستويات أو القواعد.') }
     if (!Array.isArray(levels) || !rules || typeof rules !== 'object' || Array.isArray(rules)) throw new Error('تحقق من إعدادات المستويات والقواعد.')
-    if (levels.length > 5) throw new Error('يمكنك إضافة خمسة مستويات كحد أقصى.')
-    levels = levels.map((level, index) => {
+    if (levels.length > 1) throw new Error('نظام CP يعتمد مستوى واحداً فقط.')
+    levels = levels.slice(0, 1).map((level, index) => {
       const pointsRequired = parseLevelInteger(level.pointsRequired, 0)
       if (!Number.isSafeInteger(pointsRequired) || pointsRequired < 0 || pointsRequired > 1000000000) {
         throw new Error('اكتب عدد نقاط صحيحاً من 0 إلى 1,000,000 لكل مستوى.')
@@ -1038,7 +1011,7 @@ async function saveType(item) {
       giftId: item.giftId || '',
       giftPoints: Number(item.giftPoints || 0),
       giftInteractionPoints: Number(item.giftInteractionPoints || 0),
-      maxLevel: item.maxLevel == null || item.maxLevel === '' ? undefined : Number(item.maxLevel),
+      maxLevel: 1,
       levels: levels.map(level => ({ ...level, benefits: [...(level.benefits || [])] })), rules,
     }
     if (String(item.priceInput).trim() !== '') {
@@ -1083,7 +1056,7 @@ async function saveType(item) {
       giftId: wirePayload.giftId || '',
       giftPoints: Number(wirePayload.giftPoints || 0),
       giftInteractionPoints: Number(wirePayload.giftInteractionPoints || 0),
-      maxLevel: wirePayload.maxLevel ?? null,
+      maxLevel: 1,
       levels: wirePayload.levels || [],
       rules: wirePayload.rules || {},
     }
@@ -1092,7 +1065,7 @@ async function saveType(item) {
       giftId: persistedType.giftId || '',
       giftPoints: Number(persistedType.giftPoints || 0),
       giftInteractionPoints: Number(persistedType.giftInteractionPoints || 0),
-      maxLevel: persistedType.maxLevel ?? null,
+      maxLevel: 1,
       levels: persistedType.levels || [],
       rules: persistedType.rules || {},
     }
