@@ -175,8 +175,12 @@ function renderRewardCard(r){
  const bg=p.cardBackgroundUrl?"background-image:linear-gradient(115deg,#21091a88,#21091a55),url(&quot;"+esc(p.cardBackgroundUrl)+"&quot;)":"";
  const title=r.name||r.title||p.title||("المستوى "+(r.level||1));
  const currentPoints=Math.max(0,Number(data.relationship.points)||0),requiredPoints=Math.max(0,Number(r.pointsRequired)||0);
- const unlocked=currentPoints>=requiredPoints,remaining=Math.max(0,requiredPoints-currentPoints);
- const progressPct=requiredPoints>0?Math.max(0,Math.min(100,currentPoints/requiredPoints*100)):(unlocked?100:0);
+ const orderedLevels=data.rewards.slice().sort((a,b)=>Number(a.level)-Number(b.level));
+ const previousLevel=orderedLevels.filter(item=>Number(item.level)<Number(r.level)).pop();
+ const progressStart=Math.max(0,Number(previousLevel?.pointsRequired)||0),progressSpan=Math.max(0,requiredPoints-progressStart);
+ const unlocked=currentPoints>=requiredPoints,earnedInLevel=Math.min(progressSpan,Math.max(0,currentPoints-progressStart));
+ const remaining=Math.max(0,progressSpan-earnedInLevel);
+ const progressPct=progressSpan>0?Math.max(0,Math.min(100,earnedInLevel/progressSpan*100)):(unlocked?100:0);
  const daysRequired=Number(r.requiredDays??r.daysRequired??0),giftCount=Number(r.requiredGiftCount??r.giftsRequired??r.giftCountRequired??0);
  const rewardDays=Number(r.rewardDays||0),permanent=r.rewardPermanent===true;
  const typeLabel=String(r.typeLabel||r.type||"CP").toUpperCase(),rewards=[];
@@ -188,7 +192,7 @@ function renderRewardCard(r){
  if(gift.animationUrl)rewards.push('<div class="cp-reward-item '+(!unlocked?'cp-level-locked':'')+'">'+rewardImage(gift.animationUrl,"هدية الثنائي","cp-reward-item-image")+'<div><small>هدية الثنائي</small><strong>هدية ارتباط CP</strong></div></div>');
  const rewardGrid=rewards.length?'<div class="cp-reward-section"><strong>المكافآت</strong><div class="cp-reward-grid">'+rewards.join("")+'</div></div>':'';
  return '<article class="cp-reward-card"><div class="cp-reward-hero" style="'+bg+'">'+(p.frameUrl?rewardImage(p.frameUrl,"إطار المستوى","cp-reward-frame"):"")+(p.levelLogoUrl||p.logoUrl?rewardImage(p.levelLogoUrl||p.logoUrl,"شعار المستوى","cp-reward-logo"):'<div class="cp-reward-logo cp-reward-logo-fallback">✦</div>')+'<div class="cp-reward-heading"><span class="cp-reward-kicker">'+esc(typeLabel)+' · LEVEL '+esc(r.level||1)+'</span><h3 style="color:'+esc(p.nameColor||"#ffe7f5")+';text-shadow:'+(p.nameGlow?'0 0 7px currentColor,0 0 16px currentColor':'none')+'">'+esc(title)+'</h3>'+(p.title&&p.title!==title?'<p>'+esc(p.title)+'</p>':'')+(r.description?'<p class="cp-level-description">'+esc(r.description)+'</p>':'')+'</div><span class="cp-reward-level-pill">المستوى '+esc(r.level||1)+'</span><span class="cp-level-heart" aria-hidden="true">♥</span></div>'+
- '<div class="cp-reward-body"><div class="cp-level-lock-label">'+(unlocked?'🔓 تم فتح المستوى':'🔒 هذا المستوى مقفل حتى اكتمال النقاط')+'</div><div class="cp-level-progress"><div class="cp-level-progress-head"><strong>تقدم المستوى</strong><span>'+score(currentPoints)+' / '+score(requiredPoints)+' نقطة</span></div><div class="cp-level-progress-track"><div class="cp-level-progress-fill" style="width:'+progressPct+'%"></div></div><div class="cp-level-progress-foot"><span>'+(unlocked?'تم فتح المستوى':'باقي '+score(remaining)+' نقطة')+'</span><span>'+Math.round(progressPct)+'%</span></div></div>'+
+ '<div class="cp-reward-body"><div class="cp-level-lock-label">'+(unlocked?'🔓 تم فتح المستوى':'🔒 هذا المستوى مقفل حتى اكتمال النقاط')+'</div><div class="cp-level-progress"><div class="cp-level-progress-head"><strong>تقدم المستوى</strong><span>'+score(earnedInLevel)+' / '+score(progressSpan)+' نقطة</span></div><div class="cp-level-progress-track"><div class="cp-level-progress-fill" style="width:'+progressPct+'%"></div></div><div class="cp-level-progress-foot"><span>'+(unlocked?'تم فتح المستوى':'باقي '+score(remaining)+' نقطة')+'</span><span>'+Math.round(progressPct)+'%</span></div></div>'+
  '<div class="cp-reward-stats"><span>💎 '+score(requiredPoints)+' نقطة مطلوبة</span>'+(daysRequired>0?'<span>📅 '+score(daysRequired)+' يوم للفتح</span>':'')+(giftCount>0?'<span>🎁 '+score(giftCount)+' هدية مطلوبة</span>':'')+(rewardDays>0?'<span>⏳ '+(permanent?'دائمة':score(rewardDays)+' يوم')+'</span>':'')+'</div>'+
  (rewards.length?rewardGrid:'<p class="empty">لا توجد مكافآت مضافة لهذا المستوى</p>')+(benefitText.length?'<div class="cp-reward-section"><strong>مزايا المستوى</strong><p>'+esc(benefitText.join(" · "))+'</p></div>':'')+(Number(r.giftBonusPercent)>0?'<div class="cp-reward-bonus">✨ زيادة نقاط هدايا الثنائي '+esc(r.giftBonusPercent)+'%</div>':'')+'</div></article>';
 }
