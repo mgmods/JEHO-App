@@ -15505,6 +15505,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             String winner = memberStr(payload, "winnerName");
             if (winner == null || winner.trim().isEmpty()) winner = "أحد الداعمين";
+            final String chestWinnerName = winner;
             String levelTitle = memberStr(payload, "levelTitle");
             java.util.ArrayList<String> rewardNames = new java.util.ArrayList<>();
             String rewardImage = null;
@@ -15546,7 +15547,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (toastEnabled) {
                     boolean showWinner = toastConfig == null || !Boolean.FALSE.equals(toastConfig.get("showWinnerName"));
                     GlobalCelebrationToast.showRoomTop(
-                            this, showWinner ? winner : "💥 انفجار صندوق الدعم!", message, null, chestRewardImage,
+                            this, showWinner ? chestWinnerName : "💥 انفجار صندوق الدعم!", message, null, chestRewardImage,
                             chestToastKey, 0d, 0L, null, "support_chest", roomId);
                 }
                 // Custom room-wide media replaces the legacy built-in burst.
