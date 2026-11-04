@@ -1239,7 +1239,7 @@
         android:id="@+id/musicFloatWrap"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_marginEnd="12dp"
+        android:layout_marginStart="12dp"
         android:layout_marginBottom="12dp"
         android:background="@drawable/bg_room_tool_circle"
         android:clipToOutline="true"
@@ -1247,7 +1247,7 @@
         android:elevation="20dp"
         android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/bottomBar"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintStart_toStartOf="parent">
 
         <ImageView
             android:id="@+id/imgMusicFloatDisc"
