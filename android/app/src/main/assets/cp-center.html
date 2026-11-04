@@ -66,13 +66,13 @@ header button{background:none;border:0;font-size:28px}
 .cp-reward-hero{position:relative;min-height:142px;padding:20px 18px 18px 100px;display:flex;align-items:center;gap:12px;background-color:#4b1740;background-size:cover;background-position:center;border-bottom:1px solid #ffffff30}
 .cp-reward-hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#16051488,transparent 90%);pointer-events:none}
 .cp-reward-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:1;pointer-events:none}
-.cp-reward-logo{position:absolute;z-index:2;right:16px;top:50%;transform:translateY(-50%);width:68px;height:68px;object-fit:contain;filter:drop-shadow(0 4px 10px #160014aa)}
+.cp-reward-logo{position:absolute;z-index:2;left:16px;right:auto;top:50%;transform:translateY(-50%);width:68px;height:68px;object-fit:contain;filter:drop-shadow(0 4px 10px #160014aa)}
 .cp-reward-logo-fallback{display:grid;place-items:center;border-radius:20px;background:linear-gradient(145deg,#ffdf9a,#e65b9b);color:#7a174e;font-size:34px}
 .cp-reward-heading{position:relative;z-index:2;min-width:0}
 .cp-reward-kicker{font-size:10px;letter-spacing:1.4px;color:#ffe6b0;font-weight:900}
 .cp-reward-heading h3{font-size:19px;margin:5px 0 2px;font-weight:900;overflow-wrap:anywhere}
 .cp-reward-heading p{font-size:12px;color:#ffe8f4;margin:0}.cp-level-description{font-size:12px;line-height:1.65;color:#fff1f8;margin-top:6px;max-width:100%}
-.cp-reward-level-pill{position:absolute;z-index:3;left:12px;top:12px;padding:6px 10px;border-radius:20px;background:#23051dbb;border:1px solid #ffdf9a99;color:#ffe4a0;font-size:11px;font-weight:800}
+.cp-reward-level-pill{position:absolute;z-index:3;right:12px;left:auto;top:12px;padding:6px 10px;border-radius:20px;background:#23051dbb;border:1px solid #ffdf9a99;color:#ffe4a0;font-size:11px;font-weight:800}
 .cp-reward-body{padding:15px}
 .cp-reward-stats{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
 .cp-reward-stats span,.cp-reward-chips span{padding:7px 10px;border-radius:18px;background:#ffffff14;border:1px solid #ffffff20;color:#ffe9f5;font-size:11px;font-weight:700}
@@ -95,7 +95,7 @@ header button{background:none;border:0;font-size:28px}
 .cp-store-action{width:100%;border:1px solid #ffdf9a;border-radius:22px;background:linear-gradient(100deg,#ffe98a,#f6b83b);color:#57163d;padding:10px 7px;font-weight:900;font-size:12px}
 .cp-store-action:disabled{opacity:.6;cursor:default}
 @media(max-width:360px){.cp-store-grid{grid-template-columns:1fr}.cp-store-preview{height:160px}}
-@media(max-width:380px){.cp-reward-hero{padding-left:82px;min-height:126px}.cp-reward-logo{width:56px;height:56px;right:12px}.cp-reward-heading h3{font-size:16px}.cp-reward-level-pill{font-size:9px}}
+@media(max-width:380px){.cp-reward-hero{padding-left:82px;min-height:126px}.cp-reward-logo{width:56px;height:56px;left:12px;right:auto}.cp-reward-heading h3{font-size:16px}.cp-reward-level-pill{font-size:9px}}
 </style>
 </head>
 <body>
@@ -129,7 +129,7 @@ header button{background:none;border:0;font-size:28px}
 <section id="rules" class="hidden"><div class="panel"><h2 class="title">💖 قواعد CP</h2><div id="rulesList"></div></div></section>
 <section id="store" class="hidden"><div class="panel"><h2 class="title">🛍️ متجر CP</h2><p class="note">اختر الخلفية أو الشعار أو الإطار الذي يعجبك. شاهد المعاينة أولاً، واشترِ بالكوينز؛ عناصر CP تُركّب تلقائياً بعد نجاح الشراء.</p><div id="storeView"><p class="empty">جارٍ تحميل عناصر متجر CP…</p></div></div></section>
 </main>
-<nav class="bottom" style="grid-template-columns:repeat(5,1fr)"><button data-page="weekly"><span class="navicon">🏆</span>الثنائيات</button><button data-page="relationship"><span class="navicon">❤️</span>علاقاتي</button><button data-page="store"><span class="navicon">🛍️</span>المتجر</button><button data-page="tasks"><span class="navicon">🎁</span>المهمات</button><button data-page="rules"><span class="navicon">💖</span>القواعد</button></nav>
+<nav class="bottom" style="grid-template-columns:repeat(4,1fr)"><button data-page="weekly"><span class="navicon">🏆</span>الثنائيات</button><button data-page="relationship"><span class="navicon">❤️</span>علاقاتي</button><button data-page="store"><span class="navicon">🛍️</span>المتجر</button><button data-page="tasks"><span class="navicon">🎁</span>المهمات</button></nav>
 </div>
 <div id="modalRoot"></div><div id="toast" class="toast hidden"></div>
 <script>
