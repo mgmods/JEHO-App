@@ -1277,6 +1277,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             Result<List<Map<String, Object>>> result = ApiCall.execute(container.getUserApi().cpCatalog());
             Map<String, String> mappings = new LinkedHashMap<>();
             Map<String, Integer> prices = new LinkedHashMap<>();
+            // CP catalog carries the dashboard-selected gift row as well as its id.
+            // Keep that uploaded artwork available even if the general gift cache is stale.
+            Map<String, GiftDtos.GiftDto> cpGiftCatalog = new LinkedHashMap<>();
             boolean configuredGiftTabEnabled = true;
             if (result.success && result.data != null) {
                 for (Map<String, Object> row : result.data) {
@@ -1300,8 +1303,26 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     // dashboard price is zero (free/admin-configured). Visibility must not
                     // depend on a positive price; the send endpoint remains authoritative.
                     if (id instanceof String && !((String) id).isEmpty()) {
-                        mappings.put((String) id, (String) type);
-                        if (priceValue != null) prices.put((String) id, price);
+                        String giftId = (String) id;
+                        mappings.put(giftId, (String) type);
+                        if (priceValue != null) prices.put(giftId, price);
+                        Map<?, ?> giftRow = (Map<?, ?>) giftObj;
+                        GiftDtos.GiftDto configuredGift = new GiftDtos.GiftDto();
+                        configuredGift.id = giftId;
+                        Object nameValue = giftRow.get("name");
+                        if (nameValue != null) configuredGift.name = String.valueOf(nameValue);
+                        Object iconValue = giftRow.get("iconUrl");
+                        if (iconValue != null) configuredGift.iconUrl = String.valueOf(iconValue);
+                        Object animationValue = giftRow.get("animationUrl");
+                        if (animationValue != null) configuredGift.animationUrl = String.valueOf(animationValue);
+                        configuredGift.type = "premium";
+                        configuredGift.category = "cp";
+                        configuredGift.coinPrice = price;
+                        try { configuredGift.diamondValue = Math.max(0, Integer.parseInt(String.valueOf(giftRow.get("diamondValue")))); }
+                        catch (Exception ignored) { }
+                        try { configuredGift.sortOrder = Integer.parseInt(String.valueOf(giftRow.get("sortOrder"))); }
+                        catch (Exception ignored) { }
+                        cpGiftCatalog.put(giftId, configuredGift);
                     }
                 }
             }
@@ -1314,11 +1335,34 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     cpGiftTypes.putAll(mappings);
                     cpGiftPrices.clear();
                     cpGiftPrices.putAll(prices);
+                    for (Map.Entry<String, GiftDtos.GiftDto> entry : cpGiftCatalog.entrySet()) {
+                        GiftDtos.GiftDto configured = entry.getValue();
+                        GiftDtos.GiftDto current = null;
+                        for (GiftDtos.GiftDto candidate : allGifts) {
+                            if (candidate != null && entry.getKey().equals(candidate.id)) {
+                                current = candidate;
+                                break;
+                            }
+                        }
+                        if (current == null) {
+                            allGifts.add(configured);
+                        } else {
+                            // Dashboard-uploaded icon/animation is authoritative for CP.
+                            if (configured.iconUrl != null && !configured.iconUrl.trim().isEmpty()) {
+                                current.iconUrl = configured.iconUrl;
+                            }
+                            if (configured.animationUrl != null && !configured.animationUrl.trim().isEmpty()) {
+                                current.animationUrl = configured.animationUrl;
+                            }
+                            if (configured.name != null && !configured.name.trim().isEmpty()) {
+                                current.name = configured.name;
+                            }
+                            current.category = "cp";
+                        }
+                    }
                     applyCpGiftPrices();
-                    // Revalidate the catalog as well: a newly selected dashboard gift may
-                    // have been added or reclassified while this sheet was already open.
-                    if (vm != null) vm.load();
-                    // Rebuild the tabs now that the live CP catalog is known.
+                    // Rebuild the tabs from the live dashboard CP gift data without
+                    // issuing a second full catalog request while the sheet is opening.
                     applyCategories(new ArrayList<>(tabCategories));
                     applyFilter();
                     refreshSendBtn();
