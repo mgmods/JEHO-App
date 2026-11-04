@@ -19,7 +19,7 @@ public class VoiceRoomViewModel extends ViewModel {
     private final MutableLiveData<Boolean> handRaised = new MutableLiveData<>(false);
     private final MutableLiveData<List<RoomDtos.SeatRequestDto>> seatRequests =
             new MutableLiveData<>(new ArrayList<>());
-    private final MutableLiveData<Boolean> seatRequestsLoading = new MutableLiveData<>(false);
+    private final MutableLiveData<Boolean> seatRequestsLoading = new MutableLiveData<>();
     private final MutableLiveData<RoomDtos.SupportersResult> supporters = new MutableLiveData<>();
     private final MutableLiveData<String> info = new MutableLiveData<>();
 
