@@ -158,7 +158,6 @@
                   <strong>المستوى {{ level.level }} · {{ level.name || level.presentation?.title || 'بدون اسم' }}</strong>
                   <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="small text-secondary">يفتح عند {{ format(level.pointsRequired) }} نقطة</span>
-                    <button v-if="item.levelsEditor.length > 1" type="button" class="btn btn-outline-danger btn-sm" @click="removeLevel(item, level.level)">حذف المستوى</button>
                   </div>
                 </div>
                 <div class="row g-3">
@@ -921,13 +920,6 @@ function addLevel(item) {
   item.levelsEditor = levels
   syncLevelEditor(item)
 }
-function removeLevel(item, levelNumber) {
-  const levels = (Array.isArray(item.levelsEditor) ? item.levelsEditor : []).filter(level => Number(level.level) !== Number(levelNumber))
-  if (!levels.length) { error.value = 'يجب الإبقاء على مستوى واحد على الأقل.'; return }
-  item.levelsEditor = levels.map((level, index) => ({ ...level, level: index + 1 }))
-  syncLevelEditor(item)
-}
-
 function syncLevelEditor(item) {
   const levels = (Array.isArray(item.levelsEditor) ? item.levelsEditor : []).map((level, index) => ({
     ...level,
