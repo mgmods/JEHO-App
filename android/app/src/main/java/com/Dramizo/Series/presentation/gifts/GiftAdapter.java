@@ -132,7 +132,7 @@ public class GiftAdapter extends ListAdapter<GiftDtos.GiftDto, GiftAdapter.VH> {
             holder.b.giftImage.setImageResource(ImagePlaceholder.gift());
         } else if (kind == com.Dramizo.Series.util.CosmeticMedia.Kind.GIF
                 || (abs.toLowerCase(Locale.US).contains(".gif"))
-                || (abs.toLowerCase(Locale.US).contains(".webp"))) {
+                ) {
             try {
                 Glide.with(holder.b.giftImage)
                         .asGif()
