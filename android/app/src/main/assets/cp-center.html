@@ -88,7 +88,8 @@ header button{background:none;border:0;font-size:28px}
 .cp-store-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
 .cp-store-card{min-width:0;border:1px solid #ffda7266;border-radius:20px;padding:11px;background:linear-gradient(145deg,#ffffff18,#1c071b88);box-shadow:0 8px 22px #16001455}
 .cp-store-preview{width:100%;height:138px;object-fit:contain;border-radius:15px;background:#ffffff12;padding:8px}
-.cp-store-card h3{font-size:14px;color:#ffe7a8;margin:10px 0 5px;overflow-wrap:anywhere}
+.cp-store-kind{display:inline-block;margin-top:8px;padding:4px 8px;border-radius:10px;background:#ffffff18;color:#ffdf9a;font-size:10px;font-weight:800}
+.cp-store-card h3{font-size:14px;color:#ffe7a8;margin:6px 0 5px;overflow-wrap:anywhere}
 .cp-store-card p{font-size:11px;line-height:1.6;color:var(--muted);min-height:34px;margin:0 0 8px}
 .cp-store-price{font-size:12px;font-weight:900;color:#ffdf8b;margin:7px 0}
 .cp-store-action{width:100%;border:1px solid #ffdf9a;border-radius:22px;background:linear-gradient(100deg,#ffe98a,#f6b83b);color:#57163d;padding:10px 7px;font-weight:900;font-size:12px}
@@ -226,6 +227,7 @@ window.renderCpStore=function(rows){
   const image=item.previewUrl||item.animationUrl||fallback;
   const price=Math.max(0,Number(item.coinPrice)||0);
   const lease=Number(item.meta?.leaseDays||30);
+  const kind=item.type==="cp_background"?"خلفية CP":item.type==="cp_logo"?"شعار CP":item.type==="profile_card"?"بطاقة الملف":item.type==="nameplate"?"لوحة الاسم":item.type==="level_badge"?"شارة":item.type||"عنصر تجميلي";
   const expiry=item.expiresAt?Date.parse(item.expiresAt):NaN;
   const owned=item.owned===true&&(!item.expiresAt||Number.isNaN(expiry)||expiry>Date.now());
   const equipped=owned&&item.equipped===true;
@@ -234,7 +236,7 @@ window.renderCpStore=function(rows){
    : owned
     ? '<button class="cp-store-action" data-store-equip="'+esc(id)+'">تركيب الآن</button>'
     : '<button class="cp-store-action" data-store-purchase="'+esc(id)+'">شراء وتركيب · '+score(price)+' كوين</button>';
-  return '<article class="cp-store-card"><img class="cp-store-preview" src="'+esc(image)+'" alt="'+esc(item.name||"عنصر CP")+'" loading="lazy" onerror="this.onerror=null;this.src=\''+fallback+'\'"><h3>'+esc(item.name||"عنصر CP")+'</h3><p>'+esc(item.description||"عنصر تجميلي خاص بمتجر CP")+'</p><div class="cp-store-price">'+score(price)+' كوين · '+score(lease)+' يوم</div>'+button+'</article>';
+  return '<article class="cp-store-card"><img class="cp-store-preview" src="'+esc(image)+'" alt="'+esc(item.name||"عنصر CP")+'" loading="lazy" onerror="this.onerror=null;this.src=\''+fallback+'\'"><div class="cp-store-kind">'+esc(kind)+'</div><h3>'+esc(item.name||"عنصر CP")+'</h3><p>'+esc(item.description||"عنصر تجميلي خاص بمتجر CP")+'</p><div class="cp-store-price">'+score(price)+' كوين · '+score(lease)+' يوم</div>'+button+'</article>';
  }).join("")+'</div>';
 };
 window.showCpMessage=toast;window.showCpError=m=>toast(m||"حدث خطأ");

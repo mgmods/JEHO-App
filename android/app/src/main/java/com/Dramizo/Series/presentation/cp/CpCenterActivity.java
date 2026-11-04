@@ -331,6 +331,7 @@ public class CpCenterActivity extends ThemedActivity {
                             ? "تم الشراء وتركيب عنصر CP تلقائياً."
                             : "تم الشراء، لكن تعذر التركيب التلقائي. يمكنك إعادة محاولة التركيب.");
                     loadStore();
+                    loadHome();
                 } else {
                     message(result.error == null ? "تعذر شراء العنصر." : result.error);
                 }
@@ -347,6 +348,7 @@ public class CpCenterActivity extends ThemedActivity {
                 if (result.success) {
                     message("تم تركيب عنصر CP بنجاح.");
                     loadStore();
+                    loadHome();
                 } else {
                     message(result.error == null ? "تعذر تركيب العنصر." : result.error);
                 }
