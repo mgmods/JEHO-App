@@ -367,15 +367,17 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       `WITH weekly_totals AS (
          SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
            COALESCE(SUM(e.points::numeric), 0) AS weekly_points,
-           json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level) AS "userA",
-           json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level) AS "userB"
+           json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level, 'nameColor', pa."nameColor") AS "userA",
+           json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level, 'nameColor', pb."nameColor") AS "userB"
          FROM cp_relationships r
          JOIN users a ON a.id = r."userAId"
          JOIN users b ON b.id = r."userBId"
+         LEFT JOIN user_profiles pa ON pa."userId" = a.id
+         LEFT JOIN user_profiles pb ON pb."userId" = b.id
          LEFT JOIN cp_point_events e ON e."relationshipId" = r.id
            AND e."createdAt" >= date_trunc('week', now())
          WHERE r.status = 'active'
-         GROUP BY r.id, a.id, b.id
+         GROUP BY r.id, a.id, b.id, pa."nameColor", pb."nameColor"
        ), ranked AS (
          SELECT weekly_totals.*,
            ROW_NUMBER() OVER (ORDER BY weekly_points DESC, points::numeric DESC, "startedAt" ASC) AS weekly_rank
@@ -438,9 +440,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.dataSource.query(
       `SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
         json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level,
-          'vipBadgeUrl', pa."vipBadgeUrl", 'hostBadgeUrl', pa."hostBadgeUrl", 'levelBadgeUrl', pa."levelBadgeUrl") AS "userA",
+          'vipBadgeUrl', pa."vipBadgeUrl", 'hostBadgeUrl', pa."hostBadgeUrl", 'levelBadgeUrl', pa."levelBadgeUrl", 'nameColor', pa."nameColor") AS "userA",
         json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level,
-          'vipBadgeUrl', pb."vipBadgeUrl", 'hostBadgeUrl', pb."hostBadgeUrl", 'levelBadgeUrl', pb."levelBadgeUrl") AS "userB"
+          'vipBadgeUrl', pb."vipBadgeUrl", 'hostBadgeUrl', pb."hostBadgeUrl", 'levelBadgeUrl', pb."levelBadgeUrl", 'nameColor', pb."nameColor") AS "userB"
        FROM cp_relationships r
        JOIN users a ON a.id = r."userAId" JOIN users b ON b.id = r."userBId"
        LEFT JOIN user_profiles pa ON pa."userId" = a.id
