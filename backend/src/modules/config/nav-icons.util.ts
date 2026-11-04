@@ -4,7 +4,7 @@
  */
 
 export type NavTabKey = 'party' | 'drama' | 'games' | 'chat' | 'me';
-export const PROFILE_ACTION_KEYS = ['events', 'agency', 'recharge', 'tasks', 'settings', 'support'] as const;
+export const PROFILE_ACTION_KEYS = ['vip', 'level', 'store', 'room', 'agencyCenter', 'events', 'agency', 'tasks', 'recharge', 'tools', 'settings', 'support'] as const;
 export type ProfileActionKey = typeof PROFILE_ACTION_KEYS[number];
 export const CHANNEL_ICON_KEYS = ['officialNews', 'adminMessages', 'notifications'] as const;
 export type ChannelIconKey = typeof CHANNEL_ICON_KEYS[number];
