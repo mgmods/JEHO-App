@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#8d205f">
 <title>علاقات CP ❤️</title>
 <style>
+@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800;900&display=swap");
 :root{--pink:#ff70ad;--gold:#ffda72;--bg:#31072d;--text:#fff4fb;--muted:#dfbdd3}
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans Arabic","Noto Naskh Arabic","Tajawal",Tahoma,sans-serif;font-size:14px;color:var(--text);background:radial-gradient(ellipse at top,#c14c8b,transparent 55%),linear-gradient(160deg,#a52f70,#641449 50%,#25031f);min-height:100vh}
@@ -96,7 +97,7 @@ header button{background:none;border:0;font-size:28px}
 .cp-store-action:disabled{opacity:.6;cursor:default}
 @media(max-width:360px){.cp-store-grid{grid-template-columns:1fr}.cp-store-preview{height:160px}}
 @media(max-width:380px){.cp-reward-hero{padding-left:82px;min-height:126px}.cp-reward-logo{width:56px;height:56px;left:12px;right:auto}.cp-reward-heading h3{font-size:16px}.cp-reward-level-pill{font-size:9px}}
-.cp-level-heart{position:absolute;z-index:4;right:26px;top:48px;font-size:20px;filter:drop-shadow(0 2px 7px #ff4d9a);animation:pulse 1.6s infinite}
+.cp-level-heart{position:absolute;z-index:4;left:50%;right:auto;top:auto;bottom:8px;transform:translateX(-50%);font-size:18px;line-height:1;filter:drop-shadow(0 2px 7px #ff4d9a);animation:pulse 1.6s infinite;pointer-events:none}
 .cp-level-progress{margin:4px 0 15px;padding:12px;border-radius:16px;background:#ffffff0b;border:1px solid #ffffff1c}
 .cp-level-progress-head,.cp-level-progress-foot{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:11px;color:#ffe9f5}
 .cp-level-progress-head{margin-bottom:8px}.cp-level-progress-head strong{color:#ffe4a0}
@@ -119,6 +120,68 @@ header button{background:none;border:0;font-size:28px}
 @keyframes floatHeart{0%,100%{opacity:.45;translate:0 4px;scale:.8}50%{opacity:1;translate:0 -8px;scale:1.15}}
 body{font-family:"Noto Sans Arabic","Noto Naskh Arabic","Tajawal",Tahoma,sans-serif;font-size:14px}
 .title{font-size:19px;font-weight:800}
+
+/* CP typography + spacing correction: load a real Arabic typeface and keep a compact hierarchy. */
+:root{--cp-font:"Tajawal","Noto Sans Arabic","Noto Naskh Arabic",sans-serif}
+html,body,button,input,select,textarea{font-family:var(--cp-font)!important}
+body{font-size:13px}
+header{padding:16px 18px}
+header h1{font-size:21px;line-height:1.35}
+header button{font-size:25px}
+.content{padding:0 13px}
+.panel{padding:14px;border-radius:22px;margin:10px 0 16px}
+.title{font-size:17px;line-height:1.45;margin:8px 0 13px}
+.pair{min-height:136px}
+.person{gap:8px}
+.username-btn{font-size:12px;padding:7px 10px}
+.score{font-size:13px}
+.tabs{margin:14px 0}
+.tabs button{font-size:12px;padding:10px 3px}
+.row{padding:10px;border-radius:18px;gap:7px}
+.rule{padding:11px;gap:9px}
+.rule p{font-size:12px;line-height:1.7}
+.empty{font-size:12px;padding:20px 9px}
+.note,.task-meta{font-size:11px;line-height:1.65}
+.task-card{padding:12px}
+.action{font-size:12px;padding:10px 17px}
+.bottom{padding:8px}
+.bottom button{font-size:11px}
+.navicon{font-size:25px}
+.cp-reward-hero{min-height:132px;padding:17px 16px 38px 92px}
+.cp-reward-heading{align-self:center;margin-bottom:8px}
+.cp-reward-heading h3{font-size:16px;line-height:1.4;margin:4px 0 2px}
+.cp-reward-heading p,.cp-level-description{font-size:11px;line-height:1.55}
+.cp-reward-kicker{font-size:9px;letter-spacing:1px}
+.cp-reward-level-pill{font-size:10px;padding:5px 8px}
+.cp-reward-body{padding:12px}
+.cp-reward-stats span,.cp-reward-chips span{font-size:10px;padding:6px 8px}
+.cp-reward-item{gap:9px;padding:8px}
+.cp-reward-item strong{font-size:12px}
+.cp-reward-item small{font-size:9px}
+.cp-reward-section>strong{font-size:11px}
+.cp-reward-section p,.cp-reward-bonus{font-size:11px}
+.cp-level-progress{padding:10px}
+.cp-level-progress-head{font-size:10px}
+.cp-level-progress-foot{font-size:9px}
+.cp-level-lock-label{font-size:10px;padding:5px 9px}
+.cp-reward-grid{gap:8px}
+.cp-reward-grid .cp-reward-item{min-height:112px;padding:8px 6px}
+.cp-reward-grid .cp-reward-item-image{width:52px;height:52px}
+.cp-store-card{padding:9px}
+.cp-store-preview{height:120px}
+.cp-store-card h3{font-size:12px}
+.cp-store-card p{font-size:10px;line-height:1.5}
+.cp-store-price,.cp-store-action{font-size:11px}
+#featured .pair{min-height:166px}
+#featured .avatar{width:clamp(80px,24vw,120px)}
+#featured .username-btn{font-size:11px;padding:6px 9px}
+@media(max-width:380px){
+ .cp-reward-hero{padding-left:76px;min-height:120px;padding-bottom:34px}
+ .cp-reward-logo{width:52px;height:52px;left:10px}
+ .cp-reward-heading h3{font-size:15px}
+ .cp-level-progress-head{font-size:9px}
+}
+
 </style>
 </head>
 <body>
