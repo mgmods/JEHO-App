@@ -138,6 +138,7 @@ public final class RoomDtos {
         @SerializedName("userId") public String userId;
         @SerializedName("seatIndex") public Integer seatIndex;
         @SerializedName("displayName") public String displayName;
+        @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("at") public String at;
     }
 
