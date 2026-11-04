@@ -1301,23 +1301,25 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       actions: ['accept', 'reject'],
       requestSource: 'gift_catalog',
     };
+    const requestTitle = 'طلب علاقة';
+    const requestBody = `أرسل لك ${senderName} طلب علاقة، هل توافق على الارتباط به؟`;
     await this.notifications.notifyUser(
       receiverId,
       NotificationType.SYSTEM,
-      'طلب ارتباط جديد',
-      `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}. وافق أو ارفض الطلب.`,
+      requestTitle,
+      requestBody,
       payload,
     ).catch(error => console.warn('[CP] gift request notification delivery failed', error));
     this.realtime.emitToUser(receiverId, 'cp:request', {
       ...payload,
-      title: 'هدية وطلب ارتباط جديد',
-      body: `أرسل لك ${senderName} هدية ${this.cpTypeLabel(type)}.`,
+      title: requestTitle,
+      body: requestBody,
     });
     if (roomId) {
       this.realtime.emitToRoom(roomId, 'room:event', {
         roomId,
         event: 'cp:request',
-        payload: { ...payload, title: 'هدية ارتباط', body: `أرسل ${senderName} هدية ارتباط.` },
+        payload: { ...payload, title: requestTitle, body: requestBody },
         at: new Date().toISOString(),
       });
     }
