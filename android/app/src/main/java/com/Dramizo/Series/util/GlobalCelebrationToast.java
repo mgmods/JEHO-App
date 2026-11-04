@@ -89,6 +89,16 @@ public final class GlobalCelebrationToast {
     private static volatile float remoteLuckyRoomHighTitleSizeSp = 13f, remoteLuckyRoomHighBodySizeSp = 12f, remoteLuckyRoomHighCountSizeSp = 12f;
     private static volatile float remoteLuckyHighTitleSizeSp = 13f, remoteLuckyHighBodySizeSp = 12f, remoteLuckyHighCountSizeSp = 12f;
     private static long lastStyleFetchAt;
+    private static volatile Map<String, Object> supportChestToastConfig;
+
+    public static void setSupportChestToastConfig(@Nullable Map<?, ?> config) {
+        if (config == null) { supportChestToastConfig = null; return; }
+        java.util.HashMap<String, Object> copy = new java.util.HashMap<>();
+        for (Map.Entry<?, ?> entry : config.entrySet()) {
+            copy.put(String.valueOf(entry.getKey()), entry.getValue());
+        }
+        supportChestToastConfig = copy;
+    }
 
     private static final class ToastRequest {
         final WeakReference<Activity> activity;
@@ -120,6 +130,15 @@ public final class GlobalCelebrationToast {
             this.roomId = roomId;
             this.centerPlacement = centerPlacement;
         }
+    }
+
+    private static float numberConfig(@Nullable Map<String, Object> config, String key, float fallback) {
+        if (config == null) return fallback;
+        try {
+            Object value = config.get(key);
+            float parsed = Float.parseFloat(String.valueOf(value));
+            return Float.isFinite(parsed) ? parsed : fallback;
+        } catch (Exception ignored) { return fallback; }
     }
 
     private GlobalCelebrationToast() {}
@@ -672,7 +691,9 @@ public final class GlobalCelebrationToast {
 
         String winnerName = firstNonEmpty(displayName, title);
         if (tvTitle != null) {
-            tvTitle.setVisibility(View.VISIBLE);
+            boolean showChestWinner = !supportChest || chestToast == null
+                    || !Boolean.FALSE.equals(chestToast.get("showWinnerName"));
+            tvTitle.setVisibility(showChestWinner ? View.VISIBLE : View.GONE);
             tvTitle.setText(winnerName != null ? winnerName : "مبروك الفوز!");
             tvTitle.setSelected(true);
         }
@@ -691,8 +712,8 @@ public final class GlobalCelebrationToast {
             tvBody.setSelected(true);
         }
         if (customToastStyle) {
-            float titleSize = supportChest ? 17f : giftSend ? remoteGiftTitleSizeSp : luckyRoomHigh ? remoteLuckyRoomHighTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
-            float bodySize = supportChest ? 14f : giftSend ? remoteGiftBodySizeSp : luckyRoomHigh ? remoteLuckyRoomHighBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
+            float titleSize = supportChest ? numberConfig(chestToast, "titleSizeSp", 17f) : giftSend ? remoteGiftTitleSizeSp : luckyRoomHigh ? remoteLuckyRoomHighTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
+            float bodySize = supportChest ? numberConfig(chestToast, "bodySizeSp", 14f) : giftSend ? remoteGiftBodySizeSp : luckyRoomHigh ? remoteLuckyRoomHighBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
             float countSize = supportChest ? 12f : giftSend ? remoteGiftCountSizeSp : luckyRoomHigh ? remoteLuckyRoomHighCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
             if (tvTitle != null) tvTitle.setTextSize(titleSize);
             if (tvBody != null) tvBody.setTextSize(bodySize);
@@ -809,8 +830,11 @@ public final class GlobalCelebrationToast {
                 : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
         int maxToastWidth = Math.max(dp(activity, 220), screenWidth - dp(activity, 24));
         int toastWidth = Math.min(dp(activity, supportChest ? 360 : Math.max(220, Math.min(360, requestedWidthDp))), maxToastWidth);
+        Map<String, Object> chestToast = supportChest ? supportChestToastConfig : null;
         int toastHeight = customToastStyle
-                ? dp(activity, supportChest ? 126 : Math.max(60, Math.min(180, requestedHeightDp)))
+                ? dp(activity, supportChest
+                    ? Math.max(60, Math.min(240, (int) numberConfig(chestToast, "height", 104)))
+                    : Math.max(60, Math.min(180, requestedHeightDp)))
                 : ViewGroup.LayoutParams.WRAP_CONTENT;
         // Keep the text elements content-sized like the dashboard's draggable preview.
         // Full-width TextViews cannot be positioned by their left-edge percentage.
@@ -839,7 +863,9 @@ public final class GlobalCelebrationToast {
             });
         } else {
             lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-            lp.topMargin = dp(activity, topMarginDp);
+            lp.topMargin = dp(activity, supportChest
+                    ? Math.max(0, Math.min(300, (int) numberConfig(chestToast, "yOffset", topMarginDp)))
+                    : topMarginDp);
         }
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
@@ -847,7 +873,9 @@ public final class GlobalCelebrationToast {
         banner.setScaleY(0.985f);
         banner.setTranslationX(dp(activity, 140));
         if (toastBackground != null) {
-            String selectedBackground = supportChest ? "" : giftSend ? remoteBackgroundUrl : luckyRoomHigh ? remoteLuckyRoomHighBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
+            String selectedBackground = supportChest
+                    ? (chestToast == null ? "" : String.valueOf(chestToast.getOrDefault("backgroundUrl", "")))
+                    : giftSend ? remoteBackgroundUrl : luckyRoomHigh ? remoteLuckyRoomHighBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
             String imageUrl = customToastStyle ? toastBackgroundUrl(selectedBackground) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 // The uploaded artwork owns its pixels, edges and alpha channel. Do not add
