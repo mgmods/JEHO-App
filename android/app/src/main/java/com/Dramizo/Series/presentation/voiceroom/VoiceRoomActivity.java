@@ -18098,9 +18098,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 TextView tvMeta = holder.itemView.findViewById(R.id.tvRequestMeta);
                 TextView btnApprove = holder.itemView.findViewById(R.id.btnRequestApprove);
                 TextView btnReject = holder.itemView.findViewById(R.id.btnRequestReject);
+                ImageView avatar = holder.itemView.findViewById(R.id.imgRequestAvatar);
                 String name = req.displayName != null && !req.displayName.isEmpty()
                         ? req.displayName : "ضيف";
                 tvName.setText(name);
+                if (avatar != null) {
+                    com.Dramizo.Series.util.AvatarCosmetics.bindAvatar(avatar, req.avatarUrl);
+                }
+                android.graphics.drawable.GradientDrawable approveBg =
+                        new android.graphics.drawable.GradientDrawable();
+                approveBg.setColor(Color.rgb(22, 163, 112));
+                approveBg.setCornerRadius(dp(11));
+                btnApprove.setBackground(approveBg);
+                btnApprove.setTextColor(Color.WHITE);
+                android.graphics.drawable.GradientDrawable rejectBg =
+                        new android.graphics.drawable.GradientDrawable();
+                rejectBg.setColor(Color.rgb(190, 55, 70));
+                rejectBg.setCornerRadius(dp(11));
+                btnReject.setBackground(rejectBg);
+                btnReject.setTextColor(Color.WHITE);
                 tvMeta.setText(req.seatIndex != null
                         ? ("يريد مقعد " + Math.max(1, req.seatIndex))
                         : "طلب انضمام للمايك");
