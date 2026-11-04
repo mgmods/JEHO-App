@@ -129,14 +129,15 @@ public final class GiftFlyAnimator {
         hero.animate().cancel();
         hero.setAlpha(0f);
 
+        final ImageView heroView = hero;
         long pulseDuration = Math.max(360L, Math.min(900L, durationMs));
-        ObjectAnimator pulse = ObjectAnimator.ofFloat(hero, View.ALPHA,
+        ObjectAnimator pulse = ObjectAnimator.ofFloat(heroView, View.ALPHA,
                 0f, 1f, 0.12f, 1f, 0f);
         pulse.setDuration(pulseDuration);
         pulse.setInterpolator(new LinearInterpolator());
         pulse.addListener(new AnimatorListenerAdapter() {
             @Override public void onAnimationEnd(Animator animation) {
-                if (hero.getParent() != null) hero.setAlpha(0f);
+                if (heroView.getParent() != null) heroView.setAlpha(0f);
             }
             @Override public void onAnimationCancel(Animator animation) {
                 if (hero.getParent() != null) hero.setAlpha(0f);
@@ -189,12 +190,12 @@ public final class GiftFlyAnimator {
             hero.bringToFront();
             // Copies are placed above the room overlay but below the large hero marker.
             for (ImageView copy : copies) copy.bringToFront();
-            hero.bringToFront();
+            heroView.bringToFront();
             pulse.start();
             together.start();
         } catch (OutOfMemoryError | RuntimeException error) {
             for (ImageView copy : copies) remove(copy);
-            hero.setAlpha(0f);
+            heroView.setAlpha(0f);
         }
     }
 
