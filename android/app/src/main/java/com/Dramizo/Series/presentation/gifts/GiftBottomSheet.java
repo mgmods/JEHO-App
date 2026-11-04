@@ -1284,9 +1284,12 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     int price = 0;
                     try { price = (int) Math.max(0, Math.min(Integer.MAX_VALUE, Math.round(Double.parseDouble(String.valueOf(priceValue))))); }
                     catch (Exception ignored) { }
-                    if (id instanceof String && !((String) id).isEmpty() && price > 0) {
+                    // The selected CP gift belongs in the CP room tab even when its
+                    // dashboard price is zero (free/admin-configured). Visibility must not
+                    // depend on a positive price; the send endpoint remains authoritative.
+                    if (id instanceof String && !((String) id).isEmpty()) {
                         mappings.put((String) id, (String) type);
-                        prices.put((String) id, price);
+                        if (priceValue != null) prices.put((String) id, price);
                     }
                 }
             }
