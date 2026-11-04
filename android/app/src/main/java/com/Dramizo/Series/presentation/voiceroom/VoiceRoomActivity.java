@@ -1995,11 +1995,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         View content = findViewById(android.R.id.content);
         if (!(content instanceof FrameLayout)) return;
         FrameLayout root = (FrameLayout) content;
-        WebView blastWeb = new WebView(this);
+        // The explosion is a visual-only layer. WebView can still participate in
+        // touch dispatch even when setClickable(false), so explicitly pass every
+        // touch through and place it at the bottom of the room's child stack.
+        WebView blastWeb = new WebView(this) {
+            @Override public boolean dispatchTouchEvent(MotionEvent event) { return false; }
+            @Override public boolean onTouchEvent(MotionEvent event) { return false; }
+        };
         blastWeb.setBackgroundColor(Color.TRANSPARENT);
         blastWeb.setClickable(false);
         blastWeb.setFocusable(false);
         blastWeb.setFocusableInTouchMode(false);
+        blastWeb.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         blastWeb.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         WebSettings settings = blastWeb.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -2013,9 +2020,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         blastWeb.setOverScrollMode(View.OVER_SCROLL_NEVER);
         blastWeb.setVerticalScrollBarEnabled(false);
         blastWeb.setHorizontalScrollBarEnabled(false);
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+        ViewGroup roomRoot = binding != null ? binding.getRoot() : root;
+        ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        root.addView(blastWeb, params);
+        roomRoot.addView(blastWeb, 0, params);
         final boolean[] started = { false };
         blastWeb.setWebViewClient(new android.webkit.WebViewClient() {
             @Override public void onPageFinished(WebView view, String url) {
