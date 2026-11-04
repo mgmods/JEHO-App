@@ -99,21 +99,9 @@ public class GiftViewModel extends ViewModel {
                 Result<GiftDtos.GiftList> r = c.getGiftRepository().refreshGifts();
                 if (r.success && r.data != null && !r.data.isEmpty()) {
                     gifts.postValue(new ArrayList<>(r.data));
-                    ArrayList<String> urls = new ArrayList<>();
-                    for (GiftDtos.GiftDto g : r.data) {
-                        if (g == null) continue;
-                        if (g.animationUrl != null && !g.animationUrl.isEmpty()) {
-                            urls.add(g.animationUrl);
-                        }
-                        if (g.iconUrl != null && !g.iconUrl.isEmpty()) {
-                            urls.add(g.iconUrl);
-                        }
-                    }
-                    try {
-                        com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
-                                c.getAppContext(), urls);
-                    } catch (Exception ignored) {
-                    }
+                    // GiftBottomSheet warms only a small visible priority window.
+                    // Preloading the entire catalog here duplicated its Glide/video cache work
+                    // and could exhaust memory on room devices while a gift was being sent.
                 } else if (r.success && r.data != null) {
                     gifts.postValue(r.data);
                     if (r.data.isEmpty()) {
@@ -177,10 +165,16 @@ public class GiftViewModel extends ViewModel {
         final int comboCount = combo;
         c.getIoExecutor().execute(() -> {
             Result<GiftDtos.SendGiftResult> r;
-            if (targets.size() > 1 && roomId != null && !roomId.isEmpty()) {
-                r = c.sendGiftUseCase.executeAllMic(giftId, targets, qty, roomId, comboCount);
-            } else {
-                r = c.sendGiftUseCase.execute(giftId, first, qty, roomId, comboCount);
+            try {
+                if (targets.size() > 1 && roomId != null && !roomId.isEmpty()) {
+                    r = c.sendGiftUseCase.executeAllMic(giftId, targets, qty, roomId, comboCount);
+                } else {
+                    r = c.sendGiftUseCase.execute(giftId, first, qty, roomId, comboCount);
+                }
+            } catch (RuntimeException failure) {
+                android.util.Log.e("GiftViewModel", "Gift send request failed safely", failure);
+                error.postValue("تعذر إرسال الهدية، حاول مرة أخرى");
+                return;
             }
             if (!r.success) {
                 error.postValue(r.error);
