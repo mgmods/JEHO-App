@@ -219,8 +219,10 @@ window.applySupportChestWin=function(win){
    const media=document.getElementById('customBlastMedia'),audio=document.getElementById('customBlastAudio');
    if(media&&media.tagName==='VIDEO'&&overlay.classList.contains('custom-effect')){try{const startVideo=()=>{try{media.currentTime=0;}catch(e){}const playback=media.play();if(playback&&playback.catch)playback.catch(()=>{media.muted=true;media.play().catch(()=>{});});};media.load();if(media.readyState>=2)startVideo();else media.addEventListener('canplay',startVideo,{once:true});}catch(e){console.warn('Support chest video playback failed',e);}}
    if(audio&&overlay.classList.contains('custom-effect')){try{audio.currentTime=0;audio.play().catch(()=>{});}catch(e){}}
-   const videoDuration=media&&media.tagName==='VIDEO'&&Number.isFinite(media.duration)?media.duration*1000:0;
-   const visibleFor=Math.max(3600,Number(liveConfig?.explosionEffect?.durationMs)||0,videoDuration);
+   const isVideo=!!(media&&media.tagName==='VIDEO');
+   const videoDuration=isVideo&&Number.isFinite(media.duration)?media.duration*1000+250:0;
+   const visibleFor=Math.max(isVideo?12000:3600,Number(liveConfig?.explosionEffect?.durationMs)||0,videoDuration);
+   if(isVideo){media.addEventListener('ended',()=>{overlay.classList.remove('show');try{media.pause();if(audio){audio.pause();audio.currentTime=0;}}catch(e){}},{once:true});}
    setTimeout(()=>{overlay.classList.remove('show');try{if(media&&media.tagName==='VIDEO')media.pause();if(audio){audio.pause();audio.currentTime=0;}}catch(e){}},visibleFor);
   },2000);
  }catch(e){console.warn('Support chest celebration failed',e);}
