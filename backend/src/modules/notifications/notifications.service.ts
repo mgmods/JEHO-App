@@ -35,7 +35,10 @@ function isLuckyWinPayload(data?: Record<string, unknown>, title?: string, body?
   const markers = ['type', 'kind', 'notificationKind', 'event', 'source', 'reason']
     .map(key => String(data?.[key] ?? '').toLowerCase()).join(' ');
   const copy = `${String(title || '')} ${String(body || '')}`.toLowerCase();
-  return /lucky[ _:-]*(hit|win|gift|reward)|محظوظ|هدية\s*محظوظة|ربح\s*المحظوظ|حظ\s*سعيد/.test(markers + ' ' + copy);
+  const luckyKind = /lucky/.test(markers);
+  const winKind = /(hit|win|reward|won|success)/.test(markers);
+  const arabicWin = /(حظ سعيد|ربح.{0,16}محظوظ|فاز.{0,16}محظوظ|ربحت.{0,16}حظ)/.test(copy);
+  return (luckyKind && winKind) || arabicWin;
 }
 
 export class CreateNotificationDto {
