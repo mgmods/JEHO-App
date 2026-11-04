@@ -563,7 +563,8 @@ export class AdminService {
     const row = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     const defaults = {
       enabled: false, iconVisible: true, soundEnabled: true,
-      explosionEffect: { enabled: true, mediaUrl: '', width: 100, height: 100, startX: 50, startY: 46, endX: 50, endY: 50, durationMs: 1800, opacity: 100 },
+      explosionEffect: { enabled: true, mediaUrl: '', soundUrl: '', width: 100, height: 100, startX: 50, startY: 46, endX: 50, endY: 50, durationMs: 1800, opacity: 100 },
+      toast: { enabled: true, backgroundUrl: '', height: 104, yOffset: 72, titleSizeSp: 17, bodySizeSp: 14, giftSizeDp: 58, showWinnerName: true },
       goalMode: 'coins',
       coinTarget: 100000, diamondTarget: 10000, giftIds: [], giftSelectionMode: 'all',
       giftCategories: ['normal', 'lucky', 'cp'],
@@ -689,8 +690,19 @@ export class AdminService {
     const rawEffect = input.explosionEffect && typeof input.explosionEffect === 'object'
       ? input.explosionEffect as Record<string, unknown> : {};
     const mediaUrl = String(rawEffect.mediaUrl || '').trim().slice(0, 2048);
-    if (mediaUrl && !(/^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(mediaUrl))) {
+    const soundUrl = String(rawEffect.soundUrl || '').trim().slice(0, 2048);
+    const validChestMediaUrl = (value: string) => !value || /^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(value);
+    if (!validChestMediaUrl(mediaUrl)) {
       throw new BadRequestException('رابط مؤثر الانفجار يجب أن يكون HTTPS أو ملفاً داخل /uploads');
+    }
+    if (!validChestMediaUrl(soundUrl)) {
+      throw new BadRequestException('رابط صوت الانفجار يجب أن يكون HTTPS أو ملفاً داخل /uploads');
+    }
+    const rawToast = input.toast && typeof input.toast === 'object'
+      ? input.toast as Record<string, unknown> : {};
+    const toastBackgroundUrl = String(rawToast.backgroundUrl || '').trim().slice(0, 2048);
+    if (!validChestMediaUrl(toastBackgroundUrl)) {
+      throw new BadRequestException('رابط خلفية التوست يجب أن يكون HTTPS أو ملفاً داخل /uploads');
     }
     const bounded = (value: unknown, fallback: number, min: number, max: number) => {
       const n = Number(value);
@@ -699,6 +711,7 @@ export class AdminService {
     const explosionEffect = {
       enabled: rawEffect.enabled === true,
       mediaUrl,
+      soundUrl,
       width: bounded(rawEffect.width, 100, 10, 180),
       height: bounded(rawEffect.height, 100, 10, 180),
       startX: bounded(rawEffect.startX, 50, 0, 100),
@@ -707,6 +720,16 @@ export class AdminService {
       endY: bounded(rawEffect.endY, 50, 0, 100),
       durationMs: Math.floor(bounded(rawEffect.durationMs, 1800, 400, 8000)),
       opacity: bounded(rawEffect.opacity, 100, 10, 100),
+    };
+    const toast = {
+      enabled: rawToast.enabled !== false,
+      backgroundUrl: toastBackgroundUrl,
+      height: Math.floor(bounded(rawToast.height, 104, 60, 240)),
+      yOffset: Math.floor(bounded(rawToast.yOffset, 72, 0, 300)),
+      titleSizeSp: bounded(rawToast.titleSizeSp, 17, 10, 36),
+      bodySizeSp: bounded(rawToast.bodySizeSp, 14, 8, 30),
+      giftSizeDp: Math.floor(bounded(rawToast.giftSizeDp, 58, 24, 120)),
+      showWinnerName: rawToast.showWinnerName !== false,
     };
     const current = {
       enabled: input.enabled === true,
@@ -719,6 +742,7 @@ export class AdminService {
       instructions: String(input.instructions || '').slice(0, 3000),
       soundEnabled: input.soundEnabled !== false,
       explosionEffect,
+      toast,
     };
     // Serialize admin saves and verify the exact value read back from PostgreSQL
     // in the same transaction. This prevents concurrent saves from silently
