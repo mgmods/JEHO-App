@@ -15522,8 +15522,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             } catch (Exception ignored) { }
             rewardImage = resolveSupportChestMediaUrl(rewardImage);
-            String message = winner + " فجّر الصندوق وحصل على "
-                    + (rewardNames.isEmpty() ? "جوائز صندوق الدعم" : android.text.TextUtils.join("، ", rewardNames));
+            String message = (levelTitle == null || levelTitle.trim().isEmpty() ? "صندوق الدعم" : levelTitle)
+                    + " · " + (rewardNames.isEmpty() ? "تم فتح الصندوق" : android.text.TextUtils.join("، ", rewardNames));
             String roomEventId = memberStr(payload, "cycle");
             String levelId = memberStr(payload, "level");
             // Wait for the two-second chest charge-up before the shared room blast.
@@ -15533,9 +15533,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             final String chestRewardImage = rewardImage;
             handler.postDelayed(() -> {
                 if (isFinishing() || isDestroyed()) return;
-                GlobalCelebrationToast.showRoomTop(
-                        this, "💥 انفجار صندوق الدعم!", message, null, chestRewardImage,
-                        chestToastKey, 0d, 0L, null, "support_chest", roomId);
+                Map<String, Object> runtimeConfig = supportChestRuntimeConfig;
+                Map<String, Object> toastConfig = runtimeConfig != null
+                        && runtimeConfig.get("toast") instanceof Map
+                        ? (Map<String, Object>) runtimeConfig.get("toast") : null;
+                GlobalCelebrationToast.setSupportChestToastConfig(toastConfig);
+                boolean toastEnabled = toastConfig == null || !Boolean.FALSE.equals(toastConfig.get("enabled"));
+                if (toastEnabled) {
+                    boolean showWinner = toastConfig == null || !Boolean.FALSE.equals(toastConfig.get("showWinnerName"));
+                    GlobalCelebrationToast.showRoomTop(
+                            this, showWinner ? winner : "💥 انفجار صندوق الدعم!", message, null, chestRewardImage,
+                            chestToastKey, 0d, 0L, null, "support_chest", roomId);
+                }
                 // Custom room-wide media replaces the legacy built-in burst.
             }, 2000L);
             return;
