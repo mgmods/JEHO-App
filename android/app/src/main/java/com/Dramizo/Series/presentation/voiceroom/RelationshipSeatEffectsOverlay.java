@@ -273,8 +273,9 @@ final class RelationshipSeatEffectsOverlay {
     private void addEffect(@NonNull String userA, @NonNull String userB,
                            String type, String url, int sizeDp, long duration) {
         final int iconSize = dp(Math.max(20, Math.min(72, sizeDp)));
-        final boolean hasAsset = !url.trim().isEmpty()
-                && (url.startsWith("https://") || url.startsWith("http://"));
+        final String resolvedUrl = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(url.trim());
+        final boolean hasAsset = resolvedUrl != null && !resolvedUrl.trim().isEmpty()
+                && (resolvedUrl.startsWith("https://") || resolvedUrl.startsWith("http://"));
         final RibbonFallbackView fallback = new RibbonFallbackView(context);
         fallback.setVisibility(hasAsset ? View.INVISIBLE : View.VISIBLE);
         FrameLayout.LayoutParams fallbackLp = new FrameLayout.LayoutParams(1, iconSize);
@@ -365,7 +366,7 @@ final class RelationshipSeatEffectsOverlay {
                     copy.setLayoutParams(lp);
                     layer.addView(copy);
                     copies.add(copy);
-                    Glide.with(context).load(url).listener(new RequestListener<Drawable>() {
+                    Glide.with(context).load(resolvedUrl).listener(new RequestListener<Drawable>() {
                         @Override public boolean onLoadFailed(@Nullable GlideException e, Object model,
                                 Target<Drawable> target, boolean isFirstResource) {
                             assetFailed[0] = true;
