@@ -1177,7 +1177,7 @@
             android:max="100"
             android:progress="100"
             android:progressDrawable="@drawable/music_voice_seekbar"
-            android:thumb="@drawable/thumb_seekbar_music_play_control"
+            android:thumb="@drawable/thumb_seekbar_music_volume"
             android:thumbOffset="0dp"
             android:paddingStart="0dp"
             android:paddingEnd="0dp"
