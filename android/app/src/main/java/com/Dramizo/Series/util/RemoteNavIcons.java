@@ -104,7 +104,7 @@ public final class RemoteNavIcons {
         String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(raw.trim()));
         view.clearColorFilter();
         view.setImageTintList(null);
-        if (isSvgUrl(url)) { loadRemoteSvg(view, url, null, null, false); return; }
+        if (isSvgUrl(url)) { view.setImageResource(fallbackRes); loadRemoteSvg(view, url, null, null, false); return; }
         Object prev = view.getTag(R.id.tag_image_url);
         if (prev instanceof String && url.equals(prev) && view.getDrawable() != null) return;
         view.setTag(R.id.tag_image_url, url);
