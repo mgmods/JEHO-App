@@ -285,12 +285,16 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (!chatMode && !allGifts.isEmpty() && getContext() != null) {
                 java.util.ArrayList<String> warm = new java.util.ArrayList<>();
                 for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : allGifts) {
-                    if (g == null) continue;
-                    String resolved = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
-                            g.name, g.iconUrl, g.animationUrl);
-                    if (resolved != null) warm.add(resolved);
-                    else if (g.animationUrl != null) warm.add(g.animationUrl);
-                    if (warm.size() >= 6) break;
+                    if (g == null || g.iconUrl == null || g.iconUrl.trim().isEmpty()) continue;
+                    String icon = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(g.iconUrl);
+                    com.Dramizo.Series.util.CosmeticMedia.Kind kind =
+                            com.Dramizo.Series.util.CosmeticMedia.kind(icon);
+                    // Warm only a few still thumbnails. Preloading MP4/SVGA/GIF gift
+                    // effects while a live room is active competes with voice and video.
+                    if (kind == com.Dramizo.Series.util.CosmeticMedia.Kind.IMAGE) {
+                        warm.add(icon);
+                    }
+                    if (warm.size() >= 3) break;
                 }
                 com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
                         requireContext().getApplicationContext(), warm);
