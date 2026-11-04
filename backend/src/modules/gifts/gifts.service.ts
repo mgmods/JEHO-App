@@ -2065,7 +2065,10 @@ export class GiftsService implements OnModuleInit {
       { level: 3, title: 'الصندوق الأسطوري', goalMode: 'coins', rewardDays: 0, coinTarget: 300000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 20000, itemId: '' }] },
     ];
     const defaults: any = {
-      enabled: false, iconVisible: true, soundEnabled: true, goalMode: 'coins',
+      enabled: false, iconVisible: true, soundEnabled: true,
+      explosionEffect: { enabled: true, mediaUrl: '', soundUrl: '', width: 100, height: 100, startX: 50, startY: 46, endX: 50, endY: 50, durationMs: 1800, opacity: 100 },
+      toast: { enabled: true, backgroundUrl: '', height: 104, yOffset: 72, titleSizeSp: 17, bodySizeSp: 14, giftSizeDp: 58, showWinnerName: true },
+      goalMode: 'coins',
       coinTarget: 100000, diamondTarget: 10000, giftIds: [],
       giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all',
       levels: defaultLevels, rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '',
