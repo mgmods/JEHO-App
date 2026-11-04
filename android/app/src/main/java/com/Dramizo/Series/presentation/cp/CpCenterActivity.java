@@ -93,8 +93,9 @@ public class CpCenterActivity extends ThemedActivity {
                 loadHome();
                 loadRequests();
                 loadTasks();
-                // Load dashboard-managed level names, artwork and rewards on first open.
+                // Load dashboard-managed level artwork/rewards and the CP Store on first open.
                 loadCatalog();
+                loadStore();
             }
         });
         web.addJavascriptInterface(new CpBridge(), "JehoCP");
@@ -260,6 +261,45 @@ public class CpCenterActivity extends ThemedActivity {
         });
     }
 
+
+    private void loadStore() {
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> catalog = ApiCall.execute(c.getUserApi().cosmeticsCatalog());
+            Result<List<Map<String, Object>>> inventory = ApiCall.execute(c.getUserApi().cosmeticsInventory());
+            Map<String, Map<String, Object>> ownedById = new HashMap<>();
+            if (inventory.success && inventory.data != null) {
+                for (Map<String, Object> owned : inventory.data) {
+                    if (owned == null) continue;
+                    Object cosmeticValue = owned.get("cosmetic");
+                    if (!(cosmeticValue instanceof Map)) continue;
+                    Object idValue = ((Map<?, ?>) cosmeticValue).get("id");
+                    if (idValue != null) ownedById.put(String.valueOf(idValue), owned);
+                }
+            }
+            List<Map<String, Object>> items = new ArrayList<>();
+            if (catalog.success && catalog.data != null) {
+                for (Map<String, Object> item : catalog.data) {
+                    if (item == null) continue;
+                    String code = String.valueOf(item.get("code") == null ? "" : item.get("code"));
+                    Object metaValue = item.get("meta");
+                    Map<?, ?> meta = metaValue instanceof Map ? (Map<?, ?>) metaValue : java.util.Collections.emptyMap();
+                    boolean cpStore = Boolean.TRUE.equals(meta.get("cpStore"))
+                            || "true".equalsIgnoreCase(String.valueOf(meta.get("cpStore")))
+                            || code.startsWith("cp_");
+                    if (!cpStore) continue;
+                    Map<String, Object> card = new HashMap<>(item);
+                    String id = String.valueOf(item.get("id") == null ? "" : item.get("id"));
+                    Map<String, Object> owned = ownedById.get(id);
+                    card.put("owned", owned != null);
+                    card.put("equipped", owned != null && Boolean.TRUE.equals(owned.get("equipped")));
+                    card.put("expiresAt", owned == null ? null : owned.get("expiresAt"));
+                    items.add(card);
+                }
+            }
+            js("window.renderCpStore && window.renderCpStore(" + gson.toJson(normalizeUrls(items)) + ")");
+        });
+    }
+
     private void loadTasks() {
         c.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().cpTasks());
@@ -276,6 +316,43 @@ public class CpCenterActivity extends ThemedActivity {
         @JavascriptInterface public void loadRewards() { CpCenterActivity.this.loadRewards(); }
         @JavascriptInterface public void loadCatalog() { CpCenterActivity.this.loadCatalog(); }
         @JavascriptInterface public void loadTasks() { CpCenterActivity.this.loadTasks(); }
+        @JavascriptInterface public void loadStore() { CpCenterActivity.this.loadStore(); }
+
+        @JavascriptInterface public void purchaseStoreItem(String cosmeticId) {
+            String id = cosmeticId == null ? "" : cosmeticId.trim();
+            if (id.isEmpty()) { message("العنصر غير صالح."); return; }
+            c.getIoExecutor().execute(() -> {
+                Map<String, String> body = new HashMap<>();
+                body.put("cosmeticId", id);
+                Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().purchaseCosmetic(body));
+                if (result.success) {
+                    boolean autoEquipped = result.data != null && Boolean.TRUE.equals(result.data.get("autoEquipped"));
+                    message(autoEquipped
+                            ? "تم الشراء وتركيب عنصر CP تلقائياً."
+                            : "تم الشراء، لكن تعذر التركيب التلقائي. يمكنك إعادة محاولة التركيب.");
+                    loadStore();
+                } else {
+                    message(result.error == null ? "تعذر شراء العنصر." : result.error);
+                }
+            });
+        }
+
+        @JavascriptInterface public void equipStoreItem(String cosmeticId) {
+            String id = cosmeticId == null ? "" : cosmeticId.trim();
+            if (id.isEmpty()) { message("العنصر غير صالح."); return; }
+            c.getIoExecutor().execute(() -> {
+                Map<String, String> body = new HashMap<>();
+                body.put("cosmeticId", id);
+                Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().equipCosmetic(body));
+                if (result.success) {
+                    message("تم تركيب عنصر CP بنجاح.");
+                    loadStore();
+                } else {
+                    message(result.error == null ? "تعذر تركيب العنصر." : result.error);
+                }
+            });
+        }
+
         @JavascriptInterface public void claimTask(String taskId) {
             String safeId = taskId == null ? "" : taskId.trim();
             if (!safeId.matches("[A-Za-z0-9_-]{2,64}")) {
@@ -300,29 +377,6 @@ public class CpCenterActivity extends ThemedActivity {
                     // remain disabled from the initial tap.
                     loadTasks();
                     message(result.error == null ? "تعذر استلام مكافأة المهمة." : result.error);
-                }
-            });
-        }
-
-        @JavascriptInterface public void sendRequest(String recipientId, String type) {
-            String recipient = recipientId == null ? "" : recipientId.trim();
-            String relationshipType = safeType(type);
-            if (recipient.isEmpty() || relationshipType.isEmpty()) {
-                message("أدخل معرّف المستخدم واختر نوع العلاقة.");
-                return;
-            }
-            Map<String, String> body = new HashMap<>();
-            body.put("recipientId", recipient);
-            body.put("type", relationshipType);
-            body.put("idempotencyKey", UUID.randomUUID().toString());
-            c.getIoExecutor().execute(() -> {
-                Result<Map<String, Object>> r = ApiCall.execute(c.getUserApi().createProfileCpRequest(body));
-                if (r.success) {
-                    message("تم إرسال طلب " + nameFor(relationshipType) + " مباشرة. سيصل للطرف الآخر إشعار للقبول أو الرفض.");
-                    js("document.getElementById('recipientId').value='';");
-                    loadRequests();
-                } else {
-                    message(r.error != null ? r.error : "تعذر إرسال طلب العلاقة");
                 }
             });
         }
