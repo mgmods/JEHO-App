@@ -845,7 +845,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       } catch { configs[type] = []; }
     }
     return rows.map((row: any) => {
-      const levels = (configs[row.type] || []).slice(0, 1).map(item => ({ ...item, level: 1 })).sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
+      const levels = (configs[row.type] || []).slice().sort((a, b) => Number(a.level) - Number(b.level));
       const currentThreshold = levels.filter(item => Number(item.level) <= Number(row.level)).reduce((max, item) => Math.max(max, Number(item.pointsRequired) || 0), 0);
       const nextLevel = levels.find(item => Number(item.level) > Number(row.level));
       const nextThreshold = nextLevel ? Math.max(0, Number(nextLevel.pointsRequired) || 0) : null;
@@ -1078,8 +1078,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       } catch { levels = []; }
       const reachedLevels = levels
         .filter(item => Number(item?.level) >= 1 && Number(item?.level) <= Number(outcome.relationship.level || 1))
-        .sort((a, b) => Number(a.level) - Number(b.level)).slice(0, 1)
-        .map(item => ({ ...item, level: 1 }));
+        .sort((a, b) => Number(a.level) - Number(b.level));
       for (const levelConfig of reachedLevels) {
         await this.grantLevelGiftRewards(
           outcome.relationship.id,
