@@ -25,9 +25,9 @@
     </section>
     <section class="card p-4 mt-3">
       <h2>مؤثر انفجار الصندوق</h2>
-      <p class="muted">ارفع ملف GIF أو WebM أو MP4 مباشرة من جهازك، دون إدخال رابط. يبدأ المؤثر من مكان الصندوق ثم يتمدد إلى الموقع والحجم المحددين.</p>
+      <p class="muted">ارفع صورة أو GIF أو فيديو MP4/WebM من جهازك. يمكن أن يحمل الفيديو صوته، أو ترفع ملف صوت منفصل يعمل مع الصورة. هذا المؤثر المخصص هو الذي يظهر لجميع الموجودين عند تفجير الصندوق.</p>
       <label class="switchrow"><span><b>تفعيل المؤثر المتحرك المخصص</b><small>عند الإيقاف يعود التطبيق إلى مؤثر الانفجار الافتراضي.</small></span><input v-model="form.explosionEffect.enabled" type="checkbox"></label>
-      <label class="field">ملف مؤثر الانفجار (GIF / WebM / MP4)<input type="file" accept=".gif,.webm,.mp4,image/gif,video/webm,video/mp4" :disabled="uploadingEffect" @change="uploadExplosionEffect"><small class="muted">{{ uploadingEffect ? 'جارٍ رفع الملف…' : (form.explosionEffect.mediaUrl ? 'تم اختيار المؤثر ورفعه. يمكنك استبداله بملف آخر.' : 'اختر ملفاً من جهازك لرفعه مباشرة.') }}</small></label>
+      <label class="field">ملف مؤثر الانفجار (صورة / GIF / فيديو)<input type="file" accept=".png,.jpg,.jpeg,.webp,.gif,.webm,.mp4,image/*,video/webm,video/mp4" :disabled="uploadingEffect" @change="uploadExplosionEffect"><small class="muted">{{ uploadingEffect ? 'جارٍ رفع الملف…' : (form.explosionEffect.mediaUrl ? 'تم اختيار المؤثر ورفعه. يمكنك استبداله بملف آخر.' : 'اختر ملفاً من جهازك لرفعه مباشرة.') }}</small></label>
       <div v-if="effectUploadError" class="alert alert-danger">{{ effectUploadError }}</div>
       <button v-if="form.explosionEffect.mediaUrl" type="button" class="btn btn-secondary" :disabled="uploadingEffect" @click="form.explosionEffect.mediaUrl = ''">إزالة المؤثر المخصص</button>
       <div class="effect-preview">
@@ -35,6 +35,8 @@
         <img v-else-if="form.explosionEffect.mediaUrl" :src="assetUrl(form.explosionEffect.mediaUrl)" alt="معاينة مؤثر الانفجار">
         <span v-else>💥 معاينة مؤثر الانفجار</span>
       </div>
+      <label class="field">صوت المؤثر (اختياري: MP3 / WAV / OGG)<input type="file" accept=".mp3,.wav,.ogg,.m4a,audio/*" :disabled="uploadingSound" @change="uploadExplosionSound"><small class="muted">{{ uploadingSound ? 'جارٍ رفع الصوت…' : (form.explosionEffect.soundUrl ? 'تم رفع صوت المؤثر.' : 'إذا كان الملف صورة، ارفع صوتاً منفصلاً هنا. صوت الفيديو المرفوع سيعمل أيضاً.') }}</small></label>
+      <button v-if="form.explosionEffect.soundUrl" type="button" class="btn btn-secondary" :disabled="uploadingSound" @click="form.explosionEffect.soundUrl = ''">إزالة الصوت المخصص</button>
       <div class="grid2">
         <label class="field">العرض النهائي (%)<input v-model.number="form.explosionEffect.width" type="number" min="10" max="180"></label>
         <label class="field">الارتفاع النهائي (%)<input v-model.number="form.explosionEffect.height" type="number" min="10" max="180"></label>
@@ -46,6 +48,24 @@
         <label class="field">الشفافية (%)<input v-model.number="form.explosionEffect.opacity" type="number" min="10" max="100"></label>
       </div>
       <p class="muted">القيم الافتراضية تجعل الانفجار ينطلق من منتصف منطقة الصندوق ويتوسع ليغطي معظم شاشة الروم. استخدم ملفاً شفاف الخلفية حتى تبقى المقاعد والمحادثة ظاهرة.</p>
+    </section>
+    <section class="card p-4 mt-3">
+      <h2>تصميم توست تفجير الصندوق</h2>
+      <p class="muted">تحكم بخلفية إشعار الفوز وحجمه ومكانه وصورة المكافأة، ويُطبّق على جميع أعضاء الروم.</p>
+      <label class="switchrow"><span><b>إظهار توست صندوق الدعم</b><small>إظهار إشعار الفوز أعلى الروم عند التفجير.</small></span><input v-model="form.toast.enabled" type="checkbox"></label>
+      <label class="switchrow"><span><b>إظهار اسم الفائز</b><small>إظهار اسم صاحب تفجير الصندوق في التوست.</small></span><input v-model="form.toast.showWinnerName" type="checkbox"></label>
+      <label class="field">خلفية التوست (صورة)<input type="file" accept=".png,.jpg,.jpeg,.webp,image/*" :disabled="uploadingToastBackground" @change="uploadToastBackground"><small class="muted">{{ uploadingToastBackground ? 'جارٍ رفع الخلفية…' : (form.toast.backgroundUrl ? 'تم رفع خلفية التوست.' : 'ارفع صورة الخلفية التي تريد ظهورها خلف النص والمكافأة.') }}</small></label>
+      <button v-if="form.toast.backgroundUrl" type="button" class="btn btn-secondary" :disabled="uploadingToastBackground" @click="form.toast.backgroundUrl = ''">إزالة خلفية التوست</button>
+      <div class="effect-preview toast-preview" :style="form.toast.backgroundUrl ? { backgroundImage: 'url(' + assetUrl(form.toast.backgroundUrl) + ')', backgroundSize: 'cover', backgroundPosition: 'center' } : {}">
+        <span>🎁 {{ form.toast.showWinnerName ? 'اسم الفائز' : 'تفجير صندوق الدعم' }} · معاينة التوست</span>
+      </div>
+      <div class="grid2">
+        <label class="field">ارتفاع التوست (dp)<input v-model.number="form.toast.height" type="number" min="60" max="240"></label>
+        <label class="field">المسافة من أعلى الشاشة (dp)<input v-model.number="form.toast.yOffset" type="number" min="0" max="300"></label>
+        <label class="field">حجم اسم الفائز (sp)<input v-model.number="form.toast.titleSizeSp" type="number" min="10" max="36"></label>
+        <label class="field">حجم نص التوست (sp)<input v-model.number="form.toast.bodySizeSp" type="number" min="8" max="30"></label>
+        <label class="field">حجم صورة الهدية (dp)<input v-model.number="form.toast.giftSizeDp" type="number" min="24" max="120"></label>
+      </div>
     </section>
     <section class="card p-4 mt-3">
       <h2>أقسام الهدايا المؤهلة</h2>
@@ -99,9 +119,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { supportChestApi, giftsApi, cosmeticsApi, vipApi, medalsApi, uploadsApi } from '@/api'
 import { resolveAsset } from '@/utils/assets'
-const form = reactive({ explosionEffect:{enabled:true,mediaUrl:'',width:100,height:100,startX:50,startY:46,endX:50,endY:50,durationMs:1800,opacity:100}, enabled:false, iconVisible:true, soundEnabled:true, goalMode:'coins', coinTarget:100000, diamondTarget:10000, giftIds:[], giftSelectionMode:'all', giftCategories:['normal','lucky','cp'], levels:[{level:1,title:'الصندوق الذهبي',goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:['normal','lucky','cp'],giftSelectionMode:'all',giftIds:[],imageUrl:'',featuresText:'',rewardDays:0,rewards:[{type:'coins',amount:5000,itemId:''}]}], rewardType:'none', rewardItemId:'', rewardAmount:0, instructions:'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله ينفجر الصندوق وتُمنح جميع المكافآت المحددة لمفجّر الصندوق تلقائياً.' })
+const form = reactive({ explosionEffect:{enabled:true,mediaUrl:'',soundUrl:'',width:100,height:100,startX:50,startY:46,endX:50,endY:50,durationMs:1800,opacity:100}, toast:{enabled:true,backgroundUrl:'',height:104,yOffset:72,titleSizeSp:17,bodySizeSp:14,giftSizeDp:58,showWinnerName:true}, enabled:false, iconVisible:true, soundEnabled:true, goalMode:'coins', coinTarget:100000, diamondTarget:10000, giftIds:[], giftSelectionMode:'all', giftCategories:['normal','lucky','cp'], levels:[{level:1,title:'الصندوق الذهبي',goalMode:'coins',coinTarget:100000,diamondTarget:0,giftCount:1,giftCategories:['normal','lucky','cp'],giftSelectionMode:'all',giftIds:[],imageUrl:'',featuresText:'',rewardDays:0,rewards:[{type:'coins',amount:5000,itemId:''}]}], rewardType:'none', rewardItemId:'', rewardAmount:0, instructions:'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله ينفجر الصندوق وتُمنح جميع المكافآت المحددة لمفجّر الصندوق تلقائياً.' })
 const catalogGifts=ref([]), catalogCosmetics=ref([]), catalogVipPlans=ref([]), catalogBadges=ref([]), catalogLoading=ref(false)
-const saving=ref(false), error=ref(''), notice=ref(''), uploadingEffect=ref(false), effectUploadError=ref('')
+const saving=ref(false), error=ref(''), notice=ref(''), uploadingEffect=ref(false), uploadingSound=ref(false), uploadingToastBackground=ref(false), effectUploadError=ref('')
 function unwrap(r){const d=r?.data?.data ?? r?.data ?? r;return Array.isArray(d)?d:(Array.isArray(d?.items)?d.items:(Array.isArray(d?.data)?d.data:[]))}
 function itemName(item){return item?.nameAr || item?.labelAr || item?.name || item?.title || item?.code || 'عنصر'}
 function itemImage(item){return item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.animationUrl || item?.assetUrl || item?.url || ''}
@@ -109,13 +129,32 @@ function assetUrl(value){return resolveAsset(value)}
 async function uploadExplosionEffect(event){
   const input=event?.target;const file=input?.files?.[0];if(!file)return;
   effectUploadError.value='';
-  const allowed=/\.(gif|webm|mp4)$/i.test(String(file.name||''));
-  if(!allowed){effectUploadError.value='الملف غير مدعوم. اختر GIF أو WebM أو MP4.';input.value='';return}
+  const allowed=/\.(png|jpe?g|webp|gif|webm|mp4)$/i.test(String(file.name||''));
+  if(!allowed){effectUploadError.value='الملف غير مدعوم. اختر صورة أو GIF أو WebM أو MP4.';input.value='';return}
   if(file.size>50*1024*1024){effectUploadError.value='حجم الملف يتجاوز الحد المسموح (50 ميغابايت).';input.value='';return}
   uploadingEffect.value=true;
   try{const result=await uploadsApi.upload(file);if(result?.error)throw result.error;const uploaded=result?.data;const url=String(uploaded?.url||uploaded?.path||'').trim();if(!url)throw new Error('الخادم لم يُرجع مسار الملف بعد الرفع.');form.explosionEffect.mediaUrl=url;notice.value='تم رفع مؤثر الانفجار بنجاح. اضغط حفظ الإعدادات لتفعيله في الرومات.'}
   catch(e){effectUploadError.value='فشل رفع مؤثر الانفجار: '+String(e?.message||e?.response?.data?.message||'خطأ غير معروف')}
   finally{uploadingEffect.value=false;input.value=''}
+}
+async function uploadExplosionSound(event){
+  const input=event?.target,file=input?.files?.[0];if(!file)return;
+  effectUploadError.value='';
+  if(!/\.(mp3|wav|ogg|m4a)$/i.test(String(file.name||''))){effectUploadError.value='اختر ملف صوت MP3 أو WAV أو OGG أو M4A.';input.value='';return}
+  if(file.size>20*1024*1024){effectUploadError.value='حجم ملف الصوت يتجاوز 20 ميغابايت.';input.value='';return}
+  uploadingSound.value=true;
+  try{const result=await uploadsApi.upload(file);if(result?.error)throw result.error;const uploaded=result?.data;const url=String(uploaded?.url||uploaded?.path||'').trim();if(!url)throw new Error('الخادم لم يُرجع مسار الصوت.');form.explosionEffect.soundUrl=url;notice.value='تم رفع صوت الانفجار. احفظ الإعدادات لتفعيله.'}
+  catch(e){effectUploadError.value='فشل رفع صوت الانفجار: '+String(e?.message||'خطأ غير معروف')}
+  finally{uploadingSound.value=false;input.value=''}
+}
+async function uploadToastBackground(event){
+  const input=event?.target,file=input?.files?.[0];if(!file)return;
+  if(!/\.(png|jpe?g|webp)$/i.test(String(file.name||''))){error.value='خلفية التوست يجب أن تكون PNG أو JPG أو WebP.';input.value='';return}
+  if(file.size>15*1024*1024){error.value='حجم خلفية التوست يتجاوز 15 ميغابايت.';input.value='';return}
+  uploadingToastBackground.value=true;
+  try{const result=await uploadsApi.upload(file);if(result?.error)throw result.error;const uploaded=result?.data;const url=String(uploaded?.url||uploaded?.path||'').trim();if(!url)throw new Error('الخادم لم يُرجع مسار الخلفية.');form.toast.backgroundUrl=url;notice.value='تم رفع خلفية التوست. احفظ الإعدادات لتفعيلها.'}
+  catch(e){error.value='فشل رفع خلفية التوست: '+String(e?.message||'خطأ غير معروف')}
+  finally{uploadingToastBackground.value=false;input.value=''}
 }
 function isVideo(value){return /\.(mp4|webm)(\?|$)/i.test(String(value||''))}
 function addLevel(){if(form.levels.length>=3){error.value='تم الوصول إلى الحد الأقصى: ثلاثة مستويات مستقلة.';return}const next=Math.max(0,...form.levels.map(x=>Number(x.level)||0))+1;form.levels.push({level:next,title:'المستوى '+next,goalMode:'coins',coinTarget:next*100000,diamondTarget:0,giftCount:1,giftCategories:[...(form.giftCategories||['normal'])],giftSelectionMode:'all',giftIds:[],imageUrl:'',featuresText:'',rewardDays:0,rewards:[{type:'coins',amount:5000*next,itemId:''}]})}
@@ -137,7 +176,7 @@ const rewardItems = computed(()=> {
   return []
 })
 onMounted(async()=>{
-  try{const r=await supportChestApi.getConfig();if(r?.error)throw r.error;const d=r?.data?.data ?? r?.data;if(!d||typeof d!=='object')throw new Error('Empty support chest config');Object.assign(form,d);form.explosionEffect={enabled:true,mediaUrl:'',width:100,height:100,startX:50,startY:46,endX:50,endY:50,durationMs:1800,opacity:100,...(d.explosionEffect||{})};form.giftIds=Array.isArray(d.giftIds)?d.giftIds.map(String):[];form.giftSelectionMode=String(d.giftSelectionMode||(form.giftIds.length?'selected':'all'));form.giftCategories=Array.isArray(d.giftCategories)?d.giftCategories:['normal','lucky','cp'];form.levels=Array.isArray(d.levels)&&d.levels.length?d.levels:[{level:1,title:'الصندوق الذهبي',goalMode:d.goalMode||'coins',coinTarget:d.coinTarget||100000,diamondTarget:d.diamondTarget||0,giftCount:1,giftCategories:form.giftCategories,giftSelectionMode:form.giftSelectionMode,giftIds:form.giftIds,imageUrl:'',featuresText:'',rewards:[{type:d.rewardType||'coins',amount:d.rewardAmount||1000,itemId:d.rewardItemId||''}]}];while(form.levels.length<3){const n=form.levels.length+1;form.levels.push({level:n,title:'الصندوق - المستوى '+n,goalMode:'coins',coinTarget:n*100000,diamondTarget:0,giftCount:1,giftCategories:[...form.giftCategories],giftSelectionMode:'all',giftIds:[],imageUrl:'',featuresText:'',rewardDays:0,rewards:[{type:'coins',amount:5000*n,itemId:''}]})}form.levels=form.levels.slice(0,3);form.soundEnabled=d.soundEnabled!==false;form.levels.forEach(level=>{level.rewardDays=Math.max(0,Math.floor(Number(level.rewardDays)||0));level.featuresText=String(level.featuresText || (Array.isArray(level.features)?level.features.join('\n'):'') || '');level.giftIds=Array.isArray(level.giftIds)?level.giftIds.map(String):[];level.giftSelectionMode=String(level.giftSelectionMode||(level.giftIds.length?'selected':'all'));level.giftCategories=Array.isArray(level.giftCategories)?level.giftCategories:[...form.giftCategories];level.rewards=(Array.isArray(level.rewards)?level.rewards:[]).map(reward=>({...reward,durationDays:Math.max(0,Math.min(3650,Math.floor(Number(reward.durationDays ?? level.rewardDays)||0)))}))})}
+  try{const r=await supportChestApi.getConfig();if(r?.error)throw r.error;const d=r?.data?.data ?? r?.data;if(!d||typeof d!=='object')throw new Error('Empty support chest config');Object.assign(form,d);form.explosionEffect={enabled:true,mediaUrl:'',soundUrl:'',width:100,height:100,startX:50,startY:46,endX:50,endY:50,durationMs:1800,opacity:100,...(d.explosionEffect||{})};form.toast={enabled:true,backgroundUrl:'',height:104,yOffset:72,titleSizeSp:17,bodySizeSp:14,giftSizeDp:58,showWinnerName:true,...(d.toast||{})};form.giftIds=Array.isArray(d.giftIds)?d.giftIds.map(String):[];form.giftSelectionMode=String(d.giftSelectionMode||(form.giftIds.length?'selected':'all'));form.giftCategories=Array.isArray(d.giftCategories)?d.giftCategories:['normal','lucky','cp'];form.levels=Array.isArray(d.levels)&&d.levels.length?d.levels:[{level:1,title:'الصندوق الذهبي',goalMode:d.goalMode||'coins',coinTarget:d.coinTarget||100000,diamondTarget:d.diamondTarget||0,giftCount:1,giftCategories:form.giftCategories,giftSelectionMode:form.giftSelectionMode,giftIds:form.giftIds,imageUrl:'',featuresText:'',rewards:[{type:d.rewardType||'coins',amount:d.rewardAmount||1000,itemId:d.rewardItemId||''}]}];while(form.levels.length<3){const n=form.levels.length+1;form.levels.push({level:n,title:'الصندوق - المستوى '+n,goalMode:'coins',coinTarget:n*100000,diamondTarget:0,giftCount:1,giftCategories:[...form.giftCategories],giftSelectionMode:'all',giftIds:[],imageUrl:'',featuresText:'',rewardDays:0,rewards:[{type:'coins',amount:5000*n,itemId:''}]})}form.levels=form.levels.slice(0,3);form.soundEnabled=d.soundEnabled!==false;form.levels.forEach(level=>{level.rewardDays=Math.max(0,Math.floor(Number(level.rewardDays)||0));level.featuresText=String(level.featuresText || (Array.isArray(level.features)?level.features.join('\n'):'') || '');level.giftIds=Array.isArray(level.giftIds)?level.giftIds.map(String):[];level.giftSelectionMode=String(level.giftSelectionMode||(level.giftIds.length?'selected':'all'));level.giftCategories=Array.isArray(level.giftCategories)?level.giftCategories:[...form.giftCategories];level.rewards=(Array.isArray(level.rewards)?level.rewards:[]).map(reward=>({...reward,durationDays:Math.max(0,Math.min(3650,Math.floor(Number(reward.durationDays ?? level.rewardDays)||0)))}))})}
   catch(e){error.value='تعذّر تحميل إعدادات صندوق الدعم من الخادم: '+String(e?.message||'خطأ غير معروف')}
   catalogLoading.value=true
   try{const [g,c,vip,badges]=await Promise.all([giftsApi.list({limit:500}),cosmeticsApi.adminList({limit:500}),vipApi.plans(),medalsApi.list()]);catalogGifts.value=unwrap(g).filter(x=>x.isActive!==false);catalogCosmetics.value=unwrap(c).filter(x=>x.isActive!==false);catalogVipPlans.value=unwrap(vip).filter(x=>x.isActive!==false);catalogBadges.value=unwrap(badges).filter(x=>x.isActive!==false)}
@@ -173,6 +212,7 @@ function canonicalConfig(config){
     enabled:config?.enabled===true,
     iconVisible:config?.iconVisible!==false,
     soundEnabled:config?.soundEnabled!==false,
+    toast:{enabled:config?.toast?.enabled!==false,backgroundUrl:String(config?.toast?.backgroundUrl||'').trim().slice(0,2048),height:Math.max(60,Math.min(240,Math.floor(Number(config?.toast?.height)||104))),yOffset:Math.max(0,Math.min(300,Math.floor(Number(config?.toast?.yOffset)||0))),titleSizeSp:Math.max(10,Math.min(36,Number(config?.toast?.titleSizeSp)||17)),bodySizeSp:Math.max(8,Math.min(30,Number(config?.toast?.bodySizeSp)||14)),giftSizeDp:Math.max(24,Math.min(120,Math.floor(Number(config?.toast?.giftSizeDp)||58))),showWinnerName:config?.toast?.showWinnerName!==false},
     goalMode:String(config?.goalMode||'coins'),
     coinTarget:Math.max(0,Math.floor(Number(config?.coinTarget)||0)),
     diamondTarget:Math.max(0,Math.floor(Number(config?.diamondTarget)||0)),
@@ -183,7 +223,7 @@ function canonicalConfig(config){
     rewardItemId:String(config?.rewardItemId||'').trim(),
     rewardAmount:Math.max(0,Math.floor(Number(config?.rewardAmount)||0)),
     instructions:String(config?.instructions||'').slice(0,3000),
-    explosionEffect:{enabled:config?.explosionEffect?.enabled===true,mediaUrl:String(config?.explosionEffect?.mediaUrl||'').trim().slice(0,2048),width:Math.max(10,Math.min(180,Number(config?.explosionEffect?.width)||100)),height:Math.max(10,Math.min(180,Number(config?.explosionEffect?.height)||100)),startX:Math.max(0,Math.min(100,Number(config?.explosionEffect?.startX)||0)),startY:Math.max(0,Math.min(100,Number(config?.explosionEffect?.startY)||0)),endX:Math.max(0,Math.min(100,Number(config?.explosionEffect?.endX)||0)),endY:Math.max(0,Math.min(100,Number(config?.explosionEffect?.endY)||0)),durationMs:Math.max(400,Math.min(8000,Math.floor(Number(config?.explosionEffect?.durationMs)||1800))),opacity:Math.max(10,Math.min(100,Number(config?.explosionEffect?.opacity)||100))},
+    explosionEffect:{enabled:config?.explosionEffect?.enabled===true,mediaUrl:String(config?.explosionEffect?.mediaUrl||'').trim().slice(0,2048),soundUrl:String(config?.explosionEffect?.soundUrl||'').trim().slice(0,2048),width:Math.max(10,Math.min(180,Number(config?.explosionEffect?.width)||100)),height:Math.max(10,Math.min(180,Number(config?.explosionEffect?.height)||100)),startX:Math.max(0,Math.min(100,Number(config?.explosionEffect?.startX)||0)),startY:Math.max(0,Math.min(100,Number(config?.explosionEffect?.startY)||0)),endX:Math.max(0,Math.min(100,Number(config?.explosionEffect?.endX)||0)),endY:Math.max(0,Math.min(100,Number(config?.explosionEffect?.endY)||0)),durationMs:Math.max(400,Math.min(8000,Math.floor(Number(config?.explosionEffect?.durationMs)||1800))),opacity:Math.max(10,Math.min(100,Number(config?.explosionEffect?.opacity)||100))},
     levels:(Array.isArray(config?.levels)?config.levels:[]).map(canonicalLevel),
   };
 }
