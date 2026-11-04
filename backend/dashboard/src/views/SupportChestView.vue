@@ -133,7 +133,7 @@ async function uploadExplosionEffect(event){
   if(!allowed){effectUploadError.value='الملف غير مدعوم. اختر صورة أو GIF أو WebM أو MP4.';input.value='';return}
   if(file.size>50*1024*1024){effectUploadError.value='حجم الملف يتجاوز الحد المسموح (50 ميغابايت).';input.value='';return}
   uploadingEffect.value=true;
-  try{const result=await uploadsApi.upload(file);if(result?.error)throw result.error;const uploaded=result?.data;const url=String(uploaded?.url||uploaded?.path||'').trim();if(!url)throw new Error('الخادم لم يُرجع مسار الملف بعد الرفع.');form.explosionEffect.mediaUrl=url;notice.value='تم رفع مؤثر الانفجار بنجاح. اضغط حفظ الإعدادات لتفعيله في الرومات.'}
+  try{const result=await uploadsApi.upload(file);if(result?.error)throw result.error;const uploaded=result?.data;const url=String(uploaded?.url||uploaded?.path||'').trim();if(!url)throw new Error('الخادم لم يُرجع مسار الملف بعد الرفع.');form.explosionEffect.mediaUrl=url;form.explosionEffect.enabled=true;notice.value='تم رفع المؤثر وتفعيله. اضغط حفظ الإعدادات ليظهر لجميع الموجودين في الرومات.'}
   catch(e){effectUploadError.value='فشل رفع مؤثر الانفجار: '+String(e?.message||e?.response?.data?.message||'خطأ غير معروف')}
   finally{uploadingEffect.value=false;input.value=''}
 }
@@ -143,7 +143,7 @@ async function uploadExplosionSound(event){
   if(!/\.(mp3|wav|m4a|aac)$/i.test(String(file.name||''))){effectUploadError.value='اختر ملف صوت MP3 أو WAV أو M4A أو AAC.';input.value='';return}
   if(file.size>20*1024*1024){effectUploadError.value='حجم ملف الصوت يتجاوز 20 ميغابايت.';input.value='';return}
   uploadingSound.value=true;
-  try{const result=await uploadsApi.upload(file);if(result?.error)throw result.error;const uploaded=result?.data;const url=String(uploaded?.url||uploaded?.path||'').trim();if(!url)throw new Error('الخادم لم يُرجع مسار الصوت.');form.explosionEffect.soundUrl=url;notice.value='تم رفع صوت الانفجار. احفظ الإعدادات لتفعيله.'}
+  try{const result=await uploadsApi.upload(file);if(result?.error)throw result.error;const uploaded=result?.data;const url=String(uploaded?.url||uploaded?.path||'').trim();if(!url)throw new Error('الخادم لم يُرجع مسار الصوت.');form.explosionEffect.soundUrl=url;form.explosionEffect.enabled=true;notice.value='تم رفع صوت الانفجار وتفعيل المؤثر المخصص. احفظ الإعدادات لتفعيله.'}
   catch(e){effectUploadError.value='فشل رفع صوت الانفجار: '+String(e?.message||'خطأ غير معروف')}
   finally{uploadingSound.value=false;input.value=''}
 }
