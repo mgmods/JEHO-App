@@ -963,7 +963,7 @@ async function uploadLevelAsset(item, level, field, event) {
 function refreshLevelEditor(item) {
   try {
     const levels = JSON.parse(item.levelsText || '[]')
-    if (!Array.isArray(levels)) throw new Error('يجب أن يكون جدول المستويات قائمة JSON.')
+    if (!Array.isArray(levels) || levels.length !== 1) throw new Error('يجب أن يحتوي جدول CP على مستوى واحد فقط.')
     item.levelsEditor = levels.map(level => {
       const benefits = [...(Array.isArray(level.benefits) ? level.benefits : []), ...(Array.isArray(level.rewards) ? level.rewards : [])]
       const rewardCosmeticCodes = Array.from(new Set([...(Array.isArray(level.rewardCosmeticCodes) ? level.rewardCosmeticCodes : []), ...benefits.map(entry => entry?.cosmeticCode || entry?.code)].map(code => String(code || '').trim()).filter(Boolean)))

@@ -82,7 +82,6 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private final List<GiftDtos.GiftDto> allGifts = new ArrayList<>();
     private final Map<String, String> cpGiftTypes = new LinkedHashMap<>();
     private final Map<String, Integer> cpGiftPrices = new LinkedHashMap<>();
-    private volatile boolean cpCatalogLoaded;
     private volatile boolean cpGiftTabEnabled = true;
     @Nullable private String giftTypeFilter;
 
@@ -1242,15 +1241,6 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             return;
         }
 
-        // Only CP-classified gifts depend on the CP mapping request. A transient
-        // CP config failure must never block normal gifts in the room.
-        boolean selectedIsCpGift = "cp".equals(giftBucket(selected))
-                || (selected.id != null && cpGiftTypes.containsKey(selected.id));
-        if (selectedIsCpGift && !cpCatalogLoaded) {
-            Toast.makeText(requireContext(), "جارٍ التحقق من إعدادات هدية الارتباط، أعد الضغط بعد لحظة", Toast.LENGTH_SHORT).show();
-            loadCpGiftMappings();
-            return;
-        }
         sending = true;
         binding.bltvSendGift.setEnabled(false);
         binding.bltvSendGift.setText("جارٍ الإرسال ×" + qty
@@ -1309,7 +1299,6 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     cpGiftTypes.putAll(mappings);
                     cpGiftPrices.clear();
                     cpGiftPrices.putAll(prices);
-                    cpCatalogLoaded = true;
                     applyCpGiftPrices();
                     // Revalidate the catalog as well: a newly selected dashboard gift may
                     // have been added or reclassified while this sheet was already open.

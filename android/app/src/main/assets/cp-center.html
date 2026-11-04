@@ -226,8 +226,9 @@ window.renderCpStore=function(rows){
   const image=item.previewUrl||item.animationUrl||fallback;
   const price=Math.max(0,Number(item.coinPrice)||0);
   const lease=Number(item.meta?.leaseDays||30);
-  const owned=item.owned===true;
-  const equipped=item.equipped===true;
+  const expiry=item.expiresAt?Date.parse(item.expiresAt):NaN;
+  const owned=item.owned===true&&(!item.expiresAt||Number.isNaN(expiry)||expiry>Date.now());
+  const equipped=owned&&item.equipped===true;
   const button=equipped
    ? '<button class="cp-store-action" disabled>مركّب تلقائياً ✓</button>'
    : owned
