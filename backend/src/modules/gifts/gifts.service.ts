@@ -313,7 +313,7 @@ export class GiftsService implements OnModuleInit {
   private async ensureDefaultGiftCategories() {
     // CP is a reserved system tab. Create it once; all other categories remain dashboard-owned.
     try {
-      const existing = await this.categoriesRepo.findOne({ where: { key: 'cp' } });
+      let existing = await this.categoriesRepo.findOne({ where: { key: 'cp' } });
       if (!existing) {
         existing = this.categoriesRepo.create({
           key: 'cp',
