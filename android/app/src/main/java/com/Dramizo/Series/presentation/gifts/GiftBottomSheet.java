@@ -280,7 +280,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             applyCpGiftPrices();
             applyFilter();
             setLoading(false);
-            // Room only: warm gift MP4s. DM chat must not buffer dozens of videos (OOM / process kill).
+            // Room only: warm a tiny priority window. The selected gift is loaded on demand.
+            // Large catalog preloads compete with live audio/video and can kill the process.
             if (!chatMode && !allGifts.isEmpty() && getContext() != null) {
                 java.util.ArrayList<String> warm = new java.util.ArrayList<>();
                 for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : allGifts) {
@@ -289,7 +290,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                             g.name, g.iconUrl, g.animationUrl);
                     if (resolved != null) warm.add(resolved);
                     else if (g.animationUrl != null) warm.add(g.animationUrl);
-                    if (warm.size() > 40) break;
+                    if (warm.size() >= 6) break;
                 }
                 com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
                         requireContext().getApplicationContext(), warm);
@@ -315,8 +316,17 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
         // Clear sticky so observe does not immediately re-run last room/DM send.
         vm.clearSent();
-        vm.getSent().observe(getViewLifecycleOwner(),
-                result -> onGiftSent(result, roomId));
+        vm.getSent().observe(getViewLifecycleOwner(), result -> {
+            try {
+                onGiftSent(result, roomId);
+            } catch (RuntimeException failure) {
+                // The server has already committed the gift at this point. A rendering,
+                // toast, or seat-animation failure must not crash the whole room activity.
+                android.util.Log.e(TAG, "Post-send gift presentation failed", failure);
+                sending = false;
+                try { dismissAllowingStateLoss(); } catch (RuntimeException ignored) {}
+            }
+        });
 
         vm.getError().observe(getViewLifecycleOwner(), e -> {
             sending = false;
