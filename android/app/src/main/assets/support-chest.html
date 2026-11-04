@@ -152,13 +152,13 @@ function selectLevel(index){
  setMode(selectedMode);
  document.getElementById('connectionStatus').textContent=locked?'هذا المستوى مقفول حالياً. تظهر هنا معاينة الهدايا والمكافآت التي حددها المسؤول.':'تعتمد الهدايا والمكافآت واسم الصندوق على إعدادات لوحة الإدارة.';
 }
-function configureCustomBlast(effect){
+function configureCustomBlast(effect,allowSound=true){
  const overlay=document.getElementById('explosionOverlay');
  const raw=effect&&typeof effect==='object'?effect:{};
  let node=document.getElementById('customBlastMedia');
  const url=resolveChestMedia(raw.mediaUrl||'');
  let audio=document.getElementById('customBlastAudio');
- const soundUrl=resolveChestMedia(raw.soundUrl||'');
+ const soundUrl=allowSound?resolveChestMedia(raw.soundUrl||''):'';
  if(!raw.enabled||!url){overlay.classList.remove('custom-effect');if(node)node.remove();if(audio)audio.remove();return;}
  if(soundUrl){
   if(!audio){audio=document.createElement('audio');audio.id='customBlastAudio';overlay.appendChild(audio);}
@@ -167,12 +167,12 @@ function configureCustomBlast(effect){
  const video=/\.(mp4|webm)(\?|$)/i.test(url);
  if(!node||((video&&node.tagName!=='VIDEO')||(!video&&node.tagName!=='IMG'))){
   const next=document.createElement(video?'video':'img');next.id='customBlastMedia';next.className='custom-blast-media';
-  if(video){next.muted=!!soundUrl;next.autoplay=false;next.loop=false;next.playsInline=true;next.setAttribute('playsinline','');}
+  if(video){next.muted=!allowSound||!!soundUrl;next.autoplay=false;next.loop=false;next.playsInline=true;next.setAttribute('playsinline','');}
   node?.replaceWith(next);if(!node)overlay.insertBefore(next,overlay.querySelector('.blast-core'));
   node=next;
  }
  node.src=url;
- if(video){node.muted=!!soundUrl;node.loop=false;node.autoplay=false;node.preload='auto';}
+ if(video){node.muted=!allowSound||!!soundUrl;node.loop=false;node.autoplay=false;node.preload='auto';}
  const number=(v,d,min,max)=>Math.max(min,Math.min(max,Number.isFinite(Number(v))?Number(v):d));
  const set=(key,value)=>node.style.setProperty(key,value);
  set('--blast-start-x',number(raw.startX,50,0,100)+'%');
@@ -186,7 +186,7 @@ function configureCustomBlast(effect){
  overlay.classList.add('custom-effect');
 }
 function applyLiveData(config,state){
- liveConfig=config||{};liveState=state||{};configureCustomBlast(liveConfig.explosionEffect);
+ liveConfig=config||{};liveState=state||{};configureCustomBlast(liveConfig.explosionEffect,liveConfig.soundEnabled!==false);
  const visible=liveConfig.enabled===true&&liveConfig.iconVisible!==false;
  document.querySelector('.sheet').style.display=visible?'':'none';if(!visible)return;
  currentLevelIndex=Math.max(0,Math.min(2,Number(liveState.level||1)-1));
