@@ -2439,9 +2439,12 @@ export class GiftsService implements OnModuleInit {
         // Do not broadcast a live contribution toast. Progress is already included in
         // support_chest:updated; the room celebration is reserved for support_chest:opened.
         if (result.opened) {
+          // One server timestamp is shared by every room member so the uploaded blast
+          // video starts on the same timeline instead of 2 seconds after each client receives it.
+          const playAtServerMs = Date.now() + 2500;
           this.realtime?.emitToRoom(targetRoomId, 'room:event', {
             roomId: targetRoomId, event: 'support_chest:opened',
-            payload: { ...result.opened, roomId: targetRoomId, sourceRoomId: roomId },
+            payload: { ...result.opened, roomId: targetRoomId, sourceRoomId: roomId, playAtServerMs },
             at,
           });
           // Dedicated room-wide blast signal for every connected room member.
@@ -2452,7 +2455,8 @@ export class GiftsService implements OnModuleInit {
               cycle: result.opened.cycle,
               level: result.opened.level,
               eventId: result.opened.eventId || null,
-              delayMs: 2000,
+              delayMs: 2500,
+              playAtServerMs,
             },
             at,
           });
