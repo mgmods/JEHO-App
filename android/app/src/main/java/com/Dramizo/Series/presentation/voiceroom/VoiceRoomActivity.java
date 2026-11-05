@@ -7903,6 +7903,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private Runnable luckyFloatHide;
     private Runnable luckyWinHide;
     private boolean luckyFloatDismissed;
+    @Nullable private ExoPlayer luckyVideoPlayer;
 
     private void setupLuckyBoxUi() {
         if (binding.luckyFloatWrap == null) return;
@@ -8041,6 +8042,45 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void showLuckyWinOverlay(String openerName, String rewardLabel) {
+        showLuckyWinOverlay(openerName, rewardLabel, null);
+    }
+
+    private void playLuckySupportVideo(@Nullable String videoUrl) {
+        if (binding == null || binding.luckyWinVideo == null) return;
+        if (videoUrl == null || videoUrl.trim().isEmpty()) {
+            binding.luckyWinVideo.setVisibility(View.GONE);
+            return;
+        }
+        try {
+            String resolved = AssetCatalog.absoluteUrl(videoUrl.trim());
+            if (luckyVideoPlayer == null) {
+                luckyVideoPlayer = new ExoPlayer.Builder(this).build();
+                binding.luckyWinVideo.setPlayer(luckyVideoPlayer);
+            }
+            luckyVideoPlayer.stop();
+            luckyVideoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(resolved)));
+            luckyVideoPlayer.prepare();
+            luckyVideoPlayer.play();
+            binding.luckyWinVideo.setVisibility(View.VISIBLE);
+        } catch (Exception e) {
+            binding.luckyWinVideo.setVisibility(View.GONE);
+            android.util.Log.w("VoiceRoom", "Lucky support video failed", e);
+        }
+    }
+
+    private void stopLuckySupportVideo() {
+        try {
+            if (luckyVideoPlayer != null) {
+                luckyVideoPlayer.stop();
+            }
+        } catch (Exception ignored) {
+        }
+        if (binding != null && binding.luckyWinVideo != null) {
+            binding.luckyWinVideo.setVisibility(View.GONE);
+        }
+    }
+
+    private void showLuckyWinOverlay(String openerName, String rewardLabel, @Nullable String videoUrl) {
         String title = (openerName != null && !openerName.isEmpty() ? openerName : "مستخدم")
                 + " · صندوق الحظ";
         // Intentionally do not show the legacy full-screen/center reward burst.
@@ -8048,6 +8088,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // only toast surface used for gift/lucky-win announcements.
         if (binding != null && binding.luckyWinOverlay != null) {
             try {
+                playLuckySupportVideo(videoUrl);
                 if (binding.lottieLuckyWin != null) {
                     binding.lottieLuckyWin.cancelAnimation();
                     binding.lottieLuckyWin.setVisibility(View.GONE);
@@ -8064,6 +8105,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (luckyWinHide != null) handler.removeCallbacks(luckyWinHide);
         luckyWinHide = null;
         try { binding.lottieLuckyWin.cancelAnimation(); } catch (Exception ignored) {}
+        stopLuckySupportVideo();
         binding.luckyWinOverlay.animate().alpha(0f).setDuration(160)
                 .withEndAction(() -> {
                     if (binding != null && binding.luckyWinOverlay != null) {
@@ -15939,7 +15981,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (opener == null) opener = fromUsername != null ? fromUsername : "مستخدم";
             String rewardLabel = memberStr(payload, "rewardLabel");
             if (rewardLabel == null) rewardLabel = "جائزة";
-            showLuckyWinOverlay(opener, rewardLabel);
+            showLuckyWinOverlay(opener, rewardLabel, memberStr(payload, "videoUrl"));
         } else if ("lucky:hit".equals(event)) {
             // The room event is the canonical source for the configured win/return toast.
             // No local-response toast is emitted elsewhere, so include the sender as well.
@@ -18395,13 +18437,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             ? "الرجل الغامض"
                             : ContainerProvider.from(this).getSessionManager().getDisplayName();
                     if (me == null || me.isEmpty()) me = "أنا";
-                    showLuckyWinOverlay(me, rewardLabel);
+                    showLuckyWinOverlay(me, rewardLabel, target.videoUrl);
                     hideLuckyFloat();
                     JsonObject payload = new JsonObject();
                     payload.addProperty("userId", myUserId != null ? myUserId : "");
                     payload.addProperty("displayName", me);
                     payload.addProperty("mysteriousMan", mysteriousEnabled);
                     payload.addProperty("rewardLabel", rewardLabel);
+            if (target.videoUrl != null && !target.videoUrl.trim().isEmpty()) {
+                payload.addProperty("videoUrl", target.videoUrl.trim());
+            }
                     if (reward != null) {
                         payload.addProperty("coins", reward.amount);
                         payload.addProperty("rewardType", reward.type != null ? reward.type : "");
