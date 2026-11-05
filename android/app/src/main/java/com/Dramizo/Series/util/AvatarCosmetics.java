@@ -260,6 +260,8 @@ public final class AvatarCosmetics {
             @Nullable String hostBadgeUrl,
             @Nullable Map<String, ?> frameMeta,
             @Nullable Map<String, ?> hostBadgeMeta) {
+        hostBadgeUrl = isContestWear(hostBadgeUrl) ? null : hostBadgeUrl;
+        frameUrl = isContestWear(frameUrl) ? null : frameUrl;
         boolean hasBadge = hostBadgeUrl != null && !hostBadgeUrl.isEmpty();
         boolean hasFrame = frameUrl != null && !frameUrl.isEmpty();
         if (avatarView != null) resetWearTransform(avatarView);
@@ -390,14 +392,12 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> meta,
             float defaultScale) {
         if (target == null) return;
-        float scale = metaFloat(meta, "scale", defaultScale);
-        float ox = metaFloat(meta, "offsetX", 0f);
-        float oy = metaFloat(meta, "offsetY", 0f);
-        float density = target.getResources().getDisplayMetrics().density;
+        // Wearables are borders around the avatar, never oversized overlays.
+        float scale = Math.max(0.75f, Math.min(1.0f, metaFloat(meta, "scale", defaultScale)));
         target.setScaleX(scale);
         target.setScaleY(scale);
-        target.setTranslationX(ox * density);
-        target.setTranslationY(oy * density);
+        target.setTranslationX(0f);
+        target.setTranslationY(0f);
     }
 
     private static void resetWearTransform(@Nullable View v) {
@@ -406,6 +406,14 @@ public final class AvatarCosmetics {
         v.setScaleY(1f);
         v.setTranslationX(0f);
         v.setTranslationY(0f);
+    }
+
+    /** Contest condition marks are not avatar cosmetics and must never render as frames. */
+    private static boolean isContestWear(@Nullable String url) {
+        if (url == null) return false;
+        String value = url.toLowerCase(java.util.Locale.ROOT);
+        return value.contains("contest") || value.contains("competition")
+                || value.contains("مسابقة") || value.contains("شرط");
     }
 
     private static float metaFloat(@Nullable Map<String, ?> meta, String key, float fallback) {
