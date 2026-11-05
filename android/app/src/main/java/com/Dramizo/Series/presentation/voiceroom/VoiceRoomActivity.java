@@ -7904,6 +7904,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private Runnable luckyWinHide;
     private boolean luckyFloatDismissed;
     @Nullable private ExoPlayer luckyVideoPlayer;
+    @Nullable private Runnable luckyVideoStartRunnable;
+    private final Set<String> shownLuckyOpenEvents = new HashSet<>();
 
     private void setupLuckyBoxUi() {
         if (binding.luckyFloatWrap == null) return;
@@ -7915,9 +7917,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 hideLuckyFloat();
                 luckyFloatDismissed = true;
             });
-        }
-        if (binding.luckyWinOverlay != null) {
-            binding.luckyWinOverlay.setOnClickListener(v -> hideLuckyWinOverlay());
         }
         refreshLuckyFloatAvailability();
     }
@@ -8045,8 +8044,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         showLuckyWinOverlay(openerName, rewardLabel, null);
     }
 
-    private void playLuckySupportVideo(@Nullable String videoUrl) {
+    private void playLuckySupportVideo(@Nullable String videoUrl, long playAtServerMs) {
         if (binding == null || binding.luckyWinVideo == null) return;
+        if (luckyVideoStartRunnable != null) {
+            handler.removeCallbacks(luckyVideoStartRunnable);
+            luckyVideoStartRunnable = null;
+        }
         if (videoUrl == null || videoUrl.trim().isEmpty()) {
             binding.luckyWinVideo.setVisibility(View.GONE);
             return;
@@ -8057,11 +8060,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 luckyVideoPlayer = new ExoPlayer.Builder(this).build();
                 binding.luckyWinVideo.setPlayer(luckyVideoPlayer);
             }
-            luckyVideoPlayer.stop();
-            luckyVideoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(resolved)));
-            luckyVideoPlayer.prepare();
-            luckyVideoPlayer.play();
+            ExoPlayer player = luckyVideoPlayer;
+            player.stop();
             binding.luckyWinVideo.setVisibility(View.VISIBLE);
+            player.setMediaItem(MediaItem.fromUri(Uri.parse(resolved)));
+            Player.Listener readyListener = new Player.Listener() {
+                @Override public void onPlaybackStateChanged(int playbackState) {
+                    if (playbackState != Player.STATE_READY) return;
+                    player.removeListener(this);
+                    long delay = playAtServerMs > 0L
+                            ? Math.max(0L, playAtServerMs - System.currentTimeMillis())
+                            : 0L;
+                    luckyVideoStartRunnable = () -> {
+                        if (luckyVideoPlayer == player && binding != null
+                                && binding.luckyWinVideo != null
+                                && binding.luckyWinVideo.getVisibility() == View.VISIBLE) {
+                            player.play();
+                        }
+                    };
+                    handler.postDelayed(luckyVideoStartRunnable, delay);
+                }
+            };
+            player.addListener(readyListener);
+            player.prepare();
         } catch (Exception e) {
             binding.luckyWinVideo.setVisibility(View.GONE);
             android.util.Log.w("VoiceRoom", "Lucky support video failed", e);
@@ -8069,6 +8090,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void stopLuckySupportVideo() {
+        if (luckyVideoStartRunnable != null) {
+            handler.removeCallbacks(luckyVideoStartRunnable);
+            luckyVideoStartRunnable = null;
+        }
         try {
             if (luckyVideoPlayer != null) {
                 luckyVideoPlayer.stop();
@@ -8081,6 +8106,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void showLuckyWinOverlay(String openerName, String rewardLabel, @Nullable String videoUrl) {
+        showLuckyWinOverlay(openerName, rewardLabel, videoUrl, 0L);
+    }
+
+    private void showLuckyWinOverlay(String openerName, String rewardLabel,
+                                     @Nullable String videoUrl, long playAtServerMs) {
         String title = (openerName != null && !openerName.isEmpty() ? openerName : "مستخدم")
                 + " · صندوق الحظ";
         // Intentionally do not show the legacy full-screen/center reward burst.
@@ -8088,7 +8118,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // only toast surface used for gift/lucky-win announcements.
         if (binding != null && binding.luckyWinOverlay != null) {
             try {
-                playLuckySupportVideo(videoUrl);
+                playLuckySupportVideo(videoUrl, playAtServerMs);
                 if (binding.lottieLuckyWin != null) {
                     binding.lottieLuckyWin.cancelAnimation();
                     binding.lottieLuckyWin.setVisibility(View.GONE);
@@ -11871,6 +11901,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Float "+N" above the winner seat only (sender), not every mic. */
     public void showLuckyReturnOnMics(@Nullable List<String> userIds, long coinsWon) {
+        // The wallet is credited server-side; do not render a numeric coin payout in-room.
+        return;
+        /* no-op legacy payout label path */
         if (binding == null || binding.giftOverlay == null || coinsWon <= 0) return;
         List<String> ids = userIds;
         if (ids == null || ids.isEmpty()) return;
@@ -11977,13 +12010,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
         String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
+        // Keep the lucky-win announcement and multiplier, but never expose the
+        // amount credited to the winner inside the live room.
         String line;
         if (multiplier > 0d && multiplier < 1d) {
-            line = "مردود ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
+            line = "مردود ×" + formatLuckyMultiplier(multiplier);
         } else if (multiplier <= 0d) {
-            line = "مردود +" + Math.max(0L, wonCoins);
+            line = "مردود";
         } else {
-            line = "ضرب حظه وربح ×" + formatLuckyMultiplier(multiplier) + " · +" + Math.max(0L, wonCoins);
+            line = "ضرب حظه وربح ×" + formatLuckyMultiplier(multiplier);
         }
         String key = eventKey == null || eventKey.trim().isEmpty()
                 ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim();
@@ -11993,7 +12028,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // The winner alone sees their personal dashboard-configured room toast.
             GlobalCelebrationToast.showRoomCenter(
                     this, who, line, safeAvatar, null, key,
-                    Math.max(0d, multiplier), Math.max(0L, wonCoins), who,
+                    Math.max(0d, multiplier), 0L, who,
                     "lucky_hit_high", roomId);
         } else {
             // Everyone else in the room sees only the standard shared toast.
@@ -12002,7 +12037,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     : (multiplier > 0d && multiplier < 1d ? "lucky_hit_return" : "lucky_hit_normal");
             GlobalCelebrationToast.show(
                     this, who, line, safeAvatar, null, key,
-                    28, Math.max(0d, multiplier), Math.max(0L, wonCoins), who, kind, roomId);
+                    28, Math.max(0d, multiplier), 0L, who, kind, roomId);
         }
     }
 
@@ -15983,12 +16018,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             if (res != 0) showRoomReaction(uid, key, res, remoteUrl);
         } else if ("lucky:opened".equals(event)) {
-            if (fromUserId != null && fromUserId.equals(myUserId)) return;
+            String openId = memberStr(payload, "openId");
+            String eventKey = openId != null && !openId.isEmpty()
+                    ? openId
+                    : firstNonEmpty(memberStr(payload, "userId"), memberStr(payload, "playAt"));
+            if (eventKey != null && !shownLuckyOpenEvents.add(eventKey)) return;
+            if (shownLuckyOpenEvents.size() > 100) shownLuckyOpenEvents.clear();
             String opener = memberStr(payload, "displayName");
             if (opener == null) opener = fromUsername != null ? fromUsername : "مستخدم";
             String rewardLabel = memberStr(payload, "rewardLabel");
             if (rewardLabel == null) rewardLabel = "جائزة";
-            showLuckyWinOverlay(opener, rewardLabel, memberStr(payload, "videoUrl"));
+            long playAt = memberLong(payload, "playAt", 0L);
+            showLuckyWinOverlay(opener, rewardLabel, memberStr(payload, "videoUrl"), playAt);
         } else if ("lucky:hit".equals(event)) {
             // The room event is the canonical source for the configured win/return toast.
             // No local-response toast is emitted elsewhere, so include the sender as well.
@@ -18444,22 +18485,33 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             ? "الرجل الغامض"
                             : ContainerProvider.from(this).getSessionManager().getDisplayName();
                     if (me == null || me.isEmpty()) me = "أنا";
-                    showLuckyWinOverlay(me, rewardLabel, target.videoUrl);
                     hideLuckyFloat();
                     JsonObject payload = new JsonObject();
                     payload.addProperty("userId", myUserId != null ? myUserId : "");
                     payload.addProperty("displayName", me);
                     payload.addProperty("mysteriousMan", mysteriousEnabled);
                     payload.addProperty("rewardLabel", rewardLabel);
-            if (target.videoUrl != null && !target.videoUrl.trim().isEmpty()) {
-                payload.addProperty("videoUrl", target.videoUrl.trim());
-            }
+                    if (openResult.data.openId != null) payload.addProperty("openId", openResult.data.openId);
+                    String supportVideoUrl = openResult.data.videoUrl != null
+                            && !openResult.data.videoUrl.trim().isEmpty()
+                            ? openResult.data.videoUrl : target.videoUrl;
+                    if (supportVideoUrl != null && !supportVideoUrl.trim().isEmpty()) {
+                        payload.addProperty("videoUrl", supportVideoUrl.trim());
+                    }
                     if (reward != null) {
                         payload.addProperty("coins", reward.amount);
                         payload.addProperty("rewardType", reward.type != null ? reward.type : "");
                     }
                     if (roomId != null) {
-                        RealtimeClient.getInstance().emitRoomEvent(roomId, "lucky:opened", payload);
+                        boolean emitted = RealtimeClient.getInstance()
+                                .emitRoomEvent(roomId, "lucky:opened", payload);
+                        if (!emitted) {
+                            // Realtime is temporarily unavailable: keep the opener's local
+                            // result visible, but do not pretend it was synchronized to peers.
+                            showLuckyWinOverlay(me, rewardLabel, supportVideoUrl, 0L);
+                        }
+                    } else {
+                        showLuckyWinOverlay(me, rewardLabel, supportVideoUrl, 0L);
                     }
                 } else {
                     String err = openResult.error != null ? openResult.error : "حاول لاحقاً";
