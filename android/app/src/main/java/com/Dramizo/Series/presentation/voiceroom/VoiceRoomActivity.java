@@ -2027,8 +2027,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // dispatchTouchEvent() returns false, so room controls underneath remain interactive.
         roomRoot.addView(blastWeb, params);
         final boolean[] started = { false };
-        blastWeb.setWebChromeClient(new WebChromeClient());
+        blastWeb.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onConsoleMessage(android.webkit.ConsoleMessage message) {
+                android.util.Log.w("SupportChestVideo", message.message() + " @"
+                        + message.sourceId() + ":" + message.lineNumber());
+                return true;
+            }
+        });
         blastWeb.setWebViewClient(new android.webkit.WebViewClient() {
+            @Override public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                    WebResourceResponse response) {
+                super.onReceivedHttpError(view, request, response);
+                if (request != null && request.isForMainFrame() == false) {
+                    android.util.Log.w("SupportChestVideo", "Media HTTP "
+                            + response.getStatusCode() + " for " + request.getUrl());
+                }
+            }
             @Override public void onPageFinished(WebView view, String url) {
                 if (started[0] || isFinishing() || isDestroyed()) return;
                 started[0] = true;
