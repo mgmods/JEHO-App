@@ -3069,13 +3069,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Result<List<com.Dramizo.Series.data.remote.dto.BadgeDto>> badges =
                         ApiCall.execute(container.getUserApi().earnedBadges(userId));
                 if (badges != null && badges.success && badges.data != null) {
+                    // Show the user's selected medals first, then fill the remaining
+                    // chat slots with other earned/granted medals. This covers medals
+                    // awarded by secret tasks as well as medals granted directly.
+                    java.util.Set<String> addedMedalIds = new java.util.HashSet<>();
                     for (String displayedId : displayedIds) {
                         if (displayedId == null || decoration.medalUrls.size() >= 3) continue;
                         for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges.data) {
                             if (badge != null && displayedId.equals(badge.id)
                                     && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) {
                                 decoration.medalUrls.add(badge.imageUrl);
+                                addedMedalIds.add(badge.id);
                                 break;
+                            }
+                        }
+                    }
+                    if (decoration.medalUrls.size() < 3) {
+                        for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges.data) {
+                            if (decoration.medalUrls.size() >= 3) break;
+                            if (badge == null || badge.id == null || addedMedalIds.contains(badge.id)
+                                    || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) {
+                                continue;
+                            }
+                            if (badge.earned || badge.source != null) {
+                                decoration.medalUrls.add(badge.imageUrl);
+                                addedMedalIds.add(badge.id);
                             }
                         }
                     }
