@@ -780,12 +780,14 @@ public final class MiscDtos {
         @SerializedName("isActive") public boolean isActive;
         @SerializedName("opensToday") public int opensToday;
         @SerializedName("remainingToday") public int remainingToday;
+        @SerializedName("videoUrl") public String videoUrl;
     }
 
     public static class LuckyBoxRewardDto {
         @SerializedName("openId") public String openId;
         @SerializedName("boxCode") public String boxCode;
         @SerializedName("boxTitle") public String boxTitle;
+        @SerializedName("videoUrl") public String videoUrl;
         @SerializedName("reward") public LuckyReward reward;
         @SerializedName("remainingToday") public int remainingToday;
     }
