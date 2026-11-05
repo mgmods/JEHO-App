@@ -461,11 +461,36 @@ export class BadgesService {
     if (!badge) throw new NotFoundException('Medal not found');
     const identifier = (userIdentifier || '').trim();
     if (!identifier) throw new BadRequestException('User ID is required');
-    const user = await this.users.findOne({
+    // Resolve the recipient by the current account UUID/public ID first.
+    // A purchased vanity ID can also be owned by the account while it is applied
+    // to a room/agency, so it must still resolve to ownerUserId for direct admin gifts.
+    let user = await this.users.findOne({
       where: [{ id: identifier }, { publicId: identifier }],
       select: { id: true, publicId: true, username: true, displayName: true },
     });
-    if (!user) throw new NotFoundException('User not found by UUID or public ID');
+
+    if (!user && /^\\d{3,12}$/.test(identifier)) {
+      const vanityOwner = await this.dataSource.query(
+        `SELECT "ownerUserId" AS "ownerUserId"
+           FROM "vanity_ids"
+          WHERE "publicId" = $1
+            AND "status" = 'owned'
+            AND "ownerUserId" IS NOT NULL
+            AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
+            AND ("targetType" = 'account' OR "targetType" IS NULL OR "targetType" IN ('room', 'agency'))
+          LIMIT 1`,
+        [identifier],
+      );
+      const ownerUserId = vanityOwner?.[0]?.ownerUserId;
+      if (ownerUserId) {
+        user = await this.users.findOne({
+          where: { id: String(ownerUserId) },
+          select: { id: true, publicId: true, username: true, displayName: true },
+        });
+      }
+    }
+
+    if (!user) throw new NotFoundException('User not found by UUID, public ID, or owned vanity ID');
     const durationDays = durationDaysRaw == null || durationDaysRaw === 0
       ? 0
       : Math.min(3650, Math.max(1, Math.floor(Number(durationDaysRaw))));
