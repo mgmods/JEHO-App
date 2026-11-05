@@ -8150,7 +8150,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.luckyWinOverlay.setVisibility(
                     videoUrl != null && !videoUrl.trim().isEmpty() ? View.VISIBLE : View.GONE);
         }
-        appendChatLine("النظام", title + " · " + (rewardLabel != null ? rewardLabel : ""), 0, 1);
+        String cleanReward = rewardLabel != null ? rewardLabel
+                .replace("هدية محظوظة", "")
+                .replace("هدية محظوظ", "")
+                .replace("هدية الحظ", "")
+                .trim() : "";
+        appendChatLine("النظام", cleanReward.isEmpty() ? title : title + " · " + cleanReward, 0, 1);
     }
 
     private void hideLuckyWinOverlay() {
