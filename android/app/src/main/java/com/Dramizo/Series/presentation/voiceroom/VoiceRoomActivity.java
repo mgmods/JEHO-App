@@ -2852,6 +2852,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         View avatarWrap = row.findViewById(R.id.chatAvatarWrap);
 
         VipStyle.applyBubble(bubble, Math.max(0, vipLevel));
+        // Keep all message content safely inside the VIP frame artwork.
+        if (vipLevel > 0) {
+            bubble.setPadding(dp(18), dp(13), dp(18), dp(11));
+        } else {
+            bubble.setPadding(dp(11), dp(7), dp(11), dp(7));
+        }
+        bubble.setClipChildren(true);
+        bubble.setClipToPadding(true);
         line.setTextColor(VipStyle.messageColor(Math.max(0, vipLevel)));
         if (gameCel) {
             if (nameView != null) nameView.setVisibility(View.GONE);
@@ -3071,7 +3079,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     // awarded by secret tasks as well as medals granted directly.
                     java.util.Set<String> addedMedalIds = new java.util.HashSet<>();
                     for (String displayedId : displayedIds) {
-                        if (displayedId == null || decoration.medalUrls.size() >= 3) continue;
+                        if (displayedId == null || decoration.medalUrls.size() >= 100) continue;
                         for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges.data) {
                             if (badge != null && displayedId.equals(badge.id)
                                     && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) {
@@ -3081,9 +3089,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             }
                         }
                     }
-                    if (decoration.medalUrls.size() < 3) {
+                    if (decoration.medalUrls.size() < 100) {
                         for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges.data) {
-                            if (decoration.medalUrls.size() >= 3) break;
+                            if (decoration.medalUrls.size() >= 100) break;
                             if (badge == null || badge.id == null || addedMedalIds.contains(badge.id)
                                     || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) {
                                 continue;
@@ -3124,76 +3132,99 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void applyRoomChatDecorations(
             @NonNull View row, @NonNull RoomChatDecoration decoration, int fallbackVip) {
-        ImageView vip = row.findViewById(R.id.imgChatVipBadge);
-        TextView cp = row.findViewById(R.id.tvChatCpChip);
-        TextView publicId = row.findViewById(R.id.tvChatPublicId);
-        LinearLayout badgesRow = row.findViewById(R.id.chatBadgesRow);
-        ImageView[] medals = new ImageView[] {
-                row.findViewById(R.id.imgChatMedal1),
-                row.findViewById(R.id.imgChatMedal2),
-                row.findViewById(R.id.imgChatMedal3)
-        };
-        boolean any = false;
-        if (vip != null && fallbackVip > 0) {
-            vip.setVisibility(View.VISIBLE);
+        LinearLayout inline = row.findViewById(R.id.chatBadgesRow);
+        LinearLayout overflow = row.findViewById(R.id.chatBadgesOverflowRow);
+        if (inline == null || overflow == null) return;
+        inline.removeAllViews();
+        overflow.removeAllViews();
+
+        int total = 0;
+        if (fallbackVip > 0) {
+            ImageView vip = new ImageView(this);
+            vip.setContentDescription("VIP");
+            vip.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            vip.setLayoutParams(roomBadgeImageParams(16, 16, 2));
             if (decoration.vipBadgeUrl != null && !decoration.vipBadgeUrl.trim().isEmpty()) {
                 Glide.with(vip).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(
                         decoration.vipBadgeUrl)).fitCenter().into(vip);
             } else {
                 vip.setImageResource(com.Dramizo.Series.util.AssetCatalog.vipMedal(fallbackVip));
             }
-            any = true;
-        } else if (vip != null) {
-            vip.setVisibility(View.GONE);
-            vip.setImageDrawable(null);
+            addRoomChatBadge(inline, overflow, vip, total++);
         }
-        if (cp != null) {
-            cp.setVisibility(decoration.cpActive ? View.VISIBLE : View.GONE);
-            any |= decoration.cpActive;
+        if (decoration.cpActive) {
+            TextView cp = new TextView(this);
+            cp.setText("CP");
+            cp.setTextColor(Color.WHITE);
+            cp.setTextSize(8f);
+            cp.setTypeface(null, android.graphics.Typeface.BOLD);
+            cp.setIncludeFontPadding(false);
+            cp.setPadding(dp(4), dp(1), dp(4), dp(1));
+            cp.setBackgroundResource(R.drawable.bg_cp_cv_badge);
+            cp.setLayoutParams(roomBadgeTextParams(2));
+            addRoomChatBadge(inline, overflow, cp, total++);
         }
-        if (publicId != null) {
-            boolean styledId = decoration.publicId != null && !decoration.publicId.trim().isEmpty()
-                    && decoration.publicIdStyleMode != null
-                    && !"none".equalsIgnoreCase(decoration.publicIdStyleMode);
-            if (styledId) {
-                publicId.setText("ID " + decoration.publicId);
-                try {
-                    int c1 = Color.parseColor(decoration.publicIdColor1 == null
-                            ? "#7C5CFF" : decoration.publicIdColor1);
-                    int c2 = Color.parseColor(decoration.publicIdColor2 == null
-                            ? "#D6A84B" : decoration.publicIdColor2);
-                    android.graphics.drawable.GradientDrawable chip =
-                            new android.graphics.drawable.GradientDrawable(
-                                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                                    new int[] { c1, c2 });
-                    chip.setCornerRadius(dp(5));
-                    publicId.setBackground(chip);
-                } catch (Exception ignored) {
-                    publicId.setBackgroundResource(R.drawable.bg_vanity_chip);
-                }
-                publicId.setVisibility(View.VISIBLE);
-                any = true;
-            } else {
-                publicId.setVisibility(View.GONE);
+        boolean styledId = decoration.publicId != null && !decoration.publicId.trim().isEmpty()
+                && decoration.publicIdStyleMode != null
+                && !"none".equalsIgnoreCase(decoration.publicIdStyleMode);
+        if (styledId) {
+            TextView id = new TextView(this);
+            id.setText("ID " + decoration.publicId);
+            id.setTextColor(Color.WHITE);
+            id.setTextSize(8f);
+            id.setTypeface(null, android.graphics.Typeface.BOLD);
+            id.setIncludeFontPadding(false);
+            id.setPadding(dp(4), dp(1), dp(4), dp(1));
+            try {
+                int c1 = Color.parseColor(decoration.publicIdColor1 == null
+                        ? "#7C5CFF" : decoration.publicIdColor1);
+                int c2 = Color.parseColor(decoration.publicIdColor2 == null
+                        ? "#D6A84B" : decoration.publicIdColor2);
+                android.graphics.drawable.GradientDrawable chip =
+                        new android.graphics.drawable.GradientDrawable(
+                                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                                new int[] { c1, c2 });
+                chip.setCornerRadius(dp(5));
+                id.setBackground(chip);
+            } catch (Exception ignored) {
+                id.setBackgroundResource(R.drawable.bg_vanity_chip);
             }
+            id.setLayoutParams(roomBadgeTextParams(2));
+            addRoomChatBadge(inline, overflow, id, total++);
         }
-        for (int i = 0; i < medals.length; i++) {
-            ImageView medal = medals[i];
-            if (medal == null) continue;
-            if (i < decoration.medalUrls.size()) {
-                medal.setVisibility(View.VISIBLE);
-                Glide.with(medal).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(
-                        decoration.medalUrls.get(i)))
-                        .placeholder(R.drawable.ic_medal_default)
-                        .error(R.drawable.ic_medal_default)
-                        .fitCenter().into(medal);
-                any = true;
-            } else {
-                medal.setVisibility(View.GONE);
-                medal.setImageDrawable(null);
-            }
+        for (String medalUrl : decoration.medalUrls) {
+            if (medalUrl == null || medalUrl.trim().isEmpty()) continue;
+            ImageView medal = new ImageView(this);
+            medal.setContentDescription("ميدالية");
+            medal.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            medal.setLayoutParams(roomBadgeImageParams(14, 14, 1));
+            Glide.with(medal).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(medalUrl))
+                    .placeholder(R.drawable.ic_medal_default)
+                    .error(R.drawable.ic_medal_default)
+                    .fitCenter().into(medal);
+            addRoomChatBadge(inline, overflow, medal, total++);
         }
-        if (badgesRow != null) badgesRow.setVisibility(any ? View.VISIBLE : View.GONE);
+        inline.setVisibility(total > 0 ? View.VISIBLE : View.GONE);
+        overflow.setVisibility(total > 5 ? View.VISIBLE : View.GONE);
+    }
+
+    private void addRoomChatBadge(
+            @NonNull LinearLayout inline, @NonNull LinearLayout overflow,
+            @NonNull View badge, int index) {
+        (index < 5 ? inline : overflow).addView(badge);
+    }
+
+    private LinearLayout.LayoutParams roomBadgeImageParams(int widthDp, int heightDp, int endMarginDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(widthDp), dp(heightDp));
+        lp.setMarginEnd(dp(endMarginDp));
+        return lp;
+    }
+
+    private LinearLayout.LayoutParams roomBadgeTextParams(int endMarginDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.setMarginEnd(dp(endMarginDp));
+        return lp;
     }
 
     private boolean restoringRoomChat;
