@@ -32,13 +32,31 @@ function isDirectMessageNotification(notification: Notification): boolean {
 
 /** Lucky-gift win celebrations stay in the live room/app; never send an external FCM push. */
 function isLuckyWinPayload(data?: Record<string, unknown>, title?: string, body?: string): boolean {
-  const markers = ['type', 'kind', 'notificationKind', 'event', 'source', 'reason']
-    .map(key => String(data?.[key] ?? '').toLowerCase()).join(' ');
+  // Inspect all payload strings (including nested metadata) because older
+  // producers used different keys such as eventType, giftType or rewardSource.
+  const values: string[] = [];
+  const collect = (value: unknown, depth = 0) => {
+    if (depth > 4 || value == null) return;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      values.push(String(value).toLowerCase());
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(item => collect(item, depth + 1));
+      return;
+    }
+    if (typeof value === 'object') {
+      Object.values(value as Record<string, unknown>).forEach(item => collect(item, depth + 1));
+    }
+  };
+  collect(data);
+  const markers = values.join(' ');
   const copy = `${String(title || '')} ${String(body || '')}`.toLowerCase();
-  const luckyKind = /lucky/.test(markers);
-  const winKind = /(hit|win|reward|won|success)/.test(markers);
-  const arabicWin = /(حظ سعيد|ربح.{0,16}محظوظ|فاز.{0,16}محظوظ|ربحت.{0,16}حظ)/.test(copy);
-  return (luckyKind && winKind) || arabicWin;
+  const luckyKind = /(lucky|luckygift|lucky_gift|lucky-box|lucky_box|هدية الحظ|الهدية المحظوظة|محظوظ)/i.test(markers);
+  const winKind = /(hit|win|reward|won|success|payout|فوز|فاز|ربح|ربحت)/i.test(markers);
+  const arabicWin = /((فاز|فازت|ربح|ربحت|فوز|مكسب).{0,28}(هدية الحظ|الهدية المحظوظة|محظوظ)|(هدية الحظ|الهدية المحظوظة|محظوظ).{0,28}(فاز|فازت|ربح|ربحت|فوز|مكسب))/i.test(copy);
+  const englishWin = /(lucky|luckygift|lucky_gift|lucky-box|lucky_box).{0,32}(hit|win|reward|won|success|payout)|(hit|win|reward|won|success|payout).{0,32}(lucky|luckygift|lucky_gift|lucky-box|lucky_box)/i.test(copy);
+  return (luckyKind && winKind) || arabicWin || englishWin;
 }
 
 export class CreateNotificationDto {
