@@ -59,7 +59,6 @@ export class CpAdminController {
     const settings = Object.fromEntries(rows.map((row: { key: string; value: unknown }) =>
       [row.key, decodeSettingValue(row.value)],
     ));
-    const globallyEnabled = settings['cp.enabled.global'] !== false && settings['cp.enabled.global'] !== 'false';
     const types: Array<Record<string, unknown>> = [];
     for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] ?? null;
@@ -76,8 +75,9 @@ export class CpAdminController {
         levels: Array.isArray(settings[`cp.levels.${type}`])
           ? settings[`cp.levels.${type}`].slice(0, 100)
           : [],
-        // CP types are enabled automatically; price and an active gift determine purchase readiness.
-        enabled: globallyEnabled && settings[`cp.enabled.${type}`] !== false && settings[`cp.enabled.${type}`] !== 'false',
+        // Keep the per-type switch independent from the global CP master switch.
+        // The runtime catalog combines both switches when deciding whether users can access CP.
+        enabled: settings[`cp.enabled.${type}`] !== false && settings[`cp.enabled.${type}`] !== 'false',
         rules: settings[`cp.rules.${type}`] ?? {},
       });
     }
