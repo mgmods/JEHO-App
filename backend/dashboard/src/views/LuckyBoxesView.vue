@@ -89,6 +89,15 @@
           <input id="boxActive" v-model="form.isActive" class="form-check-input" type="checkbox" />
           <label class="form-check-label" for="boxActive">{{ t('common.active') }}</label>
         </div>
+        <div class="col-md-9">
+          <label class="form-label">فيديو تفجير الصندوق</label>
+          <input v-model="form.videoUrl" class="form-control" placeholder="/uploads/..." />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">رفع الفيديو</label>
+          <input ref="videoInput" class="form-control" type="file" accept="video/mp4,video/webm,video/quicktime" @change="uploadVideo" :disabled="uploadingVideo" />
+          <div v-if="uploadingVideo" class="small text-muted mt-1">جارٍ الرفع…</div>
+        </div>
         <div class="col-12">
           <label class="form-label">{{ t('luckyBoxes.rewardsJson') }}</label>
           <textarea v-model="rewardsText" class="form-control" rows="5" placeholder='[{"type":"coins","amount":100,"weight":70}]'></textarea>
@@ -112,7 +121,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { luckyBoxesApi } from '@/api'
+import { luckyBoxesApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
@@ -132,6 +141,8 @@ const editing = ref(false)
 const error = ref('')
 const success = ref('')
 const rewardsText = ref('[{"type":"coins","amount":100,"weight":70},{"type":"diamonds","amount":5,"weight":30}]')
+const uploadingVideo = ref(false)
+const videoInput = ref(null)
 const bulkBusy = ref(false)
 
 const {
@@ -184,6 +195,7 @@ const form = reactive({
   costCoins: 0,
   dailyLimitPerUser: 1,
   isActive: true,
+  videoUrl: '',
 })
 
 async function load() {
@@ -210,6 +222,7 @@ function startCreate() {
     costCoins: 0,
     dailyLimitPerUser: 1,
     isActive: true,
+    videoUrl: '',
   })
   rewardsText.value = '[{"type":"coins","amount":100,"weight":70},{"type":"diamonds","amount":5,"weight":30}]'
 }
@@ -224,8 +237,32 @@ function edit(box) {
     costCoins: box.costCoins || 0,
     dailyLimitPerUser: box.dailyLimitPerUser || 1,
     isActive: !!box.isActive,
+    videoUrl: box.videoUrl || '',
   })
   rewardsText.value = JSON.stringify(box.rewardsJson || [], null, 2)
+}
+
+async function uploadVideo(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  uploadingVideo.value = true
+  error.value = ''
+  const { data, error: err } = await uploadsApi.upload(file)
+  uploadingVideo.value = false
+  if (err) {
+    error.value = err.message || 'تعذر رفع الفيديو'
+    toast().danger(error.value)
+    return
+  }
+  const uploaded = data?.data || data
+  if (!uploaded?.url) {
+    error.value = 'تم رفع الملف لكن لم يرجع رابط الفيديو'
+    toast().danger(error.value)
+    return
+  }
+  form.videoUrl = uploaded.url
+  toast().success('تم رفع فيديو صندوق الدعم')
+  if (videoInput.value) videoInput.value.value = ''
 }
 
 async function save() {
@@ -247,6 +284,7 @@ async function save() {
     costCoins: Number(form.costCoins || 0),
     dailyLimitPerUser: Number(form.dailyLimitPerUser || 1),
     isActive: !!form.isActive,
+    videoUrl: form.videoUrl || undefined,
     rewardsJson,
   }
   const { error: err } = await luckyBoxesApi.adminUpsert(payload)
