@@ -4814,7 +4814,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
                 if (!finalResult.success || finalResult.data == null || !finalResult.data.success) {
                     // Do not keep charging/retrying queued taps after a balance or server error.
-                    queuedLuckyCannonPresses = 0;
+                    stopLuckyCannonHold();
                     BalanceRedirect.handle(VoiceRoomActivity.this,
                             finalResult.error != null ? finalResult.error : "تعذر إرسال الهدية، حاول مجدداً");
                     return;
