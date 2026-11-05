@@ -15692,42 +15692,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             handler.removeCallbacks(supportChestEventRefresh);
             handler.postDelayed(supportChestEventRefresh, 3700L);
-            WebView chestWeb = activeSupportChestWeb;
-            if (chestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
-                final String winJson = payload.toString();
-                chestWeb.post(() -> chestWeb.evaluateJavascript(
-                        "window.applySupportChestWin && window.applySupportChestWin(" + winJson + ");", null));
+            // Always render the uploaded blast in the room-level transparent overlay.
+            // Do not route it into the optional chest sheet WebView: that would confine the
+            // video to the bottom sheet for users who happen to have it open.
+            Map<String, Object> cachedConfig = supportChestRuntimeConfig;
+            if (cachedConfig != null) {
+                showSupportChestBlastOverlay(cachedConfig, payload);
             } else {
-                Map<String, Object> cachedConfig = supportChestRuntimeConfig;
-                if (cachedConfig != null) {
-                    showSupportChestBlastOverlay(cachedConfig, payload);
-                } else {
-                    final String expectedRoom = roomId;
-                    final JsonObject winPayload = payload.deepCopy();
-                    try {
-                        ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
-                                .supportChest(expectedRoom)
-                                .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
-                                    @Override public void onResponse(
-                                            retrofit2.Call<ApiResponse<Map<String, Object>>> call,
-                                            retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
-                                        if (isFinishing() || isDestroyed() || !expectedRoom.equals(roomId)
-                                                || !response.isSuccessful() || response.body() == null
-                                                || response.body().data == null) return;
-                                        Object cfg = response.body().data.get("config");
-                                        if (cfg instanceof Map) {
-                                            supportChestRuntimeConfig = new HashMap<>((Map<String, Object>) cfg);
-                                            showSupportChestBlastOverlay(supportChestRuntimeConfig, winPayload);
-                                        }
+                final String expectedRoom = roomId;
+                final JsonObject winPayload = payload.deepCopy();
+                try {
+                    ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                            .supportChest(expectedRoom)
+                            .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                                @Override public void onResponse(
+                                        retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                        retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                                    if (isFinishing() || isDestroyed() || !expectedRoom.equals(roomId)
+                                            || !response.isSuccessful() || response.body() == null
+                                            || response.body().data == null) return;
+                                    Object cfg = response.body().data.get("config");
+                                    if (cfg instanceof Map) {
+                                        supportChestRuntimeConfig = new HashMap<>((Map<String, Object>) cfg);
+                                        showSupportChestBlastOverlay(supportChestRuntimeConfig, winPayload);
                                     }
-                                    @Override public void onFailure(
-                                            retrofit2.Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
-                                        android.util.Log.w("SupportChest", "Could not load custom blast config", error);
-                                    }
-                                });
-                    } catch (Exception error) {
-                        android.util.Log.w("SupportChest", "Could not request custom blast config", error);
-                    }
+                                }
+                                @Override public void onFailure(
+                                        retrofit2.Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
+                                    android.util.Log.w("SupportChest", "Could not load custom blast config", error);
+                                }
+                            });
+                } catch (Exception error) {
+                    android.util.Log.w("SupportChest", "Could not request custom blast config", error);
                 }
             }
             String winner = memberStr(payload, "winnerName");
