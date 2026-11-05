@@ -4822,8 +4822,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Server emits the canonical room gift event; animation is rendered locally by
                 // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                // Repeats are driven only by the hold timer. Do not drain delayed
-                // sends after a slow response or after ACTION_UP.
+                // If a repeat tick arrived during this request, send it immediately
+                // only while the finger is still held. ACTION_UP clears the queue.
+                if (luckyCannonHoldActive && queuedLuckyCannonPresses > 0) {
+                    queuedLuckyCannonPresses--;
+                    sendLuckyCannonGift(true);
+                }
             });
         });
     }
