@@ -2550,14 +2550,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && RoomRtcEngine.getInstance().sendRoomChatMessage(
                         roomId, payload.toString(), (ok, err) -> {
                             if (!ok) {
-                                runOnUiThread(() -> {
-                                    boolean sent = RealtimeClient.getInstance()
-                                            .emitRoomEvent(roomId, "chat:message", payload);
-                                    if (!sent) {
-                                        Toast.makeText(this, "تعذر إرسال الرسالة", Toast.LENGTH_SHORT)
-                                                .show();
-                                    }
-                                });
+                                // Do not retry through Socket after handing the same message to
+                                // Zego: a timeout/error callback can arrive after Zego delivered
+                                // the message, and dual-broadcasting creates duplicate chat lines.
+                                runOnUiThread(() -> Toast.makeText(
+                                        this, "تعذر تأكيد إرسال الرسالة", Toast.LENGTH_SHORT).show());
                             }
                         });
         if (!zegoOk) {
