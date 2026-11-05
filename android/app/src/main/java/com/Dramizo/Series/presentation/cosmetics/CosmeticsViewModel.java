@@ -294,6 +294,32 @@ public class CosmeticsViewModel extends ViewModel {
             return;
         }
         container.getIoExecutor().execute(() -> {
+            // Avatar frames are one exclusive slot across VIP and host/contest frame types.
+            // Remove every previously equipped frame before applying the newly selected one.
+            if (isAvatarFrameType(target != null ? target.type : type)) {
+                Result<List<CosmeticDtos.UserCosmeticDto>> inventory =
+                        container.getCosmeticsRepository().inventory();
+                if (!inventory.success || inventory.data == null) {
+                    error.postValue(inventory.error != null ? inventory.error
+                            : "تعذر التحقق من الإطار المرتدى حالياً");
+                    return;
+                }
+                for (CosmeticDtos.UserCosmeticDto worn : inventory.data) {
+                    if (worn == null || !worn.equipped || worn.cosmeticId == null
+                            || cosmeticId.equals(worn.cosmeticId)
+                            || worn.cosmetic == null
+                            || !isAvatarFrameType(worn.cosmetic.type)) continue;
+                    Result<CosmeticDtos.EquipResult> removed =
+                            container.getCosmeticsRepository().unequip(worn.cosmeticId);
+                    if (removed == null || !removed.success) {
+                        error.postValue(removed != null && removed.error != null
+                                ? removed.error : "تعذر خلع الإطار السابق؛ لم يتم تغيير الإطار الحالي");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                }
+            }
             Result<CosmeticDtos.EquipResult> r =
                     container.getCosmeticsRepository().equip(cosmeticId);
             if (r.success) {
