@@ -386,6 +386,13 @@ public class CosmeticsViewModel extends ViewModel {
         });
     }
 
+    private static boolean isAvatarFrameType(@Nullable String type) {
+        if (type == null) return false;
+        String value = type.trim().toLowerCase(Locale.ROOT);
+        return "vip_badge".equals(value) || "host_badge".equals(value)
+                || "frame".equals(value) || "frames".equals(value);
+    }
+
     private void applyEquipProfile(CosmeticDtos.EquipProfile profile) {
         com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto cached =
                 container.getSessionManager().getUser();
