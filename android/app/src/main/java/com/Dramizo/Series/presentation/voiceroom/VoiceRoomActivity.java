@@ -8069,22 +8069,30 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             player.stop();
             binding.luckyWinVideo.setVisibility(View.VISIBLE);
             player.setMediaItem(MediaItem.fromUri(Uri.parse(resolved)));
+            final boolean[] startScheduled = { false };
             Player.Listener readyListener = new Player.Listener() {
                 @Override public void onPlaybackStateChanged(int playbackState) {
-                    if (playbackState != Player.STATE_READY) return;
-                    player.removeListener(this);
-                    if (luckyVideoReadyListener == this) luckyVideoReadyListener = null;
-                    long delay = playAtServerMs > 0L
-                            ? Math.max(0L, playAtServerMs - System.currentTimeMillis())
-                            : 0L;
-                    luckyVideoStartRunnable = () -> {
-                        if (luckyVideoPlayer == player && binding != null
-                                && binding.luckyWinVideo != null
-                                && binding.luckyWinVideo.getVisibility() == View.VISIBLE) {
-                            player.play();
-                        }
-                    };
-                    handler.postDelayed(luckyVideoStartRunnable, delay);
+                    if (playbackState == Player.STATE_READY && !startScheduled[0]) {
+                        startScheduled[0] = true;
+                        long delay = playAtServerMs > 0L
+                                ? Math.max(0L, playAtServerMs - System.currentTimeMillis())
+                                : 0L;
+                        luckyVideoStartRunnable = () -> {
+                            if (luckyVideoPlayer == player && binding != null
+                                    && binding.luckyWinVideo != null
+                                    && binding.luckyWinVideo.getVisibility() == View.VISIBLE) {
+                                player.play();
+                            }
+                        };
+                        handler.postDelayed(luckyVideoStartRunnable, delay);
+                    } else if (playbackState == Player.STATE_ENDED) {
+                        handler.post(VoiceRoomActivity.this::hideLuckyWinOverlay);
+                    }
+                }
+
+                @Override public void onPlayerError(androidx.media3.common.PlaybackException error) {
+                    android.util.Log.w("VoiceRoom", "Lucky support video playback error", error);
+                    handler.post(VoiceRoomActivity.this::hideLuckyWinOverlay);
                 }
             };
             luckyVideoReadyListener = readyListener;
