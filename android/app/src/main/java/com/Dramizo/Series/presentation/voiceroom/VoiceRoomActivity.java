@@ -8095,7 +8095,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             } catch (Exception ignored) {
             }
-            binding.luckyWinOverlay.setVisibility(View.GONE);
+            binding.luckyWinOverlay.setAlpha(1f);
+            binding.luckyWinOverlay.setVisibility(
+                    videoUrl != null && !videoUrl.trim().isEmpty() ? View.VISIBLE : View.GONE);
         }
         appendChatLine("النظام", title + " · " + (rewardLabel != null ? rewardLabel : ""), 0, 1);
     }
