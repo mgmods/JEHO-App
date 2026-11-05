@@ -237,6 +237,7 @@ export class LuckyBoxesService implements OnModuleInit {
         openId: openRecord.id,
         boxCode: box.code,
         boxTitle: box.title,
+        videoUrl: box.videoUrl || null,
         reward: { type: reward.type, amount: reward.amount },
         grantId: grant.id,
         remainingToday: Math.max(0, this.effectiveLimit(box) - opensToday - 1),
