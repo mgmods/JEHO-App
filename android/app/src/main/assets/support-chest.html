@@ -213,18 +213,21 @@ window.applySupportChestWin=function(win){
   clearTimeout(chestBlastTimer);
   overlay.classList.remove('show');
   const customMedia=document.getElementById('customBlastMedia');if(customMedia){customMedia.style.animation='none';void customMedia.offsetWidth;customMedia.style.animation='';}
-  chestBlastTimer=setTimeout(()=>{
-   if(chest)chest.classList.remove('preblast');
-   void overlay.offsetWidth;overlay.classList.add('show');
-   const media=document.getElementById('customBlastMedia'),audio=document.getElementById('customBlastAudio');
-   if(media&&media.tagName==='VIDEO'&&overlay.classList.contains('custom-effect')){try{const startVideo=()=>{try{media.currentTime=0;}catch(e){}const playback=media.play();if(playback&&playback.catch)playback.catch(()=>{media.muted=true;media.play().catch(()=>{});});};media.load();if(media.readyState>=2)startVideo();else media.addEventListener('canplay',startVideo,{once:true});}catch(e){console.warn('Support chest video playback failed',e);}}
-   if(audio&&overlay.classList.contains('custom-effect')){try{audio.currentTime=0;audio.play().catch(()=>{});}catch(e){}}
-   const isVideo=!!(media&&media.tagName==='VIDEO');
-   const videoDuration=isVideo&&Number.isFinite(media.duration)?media.duration*1000+250:0;
-   const visibleFor=Math.max(isVideo?12000:3600,Number(liveConfig?.explosionEffect?.durationMs)||0,videoDuration);
-   if(isVideo){media.addEventListener('ended',()=>{overlay.classList.remove('show');try{media.pause();if(audio){audio.pause();audio.currentTime=0;}}catch(e){}},{once:true});}
-   setTimeout(()=>{overlay.classList.remove('show');try{if(media&&media.tagName==='VIDEO')media.pause();if(audio){audio.pause();audio.currentTime=0;}}catch(e){}},visibleFor);
-  },2000);
+   const scheduledAt=Number(win?.playAtServerMs||win?.scheduledAtMs||0);
+   const fallbackDelay=Math.max(0,Number(win?.delayMs)||2000);
+   const startDelay=scheduledAt>0?Math.max(0,scheduledAt-Date.now()):fallbackDelay;
+   chestBlastTimer=setTimeout(()=>{
+    if(chest)chest.classList.remove('preblast');
+    void overlay.offsetWidth;overlay.classList.add('show');
+    const media=document.getElementById('customBlastMedia'),audio=document.getElementById('customBlastAudio');
+    if(media&&media.tagName==='VIDEO'&&overlay.classList.contains('custom-effect')){try{const startVideo=()=>{try{media.currentTime=0;}catch(e){}const playback=media.play();if(playback&&playback.catch)playback.catch(error=>console.warn('Support chest video playback was blocked',error));};if(media.readyState>=2)startVideo();else media.addEventListener('canplay',startVideo,{once:true});}catch(e){console.warn('Support chest video playback failed',e);}}
+    if(audio&&overlay.classList.contains('custom-effect')){try{audio.currentTime=0;audio.play().catch(()=>{});}catch(e){}}
+    const isVideo=!!(media&&media.tagName==='VIDEO');
+    const videoDuration=isVideo&&Number.isFinite(media.duration)?media.duration*1000+250:0;
+    const visibleFor=Math.max(isVideo?12000:3600,Number(liveConfig?.explosionEffect?.durationMs)||0,videoDuration);
+    if(isVideo){media.addEventListener('ended',()=>{overlay.classList.remove('show');try{media.pause();if(audio){audio.pause();audio.currentTime=0;}}catch(e){}},{once:true});}
+    setTimeout(()=>{overlay.classList.remove('show');try{if(media&&media.tagName==='VIDEO')media.pause();if(audio){audio.pause();audio.currentTime=0;}}catch(e){}},visibleFor);
+   },startDelay);
  }catch(e){console.warn('Support chest celebration failed',e);}
 };
 const help=document.getElementById('helpPanel'),helpBtn=document.getElementById('helpBtn'),closeTop=document.getElementById('closeHelp'),closeHelp=document.getElementById('helpClose');
