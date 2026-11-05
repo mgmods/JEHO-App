@@ -4,14 +4,15 @@
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_home_full_gradient"
+    android:background="#FFF4F6FA"
     android:layoutDirection="locale">
 
     <LinearLayout
         android:id="@+id/toolbarMedal"
         android:layout_width="0dp"
-        android:layout_height="52dp"
-        android:background="@color/white"
+        android:layout_height="56dp"
+        android:background="#FFFFFFFF"
+        android:elevation="3dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="8dp"
@@ -26,7 +27,7 @@
             android:contentDescription="@string/back"
             android:padding="10dp"
             android:src="@drawable/ic_arrow_back"
-            app:tint="@color/text_primary" />
+            app:tint="#FF263247" />
 
         <TextView
             android:id="@+id/tvTitle"
@@ -35,8 +36,8 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="@string/honourship"
-            android:textColor="@color/text_primary"
-            android:textSize="18sp"
+            android:textColor="#FF182338"
+            android:textSize="19sp"
             android:textStyle="bold" />
 
         <View
@@ -55,11 +56,11 @@
     <View
         android:id="@+id/vModeTabBg"
         android:layout_width="0dp"
-        android:layout_height="42dp"
+        android:layout_height="46dp"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="16dp"
         android:layout_marginEnd="16dp"
-        android:background="@drawable/bg_wallet_channel_track"
+        android:background="@drawable/bg_medal_tabs_track"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/toolbarMedal" />
@@ -68,10 +69,11 @@
         android:id="@+id/tvBadgeTab"
         android:layout_width="0dp"
         android:layout_height="42dp"
+        android:layout_margin="2dp"
         android:background="@drawable/bg_wallet_channel_on"
         android:gravity="center"
         android:text="@string/badge"
-        android:textColor="#1A1200"
+        android:textColor="#FF38280A"
         android:textSize="14sp"
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="@id/vModeTabBg"
@@ -83,9 +85,10 @@
         android:id="@+id/tvMineTab"
         android:layout_width="0dp"
         android:layout_height="42dp"
+        android:layout_margin="2dp"
         android:gravity="center"
         android:text="@string/mine"
-        android:textColor="@color/text_secondary"
+        android:textColor="#FF536176"
         android:textSize="14sp"
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="@id/vModeTabBg"
@@ -97,7 +100,7 @@
         android:id="@+id/rvMedals"
         android:layout_width="0dp"
         android:layout_height="0dp"
-         android:layout_marginTop="12dp"
+        android:layout_marginTop="14dp"
         android:clipToPadding="false"
         android:paddingHorizontal="12dp"
         android:paddingBottom="24dp"
@@ -123,7 +126,7 @@
         <ImageView
             android:layout_width="88dp"
             android:layout_height="88dp"
-            android:alpha="0.55"
+            android:alpha="0.75"
             android:contentDescription="@null"
             android:src="@drawable/ic_medal_default" />
 
@@ -134,7 +137,7 @@
             android:layout_marginTop="12dp"
             android:gravity="center"
             android:text="@string/have_not_yet_received_badge"
-            android:textColor="@color/text_secondary"
+            android:textColor="#FF536176"
             android:textSize="14sp" />
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
