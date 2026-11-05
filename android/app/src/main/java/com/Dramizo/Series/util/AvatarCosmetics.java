@@ -35,6 +35,7 @@ public final class AvatarCosmetics {
         }
         frameView.setVisibility(View.VISIBLE);
         frameView.setAlpha(1f);
+        clipFrameArtworkToAvatar(frameView);
         loadWearImage(frameView, frameUrl);
         applyWearMeta(frameView, meta, 1f);
         // Keep the frame above the circular face in every stack.
@@ -275,6 +276,7 @@ public final class AvatarCosmetics {
             if (target != null) {
                 target.setVisibility(View.VISIBLE);
                 target.setAlpha(1f);
+                clipFrameArtworkToAvatar(target);
                 // Frame/badge fills the stack; do not inflate past the box (clips lists).
                 applyWearMeta(target, hostBadgeMeta, 1f);
                 loadWearImage(target, hostBadgeUrl);
@@ -398,6 +400,24 @@ public final class AvatarCosmetics {
         target.setScaleY(scale);
         target.setTranslationX(0f);
         target.setTranslationY(0f);
+    }
+
+    /**
+     * Avatar photos are circular throughout JEHO. Clip wearable artwork to that same
+     * circular silhouette so rectangular canvases/background panels cannot cover the
+     * photo or spill outside its bounds; transparent frame details remain visible on edge.
+     */
+    private static void clipFrameArtworkToAvatar(@Nullable ImageView frame) {
+        if (frame == null) return;
+        frame.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            frame.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override public void getOutline(View view, android.graphics.Outline outline) {
+                    outline.setOval(0, 0, view.getWidth(), view.getHeight());
+                }
+            });
+            frame.setClipToOutline(true);
+        }
     }
 
     private static void resetWearTransform(@Nullable View v) {
