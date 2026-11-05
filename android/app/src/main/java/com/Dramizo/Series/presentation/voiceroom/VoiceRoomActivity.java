@@ -11901,75 +11901,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Float "+N" above the winner seat only (sender), not every mic. */
     public void showLuckyReturnOnMics(@Nullable List<String> userIds, long coinsWon) {
-        // The wallet is credited server-side; do not render a numeric coin payout in-room.
-        return;
-        /* no-op legacy payout label path */
-        if (binding == null || binding.giftOverlay == null || coinsWon <= 0) return;
-        List<String> ids = userIds;
-        if (ids == null || ids.isEmpty()) return;
-        binding.giftOverlay.setVisibility(View.VISIBLE);
-        binding.giftOverlay.bringToFront();
-        markLuckyOverlayActive(4200L);
-        float density = getResources().getDisplayMetrics().density;
-        int index = 0;
-        for (String uid : ids) {
-            View seat = findSeatViewForUser(uid);
-            if (seat == null) continue;
-            android.graphics.PointF p =
-                    GiftFlyAnimator.centerInOverlay(binding.giftOverlay, seat);
-            if (p == null) continue;
-            android.widget.TextView tv = new android.widget.TextView(this);
-            tv.setText("+" + coinsWon);
-            tv.setTextColor(0xFFFFE082);
-            tv.setTextSize(14f);
-            tv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-            tv.setShadowLayer(5f, 0f, 2f, 0xF0000000);
-            tv.setMaxLines(1);
-            tv.setPadding((int) (10 * density), (int) (4 * density),
-                    (int) (10 * density), (int) (4 * density));
-            android.graphics.drawable.GradientDrawable bg =
-                    new android.graphics.drawable.GradientDrawable();
-            bg.setCornerRadius(14f * density);
-            bg.setColor(0xCC1A0A00);
-            bg.setStroke((int) (1.5f * density), 0xFFFFC107);
-            tv.setBackground(bg);
-            tv.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-            tv.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-            tv.setX(Math.max(8f * density,
-                    Math.min(p.x - tv.getMeasuredWidth() / 2f,
-                            (binding.giftOverlay.getWidth() > 0
-                                    ? binding.giftOverlay.getWidth()
-                                    : getResources().getDisplayMetrics().widthPixels)
-                                    - tv.getMeasuredWidth() - 8f * density)));
-            tv.setY(p.y - 36f * density);
-            tv.setAlpha(0f);
-            tv.setScaleX(0.55f);
-            tv.setScaleY(0.55f);
-            binding.giftOverlay.addView(tv);
-            long stagger = index * 120L;
-            index++;
-            tv.animate()
-                    .alpha(1f)
-                    .scaleX(1.08f)
-                    .scaleY(1.08f)
-                    .translationYBy(-28f * density)
-                    .setStartDelay(stagger)
-                    .setDuration(560)
-                    .withEndAction(() -> tv.animate()
-                            .alpha(0f)
-                            .translationYBy(-18f * density)
-                            .setDuration(480)
-                            .setStartDelay(1800)
-                            .withEndAction(() -> {
-                                if (tv.getParent() instanceof android.view.ViewGroup parent) {
-                                    parent.removeView(tv);
-                                }
-                            })
-                            .start())
-                    .start();
-        }
+        // Lucky rewards are credited to the wallet by the backend. Their numeric
+        // amount is intentionally not rendered over seats inside the live room.
     }
 
     @NonNull
@@ -16022,13 +15955,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String eventKey = openId != null && !openId.isEmpty()
                     ? openId
                     : firstNonEmpty(memberStr(payload, "userId"), memberStr(payload, "playAt"));
-            if (eventKey != null && !shownLuckyOpenEvents.add(eventKey)) return;
+            if (eventKey != null && shownLuckyOpenEvents.contains(eventKey)) return;
             if (shownLuckyOpenEvents.size() > 100) shownLuckyOpenEvents.clear();
+            if (eventKey != null) shownLuckyOpenEvents.add(eventKey);
             String opener = memberStr(payload, "displayName");
             if (opener == null) opener = fromUsername != null ? fromUsername : "مستخدم";
             String rewardLabel = memberStr(payload, "rewardLabel");
             if (rewardLabel == null) rewardLabel = "جائزة";
             long playAt = memberLong(payload, "playAt", 0L);
+            long serverNow = memberLong(payload, "serverNow", 0L);
+            if (playAt > 0L && serverNow > 0L) {
+                long localNow = System.currentTimeMillis();
+                playAt = playAt - (serverNow - localNow);
+            }
             showLuckyWinOverlay(opener, rewardLabel, memberStr(payload, "videoUrl"), playAt);
         } else if ("lucky:hit".equals(event)) {
             // The room event is the canonical source for the configured win/return toast.
