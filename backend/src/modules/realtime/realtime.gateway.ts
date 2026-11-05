@@ -1047,6 +1047,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         ...(stickerUrl ? { url: stickerUrl } : {}),
       };
     } else if (data.event === 'lucky:opened') {
+      // Preserve the dashboard-uploaded video for every room member. The shared
+      // server timestamp gives all clients the same playback start target.
       payload = {
         userId: client.userId,
         displayName: profile.displayName || client.username || 'User',
@@ -1054,6 +1056,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         avatarUrl: profile.avatarUrl || null,
         mysteriousMan: profile.mysteriousMan === true,
         rewardLabel: String(incoming.rewardLabel || 'جائزة').slice(0, 80),
+        openId: String(incoming.openId || '').slice(0, 80),
+        videoUrl: typeof incoming.videoUrl === 'string'
+          ? incoming.videoUrl.trim().slice(0, 1024)
+          : null,
+        playAt: Date.now() + 2200,
       };
     } else if (data.event === 'room:typing') {
       payload = { userId: client.userId, isTyping: incoming.isTyping === true };
