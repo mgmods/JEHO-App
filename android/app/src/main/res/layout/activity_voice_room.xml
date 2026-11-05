@@ -2049,6 +2049,8 @@
                 android:layout_height="146dp"
                 android:layout_marginBottom="10dp"
                 android:background="@android:color/black"
+                android:clickable="false"
+                android:focusable="false"
                 android:visibility="gone"
                 app:resize_mode="fit"
                 app:use_controller="false" />
