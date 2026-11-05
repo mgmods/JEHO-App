@@ -7904,6 +7904,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private Runnable luckyWinHide;
     private boolean luckyFloatDismissed;
     @Nullable private ExoPlayer luckyVideoPlayer;
+    @Nullable private Player.Listener luckyVideoReadyListener;
     @Nullable private Runnable luckyVideoStartRunnable;
     private final Set<String> shownLuckyOpenEvents = new HashSet<>();
 
@@ -8061,6 +8062,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 binding.luckyWinVideo.setPlayer(luckyVideoPlayer);
             }
             ExoPlayer player = luckyVideoPlayer;
+            if (luckyVideoReadyListener != null) {
+                player.removeListener(luckyVideoReadyListener);
+                luckyVideoReadyListener = null;
+            }
             player.stop();
             binding.luckyWinVideo.setVisibility(View.VISIBLE);
             player.setMediaItem(MediaItem.fromUri(Uri.parse(resolved)));
@@ -8068,6 +8073,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 @Override public void onPlaybackStateChanged(int playbackState) {
                     if (playbackState != Player.STATE_READY) return;
                     player.removeListener(this);
+                    if (luckyVideoReadyListener == this) luckyVideoReadyListener = null;
                     long delay = playAtServerMs > 0L
                             ? Math.max(0L, playAtServerMs - System.currentTimeMillis())
                             : 0L;
@@ -8081,6 +8087,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     handler.postDelayed(luckyVideoStartRunnable, delay);
                 }
             };
+            luckyVideoReadyListener = readyListener;
             player.addListener(readyListener);
             player.prepare();
         } catch (Exception e) {
@@ -8096,6 +8103,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         try {
             if (luckyVideoPlayer != null) {
+                if (luckyVideoReadyListener != null) {
+                    luckyVideoPlayer.removeListener(luckyVideoReadyListener);
+                    luckyVideoReadyListener = null;
+                }
                 luckyVideoPlayer.stop();
             }
         } catch (Exception ignored) {
