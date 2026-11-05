@@ -115,72 +115,7 @@
                     android:layout_marginStart="4dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:visibility="gone">
-
-                    <ImageView
-                        android:id="@+id/imgChatVipBadge"
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:layout_marginEnd="2dp"
-                        android:contentDescription="VIP"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tvChatCpChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="2dp"
-                        android:background="@drawable/bg_cp_cv_badge"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="4dp"
-                        android:paddingVertical="1dp"
-                        android:text="CP"
-                        android:textColor="#FFFFFFFF"
-                        android:textSize="8sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tvChatPublicId"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="2dp"
-                        android:background="@drawable/bg_vanity_chip"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="4dp"
-                        android:paddingVertical="1dp"
-                        android:textColor="#FFFFFFFF"
-                        android:textSize="8sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
-
-                    <ImageView
-                        android:id="@+id/imgChatMedal1"
-                        android:layout_width="14dp"
-                        android:layout_height="14dp"
-                        android:layout_marginEnd="1dp"
-                        android:contentDescription="ميدالية"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-
-                    <ImageView
-                        android:id="@+id/imgChatMedal2"
-                        android:layout_width="14dp"
-                        android:layout_height="14dp"
-                        android:layout_marginEnd="1dp"
-                        android:contentDescription="ميدالية"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-
-                    <ImageView
-                        android:id="@+id/imgChatMedal3"
-                        android:layout_width="14dp"
-                        android:layout_height="14dp"
-                        android:contentDescription="ميدالية"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-                </LinearLayout>
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/tvVipChip"
@@ -206,6 +141,16 @@
                     android:layout_height="0dp"
                     android:visibility="gone" />
             </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/chatBadgesOverflowRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="right|center_vertical"
+                android:orientation="horizontal"
+                android:layoutDirection="rtl"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
