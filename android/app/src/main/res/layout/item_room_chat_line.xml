@@ -29,41 +29,6 @@
         android:paddingEnd="11dp"
         android:paddingBottom="6dp">
 
-        <FrameLayout
-            android:id="@+id/chatAvatarWrap"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:layout_marginEnd="7dp"
-            android:clipChildren="false"
-            android:clipToPadding="false">
-
-            <ImageView
-                android:id="@+id/imgChatAvatar"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:scaleType="centerCrop"
-                android:src="@drawable/ic_tab_me" />
-
-            <ImageView
-                android:id="@+id/imgChatFrame"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:visibility="gone" />
-
-            <com.Dramizo.Series.util.HostSignalView
-                android:id="@+id/webChatHostSignal"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_gravity="center"
-                android:elevation="3dp"
-                android:visibility="gone" />
-        </FrameLayout>
-
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -235,6 +200,41 @@
                     android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/chatAvatarWrap"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="7dp"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <ImageView
+                android:id="@+id/imgChatAvatar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_tab_me" />
+
+            <ImageView
+                android:id="@+id/imgChatFrame"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <com.Dramizo.Series.util.HostSignalView
+                android:id="@+id/webChatHostSignal"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:elevation="3dp"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/btnChatUserMore"
