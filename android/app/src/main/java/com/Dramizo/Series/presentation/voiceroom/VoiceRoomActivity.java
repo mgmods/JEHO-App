@@ -4865,18 +4865,53 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (binding == null || binding.giftOverlay == null) return;
             List<PointF> destinations = resolveMicCenters(recipients);
             if (destinations.isEmpty()) return;
-            int w = Math.max(binding.giftOverlay.getWidth(), 1);
-            int h = Math.max(binding.giftOverlay.getHeight(), 1);
-            // Reveal one large gift below the seat grid, then fan gift copies toward occupied seats.
+            // Anchor the large lucky-gift reveal just below seat 18, not at the
+            // screen edge or the generic viewport midpoint.
+            PointF revealCenter = resolveLuckyGiftRevealCenter();
             com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
                     binding.giftOverlay, icon, destinations, totalCoins,
-                    Math.max(1, quantity), Math.max(1, recipients.size()), null, null);
+                    Math.max(1, quantity), Math.max(1, recipients.size()),
+                    revealCenter, null, null);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
         } else {
             launch.run();
         }
+    }
+
+    /**
+     * Returns the reveal point slightly below guest seat 18, in giftOverlay coordinates.
+     * The seat view is resolved from the same sorted guest list used by the grid adapter.
+     */
+    @Nullable
+    private PointF resolveLuckyGiftRevealCenter() {
+        if (binding == null || binding.recyclerSeats == null || binding.giftOverlay == null) return null;
+        List<RoomDtos.SeatDto> guests = prepareGuestSeatsForGrid(currentSeats);
+        int adapterPosition = -1;
+        for (int i = 0; i < guests.size(); i++) {
+            RoomDtos.SeatDto seat = guests.get(i);
+            if (seat != null && seat.seatIndex == 18) {
+                adapterPosition = i;
+                break;
+            }
+        }
+        if (adapterPosition < 0) return null;
+        RecyclerView.ViewHolder holder =
+                binding.recyclerSeats.findViewHolderForAdapterPosition(adapterPosition);
+        View seatView = holder != null ? holder.itemView
+                : binding.recyclerSeats.getLayoutManager() != null
+                ? binding.recyclerSeats.getLayoutManager().findViewByPosition(adapterPosition) : null;
+        if (seatView == null || seatView.getWidth() <= 0 || seatView.getHeight() <= 0) return null;
+
+        int[] seatLocation = new int[2];
+        int[] overlayLocation = new int[2];
+        seatView.getLocationOnScreen(seatLocation);
+        binding.giftOverlay.getLocationOnScreen(overlayLocation);
+        float density = getResources().getDisplayMetrics().density;
+        float x = seatLocation[0] - overlayLocation[0] + seatView.getWidth() * 0.5f;
+        float y = seatLocation[1] - overlayLocation[1] + seatView.getHeight() + 34f * density;
+        return new PointF(x, y);
     }
 
     /** Highlight occupied seats matching gift recipients while the gift sheet is open. */
