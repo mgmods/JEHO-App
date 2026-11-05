@@ -2023,8 +2023,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         ViewGroup roomRoot = binding != null ? binding.getRoot() : root;
         ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        roomRoot.addView(blastWeb, 0, params);
+        // Add the transparent blast WebView above room content so the uploaded video is visible.
+        // dispatchTouchEvent() returns false, so room controls underneath remain interactive.
+        roomRoot.addView(blastWeb, params);
         final boolean[] started = { false };
+        blastWeb.setWebChromeClient(new WebChromeClient());
         blastWeb.setWebViewClient(new android.webkit.WebViewClient() {
             @Override public void onPageFinished(WebView view, String url) {
                 if (started[0] || isFinishing() || isDestroyed()) return;
@@ -2079,8 +2082,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     2500L + (long) numberForChest(effect.get("durationMs"), 1800L)));
         } catch (Exception ignored) { }
         // Give uploaded MP4/WebM media enough time to finish before destroying its WebView.
-        if (media != null && String.valueOf(media).matches("(?i).*\\.(mp4|webm|m4v)(\\?.*)?$")) {
-            duration = 15000L;
+        Object mediaKind = effect.get("mediaType") != null ? effect.get("mediaType")
+                : (effect.get("mimeType") != null ? effect.get("mimeType") : effect.get("type"));
+        boolean uploadedVideo = (media != null
+                && String.valueOf(media).matches("(?i).*\\.(mp4|webm|m4v)(?:[?#].*)?$"))
+                || (mediaKind != null && (String.valueOf(mediaKind).toLowerCase(java.util.Locale.ROOT).startsWith("video/")
+                || String.valueOf(mediaKind).matches("(?i)video|mp4|webm|m4v")));
+        if (uploadedVideo) {
+            // Keep the WebView alive long enough for dashboard videos, including signed URLs.
+            duration = 60000L;
         }
         final WebView overlayWeb = blastWeb;
         handler.postDelayed(() -> {
