@@ -325,7 +325,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Accepted hold ticks are drained one-by-one after each confirmed economy send. */
     private int queuedLuckyCannonPresses;
     private boolean luckyCannonHoldActive;
-    private static final long LUCKY_CANNON_REPEAT_MS = 280L;
+    private static final long LUCKY_CANNON_REPEAT_MS = 180L;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
             if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
