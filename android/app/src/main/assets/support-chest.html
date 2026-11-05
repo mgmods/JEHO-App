@@ -45,7 +45,7 @@ h1{font-size:18px;margin:0;font-weight:850;letter-spacing:.1px}.sub{font-size:11
  .burst-particles{position:absolute;inset:0;overflow:hidden;pointer-events:none}.burst-particle{position:absolute;left:50%;top:50%;font-size:25px;animation:particleFly 1.35s ease-out forwards;--dx:0px;--dy:0px}@keyframes particleFly{0%{transform:translate(-50%,-50%) scale(.25);opacity:1}100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(300deg) scale(.9);opacity:0}}
 .explosion-overlay{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at center,#ffe18c66 0,#17111eef 72%);opacity:0;pointer-events:none}
 .explosion-overlay.custom-effect{background:transparent}
-.custom-blast-media{position:absolute;z-index:1;left:var(--blast-start-x,50%);top:var(--blast-start-y,46%);width:5%;height:5%;object-fit:cover;background:transparent;transform:translate(-50%,-50%) scale(.15);opacity:0;pointer-events:none}
+.custom-blast-media{display:block;position:absolute;z-index:1;left:var(--blast-start-x,50%);top:var(--blast-start-y,46%);width:5%;height:5%;max-width:none;max-height:none;object-fit:cover;object-position:center;background:transparent;transform:translate(-50%,-50%) scale(.15);opacity:0;pointer-events:none}
 .explosion-overlay.show .custom-blast-media{animation:customBlastExpand var(--blast-duration,1800ms) cubic-bezier(.12,.8,.2,1) forwards}
 @keyframes customBlastExpand{0%{left:var(--blast-start-x,50%);top:var(--blast-start-y,46%);width:5%;height:5%;transform:translate(-50%,-50%) scale(.15);opacity:0}12%{opacity:var(--blast-opacity,1)}100%{left:var(--blast-end-x,50%);top:var(--blast-end-y,50%);width:var(--blast-width,100%);height:var(--blast-height,100%);transform:translate(-50%,-50%) scale(1);opacity:var(--blast-opacity,1)}}
 .explosion-overlay.custom-effect .blast-core{display:none}.explosion-overlay.custom-effect .burst-particles{display:none}
@@ -165,7 +165,7 @@ function configureCustomBlast(effect,allowSound=true){
   audio.src=soundUrl;audio.preload='auto';
  }else if(audio){audio.remove();audio=null;}
  const mediaKind=String(raw.mediaType||raw.mimeType||raw.type||'').toLowerCase();
- const video=/\.(mp4|webm|m4v)(\?|$)/i.test(url)||mediaKind.startsWith('video/');
+ const video=/\.(mp4|webm|m4v)(?:[?#]|$)/i.test(url)||/^video\//i.test(mediaKind)||/^(video|mp4|webm|m4v)$/i.test(mediaKind);
  if(!node||((video&&node.tagName!=='VIDEO')||(!video&&node.tagName!=='IMG'))){
   const next=document.createElement(video?'video':'img');next.id='customBlastMedia';next.className='custom-blast-media';
   if(video){next.muted=!allowSound||!!soundUrl;next.autoplay=false;next.loop=false;next.playsInline=true;next.setAttribute('playsinline','');next.setAttribute('webkit-playsinline','');next.setAttribute('preload','auto');}
@@ -173,7 +173,7 @@ function configureCustomBlast(effect,allowSound=true){
   node=next;
  }
  node.src=url;
- if(video){node.muted=!allowSound||!!soundUrl;node.loop=false;node.autoplay=false;node.playsInline=true;node.setAttribute('playsinline','');node.setAttribute('webkit-playsinline','');node.preload='auto';node.controls=false;node.load();}
+ if(video){node.muted=!allowSound||!!soundUrl;node.loop=false;node.autoplay=false;node.playsInline=true;node.setAttribute('playsinline','');node.setAttribute('webkit-playsinline','');node.preload='auto';node.controls=false;node.onerror=()=>{console.warn('Support chest video could not be decoded or loaded',node.currentSrc||node.src,node.error&&node.error.code);overlay.classList.remove('custom-effect');};node.load();}
  const number=(v,d,min,max)=>Math.max(min,Math.min(max,Number.isFinite(Number(v))?Number(v):d));
  const set=(key,value)=>node.style.setProperty(key,value);
  set('--blast-start-x',number(raw.startX,50,0,100)+'%');
