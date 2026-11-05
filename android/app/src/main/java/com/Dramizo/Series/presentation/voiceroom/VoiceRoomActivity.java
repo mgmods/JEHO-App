@@ -8052,7 +8052,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             luckyVideoStartRunnable = null;
         }
         if (videoUrl == null || videoUrl.trim().isEmpty()) {
-            binding.luckyWinVideo.setVisibility(View.GONE);
+            stopLuckySupportVideo();
             return;
         }
         try {
