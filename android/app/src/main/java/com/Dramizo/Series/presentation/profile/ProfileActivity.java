@@ -714,22 +714,45 @@ public class ProfileActivity extends ThemedActivity {
             return;
         }
 
-        boolean owner = "owner".equals(agencyRole);
-        // An active agency membership returned by the profile API is a host unless it is the owner.
-        // Pending requests are never rendered as role badges.
+        // Pending requests are not an active agency identity and must not appear on profiles.
         if (agencyRole.contains("pending") || agencyRole.contains("request")) {
             binding.tvAgencyRoleBadge.setVisibility(View.GONE);
             return;
         }
-        // Show exactly one agency identity badge; the separate blue host badge is hidden below.
-        String label = "♛  مضيف وكالة";
-        int start = 0xFFFFF0CC;
-        int end = 0xFFFFD778;
-        int textColor = 0xFF765000;
+
+        // Keep the public profile role explicit: agency owner, agency administrator,
+        // and a host who joined an agency are three different identities.
+        final String label;
+        final int start;
+        final int end;
+        final int textColor;
+        final int strokeColor;
+        if ("owner".equals(agencyRole)) {
+            label = "♛  صاحب وكالة";
+            start = 0xFFFFF0CC;
+            end = 0xFFFFD778;
+            textColor = 0xFF765000;
+            strokeColor = 0xFFE8BD57;
+        } else if ("manager".equals(agencyRole) || "admin".equals(agencyRole)
+                || "agency_admin".equals(agencyRole)) {
+            label = "◆  أدمن وكالة";
+            start = 0xFFEDE7FF;
+            end = 0xFFD8CCFF;
+            textColor = 0xFF5636A5;
+            strokeColor = 0xFFB6A0F0;
+        } else {
+            // HOST (and legacy active MEMBER records) are ordinary agency hosts.
+            label = "●  مضيف وكالة";
+            start = 0xFFDDF8F2;
+            end = 0xFFBCEDE2;
+            textColor = 0xFF126B5B;
+            strokeColor = 0xFF83D2C1;
+        }
+
         GradientDrawable chip = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT, new int[]{start, end});
         chip.setCornerRadius(100f * getResources().getDisplayMetrics().density);
-        chip.setStroke((int) (1 * getResources().getDisplayMetrics().density), 0xFFE8BD57);
+        chip.setStroke((int) (1 * getResources().getDisplayMetrics().density), strokeColor);
         binding.tvAgencyRoleBadge.setText(label);
         binding.tvAgencyRoleBadge.setTextColor(textColor);
         binding.tvAgencyRoleBadge.setBackground(chip);
