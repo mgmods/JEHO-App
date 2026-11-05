@@ -29,15 +29,27 @@ public final class LuckyGiftStageAnimator {
     public static void play(@Nullable FrameLayout overlay, @Nullable String giftIconUrl,
             @Nullable List<PointF> micTargets, long coinsSpent, int quantity, int personCount,
             @Nullable Runnable onScatterStart, @Nullable Runnable onEnd) {
+        play(overlay, giftIconUrl, micTargets, coinsSpent, quantity, personCount,
+                null, onScatterStart, onEnd);
+    }
+
+    public static void play(@Nullable FrameLayout overlay, @Nullable String giftIconUrl,
+            @Nullable List<PointF> micTargets, long coinsSpent, int quantity, int personCount,
+            @Nullable PointF revealCenter, @Nullable Runnable onScatterStart,
+            @Nullable Runnable onEnd) {
         if (overlay == null || overlay.getWidth() <= 0 || overlay.getHeight() <= 0
                 || giftIconUrl == null || giftIconUrl.trim().isEmpty()) {
             finish(onEnd);
             return;
         }
         final float density = overlay.getResources().getDisplayMetrics().density;
-        final float centerX = overlay.getWidth() * 0.5f;
-        // The lucky gift reveal is centered on the room viewport, independent of seat count.
-        final float centerY = overlay.getHeight() * 0.5f;
+        final float centerX = revealCenter != null
+                ? Math.max(56f * density, Math.min(overlay.getWidth() - 56f * density, revealCenter.x))
+                : overlay.getWidth() * 0.5f;
+        // The room caller can anchor the reveal directly below seat 18.
+        final float centerY = revealCenter != null
+                ? Math.max(56f * density, Math.min(overlay.getHeight() - 90f * density, revealCenter.y))
+                : overlay.getHeight() * 0.5f;
         final FrameLayout stage = new FrameLayout(overlay.getContext());
         stage.setClipChildren(false);
         stage.setClipToPadding(false);
