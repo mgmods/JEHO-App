@@ -4748,9 +4748,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        // Never queue repeat ticks behind a slow network request. A tick that arrives
-        // while one gift is in flight is skipped; release therefore cannot leave a backlog.
-        if (luckyCannonSending) return;
+        // Keep sends sequential for correct wallet accounting, but retain a small
+        // bounded queue while the finger is still down. Releasing clears it immediately.
+        if (luckyCannonSending) {
+            if (luckyCannonHoldActive) {
+                queuedLuckyCannonPresses = Math.min(3, queuedLuckyCannonPresses + 1);
+            }
+            return;
+        }
         final AppContainer container;
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
         final String giftId = luckyCannonGiftId;
