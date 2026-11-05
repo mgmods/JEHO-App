@@ -1695,9 +1695,9 @@
         android:background="#66000000"
         android:clickable="true"
         android:elevation="40dp"
-        android:focusable="true"
+        android:focusable="false"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -2033,7 +2033,7 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
-            android:layout_width="280dp"
+            android:layout_width="300dp"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:background="@drawable/bg_lucky_win_card"
@@ -2042,6 +2042,16 @@
             android:paddingHorizontal="22dp"
             android:paddingTop="18dp"
             android:paddingBottom="22dp">
+
+            <androidx.media3.ui.PlayerView
+                android:id="@+id/luckyWinVideo"
+                android:layout_width="260dp"
+                android:layout_height="146dp"
+                android:layout_marginBottom="10dp"
+                android:background="@android:color/black"
+                android:visibility="gone"
+                app:resize_mode="fit"
+                app:use_controller="false" />
 
             <com.airbnb.lottie.LottieAnimationView
                 android:id="@+id/lottieLuckyWin"
