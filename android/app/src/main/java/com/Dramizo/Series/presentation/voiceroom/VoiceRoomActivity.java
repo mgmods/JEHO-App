@@ -2967,11 +2967,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.topMargin = 1;
         row.setLayoutParams(lp);
-        // Mikoo room chat: all public lines start-aligned (no mine-on-right).
+        // Keep each message bubble on the opposite side of the feed while its
+        // internal content remains LTR: avatar on the left, name/badges beside it,
+        // and the message text directly underneath. Do not move the feed tabs/panel.
         if (row instanceof android.widget.LinearLayout) {
             android.widget.LinearLayout rowLl = (android.widget.LinearLayout) row;
             rowLl.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-            rowLl.setGravity(android.view.Gravity.START);
+            rowLl.setGravity(android.view.Gravity.END);
         }
         // Tag each rendered row so the three feed tabs can filter without touching RTC.
         row.setTag(gameCel ? "event" : (giftIconUrl != null && !giftIconUrl.isEmpty()
@@ -8101,6 +8103,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } catch (Exception e) {
             binding.luckyWinVideo.setVisibility(View.GONE);
             android.util.Log.w("VoiceRoom", "Lucky support video failed", e);
+            handler.post(this::hideLuckyWinOverlay);
         }
     }
 
@@ -8130,8 +8133,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void showLuckyWinOverlay(String openerName, String rewardLabel,
                                      @Nullable String videoUrl, long playAtServerMs) {
-        String title = (openerName != null && !openerName.isEmpty() ? openerName : "مستخدم")
-                + " · صندوق الحظ";
+        String title = openerName != null && !openerName.isEmpty() ? openerName : "مستخدم";
         // Intentionally do not show the legacy full-screen/center reward burst.
         // Lucky reward details remain in the room chat; the global top toast is the
         // only toast surface used for gift/lucky-win announcements.
