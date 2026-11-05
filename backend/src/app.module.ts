@@ -130,6 +130,15 @@ const entityList = Object.values(entities).filter(
           connectTimeoutMS: 8000,
         } as any).initialize();
 
+        // Additive support-box video URL column; preserves all existing lucky-box rows.
+        try {
+          await appDataSource.query(
+            'ALTER TABLE "jeho_own"."lucky_boxes" ADD COLUMN IF NOT EXISTS "videoUrl" varchar(1024)',
+          );
+        } catch (error) {
+          console.error('[LuckyBoxVideoBootstrap] Could not initialize video URL column.', error instanceof Error ? error.message : String(error));
+        }
+
         // Additive support-chest gift expiry column for existing JEHO databases.
         // Permanent gift history remains unchanged because expiresAt stays NULL.
         try {
