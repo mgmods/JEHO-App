@@ -77,11 +77,11 @@ public class MedalActivity extends ThemedActivity {
         showingMine = mineTab;
         if (tabBadge != null) {
             tabBadge.setBackgroundResource(mineTab ? 0 : R.drawable.bg_wallet_channel_on);
-            tabBadge.setTextColor(mineTab ? getColor(R.color.text_secondary) : 0xFF1A1200);
+            tabBadge.setTextColor(mineTab ? 0xFF536176 : 0xFF38280A);
         }
         if (tabMine != null) {
             tabMine.setBackgroundResource(mineTab ? R.drawable.bg_wallet_channel_on : 0);
-            tabMine.setTextColor(mineTab ? 0xFF1A1200 : getColor(R.color.text_secondary));
+            tabMine.setTextColor(mineTab ? 0xFF38280A : 0xFF536176);
         }
         bindList();
     }
@@ -280,7 +280,8 @@ public class MedalActivity extends ThemedActivity {
             boolean selected = selectedKeys.contains(row.key);
             h.itemView.setAlpha(selected ? 1f : 0.96f);
             h.action.setVisibility(showingMine && ownCabinet ? View.VISIBLE : View.GONE);
-            h.action.setText(selected ? "إلغاء التجهيز" : "تجهيز للملف الشخصي");
+            h.action.setText(selected ? "إلغاء التجهيز" : "تجهيز");
+            h.action.setTextColor(selected ? 0xFF176B45 : 0xFF49338F);
             h.action.setBackgroundResource(selected
                     ? R.drawable.bg_cosmetic_btn_equipped
                     : R.drawable.bg_cosmetic_btn_equip);
