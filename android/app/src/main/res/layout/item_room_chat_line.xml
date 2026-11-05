@@ -23,7 +23,7 @@
         android:maxWidth="340dp"
         android:minWidth="0dp"
         android:orientation="horizontal"
-        android:layoutDirection="ltr"
+        android:layoutDirection="rtl"
         android:paddingStart="9dp"
         android:paddingTop="6dp"
         android:paddingEnd="11dp"
@@ -68,7 +68,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layoutDirection="ltr">
+            android:layoutDirection="rtl">
 
             <LinearLayout
                 android:id="@+id/chatNameRow"
@@ -76,22 +76,7 @@
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:layoutDirection="ltr">
-
-                <TextView
-                    android:id="@+id/tvHostChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="3dp"
-                    android:background="@drawable/bg_seat_host_chip"
-                    android:paddingHorizontal="4dp"
-                    android:paddingVertical="1dp"
-                    android:text="المبدع"
-                    android:textColor="@color/aurora_gold"
-                    android:textSize="8sp"
-                    android:textStyle="bold"
-                    android:visibility="gone"
-                    tools:visibility="visible" />
+                android:layoutDirection="rtl">
 
                 <TextView
                     android:id="@+id/tvChatName"
@@ -107,6 +92,21 @@
                     android:textSize="11sp"
                     android:textStyle="bold"
                     tools:text="AuraStar" />
+
+                <TextView
+                    android:id="@+id/tvHostChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="3dp"
+                    android:background="@drawable/bg_seat_host_chip"
+                    android:paddingHorizontal="4dp"
+                    android:paddingVertical="1dp"
+                    android:text="المبدع"
+                    android:textColor="@color/aurora_gold"
+                    android:textSize="8sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
 
                 <LinearLayout
                     android:id="@+id/chatBadgesRow"
@@ -213,7 +213,8 @@
                 android:layout_marginTop="1dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:layoutDirection="ltr">
+                android:layoutDirection="rtl"
+                android:gravity="right|center_vertical">
 
                 <TextView
                     android:id="@+id/tvChatLine"
