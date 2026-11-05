@@ -13079,6 +13079,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onDestroy() {
+        stopLuckySupportVideo();
+        if (luckyVideoPlayer != null) {
+            try { luckyVideoPlayer.release(); } catch (Exception ignored) {}
+            luckyVideoPlayer = null;
+        }
         if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
         // Avoid retaining destroyed room activities through the recurring music UI tick.
         handler.removeCallbacks(musicProgressRunnable);
