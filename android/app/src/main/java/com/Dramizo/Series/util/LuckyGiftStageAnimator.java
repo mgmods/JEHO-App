@@ -36,9 +36,8 @@ public final class LuckyGiftStageAnimator {
         }
         final float density = overlay.getResources().getDisplayMetrics().density;
         final float centerX = overlay.getWidth() * 0.5f;
-        // Intentionally below screen center, just beneath the twenty-seat grid.
-        final float centerY = Math.min(overlay.getHeight() - 112f * density,
-                Math.max(overlay.getHeight() * 0.62f, overlay.getHeight() * 0.5f + 72f * density));
+        // The lucky gift reveal is centered on the room viewport, independent of seat count.
+        final float centerY = overlay.getHeight() * 0.5f;
         final FrameLayout stage = new FrameLayout(overlay.getContext());
         stage.setClipChildren(false);
         stage.setClipToPadding(false);
@@ -76,7 +75,7 @@ public final class LuckyGiftStageAnimator {
 
         TextView count = new TextView(overlay.getContext());
         int copies = Math.max(1, quantity) * Math.max(1, personCount);
-        count.setText(copies > 1 ? "×" + copies : "هدية محظوظة");
+        count.setText("×" + copies);
         count.setTextColor(0xFFFFFFFF);
         count.setTextSize(17f);
         count.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
