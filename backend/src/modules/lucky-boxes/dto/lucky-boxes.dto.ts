@@ -87,6 +87,11 @@ export class AdminUpsertBoxDto {
   @IsBoolean()
   isActive?: boolean;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
+
   @ApiProperty({ type: [LuckyBoxRewardDto] })
   @IsArray()
   @ValidateNested({ each: true })
