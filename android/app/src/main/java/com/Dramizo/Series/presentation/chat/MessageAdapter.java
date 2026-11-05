@@ -302,10 +302,13 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         } else if (useVipSkin) {
             // Paid VIP bubble skins apply to BOTH mine and peer (sender's VIP tier).
             VipStyle.applyBubble(holder.b.bubbleRoot, vipLevel);
-            int padH = dp(holder, 16);
-            int padT = dp(holder, 12);
-            int padB = dp(holder, 10);
+            // Keep text, emoji, reply tools and inline icons comfortably inside the VIP frame.
+            int padH = dp(holder, 22);
+            int padT = dp(holder, 17);
+            int padB = dp(holder, 15);
             holder.b.bubbleRoot.setPadding(padH, padT, padH, padB);
+            holder.b.bubbleRoot.setClipChildren(true);
+            holder.b.bubbleRoot.setClipToPadding(true);
         } else {
             int padH = dp(holder, 12);
             int padT = dp(holder, 8);
