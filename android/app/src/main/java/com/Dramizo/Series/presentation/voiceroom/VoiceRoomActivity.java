@@ -4862,13 +4862,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (binding == null || binding.giftOverlay == null) return;
             List<PointF> destinations = resolveMicCenters(recipients);
             if (destinations.isEmpty()) return;
-            // Anchor the large lucky-gift reveal just below seat 18, not at the
-            // screen edge or the generic viewport midpoint.
-            PointF revealCenter = resolveLuckyGiftRevealCenter();
+            // Always reveal the selected lucky gift at the exact screen center,
+            // then scatter copies out to the occupied microphones.
             com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
                     binding.giftOverlay, icon, destinations, totalCoins,
                     Math.max(1, quantity), Math.max(1, recipients.size()),
-                    revealCenter, null, null);
+                    null, null, null);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
