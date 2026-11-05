@@ -178,7 +178,8 @@ public class ComboGiftView extends FrameLayout {
 
             // Arabic/LTR rooms: enter from left, exit to the right (crawl across chat).
             final float enterFrom = -w - dp(28);
-            final float park = dp(10);
+            // Park the complete gift strip at the horizontal center of the room.
+            final float park = Math.max(0f, (parentW - w) / 2f);
             final float exitTo = parentW + dp(24);
 
             setTranslationX(enterFrom);
