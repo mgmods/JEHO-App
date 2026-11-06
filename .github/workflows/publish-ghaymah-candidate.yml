@@ -59,17 +59,6 @@ jobs:
           VITE_API_URL: /api/v1
           VITE_BASE: /admin/
         run: npm run build
-      - name: Set up Docker Buildx for cached image validation
-        uses: docker/setup-buildx-action@v3
-      - name: Build combined API and dashboard image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: false
-          tags: jeho-ghaymah-api:ci
-          cache-from: type=gha,scope=jeho-ghaymah
-          cache-to: type=gha,mode=max,scope=jeho-ghaymah
 
   build-and-publish:
     needs: checks
