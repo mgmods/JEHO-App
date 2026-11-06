@@ -19,7 +19,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: jeho-ghaymah-candidate
+  group: jeho-ghaymah-candidate-publish
   cancel-in-progress: true
 
 jobs:
