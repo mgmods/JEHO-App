@@ -701,7 +701,10 @@ async function load() {
     const { data, error: err } = await cosmeticsApi.adminList({ type: tab.value })
     if (err) throw err
     const payload = data?.data ?? data
-    items.value = Array.isArray(payload) ? payload : payload?.items || []
+    const rows = Array.isArray(payload) ? payload : payload?.items || []
+    // CP Store is managed exclusively from the CP area. Never show CP-only
+    // cosmetics inside the main mall/store dashboard catalog.
+    items.value = rows.filter((item) => item?.meta?.cpStore !== true)
   } catch (e) {
     error.value = e?.message || t('app.error')
   } finally {
