@@ -133,8 +133,13 @@ export class CosmeticsService implements OnModuleInit {
       where,
       order: { sortOrder: 'ASC', coinPrice: 'ASC' },
     });
-    // Some backend-only rewards are deliberately marked hidden from the mall.
-    return rows.filter((row) => (row.meta as any)?.mallHidden !== true);
+    // CP Store cosmetics are a separate catalog. They must never leak into
+    // the normal mall/store catalog, even when they are active.
+    // Keep CP Settings and CP Center access on their dedicated CP paths.
+    return rows.filter((row) => {
+      const meta = row.meta as any;
+      return meta?.mallHidden !== true && meta?.cpStore !== true;
+    });
   }
 
   async adminList(type?: CosmeticType) {
