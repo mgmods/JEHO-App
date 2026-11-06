@@ -322,10 +322,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int luckyCannonGiftQuantity = 1;
     private final List<String> luckyCannonTargets = new ArrayList<>();
     private boolean luckyCannonSending;
-    /** Accepted hold ticks are drained one-by-one after each confirmed economy send. */
-    private int queuedLuckyCannonPresses;
+    /** Number of cannon economy requests currently in flight. */
+    private int luckyCannonInFlight;
     private boolean luckyCannonHoldActive;
-    private static final long LUCKY_CANNON_REPEAT_MS = 180L;
+    private static final long LUCKY_CANNON_REPEAT_MS = 75L;
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 4;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
             if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
@@ -4752,7 +4753,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Releasing the cannon cancels every not-yet-started repeat immediately. */
     private void stopLuckyCannonHold() {
         luckyCannonHoldActive = false;
-        queuedLuckyCannonPresses = 0;
         handler.removeCallbacks(luckyCannonRepeatRunnable);
     }
 
@@ -4779,25 +4779,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        // Keep sends sequential for correct wallet accounting, but retain a small
-        // bounded queue while the finger is still down. Releasing clears it immediately.
-        if (luckyCannonSending) {
-            if (luckyCannonHoldActive) {
-                queuedLuckyCannonPresses = Math.min(3, queuedLuckyCannonPresses + 1);
-            }
-            return;
-        }
+        // Do not serialize cannon shots behind network round-trips. Allow a small
+        // bounded number of requests in flight. Releasing the finger stops creating
+        // new requests immediately; there is no queued shot to drain afterwards.
+        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) return;
         final AppContainer container;
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
         final String giftId = luckyCannonGiftId;
-        if (luckyCannonRequestId == null) luckyCannonRequestId = java.util.UUID.randomUUID().toString();
-        final String requestId = luckyCannonRequestId;
+        final String requestId = java.util.UUID.randomUUID().toString();
         final int quantity = luckyCannonGiftQuantity;
         java.util.LinkedHashSet<String> liveTargets = new java.util.LinkedHashSet<>(collectOccupiedMicUserIds());
         if (liveTargets.isEmpty()) liveTargets.addAll(luckyCannonTargets);
         final List<String> targets = new ArrayList<>(liveTargets);
         if (targets.isEmpty()) return;
         final String currentRoom = roomId;
+        luckyCannonInFlight++;
         luckyCannonSending = true;
         if (luckyCannonView != null) luckyCannonView.setEnabled(true);
         container.getIoExecutor().execute(() -> {
@@ -4841,7 +4837,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             final Result<GiftDtos.SendGiftResult> finalResult = result;
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
-                luckyCannonSending = false;
+                luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
+                luckyCannonSending = luckyCannonInFlight > 0;
                 if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
                 if (!finalResult.success || finalResult.data == null || !finalResult.data.success) {
                     // Do not keep charging/retrying queued taps after a balance or server error.
@@ -4853,12 +4850,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Server emits the canonical room gift event; animation is rendered locally by
                 // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                // If a repeat tick arrived during this request, send it immediately
-                // only while the finger is still held. ACTION_UP clears the queue.
-                if (luckyCannonHoldActive && queuedLuckyCannonPresses > 0) {
-                    queuedLuckyCannonPresses--;
-                    sendLuckyCannonGift(true);
-                }
+                // The repeat runnable drives the next shot independently; there is
+                // deliberately no post-release queue to drain.
             });
         });
     }
@@ -4907,7 +4900,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
                     binding.giftOverlay, icon, destinations, totalCoins,
                     Math.max(1, quantity), Math.max(1, recipients.size()),
-                    null, null, null);
+                    resolveLuckyGiftRevealCenter(), null, null);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
