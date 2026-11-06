@@ -177,8 +177,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       return ids.map(id => String(id || '').trim()).filter(id => UUID_REGEX.test(id));
     })));
     const gifts = giftIds.length ? await this.dataSource.query(
-      'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true AND category=$cp$',
-      [giftIds],
+      'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true AND category=$2',
+      [giftIds, 'cp'],
     ) : [];
     const giftsById = new Map(gifts.map((gift: any) => [String(gift.id), gift]));
     const cosmeticCodes = Array.from(new Set(safeLevels.flatMap(item => [
@@ -249,8 +249,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           );
           if (!claim?.id) return;
           const [gift] = await manager.query(
-            'SELECT id,name,"iconUrl" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$cp$ LIMIT 1',
-            [giftId],
+            'SELECT id,name,"iconUrl" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$2 LIMIT 1',
+            [giftId, 'cp'],
           );
           if (!gift) {
             await manager.query('DELETE FROM cp_level_gift_reward_claims WHERE id=$1', [claim.id]);
@@ -340,8 +340,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] || null;
       const [gift] = giftId ? await this.dataSource.query(
-        'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$cp$',
-        [giftId],
+        'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$2',
+        [giftId, 'cp'],
       ) : [];
       // The CP dashboard price is the live source of truth for the CP store.
       // Legacy installations without cp.price.<type> continue using the selected gift's price.

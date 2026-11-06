@@ -159,7 +159,7 @@ export class CpAdminController {
     for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] ?? null;
       const price = Number(settings[`cp.price.${type}`]);
-      const [gift] = giftId ? await this.dataSource.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$cp$', [giftId]) : [];
+      const [gift] = giftId ? await this.dataSource.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$2', [giftId, 'cp']) : [];
       types.push({
         type,
         priceCoins: Number.isSafeInteger(price) && price > 0 ? price : null,
@@ -403,8 +403,8 @@ export class CpAdminController {
         }
         if (rewardGiftIds.length) {
           const activeGifts = await this.dataSource.query(
-            'SELECT id FROM gifts WHERE id=ANY($1::uuid[]) AND "isActive"=true AND category=$cp$',
-            [rewardGiftIds],
+            'SELECT id FROM gifts WHERE id=ANY($1::uuid[]) AND "isActive"=true AND category=$2',
+            [rewardGiftIds, 'cp'],
           );
           if (activeGifts.length !== rewardGiftIds.length) {
             throw new BadRequestException('كل هدايا مكافأة المستوى يجب أن تكون هدايا نشطة من الكتالوج');
@@ -472,8 +472,8 @@ export class CpAdminController {
     }
     if (body.giftId !== undefined && body.giftId) {
       const [selectedGift] = await this.dataSource.query(
-        'SELECT id FROM gifts WHERE id=$1 AND "isActive"=true AND category=$cp$ LIMIT 1',
-        [body.giftId],
+        'SELECT id FROM gifts WHERE id=$1 AND "isActive"=true AND category=$2 LIMIT 1',
+        [body.giftId, 'cp'],
       );
       if (!selectedGift) throw new BadRequestException('اختر هدية موجودة ومفعّلة من كتالوج الهدايا');
     }
