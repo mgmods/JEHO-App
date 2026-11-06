@@ -46,13 +46,24 @@ export class BadgesService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  /** Resolve a dashboard-entered account ID without ever forcing a non-UUID value through the UUID column. */
+  private async resolveUserByIdentifier(identifier: string, select?: any) {
+    const value = (identifier || '').trim();
+    if (!value) return null;
+
+    // UUID-looking values may be safely queried against users.id. Everything else
+    // must be matched through the varchar publicId column first; otherwise Postgres
+    // can cast a numeric/vanity ID to uuid and throw "invalid input syntax for type uuid".
+    if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(value)) {
+      return this.users.findOne({ where: { id: value }, ...(select ? { select } : {}) });
+    }
+    return this.users.findOne({ where: { publicId: value }, ...(select ? { select } : {}) });
+  }
+
   async catalogForIdentifier(identifier: string) {
     const value = (identifier || '').trim();
     if (!value) throw new BadRequestException('User ID is required');
-    const user = await this.users.findOne({
-      where: [{ id: value }, { publicId: value }],
-      select: { id: true, publicId: true },
-    });
+    const user = await this.resolveUserByIdentifier(value, { id: true, publicId: true });
     if (!user) throw new NotFoundException('User not found');
     return this.catalog(user.id);
   }
@@ -464,10 +475,7 @@ export class BadgesService {
     // Resolve the recipient by the current account UUID/public ID first.
     // A purchased vanity ID can also be owned by the account while it is applied
     // to a room/agency, so it must still resolve to ownerUserId for direct admin gifts.
-    let user = await this.users.findOne({
-      where: [{ id: identifier }, { publicId: identifier }],
-      select: { id: true, publicId: true, username: true, displayName: true },
-    });
+    let user = await this.resolveUserByIdentifier(identifier, { id: true, publicId: true, username: true, displayName: true });
 
     if (!user && /^\\d{3,12}$/.test(identifier)) {
       const vanityOwner = await this.dataSource.query(
@@ -620,7 +628,7 @@ export class BadgesService {
   async revoke(badgeId: string, userIdentifier: string) {
     const identifier = (userIdentifier || '').trim();
     if (!identifier) throw new BadRequestException('User ID is required');
-    const user = await this.users.findOne({ where: [{ id: identifier }, { publicId: identifier }] });
+    const user = await this.resolveUserByIdentifier(identifier);
     if (!user) throw new NotFoundException('User not found by UUID or public ID');
     const grant = await this.userBadges.findOne({ where: { badgeId, userId: user.id } });
     if (!grant) throw new NotFoundException('Medal ownership not found');
