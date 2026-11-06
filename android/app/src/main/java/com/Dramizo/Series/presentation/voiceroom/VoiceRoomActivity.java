@@ -2839,7 +2839,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         View row = getLayoutInflater().inflate(R.layout.item_room_chat_line, binding.chatLog, false);
-        View bubble = row.findViewById(R.id.chatBubbleRoot);
+        ViewGroup bubble = row.findViewById(R.id.chatBubbleRoot);
         ImageView avatar = row.findViewById(R.id.imgChatAvatar);
         ImageView frameView = row.findViewById(R.id.imgChatFrame);
         ImageView giftIcon = row.findViewById(R.id.imgChatGift);
