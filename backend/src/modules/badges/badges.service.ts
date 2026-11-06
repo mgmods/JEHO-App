@@ -72,10 +72,7 @@ export class BadgesService {
   async earnedForIdentifier(identifier: string) {
     const value = (identifier || '').trim();
     if (!value) throw new BadRequestException('User ID is required');
-    const user = await this.users.findOne({
-      where: [{ id: value }, { publicId: value }],
-      select: { id: true, publicId: true },
-    });
+    const user = await this.resolveUserByIdentifier(value, { id: true, publicId: true });
     if (!user) throw new NotFoundException('User not found');
     await this.cleanupExpiredDisplayedMedals(user.id);
     const grants = await this.userBadges.find({
