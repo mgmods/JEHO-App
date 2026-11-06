@@ -4,6 +4,65 @@
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
     <div v-if="success" class="alert alert-success">{{ success }}</div>
 
+    
+    <section class="panel room-support-panel">
+      <div class="section-heading">
+        <div class="heading-icon room-support-icon"><i class="bi bi-trophy-fill"></i></div>
+        <div><h2>مداليات دعم الغرف</h2><p>قسم مستقل لتعريف مداليات الدعم وشروطها، دون خلطها بالمداليات العامة أو مهامها.</p></div>
+      </div>
+      <div class="room-support-settings">
+        <label class="check-row"><input v-model="roomSupport.enabled" type="checkbox" /> تفعيل نظام مداليات دعم الغرف</label>
+        <label>طريقة العرض
+          <select v-model="roomSupport.displayMode" class="form-select"><option value="highest">أعلى مدالية مستحقة فقط (highest)</option></select>
+        </label>
+        <label>مكان الظهور
+          <select v-model="roomSupport.displayLocation" class="form-select"><option value="both">داخل الغرفة وفقاعة الرسائل (both)</option></select>
+        </label>
+        <label>مدة المدالية
+          <select v-model="roomSupport.durationMode" class="form-select"><option value="admin">حسب المدة التي يحددها المدير (admin)</option></select>
+        </label>
+        <label>احتساب الدعم
+          <select v-model="roomSupport.scope" class="form-select"><option value="per_room">كل غرفة بشكل مستقل</option></select>
+        </label>
+      </div>
+      <div class="room-medal-editor">
+        <h3>{{ roomMedalEditIndex < 0 ? 'إضافة مدالية دعم' : 'تعديل مدالية دعم' }}</h3>
+        <div class="form-grid">
+          <label>اسم المدالية<input v-model.trim="roomMedalForm.name" class="form-control" maxlength="80" placeholder="مثلاً: داعم الغرفة الذهبي" /></label>
+          <label>نوع شرط الدعم
+            <select v-model="roomMedalForm.criteriaType" class="form-select">
+              <option value="coins">إجمالي العملات المدفوعة</option><option value="diamonds">إجمالي الألماس المستحق</option><option value="gifts">عدد الهدايا</option>
+            </select>
+          </label>
+          <label>الحد المطلوب<input v-model.number="roomMedalForm.threshold" class="form-control" type="number" min="1" max="1000000000" /></label>
+          <label>مدة الاستحقاق بالأيام<input v-model.number="roomMedalForm.durationDays" class="form-control" type="number" min="0" max="3650" /><small>0 = دائمة</small></label>
+          <label class="wide">رابط صورة المدالية<input v-model.trim="roomMedalForm.imageUrl" class="form-control" type="url" placeholder="ارفع الصورة أو أدخل رابطها" /></label>
+          <label class="upload-box wide"><span><i class="bi bi-cloud-arrow-up"></i> {{ roomMedalUploading ? 'جارٍ رفع الصورة…' : 'رفع صورة مدالية الدعم' }}</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" :disabled="roomMedalUploading" @change="uploadRoomMedalImage" /></label>
+          <div v-if="roomMedalForm.imageUrl" class="medal-preview"><img :src="roomMedalForm.imageUrl" alt="معاينة مدالية الدعم" /></div>
+          <label class="check-row"><input v-model="roomMedalForm.isActive" type="checkbox" /> المدالية مفعّلة</label>
+        </div>
+        <div class="room-medal-actions">
+          <button class="btn btn-success" type="button" :disabled="roomSupportSaving || roomMedalUploading" @click="saveRoomMedal">{{ roomMedalEditIndex < 0 ? 'إضافة إلى القائمة' : 'حفظ التعديل' }}</button>
+          <button v-if="roomMedalEditIndex >= 0" class="btn btn-outline-light" type="button" @click="resetRoomMedalForm">إلغاء التعديل</button>
+        </div>
+      </div>
+      <div v-if="roomSupport.medals.length" class="room-medal-list">
+        <article v-for="(medal, index) in roomSupport.medals" :key="index" class="room-medal-row">
+          <img v-if="medal.imageUrl" :src="medal.imageUrl" :alt="medal.name" />
+          <div class="room-medal-info"><strong>{{ medal.name }}</strong><small>{{ criteriaLabel(medal.criteriaType) }}: {{ Number(medal.threshold).toLocaleString() }} · {{ medal.durationDays ? medal.durationDays + ' يوم' : 'دائمة' }}</small></div>
+          <span class="status" :class="medal.isActive ? 'on' : 'off'">{{ medal.isActive ? 'مفعّلة' : 'متوقفة' }}</span>
+          <button class="btn btn-sm btn-outline-light" type="button" @click="editRoomMedal(index)">تعديل</button>
+          <button class="btn btn-sm btn-outline-danger" type="button" @click="removeRoomMedal(index)">حذف</button>
+        </article>
+      </div>
+      <p v-else class="empty">لم تتم إضافة مداليات دعم بعد.</p>
+      <div class="room-support-footer">
+        <span>الإعدادات المعتمدة: highest · both · admin</span>
+        <button class="btn btn-success" type="button" :disabled="roomSupportSaving || roomMedalUploading" @click="saveRoomSupportConfig">{{ roomSupportSaving ? 'جارٍ الحفظ…' : 'حفظ إعدادات مداليات دعم الغرف' }}</button>
+      </div>
+      <p class="secret-note">هذا القسم مستقل عن المداليات العامة. حفظ إعداداته في لوحة الإدارة لا يعني وحده تفعيل احتساب الدعم أو إظهار الميدالية داخل التطبيق؛ يلزم ربط محرك المنح والعرض في الخادم والتطبيق.</p>
+    </section>
+
     <section class="panel create-panel">
       <div class="section-heading">
         <div class="heading-icon"><i class="bi bi-award-fill"></i></div>
@@ -115,7 +174,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { medalsApi, uploadsApi } from '@/api'
+import { medalsApi, uploadsApi, settingsApi } from '@/api'
 import PageHeader from '@/components/PageHeader.vue'
 import { resolveAsset } from '@/utils/assets'
 
@@ -127,6 +186,80 @@ const error = ref('')
 const success = ref('')
 const busyId = ref('')
 const previewBroken = ref(false)
+const roomSupportSaving = ref(false)
+const roomMedalUploading = ref(false)
+const roomMedalEditIndex = ref(-1)
+const roomSupport = reactive({ enabled: true, displayMode: 'highest', displayLocation: 'both', durationMode: 'admin', scope: 'per_room', medals: [] })
+const roomMedalForm = reactive({ name: '', criteriaType: 'coins', threshold: 1000, durationDays: 0, imageUrl: '', isActive: true })
+function resetRoomMedalForm() {
+  Object.assign(roomMedalForm, { name: '', criteriaType: 'coins', threshold: 1000, durationDays: 0, imageUrl: '', isActive: true })
+  roomMedalEditIndex.value = -1
+}
+function criteriaLabel(type) { return ({ coins: 'عملات', diamonds: 'ألماس', gifts: 'هدايا' })[type] || 'عملات' }
+async function loadRoomSupportConfig() {
+  try {
+    const { data, error: err } = await settingsApi.get()
+    if (err) throw err
+    const rows = unwrap(data)
+    const row = Array.isArray(rows) ? rows.find(item => item?.key === 'room_support_medals_config') : null
+    if (!row?.value) return
+    const saved = JSON.parse(row.value)
+    roomSupport.enabled = saved.enabled !== false
+    roomSupport.displayMode = 'highest'
+    roomSupport.displayLocation = 'both'
+    roomSupport.durationMode = 'admin'
+    roomSupport.scope = 'per_room'
+    roomSupport.medals = Array.isArray(saved.medals) ? saved.medals : []
+  } catch (e) { error.value = e?.message || 'تعذر تحميل إعدادات مداليات دعم الغرف' }
+}
+async function saveRoomSupportConfig() {
+  roomSupportSaving.value = true; error.value = ''; success.value = ''
+  try {
+    const payload = {
+      enabled: !!roomSupport.enabled, displayMode: 'highest', displayLocation: 'both',
+      durationMode: 'admin', scope: 'per_room',
+      medals: roomSupport.medals.map(m => ({
+        name: String(m.name || '').trim(), criteriaType: ['coins','diamonds','gifts'].includes(m.criteriaType) ? m.criteriaType : 'coins',
+        threshold: Math.max(1, Math.floor(Number(m.threshold) || 1)),
+        durationDays: Math.max(0, Math.min(3650, Math.floor(Number(m.durationDays) || 0))),
+        imageUrl: String(m.imageUrl || '').trim(), isActive: m.isActive !== false,
+      })),
+    }
+    const { error: err } = await settingsApi.update({ room_support_medals_config: JSON.stringify(payload) })
+    if (err) throw new Error(err.message || 'تعذر حفظ إعدادات مداليات دعم الغرف')
+    success.value = 'تم حفظ إعدادات وقائمة مداليات دعم الغرف في الداشبورد.'
+  } catch (e) { error.value = e?.message || 'تعذر حفظ إعدادات مداليات دعم الغرف' }
+  finally { roomSupportSaving.value = false }
+}
+function saveRoomMedal() {
+  const name = String(roomMedalForm.name || '').trim()
+  const imageUrl = String(roomMedalForm.imageUrl || '').trim()
+  if (!name || !imageUrl) { error.value = 'أدخل اسم المدالية وارفع صورتها أولاً.'; return }
+  const item = { ...roomMedalForm, name, imageUrl, threshold: Math.max(1, Math.floor(Number(roomMedalForm.threshold) || 1)), durationDays: Math.max(0, Math.min(3650, Math.floor(Number(roomMedalForm.durationDays) || 0))) }
+  if (roomMedalEditIndex.value >= 0) roomSupport.medals.splice(roomMedalEditIndex.value, 1, item)
+  else roomSupport.medals.push(item)
+  resetRoomMedalForm()
+}
+function editRoomMedal(index) {
+  const item = roomSupport.medals[index]
+  Object.assign(roomMedalForm, { ...item })
+  roomMedalEditIndex.value = index
+}
+function removeRoomMedal(index) { roomSupport.medals.splice(index, 1); if (roomMedalEditIndex.value === index) resetRoomMedalForm() }
+async function uploadRoomMedalImage(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  roomMedalUploading.value = true; error.value = ''
+  try {
+    const { data, error: err } = await uploadsApi.upload(file)
+    if (err) throw new Error(err.message || 'فشل رفع صورة المدالية')
+    const payload = unwrap(data)
+    const url = payload.url || payload.path
+    if (!url) throw new Error('تم الرفع دون رابط للصورة')
+    roomMedalForm.imageUrl = resolveAsset(url)
+  } catch (e) { error.value = e?.message || 'فشل رفع صورة المدالية' }
+  finally { roomMedalUploading.value = false; event.target.value = '' }
+}
 const recipient = reactive({})
 const duration = reactive({})
 const hiddenTask = reactive({})
@@ -279,11 +412,26 @@ async function deleteMedal(medal) {
   } catch (e) { error.value = e?.message || 'تعذر حذف المدالية' }
   finally { busyId.value = '' }
 }
-onMounted(load)
+onMounted(() => { load(); loadRoomSupportConfig() })
 </script>
 
 <style scoped>
 .medals-page { color: #f7f8fc; }
+.room-support-icon { background:linear-gradient(135deg,#d7a83d,#8b5a12); color:#fff; }
+.room-support-settings { display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;padding:16px;border:1px solid rgba(215,168,61,.28);border-radius:14px;background:rgba(150,103,25,.10); }
+.room-support-settings label,.room-medal-editor label { display:flex;flex-direction:column;gap:7px;font-size:.88rem;font-weight:700;color:#dce4f2; }
+.room-support-settings .check-row,.room-medal-editor .check-row { flex-direction:row;align-items:center; }
+.room-medal-editor { margin-top:18px;padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:15px;background:rgba(10,16,28,.35); }
+.room-medal-editor h3 { font-size:1rem;font-weight:800;margin:0 0 14px;color:#f4d58b; }
+.room-medal-actions,.room-support-footer { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;flex-wrap:wrap; }
+.room-medal-list { display:grid;gap:10px;margin-top:16px; }
+.room-medal-row { display:flex;align-items:center;gap:12px;padding:10px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035); }
+.room-medal-row img { width:48px;height:48px;object-fit:contain;border-radius:10px;background:#101827; }
+.room-medal-info { display:grid;gap:4px;flex:1;min-width:0; }
+.room-medal-info small,.room-support-footer span { color:#a8b1c5;font-size:.8rem; }
+.room-support-footer { padding-top:14px;border-top:1px solid rgba(255,255,255,.1); }
+.room-support-panel .secret-note { margin-top:12px; }
+@media(max-width:650px) { .room-medal-row { flex-wrap:wrap; } .room-medal-info { min-width:calc(100% - 70px); } }
 .panel { background: linear-gradient(145deg, rgba(30,36,52,.96), rgba(18,23,36,.96)); border: 1px solid rgba(255,255,255,.09); border-radius: 20px; padding: 22px; margin-bottom: 26px; }
 .section-heading { display:flex; align-items:center; gap:14px; margin: 22px 0 16px; }
 .section-heading h2 { font-size: 1.15rem; font-weight: 800; margin:0 0 5px; }
