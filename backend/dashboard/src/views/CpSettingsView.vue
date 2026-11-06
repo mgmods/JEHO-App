@@ -401,7 +401,31 @@
           </div>
           <span class="badge rounded-pill text-bg-light border">متصل بكتالوج المتجر</span>
         </div>
-        <div class="alert alert-info small">الشراء وخصم العملات وارتداء العنصر يتم عبر الخادم. لا تضفوا عناصر CP بإعدادات شكلية فقط؛ يجب حفظ صورة معاينة صالحة وسعر واضح.</div>
+        <div class="alert alert-info small">كتالوج CP مستقل: العناصر التي ترفعها هنا فقط تظهر في متجر CP. عناصر المتجر العادي لا تُعرض هنا ولا يمكن شراؤها من واجهة CP.</div>
+        <div class="border rounded-3 p-3 mb-4">
+          <h4 class="h6 mb-1">هدايا CP الخاصة</h4>
+          <p class="form-text">ارفع هدايا CP من هنا مباشرة. تُحفظ في محرك الهدايا نفسه لكن بتصنيف CP مستقل، ولا تختلط بهدايا التبويبات العادية.</p>
+          <div class="row g-3 align-items-end">
+            <div class="col-sm-6 col-xl-3"><label class="form-label">اسم الهدية</label><input v-model.trim="cpGiftForm.name" class="form-control" maxlength="64" placeholder="هدية قلب CP"></div>
+            <div class="col-sm-6 col-xl-2"><label class="form-label">السعر بالكوين</label><input v-model.number="cpGiftForm.coinPrice" class="form-control" type="number" min="1" max="1000000000"></div>
+            <div class="col-sm-6 col-xl-2"><label class="form-label">ألماس المستلم</label><input v-model.number="cpGiftForm.diamondValue" class="form-control" type="number" min="0" max="1000000000"></div>
+            <div class="col-sm-6 col-xl-2"><label class="form-label">نقاط CP لكل هدية</label><input v-model.number="cpGiftForm.cpPoints" class="form-control" type="number" min="0" max="1000000000"></div>
+            <div class="col-sm-6 col-xl-3"><label class="form-label">أيقونة الهدية</label><input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" :disabled="uploadingCpGiftIcon" @change="uploadCpGiftAsset('iconUrl',$event)"><input v-model.trim="cpGiftForm.iconUrl" class="form-control form-control-sm mt-2" dir="ltr" placeholder="رابط الأيقونة"></div>
+            <div class="col-sm-6 col-xl-3"><label class="form-label">حركة الهدية (اختياري)</label><input class="form-control" type="file" accept=".gif,.webp,.mp4,.webm,image/gif,image/webp,video/mp4,video/webm" :disabled="uploadingCpGiftAnimation" @change="uploadCpGiftAsset('animationUrl',$event)"><input v-model.trim="cpGiftForm.animationUrl" class="form-control form-control-sm mt-2" dir="ltr" placeholder="رابط الحركة"></div>
+            <div class="col-sm-6 col-xl-3"><label class="form-label">نوع الهدية</label><select v-model="cpGiftForm.type" class="form-select"><option value="normal">عادية</option><option value="premium">مميزة</option><option value="combo">متتابعة</option></select></div>
+            <div class="col-sm-6 col-xl-3"><button class="btn btn-aurora w-100" type="button" :disabled="savingCpGift || uploadingCpGiftIcon || uploadingCpGiftAnimation" @click="createCpGift"><span v-if="savingCpGift" class="spinner-border spinner-border-sm me-1" />إضافة هدية CP</button></div>
+          </div>
+          <div v-if="cpGiftForm.iconUrl" class="d-flex align-items-center gap-2 mt-3"><img :src="cpGiftForm.animationUrl || cpGiftForm.iconUrl" alt="معاينة هدية CP" width="58" height="58" style="object-fit:contain"><span class="small text-secondary">معاينة الهدية قبل النشر</span></div>
+          <hr class="my-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2"><strong>هدايا CP المنشورة ({{ cpGiftItems.length }})</strong><span class="small text-secondary">لا تظهر الهدايا العادية في هذه القائمة</span></div>
+          <div v-if="!cpGiftItems.length" class="text-secondary small py-2">لم تُرفع هدايا CP بعد.</div>
+          <div v-for="gift in cpGiftItems" :key="gift.id" class="d-flex align-items-center gap-3 flex-wrap border-top py-3">
+            <img :src="gift.animationUrl || gift.iconUrl" :alt="gift.name" width="54" height="54" style="object-fit:contain">
+            <div class="flex-grow-1" style="min-width:180px"><input v-model.trim="gift.name" class="form-control form-control-sm mb-2"><div class="d-flex flex-wrap gap-2"><div><label class="form-label small mb-1">السعر</label><input v-model.number="gift.coinPrice" class="form-control form-control-sm" type="number" min="1"></div><div><label class="form-label small mb-1">ألماس</label><input v-model.number="gift.diamondValue" class="form-control form-control-sm" type="number" min="0"></div><div><label class="form-label small mb-1">نقاط CP</label><input v-model.number="gift.cpPoints" class="form-control form-control-sm" type="number" min="0"></div></div></div>
+            <label class="form-check form-switch mb-0"><input v-model="gift.isActive" class="form-check-input" type="checkbox" role="switch"><span class="form-check-label">{{ gift.isActive ? 'منشورة' : 'مخفية' }}</span></label>
+            <button class="btn btn-outline-primary btn-sm" type="button" :disabled="savingCpGift" @click="saveCpGift(gift)">حفظ الهدية</button>
+          </div>
+        </div>
         <div class="row g-3">
           <div class="col-sm-6 col-xl-3">
             <label class="form-label">رمز العنصر (فريد)</label>
@@ -416,6 +440,8 @@
             <select v-model="cpStoreForm.type" class="form-select">
               <option value="cp_background">خلفية CP</option>
               <option value="cp_logo">شعار CP</option>
+              <option value="vip_badge">إطار صورة شخصية</option>
+              <option value="host_badge">شارة خاصة</option>
               <option value="profile_card">بطاقة / إطار الملف الشخصي</option>
               <option value="level_badge">شارة مستوى</option>
               <option value="entry_effect">تأثير دخول</option>
@@ -558,7 +584,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { cpAdminApi, giftsApi, uploadsApi, cosmeticsApi } from '@/api'
+import { cpAdminApi, giftsApi, uploadsApi } from '@/api'
 import { extractList } from '@/composables/useUtils'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -568,9 +594,10 @@ const activeTab = ref('overview')
 const types = ref([])
 const gifts = ref([])
 // CP gifts remain selectable even when configured as free; visibility in the room must not be gated by price.
-const cpGifts = computed(() => gifts.value.filter(gift => String(gift.category || '').toLowerCase() === 'cp' && gift.isActive !== false))
-// The single CP level may reward any paid gift already present in the app, including CP-tab gifts.
-const normalGifts = computed(() => gifts.value.filter(gift => gift.isActive !== false && Number(gift.coinPrice ?? gift.price ?? 0) > 0))
+const cpGiftItems = computed(() => gifts.value.filter(gift => String(gift.category || '').toLowerCase() === 'cp'))
+const cpGifts = computed(() => cpGiftItems.value.filter(gift => gift.isActive !== false))
+// CP level rewards may select only gifts uploaded specifically for CP.
+const normalGifts = computed(() => cpGifts.value.filter(gift => Number(gift.coinPrice ?? gift.price ?? 0) > 0))
 const requests = ref([])
 const audit = ref([])
 const loading = ref(false)
@@ -597,6 +624,10 @@ const loadingCpStore = ref(false)
 const savingCpStore = ref(false)
 const uploadingCpStorePreview = ref(false)
 const cpStoreForm = ref({ code: '', name: '', type: 'cp_background', coinPrice: 1000, previewUrl: '', animationUrl: '', description: '', leaseDays: 30 })
+const cpGiftForm = ref({ name: '', coinPrice: 100, diamondValue: 80, cpPoints: 10, type: 'normal', iconUrl: '', animationUrl: '' })
+const savingCpGift = ref(false)
+const uploadingCpGiftIcon = ref(false)
+const uploadingCpGiftAnimation = ref(false)
 
 function label(type) {
   return type === 'relationship' ? 'نظام الارتباط الموحد' : 'نظام الارتباط الموحد'
@@ -611,11 +642,11 @@ function isCpStoreItem(item) {
 async function loadCpStoreItems() {
   loadingCpStore.value = true
   try {
-    const response = await cosmeticsApi.adminList()
+    const response = await cpAdminApi.storeItems()
     if (response?.error) throw new Error(response.error.message || 'تعذر تحميل عناصر متجر CP')
-    const allItems = extractList(payloadOf(response)).filter(item => item && item.isActive !== false)
-    rewardCosmetics.value = allItems
-    cpStoreItems.value = allItems.filter(isCpStoreItem).map(item => ({ ...item, meta: { ...(item.meta || {}), leaseDays: Number(item.meta?.leaseDays || 30) } }))
+    const allItems = extractList(payloadOf(response)).filter(Boolean)
+    cpStoreItems.value = allItems.map(item => ({ ...item, meta: { ...(item.meta || {}), leaseDays: Number(item.meta?.leaseDays || 30) } }))
+    rewardCosmetics.value = cpStoreItems.value.filter(item => item.isActive !== false)
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل عناصر متجر CP'
   } finally { loadingCpStore.value = false }
@@ -675,11 +706,12 @@ async function createCpStoreItem() {
   }
   savingCpStore.value = true
   try {
-    const response = await cosmeticsApi.create({
+    const response = await cpAdminApi.createStoreItem({
       type: form.type, code: form.code, name: form.name,
       description: form.description || '', previewUrl: form.previewUrl,
       animationUrl: form.animationUrl || null, coinPrice: Number(form.coinPrice),
       isActive: true, sortOrder: 0,
+      leaseDays: Number(form.leaseDays),
       meta: { cpStore: true, leaseDays: Number(form.leaseDays) },
     })
     if (response?.error) throw new Error(response.error.message || 'تعذر إضافة العنصر')
@@ -698,9 +730,10 @@ async function saveCpStoreItem(item) {
         !Number.isInteger(leaseDays) || leaseDays < 1 || leaseDays > 3650) {
       throw new Error('تحقق من اسم العنصر والسعر والمدة.')
     }
-    const response = await cosmeticsApi.update(item.id, {
+    const response = await cpAdminApi.updateStoreItem(item.id, {
       name: item.name.trim(),
       coinPrice: price,
+      leaseDays,
       isActive: !!item.isActive,
       meta: { ...(item.meta || {}), cpStore: true, leaseDays },
     })
@@ -709,6 +742,85 @@ async function saveCpStoreItem(item) {
     await loadCpStoreItems()
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ العنصر' }
   finally { savingCpStore.value = false }
+}
+async function loadCpGifts() {
+  const response = await giftsApi.list({ limit: 500 })
+  if (response?.error) throw new Error(response.error.message || 'تعذر تحميل هدايا CP')
+  gifts.value = extractList(response?.data?.data ?? response?.data ?? response)
+    .filter(gift => gift && String(gift.category || '').toLowerCase() === 'cp')
+}
+async function uploadCpGiftAsset(field, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  const isAnimation = field === 'animationUrl'
+  const allowed = isAnimation ? /\.(gif|webp|mp4|webm)$/i.test(file.name) : /\.(gif|webp|png|jpe?g)$/i.test(file.name)
+  if (!allowed) { error.value = isAnimation ? 'اختر GIF أو WebP أو MP4 أو WebM للحركة.' : 'اختر GIF أو WebP أو PNG أو JPG للأيقونة.'; event.target.value = ''; return }
+  if (file.size > 40 * 1024 * 1024) { error.value = 'حجم الملف يجب ألا يتجاوز 40 ميغابايت.'; event.target.value = ''; return }
+  if (isAnimation) uploadingCpGiftAnimation.value = true
+  else uploadingCpGiftIcon.value = true
+  error.value = ''
+  try {
+    const response = await uploadsApi.upload(file)
+    if (response?.error) throw new Error(response.error.message || 'تعذر رفع ملف الهدية')
+    const data = payloadOf(response)
+    const uploadedUrl = data?.url || data?.path
+    if (!uploadedUrl) throw new Error('رد رفع الملف غير مكتمل.')
+    cpGiftForm.value[field] = /^https?:\/\//i.test(uploadedUrl) ? uploadedUrl : new URL(uploadedUrl, window.location.origin).toString()
+    success.value = 'تم رفع الملف. احفظ الهدية لإضافتها إلى قسم CP.'
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر رفع ملف الهدية'
+  } finally {
+    if (isAnimation) uploadingCpGiftAnimation.value = false
+    else uploadingCpGiftIcon.value = false
+    if (event?.target) event.target.value = ''
+  }
+}
+async function createCpGift() {
+  error.value = ''; success.value = ''
+  const form = cpGiftForm.value
+  const coinPrice = Number(form.coinPrice), diamondValue = Number(form.diamondValue), cpPoints = Number(form.cpPoints)
+  if (!form.name?.trim() || !form.iconUrl || !/^https?:\/\//i.test(form.iconUrl) ||
+      !Number.isSafeInteger(coinPrice) || coinPrice < 1 || !Number.isSafeInteger(diamondValue) || diamondValue < 0 ||
+      !Number.isSafeInteger(cpPoints) || cpPoints < 0) {
+    error.value = 'أدخل اسم الهدية وأيقونتها وسعراً صحيحاً وقيمة ألماس ونقاط CP صحيحة.'
+    return
+  }
+  savingCpGift.value = true
+  try {
+    const response = await giftsApi.create({
+      name: form.name.trim(), coinPrice, diamondValue, type: form.type || 'normal',
+      category: 'cp', cpRelationshipType: 'love', cpPoints,
+      iconUrl: form.iconUrl, animationUrl: form.animationUrl || null,
+      isActive: true, sortOrder: 0,
+    })
+    if (response?.error) throw new Error(response.error.message || 'تعذر إضافة هدية CP')
+    cpGiftForm.value = { name: '', coinPrice: 100, diamondValue: 80, cpPoints: 10, type: 'normal', iconUrl: '', animationUrl: '' }
+    success.value = 'تمت إضافة الهدية إلى كتالوج هدايا CP فقط.'
+    await loadCpGifts()
+  } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر إضافة هدية CP' }
+  finally { savingCpGift.value = false }
+}
+async function saveCpGift(gift) {
+  error.value = ''; success.value = ''
+  const coinPrice = Number(gift.coinPrice), diamondValue = Number(gift.diamondValue), cpPoints = Number(gift.cpPoints || 0)
+  if (!gift.name?.trim() || !Number.isSafeInteger(coinPrice) || coinPrice < 1 ||
+      !Number.isSafeInteger(diamondValue) || diamondValue < 0 || !Number.isSafeInteger(cpPoints) || cpPoints < 0) {
+    error.value = 'تحقق من اسم الهدية والسعر والألماس ونقاط CP.'
+    return
+  }
+  savingCpGift.value = true
+  try {
+    const response = await giftsApi.update(gift.id, {
+      name: gift.name.trim(), coinPrice, diamondValue, cpPoints,
+      category: 'cp', cpRelationshipType: gift.cpRelationshipType || 'love',
+      type: gift.type || 'normal', iconUrl: gift.iconUrl,
+      animationUrl: gift.animationUrl || null, isActive: gift.isActive === true,
+    })
+    if (response?.error) throw new Error(response.error.message || 'تعذر حفظ هدية CP')
+    success.value = 'تم حفظ هدية CP.'
+    await loadCpGifts()
+  } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ هدية CP' }
+  finally { savingCpGift.value = false }
 }
 function date(value) { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('ar') }
 function selectedGift(item) { return gifts.value.find(g => String(g.id) === String(item.giftId)) || null }
@@ -781,7 +893,7 @@ async function load() {
   try {
     const [configResponse, giftsResponse] = await Promise.all([cpAdminApi.config(), giftsApi.list({ limit: 500 })])
     const config = payloadOf(configResponse)
-    gifts.value = extractList(giftsResponse?.data?.data ?? giftsResponse?.data ?? giftsResponse).filter(gift => gift && gift.isActive !== false)
+    gifts.value = extractList(giftsResponse?.data?.data ?? giftsResponse?.data ?? giftsResponse).filter(gift => gift && String(gift.category || '').toLowerCase() === 'cp')
     const configuredTasks = config.tasks && typeof config.tasks === 'object' ? config.tasks : {}
     const taskEntries = Object.entries(configuredTasks).map(([id, task]) => ({
       id,

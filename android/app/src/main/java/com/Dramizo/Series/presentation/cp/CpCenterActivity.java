@@ -264,8 +264,8 @@ public class CpCenterActivity extends ThemedActivity {
 
     private void loadStore() {
         c.getIoExecutor().execute(() -> {
-            Result<List<Map<String, Object>>> catalog = ApiCall.execute(c.getUserApi().cosmeticsCatalog());
-            Result<List<Map<String, Object>>> inventory = ApiCall.execute(c.getUserApi().cosmeticsInventory());
+            Result<List<Map<String, Object>>> catalog = ApiCall.execute(c.getUserApi().cpStoreCatalog());
+            Result<List<Map<String, Object>>> inventory = ApiCall.execute(c.getUserApi().cpStoreInventory());
             Map<String, Map<String, Object>> ownedById = new HashMap<>();
             if (inventory.success && inventory.data != null) {
                 for (Map<String, Object> owned : inventory.data) {
@@ -280,13 +280,6 @@ public class CpCenterActivity extends ThemedActivity {
             if (catalog.success && catalog.data != null) {
                 for (Map<String, Object> item : catalog.data) {
                     if (item == null) continue;
-                    String code = String.valueOf(item.get("code") == null ? "" : item.get("code"));
-                    Object metaValue = item.get("meta");
-                    Map<?, ?> meta = metaValue instanceof Map ? (Map<?, ?>) metaValue : java.util.Collections.emptyMap();
-                    boolean cpStore = Boolean.TRUE.equals(meta.get("cpStore"))
-                            || "true".equalsIgnoreCase(String.valueOf(meta.get("cpStore")))
-                            || code.startsWith("cp_");
-                    if (!cpStore) continue;
                     Map<String, Object> card = new HashMap<>(item);
                     String id = String.valueOf(item.get("id") == null ? "" : item.get("id"));
                     Map<String, Object> owned = ownedById.get(id);
@@ -324,7 +317,7 @@ public class CpCenterActivity extends ThemedActivity {
             c.getIoExecutor().execute(() -> {
                 Map<String, String> body = new HashMap<>();
                 body.put("cosmeticId", id);
-                Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().purchaseCosmetic(body));
+                Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().purchaseCpStoreItem(body));
                 if (result.success) {
                     boolean autoEquipped = result.data != null && Boolean.TRUE.equals(result.data.get("autoEquipped"));
                     message(autoEquipped
@@ -344,7 +337,7 @@ public class CpCenterActivity extends ThemedActivity {
             c.getIoExecutor().execute(() -> {
                 Map<String, String> body = new HashMap<>();
                 body.put("cosmeticId", id);
-                Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().equipCosmetic(body));
+                Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().equipCpStoreItem(body));
                 if (result.success) {
                     message("تم تركيب عنصر CP بنجاح.");
                     loadStore();

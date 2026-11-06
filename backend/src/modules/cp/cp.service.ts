@@ -32,6 +32,24 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     private readonly cosmetics: CosmeticsService,
   ) {}
 
+  async storeCatalog() {
+    return this.cosmetics.cpStoreCatalog();
+  }
+
+  async storeInventory(userId: string) {
+    return this.cosmetics.cpStoreInventory(userId);
+  }
+
+  async purchaseStoreItem(userId: string, cosmeticId: string) {
+    if (!UUID_REGEX.test(String(cosmeticId || ''))) throw new BadRequestException('معرّف عنصر CP غير صالح');
+    return this.cosmetics.purchaseCpStoreItem(userId, cosmeticId);
+  }
+
+  async equipStoreItem(userId: string, cosmeticId: string) {
+    if (!UUID_REGEX.test(String(cosmeticId || ''))) throw new BadRequestException('معرّف عنصر CP غير صالح');
+    return this.cosmetics.equipCpStoreItem(userId, cosmeticId);
+  }
+
   async onModuleInit() {
     // Backward-compatible schema adjustment: profile-origin CP requests have no room/payment.
     await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
@@ -159,7 +177,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       return ids.map(id => String(id || '').trim()).filter(id => UUID_REGEX.test(id));
     })));
     const gifts = giftIds.length ? await this.dataSource.query(
-      'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true',
+      'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true AND category=$cp$',
       [giftIds],
     ) : [];
     const giftsById = new Map(gifts.map((gift: any) => [String(gift.id), gift]));
@@ -169,10 +187,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       ...(Array.isArray(item?.benefits) ? item.benefits : []).map((entry: any) => entry?.cosmeticCode || entry?.code),
       ...(Array.isArray(item?.rewards) ? item.rewards : []).map((entry: any) => entry?.cosmeticCode || entry?.code),
     ]).map(code => String(code || '').trim()).filter(code => /^[a-zA-Z0-9_-]{2,64}$/.test(code))));
-    const cosmetics = cosmeticCodes.length ? await this.dataSource.query(
-      'SELECT code,name,type,"previewUrl","animationUrl" FROM cosmetics WHERE code=ANY($1::text[]) AND "isActive"=true',
-      [cosmeticCodes],
-    ) : [];
+    const cosmetics = cosmeticCodes.length
+      ? (await this.cosmetics.adminListCpStore())
+          .filter(item => item.isActive && cosmeticCodes.includes(item.code))
+          .map(item => ({ code: item.code, name: item.name, type: item.type, previewUrl: item.previewUrl, animationUrl: item.animationUrl }))
+      : [];
     const cosmeticsByCode = new Map(cosmetics.map((item: any) => [String(item.code), item]));
     return safeLevels.map(item => {
       const rewardGiftIds = Array.from(new Set([
@@ -230,7 +249,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           );
           if (!claim?.id) return;
           const [gift] = await manager.query(
-            'SELECT id,name,"iconUrl" FROM gifts WHERE id=$1 AND "isActive"=true LIMIT 1',
+            'SELECT id,name,"iconUrl" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$cp$ LIMIT 1',
             [giftId],
           );
           if (!gift) {
@@ -275,10 +294,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       .filter(item => /^[a-zA-Z0-9_-]{2,64}$/.test(String(item.code || '').trim()));
     if (!unique.length) return;
     const codes = unique.map(item => String(item.code).trim());
-    const available = codes.length ? await this.dataSource.query(
-      'SELECT id,code FROM cosmetics WHERE code=ANY($1::text[]) AND "isActive"=true',
-      [codes],
-    ) : [];
+    const available = codes.length
+      ? (await this.cosmetics.adminListCpStore())
+          .filter(item => item.isActive && codes.includes(item.code))
+          .map(item => ({ id: item.id, code: item.code }))
+      : [];
     const availableCodes = new Set(available.map((item: any) => String(item.code)));
     for (const userId of userIds) {
       for (const reward of unique) {
@@ -320,7 +340,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] || null;
       const [gift] = giftId ? await this.dataSource.query(
-        'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id=$1 AND "isActive"=true',
+        'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$cp$',
         [giftId],
       ) : [];
       // The CP dashboard price is the live source of truth for the CP store.
@@ -634,10 +654,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       });
     const rewardCodes = definitions.map(task => String(task.rewardCosmeticCode || '').trim()).filter(Boolean);
     const rewardRows: Array<{ code: string; name: string; previewUrl: string; type: string }> = rewardCodes.length
-      ? await this.dataSource.query(
-          'SELECT code,name,"previewUrl","animationUrl",type FROM cosmetics WHERE code = ANY($1::text[]) AND "isActive"=true',
-          [rewardCodes],
-        )
+      ? (await this.cosmetics.adminListCpStore())
+          .filter(item => item.isActive && rewardCodes.includes(item.code))
+          .map(item => ({ code: item.code, name: item.name, previewUrl: item.previewUrl, animationUrl: item.animationUrl, type: item.type }))
       : [];
     const rewardByCode = new Map(rewardRows.map(item => [item.code, item]));
     return definitions.map(task => {
@@ -722,10 +741,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     );
     let rewardItem: Record<string, unknown> | null = null;
     if (configuredCode) {
-      const [cosmetic] = await this.dataSource.query(
-        'SELECT id,code,name,type,"previewUrl","animationUrl" FROM cosmetics WHERE code=$1 AND "isActive"=true LIMIT 1',
-        [configuredCode],
-      );
+      const cosmetic = (await this.cosmetics.adminListCpStore())
+        .find(item => item.isActive && item.code === configuredCode);
       if (cosmetic) {
         const [owned] = await this.dataSource.query(
           'SELECT id FROM user_cosmetics WHERE "userId"=$1 AND "cosmeticId"=$2 LIMIT 1',

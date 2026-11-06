@@ -34,6 +34,10 @@ export const cpAdminApi = {
   adjustPoints: (payload) => safeRequest(() => api.post('/admin/cp/relationships/points', payload)),
   requests: (params) => safeRequest(() => api.get('/admin/cp/requests', { params })),
   audit: (params) => safeRequest(() => api.get('/admin/cp/audit', { params })),
+  storeItems: () => safeRequest(() => api.get('/admin/cp/store', { timeout: 20000, headers: { 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' } })),
+  createStoreItem: (data) => safeRequest(() => api.post('/admin/cp/store', data, { timeout: 30000 })),
+  updateStoreItem: (id, data) => safeRequest(() => api.patch(`/admin/cp/store/${id}`, data, { timeout: 30000 })),
+  removeStoreItem: (id) => safeRequest(() => api.delete(`/admin/cp/store/${id}`, { timeout: 30000 })),
 }
 
 export const paidMessagesApi = {

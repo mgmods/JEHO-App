@@ -159,6 +159,18 @@ public interface UserApi {
     @GET("cp/catalog")
     Call<ApiResponse<List<Map<String, Object>>>> cpCatalog();
 
+    @GET("cp/store")
+    Call<ApiResponse<List<Map<String, Object>>>> cpStoreCatalog();
+
+    @GET("cp/store/inventory")
+    Call<ApiResponse<List<Map<String, Object>>>> cpStoreInventory();
+
+    @POST("cp/store/purchase")
+    Call<ApiResponse<Map<String, Object>>> purchaseCpStoreItem(@Body Map<String, String> body);
+
+    @POST("cp/store/equip")
+    Call<ApiResponse<Map<String, Object>>> equipCpStoreItem(@Body Map<String, String> body);
+
     /** Public active relationships for room seats; returns only relationship ids/types and visual config. */
     @GET("cp/room-effects")
     Call<ApiResponse<Map<String, Object>>> cpRoomSeatEffects(@Query("userIds") String userIds);

@@ -353,7 +353,7 @@ window.renderCpStore=function(rows){
   const image=item.previewUrl||item.animationUrl||fallback;
   const price=Math.max(0,Number(item.coinPrice)||0);
   const lease=Number(item.meta?.leaseDays||30);
-  const kind=item.type==="cp_background"?"خلفية CP":item.type==="cp_logo"?"شعار CP":item.type==="profile_card"?"بطاقة الملف":item.type==="nameplate"?"لوحة الاسم":item.type==="level_badge"?"شارة":item.type||"عنصر تجميلي";
+  const kind=({cp_background:"خلفية CP",cp_logo:"شعار CP",vip_badge:"إطار صورة شخصية",host_badge:"شارة خاصة",profile_card:"بطاقة الملف",nameplate:"لوحة الاسم",level_badge:"شارة مستوى",entry_effect:"تأثير دخول",room_card:"بطاقة روم",chat_bubble:"فقاعة دردشة"})[item.type]||"مكافأة CP";
   const expiry=item.expiresAt?Date.parse(item.expiresAt):NaN;
   const owned=item.owned===true&&(!item.expiresAt||Number.isNaN(expiry)||expiry>Date.now());
   const equipped=owned&&item.equipped===true;

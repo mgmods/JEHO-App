@@ -25,6 +25,30 @@ export class CpController {
     return this.cp.profileRelationships(userId);
   }
 
+  @Get('store')
+  @ApiOperation({ summary: 'CP-only cosmetics catalog; never includes normal mall products' })
+  storeCatalog() {
+    return this.cp.storeCatalog();
+  }
+
+  @Get('store/inventory')
+  @ApiOperation({ summary: 'Inventory of CP-exclusive items only' })
+  storeInventory(@CurrentUser('sub') userId: string) {
+    return this.cp.storeInventory(userId);
+  }
+
+  @Post('store/purchase')
+  @ApiOperation({ summary: 'Purchase and auto-equip an item from the CP-only store' })
+  purchaseStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
+    return this.cp.purchaseStoreItem(userId, body?.cosmeticId);
+  }
+
+  @Post('store/equip')
+  @ApiOperation({ summary: 'Equip an owned item from the CP-only store' })
+  equipStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
+    return this.cp.equipStoreItem(userId, body?.cosmeticId);
+  }
+
   @Get('catalog')
   @ApiOperation({ summary: 'Enabled CP types and configured gift prices' })
   catalog() {

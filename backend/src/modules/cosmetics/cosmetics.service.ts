@@ -138,15 +138,51 @@ export class CosmeticsService implements OnModuleInit {
     // Keep CP Settings and CP Center access on their dedicated CP paths.
     return rows.filter((row) => {
       const meta = row.meta as any;
-      return meta?.mallHidden !== true && meta?.cpStore !== true;
+      return meta?.mallHidden !== true && !this.isCpStoreCosmetic(row);
     });
+  }
+
+  private isCpStoreCosmetic(cosmetic: Partial<Cosmetic> | null | undefined): boolean {
+    const meta: any = cosmetic?.meta as any;
+    return meta?.cpStore === true || String(cosmetic?.code || '').startsWith('cp_');
   }
 
   async adminList(type?: CosmeticType) {
     this.assertSupportedType(type);
     const where: any = {};
     if (type) where.type = type;
-    return this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', createdAt: 'DESC' } });
+    const rows = await this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', createdAt: 'DESC' } });
+    return rows.filter(row => !this.isCpStoreCosmetic(row));
+  }
+
+  async adminListCpStore() {
+    const rows = await this.cosmeticsRepo.find({ order: { sortOrder: 'ASC', createdAt: 'DESC' } });
+    return rows.filter(row => this.isCpStoreCosmetic(row));
+  }
+
+  async cpStoreCatalog() {
+    const rows = await this.cosmeticsRepo.find({
+      where: { isActive: true },
+      order: { sortOrder: 'ASC', coinPrice: 'ASC', createdAt: 'DESC' },
+    });
+    return rows.filter(row => this.isCpStoreCosmetic(row));
+  }
+
+  async purchaseCpStoreItem(userId: string, cosmeticId: string) {
+    const item = await this.cosmeticsRepo.findOne({ where: { id: cosmeticId, isActive: true } });
+    if (!item || !this.isCpStoreCosmetic(item)) throw new NotFoundException('عنصر متجر CP غير موجود أو غير متاح');
+    return this.purchase(userId, cosmeticId, { allowCpStore: true });
+  }
+
+  async equipCpStoreItem(userId: string, cosmeticId: string) {
+    const owned = await this.userCosmeticsRepo.findOne({
+      where: { userId, cosmeticId },
+      relations: ['cosmetic'],
+    });
+    if (!owned || !this.isCpStoreCosmetic(owned.cosmetic)) {
+      throw new NotFoundException('هذا العنصر ليس من متجر CP أو غير مملوك لك');
+    }
+    return this.equip(userId, cosmeticId, { allowCpStore: true });
   }
 
   /** Resolve mall/catalog preview URL from cosmetic code (agency exclusives, admin). */
@@ -306,12 +342,23 @@ export class CosmeticsService implements OnModuleInit {
   }
 
   async inventory(userId: string) {
-    // Include expired rows so the mall can offer full-price repurchase.
-    return this.userCosmeticsRepo.find({
+    // The normal mall bag must never list CP-exclusive items.
+    const rows = await this.userCosmeticsRepo.find({
       where: { userId },
       relations: ['cosmetic'],
       order: { createdAt: 'DESC' },
     });
+    return rows.filter(row => !this.isCpStoreCosmetic(row.cosmetic));
+  }
+
+  async cpStoreInventory(userId: string) {
+    // CP center uses its own inventory endpoint so mall and CP items remain isolated.
+    const rows = await this.userCosmeticsRepo.find({
+      where: { userId },
+      relations: ['cosmetic'],
+      order: { createdAt: 'DESC' },
+    });
+    return rows.filter(row => this.isCpStoreCosmetic(row.cosmetic));
   }
 
   private mallLeaseDays(cosmetic?: Cosmetic) {
@@ -392,7 +439,7 @@ export class CosmeticsService implements OnModuleInit {
     owned = await this.userCosmeticsRepo.save(owned);
 
     try {
-      await this.equip(userId, cosmetic.id, { skipRequirements: true });
+      await this.equip(userId, cosmetic.id, { skipRequirements: true, allowCpStore: true });
     } catch {
       /* equip is best-effort */
     }
@@ -532,9 +579,13 @@ export class CosmeticsService implements OnModuleInit {
     }
   }
 
-  async purchase(userId: string, cosmeticId: string) {
+  async purchase(userId: string, cosmeticId: string, options: { allowCpStore?: boolean } = {}) {
     const cosmetic = await this.cosmeticsRepo.findOne({ where: { id: cosmeticId, isActive: true } });
     if (!cosmetic) throw new NotFoundException('Cosmetic not found');
+    const isCpStoreItem = this.isCpStoreCosmetic(cosmetic);
+    if (isCpStoreItem && options.allowCpStore !== true) {
+      throw new BadRequestException('هذا العنصر خاص بمتجر CP ولا يمكن شراؤه من المتجر العادي.');
+    }
 
     // Agency exclusive frames/cards: admin grant only — never mall purchase.
     const { isAgencyExclusiveCosmetic } = await import('../agencies/agency-perks');
@@ -547,7 +598,6 @@ export class CosmeticsService implements OnModuleInit {
     await this.assertCosmeticRequirements(userId, cosmetic);
 
     const fullPrice = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
-    const isCpStoreItem = (cosmetic.meta as any)?.cpStore === true || String(cosmetic.code || '').startsWith('cp_');
     if (isCpStoreItem && fullPrice <= 0) throw new BadRequestException('سعر عنصر متجر CP غير مضبوط.');
     if (isCpStoreItem && cosmetic.type === CosmeticType.ROOM_BACKGROUND) {
       throw new BadRequestException('هذا النوع لا يُركّب تلقائياً؛ اختر بطاقة الملف الشخصي لخلفيات CP.');
@@ -622,7 +672,7 @@ export class CosmeticsService implements OnModuleInit {
     // return the explicit state so the APK can offer a manual equip retry.
     if (isCpStoreItem) {
       try {
-        const equipResult = await this.equip(userId, cosmeticId);
+        const equipResult = await this.equip(userId, cosmeticId, { allowCpStore: true });
         return { ...result, equipped: true, autoEquipped: true, equipResult };
       } catch (error) {
         return {
@@ -636,12 +686,15 @@ export class CosmeticsService implements OnModuleInit {
     return result;
   }
 
-  async equip(userId: string, cosmeticId: string, opts?: { skipRequirements?: boolean }) {
+  async equip(userId: string, cosmeticId: string, opts?: { skipRequirements?: boolean; allowCpStore?: boolean }) {
     const owned = await this.userCosmeticsRepo.findOne({
       where: { userId, cosmeticId },
       relations: ['cosmetic'],
     });
     if (!owned) throw new NotFoundException('You do not own this cosmetic');
+    if (this.isCpStoreCosmetic(owned.cosmetic) && opts?.allowCpStore !== true) {
+      throw new BadRequestException('هذا العنصر خاص بمتجر CP ولا يمكن تركيبه من المتجر العادي.');
+    }
     if (owned.expiresAt && owned.expiresAt <= new Date()) {
       throw new BadRequestException('This cosmetic has expired');
     }

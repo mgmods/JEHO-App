@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Param, UseGuards, BadRequestException, InternalServerErrorException, Header } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Delete, Param, UseGuards, BadRequestException, InternalServerErrorException, NotFoundException, Header } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { DataSource } from 'typeorm';
@@ -8,6 +8,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators';
 import { CpType } from '../../database/entities/cp-relationship.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { CosmeticsService } from '../cosmetics/cosmetics.service';
+import { CosmeticType } from '../../database/entities/cosmetic.entity';
 
 class CpTypeConfigDto {
   type?: CpType;
@@ -26,7 +28,101 @@ class CpTypeConfigDto {
 @Controller('admin/cp')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class CpAdminController {
-  constructor(private readonly dataSource: DataSource, private readonly cp: CpService, private readonly realtime: RealtimeGateway) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly cp: CpService,
+    private readonly realtime: RealtimeGateway,
+    private readonly cosmetics: CosmeticsService,
+  ) {}
+
+  @Get('store')
+  @ApiOperation({ summary: 'List only CP-exclusive store items for the CP dashboard' })
+  storeItems() {
+    return this.cosmetics.adminListCpStore();
+  }
+
+  @Post('store')
+  @ApiOperation({ summary: 'Create a CP-exclusive frame, card, nameplate or reward item' })
+  async createStoreItem(@CurrentUser('sub') adminId: string, @Body() body: Record<string, any>) {
+    const enteredCode = String(body?.code || '').trim();
+    const code = enteredCode.startsWith('cp_') ? enteredCode : `cp_${enteredCode}`;
+    const name = String(body?.name || '').trim();
+    const type = String(body?.type || '') as CosmeticType;
+    const previewUrl = String(body?.previewUrl || '').trim();
+    const animationUrl = String(body?.animationUrl || '').trim();
+    const coinPrice = Number(body?.coinPrice);
+    const leaseDays = Number(body?.leaseDays ?? 30);
+    if (!/^cp_[a-zA-Z0-9_-]{2,61}$/.test(code) || !name || name.length > 128 ||
+        !Object.values(CosmeticType).includes(type) || type === CosmeticType.ROOM_BACKGROUND ||
+        !/^https?:\/\//i.test(previewUrl) || previewUrl.length > 2048 ||
+        (animationUrl && (!/^https?:\/\//i.test(animationUrl) || animationUrl.length > 2048)) ||
+        !Number.isSafeInteger(coinPrice) || coinPrice < 1 || coinPrice > 1000000000 ||
+        !Number.isInteger(leaseDays) || leaseDays < 1 || leaseDays > 3650) {
+      throw new BadRequestException('بيانات عنصر متجر CP غير صالحة. تحقق من الرمز والصورة والسعر والمدة والفئة.');
+    }
+    const saved = await this.cosmetics.adminCreate({
+      type, code, name, description: String(body.description || '').slice(0, 500),
+      previewUrl, animationUrl: animationUrl || null, coinPrice,
+      isActive: body.isActive !== false, sortOrder: Number(body.sortOrder) || 0,
+      meta: { cpStore: true, leaseDays },
+    } as any);
+    await this.dataSource.query(
+      `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+       VALUES ($1,'store_item_create','cp_store_item',$2,$3::jsonb,now())`,
+      [adminId, saved.id, JSON.stringify({ code, type, coinPrice, leaseDays })],
+    );
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp_store', updatedAt: new Date().toISOString() });
+    return saved;
+  }
+
+  @Patch('store/:id')
+  @ApiOperation({ summary: 'Update price, duration, media, visibility or category of a CP-only item' })
+  async updateStoreItem(@CurrentUser('sub') adminId: string, @Param('id') id: string, @Body() body: Record<string, any>) {
+    const item = (await this.cosmetics.adminListCpStore()).find(row => row.id === id);
+    if (!item) throw new NotFoundException('عنصر متجر CP غير موجود');
+    const leaseDays = Number(body?.leaseDays ?? (item.meta as any)?.leaseDays ?? 30);
+    const coinPrice = Number(body?.coinPrice ?? item.coinPrice);
+    const name = String(body?.name ?? item.name).trim();
+    const type = String(body?.type ?? item.type) as CosmeticType;
+    const previewUrl = String(body?.previewUrl ?? item.previewUrl).trim();
+    const animationUrl = body?.animationUrl === undefined ? String(item.animationUrl || '') : String(body.animationUrl || '').trim();
+    if (!name || name.length > 128 || !Object.values(CosmeticType).includes(type) ||
+        type === CosmeticType.ROOM_BACKGROUND || !/^https?:\/\//i.test(previewUrl) ||
+        (animationUrl && !/^https?:\/\//i.test(animationUrl)) ||
+        !Number.isSafeInteger(coinPrice) || coinPrice < 1 || coinPrice > 1000000000 ||
+        !Number.isInteger(leaseDays) || leaseDays < 1 || leaseDays > 3650) {
+      throw new BadRequestException('بيانات تحديث عنصر CP غير صالحة');
+    }
+    const saved = await this.cosmetics.adminUpdate(id, {
+      type, name, description: body.description === undefined ? item.description : String(body.description || '').slice(0, 500),
+      previewUrl, animationUrl: animationUrl || null, coinPrice,
+      isActive: body.isActive === undefined ? item.isActive : body.isActive === true,
+      sortOrder: body.sortOrder === undefined ? item.sortOrder : Number(body.sortOrder) || 0,
+      meta: { ...((item.meta || {}) as any), cpStore: true, leaseDays },
+    });
+    await this.dataSource.query(
+      `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+       VALUES ($1,'store_item_update','cp_store_item',$2,$3::jsonb,now())`,
+      [adminId, id, JSON.stringify({ name, type, coinPrice, leaseDays, isActive: saved.isActive })],
+    );
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp_store', updatedAt: new Date().toISOString() });
+    return saved;
+  }
+
+  @Delete('store/:id')
+  @ApiOperation({ summary: 'Hide a CP-only store item without deleting users inventory history' })
+  async hideStoreItem(@CurrentUser('sub') adminId: string, @Param('id') id: string) {
+    const item = (await this.cosmetics.adminListCpStore()).find(row => row.id === id);
+    if (!item) throw new NotFoundException('عنصر متجر CP غير موجود');
+    const saved = await this.cosmetics.adminUpdate(id, { isActive: false });
+    await this.dataSource.query(
+      `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+       VALUES ($1,'store_item_hide','cp_store_item',$2,'{}'::jsonb,now())`,
+      [adminId, id],
+    );
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp_store', updatedAt: new Date().toISOString() });
+    return saved;
+  }
 
   @Get('config')
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
@@ -63,7 +159,7 @@ export class CpAdminController {
     for (const type of [CpType.RELATIONSHIP]) {
       const giftId = settings[`cp.gift.${type}`] ?? null;
       const price = Number(settings[`cp.price.${type}`]);
-      const [gift] = giftId ? await this.dataSource.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true', [giftId]) : [];
+      const [gift] = giftId ? await this.dataSource.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$cp$', [giftId]) : [];
       types.push({
         type,
         priceCoins: Number.isSafeInteger(price) && price > 0 ? price : null,
@@ -258,11 +354,9 @@ export class CpAdminController {
           if (typeof level.rewardCosmeticCode !== 'string' || !/^[a-zA-Z0-9_-]{2,64}$/.test(level.rewardCosmeticCode)) {
             throw new BadRequestException('رمز المكافأة التجميلية لمستوى CP غير صالح');
           }
-          const [rewardCosmetic] = await this.dataSource.query(
-            'SELECT id FROM cosmetics WHERE code=$1 AND "isActive"=true LIMIT 1',
-            [level.rewardCosmeticCode],
-          );
-          if (!rewardCosmetic) throw new BadRequestException('اختر مكافأة تجميلية نشطة من كتالوج المتجر');
+          const rewardCosmetic = (await this.cosmetics.adminListCpStore())
+            .find(item => item.isActive && item.code === level.rewardCosmeticCode);
+          if (!rewardCosmetic) throw new BadRequestException('اختر مكافأة نشطة من متجر CP فقط');
         }
         if (level.rewardCosmeticCodes !== undefined) {
           if (!Array.isArray(level.rewardCosmeticCodes) || level.rewardCosmeticCodes.length > 30) {
@@ -273,12 +367,10 @@ export class CpAdminController {
             throw new BadRequestException('أحد رموز المكافآت التجميلية للمستوى غير صالح');
           }
           if (codes.length) {
-            const activeItems = await this.dataSource.query(
-              'SELECT code FROM cosmetics WHERE code=ANY($1::text[]) AND "isActive"=true',
-              [codes],
-            );
+            const activeItems = (await this.cosmetics.adminListCpStore())
+              .filter(item => item.isActive && codes.includes(item.code));
             if (activeItems.length !== codes.length) {
-              throw new BadRequestException('كل المكافآت التجميلية للمستوى يجب أن تكون عناصر نشطة');
+              throw new BadRequestException('كل المكافآت التجميلية للمستوى يجب أن تكون عناصر نشطة من متجر CP');
             }
           }
         }
@@ -291,11 +383,9 @@ export class CpAdminController {
           const code = String(reward?.cosmeticCode || reward?.code || '').trim();
           if (!code) continue;
           if (!/^[a-zA-Z0-9_-]{2,64}$/.test(code)) throw new BadRequestException('رمز إحدى مكافآت المستوى غير صالح');
-          const [activeReward] = await this.dataSource.query(
-            'SELECT id FROM cosmetics WHERE code=$1 AND "isActive"=true LIMIT 1',
-            [code],
-          );
-          if (!activeReward) throw new BadRequestException('كل مكافآت المستوى يجب أن تكون عناصر تجميلية نشطة');
+          const activeReward = (await this.cosmetics.adminListCpStore())
+            .find(item => item.isActive && item.code === code);
+          if (!activeReward) throw new BadRequestException('كل مكافآت المستوى يجب أن تكون عناصر نشطة من متجر CP');
         }
         if (level.rewardDays !== undefined && (!Number.isInteger(Number(level.rewardDays)) || Number(level.rewardDays) < 1 || Number(level.rewardDays) > 365)) {
           throw new BadRequestException('مدة مكافأة مستوى CP يجب أن تكون بين يوم و365 يوماً');
@@ -313,7 +403,7 @@ export class CpAdminController {
         }
         if (rewardGiftIds.length) {
           const activeGifts = await this.dataSource.query(
-            'SELECT id FROM gifts WHERE id=ANY($1::uuid[]) AND "isActive"=true',
+            'SELECT id FROM gifts WHERE id=ANY($1::uuid[]) AND "isActive"=true AND category=$cp$',
             [rewardGiftIds],
           );
           if (activeGifts.length !== rewardGiftIds.length) {
@@ -382,7 +472,7 @@ export class CpAdminController {
     }
     if (body.giftId !== undefined && body.giftId) {
       const [selectedGift] = await this.dataSource.query(
-        'SELECT id FROM gifts WHERE id=$1 AND "isActive"=true LIMIT 1',
+        'SELECT id FROM gifts WHERE id=$1 AND "isActive"=true AND category=$cp$ LIMIT 1',
         [body.giftId],
       );
       if (!selectedGift) throw new BadRequestException('اختر هدية موجودة ومفعّلة من كتالوج الهدايا');
