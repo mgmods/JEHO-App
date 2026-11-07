@@ -12080,8 +12080,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
     public void showLuckyHitBanner(@Nullable String senderId, @Nullable String displayName, @Nullable String avatarUrl,
                                    long wonCoins, double multiplier, @Nullable String eventKey) {
-        // Keep the room toast for every completed lucky result, including a return
-        // or a zero-payout result. Only the numeric coin/rain effects stay hidden.
+        // Only positive payouts show the lucky toast; losses stay silent.
+        if (wonCoins <= 0) return;
 
         String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
         String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
@@ -12099,21 +12099,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim();
         boolean highWin = multiplier >= 10d || wonCoins >= 1000L;
         boolean isWinner = senderId != null && myUserId != null && sameUser(senderId, myUserId);
-        if (highWin) {
-            // The high-win toast is shared with everyone who receives the room event.
-            // The winner additionally gets the personal center presentation in their room.
-            GlobalCelebrationToast.show(
-                    this, who, line, safeAvatar, null, key + "-global",
-                    28, Math.max(0d, multiplier), 0L, who, "lucky_hit_high", roomId);
-            if (isWinner) {
-                GlobalCelebrationToast.showRoomCenter(
-                        this, who, line, safeAvatar, null, key + "-winner-center",
-                        Math.max(0d, multiplier), 0L, who,
-                        "lucky_hit_high", roomId);
-            }
+        if (highWin && isWinner) {
+            // The winner sees their personal dashboard-configured room toast here.
+            // The app-wide celebration event independently reaches all other app sections.
+            GlobalCelebrationToast.showRoomCenter(
+                    this, who, line, safeAvatar, null, key,
+                    Math.max(0d, multiplier), 0L, who,
+                    "lucky_hit_high", roomId);
         } else {
-            String kind = multiplier > 0d && multiplier < 1d
-                    ? "lucky_hit_return" : "lucky_hit_normal";
+            // Everyone else in the room sees the standard room toast.
+            String kind = highWin ? "lucky_hit_high"
+                    : (multiplier > 0d && multiplier < 1d ? "lucky_hit_return" : "lucky_hit_normal");
             GlobalCelebrationToast.show(
                     this, who, line, safeAvatar, null, key,
                     28, Math.max(0d, multiplier), 0L, who, kind, roomId);
