@@ -36,17 +36,9 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
     private String searchQuery = "";
     private boolean serverSearchResults;
     private final Listener listener;
-    public interface MoreListener {
-        void onMore(ChatDtos.ConversationDto item, View anchor);
-    }
-    private MoreListener moreListener;
 
     public ChatPreviewAdapter(Listener listener) {
         this.listener = listener;
-    }
-
-    public void setMoreListener(MoreListener listener) {
-        this.moreListener = listener;
     }
 
     public void submit(List<ChatDtos.ConversationDto> data) {
@@ -64,13 +56,6 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         if (data != null) sourceItems.addAll(data);
         items.clear();
         items.addAll(sourceItems);
-        notifyDataSetChanged();
-    }
-
-    public void removeConversation(String conversationId) {
-        if (conversationId == null) return;
-        sourceItems.removeIf(item -> item != null && conversationId.equals(item.id));
-        items.removeIf(item -> item != null && conversationId.equals(item.id));
         notifyDataSetChanged();
     }
 
@@ -203,7 +188,6 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
             displayName = displayName + "  ·  " + rankName.trim();
         }
         holder.b.tvTitle.setText(displayName);
-        com.Dramizo.Series.util.VipNameStyle.bind(holder.b.tvTitle, item.peer);
 
         boolean verified = item.peer != null && item.peer.genderVerified;
         if (holder.b.imgOfficial != null) {
@@ -231,11 +215,6 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(item);
         });
-        if (holder.b.btnConversationMore != null) {
-            holder.b.btnConversationMore.setOnClickListener(v -> {
-                if (moreListener != null) moreListener.onMore(item, v);
-            });
-        }
     }
 
     private void bindMeta(@NonNull VH holder, ChatDtos.ConversationDto item) {
