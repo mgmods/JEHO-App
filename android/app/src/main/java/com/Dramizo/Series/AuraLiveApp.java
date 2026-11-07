@@ -216,7 +216,7 @@ public class AuraLiveApp extends Application {
     /** Register the current FCM token after authentication is available.
      * Token creation can happen before login, so onNewToken alone is not enough.
      */
-    private void registerFcmDeviceIfReady() {
+    public void registerFcmDeviceIfReady() {
         if (container == null) return;
         String token = container.getSessionManager().getFcmToken();
         String userId = container.getSessionManager().getUserId();
