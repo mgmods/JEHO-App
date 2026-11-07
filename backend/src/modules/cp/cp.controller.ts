@@ -38,7 +38,7 @@ export class CpController {
   }
 
   @Post('store/purchase')
-  @ApiOperation({ summary: 'Purchase an item from the CP-only store and add it to the user's CP bag' })
+  @ApiOperation({ summary: "Purchase an item from the CP-only store and add it to the CP bag" })
   purchaseStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
     return this.cp.purchaseStoreItem(userId, body?.cosmeticId);
   }
