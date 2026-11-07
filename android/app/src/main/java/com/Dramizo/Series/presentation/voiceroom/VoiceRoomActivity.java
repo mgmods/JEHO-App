@@ -540,6 +540,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private RealtimeClient.UserListener moderationUserListener;
     /** Local mirror of server chat mute (text), until epoch ms. */
     private long chatMutedUntilMs;
+    private String lastRoomChatLineKey;
+    private long lastRoomChatLineAtMs;
     private ZegoEngineManager.RoomListener zegoRoomListener;
     private final ActivityResultLauncher<String[]> musicPicker = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
@@ -2551,11 +2553,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && RoomRtcEngine.getInstance().sendRoomChatMessage(
                         roomId, payload.toString(), (ok, err) -> {
                             if (!ok) {
-                                // Do not retry through Socket after handing the same message to
-                                // Zego: a timeout/error callback can arrive after Zego delivered
-                                // the message, and dual-broadcasting creates duplicate chat lines.
-                                runOnUiThread(() -> Toast.makeText(
-                                        this, "تعذر تأكيد إرسال الرسالة", Toast.LENGTH_SHORT).show());
+                                // Zego may deliver successfully before a delayed confirmation timeout.
+                                // Keep this callback silent: retrying or showing a failure toast here
+                                // creates false alarms and can make users resend an already delivered line.
+                                android.util.Log.w("RoomChat", "Zego chat confirmation timed out; delivery may already have succeeded");
                             }
                         });
         if (!zegoOk) {
@@ -2793,6 +2794,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         boolean mysteriousLine = "الرجل الغامض".equals(name);
         boolean system = "النظام".equals(name) || getString(R.string.official_news).equals(name);
         boolean gameCel = CHAT_NAME_GAME_CEL.equals(name);
+        // Deduplicate identical user lines arriving through multiple room transports
+        // or a rapid double tap. System announcements remain unaffected.
+        if (!system && !gameCel && userId != null && !userId.trim().isEmpty()) {
+            String dedupeKey = userId.trim().toLowerCase(java.util.Locale.ROOT)
+                    + "|" + (text != null ? text.trim() : "");
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (dedupeKey.equals(lastRoomChatLineKey) && now - lastRoomChatLineAtMs < 1800L) return;
+            lastRoomChatLineKey = dedupeKey;
+            lastRoomChatLineAtMs = now;
+        }
         if (!system && !gameCel && vipLevel <= 0) {
             var session = ContainerProvider.from(this).getSessionManager();
             // Only enrich cosmetics for the local user by id — never by display name.
@@ -3144,7 +3155,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ImageView vip = new ImageView(this);
             vip.setContentDescription("VIP");
             vip.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            vip.setLayoutParams(roomBadgeImageParams(16, 16, 2));
+            vip.setLayoutParams(roomBadgeImageParams(20, 20, 2));
             if (decoration.vipBadgeUrl != null && !decoration.vipBadgeUrl.trim().isEmpty()) {
                 Glide.with(vip).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(
                         decoration.vipBadgeUrl)).fitCenter().into(vip);
@@ -3157,7 +3168,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             TextView cp = new TextView(this);
             cp.setText("CP");
             cp.setTextColor(Color.WHITE);
-            cp.setTextSize(8f);
+            cp.setTextSize(9f);
             cp.setTypeface(null, android.graphics.Typeface.BOLD);
             cp.setIncludeFontPadding(false);
             cp.setPadding(dp(4), dp(1), dp(4), dp(1));
@@ -3172,7 +3183,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             TextView id = new TextView(this);
             id.setText("ID " + decoration.publicId);
             id.setTextColor(Color.WHITE);
-            id.setTextSize(8f);
+            id.setTextSize(9f);
             id.setTypeface(null, android.graphics.Typeface.BOLD);
             id.setIncludeFontPadding(false);
             id.setPadding(dp(4), dp(1), dp(4), dp(1));
@@ -3198,7 +3209,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ImageView medal = new ImageView(this);
             medal.setContentDescription("ميدالية");
             medal.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            medal.setLayoutParams(roomBadgeImageParams(14, 14, 1));
+            medal.setLayoutParams(roomBadgeImageParams(20, 20, 1));
             Glide.with(medal).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(medalUrl))
                     .placeholder(R.drawable.ic_medal_default)
                     .error(R.drawable.ic_medal_default)
