@@ -12080,9 +12080,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
     public void showLuckyHitBanner(@Nullable String senderId, @Nullable String displayName, @Nullable String avatarUrl,
                                    long wonCoins, double multiplier, @Nullable String eventKey) {
-        // Losses must be silent: no room chat line, toast, or top banner.
-        // Positive payouts include full wins and partial returns.
-        if (wonCoins <= 0) return;
+        // Keep the room toast for every completed lucky result, including a return
+        // or a zero-payout result. Only the numeric coin/rain effects stay hidden.
 
         String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
         String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
