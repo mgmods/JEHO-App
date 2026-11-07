@@ -9,7 +9,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, MoreThan, Repository, Or, IsNull } from 'typeorm';
+import { DataSource, MoreThan, Repository } from 'typeorm';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomInt } from 'crypto';
@@ -51,43 +51,15 @@ import {
   recommendedGiftDiamonds,
 } from '../../common/pricing-catalog';
 import { ECONOMY } from '../../common/economy-config';
-import { CpService } from '../cp/cp.service';
-import { VipPlan } from '../../database/entities/vip-plan.entity';
-import { NotificationType } from '../../database/entities/notification.entity';
-import { NotificationsService } from '../notifications/notifications.service';
-import { BadgesService } from '../badges/badges.service';
 
 type LuckyRoll = {
   luckyMultiplier: number | null;
   luckyCoinsWon: number;
 };
 
-type LuckyOddsBand = { minMultiplier: number; maxMultiplier: number; probability: number };
-type LuckyGiftOverride = { enabled: boolean; bands: LuckyOddsBand[] };
-type LuckyOddsConfig = {
-  enabled: boolean;
-  maxMultiplier: number;
-  bands: LuckyOddsBand[];
-  giftOverrides: Record<string, LuckyGiftOverride>;
-};
-
-const DEFAULT_LUCKY_ODDS_CONFIG: LuckyOddsConfig = {
-  enabled: true,
-  maxMultiplier: 100,
-  bands: [
-    { minMultiplier: 1, maxMultiplier: 5, probability: 5 },
-    { minMultiplier: 6, maxMultiplier: 14, probability: 10 },
-    { minMultiplier: 15, maxMultiplier: 25, probability: 15 },
-    { minMultiplier: 26, maxMultiplier: 100, probability: 10 },
-  ],
-  giftOverrides: {},
-};
-
 @Injectable()
 export class GiftsService implements OnModuleInit {
   private readonly log = new Logger(GiftsService.name);
-  private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
-  private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
 
   constructor(
     @InjectRepository(Gift) private readonly giftsRepo: Repository<Gift>,
@@ -108,11 +80,8 @@ export class GiftsService implements OnModuleInit {
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(UserVip) private readonly userVipRepo: Repository<UserVip>,
     private readonly dataSource: DataSource,
-    private readonly cpService: CpService,
     private readonly tasksService: TasksService,
-    private readonly badgesService: BadgesService,
     @Optional() private readonly realtime?: RealtimeGateway,
-    @Optional() private readonly notifications?: NotificationsService,
     @Optional()
     @Inject(forwardRef(() => ContestsService))
     private readonly contestsService?: ContestsService,
@@ -122,8 +91,6 @@ export class GiftsService implements OnModuleInit {
   async onModuleInit() {
     // Schema-only fix is always safe. Catalog seeds never run against live DB.
     await this.ensureGiftCategoryColumn();
-    await this.ensureGiftBrandAgencyColumn();
-    await this.ensureCpGiftColumns();
     await this.ensureGiftCategoriesTable();
     await this.ensureGiftSendIdempotencySchema();
     await this.ensureDefaultGiftCategories();
@@ -257,53 +224,6 @@ export class GiftsService implements OnModuleInit {
     }
   }
 
-  /** Keep the latest Gift entity column present on existing Cumin databases. */
-  private async ensureGiftBrandAgencyColumn() {
-    try {
-      await this.dataSource.query(
-        'ALTER TABLE gifts ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid NULL',
-      );
-      await this.dataSource.query(
-        'CREATE INDEX IF NOT EXISTS idx_gifts_brand_agency_id ON gifts ("brandAgencyId")',
-      );
-    } catch (err) {
-      this.log.warn(
-        'ensureGiftBrandAgencyColumn: ' +
-          (err instanceof Error ? err.message : String(err)),
-      );
-    }
-  }
-
-  /** Add CP gift configuration columns on DB-authoritative installations. */
-  private async ensureCpGiftColumns() {
-    try {
-      await this.dataSource.query(
-        `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS \"cpRelationshipType\" varchar(24) NOT NULL DEFAULT 'love'`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS \"cpPoints\" integer NULL`,
-      );
-      await this.dataSource.query(
-        `UPDATE gifts SET \"cpRelationshipType\"='love' WHERE category='cp' AND COALESCE(\"cpRelationshipType\",'')=''`,
-      );
-      const migrationKey = 'cp.gift_relationship_type_migration_v1';
-      const migrated = await this.settingsRepo.findOne({ where: { key: migrationKey } });
-      if (!migrated) {
-        await this.dataSource.query(
-          `UPDATE gifts g SET \"cpRelationshipType\" = regexp_replace(s.key, '^cp\\.gift\\.', '')
-           FROM app_settings s WHERE s.key LIKE 'cp.gift.%' AND s.value = g.id::text`,
-        );
-        await this.settingsRepo.save(this.settingsRepo.create({
-          key: migrationKey,
-          value: '1',
-          description: 'One-time migration of legacy CP gift relationship types',
-        }));
-      }
-    } catch (err) {
-      this.log.warn(`ensureCpGiftColumns: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-
   private async ensureGiftCategoriesTable() {
     try {
       await this.dataSource.query(`
@@ -331,53 +251,7 @@ export class GiftsService implements OnModuleInit {
    * Kept as a no-op so existing call sites don’t break.
    */
   private async ensureDefaultGiftCategories() {
-    // CP is a reserved system tab. Create it once; all other categories remain dashboard-owned.
-    try {
-      let existing = await this.categoriesRepo.findOne({ where: { key: 'cp' } });
-      if (!existing) {
-        existing = this.categoriesRepo.create({
-          key: 'cp',
-          labelAr: 'هدايا CP',
-          labelEn: 'CP Gifts',
-          sortOrder: 5,
-          isActive: true,
-          iconUrl: null,
-        });
-      } else {
-        // CP is a reserved system tab: normalize old CB labels and recover it
-        // if an earlier dashboard edit accidentally hid the category.
-        existing.labelAr = 'هدايا CP';
-        existing.labelEn = 'CP Gifts';
-        existing.isActive = true;
-        existing.sortOrder = 5;
-      }
-      await this.categoriesRepo.save(existing);
-      // One-time migration only: legacy CP starter gifts become CP-category gifts.
-      // After migration the dashboard category is authoritative and must never be
-      // overwritten on later application starts.
-      const migrationKey = 'cp.gift_category_migration_v1';
-      const migrated = await this.settingsRepo.findOne({ where: { key: migrationKey } });
-      if (!migrated) {
-        const configured = await this.dataSource.query(
-          "SELECT value FROM app_settings WHERE key LIKE 'cp.gift.%' AND COALESCE(value, '') <> ''",
-        );
-        const giftIds = Array.from(new Set(configured.map((row: any) => String(row.value || '').trim()).filter(Boolean)));
-        if (giftIds.length) {
-          await this.giftsRepo.createQueryBuilder()
-            .update(Gift)
-            .set({ category: 'cp' })
-            .where('id::text IN (:...giftIds)', { giftIds })
-            .execute();
-        }
-        await this.settingsRepo.save(this.settingsRepo.create({
-          key: migrationKey,
-          value: '1',
-          description: 'One-time migration of legacy CP starter gifts into CP category',
-        }));
-      }
-    } catch (err) {
-      this.log.warn(`ensure CP gift category: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    /* no-op — admin panel is the source of truth */
   }
 
   /**
@@ -386,9 +260,10 @@ export class GiftsService implements OnModuleInit {
    * 2) NEVER reassign gift.category — that column is dashboard-owned
    * 3) hard-deactivate duplicates (same art / same name)
    *
-   * The stored per-gift diamondValue is ignored: every paid gift is re-minted
-   * from coinPrice × live dashboard ratio (still subject to the absolute safety cap).
-   * This keeps catalog values from silently reducing a host's configured payout.
+   * If `forceFromRatio` is true, the stored diamondValue is IGNORED and
+   * every gift is re-minted purely from `coinPrice × ratio` (still capped).
+   * This is used when the admin lowers the ratio/cap and wants the whole
+   * board recomputed. Called by the admin economy-settings endpoint.
    */
   async normalizeGiftEconomyCatalog(opts: { forceFromRatio?: boolean } = {}) {
     try {
@@ -409,9 +284,12 @@ export class GiftsService implements OnModuleInit {
         }
         const isLucky = g.type === GiftType.LUCKY;
         const ratio = isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio;
-        // The gift's coin price and live dashboard ratio are authoritative.
-        // Do not let stale catalog diamondValue reduce the host's configured payout.
-        const nextDiamonds = mintDiamondsPerUnit(price, 0, ratio);
+        const catalogSeed = opts.forceFromRatio
+          ? 0 // ignore stored value → recompute purely from ratio
+          : Number(g.diamondValue) > 0
+            ? Number(g.diamondValue)
+            : recommendedGiftDiamonds(price, isLucky);
+        const nextDiamonds = mintDiamondsPerUnit(price, catalogSeed, ratio);
         if (Math.max(0, Math.floor(Number(g.diamondValue) || 0)) !== nextDiamonds) {
           g.diamondValue = nextDiamonds;
           diamondFixed++;
@@ -556,9 +434,6 @@ export class GiftsService implements OnModuleInit {
       const active = await this.giftsRepo.find({ where: { isActive: true } });
       const groups = new Map<string, typeof active>();
       for (const g of active) {
-        // CP gifts are individually configured rewards; never hide one because
-        // another CP gift happens to share its name or artwork.
-        if (String(g.category || '').toLowerCase() === 'cp') continue;
         const key = keyFn(g);
         if (!key) continue;
         const arr = groups.get(key) || [];
@@ -575,32 +450,32 @@ export class GiftsService implements OnModuleInit {
     // 1) same name+price
     await runPass(
       (g) =>
-        `${String(g.category || 'normal').toLowerCase()}:${this.giftNameKey(g.name)}|${Math.floor(Number(g.coinPrice) || 0)}`,
+        `${this.giftNameKey(g.name)}|${Math.floor(Number(g.coinPrice) || 0)}`,
     );
 
     // 2) same display name (any price) — one “وردة” only
     await runPass((g) => {
       const nk = this.giftNameKey(g.name);
-      return nk ? `name:${String(g.category || 'normal').toLowerCase()}:${nk}` : '';
+      return nk ? `name:${nk}` : '';
     });
 
     // 3) same icon file basename
     await runPass((g) => {
       const icon = this.giftMediaFileKey(g.iconUrl);
-      return icon ? `icon:${String(g.category || 'normal').toLowerCase()}:${icon}` : '';
+      return icon ? `icon:${icon}` : '';
     });
 
     // 4) same art stem (gift-rose / rose / gift_rose)
     await runPass((g) => {
       const stem = this.giftArtStem(g.iconUrl);
-      return stem ? `stem:${String(g.category || 'normal').toLowerCase()}:${stem}` : '';
+      return stem ? `stem:${stem}` : '';
     });
 
     // 5) same real motion asset
     await runPass((g) => {
       const anim = this.giftMediaFileKey(g.animationUrl);
       if (!anim || !/\.(mp4|webm|mov|gif|webp)$/i.test(anim)) return '';
-      return `anim:${String(g.category || 'normal').toLowerCase()}:${anim}`;
+      return `anim:${anim}`;
     });
 
     return deactivated;
@@ -804,7 +679,6 @@ export class GiftsService implements OnModuleInit {
         },
         {
           name: 'قلب CP',
-          // CP initiation is a normal dashboard-managed gift item, not a separate gift tab.
           category: 'cp',
           type: GiftType.PREMIUM,
           iconUrl: '/assets/gifts/mikoo/bg_cp_card.webp',
@@ -902,17 +776,11 @@ export class GiftsService implements OnModuleInit {
           continue;
         }
         let dirty = false;
-        const isCpInitiationGift = seed.name === 'قلب CP';
-        // The dashboard owns CP gift artwork and category after creation.
-        // Keep the dedicated CP category intact; never silently move relationship gifts to Premium.
-        if (!isCpInitiationGift && existing.iconUrl !== seed.iconUrl) {
+        if (existing.iconUrl !== seed.iconUrl) {
           existing.iconUrl = seed.iconUrl;
           dirty = true;
         }
-        if (isCpInitiationGift && (existing as any).category !== 'cp') {
-          (existing as any).category = 'cp';
-          dirty = true;
-        } else if (!isCpInitiationGift && (existing as any).category !== seed.category) {
+        if ((existing as any).category !== seed.category) {
           (existing as any).category = seed.category;
           dirty = true;
         }
@@ -1636,210 +1504,45 @@ export class GiftsService implements OnModuleInit {
   }
 
   /**
-   * Server-authoritative lucky-gift roll. Probabilities are percentages per band;
-   * the unallocated remainder is a complete loss (X0). Multipliers are integers.
-   * Settings are read from the database on every send so dashboard changes apply
-   * to the next operation without a process restart.
+   * House-positive lucky roll with frequent soft rebates (Mikoo-style feel).
+   * Approx EV ≈ 0.52–0.55 of stake — platform keeps the rest + diamond cut every send.
+   * Soft returns are common so users rarely see an empty round (no harsh lose UX).
+   * Tiers:
+   *  - 40% soft 0.30–0.80×
+   *  - 10% medium 1.20–2.50×
+   *  - 2.5% big 3–max× (hard-capped)
    */
-  private async rollLuckyPayout(totalCoins: number, giftId: string): Promise<LuckyRoll> {
-    const config = await this.getLuckyGiftOddsConfig();
-    const override = config.giftOverrides?.[giftId];
-    if (!config.enabled || override?.enabled === false) {
-      return { luckyMultiplier: null, luckyCoinsWon: 0 };
+  private rollLuckyPayout(
+    totalCoins: number,
+    cfg?: {
+      winChance?: number;
+      minMultiplier?: number;
+      maxMultiplier?: number;
+    } | null,
+  ): LuckyRoll {
+    const hardMax = Math.max(1, Number(ECONOMY.luckyGiftMaxMultiplier) || 5);
+    const maxMul = Math.min(
+      hardMax,
+      Math.max(3, Number(cfg?.maxMultiplier) || hardMax),
+    );
+    // ≈ EV 0.40–0.42 coin rebate to sender (house keeps majority + diamond cut).
+    const roll = randomInt(0, 1_000_000) / 1_000_000;
+    let luckyMultiplier: number | null = null;
+    if (roll < 0.38) {
+      const frac = randomInt(0, 1_000_000) / 1_000_000;
+      luckyMultiplier = Math.round((0.25 + frac * 0.45) * 100) / 100; // 0.25–0.70
+    } else if (roll < 0.47) {
+      const frac = randomInt(0, 1_000_000) / 1_000_000;
+      luckyMultiplier = Math.round((1.1 + frac * 0.9) * 100) / 100; // 1.10–2.00
+    } else if (roll < 0.485) {
+      const frac = randomInt(0, 1_000_000) / 1_000_000;
+      luckyMultiplier = Math.round((2.5 + frac * (maxMul - 2.5)) * 100) / 100;
     }
-    const bands = override?.bands?.length ? override.bands : config.bands;
-    const stake = Math.max(0, Math.floor(Number(totalCoins) || 0));
-    if (bands.some(band => stake * band.maxMultiplier > Number.MAX_SAFE_INTEGER)) {
-      throw new BadRequestException('قيمة الهدية مع أعلى مضاعف تتجاوز دقة الحساب الآمنة؛ خفّض المضاعف أو قيمة الإرسال');
-    }
-    const roll = randomInt(0, 100_000) / 1_000;
-    let cumulative = 0;
-    for (const band of bands) {
-      cumulative += band.probability;
-      if (roll < cumulative) {
-        const min = Math.max(1, Math.floor(band.minMultiplier));
-        const max = Math.max(min, Math.floor(band.maxMultiplier));
-        const multiplier = randomInt(min, max + 1);
-        return {
-          luckyMultiplier: multiplier,
-          luckyCoinsWon: Math.max(0, Math.floor(stake * multiplier)),
-        };
-      }
-    }
-    return { luckyMultiplier: null, luckyCoinsWon: 0 };
-  }
-
-  private normalizeLuckyOddsConfig(input: any): LuckyOddsConfig {
-    if (!input || typeof input !== 'object') throw new BadRequestException('إعدادات هدايا الحظ غير صالحة');
-    const maxMultiplier = Math.floor(Number(input.maxMultiplier));
-    if (!Number.isFinite(maxMultiplier) || maxMultiplier < 1 || maxMultiplier > 1_000_000) {
-      throw new BadRequestException('أعلى مضاعف يجب أن يكون بين X1 وX1,000,000');
-    }
-    const normalizeBands = (raw: any, label: string): LuckyOddsBand[] => {
-      if (!Array.isArray(raw) || raw.length < 1 || raw.length > 100) {
-        throw new BadRequestException(label + ': أضف نطاقاً واحداً على الأقل (بحد أقصى 100 نطاق)');
-      }
-      const bands = raw.map((item: any) => {
-        const minMultiplier = Math.floor(Number(item?.minMultiplier));
-        const maxBandMultiplier = Math.floor(Number(item?.maxMultiplier));
-        const probability = Number(item?.probability);
-        if (!Number.isInteger(minMultiplier) || !Number.isInteger(maxBandMultiplier) ||
-            minMultiplier < 1 || maxBandMultiplier < minMultiplier || maxBandMultiplier > 1_000_000 ||
-            !Number.isFinite(probability) || probability < 0 || probability > 100) {
-          throw new BadRequestException(label + ': نطاق مضاعف أو نسبة غير صالحة');
-        }
-        if (maxBandMultiplier > maxMultiplier) throw new BadRequestException(label + ': يوجد نطاق أعلى من الحد الأعلى للمضاعف');
-        return { minMultiplier, maxMultiplier: maxBandMultiplier, probability: Math.round(probability * 10000) / 10000 };
-      }).sort((a, b) => a.minMultiplier - b.minMultiplier);
-      for (let i = 1; i < bands.length; i++) {
-        if (bands[i].minMultiplier <= bands[i - 1].maxMultiplier) {
-          throw new BadRequestException(label + ': نطاقات المضاعفات لا يجوز أن تتداخل');
-        }
-      }
-      if (bands.reduce((sum, band) => sum + band.probability, 0) > 100.000001) {
-        throw new BadRequestException(label + ': مجموع احتمالات الفوز لا يجوز أن يتجاوز 100%');
-      }
-      return bands;
-    };
-    const bands = normalizeBands(input.bands, 'الاحتمالات العامة');
-    const giftOverrides: Record<string, LuckyGiftOverride> = {};
-    const rawOverrides = input.giftOverrides && typeof input.giftOverrides === 'object' ? input.giftOverrides : {};
-    for (const [giftId, raw] of Object.entries(rawOverrides)) {
-      if (!giftId || !raw || typeof raw !== 'object') continue;
-      const entry = raw as any;
-      giftOverrides[giftId] = {
-        enabled: entry.enabled !== false,
-        bands: normalizeBands(entry.bands, 'إعدادات الهدية ' + giftId),
-      };
-    }
-    return { enabled: input.enabled !== false, maxMultiplier, bands, giftOverrides };
-  }
-
-  async getLuckyGiftOddsConfig(): Promise<LuckyOddsConfig> {
-    const row = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_odds_config_v1' } });
-    if (!row) return { ...DEFAULT_LUCKY_ODDS_CONFIG, bands: [...DEFAULT_LUCKY_ODDS_CONFIG.bands], giftOverrides: {} };
-    try { return this.normalizeLuckyOddsConfig(JSON.parse(row.value)); }
-    catch {
-      this.log.error('Invalid lucky gift odds config; using safe defaults');
-      return { ...DEFAULT_LUCKY_ODDS_CONFIG, bands: [...DEFAULT_LUCKY_ODDS_CONFIG.bands], giftOverrides: {} };
-    }
-  }
-
-  async getLuckyGiftOddsDashboard() {
-    const [config, gifts, audit] = await Promise.all([
-      this.getLuckyGiftOddsConfig(),
-      this.giftsRepo.find({ where: { type: GiftType.LUCKY }, order: { sortOrder: 'ASC', coinPrice: 'ASC' } }),
-      this.settingsRepo.findOne({ where: { key: 'lucky_gift_odds_audit_v1' } }),
-    ]);
-    let auditRows: any[] = [];
-    try { auditRows = audit ? JSON.parse(audit.value) : []; } catch {}
-    let recentResults: any[] = [];
-    let stats: any = { totalSends: 0, totalGiftCoins: 0, winCount: 0, lossCount: 0, totalPayout: 0 };
-    try {
-      const rows = await this.dataSource.query(
-        `SELECT gs.id, gs."giftId", gs."giftName", gs."senderId", gs."receiverId",
-                gs.quantity, gs."totalCoins", gs."luckyMultiplier", gs."createdAt"
-         FROM gift_sends gs INNER JOIN gifts g ON g.id = gs."giftId"
-         WHERE g.type = $1 ORDER BY gs."createdAt" DESC LIMIT 100`,
-        [GiftType.LUCKY],
-      );
-      recentResults = rows;
-      const totals = await this.dataSource.query(
-        `SELECT COUNT(*)::int AS "totalSends",
-                COALESCE(SUM(gs."totalCoins"), 0)::bigint AS "totalGiftCoins",
-                COUNT(*) FILTER (WHERE gs."luckyMultiplier" IS NOT NULL)::int AS "winCount",
-                COUNT(*) FILTER (WHERE gs."luckyMultiplier" IS NULL)::int AS "lossCount",
-                COALESCE(SUM(CASE WHEN gs."luckyMultiplier" IS NOT NULL
-                  THEN FLOOR(gs."totalCoins" * gs."luckyMultiplier") ELSE 0 END), 0)::bigint AS "totalPayout"
-         FROM gift_sends gs INNER JOIN gifts g ON g.id = gs."giftId" WHERE g.type = $1`,
-        [GiftType.LUCKY],
-      );
-      if (totals?.[0]) stats = {
-        totalSends: Number(totals[0].totalSends || 0),
-        totalGiftCoins: Number(totals[0].totalGiftCoins || 0),
-        winCount: Number(totals[0].winCount || 0),
-        lossCount: Number(totals[0].lossCount || 0),
-        totalPayout: Number(totals[0].totalPayout || 0),
-      };
-    } catch (error) {
-      this.log.warn('Could not read lucky gift result history or aggregate stats');
-    }
-    return {
-      config,
-      gifts: gifts.map(g => ({ id: g.id, name: g.name, coinPrice: g.coinPrice, isActive: g.isActive })),
-      audit: auditRows.slice(0, 200),
-      recentResults,
-      stats,
-    };
-  }
-
-  async updateLuckyGiftOddsConfig(input: unknown, actorId: string) {
-    const next = this.normalizeLuckyOddsConfig(input);
-    return this.dataSource.transaction(async manager => {
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['jeho:lucky-gift-odds-config-v1']);
-      const repo = manager.getRepository(AppSetting);
-      const configKey = 'lucky_gift_odds_config_v1';
-      const auditKey = 'lucky_gift_odds_audit_v1';
-      const oldRow = await repo.findOne({ where: { key: configKey }, lock: { mode: 'pessimistic_write' } });
-      const auditRow = await repo.findOne({ where: { key: auditKey }, lock: { mode: 'pessimistic_write' } });
-      let previous: any = DEFAULT_LUCKY_ODDS_CONFIG;
-      let audit: any[] = [];
-      try { if (oldRow) previous = this.normalizeLuckyOddsConfig(JSON.parse(oldRow.value)); } catch {}
-      try { if (auditRow) audit = JSON.parse(auditRow.value); } catch {}
-      const savedConfig = oldRow ?? repo.create({ key: configKey, description: 'Dashboard-managed lucky gift odds configuration', value: '' });
-      savedConfig.value = JSON.stringify(next);
-      savedConfig.description = 'Dashboard-managed lucky gift odds configuration';
-      await repo.save(savedConfig);
-      audit.unshift({ changedAt: new Date().toISOString(), actorId: String(actorId || 'unknown'), previous, next });
-      audit = audit.slice(0, 500);
-      const savedAudit = auditRow ?? repo.create({ key: auditKey, description: 'Lucky gift odds change audit log', value: '' });
-      savedAudit.value = JSON.stringify(audit);
-      savedAudit.description = 'Lucky gift odds change audit log';
-      await repo.save(savedAudit);
-      return { ok: true, config: next, auditCount: audit.length, appliedAt: new Date().toISOString() };
-    });
-  }
-
-  async simulateLuckyGiftOdds(input: any) {
-    const config = this.normalizeLuckyOddsConfig(input?.config ?? await this.getLuckyGiftOddsConfig());
-    const giftId = String(input?.giftId || '');
-    const override = giftId ? config.giftOverrides[giftId] : undefined;
-    const bands = override?.bands?.length ? override.bands : config.bands;
-    const iterations = Math.max(100, Math.min(100_000, Math.floor(Number(input?.iterations) || 10_000)));
-    const stake = Math.max(1, Math.floor(Number(input?.giftPrice) || 1000));
-    const counts: Record<string, number> = {};
-    let lossCount = 0;
-    let totalPayout = 0;
-    if (!config.enabled || override?.enabled === false) lossCount = iterations;
-    else {
-      for (let i = 0; i < iterations; i++) {
-        const roll = randomInt(0, 100_000) / 1_000;
-        let cumulative = 0;
-        let multiplier = 0;
-        for (const band of bands) {
-          cumulative += band.probability;
-          if (roll < cumulative) {
-            multiplier = randomInt(band.minMultiplier, band.maxMultiplier + 1);
-            break;
-          }
-        }
-        if (multiplier <= 0) lossCount++;
-        else {
-          const key = 'X' + multiplier;
-          counts[key] = (counts[key] || 0) + 1;
-          totalPayout += stake * multiplier;
-        }
-      }
-    }
-    return {
-      iterations, giftPrice: stake, lossCount, winCount: iterations - lossCount,
-      lossPercent: Number((lossCount * 100 / iterations).toFixed(2)),
-      winPercent: Number(((iterations - lossCount) * 100 / iterations).toFixed(2)),
-      totalSimulatedPayout: Math.floor(totalPayout),
-      averagePayoutPerSend: Number((totalPayout / iterations).toFixed(2)),
-      expectedReturnPercent: Number((totalPayout / (stake * iterations) * 100).toFixed(2)),
-      multiplierCounts: counts,
-    };
+    const luckyCoinsWon =
+      luckyMultiplier != null
+        ? Math.max(1, Math.floor(Math.max(0, totalCoins) * luckyMultiplier))
+        : 0;
+    return { luckyMultiplier, luckyCoinsWon };
   }
 
   async catalog() {
@@ -1856,11 +1559,8 @@ export class GiftsService implements OnModuleInit {
     const showDiamonds = !!ECONOMY.showDiamondValueInApp;
     for (const g of gifts) {
       if (this.isLuckyBoxCatalogGift(g)) continue;
-      const effectiveCategory = String(g.category || 'normal').toLowerCase();
       const stem = this.giftArtStem(g.iconUrl) || this.giftNameKey(g.name);
-      const key = effectiveCategory === 'cp'
-        ? 'cp:' + String(g.id)
-        : effectiveCategory + ':' + (stem || String(g.id));
+      const key = stem || String(g.id);
       if (seen.has(key)) continue;
       seen.add(key);
       const price = Math.max(0, Math.floor(Number(g.coinPrice) || 0));
@@ -1874,9 +1574,6 @@ export class GiftsService implements OnModuleInit {
       // Return a lightweight clone so mutating diamondValue on the response
       // never triggers an implicit repo save.
       const view: any = { ...g };
-      // Configured CB starter gifts get a dedicated gift-sheet tab without
-      // changing the dashboard-owned category stored in the database.
-      view.category = effectiveCategory;
       view.diamondValue = showDiamonds ? mintedDiamonds : 0;
       out.push(view);
     }
@@ -1892,31 +1589,15 @@ export class GiftsService implements OnModuleInit {
       where: { isActive: true },
       order: { sortOrder: 'ASC', createdAt: 'ASC' },
     });
-    const categories = rows.map((r) => ({
+    return rows.map((r) => ({
       id: r.id,
       key: r.key,
-      labelAr: r.key === 'cp' ? 'هدايا CP' : r.labelAr,
-      labelEn: r.key === 'cp' ? 'CP Gifts' : r.labelEn,
+      labelAr: r.labelAr,
+      labelEn: r.labelEn,
       sortOrder: r.sortOrder,
       isActive: r.isActive,
       iconUrl: (r as any).iconUrl ?? null,
     }));
-    const [configuredCpGift] = await this.dataSource.query(
-      "SELECT value FROM app_settings WHERE key LIKE 'cp.gift.%' LIMIT 1",
-    ).catch(() => []);
-    const activeCpGiftCount = await this.giftsRepo.count({ where: { category: 'cp', isActive: true } }).catch(() => 0);
-    if ((configuredCpGift?.value || activeCpGiftCount > 0) && !categories.some(category => category.key === 'cp')) {
-      categories.push({
-        id: 'cp',
-        key: 'cp',
-        labelAr: 'هدايا CP',
-        labelEn: 'CP Gifts',
-        sortOrder: 5,
-        isActive: true,
-        iconUrl: null,
-      });
-    }
-    return categories;
   }
 
   async listCategoriesAdmin() {
@@ -2079,148 +1760,22 @@ export class GiftsService implements OnModuleInit {
       throw new BadRequestException('A valid roomId is required');
     }
     const configRow = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
-    const defaultLevels = [
-      { level: 1, title: 'الصندوق الذهبي', goalMode: 'coins', rewardDays: 0, coinTarget: 100000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 5000, itemId: '' }] },
-      { level: 2, title: 'الصندوق الملكي', goalMode: 'coins', rewardDays: 0, coinTarget: 200000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 10000, itemId: '' }] },
-      { level: 3, title: 'الصندوق الأسطوري', goalMode: 'coins', rewardDays: 0, coinTarget: 300000, diamondTarget: 0, giftCount: 1, giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '', features: [], rewards: [{ type: 'coins', amount: 20000, itemId: '' }] },
-    ];
-    const defaults: any = {
-      enabled: false, iconVisible: true, soundEnabled: true,
-      explosionEffect: { enabled: true, mediaUrl: '', soundUrl: '', width: 100, height: 100, startX: 50, startY: 46, endX: 50, endY: 50, durationMs: 1800, opacity: 100 },
-      toast: { enabled: true, backgroundUrl: '', height: 104, yOffset: 72, titleSizeSp: 17, bodySizeSp: 14, giftSizeDp: 58, showWinnerName: true },
-      goalMode: 'coins',
-      coinTarget: 100000, diamondTarget: 10000, giftIds: [],
-      giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all',
-      levels: defaultLevels, rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '',
-    };
+    const defaults = { enabled: false, iconVisible: true, goalMode: 'coins', coinTarget: 100000, diamondTarget: 10000, giftIds: [], rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '' };
     let config: any = defaults;
-    try {
-      if (configRow?.value) {
-        const parsed = JSON.parse(configRow.value);
-        config = {
-          ...defaults, ...parsed,
-          giftSelectionMode: parsed.giftSelectionMode
-            || (Array.isArray(parsed.giftIds) && parsed.giftIds.length ? 'selected' : 'all'),
-        };
-      }
-    } catch {}
-    const configuredLevels = Array.isArray(config.levels) ? config.levels.slice(0, 3) : [];
-    while (configuredLevels.length < 3) {
-      const next = configuredLevels.length;
-      configuredLevels.push({ ...defaultLevels[next], giftCategories: [...(config.giftCategories || defaultLevels[next].giftCategories)] });
-    }
-    const levels = configuredLevels.map((level: any, index: number) => ({
-      ...defaultLevels[index], ...level, level: index + 1,
-      features: Array.isArray(level.features) ? level.features.map((x: any) => String(x || '').trim()).filter(Boolean)
-        : String(level.featuresText || '').split(/\r?\n/).map((x: string) => x.trim()).filter(Boolean),
-      rewards: Array.isArray(level.rewards) ? level.rewards : [],
-    }));
-
-    // Each room owns an independent progress record. Keep the historical per-room
-    // key so any valid room-specific progress from older builds remains intact.
-    const key = `support_chest_room:${roomId}`;
+    try { if (configRow?.value) config = { ...defaults, ...JSON.parse(configRow.value) }; } catch {}
+    const key = 'support_chest_room:' + roomId;
     let row = await this.settingsRepo.findOne({ where: { key } });
     if (!row) {
-      await this.dataSource.transaction(async manager => {
-        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
-        const stateRepo = manager.getRepository(AppSetting);
-        const existingRoomState = await stateRepo.findOne({
-          where: { key },
-          lock: { mode: 'pessimistic_write' },
-        });
-        if (!existingRoomState) {
-          const initialState = {
-            roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1,
-          };
-          await stateRepo.save(stateRepo.create({
-            key,
-            value: JSON.stringify(initialState),
-            description: `Independent support chest progress for room ${roomId}`,
-          }));
-        }
-      });
+      await this.dataSource.query('INSERT INTO app_settings ("key", "value", "description") VALUES ($1, $2, $3) ON CONFLICT ("key") DO NOTHING', [key, JSON.stringify({ roomId, coins: 0, diamonds: 0, level: 1, cycle: 1 }), 'Room support chest state']);
       row = await this.settingsRepo.findOne({ where: { key } });
     }
-    let state: any = { roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
+    let state: any = { roomId, coins: 0, diamonds: 0, level: 1, cycle: 1 };
     try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
-
-    const globalAllowedCategories = Array.isArray(config.giftCategories)
-      ? config.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
-    const globalGiftIds = Array.isArray(config.giftIds) ? config.giftIds.map(String) : [];
-    const globalGiftSelectionMode = String(config.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'));
-    const allGifts = await this.giftsRepo.find({ where: { isActive: true }, order: { sortOrder: 'ASC' } as any });
-    // The dashboard exposes three support-chest sections: normal, lucky and CP.
-    // In the actual gift catalog, ordinary gifts use tab categories such as
-    // basic/fancy/luxury/bag/friend/country/agency/premium rather than "normal".
-    // Treat every non-CP, non-lucky catalog gift as a normal gift so those tabs
-    // are not silently excluded from room support progress.
-    const classifySupportGift = (gift: Gift): 'normal' | 'lucky' | 'cp' => {
-      const rawCategory = String(gift.category || '').trim().toLowerCase();
-      const rawType = String(gift.type || '').trim().toLowerCase();
-      if (rawCategory === 'cp' || rawType === 'cp') return 'cp';
-      if (rawType === 'lucky' || rawCategory === 'lucky') return 'lucky';
-      return 'normal';
-    };
-    const enrichedLevels = await Promise.all(levels.map(async (level: any, index: number) => {
-      const levelCategories = Array.isArray(level.giftCategories)
-        ? level.giftCategories.map(String) : globalAllowedCategories;
-      const allowedCategories = levelCategories.filter((category: string) => globalAllowedCategories.includes(category));
-      const levelGiftIds = Array.isArray(level.giftIds) ? level.giftIds.map(String) : [];
-      const levelGiftSelectionMode = String(level.giftSelectionMode || (levelGiftIds.length ? 'selected' : 'all'));
-      const eligibleGifts = allGifts.filter(gift => {
-        const category = classifySupportGift(gift);
-        return allowedCategories.includes(category)
-          && (globalGiftSelectionMode !== 'selected' || globalGiftIds.includes(String(gift.id)))
-          && (levelGiftSelectionMode !== 'selected' || levelGiftIds.includes(String(gift.id)));
-      }).map(gift => ({
-        id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl || null,
-        coinPrice: Number(gift.coinPrice) || 0, category: classifySupportGift(gift),
-      }));
-      const rawRewards = Array.isArray(level.rewards) ? level.rewards.filter((reward: any) => reward && String(reward.type || '') !== 'none') : [];
-      const rewards = await Promise.all(rawRewards.map(async (reward: any) => {
-        const type = String(reward?.type || '');
-        const itemId = String(reward?.itemId || '');
-        let item: any = null;
-        if (type === 'frame' && itemId) item = await this.cosmeticsRepo.findOne({ where: { id: itemId } });
-        else if (type === 'badge' && itemId) item = await this.dataSource.getRepository(Badge).findOne({ where: { id: itemId } });
-        else if (type === 'vip' && itemId) item = await this.dataSource.getRepository(VipPlan).findOne({ where: { id: itemId } });
-        else if (type === 'gift' && itemId) item = await this.giftsRepo.findOne({ where: { id: itemId } });
-        return {
-          type, amount: Math.max(1, Number(reward?.amount) || 1), itemId,
-          name: item?.name || (type === 'coins' ? 'كوينزات' : type === 'diamonds' ? 'ماسات' : type.toUpperCase()),
-          imageUrl: item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.badgeUrl || item?.animationUrl || null,
-          iconUrl: item?.iconUrl || null, animationUrl: item?.animationUrl || null,
-        };
-      }));
-      return { ...level, level: index + 1, eligibleGifts, eligibleGiftCount: eligibleGifts.length, rewards, rewardCount: rewards.length };
-    }));
-
-    const levelIndex = Math.max(0, Math.min(2, Number(state.level || 1) - 1));
-    const currentLevel = enrichedLevels[levelIndex];
-    return {
-      config: {
-        ...config, levels: enrichedLevels,
-        eligibleGifts: currentLevel.eligibleGifts,
-        eligibleGiftCount: currentLevel.eligibleGiftCount,
-        currentLevel,
-      },
-      state: { ...state, roomId, level: levelIndex + 1, currentLevel: currentLevel.title || ('المستوى ' + (levelIndex + 1)) },
-      currentLevel,
-    };
+    return { config, state };
   }
 
-  async applySupportChestGift(
-    roomId: string,
-    giftId: string,
-    coins: number,
-    diamonds: number,
-    senderId: string,
-    giftCategory?: string | null,
-    giftType?: string | null,
-    quantity = 1,
-  ) {
-    // Serialize contributions only within this room; other rooms never share progress.
-    const key = `support_chest_room:${roomId}`;
+  async applySupportChestGift(roomId: string, giftId: string, coins: number, diamonds: number, senderId: string) {
+    const key = 'support_chest_room:' + roomId;
     const result = await this.dataSource.transaction(async manager => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
       const repo = manager.getRepository(AppSetting);
@@ -2229,319 +1784,121 @@ export class GiftsService implements OnModuleInit {
       let cfg: any;
       try { cfg = JSON.parse(cfgRow.value); } catch { return null; }
       if (cfg.enabled !== true) return null;
-      const categoryRaw = String(giftCategory || '').trim().toLowerCase();
-      const typeRaw = String(giftType || '').trim().toLowerCase();
-      // Match getSupportChestState(): catalog tab names (basic, fancy, bag,
-      // premium, etc.) all belong to the normal-gifts section unless explicitly
-      // marked lucky or CP.
-      const category = categoryRaw === 'cp' || typeRaw === 'cp' ? 'cp'
-        : (typeRaw === 'lucky' || categoryRaw === 'lucky') ? 'lucky'
-        : 'normal';
-      const globalCategories = Array.isArray(cfg.giftCategories) ? cfg.giftCategories.map(String) : ['normal', 'lucky', 'cp'];
-      if (!globalCategories.includes(category)) return null;
-      const globalGiftIds = Array.isArray(cfg.giftIds) ? cfg.giftIds.map(String) : [];
-      const globalGiftSelectionMode = String(cfg.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'));
-      if (globalGiftSelectionMode === 'selected' && !globalGiftIds.includes(String(giftId))) return null;
-      let levels = Array.isArray(cfg.levels) ? cfg.levels.slice(0, 3) : [];
-      if (!levels.length) {
-        levels.push({
-          level: 1, title: 'الصندوق الذهبي', goalMode: cfg.goalMode || 'coins',
-          coinTarget: cfg.coinTarget || 100000, diamondTarget: cfg.diamondTarget || 0,
-          giftCount: 1, giftCategories: globalCategories,
-          giftSelectionMode: cfg.giftSelectionMode || (globalGiftIds.length ? 'selected' : 'all'),
-          giftIds: globalGiftIds,
-          rewards: [{ type: cfg.rewardType || 'coins', amount: cfg.rewardAmount || 5000, itemId: cfg.rewardItemId || '' }],
-        });
-      }
-      const fallbackLevels = [
-        { level: 1, title: 'الصندوق الذهبي', goalMode: 'coins', coinTarget: 100000, diamondTarget: 0, giftCount: 1, giftCategories: globalCategories, giftSelectionMode: 'all', giftIds: [], rewards: [{ type: 'coins', amount: 5000, itemId: '' }] },
-        { level: 2, title: 'الصندوق الملكي', goalMode: 'coins', coinTarget: 200000, diamondTarget: 0, giftCount: 1, giftCategories: globalCategories, giftSelectionMode: 'all', giftIds: [], rewards: [{ type: 'coins', amount: 10000, itemId: '' }] },
-        { level: 3, title: 'الصندوق الأسطوري', goalMode: 'coins', coinTarget: 300000, diamondTarget: 0, giftCount: 1, giftCategories: globalCategories, giftSelectionMode: 'all', giftIds: [], rewards: [{ type: 'coins', amount: 20000, itemId: '' }] },
-      ];
-      while (levels.length < 3) levels.push({ ...fallbackLevels[levels.length] });
+      const giftIds = Array.isArray(cfg.giftIds) ? cfg.giftIds.map(String) : [];
+      if (giftIds.length && !giftIds.includes(String(giftId))) return null;
       let row = await repo.findOne({ where: { key } });
-      let state: any = { roomId, coins: 0, diamonds: 0, giftCount: 0, level: 1, cycle: 1 };
+      let state: any = { roomId, coins: 0, diamonds: 0, level: 1, cycle: 1 };
       try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
-      let levelIndex = Math.max(0, Math.min(levels.length - 1, Number(state.level || 1) - 1));
-      state.level = levelIndex + 1;
-      const levelCfg = levels[levelIndex];
-      const allowedCategories = (Array.isArray(levelCfg.giftCategories)
-        ? levelCfg.giftCategories.map(String) : globalCategories).filter(value => globalCategories.includes(value));
-      const configuredLevelGiftIds = Array.isArray(levelCfg.giftIds) ? levelCfg.giftIds.map(String) : [];
-      const levelGiftSelectionMode = String(levelCfg.giftSelectionMode || (configuredLevelGiftIds.length ? 'selected' : 'all'));
-      const levelGiftIds = configuredLevelGiftIds;
-      if (!allowedCategories.includes(category)
-          || (levelGiftSelectionMode === 'selected' && !levelGiftIds.includes(String(giftId)))) return null;
       state.coins = (Number(state.coins) || 0) + Math.max(0, Number(coins) || 0);
       state.diamonds = (Number(state.diamonds) || 0) + Math.max(0, Number(diamonds) || 0);
-      state.giftCount = (Number(state.giftCount) || 0) + Math.max(1, Math.floor(Number(quantity) || 1));
       state.lastSenderId = senderId;
       state.updatedAt = new Date().toISOString();
-      const mode = String(levelCfg.goalMode || cfg.goalMode || 'coins');
-      const coinTarget = Math.max(0, Number(levelCfg.coinTarget ?? cfg.coinTarget) || 0);
-      const diamondTarget = Math.max(0, Number(levelCfg.diamondTarget ?? cfg.diamondTarget) || 0);
-      // In "both" mode a zero target means that currency is not required.
-      // Keep this identical to support-chest.html, which treats a zero side as 100%.
-      const coinReached = coinTarget > 0 && state.coins >= coinTarget;
-      const diamondReached = diamondTarget > 0 && state.diamonds >= diamondTarget;
-      const coinTargetSatisfied = coinTarget <= 0 || coinReached;
-      const diamondTargetSatisfied = diamondTarget <= 0 || diamondReached;
-      const countReached = state.giftCount >= Math.max(1, Number(levelCfg.giftCount) || 1);
-      const targetReached = mode === 'both'
-        ? coinTargetSatisfied && diamondTargetSatisfied
-        : mode === 'diamonds' ? diamondReached : coinReached;
-      state.goalReached = targetReached && countReached;
-      const contributor = await manager.getRepository(User).findOne({ where: { id: senderId } });
-      const contribution = {
-        senderId, senderName: contributor?.displayName || contributor?.username || 'مستخدم',
-        roomId, level: levelIndex + 1, levelTitle: levelCfg.title || ('المستوى ' + (levelIndex + 1)),
-        coins: state.coins, diamonds: state.diamonds, giftCount: state.giftCount,
-        goalReached: state.goalReached, cycle: Math.max(1, Number(state.cycle) || 1),
-      };
-      let opened: any = null;
+      const mode = String(cfg.goalMode || 'coins');
+      const c = Number(cfg.coinTarget) > 0 && state.coins >= Number(cfg.coinTarget);
+      const d = Number(cfg.diamondTarget) > 0 && state.diamonds >= Number(cfg.diamondTarget);
+      state.goalReached = mode === 'both' ? c && d : mode === 'diamonds' ? d : c;
       if (state.goalReached) {
-        const rewards = Array.isArray(levelCfg.rewards)
-          ? levelCfg.rewards.filter((entry: any) => entry && String(entry.type || '') !== 'none')
-          : [];
-        // An empty reward list must not block the completed level from opening.
-        // The room still receives the opening event and the next level can start.
-        // Every reward configured for this level is granted to the final contributor.
-        const granted: any[] = [];
-        for (let rewardIndex = 0; rewardIndex < rewards.length; rewardIndex++) {
-          const reward = rewards[rewardIndex];
-        {
-          const rewardType = String(reward.type || '');
-          const amount = Math.max(1, Math.floor(Number(reward.amount) || 1));
-          const itemId = String(reward.itemId || '').trim();
-          const rewardDays = Math.max(0, Math.min(3650, Math.floor(Number(reward.durationDays ?? levelCfg.rewardDays) || 0)));
-          const rewardExpiresAt = rewardDays > 0 ? new Date(Date.now() + rewardDays * 24 * 60 * 60 * 1000) : null;
-          if (rewardType === 'coins' || rewardType === 'diamonds') {
-            const walletRepo = manager.getRepository(Wallet);
-            const wallet = await walletRepo.findOne({ where: { userId: senderId }, lock: { mode: 'pessimistic_write' } });
-            if (!wallet) throw new BadRequestException('Support chest winner wallet not found');
-            if (rewardType === 'coins') wallet.coins = Number(wallet.coins || 0) + amount;
-            else wallet.diamonds = Number(wallet.diamonds || 0) + amount;
-            await walletRepo.save(wallet);
-            await manager.getRepository(WalletTransaction).save(manager.getRepository(WalletTransaction).create({
-              userId: senderId, type: TransactionType.ADMIN_ADJUST,
-              currency: rewardType === 'coins' ? CurrencyType.COINS : CurrencyType.DIAMONDS,
-              amount, balanceAfter: rewardType === 'coins' ? Number(wallet.coins) : Number(wallet.diamonds),
-              referenceType: 'support_chest_reward',
-              referenceId: 'support_chest:' + roomId + ':' + String(state.cycle || 1) + ':' + String(levelIndex + 1) + ':' + rewardIndex,
-              description: 'JEHO support chest reward',
-              metadata: { roomId, cycle: state.cycle || 1, giftId, level: levelIndex + 1 },
-            }));
-            granted.push({ type: rewardType, amount, name: rewardType === 'coins' ? 'كوينزات' : 'ماسات' });
-          } else if (rewardType === 'frame') {
-            if (!itemId) throw new BadRequestException('Support chest frame reward requires an item ID');
-            const cosmetic = await manager.getRepository(Cosmetic).findOne({ where: { id: itemId, isActive: true } });
-            if (!cosmetic) throw new BadRequestException('Support chest frame reward is not active');
-            const ownership = manager.getRepository(UserCosmetic);
-            const owned = await ownership.findOne({ where: { userId: senderId, cosmeticId: cosmetic.id } });
-            if (!owned) await ownership.save(ownership.create({ userId: senderId, cosmeticId: cosmetic.id, equipped: false, expiresAt: rewardExpiresAt }));
-            else if (rewardDays <= 0) { if (owned.expiresAt) { owned.expiresAt = null; await ownership.save(owned); } }
-            else if (owned.expiresAt) { owned.expiresAt = new Date(Math.max(Date.now(), new Date(owned.expiresAt).getTime()) + rewardDays * 24 * 60 * 60 * 1000); await ownership.save(owned); }
-            granted.push({ type: 'frame', itemId: cosmetic.id, name: cosmetic.name, imageUrl: cosmetic.previewUrl || null });
-          } else if (rewardType === 'badge') {
-            if (!itemId) throw new BadRequestException('Support chest badge reward requires an item ID');
-            const badge = await manager.getRepository(Badge).findOne({ where: { id: itemId, isActive: true } });
-            if (!badge) throw new BadRequestException('Support chest badge reward is not active');
-            const ownership = manager.getRepository(UserBadge);
-            const owned = await ownership.findOne({ where: { userId: senderId, badgeId: badge.id } });
-            if (!owned) await ownership.save(ownership.create({ userId: senderId, badgeId: badge.id, grantedByAdminId: null, source: 'support_chest', expiresAt: rewardExpiresAt }));
-            else if (rewardDays <= 0) { if (owned.expiresAt) { owned.expiresAt = null; await ownership.save(owned); } }
-            else if (owned.expiresAt) { owned.expiresAt = new Date(Math.max(Date.now(), new Date(owned.expiresAt).getTime()) + rewardDays * 24 * 60 * 60 * 1000); await ownership.save(owned); }
-            granted.push({ type: 'badge', itemId: badge.id, name: badge.name, imageUrl: badge.imageUrl || null });
-          } else if (rewardType === 'gift') {
-            if (!itemId) throw new BadRequestException('Support chest gift reward requires a gift ID');
-            const gift = await manager.getRepository(Gift).findOne({ where: { id: itemId, isActive: true } });
-            if (!gift) throw new BadRequestException('Support chest gift reward is not active');
-            // Persist the free prize in gift history as a self-delivered system reward.
-            await manager.getRepository(GiftSend).save(manager.getRepository(GiftSend).create({
-              giftId: gift.id, giftName: gift.name, giftIconUrl: gift.iconUrl || null,
-              senderId, receiverId: senderId, roomId,
-              quantity: amount, comboCount: amount, totalCoins: 0, diamondsAwarded: 0,
-              luckyMultiplier: null,
-              expiresAt: rewardExpiresAt,
-            }));
-            granted.push({
-              type: 'gift', itemId: gift.id, amount, name: gift.name,
-              imageUrl: gift.iconUrl || gift.animationUrl || null,
-              iconUrl: gift.iconUrl || null, animationUrl: gift.animationUrl || null,
-            });
-          } else if (rewardType === 'vip') {
-            if (!itemId) throw new BadRequestException('Support chest VIP reward requires a VIP plan ID');
-            const plan = await manager.getRepository(VipPlan).findOne({ where: { id: itemId, isActive: true } });
-            if (!plan) throw new BadRequestException('Support chest VIP plan is not active');
-            const startsAt = new Date();
-            const expiresAt = new Date(startsAt.getTime() + amount * 24 * 60 * 60 * 1000);
-            const userVipRepo = manager.getRepository(UserVip);
-            const active = await userVipRepo.findOne({ where: { userId: senderId, isActive: true, expiresAt: MoreThan(new Date()) } });
-            if (active) {
-              active.expiresAt = new Date(Math.max(Date.now(), new Date(active.expiresAt).getTime()) + amount * 24 * 60 * 60 * 1000);
-              if (Number(plan.level) >= Number(active.level || 0)) {
-                active.level = Number(plan.level) || Number(active.level) || 0;
-                active.vipPlanId = plan.id;
-              }
-              await userVipRepo.save(active);
-            } else {
-              await userVipRepo.save(userVipRepo.create({
-                userId: senderId, vipPlanId: plan.id, level: plan.level,
-                startsAt, expiresAt, isActive: true,
-              }));
-            }
-            granted.push({ type: 'vip', amount, itemId: plan.id, name: plan.name, imageUrl: plan.badgeUrl || null });
-          } else if (rewardType === 'none') {
-            granted.push({ type: 'none', amount: 0, name: 'بدون مكافأة' });
-          } else {
-            throw new BadRequestException('Unsupported support chest reward type: ' + rewardType);
-          }
-          }
-        }
-        const winner = await manager.getRepository(User).findOne({ where: { id: senderId } });
-        opened = {
-          winnerId: senderId,
-          winnerName: winner?.displayName || winner?.username || 'مستخدم',
-          roomId, level: levelIndex + 1, cycle: Math.max(1, Number(state.cycle) || 1), levelTitle: levelCfg.title || ('المستوى ' + (levelIndex + 1)),
-          rewards: granted, giftId, category, soundEnabled: cfg.soundEnabled !== false,
-        };
-        state.lastWinnerId = senderId;
-        state.lastWinnerName = opened.winnerName;
-        state.lastRewards = granted;
-        state.lastReward = granted[0] || null;
-        state.lastRewardType = granted[0]?.type || 'none';
-        state.lastRewardAmount = granted[0]?.amount || 1;
-        state.lastGiftId = giftId;
-        state.coins = 0; state.diamonds = 0; state.giftCount = 0;
-        state.goalReached = false;
-        state.rewardPending = false;
-        const next = levelIndex + 2;
-        if (next > levels.length) {
-          state.level = 1;
+        const rewardType = String(cfg.rewardType || 'none');
+        const amount = Math.max(0, Math.floor(Number(cfg.rewardAmount) || 0));
+        if ((rewardType === 'coins' || rewardType === 'diamonds') && amount > 0) {
+          const walletRepo = manager.getRepository(Wallet);
+          const wallet = await walletRepo.findOne({ where: { userId: senderId }, lock: { mode: 'pessimistic_write' } });
+          if (!wallet) throw new BadRequestException('Support chest winner wallet not found');
+          if (rewardType === 'coins') wallet.coins = Number(wallet.coins || 0) + amount;
+          else wallet.diamonds = Number(wallet.diamonds || 0) + amount;
+          await walletRepo.save(wallet);
+          const txRepo = manager.getRepository(WalletTransaction);
+          await txRepo.save(txRepo.create({
+            userId: senderId, type: TransactionType.ADMIN_ADJUST,
+            currency: rewardType === 'coins' ? CurrencyType.COINS : CurrencyType.DIAMONDS,
+            amount, balanceAfter: rewardType === 'coins' ? Number(wallet.coins) : Number(wallet.diamonds),
+            referenceType: 'support_chest_reward',
+            referenceId: roomId + ':' + String(state.cycle || 1),
+            description: 'JEHO support chest reward',
+            metadata: { roomId, cycle: state.cycle || 1, giftId },
+          }));
+          state.lastWinnerId = senderId;
+          state.lastRewardType = rewardType;
+          state.lastRewardAmount = amount;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
           state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+        } else if (rewardType === 'frame') {
+          if (!cfg.rewardItemId) throw new BadRequestException('Support chest frame reward requires rewardItemId');
+          const cosmetic = await manager.getRepository(Cosmetic).findOne({
+            where: { id: String(cfg.rewardItemId), isActive: true },
+          });
+          if (!cosmetic) throw new BadRequestException('Support chest frame reward is not an active cosmetic');
+          const userCosmetics = manager.getRepository(UserCosmetic);
+          const owned = await userCosmetics.findOne({
+            where: { userId: senderId, cosmeticId: cosmetic.id },
+          });
+          if (!owned) {
+            await userCosmetics.save(userCosmetics.create({
+              userId: senderId, cosmeticId: cosmetic.id, equipped: false, expiresAt: null,
+            }));
+          }
+          state.lastWinnerId = senderId;
+          state.lastRewardType = 'frame';
+          state.lastRewardItemId = cosmetic.id;
+          state.lastRewardAmount = 1;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+          state.rewardPending = false;
+        } else if (rewardType === 'badge') {
+          if (!cfg.rewardItemId) throw new BadRequestException('Support chest badge reward requires rewardItemId');
+          const badge = await manager.getRepository(Badge).findOne({
+            where: { id: String(cfg.rewardItemId), isActive: true },
+          });
+          if (!badge) throw new BadRequestException('Support chest badge reward is not an active badge');
+          const userBadges = manager.getRepository(UserBadge);
+          const owned = await userBadges.findOne({
+            where: { userId: senderId, badgeId: badge.id },
+          });
+          if (!owned) {
+            await userBadges.save(userBadges.create({
+              userId: senderId, badgeId: badge.id, grantedByAdminId: null, source: 'support_chest',
+            }));
+          }
+          state.lastWinnerId = senderId;
+          state.lastRewardType = 'badge';
+          state.lastRewardItemId = badge.id;
+          state.lastRewardAmount = 1;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+          state.rewardPending = false;
+        } else if (rewardType === 'none' || amount <= 0) {
+          state.lastWinnerId = senderId;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
         } else {
-          state.level = next;
+          // Gift-inventory rewards are not supported yet; keep the goal pending rather than falsely marking paid.
+          state.rewardPending = true;
+          state.winnerId = senderId;
         }
       }
       if (row) { row.value = JSON.stringify(state); await repo.save(row); }
-      else await repo.save(repo.create({ key, value: JSON.stringify(state), description: `Independent support chest progress for room ${roomId}` }));
-      return { config: cfg, state, opened, contribution };
+      else await repo.save(repo.create({ key, value: JSON.stringify(state), description: 'Room support chest state' }));
+      return { config: cfg, state };
     });
-    if (result) {
-      // Progress, level transitions, chest openings and reward animations are room-local.
-      const targetRoomIds = [roomId];
-      const at = new Date().toISOString();
-      for (const targetRoomId of targetRoomIds) {
-        const roomState = { ...result.state, roomId: targetRoomId };
-        this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-          roomId: targetRoomId, event: 'support_chest:updated',
-          payload: { config: result.config, state: roomState, contribution: result.contribution },
-          at,
-        });
-        // Do not broadcast a live contribution toast. Progress is already included in
-        // support_chest:updated; the room celebration is reserved for support_chest:opened.
-        if (result.opened) {
-          // One server timestamp is shared by every room member so the uploaded blast
-          // video starts on the same timeline instead of 2 seconds after each client receives it.
-          const playAtServerMs = Date.now() + 2500;
-          this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-            roomId: targetRoomId, event: 'support_chest:opened',
-            payload: { ...result.opened, roomId: targetRoomId, sourceRoomId: roomId, playAtServerMs },
-            at,
-          });
-          // Dedicated room-wide blast signal for every connected room member.
-          this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-            roomId: targetRoomId, event: 'support_chest:blast',
-            payload: {
-              roomId: targetRoomId,
-              cycle: result.opened.cycle,
-              level: result.opened.level,
-              eventId: result.opened.eventId || null,
-              delayMs: 2500,
-              playAtServerMs,
-            },
-            at,
-          });
-        }
-      }
-      if (result.opened) {
-        const win = result.opened;
-        const awardedGifts = Array.isArray(win.rewards) ? win.rewards.filter((entry: any) => entry?.type === 'gift') : [];
-        if (awardedGifts.length) {
-          const winnerUser = await this.usersRepo.findOne({ where: { id: win.winnerId } });
-          const winnerProfile = await this.profilesRepo.findOne({ where: { userId: win.winnerId } });
-          for (const awardedGift of awardedGifts) {
-            const giftPayload = {
-              supportChestReward: true, giftId: awardedGift.itemId,
-              giftName: awardedGift.name, giftType: 'normal',
-              giftIconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
-              iconUrl: awardedGift.iconUrl || awardedGift.imageUrl || null,
-              animationUrl: awardedGift.animationUrl || null,
-              senderId: win.winnerId, senderName: 'صندوق الدعم', senderAvatarUrl: null,
-              receiverId: win.winnerId,
-              receiverName: winnerUser?.displayName || winnerUser?.username || win.winnerName,
-              receiverAvatarUrl: winnerUser?.avatarUrl || null,
-              quantity: awardedGift.amount || 1, comboCount: awardedGift.amount || 1,
-              totalCoins: 0, diamondsAwarded: 0, roomId,
-              at: new Date().toISOString(),
-            };
-            this.realtime?.emitToUser(win.winnerId, 'gift:animation', giftPayload);
-            for (const targetRoomId of targetRoomIds) {
-              const roomGiftPayload = { ...giftPayload, roomId: targetRoomId };
-              this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-                roomId: targetRoomId, event: 'gift:animation', payload: roomGiftPayload,
-                from: { userId: win.winnerId }, at: giftPayload.at,
-              });
-              this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-                roomId: targetRoomId, event: 'gift:send', payload: roomGiftPayload,
-                from: { userId: win.winnerId }, at: giftPayload.at,
-              });
-              this.realtime?.emitToRoom(targetRoomId, 'room:event', {
-                roomId: targetRoomId, event: 'support_chest:reward',
-                payload: { ...roomGiftPayload, profileId: winnerProfile?.userId || null },
-                at: giftPayload.at,
-              });
-            }
-          }
-        }
-        const rewardNames = (Array.isArray(win.rewards) ? win.rewards : [])
-          .map((reward: any) => String(reward?.name || reward?.type || 'جائزة')).filter(Boolean).join('، ');
-        await this.notifications?.notifyUser(
-          win.winnerId, NotificationType.SYSTEM,
-          '🎁 مبروك! فجّرت صندوق الدعم',
-          'حصلت على: ' + (rewardNames || 'مكافآت صندوق الدعم'),
-          { type: 'support_chest_reward', roomId, level: win.level, rewards: win.rewards },
-        ).catch(error => this.log.warn('Support chest winner notification failed: ' + String(error?.message || error)));
-      }
-    }
-    return result;
-  }
-
-  private async mysteriousPolicy(): Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }> {
-    const now = Date.now();
-    if (this.mysteriousPolicyCache && this.mysteriousPolicyCache.expiresAt > now) {
-      return this.mysteriousPolicyCache;
-    }
-    if (this.mysteriousPolicyLookup) return this.mysteriousPolicyLookup;
-    this.mysteriousPolicyLookup = this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } })
-      .then((row) => ({ row, failed: false, expiresAt: Date.now() + 5_000 }))
-      .catch(() => ({ row: null, failed: true, expiresAt: Date.now() + 2_000 }))
-      .then((result) => {
-        this.mysteriousPolicyCache = result;
-        return result;
-      })
-      .finally(() => { this.mysteriousPolicyLookup = undefined; });
-    return this.mysteriousPolicyLookup;
+    if (result) this.realtime?.emitToRoom(roomId, 'room:event', { roomId, event: 'support_chest:updated', payload: result, at: new Date().toISOString() });
   }
 
   private async mysteriousRoomIdentity(userId: string | null | undefined): Promise<{ enabled: boolean; frameUrl: string | null }> {
     if (!userId) return { enabled: false, frameUrl: null };
     try {
       const rows = await this.dataSource.query(
-        `SELECT u."mysteriousMode" AS "mysteriousMode", active.benefits AS benefits, active.level AS "vipLevel"
+        `SELECT u."mysteriousMode" AS "mysteriousMode", active.benefits AS benefits
            FROM users u
            LEFT JOIN LATERAL (
-             SELECT vp.benefits, uv.level
+             SELECT vp.benefits
                FROM user_vips uv
                JOIN vip_plans vp ON vp.id = uv."vipPlanId"
               WHERE uv."userId" = u.id
@@ -2560,23 +1917,7 @@ export class GiftsService implements OnModuleInit {
       if (typeof benefits === 'string') {
         try { benefits = JSON.parse(benefits); } catch { benefits = {}; }
       }
-      const currentPolicy = await this.mysteriousPolicy();
-      if (currentPolicy.failed) return { enabled: false, frameUrl: null };
-      const policyRow = currentPolicy.row;
-      if (policyRow) {
-        let policy: any = {};
-        try {
-          policy = typeof policyRow.value === 'string' ? JSON.parse(policyRow.value) : (policyRow.value || {});
-        } catch {
-          return { enabled: false, frameUrl: null };
-        }
-        const allowedLevels = Array.isArray(policy.eligibleVipLevels)
-          ? policy.eligibleVipLevels.map(Number).filter((n: number) => Number.isInteger(n) && n >= 1 && n <= 7)
-          : [];
-        if (policy.enabled !== true || !allowedLevels.includes(Number(row.vipLevel))) {
-          return { enabled: false, frameUrl: null };
-        }
-      } else if (!Array.isArray(benefits?.extra) || !benefits.extra.includes('mysterious_man')) {
+      if (!Array.isArray(benefits?.extra) || !benefits.extra.includes('mysterious_man')) {
         return { enabled: false, frameUrl: null };
       }
       const visuals = benefits.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
@@ -2594,13 +1935,8 @@ export class GiftsService implements OnModuleInit {
     senderId: string,
     requestId: string,
     receiverIds: string[],
-    manager?: any,
-    expected?: { giftId?: string; quantity?: number; roomId?: string; comboCount?: number },
   ): Promise<any | null> {
-    const sendsRepo = manager ? manager.getRepository(GiftSend) : this.sendsRepo;
-    const giftsRepo = manager ? manager.getRepository(Gift) : this.giftsRepo;
-    const walletsRepo = manager ? manager.getRepository(Wallet) : this.walletsRepo;
-    const rows = await sendsRepo.find({ where: { requestId, senderId } });
+    const rows = await this.sendsRepo.find({ where: { requestId, senderId } });
     if (!rows.length) return null;
     const requested = [...new Set(receiverIds.map(String))].sort();
     const recorded = [...new Set(rows.map((row) => String(row.receiverId)))].sort();
@@ -2609,24 +1945,9 @@ export class GiftsService implements OnModuleInit {
     }
     const first = rows[0];
     const gift = first.giftId
-      ? await giftsRepo.findOne({ where: { id: first.giftId } })
+      ? await this.giftsRepo.findOne({ where: { id: first.giftId } })
       : null;
-    if (expected) {
-      const lucky = gift?.type === GiftType.LUCKY;
-      const qty = Math.max(1, Math.min(lucky ? 177 : 99, Math.floor(Number(expected.quantity) || 1)));
-      const combo = lucky ? 1 : Math.max(1, Math.min(99, Math.floor(Number(expected.comboCount) || 1)));
-      const roomId = expected.roomId || null;
-      const payloadMatches = rows.every((row) =>
-        String(row.giftId || '') === String(expected.giftId || '') &&
-        Number(row.quantity || 1) === qty &&
-        Number(row.comboCount || 1) === combo &&
-        (row.roomId || null) === roomId,
-      );
-      if (!payloadMatches) {
-        throw new BadRequestException('This gift request ID was already used for a different gift payload');
-      }
-    }
-    const wallet = await walletsRepo.findOne({ where: { userId: senderId } });
+    const wallet = await this.walletsRepo.findOne({ where: { userId: senderId } });
     return {
       send: first,
       sends: rows,
@@ -2653,38 +1974,6 @@ export class GiftsService implements OnModuleInit {
     };
   }
 
-  /**
-   * Serialize wallet mutations in a stable global order. Reciprocal/concurrent gifts
-   * previously locked sender first and receiver second, allowing A→B and B→A to
-   * deadlock. Transaction-scoped advisory locks are acquired by sorted user id
-   * before any wallet row lock; this also covers overlapping all-mic sends.
-   */
-  private async lockGiftWalletUsers(manager: any, userIds: Array<string | null | undefined>) {
-    const ids = [...new Set(userIds.map((id) => String(id || '').trim()).filter(Boolean))].sort();
-    for (const id of ids) {
-      await manager.query(
-        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-        ['jeho:gift-wallet:' + id],
-      );
-    }
-  }
-
-  /** Retry only fully rolled-back PostgreSQL deadlock/serialization failures. */
-  private async runGiftTransaction<T>(work: (manager: any) => Promise<T>): Promise<T> {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        return await this.dataSource.transaction(work);
-      } catch (error: any) {
-        const code = error?.driverError?.code || error?.code;
-        const retryable = code === '40P01' || code === '40001';
-        if (!retryable || attempt === 2) throw error;
-        this.log.warn(`Gift transaction conflict (${code}); retry ${attempt + 1}/2`);
-        await new Promise((resolve) => setTimeout(resolve, 35 * (attempt + 1)));
-      }
-    }
-    throw new Error('Gift transaction failed after retries');
-  }
-
   async send(senderId: string, dto: SendGiftDto) {
     const selfGift = String(senderId) === String(dto.receiverId);
     const selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
@@ -2694,16 +1983,31 @@ export class GiftsService implements OnModuleInit {
       );
     }
     if (dto.requestId) {
-      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, [dto.receiverId], undefined, dto);
+      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, [dto.receiverId]);
       if (prior) return prior;
     }
     const gift = await this.giftsRepo.findOne({ where: { id: dto.giftId, isActive: true } });
     if (!gift) throw new NotFoundException('Gift not found');
     await this.assertGiftTarget(dto, selfGift);
 
-    // CB/CP starter gifts are ordinary catalog gifts. The configured gift-to-type
-    // mapping creates an invitation after the gift transaction commits; linked users
-    // can exchange the same gift normally and receive relationship points.
+    const giftCategory = String((gift as any).category || '')
+      .trim()
+      .toLowerCase();
+    if (giftCategory === 'cp') {
+      const rows = await this.dataSource.query(
+        `SELECT 1 FROM social_requests
+          WHERE type = 'relation' AND status = 'accepted'
+            AND (("fromUserId" = $1 AND "toUserId" = $2)
+              OR ("fromUserId" = $2 AND "toUserId" = $1))
+          LIMIT 1`,
+        [senderId, dto.receiverId],
+      );
+      if (!rows?.length) {
+        throw new BadRequestException(
+          'هدايا CP للشريك فقط — أكملا ربط CP من مساحة CP أولاً',
+        );
+      }
+    }
 
     const isLucky = gift.type === GiftType.LUCKY;
     const qtyCap = isLucky ? 177 : 99;
@@ -2718,13 +2022,13 @@ export class GiftsService implements OnModuleInit {
     // The optional dashboard platform percentage adjusts the mint ratio itself.
     // It must not be deducted a second time from the already-minted diamond pool:
     // the clean economy model takes platform margin at coin → diamond mint.
-    // Host diamonds are minted from the dashboard ratio only. The platform's
-    // internal margin is accounted for separately and must never reduce host or agency earnings.
-    // Ignore stale per-gift diamondValue so a 100-coin regular gift at 100% pays 100 diamonds.
+    const platformPercent = await this.platformGiftCommissionPercent();
+    const effectiveRatioCap = Math.max(0, ratioCap * (1 - platformPercent / 100));
+    // Never use Math.min(catalog=0, …) — that wiped diamonds on unpaid catalog rows.
     const cappedPerUnit = mintDiamondsPerUnit(
       coinPrice,
-      0,
-      ratioCap,
+      gift.diamondValue,
+      effectiveRatioCap,
     );
     // Receiver diamonds are the final distributable pool. Lucky jackpot returns coins to sender.
     const diamondsAwarded = cappedPerUnit * qty;
@@ -2732,31 +2036,21 @@ export class GiftsService implements OnModuleInit {
     let luckyCoinsWon = 0;
 
     if (isLucky) {
-      const rolled = await this.rollLuckyPayout(totalCoins, gift.id);
+      const rolled = this.rollLuckyPayout(totalCoins, gift.luckyConfig);
       luckyMultiplier = rolled.luckyMultiplier;
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
 
-    // No platform commission fields are returned to gift clients.
-    // The host payout and any agency bonus are independent credits.
+    // Platform margin is already applied to the mint ratio; no second
+    // diamond deduction is applied to the receiver/agency pool.
+    const platformCut = 0;
 
-    const sendResult = await this.runGiftTransaction(async (manager) => {
-      // Lock both accounts in deterministic order before taking row-level wallet locks.
-      await this.lockGiftWalletUsers(manager, [senderId, dto.receiverId]);
+    return this.dataSource.transaction(async (manager) => {
       const wallet = await manager.findOne(Wallet, {
         where: { userId: senderId },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!wallet) throw new BadRequestException('Insufficient coins');
-      // Re-check after acquiring the sender lock: concurrent retries with the same
-      // requestId now return the committed result instead of reaching the unique index.
-      if (dto.requestId) {
-        const prior = await this.findPriorCannonRequest(
-          senderId, dto.requestId, [dto.receiverId], manager, dto,
-        );
-        if (prior) return prior;
-      }
-      if (Number(wallet.coins) < totalCoins) {
+      if (!wallet || Number(wallet.coins) < totalCoins) {
         throw new BadRequestException('Insufficient coins');
       }
 
@@ -2785,27 +2079,13 @@ export class GiftsService implements OnModuleInit {
         }),
       );
 
-      // Private platform accounting is an ADDITIONAL ledger total, never a deduction.
-      // The percentage and amount stay server-side and are not included in sender/host/agency responses.
-      const platformDiamonds = Math.floor(
-        (diamondsAwarded * Math.min(100, Math.max(0, Number(ECONOMY.platformCommissionPercent) || 0))) / 100,
-      );
-      if (platformDiamonds > 0) {
-        await manager.query(
-          `INSERT INTO app_settings (id, key, value, description, "createdAt", "updatedAt")
-           VALUES (gen_random_uuid(), 'platform_gift_revenue_diamonds', $1,
-                   'Cumulative private platform gift accounting (diamonds)', now(), now())
-           ON CONFLICT (key) DO UPDATE
-             SET value = (COALESCE(NULLIF(app_settings.value, ''), '0')::numeric + EXCLUDED.value::numeric)::text,
-                 description = EXCLUDED.description,
-                 "updatedAt" = now()`,
-          [String(platformDiamonds)],
-        );
-      }
-
-      // ── INDEPENDENT EARNINGS: host receives the full gift value.
-      // Agency commission is an additional credit, never deducted from host diamonds.
-      // Platform accounting is separate, additive and never exposed to clients.
+      // ── CLEAN ECONOMY: ONE diamond pool (wallet.diamonds) ──────────────
+      // `diamondsAwarded` = the diamonds this gift mints for the receiver side.
+      //   Personal room → host keeps 100%.
+      //   Agency room   → host keeps (100 − ownerPct)%, agency owner earns
+      //                   ownerPct% commission. BOTH land in wallet.diamonds.
+      // No separate platform cut here: platform margin is the gap between the
+      // coins the sender paid and the diamonds handed out (taken at mint).
       let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
       const distributableDiamonds = diamondsAwarded;
@@ -2838,15 +2118,25 @@ export class GiftsService implements OnModuleInit {
         if (agency?.status === AgencyStatus.ACTIVE) {
           agencyId = agency.id;
           earningsStream = 'agency';
-          // Dashboard commission is the single live source of truth for gift payouts.
+          // Owner commission %: per-agency override, else dashboard default.
           const ownerPct = Math.min(
             100,
-            Math.max(0, Number(ECONOMY.defaultGiftSplit.agencyOwnerPercent) || 0),
+            Math.max(
+              0,
+              Number(agency.commissionPercent) > 0
+                ? Number(agency.commissionPercent)
+                : ECONOMY.defaultGiftSplit.agencyOwnerPercent,
+            ),
           );
-          // Host always receives the entire minted gift value.
-          hostDiamonds = distributableDiamonds;
-          // Agency commission is an independent bonus, even when the host is also the agency owner.
-          agentShare = Math.floor((distributableDiamonds * ownerPct) / 100);
+          const receiverIsOwner = String(agency.ownerId) === String(dto.receiverId);
+          if (receiverIsOwner) {
+            // Owner is also the host → keeps the full distributable pool.
+            agentShare = 0;
+            hostDiamonds = distributableDiamonds;
+          } else {
+            agentShare = Math.floor((distributableDiamonds * ownerPct) / 100);
+            hostDiamonds = Math.max(0, distributableDiamonds - agentShare);
+          }
           if (agentShare > 0 && agency.ownerId) {
             let agentWallet = await manager.findOne(Wallet, {
               where: { userId: agency.ownerId },
@@ -2876,12 +2166,7 @@ export class GiftsService implements OnModuleInit {
               }),
             );
           }
-          await manager.increment(
-            Agency,
-            { id: agency.id },
-            'totalDiamonds',
-            distributableDiamonds + agentShare,
-          );
+          await manager.increment(Agency, { id: agency.id }, 'totalDiamonds', distributableDiamonds);
         }
       }
 
@@ -2972,6 +2257,7 @@ export class GiftsService implements OnModuleInit {
         quantity: qty,
         totalCoins,
         hostDiamonds,
+        platformCut,
         agentShare,
         stream: earningsStream,
         senderBalance: Number(wallet.coins),
@@ -2984,6 +2270,7 @@ export class GiftsService implements OnModuleInit {
           luckyReturn: luckyCoinsWon,
           luckyMultiplier: luckyMultiplier || 0,
           diamondsToHost: hostDiamonds,
+          diamondsPlatform: platformCut,
           diamondsAgency: agentShare,
           diamondPool: diamondsAwarded,
           stream: earningsStream,
@@ -2997,37 +2284,6 @@ export class GiftsService implements OnModuleInit {
         },
       };
     }).then(async (result) => {
-      // An idempotent replay must not repeat progress, scoring, or realtime effects.
-      if (result?.alreadyProcessed) return result;
-      if (result.send?.id && result.send?.receiverId) {
-        await this.cpService.createInitiationRequestFromGift(
-          senderId,
-          result.send.receiverId,
-          result.send.giftId || gift.id,
-          result.send.id,
-          dto.roomId || null,
-          String(gift.category || '').toLowerCase() === 'cp' && gift.cpPoints != null
-            ? Math.max(0, Math.floor(Number(gift.cpPoints) || 0)) * Math.max(1, Number(result.send.quantity) || qty)
-            : null,
-        ).catch((err) => {
-          this.log.warn(`CP initiation request failed: ${err instanceof Error ? err.message : String(err)}`);
-        });
-      }
-      // Credit shared CB points only after the gift row and wallet transaction committed.
-      // The CP ledger uses giftSendId as its idempotency reference, so retries cannot double-award.
-      if (result.send?.id && result.send?.receiverId) {
-        await this.cpService.recordGiftInteraction(
-          senderId,
-          result.send.receiverId,
-          result.send.id,
-          Number(result.send.totalCoins || totalCoins),
-          String(gift.category || '').toLowerCase() === 'cp' && gift.cpPoints != null
-            ? Math.max(0, Number(gift.cpPoints) || 0) * Math.max(1, Number(result.send.quantity) || qty)
-            : undefined,
-        ).catch((err) => {
-          this.log.warn(`CP gift progress failed: ${err instanceof Error ? err.message : String(err)}`);
-        });
-      }
       const taskRoom = dto.roomId
         ? await this.roomsRepo.findOne({ where: { id: dto.roomId } })
         : null;
@@ -3046,9 +2302,10 @@ export class GiftsService implements OnModuleInit {
           .catch(() => undefined);
         const spentCoins = gift.coinPrice * qty;
         // Diamonds progress = the receiver's ACTUAL share after platform/agency split.
-        // Never fall back to the raw gift pool: target progress is host earnings only.
-        const hostDiamondShare = Math.max(0, Number(result.hostDiamonds ?? 0));
-        const diamondProgress = hostDiamondShare;
+        const hostDiamondShare = Number(result.hostDiamonds ?? 0);
+        const diamondProgress = hostDiamondShare > 0
+          ? hostDiamondShare
+          : Number(result.send?.diamondsAwarded ?? 0);
         // Coins progress = proportional to the receiver's diamond share.
         // Old behaviour credited the FULL sticker price to the receiver even when
         // the platform (40%) and agency owner (15%) already skimmed most of it,
@@ -3106,34 +2363,6 @@ export class GiftsService implements OnModuleInit {
           ?.addScore(receiverId, spent, 'popular', contestContext)
           .catch(() => undefined);
       }
-      if (dto.roomId && result.send?.receiverId) {
-        const supportMetrics = {
-          coins: Number(result.send.totalCoins || totalCoins),
-          diamonds: Number(result.hostDiamonds || result.send.diamondsAwarded || 0),
-          gifts: Math.max(1, Number(result.send.quantity) || qty),
-        };
-        for (const [targetUserId, role] of [
-          [senderId, 'supporter' as const],
-          [result.send.receiverId, 'receiver' as const],
-        ] as const) {
-          const roomSupportMedal = await this.badgesService.recordRoomSupportProgress(
-            targetUserId, dto.roomId, role, supportMetrics,
-          ).catch((err) => {
-            this.log.warn(`room ${role} medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
-            return null;
-          });
-          if (roomSupportMedal) {
-            this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-              roomId: dto.roomId,
-              event: 'room_support_medal:earned',
-              payload: roomSupportMedal,
-              from: { userId: targetUserId },
-              at: new Date().toISOString(),
-            });
-          }
-        }
-      }
-
       const sender = await this.usersRepo.findOne({ where: { id: senderId } });
       const senderProfile = await this.profilesRepo.findOne({ where: { userId: senderId } });
       const vip = await this.userVipRepo.findOne({
@@ -3292,46 +2521,6 @@ export class GiftsService implements OnModuleInit {
           animationPayload.brandAgencyPublicId = brandAg.publicId || null;
         }
       }
-      if (isLucky && dto.roomId) {
-        const luckyEventId = String(result.send?.id || dto.requestId || `lucky:${senderId}:${Date.now()}`);
-        const luckySenderName = String(animationPayload.senderName || 'لاعب');
-        const luckySenderAvatar = typeof animationPayload.senderAvatarUrl === 'string'
-          ? animationPayload.senderAvatarUrl : null;
-        const luckyPayload = {
-          senderId,
-          senderName: luckySenderName,
-          senderAvatarUrl: luckySenderAvatar,
-          luckyMultiplier: Number(result.luckyMultiplier || 0),
-          luckyCoinsWon: Number(result.luckyCoinsWon || 0),
-          eventId: luckyEventId,
-          sendId: luckyEventId,
-          roomId: dto.roomId,
-        };
-        // Room members receive the normal/private high-win presentation from this event.
-        this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-          roomId: dto.roomId,
-          event: 'lucky:hit',
-          payload: luckyPayload,
-          from: { userId: senderId },
-          at: animationPayload.at,
-        });
-        // This helper broadcasts only results that meet the dashboard-configured high-win threshold.
-        await this.broadcastLuckyCelebration({
-          roomId: dto.roomId,
-          senderId,
-          displayName: luckySenderName,
-          avatarUrl: luckySenderAvatar || undefined,
-          giftName: gift.name,
-          giftIconUrl: gift.iconUrl || undefined,
-          coinPrice,
-          quantity: qty,
-          luckyMultiplier: Number(result.luckyMultiplier || 0),
-          luckyCoinsWon: Number(result.luckyCoinsWon || 0),
-          personCount: 1,
-          eventId: luckyEventId,
-        });
-      }
-
       if (dto.roomId) {
         this.realtime?.emitToRoom(dto.roomId, 'room:event', {
           roomId: dto.roomId,
@@ -3347,6 +2536,44 @@ export class GiftsService implements OnModuleInit {
           from: { userId: senderId },
           at: animationPayload.at,
         });
+        if (result.luckyMultiplier && result.luckyCoinsWon > 0) {
+          this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+            roomId: dto.roomId,
+            event: 'lucky:hit',
+            payload: {
+              senderId,
+              senderName: animationPayload.senderName,
+              senderAvatarUrl: animationPayload.senderAvatarUrl,
+              giftName: gift.name,
+              giftIconUrl: gift.iconUrl,
+              coinPrice: gift.coinPrice,
+              quantity: qty,
+              luckyMultiplier: result.luckyMultiplier,
+              luckyCoinsWon: result.luckyCoinsWon,
+              formula: `${gift.coinPrice * qty} × ${result.luckyMultiplier}`,
+            },
+            from: { userId: senderId },
+            at: animationPayload.at,
+          });
+          this.broadcastLuckyCelebration({
+            roomId: dto.roomId,
+            senderId,
+            displayName:
+              typeof animationPayload.senderName === 'string'
+                ? animationPayload.senderName
+                : undefined,
+            avatarUrl:
+              typeof animationPayload.senderAvatarUrl === 'string'
+                ? animationPayload.senderAvatarUrl
+                : undefined,
+            giftName: gift.name,
+            giftIconUrl: gift.iconUrl,
+            coinPrice: gift.coinPrice,
+            quantity: qty,
+            luckyMultiplier: result.luckyMultiplier,
+            luckyCoinsWon: result.luckyCoinsWon,
+          });
+        }
         if (taskRoom?.agencyId) {
           const agencyRooms = await this.roomsRepo.find({
             where: { agencyId: taskRoom.agencyId, status: RoomStatus.OPEN },
@@ -3367,30 +2594,16 @@ export class GiftsService implements OnModuleInit {
         }
       }
       this.realtime?.emitToUser(dto.receiverId, 'gift:animation', animationPayload);
+      if (dto.roomId) {
+        try {
+          await this.applySupportChestGift(dto.roomId, String(dto.giftId), Number(result.totalCoins || 0), Number(result.hostDiamonds || 0), senderId);
+        } catch (error) {
+          this.log.error('Support chest progress update failed', error instanceof Error ? error.stack : String(error));
+        }
+      }
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
       return result;
     });
-
-    // Process support-chest progress after the gift transaction and gift fan-out
-    // complete. This keeps the room reward/opening flow isolated from gift delivery
-    // and ensures a chest-side failure cannot roll back or interrupt the sent gift.
-    if (dto.roomId && !sendResult?.alreadyProcessed) {
-      try {
-        await this.applySupportChestGift(
-          dto.roomId,
-          String(dto.giftId),
-          Number(sendResult?.totalCoins || 0),
-          Number(sendResult?.hostDiamonds || 0),
-          senderId,
-          gift.category,
-          gift.type,
-          qty,
-        );
-      } catch (error) {
-        this.log.error('Support chest progress update failed after gift commit', error instanceof Error ? error.stack : String(error));
-      }
-    }
-    return sendResult;
   }
 
   /**
@@ -3419,7 +2632,7 @@ export class GiftsService implements OnModuleInit {
       );
     }
     if (dto.requestId) {
-      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds, undefined, dto);
+      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds);
       if (prior) return prior;
     }
     if (receiverIds.length === 1) {
@@ -3463,22 +2676,20 @@ export class GiftsService implements OnModuleInit {
     const coinPrice = Math.max(0, Number(gift.coinPrice) || 0);
     const totalCoins = coinPrice * qty * personCount;
     const ratioCap = isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio;
-    // All-mic gifts use the same live ratio as regular sends; stale catalog values cannot reduce payouts.
-    const cappedPerUnit = mintDiamondsPerUnit(coinPrice, 0, ratioCap);
+    const cappedPerUnit = mintDiamondsPerUnit(coinPrice, gift.diamondValue, ratioCap);
     const diamondPool = cappedPerUnit * qty * personCount;
 
     let luckyMultiplier: number | null = null;
     let luckyCoinsWon = 0;
     if (isLucky) {
-      const rolled = await this.rollLuckyPayout(totalCoins, gift.id);
+      const rolled = this.rollLuckyPayout(totalCoins, gift.luckyConfig);
       luckyMultiplier = rolled.luckyMultiplier;
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
 
-    // Platform accounting is additional and private: it never reduces the host/mic pool.
-    const platformCut = Math.floor(
-      (diamondPool * Math.min(100, Math.max(0, Number(ECONOMY.platformCommissionPercent) || 0))) / 100,
-    );
+    // CLEAN ECONOMY: no platform cut on all-mic. Room host takes half, the
+    // remaining half is split across the seated mics. All → wallet.diamonds.
+    const platformCut = 0;
     const rem = diamondPool;
     const hostDiamonds = Math.floor(rem / 2);
     const micsPool = rem - hostDiamonds;
@@ -3491,24 +2702,12 @@ export class GiftsService implements OnModuleInit {
       micShares.set(rid, baseMic + extra);
     }
 
-    const sendResult = await this.runGiftTransaction(async (manager) => {
-      // Lock every wallet participating in the split in sorted order. This prevents
-      // overlapping all-mic sends from acquiring the same wallets in opposite orders.
-      await this.lockGiftWalletUsers(manager, [senderId, ...receiverIds, roomHostId]);
+    return this.dataSource.transaction(async (manager) => {
       const wallet = await manager.findOne(Wallet, {
         where: { userId: senderId },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!wallet) throw new BadRequestException('Insufficient coins');
-      // Re-check after the sender wallet lock so simultaneous all-mic retries
-      // reuse the first committed send and never attempt another charge.
-      if (dto.requestId) {
-        const prior = await this.findPriorCannonRequest(
-          senderId, dto.requestId, receiverIds, manager, dto,
-        );
-        if (prior) return prior;
-      }
-      if (Number(wallet.coins) < totalCoins) {
+      if (!wallet || Number(wallet.coins) < totalCoins) {
         throw new BadRequestException('Insufficient coins');
       }
       wallet.coins = Number(wallet.coins) - totalCoins;
@@ -3518,16 +2717,18 @@ export class GiftsService implements OnModuleInit {
       await manager.save(wallet);
 
       if (platformCut > 0) {
-        await manager.query(
-          `INSERT INTO app_settings (id, key, value, description, "createdAt", "updatedAt")
-           VALUES (gen_random_uuid(), 'platform_gift_revenue_diamonds', $1,
-                   'Cumulative private platform gift accounting (diamonds)', now(), now())
-           ON CONFLICT (key) DO UPDATE
-             SET value = (COALESCE(NULLIF(app_settings.value, ''), '0')::numeric + EXCLUDED.value::numeric)::text,
-                 description = EXCLUDED.description,
-                 "updatedAt" = now()`,
-          [String(platformCut)],
-        );
+        let rev = await manager.findOne(AppSetting, {
+          where: { key: 'platform_gift_revenue_diamonds' },
+        });
+        if (!rev) {
+          rev = manager.create(AppSetting, {
+            key: 'platform_gift_revenue_diamonds',
+            value: '0',
+            description: 'Cumulative platform cut from gifts (diamonds)',
+          });
+        }
+        rev.value = String(Number(rev.value || 0) + platformCut);
+        await manager.save(rev);
       }
 
       const unitCoins = coinPrice * qty;
@@ -3568,6 +2769,7 @@ export class GiftsService implements OnModuleInit {
             personCount,
             receiverIds,
             hostDiamonds,
+            platformCut,
             diamondPool,
           },
         }),
@@ -3694,6 +2896,7 @@ export class GiftsService implements OnModuleInit {
         totalCoins,
         hostDiamonds,
         micsDiamonds: micsPool,
+        platformCut,
         agentShare: 0,
         stream: roomAgencyId ? 'agency' : 'personal',
         senderBalance: Number(wallet.coins),
@@ -3707,6 +2910,7 @@ export class GiftsService implements OnModuleInit {
           luckyMultiplier: luckyMultiplier || 0,
           diamondsToHost: hostDiamonds,
           diamondsToMics: micsPool,
+          diamondsPlatform: platformCut,
           diamondsAgency: 0,
           diamondPool,
           stream: roomAgencyId ? 'agency' : 'personal',
@@ -3720,8 +2924,6 @@ export class GiftsService implements OnModuleInit {
         },
       };
     }).then(async (result) => {
-      // An idempotent replay must not repeat progress, scoring, or room animations.
-      if (result?.alreadyProcessed) return result;
       void this.tasksService
         .recordProgress(senderId, 'gift', 1, {
           roomId: dto.roomId,
@@ -3765,36 +2967,6 @@ export class GiftsService implements OnModuleInit {
             );
           });
       }
-      if (dto.roomId) {
-        const supportMetrics = { coins: coinPrice * qty, diamonds: 0, gifts: Math.max(1, qty) };
-        const supporterMedal = await this.badgesService.recordRoomSupportProgress(
-          senderId, dto.roomId, 'supporter', supportMetrics,
-        ).catch((err) => {
-          this.log.warn(`room supporter medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
-          return null;
-        });
-        if (supporterMedal) this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-          roomId: dto.roomId, event: 'room_support_medal:earned', payload: supporterMedal,
-          from: { userId: senderId }, at: new Date().toISOString(),
-        });
-        for (const rid of receiverIds) {
-          const roomSupportMedal = await this.badgesService.recordRoomSupportProgress(
-            rid, dto.roomId, 'receiver', {
-              coins: coinPrice * qty,
-              diamonds: Number(result.micShares?.[rid] || 0),
-              gifts: Math.max(1, qty),
-            },
-          ).catch((err) => {
-            this.log.warn(`room receiver medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
-            return null;
-          });
-          if (roomSupportMedal) this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-            roomId: dto.roomId, event: 'room_support_medal:earned', payload: roomSupportMedal,
-            from: { userId: rid }, at: new Date().toISOString(),
-          });
-        }
-      }
-
       const perTargetCoins = coinPrice * qty;
       for (const rid of receiverIds) {
         await this.contestsService
@@ -3872,44 +3044,6 @@ export class GiftsService implements OnModuleInit {
         if (senderIdentity.frameUrl) animationPayload.senderVipBadgeUrl = senderIdentity.frameUrl;
         (animationPayload as any).senderMysteriousMan = true;
       }
-      if (isLucky) {
-        const luckyEventId = String(result.sends?.[0]?.id || result.send?.id || dto.requestId
-          || `lucky:${senderId}:${Date.now()}`);
-        const luckySenderName = String(animationPayload.senderName || 'لاعب');
-        const luckySenderAvatar = typeof animationPayload.senderAvatarUrl === 'string'
-          ? animationPayload.senderAvatarUrl : null;
-        const luckyPayload = {
-          senderId,
-          senderName: luckySenderName,
-          senderAvatarUrl: luckySenderAvatar,
-          luckyMultiplier: Number(result.luckyMultiplier || 0),
-          luckyCoinsWon: Number(result.luckyCoinsWon || 0),
-          eventId: luckyEventId,
-          sendId: luckyEventId,
-          roomId: dto.roomId,
-        };
-        this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-          roomId: dto.roomId,
-          event: 'lucky:hit',
-          payload: luckyPayload,
-          from: { userId: senderId },
-          at,
-        });
-        await this.broadcastLuckyCelebration({
-          roomId: dto.roomId,
-          senderId,
-          displayName: luckySenderName,
-          avatarUrl: luckySenderAvatar || undefined,
-          giftName: gift.name,
-          giftIconUrl: gift.iconUrl || undefined,
-          coinPrice,
-          quantity: qty,
-          luckyMultiplier: Number(result.luckyMultiplier || 0),
-          luckyCoinsWon: Number(result.luckyCoinsWon || 0),
-          personCount,
-          eventId: luckyEventId,
-        });
-      }
       this.realtime?.emitToRoom(dto.roomId, 'room:event', {
         roomId: dto.roomId,
         event: 'gift:animation',
@@ -3924,27 +3058,49 @@ export class GiftsService implements OnModuleInit {
         from: { userId: senderId },
         at,
       });
+      if (result.luckyMultiplier && result.luckyCoinsWon > 0) {
+        this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+          roomId: dto.roomId,
+          event: 'lucky:hit',
+          payload: {
+            senderId,
+            senderName: animationPayload.senderName,
+            senderAvatarUrl: animationPayload.senderAvatarUrl,
+            giftName: gift.name,
+            giftIconUrl: gift.iconUrl,
+            coinPrice: gift.coinPrice,
+            quantity: qty,
+            personCount,
+            luckyMultiplier: result.luckyMultiplier,
+            luckyCoinsWon: result.luckyCoinsWon,
+            formula: `${totalCoins} × ${result.luckyMultiplier}`,
+            allMic: true,
+          },
+          from: { userId: senderId },
+          at,
+        });
+        this.broadcastLuckyCelebration({
+          roomId: dto.roomId,
+          senderId,
+          displayName: animationPayload.senderName ?? undefined,
+          avatarUrl: animationPayload.senderAvatarUrl ?? undefined,
+          giftName: gift.name,
+          giftIconUrl: gift.iconUrl,
+          coinPrice: gift.coinPrice,
+          quantity: qty * Math.max(1, personCount),
+          luckyMultiplier: result.luckyMultiplier,
+          luckyCoinsWon: result.luckyCoinsWon,
+        });
+      }
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
       return result;
     });
-    if (dto.roomId && !sendResult?.alreadyProcessed) {
-      try {
-        await this.applySupportChestGift(
-          dto.roomId, String(gift.id), totalCoins,
-          Number(sendResult.hostDiamonds || hostDiamonds || 0),
-          senderId, gift.category, gift.type, qty * personCount,
-        );
-      } catch (error) {
-        this.log.error('Support chest all-mic progress update failed', error instanceof Error ? error.stack : String(error));
-      }
-    }
-    return sendResult;
   }
 
   /**
    * Global toast for OUR lucky gifts only (catalog lucky_* rolls) — not invented Mikoo packs.
    */
-  private async broadcastLuckyCelebration(opts: {
+  private broadcastLuckyCelebration(opts: {
     roomId?: string;
     senderId: string;
     displayName?: string;
@@ -3953,49 +3109,27 @@ export class GiftsService implements OnModuleInit {
     giftIconUrl?: string;
     coinPrice: number;
     quantity: number;
-    personCount?: number;
     luckyMultiplier: number;
     luckyCoinsWon: number;
-    eventId?: string;
   }) {
     const stake = Math.max(0, Math.floor(Number(opts.coinPrice) || 0))
-      * Math.max(1, Math.floor(Number(opts.quantity) || 1))
-      * Math.max(1, Math.floor(Number(opts.personCount) || 1));
+      * Math.max(1, Math.floor(Number(opts.quantity) || 1));
     const mul = Number(opts.luckyMultiplier) || 0;
     const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
-    // Read the same thresholds saved by the Toast Manager dashboard. A zero value
-    // disables that criterion; either enabled threshold may classify the result as high.
-    let minMultiplier = 10;
-    let minCoins = 1000;
-    try {
-      const setting = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
-      const config = setting?.value ? JSON.parse(setting.value) : {};
-      const parsedMultiplier = Number(config?.highWinMinMultiplier);
-      const parsedCoins = Number(config?.highWinMinCoins);
-      if (Number.isFinite(parsedMultiplier)) minMultiplier = Math.max(0, parsedMultiplier);
-      if (Number.isFinite(parsedCoins)) minCoins = Math.max(0, Math.floor(parsedCoins));
-    } catch {
-      // Preserve current safe defaults if dashboard settings cannot be read.
-    }
-    const isHighWin = (minMultiplier > 0 && mul >= minMultiplier)
-      || (minCoins > 0 && won >= minCoins);
-    if (!this.realtime || !isHighWin) return;
+    // Every positive lucky-gift return gets a global toast, including small wins.
+    // Keep the payload lightweight: one compact event, no media or animation data.
+    if (won <= 0 || !this.realtime) return;
     const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
     const soft = mul > 0 && mul < 1;
     const times = Math.max(1, Math.round(mul));
     const giftLabel = (opts.giftName || '').trim();
-    // This method exits before formatting if there is no payout; only wins/returns
-    // are eligible for a user-facing celebration.
-    const noPayout = won <= 0;
-    const title = soft ? 'مردود جزئي' : noPayout ? 'حظ أوفر' : 'حظ سعيد!';
-    const body = noPayout
-      ? `حظ أوفر ${name} في المحاولة القادمة`
-      : soft
-        ? `مبروك ${name} حصل على ${won} · مردود جزئي`
-        : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
+    const title = soft ? 'مردود جزئي' : 'حظ سعيد!';
+    const body = soft
+      ? `مبروك ${name} حصل على ${won} · مردود جزئي`
+      : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
     this.realtime.emitToAll('celebration:toast', {
       kind: 'lucky_hit',
-      id: opts.eventId || `lucky:${opts.senderId}:${Date.now()}`,
+      id: `lucky:${opts.senderId}:${Date.now()}`,
       userId: opts.senderId,
       displayName: name,
       avatarUrl: opts.avatarUrl || '',
@@ -4013,10 +3147,7 @@ export class GiftsService implements OnModuleInit {
 
   async history(userId: string, query: PaginationDto) {
     const [items, total] = await this.sendsRepo.findAndCount({
-      where: [
-        { senderId: userId, expiresAt: Or(IsNull(), MoreThan(new Date())) },
-        { receiverId: userId, expiresAt: Or(IsNull(), MoreThan(new Date())) },
-      ],
+      where: [{ senderId: userId }, { receiverId: userId }],
       relations: ['gift', 'sender', 'receiver'],
       skip: query.skip,
       take: query.limit || 20,
