@@ -108,7 +108,7 @@ import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { biasedCrashAt, multiAreaMultipliers, pickWeightedAreaId, pickWeightedAreaIndex, spinPayout, crashCashoutRake } from './mikoo-house-edge.util';
 import { GREEDY_BOX_RATIOS, LUCK_CAR_RATIOS } from './mikoo-game-economy';
 import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
-import { getGameOdds, getGameRtp } from '../game-odds-runtime';
+import { getGameOdds, getGameRtp, isGameEnabled } from '../game-odds-runtime';
 
 type GameKind = 'crash' | 'multi' | 'spin';
 
@@ -1189,6 +1189,10 @@ export class MikooGatewayService implements OnModuleDestroy {
       ws.close();
       return;
     }
+    if (!isGameEnabled(game.id)) {
+      ws.close(1013, 'Game disabled by administrator');
+      return;
+    }
     if (game.bridge === 'baishun') {
       this.baishun.handle(ws, gameSlug, req.url || '');
       return;
@@ -1218,11 +1222,19 @@ export class MikooGatewayService implements OnModuleDestroy {
     let chain: Promise<void> = Promise.resolve();
 
     ws.on('message', (data) => {
+      if (!isGameEnabled(gameSlug)) {
+        ws.close(1013, 'Game disabled by administrator');
+        return;
+      }
       const buf = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
       const frame = unpackFrame(buf);
       if (!frame) return;
       chain = chain
         .then(async () => {
+          if (!isGameEnabled(gameSlug)) {
+            ws.close(1013, 'Game disabled by administrator');
+            return;
+          }
           player = await this.dispatch(ws, gameSlug, room, kind, frame.name, frame.body, player);
         })
         .catch((err) => {
