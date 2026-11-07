@@ -1893,7 +1893,9 @@ public class ChatConversationActivity extends ThemedActivity {
 
     @Override
     protected void onPause() {
-        // Keep mute while this chat stays on the back stack (Home / lock screen).
+        // Only suppress alerts while this conversation is actually visible.
+        // Clear on pause so background/locked devices still receive message pushes.
+        com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
         super.onPause();
     }
 
