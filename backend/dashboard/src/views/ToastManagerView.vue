@@ -7,6 +7,21 @@
       <div class="toast-tabs" role="tablist" aria-label="أنواع التوستات">
         <button v-for="tab in tabs" :key="tab.key" type="button" class="toast-tab" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">{{ tab.label }}</button>
       </div>
+      <section class="position-control mt-3" aria-label="حدود إعلان الربح العالي">
+        <h3 class="settings-card-title">متى نعتبر الربح كبيراً ونعلنه بشكل عام؟</h3>
+        <p class="small text-secondary">اختر الحد بنفسك. إذا وصل الربح إلى عدد X المحدد أو إلى عدد العملات المحدد، يظهر التوست العلوي العام بالإضافة إلى التوست الوسطي على جهاز الفائز فقط. ضع 0 لتعطيل أحد الشرطين؛ يجب إبقاء شرط واحد على الأقل فعالاً.</p>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">أقل مضاعف X للإعلان العام</label>
+            <input v-model.number="form.highWinMinMultiplier" class="form-control" type="number" min="0" max="1000000" step="1" :disabled="!canWriteSettings" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">أقل ربح بالعملات للإعلان العام</label>
+            <input v-model.number="form.highWinMinCoins" class="form-control" type="number" min="0" max="1000000000" step="1" :disabled="!canWriteSettings" />
+          </div>
+        </div>
+        <div class="small text-secondary mt-2">الافتراضي الحالي: ×10 أو 1,000 عملة. التغيير يُطبّق على السيرفر والتطبيق معاً بعد الحفظ.</div>
+      </section>
       <div class="toast-preview-wrap mt-3 mb-3">
         <div v-if="activeTab !== 'luckyButton'" ref="canvasRef" class="toast-canvas" :style="canvasStyle"
              @pointermove="moveDrag" @pointerup="stopDrag" @pointercancel="stopDrag" @lostpointercapture="stopDrag">
@@ -186,6 +201,8 @@ const form = reactive({
   luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyWinHighRoom: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
+  highWinMinMultiplier: 10,
+  highWinMinCoins: 1000,
   version: 1,
 })
 const currentStyle = computed(() => activeTab.value === 'luckyButton' ? form.luckyWinNormal : form[activeTab.value])
@@ -259,6 +276,8 @@ async function load() {
       placementY: Math.max(0, Math.min(100, Number.isFinite(Number(incoming.placementY)) ? Number(incoming.placementY) : 50)),
     })
   }
+  form.highWinMinMultiplier = Math.max(0, Math.floor(Number.isFinite(Number(cfg.highWinMinMultiplier)) ? Number(cfg.highWinMinMultiplier) : 10))
+  form.highWinMinCoins = Math.max(0, Math.floor(Number.isFinite(Number(cfg.highWinMinCoins)) ? Number(cfg.highWinMinCoins) : 1000))
   Object.assign(form.luckyButton, {
     iconUrl: String(cfg.luckyButton?.iconUrl || ''),
     durationSeconds: Math.max(1, Math.min(12, Number(cfg.luckyButton?.durationSeconds) || 5)),
@@ -294,7 +313,17 @@ async function save() {
   saving.value = true
   error.value = ''
   success.value = ''
+  const highWinMinMultiplier = Math.max(0, Math.floor(Number(form.highWinMinMultiplier) || 0))
+  const highWinMinCoins = Math.max(0, Math.floor(Number(form.highWinMinCoins) || 0))
+  if (highWinMinMultiplier <= 0 && highWinMinCoins <= 0) {
+    saving.value = false
+    error.value = 'حدد حد X أو حد الربح بالعملات على الأقل حتى يعمل إعلان الربح العالي.'
+    toast().danger(error.value)
+    return
+  }
   const payload = {
+    highWinMinMultiplier,
+    highWinMinCoins,
     giftSend: { ...form.giftSend },
     luckyWinNormal: { ...form.luckyWinNormal },
     luckyReturn: { ...form.luckyReturn },
@@ -322,6 +351,11 @@ async function save() {
   const cfg = readBack?.data || readBack || {}
   if (!cfg.giftSend || !cfg.luckyWinNormal || !cfg.luckyReturn || !cfg.luckyWinHigh || !cfg.luckyWinHighRoom || !cfg.luckyButton) {
     error.value = 'الخادم لم يُرجع إعدادات التوست المحفوظة كاملة؛ لم نعرض نجاحاً غير مؤكّد.'
+    toast().danger(error.value)
+    return
+  }
+  if (Number(cfg.highWinMinMultiplier) !== highWinMinMultiplier || Number(cfg.highWinMinCoins) !== highWinMinCoins) {
+    error.value = 'لم يتم تأكيد حفظ حدود الربح العالي من قاعدة البيانات.'
     toast().danger(error.value)
     return
   }
@@ -354,6 +388,8 @@ async function save() {
   Object.assign(form.luckyWinHigh, cfg.luckyWinHigh)
   Object.assign(form.luckyWinHighRoom, cfg.luckyWinHighRoom)
   Object.assign(form.luckyButton, cfg.luckyButton)
+  form.highWinMinMultiplier = Number(cfg.highWinMinMultiplier)
+  form.highWinMinCoins = Number(cfg.highWinMinCoins)
   form.version = Number(cfg.version) || form.version
   success.value = 'تم الحفظ والتحقق من القيم بقراءة جديدة من الخادم. الإعدادات التي لم تُحفظ ستظهر كخطأ ولن تُعرض رسالة نجاح.'
   toast().success(success.value)
