@@ -198,7 +198,7 @@
       </div>
       <div class="row g-2">
         <div v-for="game in safeManageableGames" :key="'rate-'+game.id" class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small mb-1">{{ game.label }} — {{ supportsSharedRtp(game.id) ? 'العائد للاعب %' : game.id === 'crash' ? 'خصم السحب %' : 'نسبة الفوز %' }}</label>
+          <label class="form-label small mb-1">{{ game.label }} — {{ game.id === 'crash' ? 'احتمال تجاوز ×1.5 %' : supportsSharedRtp(game.id) ? 'العائد للاعب %' : 'نسبة الفوز %' }}</label>
           <input v-if="supportsDirectWinRate(game.id)" :value="gameWinRates[game.id] ?? ''" @input="gameWinRates[game.id] = $event.target.value === '' ? undefined : Math.max(0, Math.min(100, Number($event.target.value)))" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
           <input v-else-if="supportsSharedRtp(game.id)" :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
           <input v-else-if="game.id === 'crash'" :value="Math.round(Number(odds.crashCashoutRake) * 100)" @input="odds.crashCashoutRake = Math.max(90, Math.min(99, Number($event.target.value) || 90)) / 100" type="number" min="90" max="99" step="1" class="form-control form-control-sm" />
