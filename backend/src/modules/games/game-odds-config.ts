@@ -153,7 +153,7 @@ export const GAME_ODDS_COVERED_GAMES = [
   { id: 'camel-racing', via: 'playerRtp' },
   { id: 'cleopatra-slot', via: 'gameWinRates+spinHitRate' },
   { id: 'cleopatra-slots', via: 'gameWinRates+spinHitRate' },
-  { id: 'crash', via: 'crashCashoutRake+maxCrashRatio' },
+  { id: 'crash', via: 'gameWinRates+crashCashoutRake+maxCrashRatio' },
   { id: 'fishing', via: 'gameWinRates+fishingHitRate' },
   { id: 'football-plinko', via: 'gameWinRates+spinHitRate' },
   { id: 'fortune-slot', via: 'gameWinRates+spinHitRate' },
@@ -198,7 +198,7 @@ export function gameOddsClientPayload(cfg: GameOddsConfig) {
     gameWinRates: cfg.gameWinRates,
     gameRtpRates: cfg.gameRtpRates,
     hints: {
-      gameWinRates: 'نسبة الفوز المعلنة لكل لعبة من 0 إلى 100. لا تُطبّق إلا على الألعاب التي يحسم خادم JEHO نتيجتها؛ ألعاب المزوّد الخارجي تحتاج دعمًا منه.',
+      gameWinRates: 'نسبة الفوز العامة المعلنة لكل لعبة من 0 إلى 100، وتُطبّق على نتائج محرك JEHO لكل اللاعبين بالتساوي. ألعاب النتائج المشتركة تستخدم عائد اللاعب RTP، وألعاب المزوّد الخارجي تحتاج دعمًا منه.',
       playerRtp: 'نسبة ما يعود للاعب على المدى الطويل (الباقي ربح التطبيق) — لوحات الرهان المتعددة',
       spinHitRate: 'فرصة فوز كل السلوتات / بلينكو / حفلة السباحة',
       fishingHitRate: 'فرصة صيد السمك (أصعب من السلوت)',
