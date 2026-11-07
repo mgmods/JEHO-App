@@ -434,7 +434,7 @@ export class BadgesService {
       const amount = Math.max(0, Math.floor(Number(metrics?.[type] || 0)));
       if (amount <= 0) continue;
       const target = Math.max(1, Math.floor(Number(cfg.threshold) || 1));
-      const key = `room_support_medal_progress:${roomId}:${userId}:${cfg.index}`;
+      const key = `room_support_medal_progress:${roomId}:${userId}:${role}:${cfg.index}`;
       let reached = false; let current = 0;
       await this.dataSource.transaction(async (manager) => {
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
