@@ -894,8 +894,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     ? parentParams.width : Math.round(74f * density);
             int parentHeight = parentParams != null && parentParams.height > 0
                     ? parentParams.height : Math.round(74f * density);
-            int left = Math.round((parentWidth - avatarWidth) / 2f - size / 2f);
-            int top = Math.round((parentHeight - avatarHeight) / 2f - size / 2f);
+            // Keep the medal anchored to the avatar corner, with a 10dp outward offset.
+            int offset = Math.round(10f * density);
+            int left = Math.round((parentWidth - avatarWidth) / 2f - size / 2f) - offset;
+            int top = Math.round((parentHeight - avatarHeight) / 2f - size / 2f) - offset;
             lp.width = size;
             lp.height = size;
             lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
