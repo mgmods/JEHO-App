@@ -10,7 +10,7 @@
   var LOCAL_WS = LOCAL
     ? LOCAL.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:')
     : '';
-  var BAD = /(jieyou\.shop|sruner\.com|zkruner\.com|soofun\.online|api\.adnova\.bbs\.tr)/i;
+  var BAD = /(jieyou\\.shop|sruner\\.com|zkruner\\.com|soofun\\.online|api\\.adnova\\.bbs\\.tr|jeho-own-backend\\.mgs\\.blitz\\.cloud)/i;
 
   function fixPath(path) {
     if (!path) return path;
