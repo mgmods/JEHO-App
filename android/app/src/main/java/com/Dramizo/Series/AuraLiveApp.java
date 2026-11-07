@@ -51,6 +51,8 @@ public class AuraLiveApp extends Application {
     private static volatile Activity foregroundActivity;
     private static volatile int startedActivities;
     private volatile String registeredFcmIdentity;
+    private static final int REQUEST_POST_NOTIFICATIONS = 8104;
+    private static final String NOTIFICATION_PERMISSION_PREFS = "jeho_notification_permission";
 
     /** Always use for auth/session prefs (survives attachBaseContext locale wrap). */
     public static Context storageContext(Context any) {
@@ -162,6 +164,9 @@ public class AuraLiveApp extends Application {
             }
             @Override public void onActivityResumed(Activity activity) {
                 foregroundActivity = activity;
+                if (activity instanceof MainActivity) {
+                    requestNotificationPermission(activity);
+                }
                 registerFcmDeviceIfReady();
                 View decor = activity.getWindow() != null
                         ? activity.getWindow().getDecorView()
@@ -634,6 +639,32 @@ public class AuraLiveApp extends Application {
             }
         }
         return fallback;
+    }
+
+    /**
+     * Android 13+ blocks every app notification until the runtime permission is granted.
+     * Ask once when the signed-in user reaches the main screen, not during the splash flow.
+     */
+    private void requestNotificationPermission(Activity activity) {
+        if (Build.VERSION.SDK_INT < 33 || activity == null
+                || activity.isFinishing() || activity.isDestroyed()) return;
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                activity, android.Manifest.permission.POST_NOTIFICATIONS)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+        Context base = storageContext(this);
+        if (base == null) return;
+        android.content.SharedPreferences prefs =
+                base.getSharedPreferences(NOTIFICATION_PERMISSION_PREFS, MODE_PRIVATE);
+        if (prefs.getBoolean("prompted", false)) return;
+        prefs.edit().putBoolean("prompted", true).apply();
+        activity.getWindow().getDecorView().post(() -> {
+            if (!activity.isFinishing() && !activity.isDestroyed()) {
+                androidx.core.app.ActivityCompat.requestPermissions(
+                        activity,
+                        new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                        REQUEST_POST_NOTIFICATIONS);
+            }
+        });
     }
 
     private void createNotificationChannel() {
