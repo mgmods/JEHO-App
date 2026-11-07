@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException, BadRequestException, ForbiddenException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -16,8 +16,6 @@ import { RoomSeat, SeatStatus } from '../../database/entities/room-seat.entity';
 import { RoomModerator, ModeratorRole } from '../../database/entities/room-moderator.entity';
 import { RoomAccess } from '../../database/entities/room-access.entity';
 import { Gift } from '../../database/entities/gift.entity';
-import { Cosmetic } from '../../database/entities/cosmetic.entity';
-import { Badge } from '../../database/entities/badge.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { RechargeOrder, RechargeStatus } from '../../database/entities/recharge-order.entity';
 import { WithdrawRequest, WithdrawStatus } from '../../database/entities/withdraw-request.entity';
@@ -52,7 +50,6 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
 import { GiftsService } from '../gifts/gifts.service';
-import { invalidateRoomPkEnabledCache } from '../contests/room-pk-feature';
 import { AgenciesService } from '../agencies/agencies.service';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
@@ -198,16 +195,6 @@ export class UpsertGiftDto {
   @IsOptional()
   @IsString()
   category?: string;
-
-  @ApiPropertyOptional({ description: 'CP relationship type for gifts in the CP category' })
-  @IsOptional()
-  @IsString()
-  cpRelationshipType?: string;
-
-  @ApiPropertyOptional({ description: 'CP relationship points awarded per gift unit' })
-  @IsOptional()
-  @IsInt()
-  cpPoints?: number;
 }
 
 export class UpdateUserStatusDto {
@@ -266,333 +253,21 @@ export class AdminService {
     private readonly dataSource: DataSource,
   ) {}
 
-  private staffIdentityDefaults() {
-    const role = (label: string, accentColor: string) => ({
-      label, accentColor, badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '',
-    });
-    return {
-      super: role('Super Admin', '#D8B35B'),
-      admin: role('Admin', '#9AA8C7'),
-      manager: role('Manager', '#37A889'),
-    };
-  }
-
-  async getStaffIdentityConfig() {
-    const defaults = this.staffIdentityDefaults();
-    const row = await this.settingsRepo.findOne({ where: { key: 'staff_identity_config' } });
-    if (!row?.value) return defaults;
-    try {
-      const parsed = JSON.parse(row.value);
-      const clean = (role: string) => {
-        const source = parsed?.[role] && typeof parsed[role] === 'object' ? parsed[role] : {};
-        const fallback = defaults[role as keyof typeof defaults];
-        const url = (key: string) => typeof source[key] === 'string' && /^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(source[key]) ? source[key].slice(0, 2048) : '';
-        const color = typeof source.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(source.accentColor) ? source.accentColor : fallback.accentColor;
-        const label = typeof source.label === 'string' && source.label.trim() ? source.label.trim().slice(0, 32) : fallback.label;
-        return { label, accentColor: color, badgeUrl: url('badgeUrl'), frameUrl: url('frameUrl'), nameplateUrl: url('nameplateUrl'), messageCardUrl: url('messageCardUrl'), entryEffectUrl: url('entryEffectUrl') };
-      };
-      return { super: clean('super'), admin: clean('admin'), manager: clean('manager') };
-    } catch {
-      return defaults;
-    }
-  }
-
-  async patchStaffIdentityConfig(input: Record<string, unknown>) {
-    const current = await this.getStaffIdentityConfig();
-    const allowed = ['badgeUrl', 'frameUrl', 'nameplateUrl', 'messageCardUrl', 'entryEffectUrl'];
-    const url = (value: unknown, key: string) => {
-      if (value === undefined) return undefined;
-      const raw = String(value || '').trim();
-      if (!raw) return '';
-      if (raw.length > 2048 || !(/^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(raw))) {
-        throw new BadRequestException('Invalid staff identity asset URL: ' + key);
-      }
-      return raw;
-    };
-    const next: Record<string, any> = {};
-    for (const role of ['super', 'admin', 'manager'] as const) {
-      const patch = input[role] && typeof input[role] === 'object' ? input[role] as Record<string, unknown> : {};
-      const base = current[role];
-      const label = patch.label === undefined ? base.label : String(patch.label || '').trim().slice(0, 32);
-      if (!label) throw new BadRequestException('Role label cannot be empty');
-      const accentColor = patch.accentColor === undefined ? base.accentColor : String(patch.accentColor || '');
-      if (!/^#[0-9a-f]{6}$/i.test(accentColor)) throw new BadRequestException('Accent color must be a hex color');
-      const assets: Record<string, string> = {};
-      for (const key of allowed) assets[key] = url(patch[key], key) ?? base[key as keyof typeof base] as string;
-      next[role] = { label, accentColor, ...assets };
-    }
-    const key = 'staff_identity_config';
-    const existing = await this.settingsRepo.findOne({ where: { key } });
-    if (existing) {
-      existing.value = JSON.stringify(next);
-      existing.description = 'Native admin role identity assets and labels';
-      await this.settingsRepo.save(existing);
-    } else {
-      await this.settingsRepo.save(this.settingsRepo.create({
-        key, value: JSON.stringify(next), description: 'Native admin role identity assets and labels',
-      }));
-    }
-    return next;
-  }
-
-  async getToastManagerConfig() {
-    const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
-    const defaults = {
-      version: 1,
-      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
-      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
-      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
-      luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
-    };
-    if (!row?.value) return defaults;
-    try {
-      const parsed = JSON.parse(row.value);
-      const cleanStyle = (key: string, duration: number) => {
-        const raw = parsed?.[key] && typeof parsed[key] === 'object' ? parsed[key] : {};
-        return {
-          backgroundUrl: typeof raw.backgroundUrl === 'string' ? raw.backgroundUrl : '',
-          shineEnabled: raw.shineEnabled !== false,
-          frameGlowEnabled: raw.frameGlowEnabled !== false,
-          durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(raw.durationSeconds) || duration))),
-          avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? (key === 'giftSend' ? 8 : 8)) || 0)),
-          avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? (key === 'giftSend' ? 50 : 42)) || 0)),
-          textX: Math.max(0, Math.min(100, Number(raw.textX ?? 25) || 0)),
-          textY: Math.max(0, Math.min(100, Number(raw.textY ?? (key === 'giftSend' ? 50 : 42)) || 0)),
-          bodyX: Math.max(0, Math.min(100, Number(raw.bodyX ?? (key === 'giftSend' ? 25 : 25)) || 0)),
-          bodyY: Math.max(0, Math.min(100, Number(raw.bodyY ?? (key === 'giftSend' ? 67 : 62)) || 0)),
-          countX: Math.max(0, Math.min(100, Number(raw.countX ?? 88) || 0)),
-          countY: Math.max(0, Math.min(100, Number(raw.countY ?? 50) || 0)),
-          widthDp: Math.max(220, Math.min(360, Math.round(Number(raw.widthDp) || 340))),
-          heightDp: Math.max(60, Math.min(180, Math.round(Number(raw.heightDp) || 100))),
-          avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(raw.avatarSizeDp) || 44))),
-          titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.titleSizeSp) || 13))),
-          bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.bodySizeSp) || 12))),
-          countSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.countSizeSp) || 12))),
-        };
-      };
-      const button = parsed?.luckyButton && typeof parsed.luckyButton === 'object' ? parsed.luckyButton : {};
-      return {
-        version: Math.max(1, Math.floor(Number(parsed.version) || 1)),
-        giftSend: cleanStyle('giftSend', 3),
-        luckyWinNormal: cleanStyle('luckyWinNormal', 4),
-        luckyWinHigh: cleanStyle('luckyWinHigh', 5),
-        luckyButton: {
-          iconUrl: typeof button.iconUrl === 'string' ? button.iconUrl : '',
-          durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(button.durationSeconds) || 5))),
-          pulseEnabled: button.pulseEnabled !== false,
-        },
-      };
-    } catch {
-      return defaults;
-    }
-  }
-
-  async patchToastManagerConfig(input: Record<string, unknown>) {
-    const previous = await this.getToastManagerConfig();
-    const cleanUrl = (value: unknown, key: string) => {
-      const raw = typeof value === 'string' ? value.trim() : '';
-      if (!raw) return '';
-      if (raw.length > 2048) throw new BadRequestException(`Invalid ${key} URL`);
-      if (/^\/uploads\/[A-Za-z0-9._-]+$/i.test(raw)) return raw;
-      try {
-        const parsed = new URL(raw);
-        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
-      } catch {}
-      throw new BadRequestException(`Invalid ${key} URL`);
-    };
-    const cleanStyle = (key: string, duration: number) => {
-      const raw = input[key] && typeof input[key] === 'object' ? input[key] as Record<string, unknown> : {};
-      const old = previous[key as 'giftSend' | 'luckyWinNormal' | 'luckyWinHigh'];
-      return {
-        backgroundUrl: cleanUrl(raw.backgroundUrl, key),
-        shineEnabled: raw.shineEnabled !== false,
-        frameGlowEnabled: raw.frameGlowEnabled !== false,
-        durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(raw.durationSeconds) || duration))),
-        avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? old.avatarX) || 0)),
-        avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? old.avatarY) || 0)),
-        textX: Math.max(0, Math.min(100, Number(raw.textX ?? old.textX) || 0)),
-        textY: Math.max(0, Math.min(100, Number(raw.textY ?? old.textY) || 0)),
-        bodyX: Math.max(0, Math.min(100, Number(raw.bodyX ?? old.bodyX) || 0)),
-        bodyY: Math.max(0, Math.min(100, Number(raw.bodyY ?? old.bodyY) || 0)),
-        countX: Math.max(0, Math.min(100, Number(raw.countX ?? old.countX) || 0)),
-        countY: Math.max(0, Math.min(100, Number(raw.countY ?? old.countY) || 0)),
-        widthDp: Math.max(220, Math.min(360, Math.round(Number(raw.widthDp ?? old.widthDp) || 340))),
-        heightDp: Math.max(60, Math.min(180, Math.round(Number(raw.heightDp ?? old.heightDp) || 100))),
-        avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(raw.avatarSizeDp ?? old.avatarSizeDp) || 44))),
-        titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.titleSizeSp ?? old.titleSizeSp) || 13))),
-        bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.bodySizeSp ?? old.bodySizeSp) || 12))),
-        countSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.countSizeSp ?? old.countSizeSp) || 12))),
-      };
-    };
-    const button = input.luckyButton && typeof input.luckyButton === 'object' ? input.luckyButton as Record<string, unknown> : {};
-    const current = {
-      version: previous.version + 1,
-      giftSend: cleanStyle('giftSend', 3),
-      luckyWinNormal: cleanStyle('luckyWinNormal', 4),
-      luckyWinHigh: cleanStyle('luckyWinHigh', 5),
-      luckyButton: {
-        iconUrl: cleanUrl(button.iconUrl, 'lucky button icon'),
-        durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(button.durationSeconds) || 5))),
-        pulseEnabled: button.pulseEnabled !== false,
-      },
-    };
-    const existing = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
-    if (existing) {
-      existing.value = JSON.stringify(current);
-      existing.description = 'Dashboard-managed global toast styles and lucky button';
-      await this.settingsRepo.save(existing);
-    } else {
-      await this.settingsRepo.save(this.settingsRepo.create({
-        key: 'toast_manager_config',
-        value: JSON.stringify(current),
-        description: 'Dashboard-managed global toast styles and lucky button',
-      }));
-    }
-    return current;
-  }
-
-  async getMysteriousManConfig() {
-    const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
-    const defaults = { enabled: false, eligibleVipLevels: [], avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' };
-    if (!row?.value) return defaults;
-    try {
-      const parsed = JSON.parse(row.value);
-      return {
-        enabled: parsed.enabled === true,
-        eligibleVipLevels: Array.isArray(parsed.eligibleVipLevels) ? [...new Set(parsed.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))].sort((a: number, b: number) => a - b) : [],
-        avatarUrl: typeof parsed.avatarUrl === 'string' ? parsed.avatarUrl : '',
-        entryMode: parsed.entryMode === 'text' ? 'text' : 'video',
-        entryText: typeof parsed.entryText === 'string' ? parsed.entryText.slice(0, 160) : 'دخل الرجل الغامض',
-        entryEffectUrl: typeof parsed.entryEffectUrl === 'string' ? parsed.entryEffectUrl : '',
-        messageEffectUrl: typeof parsed.messageEffectUrl === 'string' ? parsed.messageEffectUrl : '',
-      };
-    } catch {
-      return defaults;
-    }
-  }
-
-  async patchMysteriousManConfig(input: Record<string, unknown>) {
-    const cleanUrl = (value: unknown, key: string) => {
-      const raw = typeof value === 'string' ? value.trim() : '';
-      if (!raw) return '';
-      if (raw.length > 2048) throw new BadRequestException(`Invalid ${key} URL`);
-      // The upload endpoint intentionally returns same-origin paths such as
-      // /uploads/<uuid>. Accept those paths as well as absolute public URLs.
-      // Reject arbitrary relative paths and non-HTTP schemes.
-      if (/^\/uploads\/[A-Za-z0-9._-]+$/i.test(raw)) return raw;
-      try {
-        const parsed = new URL(raw);
-        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
-      } catch {}
-      throw new BadRequestException(`Invalid ${key} URL`);
-    };
-    const eligibleVipLevels = Array.isArray(input.eligibleVipLevels)
-      ? [...new Set(input.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))].sort((a: number, b: number) => a - b)
-      : [];
-    const current = {
-      enabled: input.enabled === true,
-      eligibleVipLevels,
-      avatarUrl: cleanUrl(input.avatarUrl, 'avatar'),
-      entryMode: input.entryMode === 'text' ? 'text' : 'video',
-      entryText: (typeof input.entryText === 'string' ? input.entryText.trim() : 'دخل الرجل الغامض').slice(0, 160) || 'دخل الرجل الغامض',
-      entryEffectUrl: cleanUrl(input.entryEffectUrl, 'entry effect'),
-      messageEffectUrl: cleanUrl(input.messageEffectUrl, 'message effect'),
-    };
-    const existing = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
-    if (existing) {
-      existing.value = JSON.stringify(current);
-      existing.description = 'Dashboard-managed Mysterious Man shared media';
-      await this.settingsRepo.save(existing);
-    } else {
-      await this.settingsRepo.save(this.settingsRepo.create({
-        key: 'mysterious_man_config',
-        value: JSON.stringify(current),
-        description: 'Dashboard-managed Mysterious Man shared media',
-      }));
-    }
-
-    // A global disable is a hard stop, not just a display policy: clear the
-    // persisted opt-in so users stay in their natural identity if the feature
-    // is enabled again later.
-    if (!current.enabled) {
-      await this.dataSource.query(
-        'UPDATE users SET "mysteriousMode" = false WHERE "mysteriousMode" = true',
-      );
-    }
-    return current;
-  }
-
-  async getLuckyCannonConfig() {
-    const row = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } });
-    const defaults = { enabled: true, durationSeconds: 2, soundEnabled: true };
-    if (!row?.value) return defaults;
-    try {
-      const parsed = JSON.parse(row.value);
-      return {
-        enabled: parsed.enabled !== false,
-        durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(parsed.durationSeconds) || 2))),
-        soundEnabled: parsed.soundEnabled !== false,
-      };
-    } catch {
-      return defaults;
-    }
-  }
-
-  async patchLuckyCannonConfig(input: Record<string, unknown>) {
-    const current = {
-      enabled: input.enabled === true,
-      durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(input.durationSeconds) || 2))),
-      soundEnabled: input.soundEnabled !== false,
-    };
-    const existing = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } });
-    if (existing) {
-      existing.value = JSON.stringify(current);
-      existing.description = 'Dashboard-managed Lucky Gift Cannon configuration';
-      await this.settingsRepo.save(existing);
-    } else {
-      await this.settingsRepo.save(this.settingsRepo.create({
-        key: 'lucky_gift_cannon_config',
-        value: JSON.stringify(current),
-        description: 'Dashboard-managed Lucky Gift Cannon configuration',
-      }));
-    }
-    return current;
-  }
-
   async getSupportChestConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     const defaults = {
-      enabled: false, iconVisible: true, soundEnabled: true,
-      explosionEffect: { enabled: true, mediaUrl: '', soundUrl: '', width: 100, height: 100, startX: 50, startY: 46, endX: 50, endY: 50, durationMs: 1800, opacity: 100 },
-      toast: { enabled: true, backgroundUrl: '', height: 104, yOffset: 72, titleSizeSp: 17, bodySizeSp: 14, giftSizeDp: 58, showWinnerName: true },
-      goalMode: 'coins',
-      coinTarget: 100000, diamondTarget: 10000, giftIds: [], giftSelectionMode: 'all',
-      giftCategories: ['normal', 'lucky', 'cp'],
-      levels: [{
-        level: 1, title: 'الصندوق الذهبي', goalMode: 'coins', rewardDays: 0,
-        coinTarget: 100000, diamondTarget: 0, giftCount: 1,
-        giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '',
-        rewards: [{ type: 'coins', amount: 5000, itemId: '' }],
-      }],
+      enabled: false, iconVisible: true, goalMode: 'coins',
+      coinTarget: 100000, diamondTarget: 10000, giftIds: [],
       rewardType: 'none', rewardItemId: '', rewardAmount: 0,
-      instructions: 'لكل روم تقدم مستقل لا يتأثر بمساهمات الرومات الأخرى. عند اكتمال هدف الروم ينفجر صندوقه وتُمنح جميع مكافآته لمفجّر الصندوق.',
+      instructions: 'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله يحصل مرسل الهدية الأخيرة على المكافأة.',
     };
     if (!row) return defaults;
-    try {
-      const parsed = JSON.parse(row.value);
-      return {
-        ...defaults,
-        ...parsed,
-        giftSelectionMode: parsed.giftSelectionMode
-          || (Array.isArray(parsed.giftIds) && parsed.giftIds.length ? 'selected' : 'all'),
-      };
-    } catch { return defaults; }
+    try { return { ...defaults, ...JSON.parse(row.value) }; } catch { return defaults; }
   }
 
   async patchSupportChestConfig(input: Record<string, unknown>) {
     const allowedModes = new Set(['coins', 'diamonds', 'both']);
-    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge', 'vip', 'gift']);
-    const allowedCategories = new Set(['normal', 'lucky', 'cp']);
+    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge']);
     const goalMode = String(input.goalMode || 'coins');
     const rewardType = String(input.rewardType || 'none');
     if (!allowedModes.has(goalMode)) throw new BadRequestException('Invalid support chest goal mode');
@@ -602,189 +277,35 @@ export class AdminService {
     if (goalMode === 'coins' && coinTarget < 1) throw new BadRequestException('Coin target must be positive');
     if (goalMode === 'diamonds' && diamondTarget < 1) throw new BadRequestException('Diamond target must be positive');
     if (goalMode === 'both' && (coinTarget < 1 || diamondTarget < 1)) throw new BadRequestException('Both targets must be positive');
-    const giftCategories = Array.isArray(input.giftCategories)
-      ? [...new Set(input.giftCategories.map(String).filter(x => allowedCategories.has(x)))]
-      : ['normal', 'lucky', 'cp'];
-    if (!giftCategories.length) throw new BadRequestException('اختر قسماً واحداً على الأقل من أقسام الهدايا');
     const giftIds = Array.isArray(input.giftIds) ? [...new Set(input.giftIds.map(String).map(x => x.trim()).filter(Boolean))] : [];
-    const giftSelectionMode = String(input.giftSelectionMode || (giftIds.length ? 'selected' : 'all')) === 'selected' ? 'selected' : 'all';
-    if (giftSelectionMode === 'selected' && !giftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل أو اختر جميع الهدايا');
-    const rawLevels = Array.isArray(input.levels) ? input.levels as Record<string, any>[] : [];
-    if (rawLevels.length !== 3) throw new BadRequestException('يجب إعداد المستويات الثلاثة لصندوق الدعم قبل الحفظ');
-    const levels = rawLevels.map((level, index) => {
-      const mode = String(level.goalMode || 'coins');
-      if (!allowedModes.has(mode)) throw new BadRequestException('نوع هدف غير صالح في مستوى الصندوق');
-      const levelCoins = Math.max(0, Math.floor(Number(level.coinTarget) || 0));
-      const levelDiamonds = Math.max(0, Math.floor(Number(level.diamondTarget) || 0));
-      if ((mode === 'coins' && levelCoins < 1) || (mode === 'diamonds' && levelDiamonds < 1)
-          || (mode === 'both' && (levelCoins < 1 || levelDiamonds < 1))) {
-        throw new BadRequestException('يجب تحديد هدف صحيح لكل مستوى');
-      }
-      const categories = Array.isArray(level.giftCategories)
-        ? [...new Set(level.giftCategories.map(String).filter(x => allowedCategories.has(x) && giftCategories.includes(x)))]
-        : giftCategories;
-      if (!categories.length) throw new BadRequestException('اختر قسماً مشتركاً واحداً على الأقل للهدايا العامة ولهذا المستوى');
-      const levelGiftIds = Array.isArray(level.giftIds) ? [...new Set(level.giftIds.map(String).map(x => x.trim()).filter(Boolean))] : [];
-      const levelGiftSelectionMode = String(level.giftSelectionMode || (levelGiftIds.length ? 'selected' : 'all')) === 'selected' ? 'selected' : 'all';
-      if (levelGiftSelectionMode === 'selected' && !levelGiftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل لهذا المستوى أو اختر جميع الهدايا');
-      const features = Array.isArray(level.features)
-        ? [...new Set(level.features.map((value: any) => String(value || '').trim()).filter(Boolean))].slice(0, 20)
-        : String(level.featuresText || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean).slice(0, 20);
-      const rewards = Array.isArray(level.rewards) ? level.rewards.map((reward: any) => {
-        const type = String(reward?.type || '');
-        if (!allowedRewards.has(type) || type === 'none') throw new BadRequestException('نوع مكافأة غير صالح في مستوى الصندوق');
-        const amount = ['frame', 'badge'].includes(type) ? 1 : Math.max(1, Math.floor(Number(reward?.amount) || 1));
-        const itemId = String(reward?.itemId || '').trim().slice(0, 160);
-        if (['frame', 'badge', 'vip', 'gift'].includes(type) && !itemId) throw new BadRequestException('حدد العنصر المطلوب لكل مكافأة');
-        const durationDays = Math.max(0, Math.min(3650, Math.floor(Number(reward?.durationDays ?? level.rewardDays) || 0)));
-        return { type, amount, itemId, durationDays };
-      }) : [];
-      if (!rewards.length) throw new BadRequestException('أضف مكافأة واحدة على الأقل لكل مستوى');
-      return {
-        level: index + 1,
-        title: String(level.title || ('المستوى ' + (index + 1))).slice(0, 80),
-        goalMode: mode, coinTarget: levelCoins, diamondTarget: levelDiamonds,
-        giftCount: Math.max(1, Math.min(100000, Math.floor(Number(level.giftCount) || 1))),
-        giftCategories: categories,
-        giftSelectionMode: levelGiftSelectionMode,
-        giftIds: levelGiftIds,
-        imageUrl: String(level.imageUrl || '').trim().slice(0, 2048),
-        features,
-        rewards,
-        rewardDays: Math.max(0, Math.min(3650, Math.floor(Number(level.rewardDays) || 0))),
-      };
-    });
-    if (!levels.length) throw new BadRequestException('أضف مستوى واحداً على الأقل للصندوق');
-    const frameIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'frame').map(r => r.itemId)))];
-    const badgeIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'badge').map(r => r.itemId)))];
-    const vipIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'vip').map(r => r.itemId)))];
-    const rewardGiftIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'gift').map(r => r.itemId)))];
-    if (frameIds.length) {
-      const active = await this.dataSource.getRepository(Cosmetic).find({ where: { id: In(frameIds), isActive: true } });
-      if (active.length !== frameIds.length) throw new BadRequestException('تأكد أن كل الإطارات المختارة موجودة وفعالة');
+    if (giftIds.length) {
+      const activeGifts = await this.giftsRepo.find({ where: { isActive: true } });
+      const valid = new Set(activeGifts.map(g => g.id));
+      const invalid = giftIds.filter(id => !valid.has(id));
+      if (invalid.length) throw new BadRequestException('One or more gift IDs are not active JEHO catalog gifts');
     }
-    if (badgeIds.length) {
-      const active = await this.dataSource.getRepository(Badge).find({ where: { id: In(badgeIds), isActive: true } });
-      if (active.length !== badgeIds.length) throw new BadRequestException('تأكد أن كل الشارات المختارة موجودة وفعالة');
-    }
-    if (vipIds.length) {
-      const active = await this.vipRepo.find({ where: { id: In(vipIds), isActive: true } });
-      if (active.length !== vipIds.length) throw new BadRequestException('تأكد أن كل خطط VIP المختارة موجودة وفعالة');
-    }
-    const allGiftIds = [...new Set([
-      ...(giftSelectionMode === 'selected' ? giftIds : []),
-      ...levels.flatMap(x => x.giftSelectionMode === 'selected' ? x.giftIds : []),
-      ...rewardGiftIds,
-    ])];
-    if (allGiftIds.length) {
-      // Validate only the gift IDs referenced by this configuration. Loading the
-      // entire active gift catalogue on every save needlessly increases latency.
-      const activeGifts = await this.giftsRepo.find({
-        where: { id: In(allGiftIds), isActive: true },
-        select: { id: true } as any,
-      });
-      if (activeGifts.length !== allGiftIds.length) {
-        throw new BadRequestException('يوجد معرّف هدية غير صالح أو غير فعال في إعدادات الصندوق');
-      }
-    }
-    const rawEffect = input.explosionEffect && typeof input.explosionEffect === 'object'
-      ? input.explosionEffect as Record<string, unknown> : {};
-    const mediaUrl = String(rawEffect.mediaUrl || '').trim().slice(0, 2048);
-    const soundUrl = String(rawEffect.soundUrl || '').trim().slice(0, 2048);
-    const validChestMediaUrl = (value: string) => !value || /^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(value);
-    if (!validChestMediaUrl(mediaUrl)) {
-      throw new BadRequestException('رابط مؤثر الانفجار يجب أن يكون HTTPS أو ملفاً داخل /uploads');
-    }
-    if (!validChestMediaUrl(soundUrl)) {
-      throw new BadRequestException('رابط صوت الانفجار يجب أن يكون HTTPS أو ملفاً داخل /uploads');
-    }
-    const rawToast = input.toast && typeof input.toast === 'object'
-      ? input.toast as Record<string, unknown> : {};
-    const toastBackgroundUrl = String(rawToast.backgroundUrl || '').trim().slice(0, 2048);
-    if (!validChestMediaUrl(toastBackgroundUrl)) {
-      throw new BadRequestException('رابط خلفية التوست يجب أن يكون HTTPS أو ملفاً داخل /uploads');
-    }
-    const bounded = (value: unknown, fallback: number, min: number, max: number) => {
-      const n = Number(value);
-      return Math.max(min, Math.min(max, Number.isFinite(n) ? n : fallback));
-    };
-    const explosionEffect = {
-      enabled: rawEffect.enabled === true,
-      mediaUrl,
-      soundUrl,
-      width: bounded(rawEffect.width, 100, 10, 180),
-      height: bounded(rawEffect.height, 100, 10, 180),
-      startX: bounded(rawEffect.startX, 50, 0, 100),
-      startY: bounded(rawEffect.startY, 46, 0, 100),
-      endX: bounded(rawEffect.endX, 50, 0, 100),
-      endY: bounded(rawEffect.endY, 50, 0, 100),
-      durationMs: Math.floor(bounded(rawEffect.durationMs, 1800, 400, 8000)),
-      opacity: bounded(rawEffect.opacity, 100, 10, 100),
-    };
-    const toast = {
-      enabled: rawToast.enabled !== false,
-      backgroundUrl: toastBackgroundUrl,
-      height: Math.floor(bounded(rawToast.height, 104, 60, 240)),
-      yOffset: Math.floor(bounded(rawToast.yOffset, 72, 0, 300)),
-      titleSizeSp: bounded(rawToast.titleSizeSp, 17, 10, 36),
-      bodySizeSp: bounded(rawToast.bodySizeSp, 14, 8, 30),
-      giftSizeDp: Math.floor(bounded(rawToast.giftSizeDp, 58, 24, 120)),
-      showWinnerName: rawToast.showWinnerName !== false,
-    };
     const current = {
       enabled: input.enabled === true,
-      iconVisible: input.iconVisible !== false,
-      goalMode, coinTarget, diamondTarget, giftIds, giftSelectionMode,
-      giftCategories, levels,
+      iconVisible: input.iconVisible === true,
+      goalMode, coinTarget, diamondTarget, giftIds,
       rewardType,
       rewardItemId: String(input.rewardItemId || '').trim(),
       rewardAmount: Math.max(0, Math.floor(Number(input.rewardAmount) || 0)),
       instructions: String(input.instructions || '').slice(0, 3000),
-      soundEnabled: input.soundEnabled !== false,
-      explosionEffect,
-      toast,
     };
-    // Serialize admin saves and verify the exact value read back from PostgreSQL
-    // in the same transaction. This prevents concurrent saves from silently
-    // overwriting one another and avoids reporting success for an unpersisted value.
-    const persisted = await this.dataSource.transaction(async manager => {
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['support_chest_config']);
-      const repo = manager.getRepository(AppSetting);
-      let existing = await repo.findOne({
-        where: { key: 'support_chest_config' },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (existing) {
-        existing.value = JSON.stringify(current);
-        existing.description = 'JEHO support chest multi-level configuration';
-        await repo.save(existing);
-      } else {
-        existing = repo.create({
-          key: 'support_chest_config',
-          value: JSON.stringify(current),
-          description: 'JEHO support chest multi-level configuration',
-        });
-        await repo.save(existing);
-      }
-      const verified = await repo.findOne({ where: { key: 'support_chest_config' } });
-      if (!verified?.value) throw new InternalServerErrorException('تعذّر تأكيد حفظ إعدادات صندوق الدعم في قاعدة البيانات');
-      let readBack: any;
-      try { readBack = JSON.parse(verified.value); }
-      catch { throw new InternalServerErrorException('تعذّرت قراءة إعدادات صندوق الدعم بعد الحفظ'); }
-      if (JSON.stringify(readBack) !== JSON.stringify(current)) {
-        throw new InternalServerErrorException('لم تتطابق إعدادات صندوق الدعم مع النسخة المحفوظة في قاعدة البيانات');
-      }
-      return readBack;
-    });
-    const liveRooms = await this.roomsRepo.find({ where: [{ status: RoomStatus.OPEN }, { status: RoomStatus.LOCKED }], select: { id: true } as any });
-    const configAt = new Date().toISOString();
-    for (const room of liveRooms) {
-      this.realtimeGateway.emitToRoom(room.id, 'room:event', {
-        roomId: room.id, event: 'support_chest:config_updated',
-        payload: { config: persisted }, at: configAt,
-      });
+    const existing = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
+    if (existing) {
+      existing.value = JSON.stringify(current);
+      existing.description = 'JEHO support chest configuration';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: 'support_chest_config',
+        value: JSON.stringify(current),
+        description: 'JEHO support chest configuration',
+      }));
     }
-    return persisted;
+    return current;
   }
 
   async dashboard() {
@@ -1486,11 +1007,11 @@ export class AdminService {
       return {
         ...r,
         name: r.title,
-        ownerName: r.roomKind === RoomKind.SUPPORT ? (r.title || 'روم رسمي تابع للمنصة') : (r.host?.displayName || r.host?.username || '—'),
-        hostName: r.roomKind === RoomKind.SUPPORT ? (r.title || 'روم رسمي تابع للمنصة') : (r.host?.displayName || r.host?.username || '—'),
-        hostAvatarUrl: r.roomKind === RoomKind.SUPPORT ? null : (r.host?.avatarUrl || null),
-        hostFrameUrl: r.roomKind === RoomKind.SUPPORT ? null : hostFrameUrl,
-        hostFrameAnimUrl: r.roomKind === RoomKind.SUPPORT ? null : (equippedFrame || hostFrameUrl),
+        ownerName: r.host?.displayName || r.host?.username || '—',
+        hostName: r.host?.displayName || r.host?.username || '—',
+        hostAvatarUrl: r.host?.avatarUrl || null,
+        hostFrameUrl,
+        hostFrameAnimUrl: equippedFrame || hostFrameUrl,
         membersCount: r.viewerCount ?? 0,
         isSupport: r.roomKind === RoomKind.SUPPORT,
         isLive,
@@ -1745,16 +1266,14 @@ export class AdminService {
       room.emptySince = null;
     } else if (disableSupport) {
       room.roomKind = RoomKind.STANDARD;
-      // Personal rooms remain persistent even when they are no longer support rooms.
-      room.isPersistent = true;
+      room.isPersistent = false;
     }
 
-    // Only agency/support rooms are forced public and free. Persistence alone
-    // must not disable the host's normal room lock/access settings.
     const lockedFree =
       !!room.agencyId ||
       room.roomKind === RoomKind.AGENCY ||
-      room.roomKind === RoomKind.SUPPORT;
+      room.roomKind === RoomKind.SUPPORT ||
+      room.isPersistent;
 
     if (lockedFree) {
       room.status = RoomStatus.OPEN;
@@ -1775,8 +1294,9 @@ export class AdminService {
   }
 
   /**
-   * Create a genuinely platform-owned persistent room: no host user and no
-   * moderators unless dashboard staff explicitly supplies moderator IDs.
+   * Create a platform-owned, persistent official room. RoomKind.SUPPORT is the
+   * existing server-enforced pin/listing mechanism; no schema reset is needed.
+   * moderatorIds are public account IDs shown in the app, not database UUIDs.
    */
   async createPlatformRoom(dto: {
     title?: string;
@@ -1791,6 +1311,9 @@ export class AdminService {
     const requestedIds = [...new Set((dto.moderatorIds || [])
       .map((value) => String(value || '').trim())
       .filter(Boolean))];
+    if (!requestedIds.length) {
+      throw new BadRequestException('أضف آيدي مستخدم واحد على الأقل كمشرف للروم');
+    }
     const moderatorUsers: User[] = [];
     for (const publicId of requestedIds) {
       const user = await this.usersRepo.findOne({ where: { publicId } });
@@ -1800,6 +1323,14 @@ export class AdminService {
       moderatorUsers.push(user);
     }
 
+    // Prefer an existing platform-admin account as the technical room host.
+    // If the deployment has no linked platform account, use the first appointed
+    // moderator as the required host reference; the room remains platform-managed.
+    const platformAdmin = await this.usersRepo.findOne({
+      where: { isAdmin: true, status: Not(UserStatus.DELETED) },
+      order: { createdAt: 'ASC' },
+    });
+    const hostId = platformAdmin?.id || moderatorUsers[0].id;
     const seatCount = Math.max(2, Math.min(20, Math.floor(Number(dto.seatCount) || 11)));
     let publicId = '';
     for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -1822,7 +1353,7 @@ export class AdminService {
           : 'official',
         type: RoomType.VOICE,
         status: RoomStatus.OPEN,
-        hostId: null as any,
+        hostId,
         cohostId: null,
         seatCount,
         viewerCount: 0,
@@ -1853,32 +1384,27 @@ export class AdminService {
       }
       await manager.save(seats);
 
-      if (moderatorUsers.length) {
-        const mods = moderatorUsers.map((user) => manager.create(RoomModerator, {
-          roomId: room.id,
-          userId: user.id,
-          role: ModeratorRole.ADMIN,
-          canManageMusic: true,
-          canChangeFrames: true,
-          canControlGames: true,
-          canMute: true,
-          canKick: true,
-          canBan: true,
-          canManageSeats: true,
-          canInvite: true,
-          canManageRoom: true,
-          appointedById: null as any,
-        }));
-        await manager.save(mods);
-      }
-      return {
-        room,
-        moderators: moderatorUsers.map((user) => ({
-          userId: user.id,
-          publicId: user.publicId,
-          displayName: user.displayName || user.username,
-        })),
-      };
+      const mods = moderatorUsers.map((user) => manager.create(RoomModerator, {
+        roomId: room.id,
+        userId: user.id,
+        role: ModeratorRole.ADMIN,
+        canManageMusic: true,
+        canChangeFrames: true,
+        canControlGames: true,
+        canMute: true,
+        canKick: true,
+        canBan: true,
+        canManageSeats: true,
+        canInvite: true,
+        canManageRoom: true,
+        appointedById: hostId,
+      }));
+      await manager.save(mods);
+      return { room, moderators: moderatorUsers.map((user) => ({
+        userId: user.id,
+        publicId: user.publicId,
+        displayName: user.displayName || user.username,
+      })) };
     });
     return { ...result, isPlatformManaged: true, isPinned: true };
   }
@@ -1919,7 +1445,7 @@ export class AdminService {
       canManageSeats: true,
       canInvite: true,
       canManageRoom: true,
-      appointedById: null as any,
+      appointedById: room.hostId,
     });
     await this.dataSource.getRepository(RoomModerator).save(moderator);
     return {
@@ -1927,21 +1453,6 @@ export class AdminService {
       added: true,
       moderator: { userId: user.id, publicId: user.publicId, displayName: user.displayName || user.username },
     };
-  }
-
-  /** Remove a moderator from an official platform room by public user ID. */
-  async removePlatformRoomModerator(roomId: string, publicIdRaw: string) {
-    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
-    if (!room) throw new NotFoundException('Room not found');
-    if (room.roomKind !== RoomKind.SUPPORT || !room.isPersistent) {
-      throw new BadRequestException('يمكن رفع المشرفين من رومات المنصة الرسمية فقط');
-    }
-    const publicId = String(publicIdRaw || '').trim();
-    if (!publicId) throw new BadRequestException('آيدي المستخدم مطلوب');
-    const user = await this.usersRepo.findOne({ where: { publicId } });
-    if (!user) throw new NotFoundException('لم يتم العثور على المستخدم');
-    const result = await this.dataSource.getRepository(RoomModerator).delete({ roomId, userId: user.id });
-    return { roomId, publicId, removed: Number(result.affected || 0) > 0 };
   }
 
   /** Replace the moderator list of an official platform room by public user IDs. */
@@ -1954,6 +1465,9 @@ export class AdminService {
     const requestedIds = [...new Set((publicIds || [])
       .map((value) => String(value || '').trim())
       .filter(Boolean))];
+    if (!requestedIds.length) {
+      throw new BadRequestException('يجب أن يبقى للروم مشرف واحد على الأقل');
+    }
     const users: User[] = [];
     for (const publicId of requestedIds) {
       const user = await this.usersRepo.findOne({ where: { publicId } });
@@ -1977,7 +1491,7 @@ export class AdminService {
         canManageSeats: true,
         canInvite: true,
         canManageRoom: true,
-        appointedById: null as any,
+        appointedById: room.hostId,
       }));
       await manager.save(rows);
       return users.map((user) => ({
@@ -2056,14 +1570,6 @@ export class AdminService {
   }
 
   async upsertGift(id: string | null, dto: UpsertGiftDto) {
-    const nextCategory = String(dto.category ?? '').trim().toLowerCase();
-    const cpType = String(dto.cpRelationshipType ?? 'love').trim().toLowerCase();
-    if (nextCategory === 'cp' && !['friendship', 'brotherhood', 'love', 'engagement', 'marriage'].includes(cpType)) {
-      throw new BadRequestException('نوع علاقة CP للهدية غير صالح');
-    }
-    if (dto.cpPoints !== undefined && (!Number.isSafeInteger(Number(dto.cpPoints)) || Number(dto.cpPoints) < 0 || Number(dto.cpPoints) > 1000000000)) {
-      throw new BadRequestException('نقاط هدية CP يجب أن تكون بين 0 و1,000,000,000');
-    }
     let gift = id ? await this.giftsRepo.findOne({ where: { id } }) : null;
     if (id && !gift) throw new NotFoundException('Gift not found');
     if (!gift) {
@@ -2101,12 +1607,6 @@ export class AdminService {
       isActive: dto.isActive ?? gift.isActive ?? true,
       sortOrder: dto.sortOrder ?? gift.sortOrder ?? 0,
       category: categoryDefault,
-      cpRelationshipType: dto.cpRelationshipType ?? (gift as any).cpRelationshipType ?? 'love',
-      cpPoints: String(categoryDefault || '').toLowerCase() === 'cp'
-        ? (dto.cpPoints !== undefined
-            ? Math.max(0, Math.floor(Number(dto.cpPoints) || 0))
-            : ((gift as any).cpPoints == null ? 0 : Number((gift as any).cpPoints)))
-        : ((gift as any).cpPoints == null ? null : Number((gift as any).cpPoints)),
       brandAgencyId:
         dto.brandAgencyId === undefined
           ? (gift as any).brandAgencyId ?? null
@@ -2785,22 +2285,6 @@ export class AdminService {
         // keep original value if JSON is invalid
       }
     }
-    if (key === 'app_theme') {
-      try {
-        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-        const previous = await this.settingsRepo.findOne({ where: { key } });
-        let previousVersion = 0;
-        try { previousVersion = Math.max(0, Number(JSON.parse(previous?.value || '{}')?.version) || 0); }
-        catch { previousVersion = 0; }
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          parsed.version = previousVersion + 1;
-          parsed.updatedAt = new Date().toISOString();
-          nextValue = JSON.stringify(parsed);
-        }
-      } catch {
-        // Preserve the submitted value if a legacy theme row is not valid JSON.
-      }
-    }
     if (key === 'app_nav_icons') {
       try {
         const { sanitizeNavIconsConfig } = await import('../config/nav-icons.util');
@@ -2855,23 +2339,6 @@ export class AdminService {
       if (description) setting.description = description;
     }
     const saved = await this.settingsRepo.save(setting);
-    if (key === 'features.room_pk_enabled') {
-      invalidateRoomPkEnabledCache();
-      const raw = String(nextValue || '').trim().toLowerCase();
-      this.realtimeGateway.emitToAll('contest:pk-status', {
-        enabled: ['1', 'true', 'yes', 'on'].includes(raw),
-        at: new Date().toISOString(),
-      });
-    }
-    if (key === 'app_theme') {
-      let version = 1;
-      try { version = Math.max(1, Number(JSON.parse(nextValue)?.version) || 1); } catch { /* keep fallback */ }
-      this.realtimeGateway.emitToAll('config:updated', {
-        scope: 'app-theme',
-        version,
-        at: new Date().toISOString(),
-      });
-    }
     // New covers / catalog → force clients to drop Glide disk cache.
     if (key === 'app_games') {
       await this.bumpMediaAssetEpoch();
@@ -2903,8 +2370,7 @@ export class AdminService {
 
   private publicDashboardAdmin(admin: AdminUser) {
     const superAdmin = admin.staffRole === 'super' || admin.role === AdminRole.SUPER;
-    const dashboardAdmin = !superAdmin && normalizeStaffRole({ staffRole: admin.staffRole }) === 'admin';
-    const permissions = superAdmin || dashboardAdmin
+    const permissions = superAdmin
       ? fullPermissions()
       : normalizePermissions(admin.dashboardPermissions);
     return {
@@ -2915,7 +2381,7 @@ export class AdminService {
       name: admin.displayName,
       isAdmin: true,
       isSuperAdmin: superAdmin,
-      staffRole: superAdmin ? 'super' : dashboardAdmin ? 'admin' : 'operator',
+      staffRole: superAdmin ? 'super' : 'operator',
       status: admin.isActive ? 'active' : 'disabled',
       role: 'admin',
       permissions,
@@ -2972,7 +2438,7 @@ export class AdminService {
       .addSelect('u.passwordHash')
       .where(
         "LOWER(COALESCE(u.staffRole, '')) IN (:...roles) OR u.isAdmin = true",
-        { roles: ['super', 'admin', 'operator'] },
+        { roles: ['super', 'operator'] },
       )
       .getMany();
 
@@ -3003,8 +2469,8 @@ export class AdminService {
         displayName: String(legacy.displayName || legacy.username || 'Dashboard Admin').slice(0, 120),
         passwordHash: legacy.passwordHash,
         role: staffRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR,
-        staffRole: staffRole === 'super' ? 'super' : staffRole === 'admin' ? 'admin' : 'operator',
-        dashboardPermissions: staffRole === 'super' || staffRole === 'admin'
+        staffRole: staffRole === 'super' ? 'super' : 'operator',
+        dashboardPermissions: staffRole === 'super'
           ? fullPermissions() as Record<string, string>
           : normalizePermissions(legacy.dashboardPermissions) as Record<string, string>,
         linkedUserId: legacy.id,
@@ -3018,8 +2484,7 @@ export class AdminService {
     await this.ensureDashboardAdminSchema();
     await this.ensureStaffRoleColumn();
     await this.ensureDashboardPermissionsColumn();
-    // Do not scan and migrate every legacy user on every login. The targeted
-    // legacy lookup below safely imports only the account attempting to sign in.
+    await this.migrateLegacyDashboardAccounts();
     const identifier = String(email || '').trim().toLowerCase();
     if (!identifier || !password) {
       throw new UnauthorizedException('Invalid admin credentials');
@@ -3043,10 +2508,7 @@ export class AdminService {
       let isSuperAdmin =
         admin.role === AdminRole.SUPER ||
         normalizeStaffRole({ staffRole: admin.staffRole }) === 'super';
-      let staffRole = normalizeStaffRole({ staffRole: admin.staffRole });
-      let perms = staffRole === 'admin' || isSuperAdmin
-        ? fullPermissions()
-        : normalizePermissions(admin.dashboardPermissions);
+      let perms = normalizePermissions(admin.dashboardPermissions);
       if (!isSuperAdmin && !hasAnyPermission(perms)) {
         const legacyQuery = this.usersRepo
           .createQueryBuilder('u')
@@ -3060,19 +2522,17 @@ export class AdminService {
           );
         }
         const legacy = await legacyQuery.getOne();
-        const legacyRole = normalizeStaffRole(legacy);
         if (
           legacy &&
           legacy.passwordHash &&
-          (legacyRole === 'super' || legacyRole === 'admin') &&
+          isDashboardSuper(legacy) &&
           (await bcrypt.compare(password, legacy.passwordHash))
         ) {
-          admin.role = legacyRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR;
-          admin.staffRole = legacyRole;
+          admin.role = AdminRole.SUPER;
+          admin.staffRole = 'super';
           admin.dashboardPermissions = fullPermissions() as Record<string, string>;
           await this.adminUsersRepo.save(admin);
-          isSuperAdmin = legacyRole === 'super';
-          staffRole = legacyRole;
+          isSuperAdmin = true;
           perms = normalizePermissions(admin.dashboardPermissions);
         }
       }
@@ -3113,8 +2573,8 @@ export class AdminService {
       displayName: String(legacy.displayName || legacy.username || 'Dashboard Admin').slice(0, 120),
       passwordHash: legacy.passwordHash,
       role: staffRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR,
-      staffRole: staffRole === 'super' ? 'super' : staffRole === 'admin' ? 'admin' : 'operator',
-      dashboardPermissions: staffRole === 'super' || staffRole === 'admin'
+      staffRole: staffRole === 'super' ? 'super' : 'operator',
+      dashboardPermissions: staffRole === 'super'
         ? fullPermissions() as Record<string, string>
         : normalizePermissions(legacy.dashboardPermissions) as Record<string, string>,
       linkedUserId: legacy.id,
@@ -3811,9 +3271,8 @@ export class AdminService {
     if (!user) throw new NotFoundException('User not found');
     const permanent = body.permanent === true;
     const days = Number(body.days ?? 30);
-    // The controller applies rank-specific limits (Admin: 1/3/7/15; Super Admin: 7/15/30 or permanent).
-    if (!permanent && ![1, 3, 7, 15, 30].includes(days)) {
-      throw new BadRequestException('VIP duration must be 1, 3, 7, 15 or 30 days, or permanent=true');
+    if (!permanent && ![7, 15, 30].includes(days)) {
+      throw new BadRequestException('VIP duration must be 7, 15 or 30 days, or permanent=true');
     }
     await this.userVipRepo.update({ userId: body.userId, isActive: true }, { isActive: false });
     const startsAt = new Date();
