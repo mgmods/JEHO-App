@@ -65,7 +65,7 @@ export class FirebaseAdminService implements OnModuleInit {
       }
       const projectId = String(serviceAccount.project_id || '').trim();
       const clientEmail = String(serviceAccount.client_email || '').trim();
-      const privateKey = String(serviceAccount.private_key || '').replace(/\\\\n/g, '\\n').trim();
+      const privateKey = String(serviceAccount.private_key || '').replace(/\\n/g, '\n').trim();
       if (!projectId || !clientEmail || !privateKey) {
         this.logger.error('Firebase service-account is missing project_id, client_email, or private_key — push disabled');
         return;
