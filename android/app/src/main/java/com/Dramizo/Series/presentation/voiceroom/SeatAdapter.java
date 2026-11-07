@@ -873,6 +873,20 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
     private void bindRoomSupportMedal(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (holder.b.imgRoomSupportMedal == null) return;
+        // Keep the support medal at 30dp and pull it outward from the avatar so it reads
+        // as a crown beside the upper-left seat edge rather than covering the seat.
+        android.view.ViewGroup.LayoutParams raw = holder.b.imgRoomSupportMedal.getLayoutParams();
+        if (raw instanceof android.widget.FrameLayout.LayoutParams lp) {
+            float density = holder.b.imgRoomSupportMedal.getResources().getDisplayMetrics().density;
+            int size = Math.round(30f * density);
+            int offset = Math.round(-7f * density);
+            lp.width = size;
+            lp.height = size;
+            lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+            lp.setMarginStart(offset);
+            lp.topMargin = offset;
+            holder.b.imgRoomSupportMedal.setLayoutParams(lp);
+        }
         String url = user != null && user.roomSupportMedal != null ? user.roomSupportMedal.imageUrl : null;
         if (url == null || url.trim().isEmpty()) {
             holder.b.imgRoomSupportMedal.setVisibility(View.GONE);
