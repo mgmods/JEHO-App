@@ -214,7 +214,8 @@ export class CasualBetService {
         : { multiplier: 0, detail: { reels: ['7️⃣', '💎', '🍒'] } };
     }
     if (gameId === 'roulette') {
-      const pick = String(choice || 'red').toLowerCase();
+      const rawPick = String(choice || 'red').toLowerCase();
+      const pick = ['red', 'black', 'green'].includes(rawPick) ? rawPick : 'red';
       const red = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
       const number = wantWin
         ? pick === 'green' ? 0 : pick === 'black' ? 2 : 1
@@ -244,7 +245,8 @@ export class CasualBetService {
       return { multiplier: wantWin ? 1.55 : 0, detail: { you, bot } };
     }
     if (gameId === 'hilo') {
-      const pick = String(choice || 'high').toLowerCase();
+      const rawPick = String(choice || 'high').toLowerCase();
+      const pick = ['high', 'low', 'same'].includes(rawPick) ? rawPick : 'high';
       const card = 7;
       const next = pick === 'same' ? (wantWin ? 7 : 8)
         : pick === 'low' ? (wantWin ? 6 : 8)
