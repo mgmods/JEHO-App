@@ -49,6 +49,12 @@ export class CpController {
     return this.cp.equipStoreItem(userId, body?.cosmeticId);
   }
 
+  @Post('store/unequip')
+  @ApiOperation({ summary: 'Unequip an owned CP-only item without deleting ownership' })
+  unequipStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
+    return this.cp.unequipStoreItem(userId, body?.cosmeticId);
+  }
+
   @Get('catalog')
   @ApiOperation({ summary: 'Enabled CP types and configured gift prices' })
   catalog() {
