@@ -229,17 +229,11 @@ public final class MikooGamesCatalog {
         if (Boolean.FALSE.equals(g.enabled)) return true;
         String id = g.id != null ? g.id.toLowerCase(Locale.US) : "";
         String playUrl = g.playUrl != null ? g.playUrl.toLowerCase(Locale.US) : "";
-        if (id.contains("fireforce") || playUrl.contains("fireforce")) return true;
-        if (id.contains("wheel") || id.equals("dice") || id.equals("xo")
-                || id.contains("tic_tac") || id.contains("tictactoe")
-                || playUrl.contains("lucky-wheel")
-                || playUrl.contains("dice.html")
-                || playUrl.contains("tic_tac")) {
-            return true;
-        }
-        return id.contains("ono") || id.contains("domino") || id.contains("ludo")
-                || playUrl.contains("ono.html") || playUrl.contains("domino.html")
-                || playUrl.contains("ludo.html");
+        // Do not hard-block valid catalog entries by legacy game name/type.
+        // The dashboard's enabled flag is the authoritative availability switch.
+        // Older versions hid wheel/dice/board games here, which made valid games
+        // disappear before GamePlayActivity ever had a chance to launch them.
+        return false;
     }
 
     public static boolean isMikooEntry(MiscDtos.GameDto g) {
@@ -263,15 +257,13 @@ public final class MikooGamesCatalog {
 
         Map<String, MiscDtos.GameDto> apiById = new LinkedHashMap<>();
         Set<String> apiOrder = new LinkedHashSet<>();
-        boolean anyMikoo = false;
         for (MiscDtos.GameDto g : api) {
-            if (g == null || isBlocked(g) || !isMikooEntry(g) || g.id == null) continue;
-            anyMikoo = true;
+            if (g == null || isBlocked(g) || g.id == null || g.id.trim().isEmpty()) continue;
             String id = g.id.toLowerCase(Locale.US);
             apiOrder.add(id);
             apiById.put(id, g);
         }
-        if (!anyMikoo) {
+        if (apiById.isEmpty()) {
             return new ArrayList<>(defaults.values());
         }
 
@@ -293,9 +285,12 @@ public final class MikooGamesCatalog {
                         // Dashboard custom cover (/uploads/…, CDN, etc.)
                         override.coverUrl = MediaAssetSync.bust(apiCover);
                     }
-                    // For known packaged games, ignore stale server URLs from old deployments.
-                    // The API catalog is authoritative for visibility/titles/covers, but play must use the active backend.
-                    override.playUrl = def.playUrl;
+                    // Known Mikoo games must use the current JEHO backend route; other
+                    // catalog entries keep their dashboard playUrl (HTML, wheel, dice, etc.).
+                    if (isMikooEntry(def) || isMikooEntry(override)) {
+                        override.playUrl = def.playUrl;
+                        override.mode = "mikoo_slot";
+                    }
                     if (override.titleEn == null || override.titleEn.trim().isEmpty()) {
                         override.titleEn = def.titleEn;
                     }
@@ -307,7 +302,8 @@ public final class MikooGamesCatalog {
                     override.coverUrl = MediaAssetSync.bust(override.coverUrl);
                 }
                 out.add(override);
-            } else if (def != null) {
+            } else if (def != null && isMikooEntry(def)) {
+                // Add missing built-in Mikoo entries only; non-Mikoo games are supplied by the API.
                 out.add(def);
             }
         }
