@@ -119,7 +119,7 @@ public class GamePlayActivity extends ThemedActivity {
         mode = getIntent().getStringExtra(EXTRA_MODE);
         gameId = getIntent().getStringExtra(EXTRA_GAME_ID);
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
-        pendingUrl = GameUrls.resolve(this, rawUrl);
+        pendingUrl = GameUrls.normalizeInternalGameUrl(GameUrls.resolve(this, rawUrl));
 
         if (gameId == null || gameId.isEmpty()) {
             gameId = MikooGameBridge.extractGameId(pendingUrl);
