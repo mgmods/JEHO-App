@@ -2,7 +2,7 @@ name: JEHO-OWN Backend and Dashboard Checks
 
 on:
   push:
-    branches: [jeho-own, jeho-own-working-2026-10-05, MG-JEHO]
+    branches: [jeho-own, jeho-own-working-2026-10-05, MG-JEHO, MG-JEHO-dm-notifications-20261107]
     paths:
       - "backend/**"
       - ".github/workflows/**"
@@ -19,7 +19,7 @@ concurrency:
 
 permissions:
   contents: read
-  packages: read
+  packages: write
 
 jobs:
   checks:
@@ -70,3 +70,20 @@ jobs:
       - name: Build combined API and dashboard image
         run: docker build --tag jeho-own-api:ci ./backend
 
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish JEHO-OWN image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/mgmods/jeho-own-backend:${{ github.sha }}
+            ghcr.io/mgmods/jeho-own-backend:latest
