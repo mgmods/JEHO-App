@@ -80,14 +80,6 @@
               >
                 <i class="bi" :class="g.enabled === false ? 'bi-eye-slash-fill' : 'bi-eye-fill'"></i>
               </button>
-              <button
-                type="button"
-                class="tool-btn tool-btn--danger"
-                :title="t('common.delete')"
-                @click="removeGame(idx)"
-              >
-                <i class="bi bi-trash-fill"></i>
-              </button>
             </div>
           </div>
           <div class="catalog-card__meta">
@@ -298,12 +290,6 @@
       </div>
     </div>
 
-    <ConfirmDialog
-      v-model="confirmOpen"
-      :title="t('common.delete')"
-      :message="confirmMsg"
-      @confirm="doRemoveGame"
-    />
   </div>
 </template>
 
@@ -315,7 +301,6 @@ import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 
@@ -540,17 +525,9 @@ const MIKOO = [
 ]
 
 function isLegacyHtmlGame(g) {
-  if (!g || typeof g !== 'object' || Array.isArray(g)) return true
-  const id = String(g.id || '').toLowerCase()
-  const playUrl = String(g.playUrl || '').toLowerCase()
-  return id === 'lucky-wheel' || id === 'dice' || id === 'wheel'
-    || id === 'xo' || id === 'tic_tac_toe' || id === 'tictactoe'
-    || playUrl.includes('lucky-wheel')
-    || playUrl.includes('/games/dice.html')
-    || playUrl.endsWith('dice.html')
-    || playUrl.includes('tic_tac_toe')
-    || id === 'fireforce'
-    || playUrl.includes('fireforce')
+  // Keep every saved game visible in the dashboard, including legacy or temporarily unavailable entries.
+  // Availability and launch health are separate from catalog visibility.
+  return !g || typeof g !== 'object' || Array.isArray(g)
 }
 
 function buildDefaults() {
@@ -671,30 +648,22 @@ function toggleEnabled(idx) {
   g.enabled = g.enabled === false
 }
 
-function removeGame(idx) {
-  pendingRemoveIdx.value = idx
-  const g = games.value[idx]
-  confirmMsg.value = `${t('common.delete')} «${displayTitle(g)}»؟`
-  confirmOpen.value = true
-}
-
-const confirmOpen = ref(false)
-const confirmMsg = ref('')
-const pendingRemoveIdx = ref(-1)
-
-function doRemoveGame() {
-  const idx = pendingRemoveIdx.value
-  pendingRemoveIdx.value = -1
-  if (idx < 0) return
-  games.value.splice(idx, 1)
-  if (!games.value.length) games.value = defaults.map(normalizeGame)
-  if (editIdx.value === idx) closeEdit()
-  else if (editIdx.value !== null && editIdx.value > idx) editIdx.value -= 1
-}
-
 function resetDefaults() {
   Object.keys(coverBroken).forEach((k) => delete coverBroken[k])
-  games.value = defaults.map(normalizeGame)
+  // Merge missing built-in entries without replacing or deleting any existing catalog rows.
+  const merged = new Map()
+  for (const game of Array.isArray(games.value) ? games.value : []) {
+    if (!game || typeof game !== 'object' || Array.isArray(game)) continue
+    const normalized = normalizeGame(game)
+    const id = String(normalized.id || '').trim().toLowerCase()
+    if (id) merged.set(id, normalized)
+  }
+  for (const game of defaults) {
+    const normalized = normalizeGame(game)
+    const id = String(normalized.id || '').trim().toLowerCase()
+    if (id && !merged.has(id)) merged.set(id, normalized)
+  }
+  games.value = [...merged.values()].sort((a, b) => Number(a.sortOrder || 9999) - Number(b.sortOrder || 9999))
 }
 
 async function load() {
@@ -737,7 +706,7 @@ async function load() {
       const normalized = normalizeGame(game)
       merged.set(String(normalized.id || '').toLowerCase(), normalized)
     }
-    for (const game of saved.filter((item) => item && typeof item === 'object' && !Array.isArray(item) && !isLegacyHtmlGame(item))) {
+    for (const game of saved.filter((item) => item && typeof item === 'object' && !Array.isArray(item))) {
       const normalized = normalizeGame(game)
       const id = String(normalized.id || '').trim().toLowerCase()
       if (!id) continue
@@ -810,7 +779,7 @@ async function save() {
   saving.value = true
   error.value = ''
   const payload = games.value
-    .filter((g) => !isLegacyHtmlGame(g))
+    .filter((g) => g && typeof g === 'object' && !Array.isArray(g))
     .map((g, i) => ({
       ...g,
       sortOrder: i + 1,
