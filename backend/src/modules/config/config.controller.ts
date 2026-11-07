@@ -167,6 +167,7 @@ export class ConfigController {
     const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
     const defaults = {
       backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1,
+      highWinMinMultiplier: 10, highWinMinCoins: 1000,
       giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
       luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
       luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
@@ -240,7 +241,10 @@ export class ConfigController {
       durationSeconds: Math.max(1, Math.min(12, Math.round(Number(button.durationSeconds) || 5))),
       pulseEnabled: button.pulseEnabled !== false,
     };
+    const highWinMinMultiplier = Math.max(0, Math.min(1000000, Math.floor(Number.isFinite(Number(parsed.highWinMinMultiplier)) ? Number(parsed.highWinMinMultiplier) : 10)));
+    const highWinMinCoins = Math.max(0, Math.min(1000000000, Math.floor(Number.isFinite(Number(parsed.highWinMinCoins)) ? Number(parsed.highWinMinCoins) : 1000)));
     return { ...defaults, ...giftSend, giftSend, luckyWinNormal: win('luckyWinNormal'), luckyReturn: win('luckyReturn'), luckyWinHigh: win('luckyWinHigh'), luckyWinHighRoom: win('luckyWinHighRoom'), luckyButton,
+      highWinMinMultiplier, highWinMinCoins,
       version: Math.max(1, Math.round(Number(parsed.version) || 1)) };
   }
 
