@@ -364,7 +364,7 @@ export class NotificationsService {
       return await this.sendFcm(
         recipientUserId,
         payload.senderName || 'JEHO CHAT',
-        payload.body || 'لديك رسالة جديدة',
+        String(payload.body || 'لديك رسالة جديدة').slice(0, 180),
         {
           type: 'chat',
           notificationKind: 'direct_message',
