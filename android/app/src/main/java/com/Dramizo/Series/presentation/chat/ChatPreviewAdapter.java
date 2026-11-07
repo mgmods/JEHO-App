@@ -67,6 +67,13 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         notifyDataSetChanged();
     }
 
+    public void removeConversation(String conversationId) {
+        if (conversationId == null) return;
+        sourceItems.removeIf(item -> item != null && conversationId.equals(item.id));
+        items.removeIf(item -> item != null && conversationId.equals(item.id));
+        notifyDataSetChanged();
+    }
+
     public void setSearchQuery(String query) {
         String next = query != null ? query.trim() : "";
         if (next.equalsIgnoreCase(searchQuery)) return;
