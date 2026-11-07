@@ -584,18 +584,8 @@ public final class GlobalCelebrationToast {
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
                 margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
         MAIN.post(() -> {
-            // Lucky results normally replace stale results. Keep the paired top/center
-            // placements for the same event in sequence instead of cancelling one another.
-            if (isLuckyToastKind(kind) && !pairedPlacement) {
-                PENDING.removeIf(item -> isLuckyToastKind(item.kind));
-                View active = current.get();
-                if (active != null && active.getParent() instanceof ViewGroup) {
-                    ((ViewGroup) active.getParent()).removeView(active);
-                    current.clear();
-                }
-                showing = false;
-                if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
-            }
+            // Preserve every distinct toast in arrival order. Do not replace an active
+            // lucky toast or discard pending normal/return/high results.
             PENDING.addLast(request);
             showNext();
         });
