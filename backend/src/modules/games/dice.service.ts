@@ -71,6 +71,7 @@ export class DiceService {
   }
 
   async getState(userId: string) {
+    if (!isGameEnabled('dice')) throw new BadRequestException('لعبة النرد متوقفة حالياً من الإدارة');
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Dice game disabled');
     let wallet = await this.walletRepo.findOne({ where: { userId } });
