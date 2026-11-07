@@ -873,40 +873,48 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
     private void bindRoomSupportMedal(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (holder.b.imgRoomSupportMedal == null) return;
-        // Anchor the medal to the avatar's actual upper corner, not the seat cell's
-        // outer bounds. This keeps agency and personal rooms visually identical even
-        // when their seat/avatar scale differs.
+        // Use the same physical anchor in agency and personal rooms. When a frame is
+        // equipped, pin the medal to the frame edge; otherwise pin it to the avatar.
         android.view.ViewGroup.LayoutParams raw = holder.b.imgRoomSupportMedal.getLayoutParams();
         if (raw instanceof android.widget.FrameLayout.LayoutParams lp) {
             float density = holder.b.imgRoomSupportMedal.getResources().getDisplayMetrics().density;
             int size = Math.round(30f * density);
-            android.view.View avatar = holder.b.imgAvatar;
-            android.view.ViewGroup avatarParent = avatar != null && avatar.getParent() instanceof android.view.ViewGroup
-                    ? (android.view.ViewGroup) avatar.getParent() : null;
-            android.view.ViewGroup.LayoutParams avatarParams = avatar != null ? avatar.getLayoutParams() : null;
-            android.view.ViewGroup.LayoutParams parentParams = avatarParent != null
-                    ? avatarParent.getLayoutParams() : null;
-            int avatarWidth = avatarParams != null && avatarParams.width > 0
-                    ? avatarParams.width : Math.round(51f * density);
-            int avatarHeight = avatarParams != null && avatarParams.height > 0
-                    ? avatarParams.height : Math.round(51f * density);
-            int parentWidth = parentParams != null && parentParams.width > 0
-                    ? parentParams.width : Math.round(74f * density);
-            int parentHeight = parentParams != null && parentParams.height > 0
-                    ? parentParams.height : Math.round(74f * density);
-            // Sit directly on the avatar's upper corner; no outward gap.
-            int offset = 0;
-            int left = Math.round((parentWidth - avatarWidth) / 2f - size / 2f) - offset;
-            int top = Math.round((parentHeight - avatarHeight) / 2f - size / 2f) - offset;
-            lp.width = size;
-            lp.height = size;
-            lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
-            lp.setMarginStart(left);
-            lp.topMargin = top;
-            lp.setMarginEnd(0);
-            lp.rightMargin = 0;
-            lp.bottomMargin = 0;
-            holder.b.imgRoomSupportMedal.setLayoutParams(lp);
+            android.view.View anchor = holder.b.imgAvatar;
+            if (holder.b.imgFrame != null && holder.b.imgFrame.getVisibility() == View.VISIBLE) {
+                anchor = holder.b.imgFrame;
+            }
+            android.view.ViewGroup parent = anchor != null && anchor.getParent() instanceof android.view.ViewGroup
+                    ? (android.view.ViewGroup) anchor.getParent() : null;
+            if (parent != null && holder.b.imgRoomSupportMedal.getParent() == parent) {
+                android.view.ViewGroup.LayoutParams anchorParams = anchor.getLayoutParams();
+                android.view.ViewGroup.LayoutParams parentParams = parent.getLayoutParams();
+                int parentWidth = parent.getWidth() > 0 ? parent.getWidth()
+                        : (parentParams != null && parentParams.width > 0
+                            ? parentParams.width : Math.round(76f * density));
+                int parentHeight = parent.getHeight() > 0 ? parent.getHeight()
+                        : (parentParams != null && parentParams.height > 0
+                            ? parentParams.height : Math.round(76f * density));
+                int anchorWidth = anchor.getWidth() > 0 ? anchor.getWidth()
+                        : (anchorParams != null && anchorParams.width > 0
+                            ? anchorParams.width : Math.round(52f * density));
+                int anchorHeight = anchor.getHeight() > 0 ? anchor.getHeight()
+                        : (anchorParams != null && anchorParams.height > 0
+                            ? anchorParams.height : Math.round(52f * density));
+                int anchorLeft = anchor.getWidth() > 0 ? anchor.getLeft()
+                        : Math.round((parentWidth - anchorWidth) / 2f);
+                int anchorTop = anchor.getHeight() > 0 ? anchor.getTop()
+                        : Math.round((parentHeight - anchorHeight) / 2f);
+                // Center the medal over the upper-start corner: no room-type offsets.
+                lp.width = size;
+                lp.height = size;
+                lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+                lp.setMarginStart(anchorLeft - size / 2);
+                lp.topMargin = anchorTop - size / 2;
+                lp.setMarginEnd(0);
+                lp.rightMargin = 0;
+                lp.bottomMargin = 0;
+                holder.b.imgRoomSupportMedal.setLayoutParams(lp);
+            }
         }
         String url = user != null && user.roomSupportMedal != null ? user.roomSupportMedal.imageUrl : null;
         if (url == null || url.trim().isEmpty()) {
