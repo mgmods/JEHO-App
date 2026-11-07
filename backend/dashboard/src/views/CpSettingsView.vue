@@ -597,7 +597,7 @@ const gifts = ref([])
 const cpGiftItems = computed(() => gifts.value.filter(gift => String(gift.category || '').toLowerCase() === 'cp'))
 const cpGifts = computed(() => cpGiftItems.value.filter(gift => gift.isActive !== false))
 // CP level rewards may select only gifts uploaded specifically for CP.
-const normalGifts = computed(() => cpGifts.value.filter(gift => Number(gift.coinPrice ?? gift.price ?? 0) > 0))
+const normalGifts = computed(() => gifts.value.filter(gift => gift && gift.isActive !== false && String(gift.category || '').toLowerCase() !== 'cp' && Number(gift.coinPrice ?? gift.price ?? 0) > 0))
 const requests = ref([])
 const audit = ref([])
 const loading = ref(false)
@@ -747,7 +747,7 @@ async function loadCpGifts() {
   const response = await giftsApi.list({ limit: 500 })
   if (response?.error) throw new Error(response.error.message || 'تعذر تحميل هدايا CP')
   gifts.value = extractList(response?.data?.data ?? response?.data ?? response)
-    .filter(gift => gift && String(gift.category || '').toLowerCase() === 'cp')
+    .filter(gift => gift && gift.isActive !== false)
 }
 async function uploadCpGiftAsset(field, event) {
   const file = event?.target?.files?.[0]
@@ -893,7 +893,7 @@ async function load() {
   try {
     const [configResponse, giftsResponse] = await Promise.all([cpAdminApi.config(), giftsApi.list({ limit: 500 })])
     const config = payloadOf(configResponse)
-    gifts.value = extractList(giftsResponse?.data?.data ?? giftsResponse?.data ?? giftsResponse).filter(gift => gift && String(gift.category || '').toLowerCase() === 'cp')
+    gifts.value = extractList(giftsResponse?.data?.data ?? giftsResponse?.data ?? giftsResponse).filter(gift => gift && gift.isActive !== false)
     const configuredTasks = config.tasks && typeof config.tasks === 'object' ? config.tasks : {}
     const taskEntries = Object.entries(configuredTasks).map(([id, task]) => ({
       id,
