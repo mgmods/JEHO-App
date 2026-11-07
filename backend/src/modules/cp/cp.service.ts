@@ -177,7 +177,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       return ids.map(id => String(id || '').trim()).filter(id => UUID_REGEX.test(id));
     })));
     const gifts = giftIds.length ? await this.dataSource.query(
-      'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true AND category=$2',
+      'SELECT id,name,"iconUrl","animationUrl","coinPrice" FROM gifts WHERE id::text = ANY($1::text[]) AND "isActive"=true AND COALESCE(category, \'\') <> $2',
       [giftIds, 'cp'],
     ) : [];
     const giftsById = new Map(gifts.map((gift: any) => [String(gift.id), gift]));
@@ -249,7 +249,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           );
           if (!claim?.id) return;
           const [gift] = await manager.query(
-            'SELECT id,name,"iconUrl" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$2 LIMIT 1',
+            'SELECT id,name,"iconUrl" FROM gifts WHERE id=$1 AND "isActive"=true AND COALESCE(category, \'\') <> $2 LIMIT 1',
             [giftId, 'cp'],
           );
           if (!gift) {
@@ -260,9 +260,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
           // zero-cost self-delivered gift history row so it appears in the user's bag/history.
           await manager.query(
             `INSERT INTO gift_sends
-              ("giftId","giftName","giftIconUrl","senderId","receiverId","roomId",quantity,"comboCount","totalCoins","diamondsAwarded","luckyMultiplier")
-             VALUES ($1,$2,$3,$4,$4,NULL,1,1,0,0,NULL)`,
-            [gift.id, gift.name, gift.iconUrl || null, userId],
+              ("giftId","giftName","giftIconUrl","senderId","receiverId","roomId",quantity,"comboCount","totalCoins","diamondsAwarded","luckyMultiplier","expiresAt")
+             VALUES ($1,$2,$3,$4,$4,NULL,1,1,0,0,NULL,$5)`,
+            [gift.id, gift.name, gift.iconUrl || null, userId,
+              levelConfig.rewardPermanent === true ? null : new Date(Date.now() + Math.max(1, Math.min(365, Math.floor(Number(levelConfig.rewardDays) || 30))) * 86400000)],
           );
           await manager.query(
             'UPDATE cp_level_gift_reward_claims SET status=$1,"grantedAt"=now() WHERE id=$2',
