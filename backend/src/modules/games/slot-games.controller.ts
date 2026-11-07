@@ -25,7 +25,7 @@ function currentPublicOrigin(request: Request): string {
   }
 
   const configured = String(process.env.PUBLIC_API_ORIGIN || '').trim().replace(/\/+$/, '');
-  if (/^https?:\\/\\//i.test(configured) && !RETIRED_GAME_HOSTS.test(configured)) {
+  if ((configured.startsWith('https://') || configured.startsWith('http://')) && !RETIRED_GAME_HOSTS.test(configured)) {
     try {
       return new URL(configured).origin;
     } catch {
