@@ -16,7 +16,7 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { LuckyWheelSpinDto } from './dto/lucky-wheel.dto';
 import { RoomGameAccessService } from './room-game-access.service';
-import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { clampGamePayout, gamePayoutLimits } from './game-payout-guard';
 import { getGameWinRate, isGameEnabled } from './game-odds-runtime';
 
 export type LuckyWheelSector = 'red' | 'orange' | 'seven' | 'lose';
@@ -62,8 +62,8 @@ export class LuckyWheelService {
     };
     return {
       enabled: (map.get('games.lucky_wheel.enabled') ?? 'true') !== 'false',
-      minBet: Math.max(1, num('games.lucky_wheel.min_bet', 100)),
-      maxBet: Math.min(Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), GAME_PAYOUT.maxBet),
+      maxBet: Math.min(Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), gamePayoutLimits().maxBet),
+      minBet: Math.min(Math.max(1, num('games.lucky_wheel.min_bet', 100)), Math.min(Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), gamePayoutLimits().maxBet)),
       /** Very low win rate by default. */
       loseWeight: Math.max(1, num('games.lucky_wheel.lose_weight', 72)),
       x2Weight: Math.max(0, num('games.lucky_wheel.x2_weight', 24)),
