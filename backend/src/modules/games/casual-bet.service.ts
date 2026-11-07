@@ -67,13 +67,14 @@ export class CasualBetService {
   async state(userId: string) {
     let wallet = await this.walletRepo.findOne({ where: { userId } });
     if (!wallet) wallet = await this.walletRepo.save(this.walletRepo.create({ userId }));
+    const maxBet = Math.min(20_000, gamePayoutLimits().maxBet);
     return {
       balance: Number(wallet.coins || 0),
       currency: 'coins',
       minBet: 50,
-      maxBet: Math.min(20_000, gamePayoutLimits().maxBet),
-      chips: [50, 100, 500, 1000, 5000, 10_000],
-      games: ALL_CASUAL.filter((gameId) => isGameEnabled(gameId)), 
+      maxBet,
+      chips: [50, 100, 500, 1000, 5000, 10_000].filter((chip) => chip <= maxBet),
+      games: ALL_CASUAL.filter((gameId) => isGameEnabled(gameId)),
     };
   }
 
