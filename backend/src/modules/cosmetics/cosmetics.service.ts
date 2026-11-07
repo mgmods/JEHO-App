@@ -185,6 +185,17 @@ export class CosmeticsService implements OnModuleInit {
     return this.equip(userId, cosmeticId, { allowCpStore: true });
   }
 
+  async unequipCpStoreItem(userId: string, cosmeticId: string) {
+    const owned = await this.userCosmeticsRepo.findOne({
+      where: { userId, cosmeticId },
+      relations: ['cosmetic'],
+    });
+    if (!owned || !this.isCpStoreCosmetic(owned.cosmetic)) {
+      throw new NotFoundException('هذا العنصر ليس من متجر CP أو غير مملوك لك');
+    }
+    return this.unequip(userId, cosmeticId);
+  }
+
   /** Resolve mall/catalog preview URL from cosmetic code (agency exclusives, admin). */
   async resolvePreviewUrl(code: string | null | undefined): Promise<string | null> {
     const trimmed = String(code || '').trim();
@@ -352,13 +363,67 @@ export class CosmeticsService implements OnModuleInit {
   }
 
   async cpStoreInventory(userId: string) {
-    // CP center uses its own inventory endpoint so mall and CP items remain isolated.
+    // CP center owns a separate inventory. Expired leases are removed from wear
+    // before returning the active bag; ownership rows remain so repurchase can renew.
     const rows = await this.userCosmeticsRepo.find({
       where: { userId },
       relations: ['cosmetic'],
       order: { createdAt: 'DESC' },
     });
-    return rows.filter(row => this.isCpStoreCosmetic(row.cosmetic));
+    const now = Date.now();
+    const cpRows = rows.filter(row => this.isCpStoreCosmetic(row.cosmetic));
+    for (const row of cpRows) {
+      if (row.equipped && row.expiresAt && row.expiresAt.getTime() <= now) {
+        await this.clearExpiredCosmeticWear(row);
+      }
+    }
+    return cpRows.filter(row => !row.expiresAt || row.expiresAt.getTime() > now);
+  }
+
+  /** Periodic expiry cleanup for CP-only cosmetics; never deletes ownership or catalog data. */
+  async expireCpStoreCosmetics() {
+    const rows = await this.userCosmeticsRepo.find({
+      where: { equipped: true },
+      relations: ['cosmetic'],
+    });
+    const now = Date.now();
+    for (const row of rows) {
+      if (!this.isCpStoreCosmetic(row.cosmetic) || !row.expiresAt || row.expiresAt.getTime() > now) continue;
+      await this.clearExpiredCosmeticWear(row);
+    }
+  }
+
+  private async clearExpiredCosmeticWear(row: UserCosmetic) {
+    row.equipped = false;
+    await this.userCosmeticsRepo.save(row);
+    const cosmetic = row.cosmetic;
+    if (!cosmetic) return;
+    const profile = await this.profileRepo.findOne({ where: { userId: row.userId } });
+    if (!profile) return;
+    const urls = [cosmetic.previewUrl, this.cosmeticAnimationUrl(cosmetic)].filter(Boolean);
+    const matches = (value: string | null | undefined) => !!value && urls.includes(value);
+    const type = cosmetic.type;
+    if (type === CosmeticType.VIP_BADGE && matches(profile.vipBadgeUrl)) profile.vipBadgeUrl = null;
+    if (type === CosmeticType.HOST_BADGE && matches(profile.hostBadgeUrl)) profile.hostBadgeUrl = null;
+    if (type === CosmeticType.LEVEL_BADGE && matches(profile.levelBadgeUrl)) profile.levelBadgeUrl = null;
+    if (type === CosmeticType.ENTRY_EFFECT || type === CosmeticType.JOIN_TOAST) {
+      if (matches(profile.entryEffectUrl)) profile.entryEffectUrl = null;
+      if (matches(profile.entryAnimationUrl)) profile.entryAnimationUrl = null;
+    }
+    if (type === CosmeticType.ROOM_CARD && matches(profile.roomCardUrl)) {
+      profile.roomCardUrl = null;
+      await this.dataSource.query(
+        `UPDATE rooms SET "roomCardUrl" = NULL, "roomCardEquippedById" = NULL
+         WHERE "hostId" = $1 AND "roomCardEquippedById" = $1 AND "roomCardUrl" = ANY($2::text[])`,
+        [row.userId, urls],
+      ).catch(() => undefined);
+    }
+    if (type === CosmeticType.PROFILE_CARD && matches(profile.profileCardUrl)) profile.profileCardUrl = null;
+    if (type === CosmeticType.CP_BACKGROUND && matches(profile.cpBackgroundUrl)) profile.cpBackgroundUrl = null;
+    if (type === CosmeticType.CP_LOGO && matches(profile.cpLogoUrl)) profile.cpLogoUrl = null;
+    if (type === CosmeticType.CHAT_BUBBLE && matches(profile.chatBubbleUrl)) profile.chatBubbleUrl = null;
+    if (type === CosmeticType.NAMEPLATE && matches(profile.nameplateUrl)) profile.nameplateUrl = null;
+    await this.profileRepo.save(profile);
   }
 
   private mallLeaseDays(cosmetic?: Cosmetic) {
@@ -667,23 +732,16 @@ export class CosmeticsService implements OnModuleInit {
       return { owned, renew, price, fullPrice, leaseDays, expiresAt: owned.expiresAt };
     });
 
-    // CP Store items are purchased and equipped as one user action. Keep the
-    // purchase transaction committed even if a legacy cosmetic cannot be worn;
-    // return the explicit state so the APK can offer a manual equip retry.
-    if (isCpStoreItem) {
-      try {
-        const equipResult = await this.equip(userId, cosmeticId, { allowCpStore: true });
-        return { ...result, equipped: true, autoEquipped: true, equipResult };
-      } catch (error) {
-        return {
-          ...result,
-          equipped: false,
-          autoEquipped: false,
-          equipError: error instanceof Error ? error.message : 'تعذر تركيب العنصر تلقائياً',
-        };
-      }
-    }
+    // Purchase adds ownership only. Wearing is an explicit action from the CP bag.
     return result;
+  }
+
+  private cosmeticSlotTypes(type: CosmeticType): CosmeticType[] {
+    // All avatar/head frames are one visual slot, including CP-only frames.
+    if (type === CosmeticType.VIP_BADGE || type === CosmeticType.HOST_BADGE) {
+      return [CosmeticType.VIP_BADGE, CosmeticType.HOST_BADGE];
+    }
+    return [type];
   }
 
   async equip(userId: string, cosmeticId: string, opts?: { skipRequirements?: boolean; allowCpStore?: boolean }) {
@@ -704,12 +762,13 @@ export class CosmeticsService implements OnModuleInit {
     }
 
     const type = owned.cosmetic.type;
+    const slotTypes = this.cosmeticSlotTypes(type);
     const sameType = await this.userCosmeticsRepo.find({
       where: { userId },
       relations: ['cosmetic'],
     });
     for (const row of sameType) {
-      if (row.cosmetic?.type === type) {
+      if (row.cosmetic && slotTypes.includes(row.cosmetic.type)) {
         row.equipped = row.id === owned.id;
         await this.userCosmeticsRepo.save(row);
       }
@@ -758,7 +817,8 @@ export class CosmeticsService implements OnModuleInit {
       if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = owned.cosmetic.previewUrl || null;
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
       if (type === CosmeticType.HOST_BADGE) {
-        // Prefer GIF/WebP/MP4 animation when provided; skip HTML/JSON engines.
+        // VIP and host frames share one avatar-frame slot; never layer them.
+        profile.vipBadgeUrl = null;
         const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
@@ -771,6 +831,7 @@ export class CosmeticsService implements OnModuleInit {
           : owned.cosmetic.previewUrl || null;
       }
       if (type === CosmeticType.VIP_BADGE) {
+        profile.hostBadgeUrl = null;
         const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
@@ -820,12 +881,13 @@ export class CosmeticsService implements OnModuleInit {
     if (!owned) throw new NotFoundException('You do not own this cosmetic');
 
     const type = owned.cosmetic.type;
+    const slotTypes = this.cosmeticSlotTypes(type);
     const sameType = await this.userCosmeticsRepo.find({
       where: { userId },
       relations: ['cosmetic'],
     });
     for (const row of sameType) {
-      if (row.cosmetic?.type === type && row.equipped) {
+      if (row.cosmetic && slotTypes.includes(row.cosmetic.type) && row.equipped) {
         row.equipped = false;
         await this.userCosmeticsRepo.save(row);
       }
@@ -848,12 +910,13 @@ export class CosmeticsService implements OnModuleInit {
         ).catch(() => undefined);
       }
       if (type === CosmeticType.PROFILE_CARD) profile.profileCardUrl = null;
+      if (type === CosmeticType.CP_BACKGROUND) profile.cpBackgroundUrl = null;
+      if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = null;
       if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = null;
       if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = null;
-      if (type === CosmeticType.HOST_BADGE) {
+      if (type === CosmeticType.HOST_BADGE || type === CosmeticType.VIP_BADGE) {
+        // Both cosmetic types represent the same avatar-frame slot.
         profile.hostBadgeUrl = null;
-      }
-      if (type === CosmeticType.VIP_BADGE) {
         profile.vipBadgeUrl = null;
       }
       if (type === CosmeticType.LEVEL_BADGE) {
