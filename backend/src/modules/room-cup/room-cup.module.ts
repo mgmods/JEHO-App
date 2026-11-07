@@ -11,10 +11,12 @@ import { UserVip } from '../../database/entities/user-vip.entity';
 import { User } from '../../database/entities/user.entity';
 import { AdminUser } from '../../database/entities/admin-user.entity';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     AuthModule,
+    NotificationsModule,
     TypeOrmModule.forFeature([
       GiftSend,
       Room,
