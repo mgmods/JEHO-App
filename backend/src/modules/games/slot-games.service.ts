@@ -121,7 +121,7 @@ export class SlotGamesService {
 
 
 
-  private async bsConfig() {
+  private async bsConfig(origin: string) {
 
     const appId = Number(await this.readSetting('games.bsgame.app_id', '9786548770'));
 
@@ -156,6 +156,22 @@ export class SlotGamesService {
   }
 
 
+
+  private resolvePublicOrigin(candidate: string) {
+    try {
+      const parsed = new URL(String(candidate || '').trim());
+      if (
+        (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+        parsed.host &&
+        !/(api\\.adnova\\.bbs\\.tr|jieyou\\.shop|sruner\\.com|zkruner\\.com|jeho-own-backend\\.mgs\\.blitz\\.cloud)/i.test(parsed.host)
+      ) {
+        return parsed.origin;
+      }
+    } catch {
+      // Reject invalid or retired origins rather than silently routing to a legacy host.
+    }
+    throw new BadRequestException('Current JEHO game server origin is invalid');
+  }
 
   private toWsBase(url: string) {
 
@@ -322,7 +338,7 @@ export class SlotGamesService {
 
 
 
-  async startSession(userId: string, gameId: string, roomId?: string | null) {
+  async startSession(userId: string, gameId: string, roomId: string | null | undefined, publicOrigin: string) {
 
     const game = findMikooGame(gameId);
 
@@ -333,7 +349,9 @@ export class SlotGamesService {
 
     const { publicId, user } = await this.resolvePublicUserId(userId);
 
-    const cfg = await this.bsConfig();
+    const origin = this.resolvePublicOrigin(publicOrigin);
+
+    const cfg = await this.bsConfig(origin);
 
     const language = await this.resolveLanguage(userId);
 
@@ -469,9 +487,9 @@ export class SlotGamesService {
 
   /** Mikoo-compatible alias used by extracted clients. */
 
-  async getCode(userId: string, gameId: string, roomId?: string | null) {
+  async getCode(userId: string, gameId: string, roomId: string | null | undefined, publicOrigin: string) {
 
-    const session = await this.startSession(userId, gameId, roomId);
+    const session = await this.startSession(userId, gameId, roomId, publicOrigin);
 
     return { code: session.code, sessionId: session.sessionId };
 
