@@ -103,6 +103,10 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
   }
   if (!obj || typeof obj !== 'object') return { ...DEFAULT_GAME_ODDS };
   const d = DEFAULT_GAME_ODDS;
+  const maxBet = Math.floor(clamp(obj.maxBet, 100, 50_000, d.maxBet));
+  // A configured winning result must never be capped below the original stake.
+  // Keep the absolute payout ceiling at least as high as the maximum accepted bet.
+  const maxWinAbsolute = Math.max(maxBet + 1, Math.floor(clamp(obj.maxWinAbsolute, 1_000, 500_000, d.maxWinAbsolute)));
   return {
     version: Math.max(1, Math.floor(Number(obj.version) || 1)),
     updatedAt: obj.updatedAt ? String(obj.updatedAt) : undefined,
@@ -113,9 +117,9 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
     crashCashoutRake: clamp(obj.crashCashoutRake, 0.9, 0.99, d.crashCashoutRake),
     hiloPayoutMult: clamp(obj.hiloPayoutMult, 1.15, 1.7, d.hiloPayoutMult),
     royalBattlePayGate: clamp(obj.royalBattlePayGate, 0.2, 0.55, d.royalBattlePayGate),
-    maxBet: Math.floor(clamp(obj.maxBet, 100, 50_000, d.maxBet)),
+    maxBet,
     maxWinMult: Math.floor(clamp(obj.maxWinMult, 3, 25, d.maxWinMult)),
-    maxWinAbsolute: Math.floor(clamp(obj.maxWinAbsolute, 1_000, 500_000, d.maxWinAbsolute)),
+    maxWinAbsolute,
     maxCrashRatio: Math.floor(clamp(obj.maxCrashRatio, 3, 20, d.maxCrashRatio)),
     disabledGames: Array.isArray(obj.disabledGames)
       ? [...new Set<string>((obj.disabledGames as unknown[]).map((x: unknown) => String(x).trim().toLowerCase()).filter((x: string) => /^[a-z0-9][a-z0-9-]{0,63}$/.test(x)))].slice(0, 200)
@@ -153,7 +157,7 @@ export const GAME_ODDS_COVERED_GAMES = [
   { id: 'camel-racing', via: 'playerRtp' },
   { id: 'cleopatra-slot', via: 'gameWinRates+spinHitRate' },
   { id: 'cleopatra-slots', via: 'gameWinRates+spinHitRate' },
-  { id: 'crash', via: 'crashCashoutRake+maxCrashRatio' },
+  { id: 'crash', via: 'gameWinRates+crashCashoutRake+maxCrashRatio' },
   { id: 'fishing', via: 'gameWinRates+fishingHitRate' },
   { id: 'football-plinko', via: 'gameWinRates+spinHitRate' },
   { id: 'fortune-slot', via: 'gameWinRates+spinHitRate' },
@@ -198,7 +202,7 @@ export function gameOddsClientPayload(cfg: GameOddsConfig) {
     gameWinRates: cfg.gameWinRates,
     gameRtpRates: cfg.gameRtpRates,
     hints: {
-      gameWinRates: 'نسبة الفوز المعلنة لكل لعبة من 0 إلى 100. لا تُطبّق إلا على الألعاب التي يحسم خادم JEHO نتيجتها؛ ألعاب المزوّد الخارجي تحتاج دعمًا منه.',
+      gameWinRates: 'نسبة الفوز العامة المعلنة لكل لعبة من 0 إلى 100، وتُطبّق على نتائج محرك JEHO لكل اللاعبين بالتساوي. ألعاب النتائج المشتركة تستخدم عائد اللاعب RTP، وألعاب المزوّد الخارجي تحتاج دعمًا منه.',
       playerRtp: 'نسبة ما يعود للاعب على المدى الطويل (الباقي ربح التطبيق) — لوحات الرهان المتعددة',
       spinHitRate: 'فرصة فوز كل السلوتات / بلينكو / حفلة السباحة',
       fishingHitRate: 'فرصة صيد السمك (أصعب من السلوت)',
