@@ -4,7 +4,7 @@ import { Public } from '../../../common/decorators';
 import { findMikooGame } from '../mikoo-games.catalog';
 
 function origin() {
-  const raw = (process.env.PUBLIC_API_ORIGIN?.trim() && !/api\.adnova\.bbs\.tr/i.test(process.env.PUBLIC_API_ORIGIN) ? process.env.PUBLIC_API_ORIGIN.trim().replace(/\/+$/, '') : 'https://jeho-own-backend.mgs.blitz.cloud');
+  const raw = (process.env.PUBLIC_API_ORIGIN?.trim() && !/api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com/i.test(process.env.PUBLIC_API_ORIGIN) ? process.env.PUBLIC_API_ORIGIN.trim().replace(/\/+$/, '') : 'https://jeho-own-backend.mgs.blitz.cloud');
   return raw.replace(/\/$/, '');
 }
 
