@@ -879,7 +879,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (raw instanceof android.widget.FrameLayout.LayoutParams lp) {
             float density = holder.b.imgRoomSupportMedal.getResources().getDisplayMetrics().density;
             int size = Math.round(30f * density);
-            int offset = Math.round(-19f * density);
+            int offset = Math.round(-12f * density);
             lp.width = size;
             lp.height = size;
             lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
