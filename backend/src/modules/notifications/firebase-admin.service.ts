@@ -10,6 +10,8 @@ export class FirebaseAdminService implements OnModuleInit {
   private readonly logger = new Logger(FirebaseAdminService.name);
   private ready = false;
   private admin: FirebaseAdmin | null = null;
+  private projectId: string | null = null;
+  private initFailure: string | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -22,6 +24,7 @@ export class FirebaseAdminService implements OnModuleInit {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       this.admin = require('firebase-admin') as FirebaseAdmin;
       if (this.admin.apps.length) {
+        this.projectId = String(this.admin.app().options.projectId || '') || null;
         this.ready = true;
         return;
       }
@@ -53,6 +56,7 @@ export class FirebaseAdminService implements OnModuleInit {
           const json = rawJson || Buffer.from(rawBase64, 'base64').toString('utf8');
           serviceAccount = JSON.parse(json) as Record<string, unknown>;
         } catch {
+          this.initFailure = 'invalid_service_account_json';
           this.logger.error('Firebase service-account JSON/BASE64 is invalid — push disabled');
           return;
         }
@@ -61,14 +65,27 @@ export class FirebaseAdminService implements OnModuleInit {
       }
 
       if (!serviceAccount) {
-        this.logger.error('Firebase credentials not found (FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, or FIREBASE_CREDENTIALS_PATH) — push disabled');
+        this.initFailure = 'credentials_missing';
+        this.logger.error('Firebase credentials not found (FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, or FIREBASE_CREDENTIALS_PATH / GOOGLE_APPLICATION_CREDENTIALS) — push disabled');
         return;
       }
       const projectId = String(serviceAccount.project_id || '').trim();
       const clientEmail = String(serviceAccount.client_email || '').trim();
       const privateKey = String(serviceAccount.private_key || '').replace(/\\n/g, '\n').trim();
       if (!projectId || !clientEmail || !privateKey) {
+        this.initFailure = 'service_account_fields_missing';
         this.logger.error('Firebase service-account is missing project_id, client_email, or private_key — push disabled');
+        return;
+      }
+      const expectedProjectId = String(
+        this.config.get<string>('app.fcm.projectId') ||
+        process.env.FIREBASE_PROJECT_ID ||
+        'jeho-fe429',
+      ).trim();
+      if (expectedProjectId && projectId !== expectedProjectId) {
+        this.projectId = projectId;
+        this.initFailure = 'firebase_project_mismatch';
+        this.logger.error(`Firebase project mismatch: app expects ${expectedProjectId}, service account is ${projectId} — push disabled`);
         return;
       }
       serviceAccount.private_key = privateKey;
@@ -77,15 +94,33 @@ export class FirebaseAdminService implements OnModuleInit {
         credential: this.admin.credential.cert(serviceAccount as any),
       });
       this.ready = true;
+      this.projectId = projectId;
+      this.initFailure = null;
       this.logger.log(`Firebase Admin ready (project=${projectId}, serviceAccount=${clientEmail})`);
     } catch (err) {
-      this.logger.warn(`Firebase Admin init failed: ${(err as Error).message}`);
+      this.initFailure = (err as Error).message || 'firebase_admin_init_failed';
+      this.logger.error(`Firebase Admin init failed: ${this.initFailure}`);
       this.ready = false;
     }
   }
 
   isReady() {
     return this.ready && !!this.admin;
+  }
+
+  diagnostics() {
+    const expectedProjectId = String(
+      this.config.get<string>('app.fcm.projectId') ||
+      process.env.FIREBASE_PROJECT_ID ||
+      'jeho-fe429',
+    ).trim();
+    return {
+      ready: this.isReady(),
+      projectId: this.projectId,
+      expectedProjectId,
+      projectMatches: !!this.projectId && this.projectId === expectedProjectId,
+      failureReason: this.initFailure,
+    };
   }
 
   async sendToTokens(
