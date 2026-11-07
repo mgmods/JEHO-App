@@ -20,6 +20,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
+import android.widget.MediaController;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -43,6 +45,7 @@ import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.RoomShareCodec;
 import com.Dramizo.Series.util.VipStyle;
+import com.Dramizo.Series.util.VipNameStyle;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
@@ -299,10 +302,13 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         } else if (useVipSkin) {
             // Paid VIP bubble skins apply to BOTH mine and peer (sender's VIP tier).
             VipStyle.applyBubble(holder.b.bubbleRoot, vipLevel);
-            int padH = dp(holder, 16);
-            int padT = dp(holder, 12);
-            int padB = dp(holder, 10);
+            // Keep text, emoji, reply tools and inline icons comfortably inside the VIP frame.
+            int padH = dp(holder, 22);
+            int padT = dp(holder, 17);
+            int padB = dp(holder, 15);
             holder.b.bubbleRoot.setPadding(padH, padT, padH, padB);
+            holder.b.bubbleRoot.setClipChildren(true);
+            holder.b.bubbleRoot.setClipToPadding(true);
         } else {
             int padH = dp(holder, 12);
             int padT = dp(holder, 8);
@@ -630,6 +636,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
 
         holder.b.tvSender.setVisibility(View.GONE);
         holder.b.tvSender.setText(name);
+        VipNameStyle.bind(holder.b.tvSender, mine ? me : msg.sender);
 
         if (showAvatar && listener != null) {
             String clickUserId;
@@ -765,6 +772,25 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         if (holder.b.imageWrap != null) holder.b.imageWrap.setVisibility(View.GONE);
         holder.b.imgMedia.setVisibility(View.GONE);
         holder.b.imgMedia.setOnClickListener(null);
+        if (holder.b.videoMedia != null) {
+            holder.b.videoMedia.stopPlayback();
+            holder.b.videoMedia.setMediaController(null);
+            holder.b.videoMedia.setOnClickListener(null);
+            holder.b.videoMedia.setOnPreparedListener(null);
+            holder.b.videoMedia.setOnCompletionListener(null);
+            holder.b.videoMedia.setOnErrorListener(null);
+            holder.b.videoMedia.setVisibility(View.GONE);
+        }
+        if (holder.b.imgVideoThumbnail != null) {
+            Glide.with(holder.itemView).clear(holder.b.imgVideoThumbnail);
+            holder.b.imgVideoThumbnail.setVisibility(View.GONE);
+            holder.b.imgVideoThumbnail.setOnClickListener(null);
+            holder.b.imgVideoThumbnail.setImageDrawable(null);
+        }
+        if (holder.b.btnVideoPlay != null) {
+            holder.b.btnVideoPlay.setVisibility(View.GONE);
+            holder.b.btnVideoPlay.setOnClickListener(null);
+        }
         if (holder.b.rowImageReaction != null) holder.b.rowImageReaction.setVisibility(View.GONE);
         if (holder.b.audioRow != null) holder.b.audioRow.setVisibility(View.GONE);
         if (holder.b.agencyInviteRow != null) holder.b.agencyInviteRow.setVisibility(View.GONE);
@@ -803,6 +829,69 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 holder.b.tvContent.setVisibility(View.VISIBLE);
                 holder.b.tvContent.setText(msg.content);
                 bindTranslate(holder, msg);
+            }
+            return;
+        }
+
+        if ("video".equals(type) && mediaUrl != null && !mediaUrl.isEmpty()
+                && holder.b.videoMedia != null) {
+            String fullUrl = AssetCatalog.absoluteUrl(mediaUrl);
+            if (holder.b.imageWrap != null) holder.b.imageWrap.setVisibility(View.VISIBLE);
+            holder.b.imgMedia.setVisibility(View.GONE);
+            if (holder.b.rowImageReaction != null) holder.b.rowImageReaction.setVisibility(View.GONE);
+            if (holder.b.tvImageTime != null) holder.b.tvImageTime.setVisibility(View.GONE);
+
+            // A durable poster is part of the message media JSON, so history/rebinds can
+            // paint the preview without downloading/starting the full video.
+            ImageView poster = holder.b.imgVideoThumbnail;
+            View playButton = holder.b.btnVideoPlay;
+            VideoView video = holder.b.videoMedia;
+            video.setVisibility(View.GONE);
+            video.setBackgroundColor(Color.BLACK);
+            if (poster != null) {
+                poster.setVisibility(View.VISIBLE);
+                poster.setBackgroundColor(Color.rgb(21, 25, 35));
+                String thumbnailUrl = msg.media != null ? msg.media.thumbnailUrl : null;
+                if (thumbnailUrl != null && !thumbnailUrl.trim().isEmpty()) {
+                    Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(thumbnailUrl))
+                            .centerCrop().dontAnimate().into(poster);
+                } else {
+                    poster.setImageDrawable(null);
+                }
+            }
+            if (playButton != null) playButton.setVisibility(View.VISIBLE);
+
+            View.OnClickListener startVideo = v -> {
+                if (poster != null) poster.setVisibility(View.GONE);
+                if (playButton != null) playButton.setVisibility(View.GONE);
+                video.setVisibility(View.VISIBLE);
+                MediaController controls = new MediaController(holder.itemView.getContext());
+                controls.setAnchorView(video);
+                video.setMediaController(controls);
+                video.setOnPreparedListener(player -> {
+                    player.setLooping(false);
+                    video.start();
+                });
+                video.setOnCompletionListener(player -> {
+                    video.stopPlayback();
+                    video.setVisibility(View.GONE);
+                    if (poster != null) poster.setVisibility(View.VISIBLE);
+                    if (playButton != null) playButton.setVisibility(View.VISIBLE);
+                });
+                video.setOnErrorListener((player, what, extra) -> {
+                    video.setVisibility(View.GONE);
+                    if (poster != null) poster.setVisibility(View.VISIBLE);
+                    if (playButton != null) playButton.setVisibility(View.VISIBLE);
+                    Toast.makeText(holder.itemView.getContext(), "تعذر تشغيل الفيديو", Toast.LENGTH_SHORT).show();
+                    return true;
+                });
+                video.setVideoURI(Uri.parse(fullUrl));
+            };
+            if (poster != null) poster.setOnClickListener(startVideo);
+            if (playButton != null) playButton.setOnClickListener(startVideo);
+            if (msg.content != null && !msg.content.trim().isEmpty()) {
+                holder.b.tvContent.setVisibility(View.VISIBLE);
+                holder.b.tvContent.setText(msg.content);
             }
             return;
         }
@@ -1456,6 +1545,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         if (msg == null) return "";
         String type = msg.type != null ? msg.type.toLowerCase(Locale.US) : "text";
         if ("image".equals(type)) return "📷 صورة";
+        if ("video".equals(type)) return "🎬 فيديو";
         if ("audio".equals(type)) return "🎤 رسالة صوتية";
         if ("gift".equals(type)) return "🎁 " + (msg.content != null ? msg.content : "هدية");
         if (RoomShareCodec.isRoomShare(msg.content)) return RoomShareCodec.previewLabel(msg.content);
@@ -1583,6 +1673,9 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final TextView tvReplyBody;
         final View imageWrap;
         final ImageView imgMedia;
+        final VideoView videoMedia;
+        final ImageView imgVideoThumbnail;
+        final View btnVideoPlay;
         final View rowImageReaction;
         final TextView tvImageReaction;
         final TextView tvImageTime;
@@ -1634,6 +1727,9 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             tvReplyBody = root.findViewById(R.id.tvReplyBody);
             imageWrap = root.findViewById(R.id.imageWrap);
             imgMedia = root.findViewById(R.id.imgMedia);
+            videoMedia = root.findViewById(R.id.videoMedia);
+            imgVideoThumbnail = root.findViewById(R.id.imgVideoThumbnail);
+            btnVideoPlay = root.findViewById(R.id.btnVideoPlay);
             rowImageReaction = root.findViewById(R.id.rowImageReaction);
             tvImageReaction = root.findViewById(R.id.tvImageReaction);
             tvImageTime = root.findViewById(R.id.tvImageTime);
