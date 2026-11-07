@@ -1893,7 +1893,12 @@ public class ChatConversationActivity extends ThemedActivity {
 
     @Override
     protected void onPause() {
-        // Keep mute while this chat stays on the back stack (Home / lock screen).
+        // Stop advertising this thread as actively viewed while backgrounded.
+        // The server uses this room membership to decide whether a push is needed.
+        com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
+        if (conversationId != null) {
+            RealtimeClient.getInstance().leaveConversation(conversationId);
+        }
         super.onPause();
     }
 

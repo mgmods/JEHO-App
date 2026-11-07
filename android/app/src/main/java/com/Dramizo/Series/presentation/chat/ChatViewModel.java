@@ -81,7 +81,10 @@ public class ChatViewModel extends ViewModel {
 
         @Override
         public void onConnected() {
-            if (conversationId != null) RealtimeClient.getInstance().joinConversation(conversationId);
+            if (conversationId != null
+                    && com.Dramizo.Series.util.ActiveChatTracker.isViewing(conversationId)) {
+                RealtimeClient.getInstance().joinConversation(conversationId);
+            }
         }
     };
 

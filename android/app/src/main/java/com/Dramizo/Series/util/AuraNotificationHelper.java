@@ -198,7 +198,7 @@ public final class AuraNotificationHelper {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setAutoCancel(true)
-                .setOnlyAlertOnce(true)
+                .setOnlyAlertOnce(!isChat)
                 .setContentIntent(pi)
                 .setCustomContentView(compact)
                 .setCustomBigContentView(expanded)

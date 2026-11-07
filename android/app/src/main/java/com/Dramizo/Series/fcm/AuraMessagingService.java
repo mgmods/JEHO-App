@@ -124,10 +124,13 @@ public class AuraMessagingService extends FirebaseMessagingService {
                     ? "chat:" + conversationId + ":" + firstNonEmpty(data, "messageId", "message_id", "notificationId")
                     : (data != null ? firstNonEmpty(data, "notificationId", "messageId", "message_id") : null);
             InAppNotificationBanner.show(active, title, body, type, intent, dedupeKey, avatar);
+            // While JEHO is open, direct messages use the in-app queue only.
+            // Do not also post a system notification for the same foreground event.
+            if (ActiveChatTracker.isChatType(type)) return;
         }
 
-        // Keep the system notification for the shade/lock screen; taps use the same
-        // deep link. Active-chat notifications were filtered above to avoid duplicates.
+        // Background/terminated delivery keeps the Android system notification.
+        // Foreground direct messages were already handled by the in-app queue above.
         AuraNotificationHelper.show(
                 this, CHANNEL_ID, title, body, type, intent, notificationId, avatar);
         // Refresh Official News badge on Messages tab when a general notice arrives.
