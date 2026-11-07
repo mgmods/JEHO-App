@@ -72,6 +72,7 @@ export class LuckyWheelService {
   }
 
   async getState(userId: string) {
+    if (!isGameEnabled('lucky-wheel')) throw new BadRequestException('عجلة الحظ متوقفة حالياً من الإدارة');
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Lucky wheel disabled');
     let wallet = await this.walletRepo.findOne({ where: { userId } });
