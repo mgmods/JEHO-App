@@ -296,7 +296,12 @@ const baishunModuleMap: Record<string, string> = {
     '1098': 'slot777',
     '1183': 'swimsuit-party',
   };
-  const configuredPublicApiOrigin = (process.env.PUBLIC_API_ORIGIN || '').replace(/\/$/, '');
+  const rawPublicApiOrigin = String(process.env.PUBLIC_API_ORIGIN || '').trim().replace(/\/+$/, '');
+  const configuredPublicApiOrigin =
+    /^https?:\/\//i.test(rawPublicApiOrigin) &&
+    !/(api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com|jeho-own-backend\.mgs\.blitz\.cloud)/i.test(rawPublicApiOrigin)
+      ? rawPublicApiOrigin
+      : '';
   const baishunGetAddr = (req: {
     query: Record<string, string | undefined>;
     protocol?: string;
