@@ -3963,9 +3963,10 @@ export class GiftsService implements OnModuleInit {
       * Math.max(1, Math.floor(Number(opts.personCount) || 1));
     const mul = Number(opts.luckyMultiplier) || 0;
     const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
-    // Broadcast every lucky outcome (normal win, partial return, and high win)
-    // so the previous all-results toast behavior is preserved across connected rooms.
-    if (!this.realtime) return;
+    // Only high wins are announced app-wide. Normal wins and partial returns
+    // remain exclusively on the originating room:event (lucky:hit) channel.
+    const isHighWin = mul >= 10 || won >= 1000;
+    if (!this.realtime || !isHighWin) return;
     const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
     const soft = mul > 0 && mul < 1;
     const times = Math.max(1, Math.round(mul));
