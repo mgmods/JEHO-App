@@ -245,6 +245,10 @@ export class BaishunWsHandler {
     })();
 
     ws.on('message', (raw) => {
+      if (!isGameEnabled(gameSlug)) {
+        ws.close(1013, 'Game disabled by administrator');
+        return;
+      }
       void (async () => {
         try {
           await authReady;
@@ -700,6 +704,10 @@ export class BaishunWsHandler {
     this.logger.log(`baishun packer attach ${gameSlug}`);
 
     ws.on('message', (raw) => {
+      if (!isGameEnabled(gameSlug)) {
+        ws.close(1013, 'Game disabled by administrator');
+        return;
+      }
       void (async () => {
         try {
           const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);
@@ -1186,6 +1194,10 @@ export class BaishunWsHandler {
     })();
 
     ws.on('message', (raw) => {
+      if (!isGameEnabled(gameSlug)) {
+        ws.close(1013, 'Game disabled by administrator');
+        return;
+      }
       chain = chain.then(async () => {
         try {
           const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);

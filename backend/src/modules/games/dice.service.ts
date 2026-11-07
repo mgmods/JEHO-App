@@ -16,7 +16,7 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { DiceRollDto } from './dto/dice.dto';
 import { RoomGameAccessService } from './room-game-access.service';
-import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { clampGamePayout, gamePayoutLimits } from './game-payout-guard';
 import { getGameWinRate, isGameEnabled } from './game-odds-runtime';
 
 /** Display multipliers ≈ fair × 0.75 house (true 2-dice outcomes). Peaks soft-clamped by guard. */
@@ -62,8 +62,8 @@ export class DiceService {
     };
     return {
       enabled: (map.get('games.dice.enabled') ?? 'true') !== 'false',
-      minBet: Math.max(1, num('games.dice.min_bet', 100)),
-      maxBet: Math.min(Math.max(100, num('games.dice.max_bet', 10_000)), GAME_PAYOUT.maxBet),
+      maxBet: Math.min(Math.max(100, num('games.dice.max_bet', 10_000)), gamePayoutLimits().maxBet),
+      minBet: Math.min(Math.max(1, num('games.dice.min_bet', 100)), Math.min(Math.max(100, num('games.dice.max_bet', 10_000)), gamePayoutLimits().maxBet)),
       /** Very low hit rate (~8%). */
       winWeight: Math.max(0, num('games.dice.win_weight', 8)),
       loseWeight: Math.max(1, num('games.dice.lose_weight', 92)),
@@ -71,6 +71,7 @@ export class DiceService {
   }
 
   async getState(userId: string) {
+    if (!isGameEnabled('dice')) throw new BadRequestException('لعبة النرد متوقفة حالياً من الإدارة');
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Dice game disabled');
     let wallet = await this.walletRepo.findOne({ where: { userId } });
