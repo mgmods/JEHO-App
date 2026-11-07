@@ -49,6 +49,7 @@ public class AuraLiveApp extends Application {
     private AppContainer container;
     private static volatile Activity foregroundActivity;
     private static volatile int startedActivities;
+    private volatile String registeredFcmIdentity;
 
     /** Always use for auth/session prefs (survives attachBaseContext locale wrap). */
     public static Context storageContext(Context any) {
@@ -160,6 +161,7 @@ public class AuraLiveApp extends Application {
             }
             @Override public void onActivityResumed(Activity activity) {
                 foregroundActivity = activity;
+                registerFcmDeviceIfReady();
                 View decor = activity.getWindow() != null
                         ? activity.getWindow().getDecorView()
                         : null;
@@ -197,7 +199,10 @@ public class AuraLiveApp extends Application {
         try {
             FirebaseMessaging.getInstance().setAutoInitEnabled(true);
             FirebaseMessaging.getInstance().getToken()
-                    .addOnSuccessListener(token -> container.getSessionManager().saveFcmToken(token))
+                    .addOnSuccessListener(token -> {
+                        container.getSessionManager().saveFcmToken(token);
+                        registerFcmDeviceIfReady();
+                    })
                     .addOnFailureListener(e -> android.util.Log.w("AuraLiveApp", "FCM token skipped: " + e.getMessage()));
         } catch (Throwable t) {
             android.util.Log.w("AuraLiveApp", "Firebase not configured yet: " + t.getMessage());
@@ -206,6 +211,34 @@ public class AuraLiveApp extends Application {
 
     public AppContainer getContainer() {
         return container;
+    }
+
+    /** Register the current FCM token after authentication is available.
+     * Token creation can happen before login, so onNewToken alone is not enough.
+     */
+    private void registerFcmDeviceIfReady() {
+        if (container == null) return;
+        String token = container.getSessionManager().getFcmToken();
+        String userId = container.getSessionManager().getUserId();
+        String accessToken = container.getSessionManager().getAccessToken();
+        if (token == null || token.trim().isEmpty()
+                || userId == null || userId.trim().isEmpty()
+                || accessToken == null || accessToken.trim().isEmpty()) return;
+        String identity = userId + ":" + token;
+        if (identity.equals(registeredFcmIdentity)) return;
+        registeredFcmIdentity = identity;
+        container.getIoExecutor().execute(() -> {
+            try {
+                com.Dramizo.Series.domain.model.Result<Object> result =
+                        container.getNotificationRepository().registerDevice(token, "android");
+                if (result == null || !result.success) {
+                    registeredFcmIdentity = null;
+                }
+            } catch (Exception e) {
+                registeredFcmIdentity = null;
+                android.util.Log.w("AuraLiveApp", "FCM device registration deferred: " + e.getMessage());
+            }
+        });
     }
 
     private void registerRealtimeNotifications() {
