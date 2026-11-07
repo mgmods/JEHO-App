@@ -11,8 +11,9 @@
   // unrelated host. Remove it before game bundles read location.search.
   try {
     var pageUrl = new URL(window.location.href);
-    pageUrl.searchParams.delete('DOMAIN');
-    pageUrl.searchParams.delete('domain');
+    Array.from(pageUrl.searchParams.keys()).forEach(function (key) {
+      if (String(key).toLowerCase() === 'domain') pageUrl.searchParams.delete(key);
+    });
     if (window.history && window.history.replaceState &&
         pageUrl.href !== window.location.href) {
       window.history.replaceState(window.history.state, '', pageUrl.href);
