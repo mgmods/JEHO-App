@@ -873,13 +873,18 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
     private void bindRoomSupportMedal(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (holder.b.imgRoomSupportMedal == null) return;
-        // Keep the support medal at 30dp and pull it outward from the avatar so it reads
-        // as a crown beside the upper-left seat edge rather than covering the seat.
+        // Use the same scale as the seat itself. In compact agency grids the avatar/frame
+        // shrink, so a fixed 30dp medal and -10dp offset drift away from the seat corner.
+        // This is intentionally room-type agnostic: personal and agency rooms share one layout.
         android.view.ViewGroup.LayoutParams raw = holder.b.imgRoomSupportMedal.getLayoutParams();
         if (raw instanceof android.widget.FrameLayout.LayoutParams lp) {
             float density = holder.b.imgRoomSupportMedal.getResources().getDisplayMetrics().density;
-            int size = Math.round(30f * density);
-            int offset = Math.round(-10f * density);
+            int sizeDp = scaleMode == SCALE_COMPACT ? 24
+                    : scaleMode == SCALE_MEDIUM ? 27 : 30;
+            int offsetDp = scaleMode == SCALE_COMPACT ? -8
+                    : scaleMode == SCALE_MEDIUM ? -9 : -10;
+            int size = Math.round(sizeDp * density);
+            int offset = Math.round(offsetDp * density);
             lp.width = size;
             lp.height = size;
             lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
