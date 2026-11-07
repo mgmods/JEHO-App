@@ -727,11 +727,13 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       this.realtime?.emitToUser(p.userId, 'chat:message', {
         conversationId, message: mapped, at: new Date().toISOString(),
       });
-      // Direct-message push is sent only to the recipient when they are not
-      // actively viewing this conversation. It is data-only on Android so the
-      // app owns foreground banners and background notification rendering.
+      // Send a push for every direct message to the other participant.
+      // Socket membership alone does NOT prove that the app is foregrounded:
+      // Android can keep a stale conversation room while the user backgrounds
+      // JEHO. The client suppresses the push only when this exact conversation
+      // is actively visible, preventing duplicates while preserving background alerts.
       if (dmConversation.type === ConversationType.DIRECT
-          && p.userId !== senderId && !viewing && this.notifications) {
+          && p.userId !== senderId && this.notifications) {
         const sender = mapped.sender || {};
         const preview = mapped.content && String(mapped.content).trim()
           ? String(mapped.content).trim()
