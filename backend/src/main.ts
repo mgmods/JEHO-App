@@ -146,7 +146,7 @@ async function bootstrap() {
   // scripts execute. Several packaged HTML files had a broken relative path
   // (../jeho-force-local.js), which silently left games connecting to retired hosts.
   const forceLocalTag =
-    '<script src="/games/mikoo/_jeho/jeho-force-local.js"></script>';
+    '<script src="/games/mikoo/jeho-force-local.js"></script>';
   expressAppEarly.use((req: { method?: string; path?: string; url?: string }, res: {
     setHeader: (k: string, v: string) => void;
     status: (n: number) => { end: (b: string) => void };
@@ -296,7 +296,7 @@ const baishunModuleMap: Record<string, string> = {
     '1098': 'slot777',
     '1183': 'swimsuit-party',
   };
-  const configuredPublicApiOrigin = (process.env.PUBLIC_API_ORIGIN || '').replace(/\/$/, '');
+  // The request host is authoritative for game HTTP and WebSocket endpoints.
   const baishunGetAddr = (req: {
     query: Record<string, string | undefined>;
     protocol?: string;
@@ -321,7 +321,7 @@ const baishunModuleMap: Record<string, string> = {
       host && /^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(host) && ['http', 'https'].includes(protocol)
         ? `${protocol}://${host}`
         : '';
-    const apiOrigin = configuredPublicApiOrigin || requestOrigin;
+    const apiOrigin = requestOrigin;
     if (!apiOrigin) {
       res.setHeader('Cache-Control', 'no-store');
       res.status(503).json({ code: 503, message: 'Public API origin is not configured' });

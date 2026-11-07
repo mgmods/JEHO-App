@@ -1,40 +1,39 @@
-/* JEHO: route bundled Mikoo games to the active backend, never retired provider hosts. */
+/* JEHO: route every retired Mikoo provider URL to the origin serving this game. */
 (function () {
   if (window.__jehoForceLocal) return;
   window.__jehoForceLocal = true;
 
   var LOCAL = (window.location && window.location.origin) || '';
   var LOCAL_WS = LOCAL.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
-  var BAD = /(api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com)/i;
-
-  try {
-    var q = new URLSearchParams(window.location.search || '');
-    var requested = q.get('DOMAIN') || q.get('domain');
-    if (requested && !BAD.test(requested) && /^https?:\/\//i.test(requested)) {
-      LOCAL = String(requested).replace(/\/$/, '');
-      LOCAL_WS = LOCAL.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
-    }
-  } catch (e) {}
+  // Include the former JEHO/Blitz host: the route API used to return it in
+  // http_addr/ws_addr, so rewriting only the original BaiShun hosts was not enough.
+  var RETIRED = /(api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com|jeho-own-backend\.mgs\.blitz\.cloud)/i;
 
   function rewrite(url) {
     if (url == null) return url;
     var value = String(url);
-    if (!BAD.test(value)) return value;
+    if (!RETIRED.test(value) || !LOCAL) return value;
     try {
       var parsed = document.createElement('a');
       parsed.href = value;
       var path = (parsed.pathname || '/') + (parsed.search || '') + (parsed.hash || '');
       return /^wss?:/i.test(value) ? LOCAL_WS + path : LOCAL + path;
     } catch (e) {
-      return value.replace(/^https?:\/\/[^/]+/i, LOCAL).replace(/^wss?:\/\/[^/]+/i, LOCAL_WS);
+      return value
+        .replace(/^https?:\/\/[^/]+/i, LOCAL)
+        .replace(/^wss?:\/\/[^/]+/i, LOCAL_WS);
     }
   }
 
+  // Never let a game-provided DOMAIN query parameter redirect traffic to an
+  // arbitrary host. The page's current HTTPS origin is the single source of truth.
   var OriginalWebSocket = window.WebSocket;
   if (OriginalWebSocket) {
     window.WebSocket = function (url, protocols) {
       var target = rewrite(url);
-      return protocols !== undefined ? new OriginalWebSocket(target, protocols) : new OriginalWebSocket(target);
+      return protocols !== undefined
+        ? new OriginalWebSocket(target, protocols)
+        : new OriginalWebSocket(target);
     };
     window.WebSocket.prototype = OriginalWebSocket.prototype;
     ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function (key) {
