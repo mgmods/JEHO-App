@@ -12136,17 +12136,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim();
         boolean highWin = multiplier >= 10d || wonCoins >= 1000L;
         boolean isWinner = senderId != null && myUserId != null && sameUser(senderId, myUserId);
-        if (highWin && isWinner) {
-            // The winner sees their personal dashboard-configured room toast here.
-            // The app-wide celebration event independently reaches all other app sections.
-            GlobalCelebrationToast.showRoomCenter(
+        if (highWin) {
+            // Every member of this room gets the top high-win announcement.
+            GlobalCelebrationToast.show(
                     this, who, line, safeAvatar, null, key,
-                    Math.max(0d, multiplier), 0L, who,
+                    28, Math.max(0d, multiplier), 0L, who,
                     "lucky_hit_high", roomId);
+            // Only the sender's own device gets the additional center celebration.
+            // Reuse the event key so the toast queue can pair the two placements safely.
+            if (isWinner) {
+                GlobalCelebrationToast.showRoomCenter(
+                        this, who, line, safeAvatar, null, key,
+                        Math.max(0d, multiplier), 0L, who,
+                        "lucky_hit_high", roomId);
+            }
         } else {
-            // Everyone else in the room sees the standard room toast.
-            String kind = highWin ? "lucky_hit_high"
-                    : (multiplier > 0d && multiplier < 1d ? "lucky_hit_return" : "lucky_hit_normal");
+            // Ordinary wins/returns stay in this room and never become app-wide banners.
+            String kind = multiplier > 0d && multiplier < 1d
+                    ? "lucky_hit_return" : "lucky_hit_normal";
             GlobalCelebrationToast.show(
                     this, who, line, safeAvatar, null, key,
                     28, Math.max(0d, multiplier), 0L, who, kind, roomId);
