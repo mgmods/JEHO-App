@@ -296,12 +296,7 @@ const baishunModuleMap: Record<string, string> = {
     '1098': 'slot777',
     '1183': 'swimsuit-party',
   };
-  const rawPublicApiOrigin = String(process.env.PUBLIC_API_ORIGIN || '').trim().replace(/\/+$/, '');
-  const configuredPublicApiOrigin =
-    /^https?:\/\//i.test(rawPublicApiOrigin) &&
-    !/(api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com|jeho-own-backend\.mgs\.blitz\.cloud)/i.test(rawPublicApiOrigin)
-      ? rawPublicApiOrigin
-      : '';
+  // The request host is authoritative for game HTTP and WebSocket endpoints.
   const baishunGetAddr = (req: {
     query: Record<string, string | undefined>;
     protocol?: string;
