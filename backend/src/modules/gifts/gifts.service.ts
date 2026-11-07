@@ -3292,6 +3292,46 @@ export class GiftsService implements OnModuleInit {
           animationPayload.brandAgencyPublicId = brandAg.publicId || null;
         }
       }
+      if (isLucky && dto.roomId) {
+        const luckyEventId = String(result.send?.id || dto.requestId || `lucky:${senderId}:${Date.now()}`);
+        const luckySenderName = String(animationPayload.senderName || 'لاعب');
+        const luckySenderAvatar = typeof animationPayload.senderAvatarUrl === 'string'
+          ? animationPayload.senderAvatarUrl : null;
+        const luckyPayload = {
+          senderId,
+          senderName: luckySenderName,
+          senderAvatarUrl: luckySenderAvatar,
+          luckyMultiplier: Number(result.luckyMultiplier || 0),
+          luckyCoinsWon: Number(result.luckyCoinsWon || 0),
+          eventId: luckyEventId,
+          sendId: luckyEventId,
+          roomId: dto.roomId,
+        };
+        // Room members receive the normal/private high-win presentation from this event.
+        this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+          roomId: dto.roomId,
+          event: 'lucky:hit',
+          payload: luckyPayload,
+          from: { userId: senderId },
+          at: animationPayload.at,
+        });
+        // This helper broadcasts only positive high-value results (>= 1,000 coins OR >= 10x).
+        this.broadcastLuckyCelebration({
+          roomId: dto.roomId,
+          senderId,
+          displayName: luckySenderName,
+          avatarUrl: luckySenderAvatar || undefined,
+          giftName: gift.name,
+          giftIconUrl: gift.iconUrl || undefined,
+          coinPrice,
+          quantity: qty,
+          luckyMultiplier: Number(result.luckyMultiplier || 0),
+          luckyCoinsWon: Number(result.luckyCoinsWon || 0),
+          personCount: 1,
+          eventId: luckyEventId,
+        });
+      }
+
       if (dto.roomId) {
         this.realtime?.emitToRoom(dto.roomId, 'room:event', {
           roomId: dto.roomId,
@@ -3832,6 +3872,44 @@ export class GiftsService implements OnModuleInit {
         if (senderIdentity.frameUrl) animationPayload.senderVipBadgeUrl = senderIdentity.frameUrl;
         (animationPayload as any).senderMysteriousMan = true;
       }
+      if (isLucky) {
+        const luckyEventId = String(result.sends?.[0]?.id || result.send?.id || dto.requestId
+          || `lucky:${senderId}:${Date.now()}`);
+        const luckySenderName = String(animationPayload.senderName || 'لاعب');
+        const luckySenderAvatar = typeof animationPayload.senderAvatarUrl === 'string'
+          ? animationPayload.senderAvatarUrl : null;
+        const luckyPayload = {
+          senderId,
+          senderName: luckySenderName,
+          senderAvatarUrl: luckySenderAvatar,
+          luckyMultiplier: Number(result.luckyMultiplier || 0),
+          luckyCoinsWon: Number(result.luckyCoinsWon || 0),
+          eventId: luckyEventId,
+          sendId: luckyEventId,
+          roomId: dto.roomId,
+        };
+        this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+          roomId: dto.roomId,
+          event: 'lucky:hit',
+          payload: luckyPayload,
+          from: { userId: senderId },
+          at,
+        });
+        this.broadcastLuckyCelebration({
+          roomId: dto.roomId,
+          senderId,
+          displayName: luckySenderName,
+          avatarUrl: luckySenderAvatar || undefined,
+          giftName: gift.name,
+          giftIconUrl: gift.iconUrl || undefined,
+          coinPrice,
+          quantity: qty,
+          luckyMultiplier: Number(result.luckyMultiplier || 0),
+          luckyCoinsWon: Number(result.luckyCoinsWon || 0),
+          personCount,
+          eventId: luckyEventId,
+        });
+      }
       this.realtime?.emitToRoom(dto.roomId, 'room:event', {
         roomId: dto.roomId,
         event: 'gift:animation',
@@ -3875,12 +3953,14 @@ export class GiftsService implements OnModuleInit {
     giftIconUrl?: string;
     coinPrice: number;
     quantity: number;
+    personCount?: number;
     luckyMultiplier: number;
     luckyCoinsWon: number;
     eventId?: string;
   }) {
     const stake = Math.max(0, Math.floor(Number(opts.coinPrice) || 0))
-      * Math.max(1, Math.floor(Number(opts.quantity) || 1));
+      * Math.max(1, Math.floor(Number(opts.quantity) || 1))
+      * Math.max(1, Math.floor(Number(opts.personCount) || 1));
     const mul = Number(opts.luckyMultiplier) || 0;
     const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
     // Only high-value lucky wins are broadcast app-wide. Smaller wins stay on the
