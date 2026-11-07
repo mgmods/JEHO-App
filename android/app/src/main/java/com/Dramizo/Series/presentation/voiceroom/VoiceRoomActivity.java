@@ -4580,6 +4580,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
         lp.verticalBias = 0.62f;
         root.addView(layer, lp);
+        // Nudge the launcher slightly toward the physical right side without changing its
+        // vertical placement or drag bounds. Positive translationX is screen-right in LTR/RTL.
+        layer.setTranslationX(luckyCannonDp(14));
         com.Dramizo.Series.util.LuckyCannonView cannon =
                 new com.Dramizo.Series.util.LuckyCannonView(this);
         // The enclosing layer owns touch/click so the uploaded icon overlay and drag gesture
@@ -11710,20 +11713,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             double eventMultiplier = suppliedMultiplier > 0d
                     ? suppliedMultiplier : parseLuckyMultiplierFromText(body != null ? body : line);
             boolean highWin = coins >= 1000L || eventMultiplier >= 10d;
-            boolean winnerMatches = winnerUserId == null || winnerUserId.trim().isEmpty()
-                    || (myUserId != null && sameUser(winnerUserId, myUserId));
-            if (isSameRoom(targetRoomId) && highWin && winnerMatches) {
-                // Only the actual winner receives the original center-of-room high-X toast.
-                GlobalCelebrationToast.showRoomCenter(
-                        this, who, body != null && !body.trim().isEmpty() ? body : chat,
-                        safeAvatar, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
-                        who, "lucky_hit_high", targetRoomId);
-            } else {
-                String toastKind = highWin ? "lucky_hit_high"
-                        : (coins >= 1000L ? "lucky_hit_high" : "lucky_hit_normal");
+            boolean sameTargetRoom = isSameRoom(targetRoomId);
+            // The center celebration is private: require an explicit sender ID match.
+            // Missing winner metadata must never turn a private toast into a room-wide one.
+            boolean winnerMatches = winnerUserId != null && !winnerUserId.trim().isEmpty()
+                    && myUserId != null && sameUser(winnerUserId, myUserId);
+            // App-wide lucky events are delivered to every connected room activity. A room
+            // that did not originate this result must not show a local/normal toast for it.
+            if (!sameTargetRoom) return;
+            if (highWin) {
+                // Every member of the originating room receives the top announcement.
+                // The actual sender additionally receives the private center celebration.
+                // Both use the same event key; the toast queue preserves the paired placements.
                 GlobalCelebrationToast.show(
                         this, who, chat, safeAvatar, badgeUrl, toastKey,
-                        28, eventMultiplier, Math.max(0L, coins), who, toastKind, targetRoomId);
+                        28, eventMultiplier, Math.max(0L, coins), who, "lucky_hit_high", targetRoomId);
+                if (winnerMatches) {
+                    GlobalCelebrationToast.showRoomCenter(
+                            this, who, body != null && !body.trim().isEmpty() ? body : chat,
+                            safeAvatar, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
+                            who, "lucky_hit_high", targetRoomId);
+                }
+            } else {
+                GlobalCelebrationToast.show(
+                        this, who, chat, safeAvatar, badgeUrl, toastKey,
+                        28, eventMultiplier, Math.max(0L, coins), who, "lucky_hit_normal", targetRoomId);
             }
             // Keep the room's existing chat announcement, but do not add a second visual bubble.
             if (roomBannerEnabled()) {
