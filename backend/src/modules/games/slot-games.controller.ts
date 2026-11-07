@@ -6,7 +6,7 @@ import { CurrentUser } from '../../common/decorators';
 import { SlotGamesService } from './slot-games.service';
 import { EndSlotSessionDto, RecordSlotWinDto, StartSlotSessionDto } from './dto/slot-games.dto';
 
-const RETIRED_GAME_HOSTS = /(api\\.adnova\\.bbs\\.tr|jieyou\\.shop|sruner\\.com|zkruner\\.com|jeho-own-backend\\.mgs\\.blitz\\.cloud)/i;
+const RETIRED_GAME_HOSTS = /(api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com|jeho-own-backend\.mgs\.blitz\.cloud)/i;
 
 function firstForwarded(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value || '').split(',')[0].trim();
@@ -24,7 +24,7 @@ function currentPublicOrigin(request: Request): string {
     return `${protocol}://${host}`;
   }
 
-  const configured = String(process.env.PUBLIC_API_ORIGIN || '').trim().replace(/\\/+$/, '');
+  const configured = String(process.env.PUBLIC_API_ORIGIN || '').trim().replace(/\/+$/, '');
   if (/^https?:\\/\\//i.test(configured) && !RETIRED_GAME_HOSTS.test(configured)) {
     try {
       return new URL(configured).origin;
