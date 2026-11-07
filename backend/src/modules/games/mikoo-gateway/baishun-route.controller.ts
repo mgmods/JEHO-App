@@ -27,7 +27,7 @@ function originFromRequest(request: Request): string {
   }
 
   // Environment override is only a last resort, and retired hosts are rejected.
-  const configured = String(process.env.PUBLIC_API_ORIGIN || '').trim().replace(/\\/+$/, '');
+  const configured = String(process.env.PUBLIC_API_ORIGIN || '').trim().replace(/\/+$/, '');
   if (
     /^https?:\/\//i.test(configured) &&
     !/(api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com|jeho-own-backend\.mgs\.blitz\.cloud)/i.test(configured)
