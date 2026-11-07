@@ -43,7 +43,8 @@ public final class GlobalCelebrationToast {
     private static Runnable hideRunnable;
     private static String lastDedupeKey;
     private static long lastShownAt;
-    private static boolean lastCenterPlacement;
+    /** Bit 0 = top placement shown; bit 1 = center placement shown for this event. */
+    private static int lastDedupePlacementMask;
     private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
     private static boolean showing;
     private static volatile String remoteBackgroundUrl = "";
@@ -569,15 +570,16 @@ public final class GlobalCelebrationToast {
         // One high-win event may intentionally have two placements on the sender device:
         // the shared top banner and the sender-only center celebration. Permit that paired
         // placement once, while continuing to suppress duplicate events in the same lane.
-        boolean pairedPlacement = dedupeKey != null && dedupeKey.equals(lastDedupeKey)
-                && now - lastShownAt < 1_200L && centerPlacement != lastCenterPlacement;
-        if (dedupeKey != null && dedupeKey.equals(lastDedupeKey)
-                && now - lastShownAt < 1_200L && !pairedPlacement) {
-            return;
-        }
+        int placementBit = centerPlacement ? 2 : 1;
+        boolean sameRecentEvent = dedupeKey != null && dedupeKey.equals(lastDedupeKey)
+                && now - lastShownAt < 1_200L;
+        boolean pairedPlacement = sameRecentEvent
+                && (lastDedupePlacementMask & placementBit) == 0;
+        if (sameRecentEvent && !pairedPlacement) return;
+        if (!sameRecentEvent) lastDedupePlacementMask = 0;
         lastDedupeKey = dedupeKey;
         lastShownAt = now;
-        lastCenterPlacement = centerPlacement;
+        lastDedupePlacementMask |= placementBit;
         final int margin = Math.max(8, topMarginDp);
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
                 margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
