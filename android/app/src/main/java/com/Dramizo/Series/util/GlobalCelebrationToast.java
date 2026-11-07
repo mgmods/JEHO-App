@@ -56,6 +56,9 @@ public final class GlobalCelebrationToast {
     private static volatile String remoteLuckyReturnBackgroundUrl = "";
     private static volatile String remoteLuckyRoomHighBackgroundUrl = "";
     private static volatile String remoteLuckyHighBackgroundUrl = "";
+    // Dashboard-controlled public announcement thresholds. Zero disables that criterion.
+    private static volatile double remoteHighWinMinMultiplier = 10d;
+    private static volatile long remoteHighWinMinCoins = 1000L;
     private static volatile boolean remoteShineEnabled = true;
     private static volatile boolean remoteFrameGlowEnabled = true;
     private static volatile boolean remoteLuckyNormalShineEnabled = true;
@@ -324,6 +327,10 @@ public final class GlobalCelebrationToast {
                     Map<String, Object> returned = nestedConfig(cfg, "luckyReturn");
                     Map<String, Object> high = nestedConfig(cfg, "luckyWinHigh");
                     Map<String, Object> roomHigh = nestedConfig(cfg, "luckyWinHighRoom");
+                    try { remoteHighWinMinMultiplier = Math.max(0d, Double.parseDouble(String.valueOf(cfg.get("highWinMinMultiplier")))); }
+                    catch (Exception ignored) { remoteHighWinMinMultiplier = 10d; }
+                    try { remoteHighWinMinCoins = Math.max(0L, Long.parseLong(String.valueOf(cfg.get("highWinMinCoins")))); }
+                    catch (Exception ignored) { remoteHighWinMinCoins = 1000L; }
                     remoteBackgroundUrl = stringValue(gift.get("backgroundUrl"), stringValue(cfg.get("backgroundUrl"), ""));
                     remoteShineEnabled = !Boolean.FALSE.equals(gift.getOrDefault("shineEnabled", cfg.get("shineEnabled")));
                     remoteFrameGlowEnabled = !Boolean.FALSE.equals(gift.getOrDefault("frameGlowEnabled", cfg.get("frameGlowEnabled")));
@@ -425,6 +432,13 @@ public final class GlobalCelebrationToast {
         } catch (Exception ignored) {
             // Network settings are optional; toast display must never depend on them.
         }
+    }
+
+    /** Uses the same OR thresholds saved in the dashboard and enforced by the backend. */
+    public static boolean isHighWin(double multiplier, long coinsWon) {
+        boolean multiplierReached = remoteHighWinMinMultiplier > 0d && multiplier >= remoteHighWinMinMultiplier;
+        boolean coinsReached = remoteHighWinMinCoins > 0L && coinsWon >= remoteHighWinMinCoins;
+        return multiplierReached || coinsReached;
     }
 
     public static void show(
