@@ -64,6 +64,7 @@ public class CpCenterActivity extends ThemedActivity {
                     loadTasks();
                     loadRewards();
                     loadCatalog();
+                    loadStore();
                 });
             }
         };
@@ -319,10 +320,7 @@ public class CpCenterActivity extends ThemedActivity {
                 body.put("cosmeticId", id);
                 Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().purchaseCpStoreItem(body));
                 if (result.success) {
-                    boolean autoEquipped = result.data != null && Boolean.TRUE.equals(result.data.get("autoEquipped"));
-                    message(autoEquipped
-                            ? "تم الشراء وتركيب عنصر CP تلقائياً."
-                            : "تم الشراء، لكن تعذر التركيب التلقائي. يمكنك إعادة محاولة التركيب.");
+                    message("تم الشراء بنجاح وإضافة العنصر إلى حقيبة CP. ارتده من الحقيبة متى شئت.");
                     loadStore();
                     loadHome();
                 } else {
@@ -339,11 +337,28 @@ public class CpCenterActivity extends ThemedActivity {
                 body.put("cosmeticId", id);
                 Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().equipCpStoreItem(body));
                 if (result.success) {
-                    message("تم تركيب عنصر CP بنجاح.");
+                    message("تم ارتداء عنصر CP بنجاح. أزيل العنصر السابق من الخانة نفسها.");
                     loadStore();
                     loadHome();
                 } else {
                     message(result.error == null ? "تعذر تركيب العنصر." : result.error);
+                }
+            });
+        }
+
+        @JavascriptInterface public void unequipStoreItem(String cosmeticId) {
+            String id = cosmeticId == null ? "" : cosmeticId.trim();
+            if (id.isEmpty()) { message("العنصر غير صالح."); return; }
+            c.getIoExecutor().execute(() -> {
+                Map<String, String> body = new HashMap<>();
+                body.put("cosmeticId", id);
+                Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().unequipCpStoreItem(body));
+                if (result.success) {
+                    message("تم خلع العنصر وإعادته إلى حقيبة CP.");
+                    loadStore();
+                    loadHome();
+                } else {
+                    message(result.error == null ? "تعذر خلع العنصر." : result.error);
                 }
             });
         }
