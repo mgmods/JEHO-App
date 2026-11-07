@@ -700,6 +700,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     // Deliver to both participants concurrently instead of waiting for each socket
     // presence check and unread update in sequence.
     await Promise.all(peers.map(async (p) => {
+      // A fresh message restores the thread in each participant's inbox without
+      // restoring it for the other participant at the moment of deletion.
+      if (p.isDeleted) {
+        await this.partRepo.update({ id: p.id }, { isDeleted: false });
+        p.isDeleted = false;
+      }
       const viewing = p.userId !== senderId && this.realtime
         ? await this.realtime.isUserInConversation(p.userId, conversationId)
         : false;
