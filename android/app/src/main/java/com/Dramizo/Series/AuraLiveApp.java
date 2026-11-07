@@ -295,6 +295,9 @@ public class AuraLiveApp extends Application {
                     final String gameFinal = gameTitleValue;
                     final double mulFinal = multiplierValue;
                     final String roomFinal = roomId;
+                    final String winnerUserId = jsonStringAny(payload, null,
+                            "userId", "senderId", "winnerId", "winnerUserId");
+                    final double winnerMultiplier = mulFinal;
                     final boolean appVisible = isAppInForeground();
                     VoiceRoomActivity aliveRoom = VoiceRoomActivity.getAliveInstance();
                     Activity activity = foregroundActivity;
@@ -317,7 +320,7 @@ public class AuraLiveApp extends Application {
                     if (aliveRoom != null) {
                         aliveRoom.runOnUiThread(() -> aliveRoom.onGlobalCelebration(
                                 kind, title, body, displayName, avatar, badge, dedupe,
-                                coinsFinal, gameFinal, roomFinal));
+                                coinsFinal, gameFinal, roomFinal, winnerMultiplier, winnerUserId));
                         if (!appVisible) {
                             showCelebrationSystemNotification(title, body, avatar, dedupe);
                         }
@@ -329,7 +332,7 @@ public class AuraLiveApp extends Application {
                             if (activity instanceof VoiceRoomActivity room) {
                                 room.onGlobalCelebration(
                                         kind, title, body, displayName, avatar, badge, dedupe,
-                                        coinsFinal, gameFinal, roomFinal);
+                                        coinsFinal, gameFinal, roomFinal, winnerMultiplier, winnerUserId);
                             } else {
                                 com.Dramizo.Series.util.GlobalCelebrationToast.show(
                                         activity, title, body, avatar, badge, dedupe,
