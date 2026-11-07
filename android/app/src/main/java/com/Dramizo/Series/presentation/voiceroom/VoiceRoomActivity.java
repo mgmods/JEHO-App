@@ -11619,6 +11619,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String gameTitle,
             @Nullable String targetRoomId
     ) {
+        onGlobalCelebration(kind, title, body, displayName, avatarUrl, badgeUrl, dedupeKey,
+                coinsWon, gameTitle, targetRoomId,
+                parseLuckyMultiplierFromText(body != null ? body : title), null);
+    }
+
+    /** Explicit event metadata avoids relying on translated toast text to detect a high-X win. */
+    public void onGlobalCelebration(
+            @Nullable String kind,
+            @Nullable String title,
+            @Nullable String body,
+            @Nullable String displayName,
+            @Nullable String avatarUrl,
+            @Nullable String badgeUrl,
+            @Nullable String dedupeKey,
+            long coinsWon,
+            @Nullable String gameTitle,
+            @Nullable String targetRoomId,
+            double suppliedMultiplier,
+            @Nullable String winnerUserId
+    ) {
         if (areCelebrationPopupsMuted()) return;
         String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
         String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
@@ -11687,10 +11707,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     : ("مبروك " + who + " · حظ");
             String toastKey = dedupeKey != null ? dedupeKey
                     : ("lucky-room-" + System.currentTimeMillis());
-            double eventMultiplier = parseLuckyMultiplierFromText(body != null ? body : line);
+            double eventMultiplier = suppliedMultiplier > 0d
+                    ? suppliedMultiplier : parseLuckyMultiplierFromText(body != null ? body : line);
             boolean highWin = coins >= 1000L || eventMultiplier >= 10d;
-            if (isSameRoom(targetRoomId) && highWin) {
-                // Global event for this same room: keep the center-screen room presentation.
+            boolean winnerMatches = winnerUserId == null || winnerUserId.trim().isEmpty()
+                    || (myUserId != null && sameUser(winnerUserId, myUserId));
+            if (isSameRoom(targetRoomId) && highWin && winnerMatches) {
+                // Only the actual winner receives the original center-of-room high-X toast.
                 GlobalCelebrationToast.showRoomCenter(
                         this, who, body != null && !body.trim().isEmpty() ? body : chat,
                         safeAvatar, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
