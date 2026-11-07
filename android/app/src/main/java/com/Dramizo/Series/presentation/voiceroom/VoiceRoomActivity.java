@@ -12127,7 +12127,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         String key = eventKey == null || eventKey.trim().isEmpty()
                 ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim();
-        boolean highWin = multiplier >= 10d || wonCoins >= 1000L;
+        boolean highWin = GlobalCelebrationToast.isHighWin(multiplier, wonCoins);
         boolean isWinner = senderId != null && myUserId != null && sameUser(senderId, myUserId);
         if (highWin) {
             // Every member of this room gets the top high-win announcement.
