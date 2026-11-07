@@ -106,7 +106,7 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
   const maxBet = Math.floor(clamp(obj.maxBet, 100, 50_000, d.maxBet));
   // A configured winning result must never be capped below the original stake.
   // Keep the absolute payout ceiling at least as high as the maximum accepted bet.
-  const maxWinAbsolute = Math.max(maxBet, Math.floor(clamp(obj.maxWinAbsolute, 1_000, 500_000, d.maxWinAbsolute)));
+  const maxWinAbsolute = Math.max(maxBet + 1, Math.floor(clamp(obj.maxWinAbsolute, 1_000, 500_000, d.maxWinAbsolute)));
   return {
     version: Math.max(1, Math.floor(Number(obj.version) || 1)),
     updatedAt: obj.updatedAt ? String(obj.updatedAt) : undefined,
