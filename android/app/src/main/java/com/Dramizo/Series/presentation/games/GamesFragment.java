@@ -98,15 +98,6 @@ public class GamesFragment extends Fragment {
         }
         c = ContainerProvider.from(requireActivity());
 
-        if (binding.cardWheel != null && binding.cardWheel.getRoot() != null) {
-            binding.cardWheel.getRoot().setVisibility(View.GONE);
-        }
-        if (binding.cardDice != null && binding.cardDice.getRoot() != null) {
-            binding.cardDice.getRoot().setVisibility(View.GONE);
-        }
-        View casualSection = binding.getRoot().findViewById(R.id.casualGamesSection);
-        if (casualSection != null) casualSection.setVisibility(View.GONE);
-
         catalogAdapter = new GameCatalogAdapter(this::openGame);
         binding.recyclerGames.setLayoutManager(new GridLayoutManager(requireContext(), 3));
         binding.recyclerGames.setAdapter(catalogAdapter);
