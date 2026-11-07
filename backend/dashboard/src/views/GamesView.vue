@@ -415,8 +415,14 @@ function applyOddsPayload(data) {
   })
   if (Array.isArray(data.coveredGames)) coveredGames.value = data.coveredGames.map(String)
   if (Array.isArray(data.disabledGames)) disabledGames.value = data.disabledGames.map(String)
-  if (data.gameWinRates && typeof data.gameWinRates === 'object') Object.entries(data.gameWinRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameWinRates[id] = Math.max(0, Math.min(100, Number(value))) })
-  if (data.gameRtpRates && typeof data.gameRtpRates === 'object') Object.entries(data.gameRtpRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameRtpRates[id] = Math.max(0.55, Math.min(0.82, Number(value))) })
+  if (data.gameWinRates && typeof data.gameWinRates === 'object') {
+    Object.keys(gameWinRates).forEach((id) => delete gameWinRates[id])
+    Object.entries(data.gameWinRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameWinRates[id] = Math.max(0, Math.min(100, Number(value))) })
+  }
+  if (data.gameRtpRates && typeof data.gameRtpRates === 'object') {
+    Object.keys(gameRtpRates).forEach((id) => delete gameRtpRates[id])
+    Object.entries(data.gameRtpRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameRtpRates[id] = Math.max(0.55, Math.min(0.82, Number(value))) })
+  }
 }
 
 async function loadOdds() {
