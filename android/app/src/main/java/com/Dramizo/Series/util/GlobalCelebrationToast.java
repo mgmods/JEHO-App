@@ -40,16 +40,25 @@ import retrofit2.Response;
 public final class GlobalCelebrationToast {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static WeakReference<View> current = new WeakReference<>(null);
+    private static WeakReference<View> currentCenter = new WeakReference<>(null);
     private static Runnable hideRunnable;
+    private static Runnable hideRunnableCenter;
     private static String lastDedupeKey;
     private static long lastShownAt;
+    /** Bit 0 = top placement shown; bit 1 = center placement shown for this event. */
+    private static int lastDedupePlacementMask;
     private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
+    private static final ArrayDeque<ToastRequest> PENDING_CENTER = new ArrayDeque<>();
     private static boolean showing;
+    private static boolean showingCenter;
     private static volatile String remoteBackgroundUrl = "";
     private static volatile String remoteLuckyNormalBackgroundUrl = "";
     private static volatile String remoteLuckyReturnBackgroundUrl = "";
     private static volatile String remoteLuckyRoomHighBackgroundUrl = "";
     private static volatile String remoteLuckyHighBackgroundUrl = "";
+    // Dashboard-controlled public announcement thresholds. Zero disables that criterion.
+    private static volatile double remoteHighWinMinMultiplier = 10d;
+    private static volatile long remoteHighWinMinCoins = 1000L;
     private static volatile boolean remoteShineEnabled = true;
     private static volatile boolean remoteFrameGlowEnabled = true;
     private static volatile boolean remoteLuckyNormalShineEnabled = true;
@@ -318,6 +327,10 @@ public final class GlobalCelebrationToast {
                     Map<String, Object> returned = nestedConfig(cfg, "luckyReturn");
                     Map<String, Object> high = nestedConfig(cfg, "luckyWinHigh");
                     Map<String, Object> roomHigh = nestedConfig(cfg, "luckyWinHighRoom");
+                    try { remoteHighWinMinMultiplier = Math.max(0d, Double.parseDouble(String.valueOf(cfg.get("highWinMinMultiplier")))); }
+                    catch (Exception ignored) { remoteHighWinMinMultiplier = 10d; }
+                    try { remoteHighWinMinCoins = Math.max(0L, Long.parseLong(String.valueOf(cfg.get("highWinMinCoins")))); }
+                    catch (Exception ignored) { remoteHighWinMinCoins = 1000L; }
                     remoteBackgroundUrl = stringValue(gift.get("backgroundUrl"), stringValue(cfg.get("backgroundUrl"), ""));
                     remoteShineEnabled = !Boolean.FALSE.equals(gift.getOrDefault("shineEnabled", cfg.get("shineEnabled")));
                     remoteFrameGlowEnabled = !Boolean.FALSE.equals(gift.getOrDefault("frameGlowEnabled", cfg.get("frameGlowEnabled")));
@@ -419,6 +432,13 @@ public final class GlobalCelebrationToast {
         } catch (Exception ignored) {
             // Network settings are optional; toast display must never depend on them.
         }
+    }
+
+    /** Uses the same OR thresholds saved in the dashboard and enforced by the backend. */
+    public static boolean isHighWin(double multiplier, long coinsWon) {
+        boolean multiplierReached = remoteHighWinMinMultiplier > 0d && multiplier >= remoteHighWinMinMultiplier;
+        boolean coinsReached = remoteHighWinMinCoins > 0L && coinsWon >= remoteHighWinMinCoins;
+        return multiplierReached || coinsReached;
     }
 
     public static void show(
@@ -565,45 +585,51 @@ public final class GlobalCelebrationToast {
         }
         if (isLuckyToastKind(kind)) refreshToastStyle(activity);
         long now = System.currentTimeMillis();
-        if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 1_200L) {
-            return;
-        }
+        // One high-win event may intentionally have two placements on the sender device:
+        // the shared top banner and the sender-only center celebration. Permit that paired
+        // placement once, while continuing to suppress duplicate events in the same lane.
+        int placementBit = centerPlacement ? 2 : 1;
+        boolean sameRecentEvent = dedupeKey != null && dedupeKey.equals(lastDedupeKey)
+                && now - lastShownAt < 1_200L;
+        boolean pairedPlacement = sameRecentEvent
+                && (lastDedupePlacementMask & placementBit) == 0;
+        if (sameRecentEvent && !pairedPlacement) return;
+        if (!sameRecentEvent) lastDedupePlacementMask = 0;
         lastDedupeKey = dedupeKey;
         lastShownAt = now;
+        lastDedupePlacementMask |= placementBit;
         final int margin = Math.max(8, topMarginDp);
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
                 margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
         MAIN.post(() -> {
-            // Lucky returns are transient: keep only the newest result. Never let an
-            // old queued toast surface after the user's finger has already been released.
-            if (isLuckyToastKind(kind)) {
-                PENDING.removeIf(item -> isLuckyToastKind(item.kind));
-                View active = current.get();
-                if (active != null && active.getParent() instanceof ViewGroup) {
-                    ((ViewGroup) active.getParent()).removeView(active);
-                    current.clear();
-                }
-                showing = false;
-                if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
+            // Preserve every distinct toast in arrival order. Do not replace an active
+            // lucky toast or discard pending normal/return/high results.
+            if (request.centerPlacement) {
+                PENDING_CENTER.addLast(request);
+                showNext(true);
+            } else {
+                PENDING.addLast(request);
+                showNext(false);
             }
-            PENDING.addLast(request);
-            showNext();
         });
     }
 
-    private static void showNext() {
-        if (showing) return;
-        ToastRequest request = PENDING.pollFirst();
+    private static void showNext() { showNext(false); }
+
+    /** Top and winner-only center toasts run in independent lanes and may be visible together. */
+    private static void showNext(boolean centerLane) {
+        if (centerLane ? showingCenter : showing) return;
+        ToastRequest request = (centerLane ? PENDING_CENTER : PENDING).pollFirst();
         if (request == null) return;
         Activity activity = com.Dramizo.Series.AuraLiveApp.getForegroundActivity();
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
             activity = request.activity.get();
         }
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
-            showNext();
+            showNext(centerLane);
             return;
         }
-        showing = true;
+        if (centerLane) showingCenter = true; else showing = true;
         try {
             showInternal(activity, request.title, request.body, request.avatarUrl,
                     request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
@@ -612,8 +638,8 @@ public final class GlobalCelebrationToast {
             // A single malformed asset/activity must not leave the global toast queue
             // permanently marked as showing and hide every later celebration.
             android.util.Log.w("GlobalCelebrationToast", "Toast rendering failed", error);
-            showing = false;
-            MAIN.post(GlobalCelebrationToast::showNext);
+            if (centerLane) showingCenter = false; else showing = false;
+            MAIN.post(() -> showNext(centerLane));
         }
     }
 
@@ -632,22 +658,23 @@ public final class GlobalCelebrationToast {
             boolean centerPlacement
     ) {
         if (activity.isFinishing() || activity.isDestroyed()) {
-            showing = false;
-            showNext();
+            if (centerPlacement) showingCenter = false; else showing = false;
+            showNext(centerPlacement);
             return;
         }
         ViewGroup root = activity.findViewById(android.R.id.content);
         if (!(root instanceof FrameLayout)) {
-            showing = false;
-            showNext();
+            if (centerPlacement) showingCenter = false; else showing = false;
+            showNext(centerPlacement);
             return;
         }
 
-        View existing = current.get();
+        View existing = centerPlacement ? currentCenter.get() : current.get();
         if (existing != null && existing.getParent() instanceof ViewGroup) {
             ((ViewGroup) existing.getParent()).removeView(existing);
         }
-        if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
+        Runnable laneHide = centerPlacement ? hideRunnableCenter : hideRunnable;
+        if (laneHide != null) MAIN.removeCallbacks(laneHide);
 
         View banner = LayoutInflater.from(activity)
                 .inflate(R.layout.layout_celebration_toast, root, false);
@@ -787,7 +814,7 @@ public final class GlobalCelebrationToast {
         if (canOpenRoom) {
             final String targetRoom = roomId.trim();
             banner.setOnClickListener(v -> {
-                removeBanner(banner);
+                removeBanner(banner, centerPlacement);
                 RoomJoinGateActivity.open(activity, targetRoom);
             });
         } else {
@@ -923,7 +950,8 @@ public final class GlobalCelebrationToast {
             sheen.setAlpha(0.78f);
         } else if (sheen != null) sheen.setVisibility(View.GONE);
         root.addView(banner);
-        current = new WeakReference<>(banner);
+        if (centerPlacement) currentCenter = new WeakReference<>(banner);
+        else current = new WeakReference<>(banner);
 
         banner.animate()
                 .alpha(1f)
@@ -971,10 +999,18 @@ public final class GlobalCelebrationToast {
                 positionViewPercent(wrapTimes, banner, countX, countY, true);
             });
         }
-        hideRunnable = () -> removeBanner(banner);
-        MAIN.postDelayed(hideRunnable, customToastStyle
-                ? Math.max(1, Math.min(12, customDuration)) * 1000L
-                : (canOpenRoom ? 6200L : 5200L));
+        Runnable laneHideRunnable = () -> removeBanner(banner, centerPlacement);
+        if (centerPlacement) {
+            hideRunnableCenter = laneHideRunnable;
+            MAIN.postDelayed(hideRunnableCenter, customToastStyle
+                    ? Math.max(1, Math.min(12, customDuration)) * 1000L
+                    : (canOpenRoom ? 6200L : 5200L));
+        } else {
+            hideRunnable = laneHideRunnable;
+            MAIN.postDelayed(hideRunnable, customToastStyle
+                    ? Math.max(1, Math.min(12, customDuration)) * 1000L
+                    : (canOpenRoom ? 6200L : 5200L));
+        }
     }
 
     /** Room-wide reward burst for a completed support-chest level. */
@@ -1258,12 +1294,13 @@ public final class GlobalCelebrationToast {
         return "مبروك!";
     }
 
-    private static void removeBanner(View banner) {
+    private static void removeBanner(View banner) { removeBanner(banner, false); }
+
+    private static void removeBanner(View banner, boolean centerPlacement) {
         if (banner == null) return;
-        if (hideRunnable != null) {
-            MAIN.removeCallbacks(hideRunnable);
-            hideRunnable = null;
-        }
+        Runnable laneHide = centerPlacement ? hideRunnableCenter : hideRunnable;
+        if (laneHide != null) MAIN.removeCallbacks(laneHide);
+        if (centerPlacement) hideRunnableCenter = null; else hideRunnable = null;
         float out = -Math.max(banner.getWidth(), dp(banner, 280));
         banner.animate()
                 .alpha(0f)
@@ -1274,9 +1311,15 @@ public final class GlobalCelebrationToast {
                     if (banner.getParent() instanceof ViewGroup parent) {
                         parent.removeView(banner);
                     }
-                    if (current.get() == banner) current = new WeakReference<>(null);
-                    showing = false;
-                    showNext();
+                    if (centerPlacement) {
+                        if (currentCenter.get() == banner) currentCenter = new WeakReference<>(null);
+                        showingCenter = false;
+                        showNext(true);
+                    } else {
+                        if (current.get() == banner) current = new WeakReference<>(null);
+                        showing = false;
+                        showNext(false);
+                    }
                 })
                 .start();
     }

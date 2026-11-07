@@ -13,6 +13,8 @@ const DEFAULT_TOAST_STYLE = {
   frameGlowEnabled: true,
   durationSeconds: 3,
   version: 1,
+  highWinMinMultiplier: 10,
+  highWinMinCoins: 1000,
   giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
@@ -53,6 +55,8 @@ export class ToastManagerController {
     let parsed: any = {};
     try { parsed = row?.value ? JSON.parse(row.value) : {}; } catch { parsed = {}; }
     const oldDuration = clampSeconds(parsed.durationSeconds, 3);
+    const highWinMinMultiplier = Math.max(0, Math.min(1000000, Math.floor(Number.isFinite(Number(parsed.highWinMinMultiplier)) ? Number(parsed.highWinMinMultiplier) : 10)));
+    const highWinMinCoins = Math.max(0, Math.min(1000000000, Math.floor(Number.isFinite(Number(parsed.highWinMinCoins)) ? Number(parsed.highWinMinCoins) : 1000)));
     const giftSend = {
       backgroundUrl: cleanUrl(parsed.giftSend?.backgroundUrl, cleanUrl(parsed.backgroundUrl)),
       shineEnabled: parsed.giftSend?.shineEnabled !== false && parsed.shineEnabled !== false,
@@ -101,6 +105,7 @@ export class ToastManagerController {
       pulseEnabled: parsed.luckyButton?.pulseEnabled !== false,
     };
     return { ...DEFAULT_TOAST_STYLE, ...parsed, ...giftSend, giftSend, luckyWinNormal, luckyReturn, luckyWinHigh, luckyWinHighRoom, luckyButton,
+      highWinMinMultiplier, highWinMinCoins,
       version: Math.max(1, Math.round(Number(parsed.version) || 1)) };
   }
 
@@ -151,6 +156,11 @@ export class ToastManagerController {
         placementY: clampPercent(input.placementY, old.placementY ?? 50),
       };
     };
+    const highWinMinMultiplier = Math.max(0, Math.min(1000000, Math.floor(Number.isFinite(Number(body?.highWinMinMultiplier)) ? Number(body.highWinMinMultiplier) : previous.highWinMinMultiplier)));
+    const highWinMinCoins = Math.max(0, Math.min(1000000000, Math.floor(Number.isFinite(Number(body?.highWinMinCoins)) ? Number(body.highWinMinCoins) : previous.highWinMinCoins)));
+    if (highWinMinMultiplier <= 0 && highWinMinCoins <= 0) {
+      throw new Error('يجب تفعيل حد واحد على الأقل: عدد X أو قيمة الربح بالعملات.');
+    }
     const luckyButton = {
       iconUrl: cleanUrl(body?.luckyButton?.iconUrl, previous.luckyButton?.iconUrl || ''),
       durationSeconds: clampSeconds(body?.luckyButton?.durationSeconds, previous.luckyButton?.durationSeconds || 5),
@@ -162,6 +172,7 @@ export class ToastManagerController {
       frameGlowEnabled: giftSend.frameGlowEnabled,
       durationSeconds: giftSend.durationSeconds,
       giftSend, luckyWinNormal: win('luckyWinNormal'), luckyReturn: win('luckyReturn'), luckyWinHigh: win('luckyWinHigh'), luckyWinHighRoom: win('luckyWinHighRoom'), luckyButton,
+      highWinMinMultiplier, highWinMinCoins,
       version: previous.version + 1,
     };
     const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
@@ -177,6 +188,9 @@ export class ToastManagerController {
     let stored: any;
     try { stored = JSON.parse(persisted.value); } catch {
       throw new Error('Saved toast settings could not be read back from storage');
+    }
+    if (Number(stored?.highWinMinMultiplier) !== highWinMinMultiplier || Number(stored?.highWinMinCoins) !== highWinMinCoins) {
+      throw new Error('High-win thresholds did not persist');
     }
     const verifyFields = [
       'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
