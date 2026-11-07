@@ -234,6 +234,10 @@ public class AuraLiveApp extends Application {
                         container.getNotificationRepository().registerDevice(token, "android");
                 if (result == null || !result.success) {
                     registeredFcmIdentity = null;
+                    android.util.Log.w("AuraLiveApp", "FCM device registration failed: "
+                            + (result != null ? result.error : "empty API result"));
+                } else {
+                    android.util.Log.i("AuraLiveApp", "FCM device registered for current account");
                 }
             } catch (Exception e) {
                 registeredFcmIdentity = null;
