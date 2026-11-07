@@ -415,13 +415,15 @@ export class BadgesService {
   }
 
   /** Award configured room-support medal to the supported user; progress is isolated per room. */
-  async recordRoomSupportProgress(userId: string, roomId: string, metrics: { coins?: number; diamonds?: number; gifts?: number }): Promise<any | null> {
+  async recordRoomSupportProgress(userId: string, roomId: string, role: 'supporter' | 'receiver', metrics: { coins?: number; diamonds?: number; gifts?: number }): Promise<any | null> {
     if (!userId || !roomId) return null;
     const row = await this.dataSource.getRepository(AppSetting).findOne({ where: { key: 'room_support_medals_config' } });
     if (!row?.value) return null;
     let config: any; try { config = JSON.parse(row.value); } catch { return null; }
     if (config?.enabled === false || config?.scope !== 'per_room') return null;
-    const medals = Array.isArray(config.medals) ? config.medals : [];
+    const medals = role === 'supporter'
+      ? (Array.isArray(config.supporterMedals) ? config.supporterMedals : [])
+      : (Array.isArray(config.receiverMedals) ? config.receiverMedals : []);
     const ordered = medals.filter((m: any) => m && m.isActive !== false && String(m.imageUrl || '').trim())
       .map((m: any, index: number) => ({ ...m, index }))
       .sort((a: any, b: any) => Number(a.threshold || 0) - Number(b.threshold || 0));
@@ -449,12 +451,12 @@ export class BadgesService {
       if (reached || current >= target) highest = cfg;
     }
     if (!highest) return null;
-    const badgeKey = `room_support:${highest.index}`;
+    const badgeKey = `room_support:${role}:${highest.index}`;
     let badge = await this.badges.findOne({ where: { category: 'room_support', achievementKey: badgeKey } });
     if (!badge) {
       badge = this.badges.create({
         name: String(highest.name || 'مدالية دعم الغرفة').trim().slice(0, 80),
-        description: `مدالية دعم الغرفة · ${String(highest.criteriaType || 'coins')}`,
+        description: `${role === 'supporter' ? 'مدالية داعم الغرفة' : 'مدالية مستلم دعم الغرفة'} · ${String(highest.criteriaType || 'coins')}`,
         imageUrl: String(highest.imageUrl || '').trim().slice(0, 512),
         category: 'room_support', awardType: 'room_support', achievementKey: badgeKey,
         isActive: true, isAnimated: false, sortOrder: Number(highest.index) || 0,
@@ -485,11 +487,11 @@ export class BadgesService {
     });
     if (newlyGranted) {
       await this.notifications.notifyUser(userId, NotificationType.SYSTEM, 'ميدالية دعم جديدة! 🏅',
-        `حصلت على ميدالية ${badge.name} لدعمك داخل الغرفة.`,
-        { kind: 'room_support_medal', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, roomId }).catch(() => undefined);
+        `حصلت على ميدالية ${badge.name} ${role === 'supporter' ? 'لدعمك' : 'لاستقبالك الدعم'} داخل الغرفة.`,
+        { kind: 'room_support_medal', role, badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, roomId }).catch(() => undefined);
     }
     return { id: badge.id, name: badge.name, imageUrl: badge.imageUrl, userId, roomId,
-      threshold: Number(highest.threshold) || 0, criteriaType: String(highest.criteriaType || 'coins'),
+      role, threshold: Number(highest.threshold) || 0, criteriaType: String(highest.criteriaType || 'coins'),
       expiresAt: expiresAt?.toISOString() || null, newlyGranted };
   }
 
