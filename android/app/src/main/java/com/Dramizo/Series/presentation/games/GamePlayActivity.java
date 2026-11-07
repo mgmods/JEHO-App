@@ -478,7 +478,7 @@ public class GamePlayActivity extends ThemedActivity {
         });
     }
 
-    /** Block leftover BaiShun/jieyou hosts — everything must hit api.adnova.bbs.tr. */
+    /** Intercept retired game hosts; game traffic must use the active JEHO origin. */
     private static boolean isExternalBaiShunHost(Uri uri) {
         if (uri == null) return false;
         String host = uri.getHost();
@@ -486,10 +486,12 @@ public class GamePlayActivity extends ThemedActivity {
         String h = host.toLowerCase(Locale.US);
         return h.endsWith("jieyou.shop")
                 || h.endsWith("sruner.com")
-                || h.endsWith("zkruner.com");
+                || h.endsWith("zkruner.com")
+                || h.endsWith("api.adnova.bbs.tr")
+                || h.endsWith("jeho-own-backend.mgs.blitz.cloud");
     }
 
-    /** Rewrite WebSocket/fetch/XHR that still target jieyou onto JEHO. */
+    /** Rewrite retired Mikoo HTTP/WebSocket endpoints to the active JEHO origin. */
     private void injectForceLocalHosts(WebView view) {
         if (view == null) return;
         String origin = com.Dramizo.Series.util.ApiOrigin.origin();
@@ -497,16 +499,12 @@ public class GamePlayActivity extends ThemedActivity {
         String js = "(function(){try{"
                 + "if(window.__jehoForceLocal)return;window.__jehoForceLocal=1;"
                 + "var LOCAL='" + origin + "',LOCAL_WS='" + wsOrigin + "';"
-                + "var BAD=/(jieyou\\.shop|sruner\\.com|zkruner\\.com)/i;"
+                + "var BAD=/(api\\.adnova\\.bbs\\.tr|jieyou\\.shop|sruner\\.com|zkruner\\.com|jeho-own-backend\\.mgs\\.blitz\\.cloud)/i;"
                 + "function rewrite(u){if(u==null)return u;var s=String(u);if(!BAD.test(s))return s;"
                 + "try{var a=document.createElement('a');a.href=s;"
                 + "var path=(a.pathname||'/')+(a.search||'')+(a.hash||'');"
                 + "return /^wss?:/i.test(s)?(LOCAL_WS+path):(LOCAL+path);"
                 + "}catch(e){return s.replace(/^https?:\\/\\/[^/]+/i,LOCAL).replace(/^wss?:\\/\\/[^/]+/i,LOCAL_WS);}}"
-                + "try{var q=new URLSearchParams(location.search||'');var dom=q.get('DOMAIN')||q.get('domain');"
-                + "if(dom&&!BAD.test(dom)){LOCAL=String(dom).replace(/\\/$/,'');"
-                + "if(/^https?:/i.test(LOCAL))LOCAL_WS=LOCAL.replace(/^https:/i,'wss:').replace(/^http:/i,'ws:');}}"
-                + "catch(e){}"
                 + "var OW=window.WebSocket;if(OW){window.WebSocket=function(u,p){u=rewrite(u);"
                 + "return p!==undefined?new OW(u,p):new OW(u);};"
                 + "window.WebSocket.prototype=OW.prototype;"
