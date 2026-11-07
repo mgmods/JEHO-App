@@ -11719,24 +11719,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean winnerMatches = sameTargetRoom
                     && winnerUserId != null && !winnerUserId.trim().isEmpty()
                     && myUserId != null && sameUser(winnerUserId, myUserId);
-            if (highWin) {
-                // This is the app-wide high-win banner: show it in every connected room.
-                // Only the sender, in the originating room, also gets the center celebration.
-                // Both placements share an event key and are deduplicated per placement.
-                GlobalCelebrationToast.show(
-                        this, who, chat, safeAvatar, badgeUrl, toastKey,
-                        28, eventMultiplier, Math.max(0L, coins), who, "lucky_hit_high", targetRoomId);
-                if (winnerMatches) {
-                    GlobalCelebrationToast.showRoomCenter(
-                            this, who, body != null && !body.trim().isEmpty() ? body : chat,
-                            safeAvatar, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
-                            who, "lucky_hit_high", targetRoomId);
-                }
-            } else if (sameTargetRoom) {
-                // Ordinary outcomes remain confined to the room where the gift was sent.
-                GlobalCelebrationToast.show(
-                        this, who, chat, safeAvatar, badgeUrl, toastKey,
-                        28, eventMultiplier, Math.max(0L, coins), who, "lucky_hit_normal", targetRoomId);
+            // Every lucky outcome gets the same top toast in every connected room.
+            // Keep the additional center toast private to the winner and only for high wins.
+            GlobalCelebrationToast.show(
+                    this, who, chat, safeAvatar, badgeUrl, toastKey,
+                    28, eventMultiplier, Math.max(0L, coins), who,
+                    highWin ? "lucky_hit_high" : (eventMultiplier > 0d && eventMultiplier < 1d
+                            ? "lucky_hit_return" : "lucky_hit_normal"), targetRoomId);
+            if (highWin && winnerMatches) {
+                GlobalCelebrationToast.showRoomCenter(
+                        this, who, body != null && !body.trim().isEmpty() ? body : chat,
+                        safeAvatar, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
+                        who, "lucky_hit_high", targetRoomId);
             }
             // Keep the room's existing chat announcement, but do not add a second visual bubble.
             if (roomBannerEnabled()) {
