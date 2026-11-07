@@ -103,15 +103,16 @@
             android:contentDescription="@null"
             android:visibility="gone" />
 
-        <!-- Room-support medal: sits above the microphone/seat and is server-authoritative. -->
+        <!-- Room-support medal: upper corner of the occupied seat/avatar, like a crown. -->
         <ImageView
             android:id="@+id/imgRoomSupportMedal"
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="-2dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="5dp"
+            android:layout_marginEnd="0dp"
             android:contentDescription="@null"
-            android:elevation="12dp"
+            android:elevation="20dp"
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
