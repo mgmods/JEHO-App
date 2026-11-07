@@ -125,6 +125,11 @@ public class CosmeticsActivity extends ThemedActivity {
         storeUserName = findViewById(R.id.tvStoreUserName);
         storeUserPublicId = findViewById(R.id.tvStoreUserPublicId);
         bindStoreUserHeader();
+        View specialIdsShortcut = findViewById(R.id.btnSpecialIdsShortcut);
+        if (specialIdsShortcut != null) {
+            specialIdsShortcut.setOnClickListener(v -> startActivity(new android.content.Intent(
+                    this, com.Dramizo.Series.presentation.profile.VanityIdsActivity.class)));
+        }
 
         findViewById(R.id.btnBack).setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         bagButton.setOnClickListener(v -> {

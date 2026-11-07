@@ -114,7 +114,14 @@ public class CosmeticsCategoryFragment extends Fragment {
         vm.getSelectedId().observe(getViewLifecycleOwner(), id -> {
             if (adapter != null) adapter.notifyDataSetChanged();
         });
-        vm.getError().observe(getViewLifecycleOwner(), e -> hideLoading());
+        vm.getError().observe(getViewLifecycleOwner(), e -> {
+            hideLoading();
+            if (binding == null || e == null || e.trim().isEmpty()) return;
+            // A failed API call must be visible instead of leaving a blank catalogue area.
+            binding.recycler.setVisibility(View.GONE);
+            binding.tvEmpty.setText("تعذر تحميل هذا القسم. " + e);
+            binding.tvEmpty.setVisibility(View.VISIBLE);
+        });
     }
 
     @Override

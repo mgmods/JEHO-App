@@ -48,7 +48,9 @@ public class CosmeticsViewModel extends ViewModel {
     private final Set<String> ownedIds = new HashSet<>();
     private final Set<String> equippedIds = new HashSet<>();
     private final Map<String, String> expiresAtById = new HashMap<>();
-    private final AtomicInteger loadSeq = new AtomicInteger();
+    // Each category owns its request sequence. ViewPager2 keeps adjacent pages alive,
+    // so a request for one tab must never cancel another tab's catalogue load.
+    private final Map<String, AtomicInteger> loadSeqByType = new java.util.concurrent.ConcurrentHashMap<>();
     private volatile String filterType;
     private volatile boolean bagMode;
     private volatile String currentRoomId;
@@ -160,7 +162,10 @@ public class CosmeticsViewModel extends ViewModel {
 
     public void loadForType(String type) {
         final String loadType = type;
-        final int seq = loadSeq.incrementAndGet();
+        final String sequenceKey = loadType == null ? "" : loadType;
+        final AtomicInteger typeSequence = loadSeqByType.computeIfAbsent(
+                sequenceKey, ignored -> new AtomicInteger());
+        final int seq = typeSequence.incrementAndGet();
         filterType = loadType;
         container.getIoExecutor().execute(() -> {
             boolean needInventory;
@@ -191,7 +196,7 @@ public class CosmeticsViewModel extends ViewModel {
             Result<List<CosmeticDtos.CosmeticDto>> cat =
                     container.getCosmeticsRepository().catalog(loadType);
             // Accept only the latest in-flight request.
-            if (seq != loadSeq.get()) return;
+            if (seq != typeSequence.get()) return;
             if (cat.success && cat.data != null) {
                 List<CosmeticDtos.CosmeticDto> items = new ArrayList<>(cat.data);
                 if (bagMode) {
