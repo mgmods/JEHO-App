@@ -700,6 +700,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     // Deliver to both participants concurrently instead of waiting for each socket
     // presence check and unread update in sequence.
     await Promise.all(peers.map(async (p) => {
+      // A fresh message restores the thread in each participant's inbox without
+      // restoring it for the other participant at the moment of deletion.
+      if (p.isDeleted) {
+        await this.partRepo.update({ id: p.id }, { isDeleted: false });
+        p.isDeleted = false;
+      }
       const viewing = p.userId !== senderId && this.realtime
         ? await this.realtime.isUserInConversation(p.userId, conversationId)
         : false;
@@ -1164,20 +1170,18 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
   async deleteForMe(conversationId: string, userId: string) {
     await this.getConversation(conversationId, userId);
-    // Delete for everyone in the conversation (both peers).
-    const peers = await this.partRepo.find({ where: { conversationId } });
+    // Hide this conversation only for the requesting participant. The other
+    // participant keeps the full thread and receives no deletion event.
     await this.partRepo.update(
-      { conversationId },
+      { conversationId, userId },
       { isDeleted: true, unreadCount: 0, isArchived: false, isPinned: false },
     );
-    const at = new Date().toISOString();
-    for (const peer of peers) {
-      this.realtime?.emitToUser(peer.userId, 'chat:conversation:deleted', {
-        conversationId,
-        byUserId: userId,
-        at,
-      });
-    }
-    return { deleted: true, forEveryone: true };
+    this.realtime?.emitToUser(userId, 'chat:conversation:deleted', {
+      conversationId,
+      byUserId: userId,
+      forMe: true,
+      at: new Date().toISOString(),
+    });
+    return { deleted: true, forEveryone: false };
   }
 }

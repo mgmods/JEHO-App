@@ -12,6 +12,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
+import androidx.appcompat.widget.PopupMenu;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.inputmethod.EditorInfo;
@@ -111,6 +113,7 @@ public class MessagesFragment extends Fragment {
             }
             startActivity(i);
         });
+        adapter.setMoreListener(this::showConversationOptions);
 
         binding.recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.recycler.setAdapter(adapter);
@@ -228,6 +231,56 @@ public class MessagesFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.load();
+    }
+
+    private void showConversationOptions(
+            com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationDto item,
+            View anchor) {
+        if (!isAdded() || item == null || item.id == null) return;
+        PopupMenu menu = new PopupMenu(requireContext(), anchor);
+        menu.getMenu().add(0, 1, 0, "حذف المحادثة");
+        menu.setOnMenuItemClickListener(selected -> {
+            if (selected.getItemId() == 1) {
+                confirmDeleteConversation(item);
+                return true;
+            }
+            return false;
+        });
+        menu.show();
+    }
+
+    private void confirmDeleteConversation(
+            com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationDto item) {
+        if (!isAdded() || item == null || item.id == null) return;
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("حذف المحادثة؟")
+                .setMessage("ستُحذف من قائمة محادثاتك أنت فقط. ستبقى الرسائل والمحادثة كما هي لدى الطرف الآخر، ولن يصله أي إشعار.")
+                .setNegativeButton("إلغاء", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("حذف المحادثة", (dialog, which) -> deleteConversationForMe(item))
+                .show();
+    }
+
+    private void deleteConversationForMe(
+            com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationDto item) {
+        if (!isAdded() || item == null || item.id == null) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            Result<Object> result = ApiCall.execute(c.getChatApi().deleteConversation(item.id));
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null) return;
+                if (result.success) {
+                    if (adapter != null) adapter.removeConversation(item.id);
+                    Toast.makeText(requireContext(), "تم حذف المحادثة من حسابك", Toast.LENGTH_SHORT).show();
+                    if (viewModel != null) viewModel.load(true);
+                } else {
+                    Toast.makeText(requireContext(),
+                            result.error != null ? result.error : "تعذّر حذف المحادثة، حاول مرة أخرى",
+                            Toast.LENGTH_LONG).show();
+                }
+                updateChatSearchEmptyState();
+            });
+        });
     }
 
     private void loadChannelBranding() {
