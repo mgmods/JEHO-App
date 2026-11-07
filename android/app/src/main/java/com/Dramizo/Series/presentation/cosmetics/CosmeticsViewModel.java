@@ -21,6 +21,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class CosmeticsViewModel extends ViewModel {
@@ -48,7 +49,7 @@ public class CosmeticsViewModel extends ViewModel {
     private final Set<String> ownedIds = new HashSet<>();
     private final Set<String> equippedIds = new HashSet<>();
     private final Map<String, String> expiresAtById = new HashMap<>();
-    private final AtomicInteger loadSeq = new AtomicInteger();
+    private final ConcurrentHashMap<String, AtomicInteger> loadSeqByType = new ConcurrentHashMap<>();
     private volatile String filterType;
     private volatile boolean bagMode;
     private volatile String currentRoomId;
@@ -160,7 +161,9 @@ public class CosmeticsViewModel extends ViewModel {
 
     public void loadForType(String type) {
         final String loadType = type;
-        final int seq = loadSeq.incrementAndGet();
+        final String typeKey = loadType == null ? "" : loadType;
+        final AtomicInteger seqCounter = loadSeqByType.computeIfAbsent(typeKey, key -> new AtomicInteger());
+        final int seq = seqCounter.incrementAndGet();
         filterType = loadType;
         container.getIoExecutor().execute(() -> {
             boolean needInventory;
@@ -191,7 +194,7 @@ public class CosmeticsViewModel extends ViewModel {
             Result<List<CosmeticDtos.CosmeticDto>> cat =
                     container.getCosmeticsRepository().catalog(loadType);
             // Accept only the latest in-flight request.
-            if (seq != loadSeq.get()) return;
+            if (seq != seqCounter.get()) return;
             if (cat.success && cat.data != null) {
                 List<CosmeticDtos.CosmeticDto> items = new ArrayList<>(cat.data);
                 if (bagMode) {
