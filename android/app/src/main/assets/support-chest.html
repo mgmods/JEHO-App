@@ -15,8 +15,18 @@ h1{font-size:18px;margin:0;font-weight:850;letter-spacing:.1px}.sub{font-size:11
 .stage{position:relative;text-align:center;margin:7px auto 0;max-width:360px;padding:0 0 2px;min-height:160px}
 .glow{position:absolute;left:50%;top:47px;transform:translateX(-50%);width:170px;height:95px;background:#ffc74b33;filter:blur(22px);border-radius:50%}
 .chest{position:relative;z-index:1;width:148px;height:148px;object-fit:contain;filter:drop-shadow(0 9px 10px #0009);animation:float 3s ease-in-out infinite}
+.chest.preblast{animation:chestPreBlast 2s cubic-bezier(.2,.7,.25,1) forwards;filter:drop-shadow(0 0 22px #ffd36a) drop-shadow(0 9px 10px #0009)}
+@keyframes chestPreBlast{0%{transform:translateY(0) scale(1) rotate(0)}18%{transform:translateY(-3px) scale(1.04) rotate(-2deg)}38%{transform:translateY(1px) scale(1.01) rotate(2deg)}58%{transform:translateY(-2px) scale(1.06) rotate(-3deg)}78%{transform:translateY(0) scale(1.10) rotate(3deg)}92%{transform:translateY(0) scale(1.15) rotate(-2deg)}100%{transform:translateY(0) scale(1.18) rotate(0)}}
 .coin{position:absolute;z-index:2;font-size:22px;filter:drop-shadow(0 2px 3px #000);animation:coin 2.6s ease-in-out infinite}.c1{left:15%;top:48px}.c2{right:15%;top:62px;animation-delay:.5s}.c3{left:24%;top:105px;animation-delay:1s}.gift{position:absolute;font-size:24px;z-index:2;animation:float 2.3s ease-in-out infinite}.g1{right:19%;top:15px}.g2{left:18%;top:18px;animation-delay:.6s}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes coin{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-8px) rotate(12deg)}}
+.level-selector{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:4px 0 10px}
+.level-tab{position:relative;border:1px solid #4b4658;background:#222333;color:#d8d8e6;padding:9px 4px;border-radius:11px;font-size:11px;font-weight:800;min-width:0}
+.level-tab.active{border-color:#e5bd5d;background:linear-gradient(135deg,#5a4526,#332c28);color:#ffe4a0;box-shadow:0 0 12px #e7bd5a33}
+.level-tab.locked{border-color:#55536a;color:#aaa9bd;background:#191a28}
+.level-tab small{display:block;font-size:9px;font-weight:600;margin-top:3px;opacity:.8}
+.locked-overlay{display:none;position:absolute;z-index:4;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:5px;background:#090a13a8;border-radius:18px;color:#ffe5a1;font-weight:900;font-size:17px;backdrop-filter:blur(2px)}
+.locked-overlay.show{display:flex}.stage.preview-locked .chest{filter:grayscale(.55) brightness(.65)}.locked-preview .giftcard{position:relative;opacity:.78;filter:saturate(.65)}
+.locked-preview .giftcard:after{content:"🔒";position:absolute;top:4px;right:4px;font-size:12px;background:#10111ccc;border:1px solid #82734d;border-radius:99px;padding:2px 4px;}
 .levelrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:-2px}.level{font-size:13px;font-weight:800;color:#ffe4a0}.tag{font-size:10px;color:#a6f5ff;border:1px solid #367f88;background:#123039;padding:4px 8px;border-radius:99px}
 .modes{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0}
 .mode{border:1px solid #444456;background:#222333;color:#d8d8e6;padding:8px 4px;border-radius:11px;font-size:12px;font-weight:700}.mode.active{border-color:#d6ad50;background:linear-gradient(135deg,#5a4526,#332c28);color:#ffe4a0}
@@ -26,40 +36,200 @@ h1{font-size:18px;margin:0;font-weight:850;letter-spacing:.1px}.sub{font-size:11
 .fill{height:100%;width:65%;border-radius:99px;background:linear-gradient(90deg,#31c6da,#7af4f2 48%,#ffd05d);box-shadow:0 0 12px #6be6ef88;transition:width .45s ease}
 .details{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted)}.details b{color:#f9dc92}
 .sectiontitle{display:flex;align-items:center;justify-content:space-between;margin:14px 1px 8px;font-size:14px;font-weight:850}.hint{font-size:10px;color:#aaaabd;font-weight:500}
-.gifts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.gifts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.feature-list{display:flex;flex-wrap:wrap;gap:7px}.feature-chip{border:1px solid #62558a;background:#29243d;color:#e6ddff;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:750}
 .giftcard{min-width:0;text-align:center;border:1px solid #343449;background:linear-gradient(160deg,#28293b,#1b1c2a);border-radius:12px;padding:7px 3px 8px}
-.giftcard img{width:43px;height:43px;object-fit:contain;filter:drop-shadow(0 2px 3px #0007)}.giftname{font-size:10px;color:#e9e8f3;margin-top:2px;white-space:nowrap}.value{font-size:10px;color:#ffdf84;margin-top:4px;font-weight:800}
+.giftcard img,.giftcard video{width:43px;height:43px;object-fit:contain;filter:drop-shadow(0 2px 3px #0007)}.giftname{font-size:10px;color:#e9e8f3;margin-top:2px;white-space:nowrap}.value{font-size:10px;color:#ffdf84;margin-top:4px;font-weight:800}
 .footnote{margin:12px 0 0;font-size:10px;line-height:1.7;color:#a9a8bb;text-align:center}
 .help{display:none;position:absolute;inset:0;z-index:10;background:#0e0f19ed;padding:17px 16px 20px;overflow:auto}.help.open{display:block}.helptop{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.helptop h2{margin:0;font-size:17px}.help ol{padding-right:20px;margin:0}.help li{font-size:13px;line-height:1.8;color:#e4e3ef;margin:8px 0}.help .small{font-size:11px;color:#aaaabd;margin-top:12px}
 @media(max-height:650px){.stage{min-height:133px}.chest{width:124px;height:124px}.coin{font-size:18px}.gifts{gap:5px}.giftcard img{width:36px;height:36px}}
+ .burst-particles{position:absolute;inset:0;overflow:hidden;pointer-events:none}.burst-particle{position:absolute;left:50%;top:50%;font-size:25px;animation:particleFly 1.35s ease-out forwards;--dx:0px;--dy:0px}@keyframes particleFly{0%{transform:translate(-50%,-50%) scale(.25);opacity:1}100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(300deg) scale(.9);opacity:0}}
+.explosion-overlay{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at center,#ffe18c66 0,#17111eef 72%);opacity:0;pointer-events:none}
+.explosion-overlay.custom-effect{background:transparent}
+.custom-blast-media{display:block;position:absolute;z-index:1;left:var(--blast-start-x,50%);top:var(--blast-start-y,46%);width:5%;height:5%;max-width:none;max-height:none;object-fit:cover;object-position:center;background:transparent;transform:translate(-50%,-50%) scale(.15);opacity:0;pointer-events:none}
+.explosion-overlay.show .custom-blast-media{animation:customBlastExpand var(--blast-duration,1800ms) cubic-bezier(.12,.8,.2,1) forwards}
+@keyframes customBlastExpand{0%{left:var(--blast-start-x,50%);top:var(--blast-start-y,46%);width:5%;height:5%;transform:translate(-50%,-50%) scale(.15);opacity:0}12%{opacity:var(--blast-opacity,1)}100%{left:var(--blast-end-x,50%);top:var(--blast-end-y,50%);width:var(--blast-width,100%);height:var(--blast-height,100%);transform:translate(-50%,-50%) scale(1);opacity:var(--blast-opacity,1)}}
+.explosion-overlay.custom-effect .blast-core{display:none}.explosion-overlay.custom-effect .burst-particles{display:none}
+body.blast-only,body.blast-only html{background:transparent!important;overflow:hidden}
+body.blast-only .sheet{position:fixed;inset:0;min-height:0;padding:0;border:0;border-radius:0;background:transparent;overflow:visible}
+body.blast-only .sheet > :not(#explosionOverlay){display:none!important}
+body.blast-only .explosion-overlay{position:fixed;inset:0}
+
+.explosion-overlay.show{animation:blastFade 3.4s ease forwards}.explosion-overlay.custom-effect.show{animation:none;opacity:1}.blast-core{position:relative;width:min(78vw,280px);text-align:center;animation:chestBlast .8s cubic-bezier(.12,.8,.2,1) both}.blast-core:before,.blast-core:after{content:"";position:absolute;inset:-20px;border:3px solid #ffe18c;border-radius:50%;animation:ringBurst 1s ease-out both}.blast-core:after{animation-delay:.18s;border-color:#ff8b55}.blast-icon{font-size:76px;filter:drop-shadow(0 0 22px #ffd45a);animation:iconPop .7s cubic-bezier(.2,1.5,.3,1) both}.blast-title{font-size:21px;font-weight:950;color:#ffe7a4;margin:8px 0}.blast-winner{font-size:14px;color:#fff}.blast-prize{margin:16px auto 0;padding:12px;border:1px solid #e9c66c;background:#332a25;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:10px;max-width:260px}.blast-prize img{width:58px;height:58px;object-fit:contain}.blast-prize strong{display:block;font-size:14px}.blast-prize small{display:block;color:#ffdf92;font-size:11px;margin-top:3px}@keyframes chestBlast{0%{transform:scale(.15) rotate(-18deg);opacity:0}55%{transform:scale(1.16) rotate(5deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}@keyframes ringBurst{0%{transform:scale(.1);opacity:1}100%{transform:scale(2.2);opacity:0}}@keyframes iconPop{0%{transform:scale(.2) rotate(-20deg)}70%{transform:scale(1.25) rotate(8deg)}100%{transform:scale(1) rotate(0)}}@keyframes blastFade{0%,72%{opacity:1}100%{opacity:0}}
 </style>
 </head>
 <body>
 <main class="sheet">
 <div class="grabber"></div>
 <header><div><h1>🎁 صندوق الدعم</h1><div class="sub">كل هدية تقرّب الروم من فتح الكنز</div></div><div class="actions"><button class="round" id="helpBtn" aria-label="التعليمات">؟</button><button class="round" id="closeHelp" aria-label="إغلاق التعليمات" style="display:none">×</button></div></header>
-<section class="stage" aria-label="صندوق كنز"><div class="glow"></div><span class="coin c1">🪙</span><span class="coin c2">🪙</span><span class="coin c3">✨</span><span class="gift g1">🎁</span><span class="gift g2">💎</span><img class="chest" src="file:///android_asset/visual-system/gifts/assets/gift-treasure-chest.png" alt="صندوق كنز"></section>
+<section class="stage" aria-label="صندوق كنز"><div class="glow"></div><span class="coin c1">🪙</span><span class="coin c2">🪙</span><span class="coin c3">✨</span><span class="gift g1">🎁</span><span class="gift g2">💎</span><img class="chest" src="file:///android_asset/visual-system/gifts/assets/gift-treasure-chest.png" alt="صندوق كنز"><div class="locked-overlay" id="lockedOverlay">🔒<span>هذا المستوى مقفول</span></div></section>
+<div class="level-selector" id="levelSelector" aria-label="مستويات صندوق الدعم"></div>
 <div class="levelrow"><div class="level">المستوى <span id="level">1</span> · صندوق الروم</div><div class="tag">هدف الدعم</div></div>
-<div class="modes"><button class="mode active" data-mode="coins">🪙 كوينزات</button><button class="mode" data-mode="diamonds">💎 ماسات</button><button class="mode" data-mode="both">🪙 + 💎 الاثنين</button></div>
-<section class="stats"><div class="stathead"><strong id="metricTitle">تقدّم الكوينزات</strong><span class="percent" id="percent">0%</span></div><div class="track"><div class="fill" id="fill" style="width:0%"></div></div><div class="details"><span>المجموع: <b id="current">0</b></span><span>الهدف: <b id="target">—</b></span><span>المتبقي: <b id="remaining">—</b></span></div></section>
-<div class="sectiontitle"><span>الهدايا التي تساهم بالصندوق</span><span class="hint">قيمة المساهمة</span></div>
-<section class="gifts">
-<div class="giftcard"><img src="file:///android_asset/visual-system/gifts/assets/gift-rose.png" alt=""><div class="giftname">وردة</div><div class="value">—</div></div>
-<div class="giftcard"><img src="file:///android_asset/visual-system/gifts/assets/gift-heart.png" alt=""><div class="giftname">قلب</div><div class="value">—</div></div>
-<div class="giftcard"><img src="file:///android_asset/visual-system/gifts/assets/gift-crown.png" alt=""><div class="giftname">تاج</div><div class="value">—</div></div>
-<div class="giftcard"><img src="file:///android_asset/visual-system/gifts/assets/gift-diamond.png" alt=""><div class="giftname">ماسة</div><div class="value">—</div></div>
-</section>
+<div class="modes" id="goalModes"><button class="mode active" data-mode="coins">🪙 كوينزات</button><button class="mode" data-mode="diamonds">💎 ماسات</button></div>
+<section class="stats"><div class="stathead"><strong id="metricTitle">تقدّم الكوينزات</strong><span class="percent" id="percent">0%</span></div><div class="track"><div class="fill" id="fill" style="width:0%"></div></div><div class="details"><span>المجموع: <b id="current">0</b></span><span>الهدف: <b id="target">—</b></span><span>المتبقي: <b id="remaining">—</b></span><span>الهدايا: <b id="giftCountProgress">0 / 1</b></span></div></section>
+<div class="sectiontitle"><span>مميزات هذا المستوى</span><span class="hint">مزايا المستوى الحالي</span></div>
+<section class="feature-list" id="levelFeatures"><div class="feature-chip">تظهر المميزات المحددة من لوحة الإدارة</div></section>
+<div class="sectiontitle"><span>🎁 جوائز مفجّر الصندوق</span><span class="hint" id="rewardCount">0 مكافأة</span></div>
+<section class="gifts" id="rewardPreviews"><div class="giftcard"><div class="giftname">تظهر الجوائز المحددة من الداشبورد</div></div></section>
 <p class="footnote" id="connectionStatus">بانتظار بيانات الصندوق الحقيقية من الخادم. لا توجد مساهمات معروضة حالياً.</p>
+<div class="explosion-overlay" id="explosionOverlay" aria-live="polite"><div class="burst-particles" id="burstParticles"></div><img class="custom-blast-media" id="customBlastMedia" alt="" aria-hidden="true"><div class="blast-core"><div class="blast-icon">💥🎁</div><div class="blast-title">انفجار صندوق الدعم!</div><div class="blast-winner" id="blastWinner"></div><div class="blast-prize" id="blastPrize"></div></div></div>
 <section class="help" id="helpPanel"><div class="helptop"><h2>❔ تعليمات صندوق الدعم</h2><button class="round" id="helpClose" aria-label="إغلاق">×</button></div><ol><li>اختاروا نوع الهدف: كوينزات أو ماسات أو الاثنين معاً.</li><li>كل هدية مؤهلة تضيف قيمتها إلى تقدّم الصندوق، ويتحرك خط التقدّم مع كل مساهمة.</li><li>يعرض الخط المجموع الحالي والهدف والمتبقي حتى يعرف الجميع كم بقي.</li><li>عند اكتمال الهدف، يُفتح الصندوق وتُعرض المكافأة والفائز وفق قواعد الروم المعتمدة.</li><li>بعد منح المكافأة بنجاح، يبدأ الصندوق دورة جديدة.</li></ol><p class="small" id="helpInstructions">تعتمد قواعد الصندوق ومكافآته على إعدادات الداشبورد. لا تُمنح مكافأة قبل تأكيد الخادم نجاح منحها.</p></section>
 </main>
 <script>
 const modes=document.querySelectorAll('.mode'),fill=document.getElementById('fill'),percent=document.getElementById('percent'),title=document.getElementById('metricTitle'),current=document.getElementById('current'),target=document.getElementById('target'),remaining=document.getElementById('remaining');
-let liveConfig=null, liveState=null, selectedMode='coins';
+let liveConfig=null,liveState=null,selectedMode='coins',selectedLevelIndex=0,currentLevelIndex=0,activePreviewLevel=null,chestBlastTimer=null;
 function formatNum(n){return Math.max(0,Number(n)||0).toLocaleString('en-US')}
-function setMode(key){selectedMode=key;modes.forEach(b=>b.classList.toggle('active',b.dataset.mode===key));const cfg=liveConfig||{},st=liveState||{};const isBoth=key==='both';const goal=key==='diamonds'?'diamonds':'coins';const now=Number(goal==='diamonds'?st.diamonds:st.coins)||0;const max=Number(goal==='diamonds'?cfg.diamondTarget:cfg.coinTarget)||0;const p=max>0?Math.min(100,Math.round(now/max*100)):0;title.textContent=key==='coins'?'تقدّم الكوينزات':key==='diamonds'?'تقدّم الماسات':'تحقّق الهدفين معاً';percent.textContent=isBoth?'🪙 '+(cfg.coinTarget?Math.min(100,Math.round((Number(st.coins)||0)/cfg.coinTarget*100)):0)+'% · 💎 '+(cfg.diamondTarget?Math.min(100,Math.round((Number(st.diamonds)||0)/cfg.diamondTarget*100)):0)+'%':p+'%';fill.style.width=p+'%';current.textContent=isBoth?formatNum(st.coins)+' / '+formatNum(st.diamonds):formatNum(now);target.textContent=isBoth?formatNum(cfg.coinTarget)+' / '+formatNum(cfg.diamondTarget):formatNum(max);remaining.textContent=isBoth?formatNum(Math.max(0,(Number(cfg.coinTarget)||0)-(Number(st.coins)||0)))+' / '+formatNum(Math.max(0,(Number(cfg.diamondTarget)||0)-(Number(st.diamonds)||0))):formatNum(Math.max(0,max-now));document.getElementById('level').textContent=String(Math.max(1,Number(st.level)||1));}
-function applyLiveData(config,state){liveConfig=config||{};liveState=state||{};if(['coins','diamonds','both'].includes(liveConfig.goalMode)){selectedMode=liveConfig.goalMode;}document.getElementById('connectionStatus').textContent=liveConfig.enabled?'تم الاتصال بالخادم · التقدم محدث تلقائياً كل 15 ثانية.':'صندوق الدعم غير مفعّل حالياً من الداشبورد.';document.getElementById('helpInstructions').textContent=String(liveConfig.instructions||'تعتمد قواعد الصندوق ومكافآته على إعدادات الداشبورد.');const reward=Number(liveState.lastRewardAmount)||0;const rewardType=String(liveState.lastRewardType||'');if(reward>0&&['coins','diamonds'].includes(rewardType)){document.getElementById('connectionStatus').textContent+=' آخر مكافأة: '+formatNum(reward)+' '+(rewardType==='coins'?'كوينزات':'ماسات')+'.';}setMode(selectedMode);}
+function escHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function setMode(key){
+ selectedMode=key;modes.forEach(b=>b.classList.toggle('active',b.dataset.mode===key));
+ const cfg=liveConfig||{},lv=activePreviewLevel||cfg.currentLevel||{},locked=selectedLevelIndex>currentLevelIndex,done=selectedLevelIndex<currentLevelIndex;
+ const st=locked?{}:(liveState||{}),mode=lv.goalMode||cfg.goalMode||'coins';
+ const coinMax=Number(lv.coinTarget??cfg.coinTarget)||0,diamondMax=Number(lv.diamondTarget??cfg.diamondTarget)||0,countMax=Math.max(1,Number(lv.giftCount)||1);
+ // Completed levels are previews of a finished stage, not the current room's new progress.
+ const coinNow=done?coinMax:(Number(st.coins)||0),diamondNow=done?diamondMax:(Number(st.diamonds)||0),countNow=done?countMax:(Number(st.giftCount)||0);
+ let p=0;
+ if(mode==='both'){
+  const cp=coinMax>0?coinNow/coinMax*100:100,dp=diamondMax>0?diamondNow/diamondMax*100:100;
+  p=locked?0:Math.min(100,Math.round(Math.min(cp,dp,countNow/countMax*100)));
+  title.textContent=locked?'🔒 مستوى مقفول · الكوينزات والماسات':'تقدّم الكوينزات والماسات';
+  current.textContent=formatNum(coinNow)+' / '+formatNum(diamondNow);
+  target.textContent=formatNum(coinMax)+' / '+formatNum(diamondMax);
+  remaining.textContent=formatNum(Math.max(0,coinMax-coinNow))+' / '+formatNum(Math.max(0,diamondMax-diamondNow));
+ }else{
+  const isDiamond=mode==='diamonds',now=isDiamond?diamondNow:coinNow,max=isDiamond?diamondMax:coinMax;
+  p=locked?0:(max>0?Math.min(100,Math.round(now/max*100)):0);
+  if(!locked)p=Math.min(p,Math.round(Math.min(100,countNow/countMax*100)));
+  title.textContent=locked?'🔒 مستوى مقفول · '+(isDiamond?'الماسات':'الكوينزات'):(isDiamond?'تقدّم الماسات':'تقدّم الكوينزات');
+  current.textContent=formatNum(now);target.textContent=formatNum(max);remaining.textContent=formatNum(Math.max(0,max-now));
+ }
+ percent.textContent=p+'%';fill.style.width=p+'%';
+ document.getElementById('giftCountProgress').textContent=formatNum(countNow)+' / '+formatNum(countMax);
+ document.querySelector('.level').innerHTML='المستوى '+(selectedLevelIndex+1)+' · '+escHtml(lv.title||'صندوق الدعم')+(locked?' · 🔒 مقفول':(selectedLevelIndex<currentLevelIndex?' · مكتمل':' · الحالي'));
+}
+function setChestArt(url){
+ const fallback='file:///android_asset/visual-system/gifts/assets/gift-treasure-chest.png',source=String(url||fallback),wantsVideo=/\.(mp4|webm)(\?|$)/i.test(source);
+ let node=document.querySelector('.chest');
+ if(wantsVideo&&node.tagName!=='VIDEO'){const video=document.createElement('video');video.className='chest';video.autoplay=true;video.loop=true;video.muted=true;video.playsInline=true;video.setAttribute('playsinline','');video.setAttribute('muted','');video.setAttribute('autoplay','');video.setAttribute('loop','');node.replaceWith(video);node=video;}
+ else if(!wantsVideo&&node.tagName!=='IMG'){const image=document.createElement('img');image.className='chest';image.alt='صندوق الدعم';node.replaceWith(image);node=image;}
+ node.src=source;
+}
+function renderLevelFeatures(items){const root=document.getElementById('levelFeatures'),rows=Array.isArray(items)?items.map(x=>String(x||'').trim()).filter(Boolean):[];root.innerHTML=rows.length?rows.map(x=>'<span class="feature-chip">'+escHtml(x)+'</span>').join(''):'<span class="feature-chip">لا توجد مميزات إضافية محددة لهذا المستوى</span>';}
+function resolveChestMedia(value){
+ const raw=String(value||'').trim();if(!raw)return '';
+ if(/^(data|blob|file|content):/i.test(raw))return raw;
+ const base=String(liveConfig?.assetBaseUrl||'').replace(/\/$/,'');
+ if(/^https?:\/\//i.test(raw)){
+  try{const u=new URL(raw);const normalized=u.pathname.replace(/^\/api\/v\d+(?=\/uploads\/)/i,'');if(/^\/uploads\//i.test(normalized)&&base)return base+normalized+u.search+u.hash;return raw;}catch(e){return raw;}
+ }
+ const normalized=raw.replace(/^\/?api\/v\d+(?=\/uploads\/)/i,'');
+ if(normalized.startsWith('/'))return base?base+normalized:normalized;
+ if(/^(assets|uploads)\//i.test(normalized))return base?base+'/'+normalized:normalized;
+ return raw;
+}
+function rewardMedia(r){
+ const item=r?.item||r?.catalogItem||r?.rewardItem||{};
+ const candidates=[r?.imageUrl,r?.iconUrl,r?.previewUrl,r?.thumbnailUrl,r?.badgeUrl,r?.frameImageUrl,r?.animationUrl,r?.assetUrl,r?.url,r?.image,item?.iconUrl,item?.previewUrl,item?.imageUrl,item?.badgeUrl,item?.animationUrl,item?.assetUrl,item?.url];
+ return resolveChestMedia(candidates.find(v=>typeof v==='string'&&v.trim())||'');
+}
+function renderRewardCards(items){const root=document.getElementById('rewardPreviews'),rows=Array.isArray(items)?items:[];document.getElementById('rewardCount').textContent=rows.length+' مكافآت';root.innerHTML=rows.length?rows.map(r=>{const image=rewardMedia(r);const video=/\.(mp4|webm)(\?|$)/i.test(image);const fallback=(r.type==='coins'?'🪙':r.type==='diamonds'?'💎':r.type==='vip'?'👑':r.type==='frame'?'🖼️':r.type==='badge'?'🏅':'🎁');const visual=image?(video?'<video src="'+escHtml(image)+'" muted autoplay loop playsinline></video>':'<img src="'+escHtml(image)+'" alt="" loading="lazy" onerror="this.outerHTML=\'<span style=&quot;font-size:34px&quot;>'+fallback+'</span>\'">'):'<div style="font-size:34px">'+fallback+'</div>';return '<div class="giftcard">'+visual+'<div class="giftname">'+escHtml(r.name||r.type||'مكافأة')+'</div><div class="value">'+escHtml(r.type==='vip'?'VIP · '+(r.amount||1)+' يوم':(['coins','diamonds'].includes(r.type)?formatNum(r.amount)+' '+(r.type==='coins'?'كوينز':'ماسات'):'× '+(r.amount||1)))+'</div></div>';}).join(''):'<div class="giftcard"><div class="giftname">لم يحدد الأدمن مكافآت لهذا المستوى</div></div>';}
+function renderLevelTabs(levels){
+ const root=document.getElementById('levelSelector'),rows=Array.isArray(levels)?levels.slice(0,3):[];
+ root.innerHTML=rows.map((lv,i)=>{const locked=i>currentLevelIndex,done=i<currentLevelIndex;return '<button type="button" class="level-tab '+(i===selectedLevelIndex?'active ':'')+(locked?'locked':'')+'" data-level="'+i+'">'+(locked?'🔒 ':done?'✓ ':'🎁 ')+escHtml(lv.title||('المستوى '+(i+1)))+'<small>'+(locked?'مقفل':done?'مكتمل':'المستوى الحالي')+'</small></button>';}).join('');
+ root.querySelectorAll('[data-level]').forEach(btn=>btn.addEventListener('click',()=>selectLevel(Number(btn.dataset.level))));
+}
+function selectLevel(index){
+ const levels=Array.isArray(liveConfig?.levels)?liveConfig.levels:[],lv=levels[index];if(!lv)return;
+ selectedLevelIndex=Math.max(0,Math.min(2,index));activePreviewLevel=lv;
+ renderLevelTabs(levels);
+ const locked=selectedLevelIndex>currentLevelIndex;
+ const stage=document.querySelector('.stage');stage.classList.toggle('preview-locked',locked);
+ document.getElementById('lockedOverlay').classList.toggle('show',locked);
+ document.getElementById('rewardPreviews').classList.toggle('locked-preview',locked);
+ document.querySelector('h1').textContent='🎁 '+String(lv.title||'صندوق الدعم');
+ renderLevelFeatures(lv.features||[]);
+ renderRewardCards(lv.rewards||[]);
+ setChestArt(lv.imageUrl);
+ const mode=lv.goalMode||'coins';selectedMode=mode==='diamonds'?'diamonds':'coins';
+ setMode(selectedMode);
+ document.getElementById('connectionStatus').textContent=locked?'هذا المستوى مقفول حالياً. تظهر هنا معاينة الهدايا والمكافآت التي حددها المسؤول.':'تعتمد الهدايا والمكافآت واسم الصندوق على إعدادات لوحة الإدارة.';
+}
+function configureCustomBlast(effect,allowSound=true){
+ const overlay=document.getElementById('explosionOverlay');
+ const raw=effect&&typeof effect==='object'?effect:{};
+ let node=document.getElementById('customBlastMedia');
+ const url=resolveChestMedia(raw.mediaUrl||'');
+ let audio=document.getElementById('customBlastAudio');
+ const soundUrl=allowSound?resolveChestMedia(raw.soundUrl||''):'';
+ if(!raw.enabled||!url){overlay.classList.remove('custom-effect');if(node)node.remove();if(audio)audio.remove();return;}
+ if(soundUrl){
+  if(!audio){audio=document.createElement('audio');audio.id='customBlastAudio';overlay.appendChild(audio);}
+  audio.src=soundUrl;audio.preload='auto';
+ }else if(audio){audio.remove();audio=null;}
+ const mediaKind=String(raw.mediaType||raw.mimeType||raw.type||'').toLowerCase();
+ const video=/\.(mp4|webm|m4v)(?:[?#]|$)/i.test(url)||/^video\//i.test(mediaKind)||/^(video|mp4|webm|m4v)$/i.test(mediaKind);
+ if(!node||((video&&node.tagName!=='VIDEO')||(!video&&node.tagName!=='IMG'))){
+  const next=document.createElement(video?'video':'img');next.id='customBlastMedia';next.className='custom-blast-media';
+  if(video){next.muted=!allowSound||!!soundUrl;next.autoplay=false;next.loop=false;next.playsInline=true;next.setAttribute('playsinline','');next.setAttribute('webkit-playsinline','');next.setAttribute('preload','auto');}
+  node?.replaceWith(next);if(!node)overlay.insertBefore(next,overlay.querySelector('.blast-core'));
+  node=next;
+ }
+ node.src=url;
+ if(video){node.muted=!allowSound||!!soundUrl;node.loop=false;node.autoplay=false;node.playsInline=true;node.setAttribute('playsinline','');node.setAttribute('webkit-playsinline','');node.preload='auto';node.controls=false;node.onerror=()=>{console.warn('Support chest video could not be decoded or loaded',node.currentSrc||node.src,node.error&&node.error.code);overlay.classList.remove('custom-effect');};node.load();}
+ const number=(v,d,min,max)=>Math.max(min,Math.min(max,Number.isFinite(Number(v))?Number(v):d));
+ const set=(key,value)=>node.style.setProperty(key,value);
+ set('--blast-start-x',number(raw.startX,50,0,100)+'%');
+ set('--blast-start-y',number(raw.startY,46,0,100)+'%');
+ set('--blast-end-x',number(raw.endX,50,0,100)+'%');
+ set('--blast-end-y',number(raw.endY,50,0,100)+'%');
+ set('--blast-width',number(raw.width,100,10,180)+'%');
+ set('--blast-height',number(raw.height,100,10,180)+'%');
+ set('--blast-duration',number(raw.durationMs,1800,400,8000)+'ms');
+ set('--blast-opacity',String(number(raw.opacity,100,10,100)/100));
+ overlay.classList.add('custom-effect');
+}
+function applyLiveData(config,state){
+ liveConfig=config||{};liveState=state||{};configureCustomBlast(liveConfig.explosionEffect,liveConfig.soundEnabled!==false);
+ const visible=liveConfig.enabled===true&&liveConfig.iconVisible!==false;
+ document.querySelector('.sheet').style.display=visible?'':'none';if(!visible)return;
+ currentLevelIndex=Math.max(0,Math.min(2,Number(liveState.level||1)-1));
+ const levels=Array.isArray(liveConfig.levels)?liveConfig.levels:[];
+ if(!levels.length&&liveConfig.currentLevel)levels.push(liveConfig.currentLevel);
+ renderLevelTabs(levels);selectLevel(currentLevelIndex);
+ document.getElementById('goalModes').style.display='none';
+ document.getElementById('helpInstructions').textContent=String(liveConfig.instructions||'تعتمد قواعد الصندوق ومكافآته على إعدادات الداشبورد.');
+}
 modes.forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
 window.applySupportChestData=applyLiveData;
+window.setSupportChestBlastOnly=function(enabled){document.body.classList.toggle('blast-only',!!enabled);};
+window.applySupportChestWin=function(win){
+ try{
+  const overlay=document.getElementById('explosionOverlay'),winner=String(win?.winnerName||'أحد الداعمين'),rewards=Array.isArray(win?.rewards)?win.rewards:[];
+  const chest=document.querySelector('.chest');
+  if(chest){chest.classList.remove('preblast');void chest.offsetWidth;chest.classList.add('preblast');}
+  document.getElementById('blastWinner').textContent=winner+' فجّر '+String(win?.levelTitle||('المستوى '+(win?.level||'')));
+  document.getElementById('blastPrize').innerHTML=rewards.map(reward=>{const image=rewardMedia(reward);const visual=image?'<img src="'+escHtml(image)+'" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'🎁\',style:\'font-size:36px\'}))">':'<span style="font-size:36px">🎁</span>';return '<div>'+visual+'<strong>'+escHtml(reward?.name||reward?.type||'مكافأة')+'</strong><small>'+escHtml(reward?.type==='vip'?'VIP':reward?.type==='coins'?'كوينزات':reward?.type==='diamonds'?'ماسات':'مكافأة')+' × '+escHtml(reward?.amount||1)+'</small></div>';}).join('')||'🎁 تم فتح الصندوق';
+  const burst=document.getElementById('burstParticles');burst.innerHTML='';
+  const particles=['🎁','🪙','💎','✨','🌟','🪙','💎','🎁','✨','🪙','💎','🌟','🎁','🪙','💎','✨','🎁','🪙','💎','✨','🌟','🎁','🪙','💎'];
+  particles.forEach((symbol,index)=>{const node=document.createElement('span');node.className='burst-particle';node.textContent=symbol;const angle=(Math.PI*2*index)/particles.length;const distance=90+(index%4)*24;node.style.setProperty('--dx',Math.round(Math.cos(angle)*distance)+'px');node.style.setProperty('--dy',Math.round(Math.sin(angle)*distance)+'px');node.style.animationDelay=(index%4)*35+'ms';burst.appendChild(node);});
+  clearTimeout(chestBlastTimer);
+  overlay.classList.remove('show');
+  const customMedia=document.getElementById('customBlastMedia');if(customMedia){customMedia.style.animation='none';void customMedia.offsetWidth;customMedia.style.animation='';}
+   const scheduledAt=Number(win?.playAtServerMs||win?.scheduledAtMs||0);
+   const fallbackDelay=Math.max(0,Number(win?.delayMs)||2000);
+   const startDelay=scheduledAt>0?Math.max(0,scheduledAt-Date.now()):fallbackDelay;
+   chestBlastTimer=setTimeout(()=>{
+    if(chest)chest.classList.remove('preblast');
+    void overlay.offsetWidth;overlay.classList.add('show');
+    const media=document.getElementById('customBlastMedia'),audio=document.getElementById('customBlastAudio');
+    if(media&&media.tagName==='VIDEO'&&overlay.classList.contains('custom-effect')){try{const startVideo=()=>{try{media.currentTime=0;}catch(e){}const playback=media.play();if(playback&&playback.catch)playback.catch(error=>console.warn('Support chest video playback was blocked',error));};if(media.readyState>=2)startVideo();else media.addEventListener('canplay',startVideo,{once:true});}catch(e){console.warn('Support chest video playback failed',e);}}
+    if(audio&&overlay.classList.contains('custom-effect')){try{audio.currentTime=0;audio.play().catch(()=>{});}catch(e){}}
+    const isVideo=!!(media&&media.tagName==='VIDEO');
+    const videoDuration=isVideo&&Number.isFinite(media.duration)?media.duration*1000+250:0;
+    const visibleFor=Math.max(isVideo?12000:3600,Number(liveConfig?.explosionEffect?.durationMs)||0,videoDuration);
+    if(isVideo){media.addEventListener('ended',()=>{overlay.classList.remove('show');try{media.pause();if(audio){audio.pause();audio.currentTime=0;}}catch(e){}},{once:true});}
+    setTimeout(()=>{overlay.classList.remove('show');try{if(media&&media.tagName==='VIDEO')media.pause();if(audio){audio.pause();audio.currentTime=0;}}catch(e){}},visibleFor);
+   },startDelay);
+ }catch(e){console.warn('Support chest celebration failed',e);}
+};
 const help=document.getElementById('helpPanel'),helpBtn=document.getElementById('helpBtn'),closeTop=document.getElementById('closeHelp'),closeHelp=document.getElementById('helpClose');
 function hideHelp(){help.classList.remove('open');helpBtn.style.display='grid';closeTop.style.display='none'}
 helpBtn.addEventListener('click',()=>{help.classList.add('open');helpBtn.style.display='none';closeTop.style.display='grid'});closeTop.addEventListener('click',hideHelp);closeHelp.addEventListener('click',hideHelp);
