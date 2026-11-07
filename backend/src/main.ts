@@ -146,7 +146,7 @@ async function bootstrap() {
   // scripts execute. Several packaged HTML files had a broken relative path
   // (../jeho-force-local.js), which silently left games connecting to retired hosts.
   const forceLocalTag =
-    '<script src="/games/mikoo/_jeho/jeho-force-local.js"></script>';
+    '<script src="/games/mikoo/jeho-force-local.js"></script>';
   expressAppEarly.use((req: { method?: string; path?: string; url?: string }, res: {
     setHeader: (k: string, v: string) => void;
     status: (n: number) => { end: (b: string) => void };
