@@ -1,7 +1,6 @@
 package com.Dramizo.Series.util;
 
 import android.app.Activity;
-import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.graphics.drawable.GradientDrawable;
@@ -40,25 +39,15 @@ import retrofit2.Response;
 public final class GlobalCelebrationToast {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static WeakReference<View> current = new WeakReference<>(null);
-    private static WeakReference<View> currentCenter = new WeakReference<>(null);
     private static Runnable hideRunnable;
-    private static Runnable hideRunnableCenter;
     private static String lastDedupeKey;
     private static long lastShownAt;
-    /** Bit 0 = top placement shown; bit 1 = center placement shown for this event. */
-    private static int lastDedupePlacementMask;
     private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
-    private static final ArrayDeque<ToastRequest> PENDING_CENTER = new ArrayDeque<>();
     private static boolean showing;
-    private static boolean showingCenter;
     private static volatile String remoteBackgroundUrl = "";
     private static volatile String remoteLuckyNormalBackgroundUrl = "";
     private static volatile String remoteLuckyReturnBackgroundUrl = "";
-    private static volatile String remoteLuckyRoomHighBackgroundUrl = "";
     private static volatile String remoteLuckyHighBackgroundUrl = "";
-    // Dashboard-controlled public announcement thresholds. Zero disables that criterion.
-    private static volatile double remoteHighWinMinMultiplier = 10d;
-    private static volatile long remoteHighWinMinCoins = 1000L;
     private static volatile boolean remoteShineEnabled = true;
     private static volatile boolean remoteFrameGlowEnabled = true;
     private static volatile boolean remoteLuckyNormalShineEnabled = true;
@@ -66,12 +55,10 @@ public final class GlobalCelebrationToast {
     private static volatile boolean remoteLuckyHighShineEnabled = true;
     private static volatile boolean remoteLuckyNormalGlowEnabled = true;
     private static volatile boolean remoteLuckyReturnGlowEnabled = true;
-    private static volatile boolean remoteLuckyRoomHighShineEnabled = true, remoteLuckyRoomHighGlowEnabled = true;
     private static volatile boolean remoteLuckyHighGlowEnabled = true;
     private static volatile int remoteDurationSeconds = 3;
     private static volatile int remoteLuckyNormalDurationSeconds = 4;
     private static volatile int remoteLuckyReturnDurationSeconds = 3;
-    private static volatile int remoteLuckyRoomHighDurationSeconds = 5;
     private static volatile int remoteLuckyHighDurationSeconds = 5;
     private static volatile float remoteGiftAvatarX = 8f, remoteGiftAvatarY = 50f, remoteGiftTextX = 25f, remoteGiftTextY = 50f;
     private static volatile float remoteGiftBodyX = 25f, remoteGiftBodyY = 67f, remoteGiftCountX = 88f, remoteGiftCountY = 50f;
@@ -81,11 +68,8 @@ public final class GlobalCelebrationToast {
     private static volatile float remoteLuckyReturnAvatarX = 8f, remoteLuckyReturnAvatarY = 42f;
     private static volatile float remoteLuckyReturnTextX = 25f, remoteLuckyReturnTextY = 42f, remoteLuckyReturnBodyX = 25f, remoteLuckyReturnBodyY = 62f;
     private static volatile float remoteLuckyReturnCountX = 88f, remoteLuckyReturnCountY = 50f;
-    private static volatile float remoteLuckyRoomHighAvatarX = 8f, remoteLuckyRoomHighAvatarY = 50f, remoteLuckyRoomHighPlacementX = 50f, remoteLuckyRoomHighPlacementY = 50f;
     private static volatile float remoteLuckyHighAvatarX = 8f, remoteLuckyHighAvatarY = 42f;
-    private static volatile float remoteLuckyRoomHighTextX = 25f, remoteLuckyRoomHighTextY = 42f, remoteLuckyRoomHighBodyX = 25f, remoteLuckyRoomHighBodyY = 62f;
     private static volatile float remoteLuckyHighTextX = 25f, remoteLuckyHighTextY = 42f, remoteLuckyHighBodyX = 25f, remoteLuckyHighBodyY = 62f;
-    private static volatile float remoteLuckyRoomHighCountX = 88f, remoteLuckyRoomHighCountY = 50f;
     private static volatile float remoteLuckyHighCountX = 88f, remoteLuckyHighCountY = 50f;
     private static volatile int remoteGiftWidthDp = 340, remoteGiftHeightDp = 100, remoteGiftAvatarSizeDp = 44;
     private static volatile float remoteGiftTitleSizeSp = 13f, remoteGiftBodySizeSp = 12f, remoteGiftCountSizeSp = 12f;
@@ -93,21 +77,9 @@ public final class GlobalCelebrationToast {
     private static volatile float remoteLuckyNormalTitleSizeSp = 13f, remoteLuckyNormalBodySizeSp = 12f, remoteLuckyNormalCountSizeSp = 12f;
     private static volatile int remoteLuckyReturnWidthDp = 340, remoteLuckyReturnHeightDp = 100, remoteLuckyReturnAvatarSizeDp = 44;
     private static volatile float remoteLuckyReturnTitleSizeSp = 13f, remoteLuckyReturnBodySizeSp = 12f, remoteLuckyReturnCountSizeSp = 12f;
-    private static volatile int remoteLuckyRoomHighWidthDp = 340, remoteLuckyRoomHighHeightDp = 100, remoteLuckyRoomHighAvatarSizeDp = 44;
     private static volatile int remoteLuckyHighWidthDp = 340, remoteLuckyHighHeightDp = 100, remoteLuckyHighAvatarSizeDp = 44;
-    private static volatile float remoteLuckyRoomHighTitleSizeSp = 13f, remoteLuckyRoomHighBodySizeSp = 12f, remoteLuckyRoomHighCountSizeSp = 12f;
     private static volatile float remoteLuckyHighTitleSizeSp = 13f, remoteLuckyHighBodySizeSp = 12f, remoteLuckyHighCountSizeSp = 12f;
     private static long lastStyleFetchAt;
-    private static volatile Map<String, Object> supportChestToastConfig;
-
-    public static void setSupportChestToastConfig(@Nullable Map<?, ?> config) {
-        if (config == null) { supportChestToastConfig = null; return; }
-        java.util.HashMap<String, Object> copy = new java.util.HashMap<>();
-        for (Map.Entry<?, ?> entry : config.entrySet()) {
-            copy.put(String.valueOf(entry.getKey()), entry.getValue());
-        }
-        supportChestToastConfig = copy;
-    }
 
     private static final class ToastRequest {
         final WeakReference<Activity> activity;
@@ -121,11 +93,10 @@ public final class GlobalCelebrationToast {
         final String displayName;
         final String kind;
         final String roomId;
-        final boolean centerPlacement;
 
         ToastRequest(Activity activity, String title, String body, String avatarUrl,
                      String badgeUrl, int topMarginDp, double multiplier, long coinsWon,
-                     String displayName, String kind, String roomId, boolean centerPlacement) {
+                     String displayName, String kind, String roomId) {
             this.activity = new WeakReference<>(activity);
             this.title = title;
             this.body = body;
@@ -137,17 +108,7 @@ public final class GlobalCelebrationToast {
             this.displayName = displayName;
             this.kind = kind;
             this.roomId = roomId;
-            this.centerPlacement = centerPlacement;
         }
-    }
-
-    private static float numberConfig(@Nullable Map<String, Object> config, String key, float fallback) {
-        if (config == null) return fallback;
-        try {
-            Object value = config.get(key);
-            float parsed = Float.parseFloat(String.valueOf(value));
-            return Float.isFinite(parsed) ? parsed : fallback;
-        } catch (Exception ignored) { return fallback; }
     }
 
     private GlobalCelebrationToast() {}
@@ -158,7 +119,11 @@ public final class GlobalCelebrationToast {
                                      @Nullable String avatarUrl,
                                      @Nullable String giftIconUrl,
                                      int quantity) {
-        // Gift-send top toasts are retired globally. The gift animation remains in-room.
+        int count = Math.max(1, quantity);
+        String body = (giftName == null || giftName.trim().isEmpty() ? "هدية" : giftName.trim()) + " · تم الإرسال";
+        show(activity, senderName, body, avatarUrl, giftIconUrl,
+                "gift-send-" + System.currentTimeMillis(), 28, count, 0L,
+                senderName, "gift_send", null);
     }
 
     private static void applyRemoteStyleToActiveToast() {
@@ -166,8 +131,7 @@ public final class GlobalCelebrationToast {
         if (active == null || active.getTag() == null) return;
         String activeKind = String.valueOf(active.getTag());
         boolean giftSend = "gift_send".equals(activeKind);
-        boolean luckyRoomHigh = "lucky_hit_high_room".equals(activeKind);
-        boolean luckyHigh = "lucky_hit_high".equals(activeKind) || luckyRoomHigh;
+        boolean luckyHigh = "lucky_hit_high".equals(activeKind);
         boolean luckyReturn = "lucky_hit_return".equals(activeKind);
         boolean luckyNormal = "lucky_hit_normal".equals(activeKind);
         if (!giftSend && !luckyHigh && !luckyNormal && !luckyReturn) return;
@@ -175,37 +139,17 @@ public final class GlobalCelebrationToast {
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
         ImageView background = active.findViewById(R.id.imgToastBackground);
         String chosenBackground = giftSend ? remoteBackgroundUrl
-                : luckyRoomHigh ? remoteLuckyRoomHighBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
+                : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        final int requestedWidthDp = giftSend ? remoteGiftWidthDp
-                : luckyRoomHigh ? remoteLuckyRoomHighWidthDp : luckyHigh ? remoteLuckyHighWidthDp
-                : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
-        final int requestedHeightDp = giftSend ? remoteGiftHeightDp
-                : luckyRoomHigh ? remoteLuckyRoomHighHeightDp : luckyHigh ? remoteLuckyHighHeightDp
-                : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
+        // Keep the uploaded toast artwork at one stable size. Older saved width/height
+        // values are intentionally ignored so the background cannot jump or resize.
+        final int requestedWidthDp = 340;
+        final int requestedHeightDp = 100;
         ViewGroup.LayoutParams activeParams = active.getLayoutParams();
         if (activeParams instanceof FrameLayout.LayoutParams) {
-            int maxWidth = Math.max(dp(activity, 220), screenWidth - dp(activity, 24));
-            activeParams.width = Math.min(dp(activity, Math.max(220, Math.min(360, requestedWidthDp))), maxWidth);
-            activeParams.height = dp(activity, Math.max(60, Math.min(180, requestedHeightDp)));
+            activeParams.width = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
+            activeParams.height = dp(activity, requestedHeightDp);
             active.setLayoutParams(activeParams);
-            if (luckyRoomHigh && active.getParent() instanceof ViewGroup) {
-                ViewGroup parent = (ViewGroup) active.getParent();
-                active.post(() -> {
-                    if (active.getParent() != parent || parent.getWidth() <= 0 || parent.getHeight() <= 0) return;
-                    ViewGroup.LayoutParams currentParams = active.getLayoutParams();
-                    if (!(currentParams instanceof FrameLayout.LayoutParams)) return;
-                    FrameLayout.LayoutParams roomParams = (FrameLayout.LayoutParams) currentParams;
-                    int maxLeft = Math.max(0, parent.getWidth() - active.getWidth());
-                    int maxTop = Math.max(0, parent.getHeight() - active.getHeight());
-                    int left = Math.round(parent.getWidth() * Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementX)) / 100f - active.getWidth() / 2f);
-                    int top = Math.round(parent.getHeight() * Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementY)) / 100f - active.getHeight() / 2f);
-                    roomParams.gravity = Gravity.TOP | Gravity.LEFT;
-                    roomParams.leftMargin = Math.max(0, Math.min(maxLeft, left));
-                    roomParams.topMargin = Math.max(0, Math.min(maxTop, top));
-                    active.setLayoutParams(roomParams);
-                });
-            }
         }
         String imageUrl = toastBackgroundUrl(chosenBackground);
         if (background != null) {
@@ -221,8 +165,8 @@ public final class GlobalCelebrationToast {
                 }
             } else background.setVisibility(View.GONE);
         }
-        boolean glow = giftSend ? remoteFrameGlowEnabled : luckyRoomHigh ? remoteLuckyRoomHighGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : luckyReturn ? remoteLuckyReturnGlowEnabled : remoteLuckyNormalGlowEnabled;
-        boolean shine = giftSend ? remoteShineEnabled : luckyRoomHigh ? remoteLuckyRoomHighShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : luckyReturn ? remoteLuckyReturnShineEnabled : remoteLuckyNormalShineEnabled;
+        boolean glow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : luckyReturn ? remoteLuckyReturnGlowEnabled : remoteLuckyNormalGlowEnabled;
+        boolean shine = giftSend ? remoteShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : luckyReturn ? remoteLuckyReturnShineEnabled : remoteLuckyNormalShineEnabled;
         active.setElevation(dp(activity, glow ? 20 : 14));
         View sheen = active.findViewById(R.id.viewCelebrationSheen);
         if (sheen != null && shine) {
@@ -247,18 +191,18 @@ public final class GlobalCelebrationToast {
             ImageView avatar = active.findViewById(R.id.imgCelebrationAvatar);
             TextView title = active.findViewById(R.id.tvCelebrationTitle);
             TextView body = active.findViewById(R.id.tvCelebrationBody);
-            final float avatarX = giftSend ? remoteGiftAvatarX : luckyRoomHigh ? remoteLuckyRoomHighAvatarX : luckyHigh ? remoteLuckyHighAvatarX : luckyReturn ? remoteLuckyReturnAvatarX : remoteLuckyNormalAvatarX;
-            final float avatarY = giftSend ? remoteGiftAvatarY : luckyRoomHigh ? remoteLuckyRoomHighAvatarY : luckyHigh ? remoteLuckyHighAvatarY : luckyReturn ? remoteLuckyReturnAvatarY : remoteLuckyNormalAvatarY;
-            final float textX = giftSend ? remoteGiftTextX : luckyRoomHigh ? remoteLuckyRoomHighTextX : luckyHigh ? remoteLuckyHighTextX : luckyReturn ? remoteLuckyReturnTextX : remoteLuckyNormalTextX;
-            final float textY = giftSend ? remoteGiftTextY : luckyRoomHigh ? remoteLuckyRoomHighTextY : luckyHigh ? remoteLuckyHighTextY : luckyReturn ? remoteLuckyReturnTextY : remoteLuckyNormalTextY;
-            final float bodyX = giftSend ? remoteGiftBodyX : luckyRoomHigh ? remoteLuckyRoomHighBodyX : luckyHigh ? remoteLuckyHighBodyX : luckyReturn ? remoteLuckyReturnBodyX : remoteLuckyNormalBodyX;
-            final float bodyY = giftSend ? remoteGiftBodyY : luckyRoomHigh ? remoteLuckyRoomHighBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
-            final float countX = giftSend ? remoteGiftCountX : luckyRoomHigh ? remoteLuckyRoomHighCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
-            final float countY = giftSend ? remoteGiftCountY : luckyRoomHigh ? remoteLuckyRoomHighCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
-            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyRoomHigh ? remoteLuckyRoomHighAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
-            final float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyRoomHigh ? remoteLuckyRoomHighTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
-            final float bodySize = giftSend ? remoteGiftBodySizeSp : luckyRoomHigh ? remoteLuckyRoomHighBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
-            final float countSize = giftSend ? remoteGiftCountSizeSp : luckyRoomHigh ? remoteLuckyRoomHighCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
+            final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : luckyReturn ? remoteLuckyReturnAvatarX : remoteLuckyNormalAvatarX;
+            final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : luckyReturn ? remoteLuckyReturnAvatarY : remoteLuckyNormalAvatarY;
+            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : luckyReturn ? remoteLuckyReturnTextX : remoteLuckyNormalTextX;
+            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : luckyReturn ? remoteLuckyReturnTextY : remoteLuckyNormalTextY;
+            final float bodyX = giftSend ? remoteGiftBodyX : luckyHigh ? remoteLuckyHighBodyX : luckyReturn ? remoteLuckyReturnBodyX : remoteLuckyNormalBodyX;
+            final float bodyY = giftSend ? remoteGiftBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
+            final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
+            final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
+            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
+            final float bodySize = giftSend ? remoteGiftBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
+            final float countSize = giftSend ? remoteGiftCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
             applyTextSizes(title, body, active.findViewById(R.id.tvCelebrationTimes), titleSize, bodySize, countSize);
             resizeAvatar(activity, avatar, avatarSize);
             active.post(() -> {
@@ -271,7 +215,7 @@ public final class GlobalCelebrationToast {
         }
         if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
         hideRunnable = () -> removeBanner(active);
-        int duration = giftSend ? remoteDurationSeconds : luckyRoomHigh ? remoteLuckyRoomHighDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
+        int duration = giftSend ? remoteDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
         MAIN.postDelayed(hideRunnable, Math.max(1, Math.min(12, duration)) * 1000L);
     }
 
@@ -283,17 +227,6 @@ public final class GlobalCelebrationToast {
     private static String stringValue(Object value, String fallback) {
         return value instanceof String ? ((String) value).trim() : fallback;
     }
-    private static boolean isLuckyToastKind(@Nullable String kind) {
-        if (kind == null) return false;
-        String normalized = kind.trim().toLowerCase(java.util.Locale.ROOT);
-        return "lucky_hit".equals(normalized)
-                || "lucky_hit_normal".equals(normalized)
-                || "lucky_hit_high".equals(normalized)
-                || "lucky_hit_return".equals(normalized)
-                || "lucky_return".equals(normalized)
-                || "lucky_high".equals(normalized);
-    }
-
     private static int intValue(Object value, int fallback) {
         try { return Math.max(1, Math.min(12, (int) Math.round(Double.parseDouble(String.valueOf(value))))); }
         catch (Exception ignored) { return fallback; }
@@ -303,16 +236,9 @@ public final class GlobalCelebrationToast {
         catch (Exception ignored) { return fallback; }
     }
 
-    /** Force a fresh dashboard style after the server announces a config change. */
-    public static void refreshStyleNow(@Nullable Activity activity) {
-        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
-        lastStyleFetchAt = 0L;
-        refreshToastStyle(activity);
-    }
-
     private static void refreshToastStyle(Activity activity) {
         long now = System.currentTimeMillis();
-        if (now - lastStyleFetchAt < 60_000L) return;
+        if (now - lastStyleFetchAt < 3_000L) return;
         lastStyleFetchAt = now;
         try {
             com.Dramizo.Series.AuraLiveApp app =
@@ -326,11 +252,6 @@ public final class GlobalCelebrationToast {
                     Map<String, Object> normal = nestedConfig(cfg, "luckyWinNormal");
                     Map<String, Object> returned = nestedConfig(cfg, "luckyReturn");
                     Map<String, Object> high = nestedConfig(cfg, "luckyWinHigh");
-                    Map<String, Object> roomHigh = nestedConfig(cfg, "luckyWinHighRoom");
-                    try { remoteHighWinMinMultiplier = Math.max(0d, Double.parseDouble(String.valueOf(cfg.get("highWinMinMultiplier")))); }
-                    catch (Exception ignored) { remoteHighWinMinMultiplier = 10d; }
-                    try { remoteHighWinMinCoins = Math.max(0L, Long.parseLong(String.valueOf(cfg.get("highWinMinCoins")))); }
-                    catch (Exception ignored) { remoteHighWinMinCoins = 1000L; }
                     remoteBackgroundUrl = stringValue(gift.get("backgroundUrl"), stringValue(cfg.get("backgroundUrl"), ""));
                     remoteShineEnabled = !Boolean.FALSE.equals(gift.getOrDefault("shineEnabled", cfg.get("shineEnabled")));
                     remoteFrameGlowEnabled = !Boolean.FALSE.equals(gift.getOrDefault("frameGlowEnabled", cfg.get("frameGlowEnabled")));
@@ -352,19 +273,15 @@ public final class GlobalCelebrationToast {
                     remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
                     remoteLuckyReturnBackgroundUrl = stringValue(returned.get("backgroundUrl"), "");
                     remoteLuckyHighBackgroundUrl = stringValue(high.get("backgroundUrl"), "");
-                    remoteLuckyRoomHighBackgroundUrl = stringValue(roomHigh.get("backgroundUrl"), "");
                     remoteLuckyNormalShineEnabled = !Boolean.FALSE.equals(normal.get("shineEnabled"));
                     remoteLuckyReturnShineEnabled = !Boolean.FALSE.equals(returned.get("shineEnabled"));
                     remoteLuckyHighShineEnabled = !Boolean.FALSE.equals(high.get("shineEnabled"));
-                    remoteLuckyRoomHighShineEnabled = !Boolean.FALSE.equals(roomHigh.get("shineEnabled"));
                     remoteLuckyNormalGlowEnabled = !Boolean.FALSE.equals(normal.get("frameGlowEnabled"));
                     remoteLuckyReturnGlowEnabled = !Boolean.FALSE.equals(returned.get("frameGlowEnabled"));
                     remoteLuckyHighGlowEnabled = !Boolean.FALSE.equals(high.get("frameGlowEnabled"));
-                    remoteLuckyRoomHighGlowEnabled = !Boolean.FALSE.equals(roomHigh.get("frameGlowEnabled"));
                     remoteLuckyNormalDurationSeconds = intValue(normal.get("durationSeconds"), 4);
                     remoteLuckyReturnDurationSeconds = intValue(returned.get("durationSeconds"), 3);
                     remoteLuckyHighDurationSeconds = intValue(high.get("durationSeconds"), 5);
-                    remoteLuckyRoomHighDurationSeconds = intValue(roomHigh.get("durationSeconds"), 5);
                     remoteLuckyNormalAvatarX = floatValue(normal.get("avatarX"), 8f);
                     remoteLuckyNormalAvatarY = floatValue(normal.get("avatarY"), 50f);
                     remoteLuckyNormalTextX = floatValue(normal.get("textX"), 25f);
@@ -394,35 +311,19 @@ public final class GlobalCelebrationToast {
                     remoteLuckyReturnBodySizeSp = dimensionValue(returned.get("bodySizeSp"), 12, 8, 30);
                     remoteLuckyReturnCountSizeSp = dimensionValue(returned.get("countSizeSp"), 12, 8, 30);
                     remoteLuckyHighAvatarX = floatValue(high.get("avatarX"), 8f);
-                    remoteLuckyRoomHighAvatarX = floatValue(roomHigh.get("avatarX"), 8f);
                     remoteLuckyHighAvatarY = floatValue(high.get("avatarY"), 50f);
-                    remoteLuckyRoomHighAvatarY = floatValue(roomHigh.get("avatarY"), 50f);
-                    remoteLuckyRoomHighPlacementX = floatValue(roomHigh.get("placementX"), 50f);
-                    remoteLuckyRoomHighPlacementY = floatValue(roomHigh.get("placementY"), 50f);
                     remoteLuckyHighTextX = floatValue(high.get("textX"), 25f);
-                    remoteLuckyRoomHighTextX = floatValue(roomHigh.get("textX"), 25f);
                     remoteLuckyHighTextY = floatValue(high.get("textY"), 42f);
-                    remoteLuckyRoomHighTextY = floatValue(roomHigh.get("textY"), 42f);
                     remoteLuckyHighBodyX = floatValue(high.get("bodyX"), 25f);
-                    remoteLuckyRoomHighBodyX = floatValue(roomHigh.get("bodyX"), 25f);
                     remoteLuckyHighBodyY = floatValue(high.get("bodyY"), 62f);
-                    remoteLuckyRoomHighBodyY = floatValue(roomHigh.get("bodyY"), 62f);
                     remoteLuckyHighCountX = floatValue(high.get("countX"), 88f);
-                    remoteLuckyRoomHighCountX = floatValue(roomHigh.get("countX"), 88f);
                     remoteLuckyHighCountY = floatValue(high.get("countY"), 50f);
-                    remoteLuckyRoomHighCountY = floatValue(roomHigh.get("countY"), 50f);
                     remoteLuckyHighWidthDp = dimensionValue(high.get("widthDp"), 340, 220, 360);
-                    remoteLuckyRoomHighWidthDp = dimensionValue(roomHigh.get("widthDp"), 340, 220, 360);
                     remoteLuckyHighHeightDp = dimensionValue(high.get("heightDp"), 100, 60, 180);
-                    remoteLuckyRoomHighHeightDp = dimensionValue(roomHigh.get("heightDp"), 100, 60, 180);
                     remoteLuckyHighAvatarSizeDp = dimensionValue(high.get("avatarSizeDp"), 44, 20, 76);
-                    remoteLuckyRoomHighAvatarSizeDp = dimensionValue(roomHigh.get("avatarSizeDp"), 44, 20, 76);
                     remoteLuckyHighTitleSizeSp = dimensionValue(high.get("titleSizeSp"), 13, 8, 30);
-                    remoteLuckyRoomHighTitleSizeSp = dimensionValue(roomHigh.get("titleSizeSp"), 13, 8, 30);
                     remoteLuckyHighBodySizeSp = dimensionValue(high.get("bodySizeSp"), 12, 8, 30);
-                    remoteLuckyRoomHighBodySizeSp = dimensionValue(roomHigh.get("bodySizeSp"), 12, 8, 30);
                     remoteLuckyHighCountSizeSp = dimensionValue(high.get("countSizeSp"), 12, 8, 30);
-                    remoteLuckyRoomHighCountSizeSp = dimensionValue(roomHigh.get("countSizeSp"), 12, 8, 30);
                     MAIN.post(GlobalCelebrationToast::applyRemoteStyleToActiveToast);
                 }
                 @Override public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
@@ -432,13 +333,6 @@ public final class GlobalCelebrationToast {
         } catch (Exception ignored) {
             // Network settings are optional; toast display must never depend on them.
         }
-    }
-
-    /** Uses the same OR thresholds saved in the dashboard and enforced by the backend. */
-    public static boolean isHighWin(double multiplier, long coinsWon) {
-        boolean multiplierReached = remoteHighWinMinMultiplier > 0d && multiplier >= remoteHighWinMinMultiplier;
-        boolean coinsReached = remoteHighWinMinCoins > 0L && coinsWon >= remoteHighWinMinCoins;
-        return multiplierReached || coinsReached;
     }
 
     public static void show(
@@ -495,8 +389,6 @@ public final class GlobalCelebrationToast {
             @Nullable String kind,
             @Nullable String roomId
     ) {
-        // Never render the retired gift-send confirmation toast, regardless of caller.
-        if ("gift_send".equalsIgnoreCase(kind)) return;
         if (activity == null || activity.isFinishing()) return;
         try {
             android.content.Context app = activity.getApplicationContext();
@@ -506,141 +398,38 @@ public final class GlobalCelebrationToast {
             }
         } catch (Exception ignored) {
         }
-        enqueueToast(activity, title, body, avatarUrl, badgeUrl, dedupeKey, topMarginDp,
-                multiplier, coinsWon, displayName, kind, roomId, false);
-    }
-
-    /** Shows the chest burst independently of optional celebration banners/settings. */
-    public static void showSupportChestBurst(@Nullable Activity activity) {
-        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
-        MAIN.post(() -> {
-            if (activity.isFinishing() || activity.isDestroyed()) return;
-            ViewGroup root = activity.findViewById(android.R.id.content);
-            if (root instanceof FrameLayout) showChestBurst(activity, (FrameLayout) root);
-        });
-    }
-
-    /** Room-only presentation for large lucky wins: same configurable artwork, centered on screen. */
-    public static void showRoomCenter(
-            @Nullable Activity activity,
-            @Nullable String title,
-            @Nullable String body,
-            @Nullable String avatarUrl,
-            @Nullable String badgeUrl,
-            @Nullable String dedupeKey,
-            double multiplier,
-            long coinsWon,
-            @Nullable String displayName,
-            @Nullable String kind,
-            @Nullable String roomId
-    ) {
-        if ("gift_send".equalsIgnoreCase(kind)) return;
-        enqueueToast(activity, title, body, avatarUrl, badgeUrl, dedupeKey, 28,
-                multiplier, coinsWon, displayName, kind, roomId, true);
-    }
-
-    /** Room-wide top banner for chest openings; matches the normal high-return toast lane. */
-    public static void showRoomTop(
-            @Nullable Activity activity,
-            @Nullable String title,
-            @Nullable String body,
-            @Nullable String avatarUrl,
-            @Nullable String badgeUrl,
-            @Nullable String dedupeKey,
-            double multiplier,
-            long coinsWon,
-            @Nullable String displayName,
-            @Nullable String kind,
-            @Nullable String roomId
-    ) {
-        if ("gift_send".equalsIgnoreCase(kind)) return;
-        enqueueToast(activity, title, body, avatarUrl, badgeUrl, dedupeKey, 72,
-                multiplier, coinsWon, displayName, kind, roomId, false);
-    }
-
-    private static void enqueueToast(
-            @Nullable Activity activity,
-            @Nullable String title,
-            @Nullable String body,
-            @Nullable String avatarUrl,
-            @Nullable String badgeUrl,
-            @Nullable String dedupeKey,
-            int topMarginDp,
-            double multiplier,
-            long coinsWon,
-            @Nullable String displayName,
-            @Nullable String kind,
-            @Nullable String roomId,
-            boolean centerPlacement
-    ) {
-        if ("gift_send".equalsIgnoreCase(kind)) return;
-        if (activity == null || activity.isFinishing()) return;
-        try {
-            android.content.Context app = activity.getApplicationContext();
-            if (app instanceof com.Dramizo.Series.AuraLiveApp aura
-                    && aura.getContainer().getSessionManager().isMuteCelebrationPopups()) {
-                return;
-            }
-        } catch (Exception ignored) {
-        }
-        if (isLuckyToastKind(kind)) refreshToastStyle(activity);
+        if ("gift_send".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind)) refreshToastStyle(activity);
         long now = System.currentTimeMillis();
-        // One high-win event may intentionally have two placements on the sender device:
-        // the shared top banner and the sender-only center celebration. Permit that paired
-        // placement once, while continuing to suppress duplicate events in the same lane.
-        int placementBit = centerPlacement ? 2 : 1;
-        boolean sameRecentEvent = dedupeKey != null && dedupeKey.equals(lastDedupeKey)
-                && now - lastShownAt < 1_200L;
-        boolean pairedPlacement = sameRecentEvent
-                && (lastDedupePlacementMask & placementBit) == 0;
-        if (sameRecentEvent && !pairedPlacement) return;
-        if (!sameRecentEvent) lastDedupePlacementMask = 0;
+        if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 8_000L) {
+            return;
+        }
         lastDedupeKey = dedupeKey;
         lastShownAt = now;
-        lastDedupePlacementMask |= placementBit;
         final int margin = Math.max(8, topMarginDp);
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
-                margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
+                margin, multiplier, coinsWon, displayName, kind, roomId);
         MAIN.post(() -> {
-            // Preserve every distinct toast in arrival order. Do not replace an active
-            // lucky toast or discard pending normal/return/high results.
-            if (request.centerPlacement) {
-                PENDING_CENTER.addLast(request);
-                showNext(true);
-            } else {
-                PENDING.addLast(request);
-                showNext(false);
-            }
+            PENDING.addLast(request);
+            showNext();
         });
     }
 
-    private static void showNext() { showNext(false); }
-
-    /** Top and winner-only center toasts run in independent lanes and may be visible together. */
-    private static void showNext(boolean centerLane) {
-        if (centerLane ? showingCenter : showing) return;
-        ToastRequest request = (centerLane ? PENDING_CENTER : PENDING).pollFirst();
+    private static void showNext() {
+        if (showing) return;
+        ToastRequest request = PENDING.pollFirst();
         if (request == null) return;
         Activity activity = com.Dramizo.Series.AuraLiveApp.getForegroundActivity();
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
             activity = request.activity.get();
         }
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
-            showNext(centerLane);
+            showNext();
             return;
         }
-        if (centerLane) showingCenter = true; else showing = true;
-        try {
-            showInternal(activity, request.title, request.body, request.avatarUrl,
-                    request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
-                    request.displayName, request.kind, request.roomId, request.centerPlacement);
-        } catch (Throwable error) {
-            // A single malformed asset/activity must not leave the global toast queue
-            // permanently marked as showing and hide every later celebration.
-            android.util.Log.w("GlobalCelebrationToast", "Toast rendering failed", error);
-            if (centerLane) showingCenter = false; else showing = false;
-            MAIN.post(() -> showNext(centerLane));
-        }
+        showing = true;
+        showInternal(activity, request.title, request.body, request.avatarUrl,
+                request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
+                request.displayName, request.kind, request.roomId);
     }
 
     private static void showInternal(
@@ -654,27 +443,25 @@ public final class GlobalCelebrationToast {
             long coinsWon,
             @Nullable String displayName,
             @Nullable String kind,
-            @Nullable String roomId,
-            boolean centerPlacement
+            @Nullable String roomId
     ) {
         if (activity.isFinishing() || activity.isDestroyed()) {
-            if (centerPlacement) showingCenter = false; else showing = false;
-            showNext(centerPlacement);
+            showing = false;
+            showNext();
             return;
         }
         ViewGroup root = activity.findViewById(android.R.id.content);
         if (!(root instanceof FrameLayout)) {
-            if (centerPlacement) showingCenter = false; else showing = false;
-            showNext(centerPlacement);
+            showing = false;
+            showNext();
             return;
         }
 
-        View existing = centerPlacement ? currentCenter.get() : current.get();
+        View existing = current.get();
         if (existing != null && existing.getParent() instanceof ViewGroup) {
             ((ViewGroup) existing.getParent()).removeView(existing);
         }
-        Runnable laneHide = centerPlacement ? hideRunnableCenter : hideRunnable;
-        if (laneHide != null) MAIN.removeCallbacks(laneHide);
+        if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
 
         View banner = LayoutInflater.from(activity)
                 .inflate(R.layout.layout_celebration_toast, root, false);
@@ -689,61 +476,25 @@ public final class GlobalCelebrationToast {
         View sheen = banner.findViewById(R.id.viewCelebrationSheen);
 
         boolean planet = kind != null && "planet_summon".equalsIgnoreCase(kind);
-        boolean supportChest = kind != null && "support_chest".equalsIgnoreCase(kind);
-        Map<String, Object> chestToast = supportChest ? supportChestToastConfig : null;
-        if (supportChest && avatar != null) {
-            int giftSize = dp(activity, Math.max(24, Math.min(120,
-                    (int) numberConfig(supportChestToastConfig, "giftSizeDp", 58))));
-            ViewGroup.LayoutParams imageParams = avatar.getLayoutParams();
-            if (imageParams != null) {
-                imageParams.width = giftSize;
-                imageParams.height = giftSize;
-                avatar.setLayoutParams(imageParams);
-            }
-        }
         boolean gameOrLucky = kind != null && (
-                "game_win".equalsIgnoreCase(kind) || isLuckyToastKind(kind));
+                "game_win".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind));
         boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
-        boolean luckyWin = isLuckyToastKind(kind);
-        // Different send paths phrase partial returns differently ("مردود +..." vs
-        // "مردود جزئي ..."). Classify by the outcome, not one exact UI string, so the
-        // dashboard's dedicated return-toast background/style is used on every client.
-        boolean explicitReturn = kind != null && ("lucky_hit_return".equalsIgnoreCase(kind)
-                || "lucky_return".equalsIgnoreCase(kind));
-        boolean explicitHigh = kind != null && ("lucky_hit_high".equalsIgnoreCase(kind)
-                || "lucky_high".equalsIgnoreCase(kind));
-        boolean explicitNormal = kind != null && "lucky_hit_normal".equalsIgnoreCase(kind);
-        boolean luckyReturn = luckyWin && (explicitReturn || (!explicitHigh && !explicitNormal
-                && (multiplier <= 0d || (body != null
-                && (body.contains("مردود جزئي") || body.contains("مردود +")
-                || body.contains("مردود الهدية"))))));
-        boolean luckyHigh = luckyWin && !luckyReturn
-                && (explicitHigh || multiplier >= 10d || coinsWon >= 1000L);
-        boolean luckyRoomHigh = luckyHigh && centerPlacement;
-        String toastKindTag = supportChest ? "support_chest" : giftSend ? "gift_send" : luckyWin ? (luckyRoomHigh ? "lucky_hit_high_room" : luckyReturn ? "lucky_hit_return" : luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
+        boolean luckyWin = kind != null && "lucky_hit".equalsIgnoreCase(kind);
+        boolean luckyReturn = luckyWin && body != null && body.contains("مردود جزئي");
+        boolean luckyHigh = luckyWin && !luckyReturn && (multiplier >= 10d || coinsWon >= 1000L);
+        String toastKindTag = giftSend ? "gift_send" : luckyWin ? (luckyReturn ? "lucky_hit_return" : luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
         banner.setTag(toastKindTag);
-        boolean customToastStyle = giftSend || luckyWin || supportChest;
-        boolean remoteShine = !supportChest && (giftSend ? remoteShineEnabled : luckyRoomHigh ? remoteLuckyRoomHighShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : luckyReturn ? remoteLuckyReturnShineEnabled : remoteLuckyNormalShineEnabled);
-        boolean remoteGlow = !supportChest && (giftSend ? remoteFrameGlowEnabled : luckyRoomHigh ? remoteLuckyRoomHighGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : luckyReturn ? remoteLuckyReturnGlowEnabled : remoteLuckyNormalGlowEnabled);
-        int customDuration = supportChest ? 6 : giftSend ? remoteDurationSeconds : luckyRoomHigh ? remoteLuckyRoomHighDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
+        boolean customToastStyle = giftSend || luckyWin;
+        boolean remoteShine = giftSend ? remoteShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : luckyReturn ? remoteLuckyReturnShineEnabled : remoteLuckyNormalShineEnabled;
+        boolean remoteGlow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : luckyReturn ? remoteLuckyReturnGlowEnabled : remoteLuckyNormalGlowEnabled;
+        int customDuration = giftSend ? remoteDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
         if (planet) {
             banner.setBackgroundResource(R.drawable.bg_planet_go_banner);
-        }
-        if (supportChest) {
-            GradientDrawable supportChestBackground = new GradientDrawable(
-                    GradientDrawable.Orientation.TL_BR,
-                    new int[] { 0xF52A1B12, 0xF04A321B, 0xF51C1B2B });
-            supportChestBackground.setCornerRadius(dp(activity, 18));
-            supportChestBackground.setStroke(dp(activity, 2), 0xFFFFD36A);
-            banner.setBackground(supportChestBackground);
-            banner.setElevation(dp(activity, 24));
         }
 
         String winnerName = firstNonEmpty(displayName, title);
         if (tvTitle != null) {
-            boolean showChestWinner = !supportChest || chestToast == null
-                    || !Boolean.FALSE.equals(chestToast.get("showWinnerName"));
-            tvTitle.setVisibility(showChestWinner ? View.VISIBLE : View.GONE);
+            tvTitle.setVisibility(View.VISIBLE);
             tvTitle.setText(winnerName != null ? winnerName : "مبروك الفوز!");
             tvTitle.setSelected(true);
         }
@@ -762,9 +513,9 @@ public final class GlobalCelebrationToast {
             tvBody.setSelected(true);
         }
         if (customToastStyle) {
-            float titleSize = supportChest ? numberConfig(chestToast, "titleSizeSp", 17f) : giftSend ? remoteGiftTitleSizeSp : luckyRoomHigh ? remoteLuckyRoomHighTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
-            float bodySize = supportChest ? numberConfig(chestToast, "bodySizeSp", 14f) : giftSend ? remoteGiftBodySizeSp : luckyRoomHigh ? remoteLuckyRoomHighBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
-            float countSize = supportChest ? 12f : giftSend ? remoteGiftCountSizeSp : luckyRoomHigh ? remoteLuckyRoomHighCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
+            float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : luckyReturn ? remoteLuckyReturnTitleSizeSp : remoteLuckyNormalTitleSizeSp;
+            float bodySize = giftSend ? remoteGiftBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : luckyReturn ? remoteLuckyReturnBodySizeSp : remoteLuckyNormalBodySizeSp;
+            float countSize = giftSend ? remoteGiftCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : luckyReturn ? remoteLuckyReturnCountSizeSp : remoteLuckyNormalCountSizeSp;
             if (tvTitle != null) tvTitle.setTextSize(titleSize);
             if (tvBody != null) tvBody.setTextSize(bodySize);
             if (tvTimes != null) tvTimes.setTextSize(countSize);
@@ -814,7 +565,7 @@ public final class GlobalCelebrationToast {
         if (canOpenRoom) {
             final String targetRoom = roomId.trim();
             banner.setOnClickListener(v -> {
-                removeBanner(banner, centerPlacement);
+                removeBanner(banner);
                 RoomJoinGateActivity.open(activity, targetRoom);
             });
         } else {
@@ -872,19 +623,11 @@ public final class GlobalCelebrationToast {
         }
 
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        final int requestedWidthDp = giftSend ? remoteGiftWidthDp
-                : luckyRoomHigh ? remoteLuckyRoomHighWidthDp : luckyHigh ? remoteLuckyHighWidthDp
-                : luckyReturn ? remoteLuckyReturnWidthDp : remoteLuckyNormalWidthDp;
-        final int requestedHeightDp = giftSend ? remoteGiftHeightDp
-                : luckyRoomHigh ? remoteLuckyRoomHighHeightDp : luckyHigh ? remoteLuckyHighHeightDp
-                : luckyReturn ? remoteLuckyReturnHeightDp : remoteLuckyNormalHeightDp;
-        int maxToastWidth = Math.max(dp(activity, 220), screenWidth - dp(activity, 24));
-        int toastWidth = Math.min(dp(activity, supportChest ? 360 : Math.max(220, Math.min(360, requestedWidthDp))), maxToastWidth);
-        int toastHeight = customToastStyle
-                ? dp(activity, supportChest
-                    ? Math.max(60, Math.min(240, (int) numberConfig(chestToast, "height", 104)))
-                    : Math.max(60, Math.min(180, requestedHeightDp)))
-                : ViewGroup.LayoutParams.WRAP_CONTENT;
+        // Fixed toast dimensions: background artwork never changes size based on old settings.
+        final int requestedWidthDp = 340;
+        final int requestedHeightDp = 100;
+        int toastWidth = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
+        int toastHeight = customToastStyle ? dp(activity, requestedHeightDp) : ViewGroup.LayoutParams.WRAP_CONTENT;
         // Keep the text elements content-sized like the dashboard's draggable preview.
         // Full-width TextViews cannot be positioned by their left-edge percentage.
         int textMaxWidth = Math.max(dp(activity, 84), Math.round(toastWidth * 0.66f));
@@ -895,36 +638,15 @@ public final class GlobalCelebrationToast {
             avatar.setClipToOutline(true);
         }
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(toastWidth, toastHeight);
-        if (centerPlacement) {
-            lp.gravity = Gravity.TOP | Gravity.LEFT;
-            final float placementX = (supportChest ? 50f : Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementX))) / 100f;
-            final float placementY = (supportChest ? 50f : Math.max(0f, Math.min(100f, remoteLuckyRoomHighPlacementY))) / 100f;
-            banner.post(() -> {
-                if (banner.getParent() == null) return;
-                int maxLeft = Math.max(0, root.getWidth() - banner.getWidth());
-                int maxTop = Math.max(0, root.getHeight() - banner.getHeight());
-                int left = Math.round(root.getWidth() * placementX - banner.getWidth() / 2f);
-                int top = Math.round(root.getHeight() * placementY - banner.getHeight() / 2f);
-                FrameLayout.LayoutParams positioned = (FrameLayout.LayoutParams) banner.getLayoutParams();
-                positioned.leftMargin = Math.max(0, Math.min(maxLeft, left));
-                positioned.topMargin = Math.max(0, Math.min(maxTop, top));
-                banner.setLayoutParams(positioned);
-            });
-        } else {
-            lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-            lp.topMargin = dp(activity, supportChest
-                    ? Math.max(0, Math.min(300, (int) numberConfig(chestToast, "yOffset", topMarginDp)))
-                    : topMarginDp);
-        }
+        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        lp.topMargin = dp(activity, topMarginDp);
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
         banner.setScaleX(0.985f);
         banner.setScaleY(0.985f);
         banner.setTranslationX(dp(activity, 140));
         if (toastBackground != null) {
-            String selectedBackground = supportChest
-                    ? (chestToast == null ? "" : String.valueOf(chestToast.getOrDefault("backgroundUrl", "")))
-                    : giftSend ? remoteBackgroundUrl : luckyRoomHigh ? remoteLuckyRoomHighBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
+            String selectedBackground = giftSend ? remoteBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : luckyReturn ? remoteLuckyReturnBackgroundUrl : remoteLuckyNormalBackgroundUrl;
             String imageUrl = customToastStyle ? toastBackgroundUrl(selectedBackground) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 // The uploaded artwork owns its pixels, edges and alpha channel. Do not add
@@ -939,7 +661,7 @@ public final class GlobalCelebrationToast {
                 toastBackground.setVisibility(View.GONE);
             }
         }
-        banner.setElevation(dp(activity, supportChest ? 28 : customToastStyle && remoteGlow ? 20 : 14));
+        banner.setElevation(dp(activity, customToastStyle && remoteGlow ? 20 : 14));
         if (sheen != null && customToastStyle && remoteShine) {
             sheen.setVisibility(View.VISIBLE);
             GradientDrawable shine = new GradientDrawable(
@@ -950,8 +672,7 @@ public final class GlobalCelebrationToast {
             sheen.setAlpha(0.78f);
         } else if (sheen != null) sheen.setVisibility(View.GONE);
         root.addView(banner);
-        if (centerPlacement) currentCenter = new WeakReference<>(banner);
-        else current = new WeakReference<>(banner);
+        current = new WeakReference<>(banner);
 
         banner.animate()
                 .alpha(1f)
@@ -981,15 +702,15 @@ public final class GlobalCelebrationToast {
                     .start();
         }
         if (customToastStyle) {
-            final float avatarX = supportChest ? 10f : giftSend ? remoteGiftAvatarX : luckyRoomHigh ? remoteLuckyRoomHighAvatarX : luckyHigh ? remoteLuckyHighAvatarX : luckyReturn ? remoteLuckyReturnAvatarX : remoteLuckyNormalAvatarX;
-            final float avatarY = supportChest ? 50f : giftSend ? remoteGiftAvatarY : luckyRoomHigh ? remoteLuckyRoomHighAvatarY : luckyHigh ? remoteLuckyHighAvatarY : luckyReturn ? remoteLuckyReturnAvatarY : remoteLuckyNormalAvatarY;
-            final float textX = supportChest ? 28f : giftSend ? remoteGiftTextX : luckyRoomHigh ? remoteLuckyRoomHighTextX : luckyHigh ? remoteLuckyHighTextX : luckyReturn ? remoteLuckyReturnTextX : remoteLuckyNormalTextX;
-            final float textY = supportChest ? 38f : giftSend ? remoteGiftTextY : luckyRoomHigh ? remoteLuckyRoomHighTextY : luckyHigh ? remoteLuckyHighTextY : luckyReturn ? remoteLuckyReturnTextY : remoteLuckyNormalTextY;
-            final float bodyX = supportChest ? 28f : giftSend ? remoteGiftBodyX : luckyRoomHigh ? remoteLuckyRoomHighBodyX : luckyHigh ? remoteLuckyHighBodyX : luckyReturn ? remoteLuckyReturnBodyX : remoteLuckyNormalBodyX;
-            final float bodyY = supportChest ? 65f : giftSend ? remoteGiftBodyY : luckyRoomHigh ? remoteLuckyRoomHighBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
-            final float countX = giftSend ? remoteGiftCountX : luckyRoomHigh ? remoteLuckyRoomHighCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
-            final float countY = giftSend ? remoteGiftCountY : luckyRoomHigh ? remoteLuckyRoomHighCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
-            final int avatarSize = supportChest ? 56 : giftSend ? remoteGiftAvatarSizeDp : luckyRoomHigh ? remoteLuckyRoomHighAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : luckyReturn ? remoteLuckyReturnAvatarX : remoteLuckyNormalAvatarX;
+            final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : luckyReturn ? remoteLuckyReturnAvatarY : remoteLuckyNormalAvatarY;
+            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : luckyReturn ? remoteLuckyReturnTextX : remoteLuckyNormalTextX;
+            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : luckyReturn ? remoteLuckyReturnTextY : remoteLuckyNormalTextY;
+            final float bodyX = giftSend ? remoteGiftBodyX : luckyHigh ? remoteLuckyHighBodyX : luckyReturn ? remoteLuckyReturnBodyX : remoteLuckyNormalBodyX;
+            final float bodyY = giftSend ? remoteGiftBodyY : luckyHigh ? remoteLuckyHighBodyY : luckyReturn ? remoteLuckyReturnBodyY : remoteLuckyNormalBodyY;
+            final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : luckyReturn ? remoteLuckyReturnCountX : remoteLuckyNormalCountX;
+            final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : luckyReturn ? remoteLuckyReturnCountY : remoteLuckyNormalCountY;
+            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : luckyReturn ? remoteLuckyReturnAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
             resizeAvatar(activity, avatar, avatarSize);
             banner.post(() -> {
                 if (banner.getParent() == null) return;
@@ -999,191 +720,10 @@ public final class GlobalCelebrationToast {
                 positionViewPercent(wrapTimes, banner, countX, countY, true);
             });
         }
-        Runnable laneHideRunnable = () -> removeBanner(banner, centerPlacement);
-        if (centerPlacement) {
-            hideRunnableCenter = laneHideRunnable;
-            MAIN.postDelayed(hideRunnableCenter, customToastStyle
-                    ? Math.max(1, Math.min(12, customDuration)) * 1000L
-                    : (canOpenRoom ? 6200L : 5200L));
-        } else {
-            hideRunnable = laneHideRunnable;
-            MAIN.postDelayed(hideRunnable, customToastStyle
-                    ? Math.max(1, Math.min(12, customDuration)) * 1000L
-                    : (canOpenRoom ? 6200L : 5200L));
-        }
-    }
-
-    /** Room-wide reward burst for a completed support-chest level. */
-    private static void showChestBurst(Activity activity, FrameLayout root) {
-        if (activity == null || root == null || activity.isFinishing() || activity.isDestroyed()) return;
-
-        final FrameLayout celebration = new FrameLayout(activity);
-        celebration.setClipChildren(false);
-        celebration.setClipToPadding(false);
-        celebration.setClickable(false);
-        celebration.setFocusable(false);
-        root.addView(celebration, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        final int width = Math.max(root.getWidth(), activity.getResources().getDisplayMetrics().widthPixels);
-        final int height = Math.max(root.getHeight(), activity.getResources().getDisplayMetrics().heightPixels);
-        final int dp8 = dp(activity, 8);
-
-        // A bright impact flash and expanding gold shockwaves.
-        View flash = new View(activity);
-        GradientDrawable flashShape = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[] { 0x00FFF4C5, 0x88FFE28A, 0x00FF9D36 });
-        flashShape.setShape(GradientDrawable.OVAL);
-        flash.setBackground(flashShape);
-        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(
-                dp(activity, 190), dp(activity, 190), Gravity.CENTER);
-        celebration.addView(flash, flashParams);
-        AnimatorSet flashAnim = new AnimatorSet();
-        flashAnim.playTogether(
-                ObjectAnimator.ofFloat(flash, View.ALPHA, 0f, 0.95f, 0f),
-                ObjectAnimator.ofFloat(flash, View.SCALE_X, 0.12f, 2.35f),
-                ObjectAnimator.ofFloat(flash, View.SCALE_Y, 0.12f, 2.35f));
-        flashAnim.setDuration(1450L);
-        flashAnim.start();
-
-        for (int ringIndex = 0; ringIndex < 4; ringIndex++) {
-            View ring = new View(activity);
-            GradientDrawable ringShape = new GradientDrawable();
-            ringShape.setShape(GradientDrawable.OVAL);
-            ringShape.setColor(0x00FFFFFF);
-            ringShape.setStroke(dp(activity, ringIndex == 0 ? 4 : 2),
-                    ringIndex == 1 ? 0xFFFFA94B : 0xFFFFE18A);
-            ring.setBackground(ringShape);
-            FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(
-                    dp(activity, 112), dp(activity, 112), Gravity.CENTER);
-            celebration.addView(ring, ringParams);
-            AnimatorSet ringAnim = new AnimatorSet();
-            ringAnim.playTogether(
-                    ObjectAnimator.ofFloat(ring, View.ALPHA, 0.95f, 0f),
-                    ObjectAnimator.ofFloat(ring, View.SCALE_X, 0.15f, 2.9f),
-                    ObjectAnimator.ofFloat(ring, View.SCALE_Y, 0.15f, 2.9f));
-            ringAnim.setStartDelay(ringIndex * 220L);
-            ringAnim.setDuration(1450L + ringIndex * 180L);
-            ringAnim.start();
-        }
-
-        // Golden coin and diamond rain falls from the top of every viewer's screen.
-        final String[] rainSymbols = { "🪙", "🪙", "💎", "🪙", "✨", "🪙", "🎁", "🪙" };
-        for (int i = 0; i < 42; i++) {
-            TextView coin = new TextView(activity);
-            coin.setText(rainSymbols[i % rainSymbols.length]);
-            coin.setTextSize(i % 5 == 0 ? 27f : 22f);
-            coin.setGravity(Gravity.CENTER);
-            coin.setClickable(false);
-            coin.setFocusable(false);
-            FrameLayout.LayoutParams coinParams = new FrameLayout.LayoutParams(
-                    dp(activity, 38), dp(activity, 42), Gravity.TOP | Gravity.LEFT);
-            coinParams.leftMargin = Math.max(0, Math.min(width - dp(activity, 38),
-                    (int) ((i * (width / 32f)) + ((i % 3) - 1) * dp8)));
-            celebration.addView(coin, coinParams);
-            coin.setTranslationY(-dp(activity, 35 + (i % 5) * 34));
-            coin.setRotation((i % 2 == 0 ? -1f : 1f) * (i % 4) * 18f);
-            AnimatorSet rain = new AnimatorSet();
-            rain.playTogether(
-                    ObjectAnimator.ofFloat(coin, View.TRANSLATION_Y, coin.getTranslationY(),
-                            height + dp(activity, 70 + (i % 4) * 30)),
-                    ObjectAnimator.ofFloat(coin, View.TRANSLATION_X, 0f,
-                            (i % 2 == 0 ? 1f : -1f) * dp(activity, 22 + (i % 5) * 12)),
-                    ObjectAnimator.ofFloat(coin, View.ROTATION, coin.getRotation(),
-                            coin.getRotation() + (i % 2 == 0 ? 420f : -420f)),
-                    ObjectAnimator.ofFloat(coin, View.ALPHA, 0f, 1f, 1f, 0f));
-            rain.setStartDelay((i % 8) * 110L);
-            rain.setDuration(2500L + (i % 4) * 240L);
-            rain.start();
-        }
-
-        // Radial reward burst: gift boxes, coins, diamonds and light particles.
-        final String[] symbols = { "🎁", "🪙", "💎", "✨", "🌟", "🪙", "💎", "🎁",
-                "✨", "🪙", "💎", "🌟", "🎁", "🪙", "💎", "✨", "🪙", "🎁", "💎", "🌟",
-                "🪙", "💎", "🎁", "✨" };
-        for (int i = 0; i < symbols.length; i++) {
-            TextView particle = new TextView(activity);
-            particle.setText(symbols[i]);
-            particle.setTextSize(23f + (i % 3) * 4f);
-            particle.setGravity(Gravity.CENTER);
-            particle.setClickable(false);
-            particle.setFocusable(false);
-            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                    Gravity.CENTER);
-            celebration.addView(particle, params);
-            double angle = (Math.PI * 2d * i) / symbols.length;
-            float distance = dp(activity, 115 + (i % 4) * 34);
-            float dx = (float) Math.cos(angle) * distance;
-            float dy = (float) Math.sin(angle) * distance;
-            AnimatorSet burst = new AnimatorSet();
-            burst.playTogether(
-                    ObjectAnimator.ofFloat(particle, View.TRANSLATION_X, 0f, dx),
-                    ObjectAnimator.ofFloat(particle, View.TRANSLATION_Y, 0f, dy),
-                    ObjectAnimator.ofFloat(particle, View.ROTATION, 0f,
-                            (i % 2 == 0 ? 1f : -1f) * 330f),
-                    ObjectAnimator.ofFloat(particle, View.ALPHA, 0f, 1f, 0f),
-                    ObjectAnimator.ofFloat(particle, View.SCALE_X, 0.2f, 1.25f, 0.7f),
-                    ObjectAnimator.ofFloat(particle, View.SCALE_Y, 0.2f, 1.25f, 0.7f));
-            burst.setStartDelay(180L + (i % 5) * 65L);
-            burst.setDuration(1950L + (i % 3) * 210L);
-            burst.start();
-        }
-
-        // High-contrast in-room celebration toast, centered over the room content.
-        TextView banner = new TextView(activity);
-        banner.setText("💥  انفجار صندوق الدعم  💎");
-        banner.setTextColor(0xFFFFE9B0);
-        banner.setTextSize(16f);
-        banner.setTypeface(null, android.graphics.Typeface.BOLD);
-        banner.setGravity(Gravity.CENTER);
-        banner.setPadding(dp(activity, 20), dp(activity, 13), dp(activity, 20), dp(activity, 13));
-        GradientDrawable bannerBg = new GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[] { 0xF52C1D16, 0xF55A3B18, 0xF52C1D16 });
-        bannerBg.setCornerRadius(dp(activity, 28));
-        bannerBg.setStroke(dp(activity, 1), 0xFFFFD36A);
-        banner.setBackground(bannerBg);
-        banner.setElevation(dp(activity, 18));
-        FrameLayout.LayoutParams bannerParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER);
-        bannerParams.topMargin = dp(activity, 155);
-        celebration.addView(banner, bannerParams);
-        AnimatorSet bannerAnim = new AnimatorSet();
-        bannerAnim.playTogether(
-                ObjectAnimator.ofFloat(banner, View.ALPHA, 0f, 1f, 1f, 0f),
-                ObjectAnimator.ofFloat(banner, View.TRANSLATION_Y, dp(activity, 24), 0f, 0f, -dp(activity, 12)),
-                ObjectAnimator.ofFloat(banner, View.SCALE_X, 0.82f, 1.04f, 1f, 0.98f),
-                ObjectAnimator.ofFloat(banner, View.SCALE_Y, 0.82f, 1.04f, 1f, 0.98f));
-        bannerAnim.setStartDelay(320L);
-        bannerAnim.setDuration(3400L);
-        bannerAnim.start();
-
-        TextView blast = new TextView(activity);
-        blast.setText("💥");
-        blast.setTextSize(76f);
-        blast.setGravity(Gravity.CENTER);
-        blast.setClickable(false);
-        blast.setFocusable(false);
-        blast.setShadowLayer(dp(activity, 20), 0f, 0f, 0xFFFFD36A);
-        FrameLayout.LayoutParams blastParams = new FrameLayout.LayoutParams(
-                dp(activity, 132), dp(activity, 132), Gravity.CENTER);
-        celebration.addView(blast, blastParams);
-        AnimatorSet blastAnimation = new AnimatorSet();
-        blastAnimation.playTogether(
-                ObjectAnimator.ofFloat(blast, View.ALPHA, 0f, 1f, 1f, 0f),
-                ObjectAnimator.ofFloat(blast, View.SCALE_X, 0.12f, 1.3f, 1.7f, 1.95f),
-                ObjectAnimator.ofFloat(blast, View.SCALE_Y, 0.12f, 1.3f, 1.7f, 1.95f),
-                ObjectAnimator.ofFloat(blast, View.ROTATION, -22f, 8f, -4f, 0f));
-        blastAnimation.setStartDelay(180L);
-        blastAnimation.setDuration(2150L);
-        blastAnimation.start();
-
-        MAIN.postDelayed(() -> {
-            if (celebration.getParent() == root) root.removeView(celebration);
-        }, 4550L);
+        hideRunnable = () -> removeBanner(banner);
+        MAIN.postDelayed(hideRunnable, customToastStyle
+                ? Math.max(1, Math.min(12, customDuration)) * 1000L
+                : (canOpenRoom ? 6200L : 5200L));
     }
 
     private static String formatMultiplier(double multiplier) {
@@ -1229,30 +769,17 @@ public final class GlobalCelebrationToast {
         if (target == null || container == null || container.getWidth() <= 0 || container.getHeight() <= 0) return;
         float desiredX = container.getWidth() * Math.max(0f, Math.min(100f, xPercent)) / 100f;
         float desiredY = container.getHeight() * Math.max(0f, Math.min(100f, yPercent)) / 100f;
-        float targetWidth = Math.max(1, target.getWidth());
-        float targetHeight = Math.max(1, target.getHeight());
-        // Keep all configured elements inside the artwork even when a saved slider
-        // value is 0% or 100%; otherwise the avatar/name/reward/X can disappear off-edge.
-        if (centerX) {
-            desiredX = Math.max(targetWidth / 2f,
-                    Math.min(container.getWidth() - targetWidth / 2f, desiredX));
-        } else {
-            desiredX = Math.max(0f,
-                    Math.min(Math.max(0f, container.getWidth() - targetWidth), desiredX));
-        }
-        desiredY = Math.max(targetHeight / 2f,
-                Math.min(container.getHeight() - targetHeight / 2f, desiredY));
         int[] targetLocation = new int[2];
         int[] containerLocation = new int[2];
         target.getLocationOnScreen(targetLocation);
         container.getLocationOnScreen(containerLocation);
         // Dashboard preview stores the avatar/count center but the text's left edge.
         // Remove existing translations before deriving the layout baseline so repeated
-        // live-style refreshes are idempotent.
+        // live-style refreshes are idempotent and never push elements off the artwork.
         float baseX = targetLocation[0] - containerLocation[0] - target.getTranslationX();
         float baseY = targetLocation[1] - containerLocation[1] - target.getTranslationY();
-        target.setTranslationX(desiredX - baseX - (centerX ? targetWidth / 2f : 0f));
-        target.setTranslationY(desiredY - baseY - targetHeight / 2f);
+        target.setTranslationX(desiredX - baseX - (centerX ? target.getWidth() / 2f : 0f));
+        target.setTranslationY(desiredY - baseY - target.getHeight() / 2f);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
@@ -1294,13 +821,12 @@ public final class GlobalCelebrationToast {
         return "مبروك!";
     }
 
-    private static void removeBanner(View banner) { removeBanner(banner, false); }
-
-    private static void removeBanner(View banner, boolean centerPlacement) {
+    private static void removeBanner(View banner) {
         if (banner == null) return;
-        Runnable laneHide = centerPlacement ? hideRunnableCenter : hideRunnable;
-        if (laneHide != null) MAIN.removeCallbacks(laneHide);
-        if (centerPlacement) hideRunnableCenter = null; else hideRunnable = null;
+        if (hideRunnable != null) {
+            MAIN.removeCallbacks(hideRunnable);
+            hideRunnable = null;
+        }
         float out = -Math.max(banner.getWidth(), dp(banner, 280));
         banner.animate()
                 .alpha(0f)
@@ -1311,15 +837,9 @@ public final class GlobalCelebrationToast {
                     if (banner.getParent() instanceof ViewGroup parent) {
                         parent.removeView(banner);
                     }
-                    if (centerPlacement) {
-                        if (currentCenter.get() == banner) currentCenter = new WeakReference<>(null);
-                        showingCenter = false;
-                        showNext(true);
-                    } else {
-                        if (current.get() == banner) current = new WeakReference<>(null);
-                        showing = false;
-                        showNext(false);
-                    }
+                    if (current.get() == banner) current = new WeakReference<>(null);
+                    showing = false;
+                    showNext();
                 })
                 .start();
     }
