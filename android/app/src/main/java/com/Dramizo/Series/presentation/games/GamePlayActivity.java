@@ -494,11 +494,11 @@ public class GamePlayActivity extends ThemedActivity {
     /** Rewrite retired Mikoo HTTP/WebSocket endpoints to the active JEHO origin. */
     private void injectForceLocalHosts(WebView view) {
         if (view == null) return;
-        String origin = com.Dramizo.Series.util.ApiOrigin.origin();
-        String wsOrigin = origin.replace("https://", "wss://").replace("http://", "ws://");
+        String fallbackOrigin = com.Dramizo.Series.util.ApiOrigin.origin();
         String js = "(function(){try{"
                 + "if(window.__jehoForceLocal)return;window.__jehoForceLocal=1;"
-                + "var LOCAL='" + origin + "',LOCAL_WS='" + wsOrigin + "';"
+                + "var LOCAL=(window.location&&window.location.origin&&window.location.origin!=='null')?window.location.origin:'" + fallbackOrigin + "';"
+                + "var LOCAL_WS=LOCAL.replace(/^https:/i,'wss:').replace(/^http:/i,'ws:');"
                 + "var BAD=/(api\\.adnova\\.bbs\\.tr|jieyou\\.shop|sruner\\.com|zkruner\\.com|jeho-own-backend\\.mgs\\.blitz\\.cloud)/i;"
                 + "function rewrite(u){if(u==null)return u;var s=String(u);if(!BAD.test(s))return s;"
                 + "try{var a=document.createElement('a');a.href=s;"
