@@ -3107,26 +3107,30 @@ export class GiftsService implements OnModuleInit {
           .catch(() => undefined);
       }
       if (dto.roomId && result.send?.receiverId) {
-        const roomSupportMedal = await this.badgesService.recordRoomSupportProgress(
-          result.send.receiverId,
-          dto.roomId,
-          {
-            coins: Number(result.send.totalCoins || totalCoins),
-            diamonds: Number(result.hostDiamonds || result.send.diamondsAwarded || 0),
-            gifts: Math.max(1, Number(result.send.quantity) || qty),
-          },
-        ).catch((err) => {
-          this.log.warn(`room support medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
-          return null;
-        });
-        if (roomSupportMedal) {
-          this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-            roomId: dto.roomId,
-            event: 'room_support_medal:earned',
-            payload: roomSupportMedal,
-            from: { userId: result.send.receiverId },
-            at: new Date().toISOString(),
+        const supportMetrics = {
+          coins: Number(result.send.totalCoins || totalCoins),
+          diamonds: Number(result.hostDiamonds || result.send.diamondsAwarded || 0),
+          gifts: Math.max(1, Number(result.send.quantity) || qty),
+        };
+        for (const [targetUserId, role] of [
+          [senderId, 'supporter' as const],
+          [result.send.receiverId, 'receiver' as const],
+        ] as const) {
+          const roomSupportMedal = await this.badgesService.recordRoomSupportProgress(
+            targetUserId, dto.roomId, role, supportMetrics,
+          ).catch((err) => {
+            this.log.warn(`room ${role} medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
+            return null;
           });
+          if (roomSupportMedal) {
+            this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+              roomId: dto.roomId,
+              event: 'room_support_medal:earned',
+              payload: roomSupportMedal,
+              from: { userId: targetUserId },
+              at: new Date().toISOString(),
+            });
+          }
         }
       }
 
@@ -3722,28 +3726,32 @@ export class GiftsService implements OnModuleInit {
           });
       }
       if (dto.roomId) {
+        const supportMetrics = { coins: coinPrice * qty, diamonds: 0, gifts: Math.max(1, qty) };
+        const supporterMedal = await this.badgesService.recordRoomSupportProgress(
+          senderId, dto.roomId, 'supporter', supportMetrics,
+        ).catch((err) => {
+          this.log.warn(`room supporter medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
+          return null;
+        });
+        if (supporterMedal) this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+          roomId: dto.roomId, event: 'room_support_medal:earned', payload: supporterMedal,
+          from: { userId: senderId }, at: new Date().toISOString(),
+        });
         for (const rid of receiverIds) {
           const roomSupportMedal = await this.badgesService.recordRoomSupportProgress(
-            rid,
-            dto.roomId,
-            {
+            rid, dto.roomId, 'receiver', {
               coins: coinPrice * qty,
               diamonds: Number(result.micShares?.[rid] || 0),
               gifts: Math.max(1, qty),
             },
           ).catch((err) => {
-            this.log.warn(`room support medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
+            this.log.warn(`room receiver medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
             return null;
           });
-          if (roomSupportMedal) {
-            this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-              roomId: dto.roomId,
-              event: 'room_support_medal:earned',
-              payload: roomSupportMedal,
-              from: { userId: rid },
-              at: new Date().toISOString(),
-            });
-          }
+          if (roomSupportMedal) this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+            roomId: dto.roomId, event: 'room_support_medal:earned', payload: roomSupportMedal,
+            from: { userId: rid }, at: new Date().toISOString(),
+          });
         }
       }
 
