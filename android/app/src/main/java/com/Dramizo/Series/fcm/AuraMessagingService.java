@@ -55,6 +55,15 @@ public class AuraMessagingService extends FirebaseMessagingService {
         }
 
         String type = data.containsKey("type") && data.get("type") != null ? data.get("type") : "system";
+        Log.i(TAG, "FCM message received type=" + type + " dataKeys=" + data.keySet());
+        if (!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            Log.w(TAG, "FCM received but app notifications are disabled by system settings");
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "FCM received but POST_NOTIFICATIONS permission is not granted");
+        }
         // Defensive client-side guard for older backend versions or queued FCM messages:
         // lucky-win celebrations are room/in-app only and must never become Android push alerts.
         if (isLuckyWinMessage(type, title, body, data)) return;
