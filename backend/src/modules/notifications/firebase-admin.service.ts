@@ -28,6 +28,7 @@ export class FirebaseAdminService implements OnModuleInit {
       const configured =
         this.config.get<string>('app.fcm.credentialsPath') ||
         process.env.FIREBASE_CREDENTIALS_PATH ||
+        process.env.GOOGLE_APPLICATION_CREDENTIALS ||
         '';
       const candidates = [
         configured,
