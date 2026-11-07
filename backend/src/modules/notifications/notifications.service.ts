@@ -399,6 +399,38 @@ export class NotificationsService {
     };
   }
 
+  /** Send a real push to the authenticated admin device for end-to-end FCM verification. */
+  async sendFcmTest(userId: string) {
+    const devices = await this.devicesRepo.find({ where: { userId, isActive: true } });
+    const tokenDevices = devices.filter((device) => !!device.fcmToken && !!device.fcmToken.trim()).length;
+    const firebaseReady = this.firebase.isReady();
+    if (!firebaseReady || tokenDevices === 0) {
+      return {
+        sent: false,
+        firebaseReady,
+        activeDevices: devices.length,
+        tokenDevices,
+        reason: !firebaseReady ? 'firebase_not_ready' : 'no_registered_device_token',
+      };
+    }
+    const title = 'JEHO CHAT';
+    const body = 'هذا إشعار اختبار للتأكد من عمل إشعارات الرسائل';
+    const sent = await this.sendFcm(userId, title, body, {
+      type: 'system',
+      notificationKind: 'fcm_test',
+      title,
+      body,
+      test: 'true',
+    });
+    return {
+      sent,
+      firebaseReady,
+      activeDevices: devices.length,
+      tokenDevices,
+      reason: sent ? null : 'fcm_rejected_or_delivery_failed',
+    };
+  }
+
   async sendFcm(
     userId: string,
     title: string,
