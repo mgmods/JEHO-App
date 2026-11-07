@@ -10,7 +10,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
@@ -89,12 +89,14 @@ function agencyVisualBannerTier(totalDiamonds: number): number {
   if (d >= 10_000) return 2;
   return 1;
 }
+/** Personal empty live rooms auto-end after this many minutes (owner-away / ghost rooms). */
+const DEFAULT_PERSONAL_EMPTY_CLOSE_MINUTES = 30;
+
 @Injectable()
 export class RoomsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(RoomsService.name);
+  private personalEmptySweepTimer: ReturnType<typeof setInterval> | null = null;
   private chatAutoClearTimer: ReturnType<typeof setInterval> | null = null;
-  private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
-  private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
   /** Default list/cover art when a room has no custom cover (backgrounds pack on disk). */
   private readonly roomCoverCards = [
     'backgrounds/bg_aurora_night',
@@ -140,50 +142,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
-  private async recordAgencyModerationAction(
-    roomId: string,
-    actorId: string,
-    targetUserId: string,
-    action: 'mute' | 'remove_mic' | 'kick' | 'ban',
-    reason?: string | null,
-    metadata: Record<string, unknown> = {},
-  ) {
-    try {
-      await this.dataSource.query(
-        `INSERT INTO agency_moderation_audit
-          ("agencyId", "roomId", "actorId", "targetUserId", action, reason, metadata)
-         SELECT r."agencyId", r.id, $2, $3, $4, $5, $6::jsonb
-         FROM rooms r
-         WHERE r.id = $1 AND r."agencyId" IS NOT NULL`,
-        [roomId, actorId, targetUserId, action, reason || null, JSON.stringify(metadata || {})],
-      );
-    } catch (err) {
-      this.log.warn(`record agency moderation action: ${(err as Error).message}`);
-    }
-  }
-
   async onModuleInit() {
-    try {
-      await this.dataSource.query(`
-        CREATE TABLE IF NOT EXISTS agency_moderation_audit (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
-          "roomId" uuid NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-          "actorId" uuid REFERENCES users(id) ON DELETE SET NULL,
-          "targetUserId" uuid REFERENCES users(id) ON DELETE SET NULL,
-          action varchar(24) NOT NULL,
-          reason text,
-          metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-          "createdAt" timestamptz NOT NULL DEFAULT NOW()
-        )
-      `);
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS "IDX_agency_moderation_audit_agency_created"
-        ON agency_moderation_audit ("agencyId", "createdAt" DESC)
-      `);
-    } catch (err) {
-      this.log.warn(`ensure agency moderation audit: ${(err as Error).message}`);
-    }
     try {
       await this.dataSource.query(
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(6)`,
@@ -210,9 +169,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "micInteractEnabled" boolean NOT NULL DEFAULT true`,
       );
       await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "micRequestEnabled" boolean NOT NULL DEFAULT false`,
-      );
-      await this.dataSource.query(
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "entryEffectsEnabled" boolean NOT NULL DEFAULT true`,
       );
       await this.dataSource.query(
@@ -227,9 +183,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await this.dataSource.query(
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS "staffRole" varchar(16) DEFAULT NULL`,
       );
-      // Platform-owned support rooms have no user owner; preserve all existing room rows.
-      await this.dataSource.query(`ALTER TABLE rooms ALTER COLUMN "hostId" DROP NOT NULL`);
-      await this.dataSource.query(`ALTER TABLE room_moderators ALTER COLUMN "appointedById" DROP NOT NULL`);
     } catch (err) {
       this.log.warn(
         `rooms column ensure skipped: ${
@@ -237,25 +190,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         }`,
       );
     }
-    // Personal rooms are durable room identities, not temporary live-session records.
-    // Repair older active personal rooms once at boot so a stale idle marker or a legacy
-    // non-persistent flag can never make them disappear after the host disconnects.
-    try {
-      await this.dataSource.query(`
-        UPDATE rooms
-           SET "isPersistent" = TRUE,
-               "emptySince" = NULL,
-               "activeHostId" = COALESCE("activeHostId", "hostId")
-         WHERE "agencyId" IS NULL
-           AND "roomKind" = $1
-           AND status <> $2
-           AND "hostId" IS NOT NULL
-      `, [RoomKind.STANDARD, RoomStatus.CLOSED]);
-    } catch (err) {
-      this.log.warn(`ensure persistent personal rooms: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    // Personal live rooms remain open until the host or authorized staff explicitly ends them.
+    // Personal rooms: end live if nobody is in (host away + empty) for ~30 minutes.
+    this.personalEmptySweepTimer = setInterval(() => {
+      void this.sweepEmptyPersonalRooms().catch((err) =>
+        this.log.warn(
+          `personal empty sweep: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }, 60_000);
     // Auto-clear public chat for rooms with chatAutoClearMinutes > 0.
     this.chatAutoClearTimer = setInterval(() => {
       void this.sweepAutoChatClear().catch((err) =>
@@ -267,6 +209,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy() {
+    if (this.personalEmptySweepTimer) {
+      clearInterval(this.personalEmptySweepTimer);
+      this.personalEmptySweepTimer = null;
+    }
     if (this.chatAutoClearTimer) {
       clearInterval(this.chatAutoClearTimer);
       this.chatAutoClearTimer = null;
@@ -311,7 +257,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
    */
   async syncPersonalRoomEmptyState(roomId: string) {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
-    if (!room || !this.isPersonalLiveRoom(room) || room.isPersistent) return;
+    if (!room || !this.isPersonalLiveRoom(room)) return;
     const presence = await this.countLivePresence(roomId);
     if (presence > 0) {
       if (room.emptySince) {
@@ -324,6 +270,65 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       room.emptySince = new Date();
       await this.roomsRepo.save(room);
     }
+  }
+
+  /** End personal lives that have been fully empty for the configured window. */
+  async sweepEmptyPersonalRooms() {
+    const minutes = await this.numberSetting(
+      'rooms.personal_empty_close_minutes',
+      DEFAULT_PERSONAL_EMPTY_CLOSE_MINUTES,
+    );
+    const cutoff = new Date(Date.now() - Math.max(5, minutes) * 60_000);
+    const candidates = await this.roomsRepo
+      .createQueryBuilder('room')
+      .where('room.activeHostId IS NOT NULL')
+      .andWhere('room.status != :closed', { closed: RoomStatus.CLOSED })
+      .andWhere('room.agencyId IS NULL')
+      .andWhere("(room.roomKind IS NULL OR room.roomKind = :std)", {
+        std: RoomKind.STANDARD,
+      })
+      .getMany();
+
+    let closed = 0;
+    for (const room of candidates) {
+      if (!this.isPersonalLiveRoom(room)) continue;
+      const presence = await this.countLivePresence(room.id);
+      if (presence > 0) {
+        if (room.emptySince) {
+          room.emptySince = null;
+          await this.roomsRepo.save(room);
+        }
+        continue;
+      }
+      if (!room.emptySince) {
+        room.emptySince = new Date();
+        await this.roomsRepo.save(room);
+        continue;
+      }
+      if (room.emptySince > cutoff) continue;
+      await this.endLiveSession(room);
+      this.realtimeGateway.emitToRoom(room.id, 'room:event', {
+        roomId: room.id,
+        event: 'room:auto_closed',
+        payload: {
+          roomId: room.id,
+          reason: 'personal_empty_timeout',
+          emptyMinutes: minutes,
+        },
+        at: new Date().toISOString(),
+      });
+      closed += 1;
+      this.log.log(
+        `Auto-closed empty personal room ${room.id} after ${minutes}m idle`,
+      );
+    }
+    return { scanned: candidates.length, closed };
+  }
+
+  private async numberSetting(key: string, fallback: number): Promise<number> {
+    const row = await this.settingsRepo.findOne({ where: { key } });
+    const n = Number(row?.value);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
   }
 
   private async boolSetting(key: string, fallback: boolean): Promise<boolean> {
@@ -463,23 +468,17 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           WHERE ${whereSql}
        GROUP BY g."senderId", u."displayName", u.username, u."avatarUrl", p."hostBadgeUrl"
        ORDER BY score DESC
-          LIMIT 30`,
+          LIMIT 3`,
         params,
       );
-      const hiddenIds = await this.mysteriousModeUserIds(
-        rows.map((row: Record<string, unknown>) => String(row.userId || '')),
-      );
-      return rows
-        .filter((row: Record<string, unknown>) => !hiddenIds.has(String(row.userId || '')))
-        .slice(0, 3)
-        .map((row: Record<string, unknown>, index: number) => ({
-          rank: index + 1,
-          userId: row.userId,
-          displayName: row.displayName,
-          avatarUrl: row.avatarUrl,
-          hostBadgeUrl: row.hostBadgeUrl,
-          score: Number(row.score || 0),
-        }));
+      return rows.map((row: Record<string, unknown>, index: number) => ({
+        rank: index + 1,
+        userId: row.userId,
+        displayName: row.displayName,
+        avatarUrl: row.avatarUrl,
+        hostBadgeUrl: row.hostBadgeUrl,
+        score: Number(row.score || 0),
+      }));
     };
     // Room header tops are session-scoped: cleared when live ends.
     const roomTop =
@@ -552,7 +551,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     } else if (periodKind === 'month') {
       timeSql = ` AND g."createdAt" >= NOW() - INTERVAL '30 days'`;
     }
-    params.push(Math.min(500, n * 5));
+    params.push(n);
     const rows = await this.dataSource.query(
       `SELECT ${userCol} AS "userId",
               COALESCE(u."displayName", u.username, 'مستخدم') AS "displayName",
@@ -566,19 +565,13 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         LIMIT $${params.length}`,
       params,
     );
-    const hiddenIds = await this.mysteriousModeUserIds(
-      rows.map((row: Record<string, unknown>) => String(row.userId || '')),
-    );
-    const items = rows
-      .filter((row: Record<string, unknown>) => !hiddenIds.has(String(row.userId || '')))
-      .slice(0, n)
-      .map((row: Record<string, unknown>, index: number) => ({
-        rank: index + 1,
-        userId: row.userId,
-        displayName: row.displayName,
-        avatarUrl: row.avatarUrl,
-        score: Number(row.score || 0),
-      }));
+    const items = rows.map((row: Record<string, unknown>, index: number) => ({
+      rank: index + 1,
+      userId: row.userId,
+      displayName: row.displayName,
+      avatarUrl: row.avatarUrl,
+      score: Number(row.score || 0),
+    }));
     const dayGold = await this.roomDayGold(roomId);
     return {
       roomId,
@@ -873,7 +866,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         activeHostId: hostId,
         liveSessionStartedAt: existing.liveSessionStartedAt || new Date(),
         emptySince: null,
-        isPersistent: true,
+        isPersistent: false,
         isPublic: true,
         accessMode: RoomAccessMode.FREE,
         entryFeeCoins: 0,
@@ -906,7 +899,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       activeHostId: hostId,
       status: RoomStatus.OPEN,
       roomKind: RoomKind.STANDARD,
-      isPersistent: true,
+      isPersistent: false,
       seatCount,
       topic: dto.topic || null,
       isPublic: true,
@@ -1215,7 +1208,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     qb.where(conditions.map((part) => `(${part})`).join(' OR '))
       .andWhere('room."status" != :closedStatus', { closedStatus: RoomStatus.CLOSED })
-      .orderBy('room.updatedAt', 'DESC')
+      .orderBy('room."updatedAt"', 'DESC')
       .take(100);
     const rooms = this.dedupeRoomsById(await qb.getMany());
     const giftCoins = await this.roomGiftCoinTotals(rooms.map((room) => room.id));
@@ -1232,65 +1225,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return (row?.meta as Record<string, unknown> | null) ?? null;
   }
 
-  private async displayRankMapForUsers(userIds: string[]) {
-    const ids = [...new Set((userIds || []).filter(Boolean))];
-    const result = new Map<string, { customDisplayRankName: string | null; customDisplayRankImageUrl: string | null; customDisplayRankAnimated: boolean }>();
-    if (!ids.length) return result;
-    const rows = await this.dataSource.query(
-      `SELECT DISTINCT ON (ub."userId")
-              ub."userId" AS "userId", b.name AS "name",
-              b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated"
-         FROM user_badges ub
-         JOIN badges b ON b.id = ub."badgeId"
-        WHERE ub."userId" = ANY($1::uuid[])
-          AND b.category = 'display_rank' AND b."isActive" = true
-          AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
-        ORDER BY ub."userId", ub."grantedAt" DESC, b."sortOrder" ASC`,
-      [ids],
-    );
-    for (const row of rows || []) result.set(String(row.userId), {
-      customDisplayRankName: row.name ? String(row.name) : null,
-      customDisplayRankImageUrl: row.imageUrl ? String(row.imageUrl) : null,
-      customDisplayRankAnimated: row.isAnimated === true || row.isAnimated === 'true',
-    });
-    return result;
-  }
-
-  /**
-   * First-paint room decoration. The initial join must not issue per-user cosmetic
-   * ownership/meta queries (up to five extra DB round-trips per seat). Use the
-   * profile's already-equipped visual fields and batched VIP/rank/name-style maps;
-   * the normal detail refresh performs the full ownership verification afterward.
-   */
-  private attachFrameFast(
-    user: any,
-    vipLevel = 0,
-    displayRank?: Record<string, unknown> | null,
-    nameStyle?: Record<string, unknown> | null,
-  ) {
-    if (!user) return null;
-    const profile = user.profile || {};
-    const level = Number(vipLevel || user.vipLevel || 0);
-    const rawVip = profile.vipBadgeUrl ?? user.vipBadgeUrl ?? null;
-    return {
-      ...user,
-      country: profile.country ?? user.country ?? null,
-      hostBadgeUrl: profile.hostBadgeUrl ?? user.hostBadgeUrl ?? null,
-      hostBadgeMeta: null,
-      // Static VIP art is supplied through the fixed head/tou fields below.
-      vipBadgeUrl: isStaticVipTouUrl(rawVip) ? null : rawVip,
-      vipHeadUrl: fixedVipHeadUrl(level),
-      vipTouUrl: fixedVipFrameUrl(level),
-      levelBadgeUrl: profile.levelBadgeUrl ?? user.levelBadgeUrl ?? null,
-      roomCardUrl: profile.roomCardUrl ?? user.roomCardUrl ?? null,
-      vipLevel: level,
-      nameStyle: nameStyle || null,
-      ...(displayRank || {}),
-      profile: undefined,
-    };
-  }
-
-  private async attachFrame(user: any, vipLevel = 0, displayRank?: Record<string, unknown> | null, nameStyle?: Record<string, unknown> | null) {
+  private async attachFrame(user: any, vipLevel = 0) {
     if (!user) return null;
     const profile = user.profile || {};
     const rawHost = profile.hostBadgeUrl ?? user.hostBadgeUrl ?? null;
@@ -1298,19 +1233,21 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const rawLevel = profile.levelBadgeUrl ?? user.levelBadgeUrl ?? null;
     // Prefer owned+equipped URL, but never strip a profile-equipped host frame
     // (room stage/seats were losing the badge while profile/chat still showed it).
-    // The profile fields are already the equipped visual references. The previous
-    // ownership lookups fell back to these same raw URLs when no row matched, so
-    // issuing three per-user DB queries here added latency without changing output.
-    const hostBadgeUrl = rawHost;
+    const [verifiedHost, verifiedVip, verifiedLevel] = await Promise.all([
+      this.activeOwnedWearUrl(user.id, rawHost),
+      this.activeOwnedWearUrl(user.id, rawVip),
+      this.activeOwnedWearUrl(user.id, rawLevel),
+    ]);
+    const hostBadgeUrl = verifiedHost ?? rawHost;
     const level = Number(vipLevel || user.vipLevel || 0);
     // Equipped wear first (mall / SVGA). Static VIP art is vipTouUrl/vipHeadUrl only.
-    let vipBadgeUrl = rawVip;
+    let vipBadgeUrl = verifiedVip ?? rawVip;
     if (isStaticVipTouUrl(vipBadgeUrl)) {
       vipBadgeUrl = await this.findEquippedMallHeadFrame(user.id);
     }
     const vipHeadUrl = fixedVipHeadUrl(level);
     const vipTouUrl = fixedVipFrameUrl(level);
-    const levelBadgeUrl = rawLevel;
+    const levelBadgeUrl = verifiedLevel ?? rawLevel;
     const hostBadgeMeta = await this.wearMetaForUrl(hostBadgeUrl);
     return {
       ...user,
@@ -1323,8 +1260,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       levelBadgeUrl,
       roomCardUrl: profile.roomCardUrl ?? user.roomCardUrl ?? null,
       vipLevel: level,
-      nameStyle: nameStyle || null,
-      ...(displayRank || {}),
       profile: undefined,
     };
   }
@@ -1343,7 +1278,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           AND (owned."expiresAt" IS NULL OR owned."expiresAt" > NOW())
           AND COALESCE(cosmetic."previewUrl", '') NOT LIKE '%ud_vip_tou_%'
           AND COALESCE(cosmetic."previewUrl", '') NOT LIKE '%vip_tou_fixed_%'
-          AND COALESCE((COALESCE(NULLIF(cosmetic.meta, '')::jsonb, '{}'::jsonb) ->> 'fixedVipFrame'), '') <> 'true'
+          AND COALESCE(cosmetic.meta->>'fixedVipFrame', '') <> 'true'
         ORDER BY owned."updatedAt" DESC NULLS LAST
         LIMIT 1`,
       [userId],
@@ -1428,36 +1363,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return map;
   }
 
-  /** Public VIP name styles for room seats/host; only active, unexpired subscriptions qualify. */
-  private async nameStyleMapForUsers(userIds: string[]) {
-    const ids = [...new Set((userIds || []).filter(Boolean))];
-    const map = new Map<string, Record<string, unknown>>();
-    if (!ids.length) return map;
-    const rows = await this.dataSource.query(
-      `SELECT DISTINCT ON (uv."userId")
-              uv."userId" AS "userId",
-              COALESCE(NULLIF(vp.benefits, '')::jsonb, '{}'::jsonb)->'visuals'->'nameStyle' AS "nameStyle"
-         FROM user_vips uv
-         JOIN vip_plans vp ON vp.id = uv."vipPlanId"
-        WHERE uv."userId" = ANY($1::uuid[])
-          AND uv."isActive" = true
-          AND uv."startsAt" <= NOW()
-          AND uv."expiresAt" > NOW()
-        ORDER BY uv."userId", uv.level DESC, uv."updatedAt" DESC`,
-      [ids],
-    ) as Array<{ userId: string; nameStyle: Record<string, unknown> | string | null }>;
-    for (const row of rows || []) {
-      let style: any = row.nameStyle;
-      if (typeof style === 'string') {
-        try { style = JSON.parse(style); } catch { style = null; }
-      }
-      if (style && typeof style === 'object' && style.enabled === true) {
-        map.set(String(row.userId), style as Record<string, unknown>);
-      }
-    }
-    return map;
-  }
-
   private collectViewerAvatars(room: any): string[] {
     const urls: string[] = [];
     const seen = new Set<string>();
@@ -1509,123 +1414,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return map;
   }
 
-  /** Cache the dashboard policy briefly; room rosters can contain many users. */
-  private async mysteriousPolicy(): Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }> {
-    const now = Date.now();
-    if (this.mysteriousPolicyCache && this.mysteriousPolicyCache.expiresAt > now) {
-      return this.mysteriousPolicyCache;
-    }
-    if (this.mysteriousPolicyLookup) return this.mysteriousPolicyLookup;
-    this.mysteriousPolicyLookup = this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } })
-      .then((row) => ({ row, failed: false, expiresAt: Date.now() + 5_000 }))
-      .catch(() => ({ row: null, failed: true, expiresAt: Date.now() + 2_000 }))
-      .then((result) => {
-        this.mysteriousPolicyCache = result;
-        return result;
-      })
-      .finally(() => { this.mysteriousPolicyLookup = undefined; });
-    return this.mysteriousPolicyLookup;
-  }
-
-  /** Dashboard policy is authoritative; legacy plan benefits are only a pre-policy fallback. */
-  private async isMysteriousModeEligible(user: User | null | undefined, vip: UserVip | null | undefined): Promise<boolean> {
-    if (!user?.mysteriousMode || !vip || !vip.isActive) return false;
-    if (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) return false;
-    const level = Number(vip.level || 0);
-    if (!Number.isInteger(level) || level < 1 || level > 7) return false;
-
-    const currentPolicy = await this.mysteriousPolicy();
-    if (currentPolicy.failed) return false;
-    const policyRow = currentPolicy.row;
-    const benefits = vip.vipPlan?.benefits as any;
-    if (policyRow) {
-      let policy: any = {};
-      try {
-        policy = typeof policyRow.value === 'string'
-          ? JSON.parse(policyRow.value)
-          : (policyRow.value || {});
-      } catch {
-        return false;
-      }
-      const levels = Array.isArray(policy.eligibleVipLevels)
-        ? policy.eligibleVipLevels.map(Number).filter((n: number) =>
-            Number.isInteger(n) && n >= 1 && n <= 7)
-        : [];
-      return policy.enabled === true && levels.includes(level);
-    }
-    const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
-    return Array.isArray(extra) && extra.includes('mysterious_man');
-  }
-
-  /** Resolve active mysterious-mode users in batches so ranking reads stay bounded. */
-  private async mysteriousModeUserIds(userIds: string[]): Promise<Set<string>> {
-    const ids = [...new Set((userIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
-    if (!ids.length) return new Set<string>();
-    const users = await this.usersRepo.find({
-      where: { id: In(ids), mysteriousMode: true },
-    });
-    if (!users.length) return new Set<string>();
-    const vipRows = await this.userVipsRepo.find({
-      where: {
-        userId: In(users.map((user) => user.id)),
-        isActive: true,
-        expiresAt: MoreThan(new Date()),
-      },
-      relations: ['vipPlan'],
-      order: { level: 'DESC' },
-    });
-    const vipByUser = new Map<string, UserVip>();
-    for (const vip of vipRows) {
-      if (!vipByUser.has(vip.userId)) vipByUser.set(vip.userId, vip);
-    }
-    const hidden = new Set<string>();
-    await Promise.all(users.map(async (user) => {
-      if (await this.isMysteriousModeEligible(user, vipByUser.get(user.id))) {
-        hidden.add(user.id);
-      }
-    }));
-    return hidden;
-  }
-
-  /** Return room-only anonymous presentation only for an eligible, unexpired VIP. */
-  private async mysteriousRoomIdentity(userId: string): Promise<Record<string, unknown> | null> {
-    if (!userId) return null;
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
-    if (!user?.mysteriousMode) return null;
-    const vip = await this.userVipsRepo.findOne({
-      where: { userId, isActive: true, expiresAt: MoreThan(new Date()) },
-      relations: ['vipPlan'],
-      order: { level: 'DESC' },
-    });
-    if (!(await this.isMysteriousModeEligible(user, vip))) return null;
-    const benefits = vip?.vipPlan?.benefits as any;
-    const visuals = benefits?.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
-    const customFrame = visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null);
-    return {
-      mysteriousMan: true,
-      displayName: 'الرجل الغامض',
-      username: 'mysterious_man',
-      avatarUrl: null,
-      publicId: null,
-      ...(customFrame ? { vipBadgeUrl: customFrame, frameUrl: customFrame } : {}),
-    };
-  }
-
-  private async roomSupportMedalMapForUsers(userIds: string[]) {
-    const ids = [...new Set((userIds || []).filter(Boolean))];
-    const result = new Map<string, { id: string; name: string; imageUrl: string; expiresAt: string | null }>();
-    if (!ids.length) return result;
-    const rows = await this.dataSource.query(
-      'SELECT DISTINCT ON (ub."userId") ub."userId" AS "userId", b.id, b.name, b."imageUrl" AS "imageUrl", ub."expiresAt" AS "expiresAt" FROM user_badges ub JOIN badges b ON b.id = ub."badgeId" WHERE ub."userId" = ANY($1::uuid[]) AND b.category = \'room_support\' AND b."isActive" = true AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW()) ORDER BY ub."userId", ub."grantedAt" DESC, b."sortOrder" ASC',
-      [ids],
-    );
-    for (const row of rows || []) result.set(String(row.userId), {
-      id: String(row.id), name: String(row.name || ''), imageUrl: String(row.imageUrl || ''),
-      expiresAt: row.expiresAt ? new Date(row.expiresAt).toISOString() : null,
-    });
-    return result;
-  }
-
   private async decorateRoom(room: any) {
     const userIds: string[] = [];
     if (room.hostId) userIds.push(room.hostId);
@@ -1633,12 +1421,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       if (s.userId) userIds.push(s.userId);
       else if (s.user?.id) userIds.push(s.user.id);
     }
-    const [vipMap, displayRanks, nameStyles, roomSupportMedals] = await Promise.all([
-      this.vipMapForUsers(userIds),
-      this.displayRankMapForUsers(userIds),
-      this.nameStyleMapForUsers(userIds),
-      this.roomSupportMedalMapForUsers(userIds),
-    ]);
+    const vipMap = await this.vipMapForUsers(userIds);
     const uploadedRoomBackground = this.isUploadedRoomImageUrl(room.backgroundUrl)
       ? String(room.backgroundUrl).trim()
       : null;
@@ -1657,34 +1440,20 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         ? room.roomCardUrl.trim()
         : null;
     const hostProfile = room.host?.profile as { roomCardUrl?: string | null } | undefined;
-    const isPlatformRoom = room.roomKind === RoomKind.SUPPORT;
     const fromHostProfile =
-      !isPlatformRoom && typeof hostProfile?.roomCardUrl === 'string' && hostProfile.roomCardUrl.trim()
+      typeof hostProfile?.roomCardUrl === 'string' && hostProfile.roomCardUrl.trim()
         ? hostProfile.roomCardUrl.trim()
         : null;
     const decoratedSeats = await Promise.all(
       (room.seats || []).map(async (s: any) => {
         const uid = s.userId || s.user?.id;
-        const attached = await this.attachFrame(s.user, vipMap.get(uid) || 0, displayRanks.get(uid) || null, nameStyles.get(uid) || null);
-        const anonymous = await this.mysteriousRoomIdentity(uid);
         return {
           ...s,
-          user: anonymous && attached
-            ? { ...attached, ...anonymous, roomSupportMedal: roomSupportMedals.get(uid) || null }
-            : (attached ? { ...attached, roomSupportMedal: roomSupportMedals.get(uid) || null } : attached),
+          user: await this.attachFrame(s.user, vipMap.get(uid) || 0),
         };
       }),
     );
-    // Official platform rooms have no user owner. Every ordinary room, including
-    // the account owner's personal room, uses the same server-authoritative alias
-    // whenever mysterious mode is enabled; there is no room-specific identity bypass.
-    const attachedHost = isPlatformRoom ? null : await this.attachFrame(room.host, vipMap.get(room.hostId) || 0, displayRanks.get(room.hostId) || null, nameStyles.get(room.hostId) || null);
-    const hostAnonymous = !isPlatformRoom && room.hostId
-      ? await this.mysteriousRoomIdentity(room.hostId)
-      : null;
-    const hostDto = hostAnonymous && attachedHost
-      ? { ...attachedHost, ...hostAnonymous, roomSupportMedal: roomSupportMedals.get(room.hostId) || null }
-      : (attachedHost ? { ...attachedHost, roomSupportMedal: roomSupportMedals.get(room.hostId) || null } : attachedHost);
+    const hostDto = await this.attachFrame(room.host, vipMap.get(room.hostId) || 0);
     const fromHostDto =
       hostDto && typeof (hostDto as any).roomCardUrl === 'string'
         ? String((hostDto as any).roomCardUrl).trim() || null
@@ -1823,15 +1592,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
   private async memberIdentity(userId: string) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
-    const anonymous = await this.mysteriousRoomIdentity(userId);
     return {
       userId,
-      displayName: anonymous ? 'الرجل الغامض' : (user?.displayName || user?.username || 'مستخدم'),
-      username: anonymous ? 'mysterious_man' : (user?.username || null),
-      avatarUrl: anonymous ? null : (user?.avatarUrl || null),
-      publicId: anonymous ? null : (user?.publicId || null),
-      mysteriousMan: !!anonymous,
-      ...(anonymous || {}),
+      displayName: user?.displayName || user?.username || 'مستخدم',
+      publicId: user?.publicId || null,
     };
   }
 
@@ -1949,24 +1713,18 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getRoom(id: string, options?: { fast?: boolean }) {
-    // Load the room/host separately from the two one-to-many collections.
-    // Joining seats and moderators in one TypeORM query multiplies rows
-    // (seatCount × moderatorCount) and inflates every room-entry response.
     const room = await this.roomsRepo.findOne({
       where: { id },
-      relations: ['host', 'host.profile'],
+      relations: [
+        'host',
+        'host.profile',
+        'seats',
+        'seats.user',
+        'seats.user.profile',
+        'moderators',
+      ],
     });
     if (!room) throw new NotFoundException('Room not found');
-    const [loadedSeats, loadedModerators] = await Promise.all([
-      this.seatsRepo.find({
-        where: { roomId: id },
-        relations: ['user', 'user.profile'],
-        order: { seatIndex: 'ASC' },
-      }),
-      this.modsRepo.find({ where: { roomId: id } }),
-    ]);
-    room.seats = loadedSeats;
-    room.moderators = loadedModerators;
     await this.assertAgencyRoomActive(room);
     // Respect host-configured size (guest mics + host seat). Never force back to default 11.
     const desiredSeatCount = Math.max(
@@ -2028,16 +1786,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         const uid = seat?.userId || seat?.user?.id;
         if (uid) fastUserIds.push(uid);
       }
-      const [fastVipMap, fastRanks, fastNameStyles] = await Promise.all([
-        this.vipMapForUsers(fastUserIds),
-        this.displayRankMapForUsers(fastUserIds),
-        this.nameStyleMapForUsers(fastUserIds),
-      ]);
+      const fastVipMap = await this.vipMapForUsers(fastUserIds);
       const fastSeats = await Promise.all((room.seats || []).map(async (seat: any) => {
         const uid = seat?.userId || seat?.user?.id;
-        return { ...seat, user: this.attachFrameFast(seat.user, fastVipMap.get(uid) || 0, fastRanks.get(uid) || null, fastNameStyles.get(uid) || null) };
+        return { ...seat, user: await this.attachFrame(seat.user, fastVipMap.get(uid) || 0) };
       }));
-      const fastHost = this.attachFrameFast(room.host, fastVipMap.get(room.hostId) || 0, fastRanks.get(room.hostId) || null, fastNameStyles.get(room.hostId) || null);
+      const fastHost = await this.attachFrame(room.host, fastVipMap.get(room.hostId) || 0);
       return {
         ...safeRoom,
         host: fastHost,
@@ -2162,10 +1916,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const [ban, existingAccess] = await Promise.all([
-      this.bansRepo.findOne({ where: { roomId, userId } }),
-      this.accessRepo.findOne({ where: { roomId, userId } }),
-    ]);
+    const ban = await this.bansRepo.findOne({ where: { roomId, userId } });
     if (ban && (!ban.expiresAt || ban.expiresAt > new Date())) {
       throw new ForbiddenException('You are banned from this room');
     }
@@ -2182,7 +1933,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       if (!ok) throw new ForbiddenException('Invalid room password');
     }
 
-    let priorAccess = existingAccess;
+    let priorAccess = await this.accessRepo.findOne({ where: { roomId, userId } });
     if (
       priorAccess?.grantType === RoomAccessGrant.SESSION &&
       priorAccess.expiresAt &&
@@ -2359,7 +2110,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       charmEnabled?: boolean;
       bannerEnabled?: boolean;
       micInteractEnabled?: boolean;
-      micRequestEnabled?: boolean;
       entryEffectsEnabled?: boolean;
       lowGiftEffectsEnabled?: boolean;
     },
@@ -2372,9 +2122,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     );
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
-    if (typeof patch.micRequestEnabled === 'boolean' && room.hostId !== actorId) {
-      throw new ForbiddenException('Only the room owner can change mic request mode');
-    }
     if (typeof patch.chatZoneEnabled === 'boolean') {
       room.chatZoneEnabled = patch.chatZoneEnabled;
     }
@@ -2387,9 +2134,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     if (typeof patch.micInteractEnabled === 'boolean') {
       room.micInteractEnabled = patch.micInteractEnabled;
     }
-    if (typeof patch.micRequestEnabled === 'boolean') {
-      room.micRequestEnabled = patch.micRequestEnabled;
-    }
     if (typeof patch.entryEffectsEnabled === 'boolean') {
       room.entryEffectsEnabled = patch.entryEffectsEnabled;
     }
@@ -2397,22 +2141,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       room.lowGiftEffectsEnabled = patch.lowGiftEffectsEnabled;
     }
     await this.roomsRepo.save(room);
-    if (patch.micRequestEnabled === false) {
-      await this.seatSignalsRepo.delete({ roomId, kind: RoomSeatSignalKind.REQUEST });
-      this.realtimeGateway.emitToRoom(roomId, 'room:event', {
-        roomId,
-        event: 'room:seat_requests_cleared',
-        payload: { roomId, reason: 'mic_request_disabled' },
-        at: new Date().toISOString(),
-      });
-    }
     const payload = {
       roomId,
       chatZoneEnabled: room.chatZoneEnabled !== false,
       charmEnabled: room.charmEnabled !== false,
       bannerEnabled: room.bannerEnabled !== false,
       micInteractEnabled: room.micInteractEnabled !== false,
-      micRequestEnabled: room.micRequestEnabled === true,
       entryEffectsEnabled: room.entryEffectsEnabled !== false,
       lowGiftEffectsEnabled: room.lowGiftEffectsEnabled !== false,
     };
@@ -2685,31 +2419,19 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       where: { roomId, kind: RoomSeatSignalKind.REQUEST },
       order: { createdAt: 'ASC' },
     });
-    const users = await Promise.all(
-      rows.map((row) => this.usersRepo.findOne({ where: { id: row.userId } })),
-    );
-    return rows.map((row, index) => ({
+    return rows.map((row) => ({
       userId: row.userId,
       seatIndex: row.seatIndex,
-      displayName: row.displayName || users[index]?.displayName || users[index]?.username || 'Guest',
-      avatarUrl: users[index]?.avatarUrl || null,
+      displayName: row.displayName || 'Guest',
       at: row.createdAt.toISOString(),
     }));
   }
 
-  private async assertMicRequestPermission(roomId: string, actorId: string, message: string) {
-    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
-    if (!room) throw new NotFoundException('Room not found');
-    const permissions = await this.getViewerRoomPermissions(room, actorId);
-    if (!permissions.canInvite && !permissions.canManageSeats) {
-      throw new ForbiddenException(message);
-    }
-  }
-
   async listSeatRequests(roomId: string, actorId: string) {
-    await this.assertMicRequestPermission(
+    await this.assertModeratorPermission(
       roomId,
       actorId,
+      'canInvite',
       'Mic invitation permission is required',
     );
     return { items: await this.seatRequestItems(roomId) };
@@ -2906,9 +2628,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     seatIndex?: number | null,
     invited = false,
   ) {
-    await this.assertMicRequestPermission(
+    await this.assertModeratorPermission(
       roomId,
       actorId,
+      'canInvite',
       'Mic request approval permission is required',
     );
     const pending = await this.seatSignalsRepo.findOne({
@@ -2979,15 +2702,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.seatSignalsRepo.delete({ roomId, userId: targetUserId });
 
     this.notifyRoomUpdated(roomId);
-    const approvedIdentity = await this.memberIdentity(targetUserId);
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
       roomId,
       event: 'room:seat_approved',
       payload: {
         roomId,
-        ...approvedIdentity,
         userId: targetUserId,
         seatIndex: target.seatIndex,
+        displayName: pending?.displayName || null,
       },
       at: new Date().toISOString(),
     });
@@ -2995,9 +2717,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async rejectSeat(roomId: string, actorId: string, targetUserId: string) {
-    await this.assertMicRequestPermission(
+    await this.assertModeratorPermission(
       roomId,
       actorId,
+      'canInvite',
       'Mic request approval permission is required',
     );
     await this.seatSignalsRepo.delete({
@@ -3022,9 +2745,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const effectiveUserId =
       targetUserId && String(targetUserId).trim() ? String(targetUserId).trim() : actorId;
     const moderatingOther = effectiveUserId !== actorId;
-    if (moderatingOther && !muted) {
-      throw new ForbiddenException('لا يمكن للمشرف فتح المايك نيابةً عن المستخدم؛ المستخدم يتحكم بفتح مايكه');
-    }
     if (moderatingOther) {
       await this.assertModeratorPermission(
         roomId,
@@ -3048,18 +2768,16 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     ) {
       throw new ForbiddenException('يحتاج المضيف أو المشرف لفك كتم المايك أولاً');
     }
+    seat.isMuted = !!muted;
     if (moderatingOther) {
-      // A moderator can close another user's mic, but cannot open it on their behalf.
-      // Keep self-unmute under the user's control.
-      seat.isMuted = true;
-      seat.isModeratorMuted = false;
-    } else {
-      seat.isMuted = !!muted;
+      seat.isModeratorMuted = !!muted;
+      // Unmute by host/mod clears both flags so the guest can speak again.
+      if (!muted) {
+        seat.isMuted = false;
+        seat.isModeratorMuted = false;
+      }
     }
     await this.seatsRepo.save(seat);
-    if (moderatingOther && muted) {
-      await this.recordAgencyModerationAction(roomId, actorId, effectiveUserId, 'mute', 'moderator_mute');
-    }
     // Admin mute is flag-only — do not eject from Zego (kick/ban still eject).
     this.notifyRoomUpdated(roomId);
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
@@ -3128,11 +2846,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     this.notifyRoomUpdated(roomId);
     if (wasSeated) {
-      const leavingIdentity = await this.memberIdentity(userId);
       this.realtimeGateway.emitToRoom(roomId, 'room:event', {
         roomId,
         event: 'room:seat_left',
-        payload: { roomId, ...leavingIdentity, userId },
+        payload: { roomId, userId },
         at: new Date().toISOString(),
       });
     }
@@ -3177,30 +2894,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /** Room owner/moderator directly assigns an in-room audience member to a mic. */
-  async assignSeat(roomId: string, actorId: string, targetUserId: string, seatIndex?: number | null) {
-    await this.assertMicRequestPermission(
-      roomId,
-      actorId,
-      'Mic seat management permission is required',
-    );
-    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
-    if (!room) throw new NotFoundException('Room not found');
-    const [access, existingSeat, ban] = await Promise.all([
-      this.accessRepo.findOne({ where: { roomId, userId: targetUserId } }),
-      this.seatsRepo.findOne({ where: { roomId, userId: targetUserId } }),
-      this.bansRepo.findOne({ where: { roomId, userId: targetUserId } }),
-    ]);
-    if (ban && (!ban.expiresAt || ban.expiresAt > new Date())) {
-      throw new ForbiddenException('المستخدم محظور من هذه الغرفة');
-    }
-    if (!this.hasActiveAccess(access) && !existingSeat && room.hostId !== targetUserId) {
-      throw new ForbiddenException('يجب أن يكون المستخدم داخل الغرفة أولاً');
-    }
-    // Reuse the same transactional seat assignment and realtime event path as approval.
-    return this.approveSeat(roomId, actorId, targetUserId, seatIndex ?? null, true);
-  }
-
   async takeSeat(roomId: string, userId: string, dto: TakeSeatDto) {
     // Already joined via /join — do not re-require password (that blocked seat switches).
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
@@ -3214,19 +2907,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
     const isHost = room.hostId === userId;
     const alreadySeated = await this.seatsRepo.findOne({ where: { roomId, userId } });
-    const viewerMicPermissions = room.micRequestEnabled === true
-      ? await this.getViewerRoomPermissions(room, userId)
-      : null;
-    const canBypassMicRequest = isHost || (
-      room.micRequestEnabled === true && (
-        room.cohostId === userId || room.activeHostId === userId
-        || viewerMicPermissions?.canInvite === true
-        || viewerMicPermissions?.canManageSeats === true
-      )
-    );
-    if (room.micRequestEnabled === true && !alreadySeated && !canBypassMicRequest) {
-      throw new ForbiddenException('This room requires approval before taking a mic seat');
-    }
     // Guests may only switch seats if already on mic; first seat requires host approval
     // unless the dashboard enables free mic (rooms.mic_without_host_approval).
     if (!isHost && !alreadySeated) {
@@ -3245,11 +2925,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           agencyMemberCanSit = membership.length > 0;
         }
       }
-      // The room owner's request gate overrides agency membership and the global
-      // free-mic setting. Only the host and explicitly authorized mic managers bypass it.
-      const freeMic = room.micRequestEnabled === true
-        ? canBypassMicRequest
-        : (agencyMemberCanSit || await this.micWithoutHostApproval());
+      const freeMic = agencyMemberCanSit || await this.micWithoutHostApproval();
       if (!freeMic) {
         throw new ForbiddenException('Request mic access and wait for host approval');
       }
@@ -3445,30 +3121,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   async forceLeaveSeat(roomId: string, userId: string, reason?: string) {
     const seat = await this.seatsRepo.findOne({ where: { roomId, userId } });
     if (!seat) return { left: false, userId };
-
-    // Use a conditional SQL update against the live occupant, then verify the
-    // persisted row before broadcasting. Do not trust an in-memory entity/save
-    // here: this action must empty the actual seat row for every room client.
-    const updateResult = await this.seatsRepo.update(
-      { roomId, userId },
-      {
-        userId: null,
-        status: SeatStatus.EMPTY,
-        isMuted: false,
-        isModeratorMuted: false,
-      },
-    );
-    await this.seatSignalsRepo.delete({ roomId, userId });
-
-    const persistedSeat = await this.seatsRepo.findOne({ where: { roomId, seatIndex: seat.seatIndex } });
-    if (
-      (updateResult.affected ?? 0) < 1 ||
-      !persistedSeat ||
-      persistedSeat.userId === userId
-    ) {
-      throw new BadRequestException('تعذر تحديث المقعد، حاول مرة أخرى');
-    }
-
+    await this.clearUserSeat(roomId, userId);
     this.notifyRoomUpdated(roomId);
     const member = await this.memberIdentity(userId);
     // Broadcast to the room and directly to the affected user. The Android target
@@ -3495,14 +3148,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return { left: true, userId };
   }
 
-  /**
-   * Dedicated moderation path for removing a seated member while keeping them in the room.
-   * Shares the authoritative permission checks and seat/event handling with the legacy route.
-   */
-  async removeMemberFromMic(roomId: string, actorId: string, targetUserId: string, reason?: string) {
-    return this.forceLeaveSeatByModerator(roomId, actorId, targetUserId, reason || 'moderator_remove_mic');
-  }
-
   /** Host/moderator: remove someone from mic without kicking them from the room. */
   async forceLeaveSeatByModerator(
     roomId: string,
@@ -3520,74 +3165,21 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         'لا تملك صلاحية إنزال المستخدمين من المايك',
       );
     } catch (permissionError) {
-      try {
-        // Explicit room-kick permission also permits mic-only removal.
-        await this.assertModeratorPermission(
-          roomId,
-          actorId,
-          'canKick',
-          'لا تملك صلاحية إنزال المستخدمين من المايك',
-        );
-      } catch (kickPermissionError) {
-        // Support existing appointed room moderators whose older permission rows
-        // do not have canManageSeats synchronized, while still requiring an active room.
-        const room = await this.roomsRepo.findOne({ where: { id: roomId } });
-        if (!room) throw new NotFoundException('Room not found');
-        await this.assertAgencyRoomActive(room);
-        const appointedModerator = await this.modsRepo.findOne({ where: { roomId, userId: actorId } });
-        const staff = await this.platformStaffRole(actorId);
-        const privilegedHost = room.hostId === actorId || room.cohostId === actorId || room.activeHostId === actorId;
-        if (!appointedModerator && !privilegedHost && staff !== 'manager' && staff !== 'admin' && staff !== 'super') {
-          throw kickPermissionError;
-        }
-      }
+      // A moderator explicitly granted room-kick rights can also remove a user from the mic.
+      // Room owners/cohosts, platform staff and agency managers pass the first check above.
+      await this.assertModeratorPermission(
+        roomId,
+        actorId,
+        'canKick',
+        'لا تملك صلاحية إنزال المستخدمين من المايك',
+      );
     }
-    // Removing someone from the microphone is not a room kick/ban.
-    // Keep platform-staff hierarchy and self/room-owner protections, but do not
-    // block a mic-only action merely because the target is a cohost or room moderator.
-    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
-    if (!room) throw new NotFoundException('Room not found');
-    if (actorId === uid) {
-      throw new ForbiddenException('لا يمكنك إنزال نفسك بهذه الطريقة');
-    }
-    const actorStaff = await this.platformStaffRole(actorId);
-    const targetStaff = await this.platformStaffRole(uid);
-    if (
-      staffRank(targetStaff) > 0 &&
-      staffRank(actorStaff) < staffRank(targetStaff)
-    ) {
-      throw new ForbiddenException('لا يمكن استهداف طاقم المنصة الأعلى رتبة');
-    }
-    if (
-      staffRank(targetStaff) > 0 &&
-      staffRank(actorStaff) === staffRank(targetStaff) &&
-      actorStaff !== 'super'
-    ) {
-      throw new ForbiddenException('لا يمكن لمشرف المنصة استهداف زميل بنفس الرتبة');
-    }
-    if (actorStaff !== 'super' && room.hostId === uid) {
-      throw new ForbiddenException('لا يمكن إنزال صاحب الغرفة من المايك');
-    }
-    // Room moderators cannot override the host/cohost or another appointed
-    // moderator, but platform managers and the room owner can perform mic-only removal.
-    if (actorStaff !== 'super' && actorStaff !== 'admin' && actorStaff !== 'manager' && room.hostId !== actorId) {
-      if (room.cohostId === uid) {
-        throw new ForbiddenException('لا يمكن للمشرف استهداف المضيف المساعد');
-      }
-      const targetModerator = await this.modsRepo.findOne({
-        where: { roomId, userId: uid },
-      });
-      if (targetModerator) {
-        throw new ForbiddenException('لا يمكن لمشرف إنزال مشرف آخر من المايك');
-      }
-    }
+    await this.assertCanTargetUser(roomId, actorId, uid);
     const seat = await this.seatsRepo.findOne({ where: { roomId, userId: uid } });
     if (!seat) {
       throw new BadRequestException('المستخدم ليس على المايك حالياً');
     }
-    const result = await this.forceLeaveSeat(roomId, uid, reason || 'moderator');
-    await this.recordAgencyModerationAction(roomId, actorId, uid, 'remove_mic', reason || 'moderator_remove_mic');
-    return result;
+    return this.forceLeaveSeat(roomId, uid, reason || 'moderator');
   }
 
   private async clearUserSeat(roomId: string, userId: string) {
@@ -3660,7 +3252,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.realtimeGateway.ejectUserFromRoom(roomId, dto.userId);
     void this.ejectRtcUser(roomId, dto.userId, 'Kicked from voice room');
     void this.realtimeGateway.broadcastRoomPresence(roomId).catch(() => undefined);
-    await this.recordAgencyModerationAction(roomId, actorId, dto.userId, 'kick', dto.reason || null);
     return { kicked: true, userId: dto.userId };
   }
 
@@ -3788,10 +3379,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.realtimeGateway.ejectUserFromRoom(roomId, dto.userId);
     void this.ejectRtcUser(roomId, dto.userId, 'Banned from voice room');
     void this.realtimeGateway.broadcastRoomPresence(roomId).catch(() => undefined);
-    await this.recordAgencyModerationAction(roomId, actorId, dto.userId, 'ban', saved.reason || null, {
-      durationMinutes: dto.durationMinutes,
-      expiresAt: saved.expiresAt,
-    });
     return saved;
   }
 
@@ -4322,19 +3909,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     ) {
       return;
     }
-    // Platform staff permissions are explicit and independent of room appointment:
-    // Super = full room powers; Admin = room moderation/configuration actions;
-    // Manager = mic mute, mic removal, and room kick only (never room ban/invite/config).
+    // Platform staff: super = full room powers; manager = mute/kick/ban/seats/invite.
     const staff = await this.platformStaffRole(actorId);
-    if (staff === 'super' || staff === 'admin') return;
-    if (
-      staff === 'manager' &&
-      ['canMute', 'canKick', 'canManageSeats'].includes(permission)
-    ) {
+    if (staff === 'super') return;
+    if (staff === 'manager' && permission !== 'canManageRoom') {
       return;
-    }
-    if (staff === 'manager') {
-      throw new ForbiddenException('صلاحية المانجر تقتصر على كتم المايك وإنزال المستخدم أو إخراجه من الروم');
     }
     await this.assertAgencyRoomActive(room);
     // Active agency owners/managers can moderate rooms belonging to their agency.
@@ -4373,8 +3952,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     ) {
       return;
     }
-    const staffRole = await this.platformStaffRole(actorId);
-    if (staffRole === 'super' || staffRole === 'admin' || staffRole === 'manager') return;
+    if ((await this.platformStaffRole(actorId)) === 'super') return;
     const mod = await this.modsRepo.findOne({ where: { roomId, userId: actorId } });
     if (!mod?.canManageMusic) {
       throw new ForbiddenException('Music permission is required');
