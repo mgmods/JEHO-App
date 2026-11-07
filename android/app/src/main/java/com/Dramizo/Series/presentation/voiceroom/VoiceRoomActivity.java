@@ -3155,7 +3155,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ImageView vip = new ImageView(this);
             vip.setContentDescription("VIP");
             vip.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            vip.setLayoutParams(roomBadgeImageParams(20, 20, 2));
+            vip.setLayoutParams(roomBadgeImageParams(25, 25, 2));
             if (decoration.vipBadgeUrl != null && !decoration.vipBadgeUrl.trim().isEmpty()) {
                 Glide.with(vip).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(
                         decoration.vipBadgeUrl)).fitCenter().into(vip);
@@ -3168,10 +3168,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             TextView cp = new TextView(this);
             cp.setText("CP");
             cp.setTextColor(Color.WHITE);
-            cp.setTextSize(9f);
+            cp.setTextSize(10f);
             cp.setTypeface(null, android.graphics.Typeface.BOLD);
             cp.setIncludeFontPadding(false);
-            cp.setPadding(dp(4), dp(1), dp(4), dp(1));
+            cp.setPadding(dp(5), dp(2), dp(5), dp(2));
             cp.setBackgroundResource(R.drawable.bg_cp_cv_badge);
             cp.setLayoutParams(roomBadgeTextParams(2));
             addRoomChatBadge(inline, overflow, cp, total++);
@@ -3183,10 +3183,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             TextView id = new TextView(this);
             id.setText("ID " + decoration.publicId);
             id.setTextColor(Color.WHITE);
-            id.setTextSize(9f);
+            id.setTextSize(10f);
             id.setTypeface(null, android.graphics.Typeface.BOLD);
             id.setIncludeFontPadding(false);
-            id.setPadding(dp(4), dp(1), dp(4), dp(1));
+            id.setPadding(dp(5), dp(2), dp(5), dp(2));
             try {
                 int c1 = Color.parseColor(decoration.publicIdColor1 == null
                         ? "#7C5CFF" : decoration.publicIdColor1);
@@ -3209,7 +3209,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ImageView medal = new ImageView(this);
             medal.setContentDescription("ميدالية");
             medal.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            medal.setLayoutParams(roomBadgeImageParams(20, 20, 1));
+            medal.setLayoutParams(roomBadgeImageParams(25, 25, 1));
             Glide.with(medal).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(medalUrl))
                     .placeholder(R.drawable.ic_medal_default)
                     .error(R.drawable.ic_medal_default)
