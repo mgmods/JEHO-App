@@ -1,96 +1,64 @@
-/* JEHO: route legacy game hosts to the same active JEHO backend serving this game. */
+/* JEHO: route every retired Mikoo provider URL to the origin serving this game. */
 (function () {
   if (window.__jehoForceLocal) return;
-  window.__jehoForceLocal = 1;
+  window.__jehoForceLocal = true;
 
-  // Games are served from the JEHO backend itself. Never pin them to a retired host.
-  var LOCAL = (window.location && window.location.origin && window.location.origin !== 'null')
-    ? window.location.origin
-    : '';
-  var LOCAL_WS = LOCAL
-    ? LOCAL.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:')
-    : '';
-  var BAD = /(jieyou\\.shop|sruner\\.com|zkruner\\.com|soofun\\.online|api\\.adnova\\.bbs\\.tr|jeho-own-backend\\.mgs\\.blitz\\.cloud)/i;
+  var LOCAL = (window.location && window.location.origin) || '';
+  var LOCAL_WS = LOCAL.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
+  // Include the former JEHO/Blitz host: the route API used to return it in
+  // http_addr/ws_addr, so rewriting only the original BaiShun hosts was not enough.
+  var RETIRED = /(api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com|jeho-own-backend\.mgs\.blitz\.cloud)/i;
 
-  function fixPath(path) {
-    if (!path) return path;
-    return String(path)
-      .replace(/\/game_route(?=\/|\?|$)/gi, '/games/route')
-      .replace(/\/game-route(?=\/|\?|$)/gi, '/games/route');
-  }
-
-  function rewrite(u) {
-    if (u == null) return u;
-    var s = String(u);
-    var needsHost = BAD.test(s);
-    var needsPath = /\/game_route(\/|\?|$)/i.test(s) || /\/game-route(\/|\?|$)/i.test(s);
-    if (!needsHost && !needsPath) return s;
+  function rewrite(url) {
+    if (url == null) return url;
+    var value = String(url);
+    if (!RETIRED.test(value) || !LOCAL) return value;
     try {
-      var a = document.createElement('a');
-      a.href = s;
-      var path = fixPath((a.pathname || '/') + (a.search || '') + (a.hash || ''));
-      if (/^wss?:/i.test(s)) {
-        var wsOrigin = needsHost ? LOCAL_WS : a.protocol + '//' + a.host;
-        return (wsOrigin || (a.protocol + '//' + a.host)).replace(/\/$/, '') + path;
-      }
-      var origin = needsHost ? LOCAL : a.protocol + '//' + a.host;
-      return (origin || (a.protocol + '//' + a.host)).replace(/\/$/, '') + path;
+      var parsed = document.createElement('a');
+      parsed.href = value;
+      var path = (parsed.pathname || '/') + (parsed.search || '') + (parsed.hash || '');
+      return /^wss?:/i.test(value) ? LOCAL_WS + path : LOCAL + path;
     } catch (e) {
-      var out = s;
-      if (needsHost && LOCAL) {
-        out = out
-          .replace(/^https?:\/\/[^/]+/i, LOCAL)
-          .replace(/^wss?:\/\/[^/]+/i, LOCAL_WS);
-      }
-      return fixPath(out);
+      return value
+        .replace(/^https?:\/\/[^/]+/i, LOCAL)
+        .replace(/^wss?:\/\/[^/]+/i, LOCAL_WS);
     }
   }
 
-  // A session DOMAIN may override the page origin, but only when it is a valid
-  // non-legacy JEHO URL. Keep only its origin, never a route path.
-  try {
-    var q = new URLSearchParams(location.search || '');
-    var dom = q.get('DOMAIN') || q.get('domain');
-    if (dom && !BAD.test(dom)) {
-      var parsed = new URL(dom, location.origin);
-      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
-        LOCAL = parsed.origin;
-        LOCAL_WS = LOCAL.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
-      }
-    }
-  } catch (e) {}
-
-  var OW = window.WebSocket;
-  if (OW) {
+  // Never let a game-provided DOMAIN query parameter redirect traffic to an
+  // arbitrary host. The page's current HTTPS origin is the single source of truth.
+  var OriginalWebSocket = window.WebSocket;
+  if (OriginalWebSocket) {
     window.WebSocket = function (url, protocols) {
-      var u = rewrite(url);
-      return protocols !== undefined ? new OW(u, protocols) : new OW(u);
+      var target = rewrite(url);
+      return protocols !== undefined
+        ? new OriginalWebSocket(target, protocols)
+        : new OriginalWebSocket(target);
     };
-    window.WebSocket.prototype = OW.prototype;
-    window.WebSocket.CONNECTING = OW.CONNECTING;
-    window.WebSocket.OPEN = OW.OPEN;
-    window.WebSocket.CLOSING = OW.CLOSING;
-    window.WebSocket.CLOSED = OW.CLOSED;
+    window.WebSocket.prototype = OriginalWebSocket.prototype;
+    ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function (key) {
+      window.WebSocket[key] = OriginalWebSocket[key];
+    });
   }
 
   if (window.fetch) {
-    var ofetch = window.fetch.bind(window);
+    var originalFetch = window.fetch.bind(window);
     window.fetch = function (input, init) {
       if (typeof input === 'string') input = rewrite(input);
       else if (input && typeof Request !== 'undefined' && input instanceof Request) {
         input = new Request(rewrite(input.url), input);
       }
-      return ofetch(input, init);
+      return originalFetch(input, init);
     };
   }
 
-  var XO = window.XMLHttpRequest;
-  if (XO && XO.prototype) {
-    var open = XO.prototype.open;
-    XO.prototype.open = function () {
+  var OriginalXHR = window.XMLHttpRequest;
+  if (OriginalXHR && OriginalXHR.prototype) {
+    var originalOpen = OriginalXHR.prototype.open;
+    OriginalXHR.prototype.open = function () {
       var args = Array.prototype.slice.call(arguments);
       if (args.length > 1) args[1] = rewrite(args[1]);
-      return open.apply(this, args);
+      return originalOpen.apply(this, args);
     };
   }
 })();
