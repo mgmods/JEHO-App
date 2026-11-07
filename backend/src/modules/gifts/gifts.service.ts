@@ -3315,8 +3315,8 @@ export class GiftsService implements OnModuleInit {
           from: { userId: senderId },
           at: animationPayload.at,
         });
-        // This helper broadcasts only positive high-value results (>= 1,000 coins OR >= 10x).
-        this.broadcastLuckyCelebration({
+        // This helper broadcasts only results that meet the dashboard-configured high-win threshold.
+        await this.broadcastLuckyCelebration({
           roomId: dto.roomId,
           senderId,
           displayName: luckySenderName,
@@ -3895,7 +3895,7 @@ export class GiftsService implements OnModuleInit {
           from: { userId: senderId },
           at,
         });
-        this.broadcastLuckyCelebration({
+        await this.broadcastLuckyCelebration({
           roomId: dto.roomId,
           senderId,
           displayName: luckySenderName,
@@ -3944,7 +3944,7 @@ export class GiftsService implements OnModuleInit {
   /**
    * Global toast for OUR lucky gifts only (catalog lucky_* rolls) — not invented Mikoo packs.
    */
-  private broadcastLuckyCelebration(opts: {
+  private async broadcastLuckyCelebration(opts: {
     roomId?: string;
     senderId: string;
     displayName?: string;
@@ -3963,9 +3963,22 @@ export class GiftsService implements OnModuleInit {
       * Math.max(1, Math.floor(Number(opts.personCount) || 1));
     const mul = Number(opts.luckyMultiplier) || 0;
     const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
-    // Only high wins are announced app-wide. Normal wins and partial returns
-    // remain exclusively on the originating room:event (lucky:hit) channel.
-    const isHighWin = mul >= 10 || won >= 1000;
+    // Read the same thresholds saved by the Toast Manager dashboard. A zero value
+    // disables that criterion; either enabled threshold may classify the result as high.
+    let minMultiplier = 10;
+    let minCoins = 1000;
+    try {
+      const setting = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+      const config = setting?.value ? JSON.parse(setting.value) : {};
+      const parsedMultiplier = Number(config?.highWinMinMultiplier);
+      const parsedCoins = Number(config?.highWinMinCoins);
+      if (Number.isFinite(parsedMultiplier)) minMultiplier = Math.max(0, parsedMultiplier);
+      if (Number.isFinite(parsedCoins)) minCoins = Math.max(0, Math.floor(parsedCoins));
+    } catch {
+      // Preserve current safe defaults if dashboard settings cannot be read.
+    }
+    const isHighWin = (minMultiplier > 0 && mul >= minMultiplier)
+      || (minCoins > 0 && won >= minCoins);
     if (!this.realtime || !isHighWin) return;
     const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
     const soft = mul > 0 && mul < 1;
