@@ -110,9 +110,9 @@ export class GiftsService implements OnModuleInit {
     private readonly dataSource: DataSource,
     private readonly cpService: CpService,
     private readonly tasksService: TasksService,
+    private readonly badgesService: BadgesService,
     @Optional() private readonly realtime?: RealtimeGateway,
     @Optional() private readonly notifications?: NotificationsService,
-    private readonly badgesService: BadgesService,
     @Optional()
     @Inject(forwardRef(() => ContestsService))
     private readonly contestsService?: ContestsService,
