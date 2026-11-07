@@ -26,6 +26,7 @@ import com.Dramizo.Series.presentation.profile.ProfileActivity;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.realtime.RealtimeClient;
 import com.Dramizo.Series.util.ActiveChatTracker;
+import com.Dramizo.Series.util.InAppNotificationBanner;
 import com.Dramizo.Series.util.AppFeatures;
 import com.Dramizo.Series.util.AppLoadingOverlay;
 import com.Dramizo.Series.util.AuraNotificationHelper;
@@ -216,7 +217,7 @@ public class AuraLiveApp extends Application {
     /** Register the current FCM token after authentication is available.
      * Token creation can happen before login, so onNewToken alone is not enough.
      */
-    private void registerFcmDeviceIfReady() {
+    public void registerFcmDeviceIfReady() {
         if (container == null) return;
         String token = container.getSessionManager().getFcmToken();
         String userId = container.getSessionManager().getUserId();
@@ -377,6 +378,53 @@ public class AuraLiveApp extends Application {
 
                     // Fully outside the app — system heads-up notification.
                     showCelebrationSystemNotification(title, body, avatar, dedupe);
+                    return;
+                }
+                // Direct-message realtime events must produce an in-app banner even though
+                // they are not persisted as generic notification:new inbox rows.
+                if ("chat:message".equals(event) && payload != null) {
+                    try {
+                        JsonObject message = payload.has("message") && payload.get("message").isJsonObject()
+                                ? payload.getAsJsonObject("message") : payload;
+                        String conversationId = jsonString(payload, "conversationId",
+                                jsonString(message, "conversationId", null));
+                        String senderId = jsonString(message, "senderId",
+                                message.has("sender") && message.get("sender").isJsonObject()
+                                        ? jsonString(message.getAsJsonObject("sender"), "id", null) : null);
+                        String currentUserId = container != null
+                                ? container.getSessionManager().getUserId() : null;
+                        if (senderId != null && senderId.equals(currentUserId)) return;
+                        if (ActiveChatTracker.isViewing(conversationId)) return;
+                        if (container != null
+                                && container.getSessionManager().isMuteMessageNotifications()) return;
+                        Activity chatActivity = foregroundActivity;
+                        if (chatActivity == null || chatActivity.isFinishing()
+                                || chatActivity.isDestroyed()) return;
+                        JsonObject sender = message.has("sender") && message.get("sender").isJsonObject()
+                                ? message.getAsJsonObject("sender") : new JsonObject();
+                        String senderName = jsonString(sender, "displayName",
+                                jsonString(sender, "username", "رسالة جديدة"));
+                        String body = jsonString(message, "content", "لديك رسالة جديدة");
+                        String messageId = jsonString(message, "id", null);
+                        String avatar = jsonString(sender, "avatarUrl", null);
+                        Map<String, Object> routeData = new HashMap<>();
+                        routeData.put("conversationId", conversationId);
+                        routeData.put("senderName", senderName);
+                        if (senderId != null) routeData.put("peer_id", senderId);
+                        Intent chatIntent = NotificationRouter.build(chatActivity, "chat", routeData);
+                        if (conversationId != null) {
+                            chatIntent.putExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID, conversationId);
+                        }
+                        chatIntent.putExtra(ChatConversationActivity.EXTRA_TITLE, senderName);
+                        if (senderId != null) chatIntent.putExtra(ChatConversationActivity.EXTRA_PEER_ID, senderId);
+                        if (avatar != null) chatIntent.putExtra(ChatConversationActivity.EXTRA_AVATAR, avatar);
+                        String dedupe = conversationId != null && messageId != null
+                                ? "chat:" + conversationId + ":" + messageId : null;
+                        InAppNotificationBanner.show(chatActivity, senderName, body, "chat",
+                                chatIntent, dedupe, avatar);
+                    } catch (Exception e) {
+                        android.util.Log.w("AuraLiveApp", "Realtime chat banner failed: " + e.getMessage());
+                    }
                     return;
                 }
                 if (!"notification:new".equals(event) || payload == null) return;

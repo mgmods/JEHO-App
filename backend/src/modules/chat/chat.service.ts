@@ -740,7 +740,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
           : mapped.type === MessageType.AUDIO ? 'أرسل رسالة صوتية'
           : mapped.type === MessageType.GIFT ? 'أرسل هدية'
           : 'لديك رسالة جديدة';
-        void this.notifications.sendDirectMessagePush(p.userId, {
+        const pushSent = await this.notifications.sendDirectMessagePush(p.userId, {
           conversationId,
           messageId: String(mapped.id),
           senderId,
@@ -748,6 +748,11 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
           avatarUrl: sender.avatarUrl || null,
           body: preview,
         });
+        if (!pushSent) {
+          // Keep message persistence/realtime delivery successful, but make missing
+          // device tokens or FCM failures visible in backend logs for diagnosis.
+          console.warn(`[chat-push] delivery unavailable recipient=${p.userId} conversation=${conversationId} message=${mapped.id}`);
+        }
       }
       this.realtime?.emitToUser(p.userId, 'chat:conversation:updated', {
         conversationId, lastMessage: mapped,
