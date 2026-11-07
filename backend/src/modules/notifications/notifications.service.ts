@@ -391,6 +391,7 @@ export class NotificationsService {
       .andWhere("device.fcmToken <> ''")
       .getCount();
     return {
+      ...this.firebase.diagnostics(),
       firebaseReady: this.firebase.isReady(),
       activeDevices,
       tokenDevices,
@@ -403,14 +404,18 @@ export class NotificationsService {
   async sendFcmTest(userId: string) {
     const devices = await this.devicesRepo.find({ where: { userId, isActive: true } });
     const tokenDevices = devices.filter((device) => !!device.fcmToken && !!device.fcmToken.trim()).length;
-    const firebaseReady = this.firebase.isReady();
+    const firebaseDiagnostics = this.firebase.diagnostics();
+    const firebaseReady = firebaseDiagnostics.ready;
     if (!firebaseReady || tokenDevices === 0) {
       return {
         sent: false,
+        ...firebaseDiagnostics,
         firebaseReady,
         activeDevices: devices.length,
         tokenDevices,
-        reason: !firebaseReady ? 'firebase_not_ready' : 'no_registered_device_token',
+        reason: !firebaseReady
+          ? (firebaseDiagnostics.failureReason || 'firebase_not_ready')
+          : 'no_registered_device_token',
       };
     }
     const title = 'JEHO CHAT';
@@ -424,6 +429,7 @@ export class NotificationsService {
     });
     return {
       sent,
+      ...firebaseDiagnostics,
       firebaseReady,
       activeDevices: devices.length,
       tokenDevices,
