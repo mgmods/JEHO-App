@@ -28,9 +28,9 @@
       <div class="room-role-switch" role="group" aria-label="نوع مدالية دعم الغرف"><button type="button" :class="{ active: activeRoomMedalRole === 'supporter' }" @click="activeRoomMedalRole = 'supporter'">ميداليات الداعم</button><button type="button" :class="{ active: activeRoomMedalRole === 'receiver' }" @click="activeRoomMedalRole = 'receiver'">ميداليات المستلم</button></div>
       <div class="room-role-hint">{{ activeRoomMedalRole === 'supporter' ? 'هذه التصاميم تُمنح للشخص الذي يرسل الهدايا والدعم داخل الغرفة.' : 'هذه التصاميم تُمنح للشخص الذي يستقبل الهدايا والدعم داخل الغرفة.' }}</div>
       <div class="room-medal-editor">
-        <h3>{{ roomMedalEditIndex < 0 ? 'إضافة مدالية للداعم' : 'تعديل مدالية الداعم' }}</h3>
+        <h3>{{ roomMedalEditIndex < 0 ? (activeRoomMedalRole === 'supporter' ? 'إضافة مدالية للداعم' : 'إضافة مدالية للمستلم') : (activeRoomMedalRole === 'supporter' ? 'تعديل مدالية الداعم' : 'تعديل مدالية المستلم') }}</h3>
         <div class="form-grid">
-          <label>اسم المدالية<input v-model.trim="roomMedalForm.name" class="form-control" maxlength="80" placeholder="مثلاً: داعم الغرفة الذهبي" /></label>
+          <label>اسم المدالية<input v-model.trim="roomMedalForm.name" class="form-control" maxlength="80"  :placeholder="activeRoomMedalRole === 'supporter' ? 'مثلاً: داعم الغرفة الذهبي' : 'مثلاً: مستلم الدعم الذهبي'" /></label>
           <label>نوع شرط الدعم
             <select v-model="roomMedalForm.criteriaType" class="form-select">
               <option value="coins">إجمالي العملات المدفوعة</option><option value="diamonds">إجمالي الألماس المستحق</option><option value="gifts">عدد الهدايا</option>
@@ -39,7 +39,7 @@
           <label>الحد المطلوب<input v-model.number="roomMedalForm.threshold" class="form-control" type="number" min="1" max="1000000000" /></label>
           <label>مدة الاستحقاق بالأيام<input v-model.number="roomMedalForm.durationDays" class="form-control" type="number" min="0" max="3650" /><small>0 = دائمة</small></label>
           <label class="wide">رابط صورة المدالية<input v-model.trim="roomMedalForm.imageUrl" class="form-control" type="url" placeholder="ارفع الصورة أو أدخل رابطها" /></label>
-          <label class="upload-box wide"><span><i class="bi bi-cloud-arrow-up"></i> {{ roomMedalUploading ? 'جارٍ رفع الصورة…' : 'رفع صورة ميدالية الداعم/المستلم' }}</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" :disabled="roomMedalUploading" @change="uploadRoomMedalImage" /></label>
+          <label class="upload-box wide"><span><i class="bi bi-cloud-arrow-up"></i> {{ roomMedalUploading ? 'جارٍ رفع الصورة…' : (activeRoomMedalRole === 'supporter' ? 'رفع صورة ميدالية الداعم' : 'رفع صورة ميدالية المستلم') }}</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" :disabled="roomMedalUploading" @change="uploadRoomMedalImage" /></label>
           <div v-if="roomMedalForm.imageUrl" class="medal-preview"><img :src="roomMedalForm.imageUrl" alt="معاينة ميدالية الدعم" /></div>
           <label class="check-row"><input v-model="roomMedalForm.isActive" type="checkbox" /> المدالية مفعّلة</label>
         </div>
@@ -48,7 +48,7 @@
           <button v-if="roomMedalEditIndex >= 0" class="btn btn-outline-light" type="button" @click="resetRoomMedalForm">إلغاء التعديل</button>
         </div>
       </div>
-      <div v-if="roomSupport.medals.length" class="room-medal-list">
+      <div v-if="activeRoomMedals.length" class="room-medal-list">
         <article v-for="(medal, index) in activeRoomMedals" :key="index" class="room-medal-row">
           <img v-if="medal.imageUrl" :src="medal.imageUrl" :alt="medal.name" />
           <div class="room-medal-info"><strong>{{ medal.name }}</strong><small>{{ criteriaLabel(medal.criteriaType) }}: {{ Number(medal.threshold).toLocaleString() }} · {{ medal.durationDays ? medal.durationDays + ' يوم' : 'دائمة' }}</small></div>
@@ -246,17 +246,21 @@ function saveRoomMedal() {
   const name = String(roomMedalForm.name || '').trim()
   const imageUrl = String(roomMedalForm.imageUrl || '').trim()
   if (!name || !imageUrl) { error.value = 'أدخل اسم المدالية وارفع صورتها أولاً.'; return }
-  const item = { ...roomMedalForm, name, imageUrl, threshold: Math.max(1, Math.floor(Number(roomMedalForm.threshold) || 1)), durationDays: Math.max(0, Math.min(3650, Math.floor(Number(roomMedalForm.durationDays) || 0))) }
+  const item = { ...roomMedalForm, name, imageUrl, role: activeRoomMedalRole.value, threshold: Math.max(1, Math.floor(Number(roomMedalForm.threshold) || 1)), durationDays: Math.max(0, Math.min(3650, Math.floor(Number(roomMedalForm.durationDays) || 0))) }
   if (roomMedalEditIndex.value >= 0) activeRoomMedals.value.splice(roomMedalEditIndex.value, 1, item)
-  else roomSupport.medals.push(item)
+  else activeRoomMedals.value.push(item)
   resetRoomMedalForm()
 }
 function editRoomMedal(index) {
-  const item = roomSupport.medals[index]
+  const item = activeRoomMedals.value[index]
+  if (!item) return
   Object.assign(roomMedalForm, { ...item })
   roomMedalEditIndex.value = index
 }
-function removeRoomMedal(index) { roomSupport.medals.splice(index, 1); if (roomMedalEditIndex.value === index) resetRoomMedalForm() }
+function removeRoomMedal(index) {
+  activeRoomMedals.value.splice(index, 1)
+  if (roomMedalEditIndex.value === index) resetRoomMedalForm()
+}
 async function uploadRoomMedalImage(event) {
   const file = event.target.files?.[0]
   if (!file) return
