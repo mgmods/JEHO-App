@@ -30,9 +30,9 @@ public class AuraMessagingService extends FirebaseMessagingService {
         AuraLiveApp app = (AuraLiveApp) getApplication();
         AppContainer container = app.getContainer();
         container.getSessionManager().saveFcmToken(token);
-        container.getIoExecutor().execute(() ->
-                container.getNotificationRepository().registerDevice(token, "android")
-        );
+        // Token refresh can happen before login; the app retries registration after auth
+        // becomes available instead of sending an unauthenticated device-registration call.
+        app.registerFcmDeviceIfReady();
     }
 
     @Override
