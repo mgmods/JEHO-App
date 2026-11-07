@@ -1893,9 +1893,12 @@ public class ChatConversationActivity extends ThemedActivity {
 
     @Override
     protected void onPause() {
-        // Only suppress alerts while this conversation is actually visible.
-        // Clear on pause so background/locked devices still receive message pushes.
+        // Stop advertising this thread as actively viewed while backgrounded.
+        // The server uses this room membership to decide whether a push is needed.
         com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
+        if (conversationId != null) {
+            RealtimeClient.getInstance().leaveConversation(conversationId);
+        }
         super.onPause();
     }
 
