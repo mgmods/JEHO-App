@@ -184,7 +184,7 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <div>
           <h3 class="h6 mb-1">نسبة الفوز لكل لعبة</h3>
-          <p class="small text-muted mb-0">نسبة موحّدة لكل المستخدمين. هذه الإعدادات لا تُطبّق على نتائج يحسمها مزوّد خارجي ما لم يدعم المزوّد التحكم بها.</p>
+          <p class="small text-muted mb-0">نسبة عامة موحّدة لكل اللاعبين. امسح قيمة اللعبة لاستعادة إعدادها الافتراضي؛ الألعاب ذات النتيجة المشتركة تُضبط بعائد اللاعب RTP.</p>
         </div>
         <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ نسب الفوز</button>
       </div>
