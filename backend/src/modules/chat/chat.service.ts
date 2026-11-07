@@ -737,7 +737,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
           ? String(mapped.content).trim()
           : mapped.type === MessageType.IMAGE ? 'أرسل صورة'
           : mapped.type === MessageType.VIDEO ? 'أرسل فيديو'
-          : mapped.type === MessageType.VOICE ? 'أرسل رسالة صوتية'
+          : mapped.type === MessageType.AUDIO ? 'أرسل رسالة صوتية'
           : mapped.type === MessageType.GIFT ? 'أرسل هدية'
           : 'لديك رسالة جديدة';
         void this.notifications.sendDirectMessagePush(p.userId, {
