@@ -326,7 +326,7 @@ const baishunModuleMap: Record<string, string> = {
       host && /^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(host) && ['http', 'https'].includes(protocol)
         ? `${protocol}://${host}`
         : '';
-    const apiOrigin = configuredPublicApiOrigin || requestOrigin;
+    const apiOrigin = requestOrigin;
     if (!apiOrigin) {
       res.setHeader('Cache-Control', 'no-store');
       res.status(503).json({ code: 503, message: 'Public API origin is not configured' });
