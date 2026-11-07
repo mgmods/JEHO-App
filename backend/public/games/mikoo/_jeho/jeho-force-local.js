@@ -1,13 +1,18 @@
-/* JEHO: never talk to BaiShun/jieyou — rewrite to local API. */
+/* JEHO: route legacy game hosts to the same active JEHO backend serving this game. */
 (function () {
   if (window.__jehoForceLocal) return;
   window.__jehoForceLocal = 1;
-  var LOCAL = 'https://api.adnova.bbs.tr';
-  var LOCAL_WS = 'wss://api.adnova.bbs.tr';
-  var BAD = /(jieyou\.shop|sruner\.com|zkruner\.com|soofun\.online)/i;
+
+  // Games are served from the JEHO backend itself. Never pin them to a retired host.
+  var LOCAL = (window.location && window.location.origin && window.location.origin !== 'null')
+    ? window.location.origin
+    : '';
+  var LOCAL_WS = LOCAL
+    ? LOCAL.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:')
+    : '';
+  var BAD = /(jieyou\.shop|sruner\.com|zkruner\.com|soofun\.online|api\.adnova\.bbs\.tr)/i;
 
   function fixPath(path) {
-    // BaiShun historical path is /game_route; JEHO serves /games/route.
     if (!path) return path;
     return String(path)
       .replace(/\/game_route(?=\/|\?|$)/gi, '/games/route')
@@ -26,13 +31,13 @@
       var path = fixPath((a.pathname || '/') + (a.search || '') + (a.hash || ''));
       if (/^wss?:/i.test(s)) {
         var wsOrigin = needsHost ? LOCAL_WS : a.protocol + '//' + a.host;
-        return wsOrigin.replace(/\/$/, '') + path;
+        return (wsOrigin || (a.protocol + '//' + a.host)).replace(/\/$/, '') + path;
       }
       var origin = needsHost ? LOCAL : a.protocol + '//' + a.host;
-      return origin.replace(/\/$/, '') + path;
+      return (origin || (a.protocol + '//' + a.host)).replace(/\/$/, '') + path;
     } catch (e) {
       var out = s;
-      if (needsHost) {
+      if (needsHost && LOCAL) {
         out = out
           .replace(/^https?:\/\/[^/]+/i, LOCAL)
           .replace(/^wss?:\/\/[^/]+/i, LOCAL_WS);
@@ -41,18 +46,15 @@
     }
   }
 
+  // A session DOMAIN may override the page origin, but only when it is a valid
+  // non-legacy JEHO URL. Keep only its origin, never a route path.
   try {
     var q = new URLSearchParams(location.search || '');
     var dom = q.get('DOMAIN') || q.get('domain');
     if (dom && !BAD.test(dom)) {
-      window.__JEHO_DOMAIN = dom;
-      LOCAL = String(dom).replace(/\/$/, '');
-      // Keep host only — never keep /games/route path on LOCAL_WS.
-      try {
-        var u = new URL(LOCAL.indexOf('http') === 0 ? LOCAL : 'https://' + LOCAL);
-        LOCAL = u.origin;
-      } catch (e2) {}
-      if (/^https?:/i.test(LOCAL)) {
+      var parsed = new URL(dom, location.origin);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        LOCAL = parsed.origin;
         LOCAL_WS = LOCAL.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
       }
     }
