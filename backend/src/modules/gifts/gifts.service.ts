@@ -3972,10 +3972,13 @@ export class GiftsService implements OnModuleInit {
     const giftLabel = (opts.giftName || '').trim();
     // This method exits before formatting if there is no payout; only wins/returns
     // are eligible for a user-facing celebration.
-    const title = soft ? 'مردود جزئي' : 'حظ سعيد!';
-    const body = soft
-      ? `مبروك ${name} حصل على ${won} · مردود جزئي`
-      : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
+    const noPayout = won <= 0;
+    const title = soft ? 'مردود جزئي' : noPayout ? 'حظ أوفر' : 'حظ سعيد!';
+    const body = noPayout
+      ? `حظ أوفر ${name} في المحاولة القادمة`
+      : soft
+        ? `مبروك ${name} حصل على ${won} · مردود جزئي`
+        : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
     this.realtime.emitToAll('celebration:toast', {
       kind: 'lucky_hit',
       id: opts.eventId || `lucky:${opts.senderId}:${Date.now()}`,
