@@ -37,9 +37,40 @@ public final class GameUrls {
             return asset(file);
         }
         if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("file://")) {
-            return raw;
+            return normalizeInternalGameUrl(raw);
+        }
+        // Dashboard may return an absolute path such as /games/dice.html.
+        // Treat it as a path on the authoritative JEHO backend instead of
+        // concatenating it after /games/ (which produced /games//games/...).
+        if (raw.startsWith("/")) {
+            return normalizeInternalGameUrl(ApiOrigin.origin() + raw);
         }
         return preferAsset(context, raw.contains(".") ? raw : raw + ".html");
+    }
+
+    /**
+     * Normalize legacy/internal game hosts to the current JEHO backend while
+     * preserving the dashboard-selected path and query parameters.
+     */
+    public static String normalizeInternalGameUrl(String url) {
+        if (url == null || url.trim().isEmpty()) return url;
+        try {
+            android.net.Uri u = android.net.Uri.parse(url.trim());
+            String host = u.getHost();
+            if (host == null || host.isEmpty()) return url;
+            String h = host.toLowerCase(Locale.US);
+            if (h.endsWith("jieyou.shop")
+                    || h.endsWith("sruner.com")
+                    || h.endsWith("zkruner.com")) {
+                android.net.Uri.Builder builder = u.buildUpon();
+                android.net.Uri canonical = android.net.Uri.parse(ApiOrigin.origin());
+                builder.scheme(canonical.getScheme());
+                builder.authority(canonical.getAuthority());
+                return builder.build().toString();
+            }
+        } catch (Exception ignored) {
+        }
+        return url;
     }
 
     public static String preferAsset(Context context, String fileName) {
