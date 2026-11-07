@@ -43,6 +43,7 @@ public final class GlobalCelebrationToast {
     private static Runnable hideRunnable;
     private static String lastDedupeKey;
     private static long lastShownAt;
+    private static boolean lastCenterPlacement;
     private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
     private static boolean showing;
     private static volatile String remoteBackgroundUrl = "";
@@ -565,18 +566,25 @@ public final class GlobalCelebrationToast {
         }
         if (isLuckyToastKind(kind)) refreshToastStyle(activity);
         long now = System.currentTimeMillis();
-        if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 1_200L) {
+        // One high-win event may intentionally have two placements on the sender device:
+        // the shared top banner and the sender-only center celebration. Permit that paired
+        // placement once, while continuing to suppress duplicate events in the same lane.
+        boolean pairedPlacement = dedupeKey != null && dedupeKey.equals(lastDedupeKey)
+                && now - lastShownAt < 1_200L && centerPlacement != lastCenterPlacement;
+        if (dedupeKey != null && dedupeKey.equals(lastDedupeKey)
+                && now - lastShownAt < 1_200L && !pairedPlacement) {
             return;
         }
         lastDedupeKey = dedupeKey;
         lastShownAt = now;
+        lastCenterPlacement = centerPlacement;
         final int margin = Math.max(8, topMarginDp);
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
                 margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
         MAIN.post(() -> {
-            // Lucky returns are transient: keep only the newest result. Never let an
-            // old queued toast surface after the user's finger has already been released.
-            if (isLuckyToastKind(kind)) {
+            // Lucky results normally replace stale results. Keep the paired top/center
+            // placements for the same event in sequence instead of cancelling one another.
+            if (isLuckyToastKind(kind) && !pairedPlacement) {
                 PENDING.removeIf(item -> isLuckyToastKind(item.kind));
                 View active = current.get();
                 if (active != null && active.getParent() instanceof ViewGroup) {
