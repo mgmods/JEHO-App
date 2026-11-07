@@ -106,11 +106,11 @@
         <!-- Room-support medal: upper corner of the occupied seat/avatar, like a crown. -->
         <ImageView
             android:id="@+id/imgRoomSupportMedal"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:layout_gravity="top|start"
-            android:layout_marginTop="2dp"
-            android:layout_marginStart="2dp"
+            android:layout_marginTop="-7dp"
+            android:layout_marginStart="-7dp"
             android:contentDescription="@null"
             android:elevation="20dp"
             android:scaleType="fitCenter"
