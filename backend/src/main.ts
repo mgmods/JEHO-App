@@ -142,30 +142,29 @@ async function bootstrap() {
     }
   });
 
-  // BaiShun HTML: inject JEHO host rewrite before static serve (no jieyou/sruner/zkruner).
+  // Inject the JEHO host bridge into every Mikoo game document before any game
+  // scripts execute. Several packaged HTML files had a broken relative path
+  // (../jeho-force-local.js), which silently left games connecting to retired hosts.
   const forceLocalTag =
     '<script src="/games/mikoo/_jeho/jeho-force-local.js"></script>';
   expressAppEarly.use((req: { method?: string; path?: string; url?: string }, res: {
     setHeader: (k: string, v: string) => void;
     status: (n: number) => { end: (b: string) => void };
-    sendFile: (p: string, opts: { root?: string }, cb?: (err?: Error) => void) => void;
   }, next: () => void) => {
     const pathName = String(req.path || req.url || '').split('?')[0];
-    if (
-      req.method === 'GET' &&
-      /^\/games\/mikoo\/(slot777|cleopatra-slot|football-plinko|fishing|hilo|royal-battle|swimsuit-party|greedy-lion)\/?(index\.html)?$/i.test(
-        pathName,
-      )
-    ) {
-      const parts = pathName.replace(/\/+/g, '/').split('/');
-      const slug = parts[3];
+    const gamePage = /^\/games\/mikoo\/([a-z0-9_-]+)\/?(?:index\.html)?$/i.exec(pathName);
+    if (req.method === 'GET' && gamePage) {
+      const slug = gamePage[1];
       const htmlPath = join(process.cwd(), 'public', 'games', 'mikoo', slug, 'index.html');
       readFile(htmlPath, 'utf8', (err, html) => {
         if (err || !html) return next();
-        let out = html;
-        if (!out.includes('jeho-force-local.js')) {
-          out = out.replace(/<head([^>]*)>/i, `<head$1>\n    ${forceLocalTag}`);
-        }
+        // Remove any stale or incorrectly-relative copy and inject the absolute
+        // same-origin path first in <head>, before Cocos bootstraps networking.
+        let out = html.replace(
+          /<script\b[^>]*jeho-force-local\.js[^>]*>\s*<\/script>/gi,
+          '',
+        );
+        out = out.replace(/<head([^>]*)>/i, '<head$1>\n    ' + forceLocalTag);
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         noStoreHeaders(res);
         res.status(200).end(out);
