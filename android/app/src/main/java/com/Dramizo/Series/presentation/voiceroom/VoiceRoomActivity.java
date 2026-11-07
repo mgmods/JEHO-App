@@ -11714,17 +11714,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     ? suppliedMultiplier : parseLuckyMultiplierFromText(body != null ? body : line);
             boolean highWin = coins >= 1000L || eventMultiplier >= 10d;
             boolean sameTargetRoom = isSameRoom(targetRoomId);
-            // The center celebration is private: require an explicit sender ID match.
-            // Missing winner metadata must never turn a private toast into a room-wide one.
-            boolean winnerMatches = winnerUserId != null && !winnerUserId.trim().isEmpty()
+            // The center celebration is private: require an explicit sender ID match AND
+            // the originating room. Missing winner metadata must never expose it to others.
+            boolean winnerMatches = sameTargetRoom
+                    && winnerUserId != null && !winnerUserId.trim().isEmpty()
                     && myUserId != null && sameUser(winnerUserId, myUserId);
-            // App-wide lucky events are delivered to every connected room activity. A room
-            // that did not originate this result must not show a local/normal toast for it.
-            if (!sameTargetRoom) return;
             if (highWin) {
-                // Every member of the originating room receives the top announcement.
-                // The actual sender additionally receives the private center celebration.
-                // Both use the same event key; the toast queue preserves the paired placements.
+                // This is the app-wide high-win banner: show it in every connected room.
+                // Only the sender, in the originating room, also gets the center celebration.
+                // Both placements share an event key and are deduplicated per placement.
                 GlobalCelebrationToast.show(
                         this, who, chat, safeAvatar, badgeUrl, toastKey,
                         28, eventMultiplier, Math.max(0L, coins), who, "lucky_hit_high", targetRoomId);
@@ -11734,7 +11732,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             safeAvatar, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
                             who, "lucky_hit_high", targetRoomId);
                 }
-            } else {
+            } else if (sameTargetRoom) {
+                // Ordinary outcomes remain confined to the room where the gift was sent.
                 GlobalCelebrationToast.show(
                         this, who, chat, safeAvatar, badgeUrl, toastKey,
                         28, eventMultiplier, Math.max(0L, coins), who, "lucky_hit_normal", targetRoomId);
