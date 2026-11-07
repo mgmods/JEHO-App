@@ -171,6 +171,9 @@ public interface UserApi {
     @POST("cp/store/equip")
     Call<ApiResponse<Map<String, Object>>> equipCpStoreItem(@Body Map<String, String> body);
 
+    @POST("cp/store/unequip")
+    Call<ApiResponse<Map<String, Object>>> unequipCpStoreItem(@Body Map<String, String> body);
+
     /** Public active relationships for room seats; returns only relationship ids/types and visual config. */
     @GET("cp/room-effects")
     Call<ApiResponse<Map<String, Object>>> cpRoomSeatEffects(@Query("userIds") String userIds);
