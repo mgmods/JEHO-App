@@ -39,6 +39,7 @@ import {
   CurrencyType,
 } from '../../database/entities/wallet-transaction.entity';
 import { ContentModerationService } from '../moderation/content-moderation.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ChatService implements OnModuleInit, OnModuleDestroy {
@@ -76,6 +77,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     private readonly dataSource: DataSource,
     private readonly mediaCleanup: MediaCleanupService,
     private readonly moderation: ContentModerationService,
+    @Optional() private readonly notifications?: NotificationsService,
     @Optional() private readonly realtime?: RealtimeGateway,
     @Optional() private readonly tasks?: TasksService,
   ) {}
@@ -725,6 +727,28 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       this.realtime?.emitToUser(p.userId, 'chat:message', {
         conversationId, message: mapped, at: new Date().toISOString(),
       });
+      // Direct-message push is sent only to the recipient when they are not
+      // actively viewing this conversation. It is data-only on Android so the
+      // app owns foreground banners and background notification rendering.
+      if (dmConversation.type === ConversationType.DIRECT
+          && p.userId !== senderId && !viewing && this.notifications) {
+        const sender = mapped.sender || {};
+        const preview = mapped.content && String(mapped.content).trim()
+          ? String(mapped.content).trim()
+          : mapped.type === MessageType.IMAGE ? 'أرسل صورة'
+          : mapped.type === MessageType.VIDEO ? 'أرسل فيديو'
+          : mapped.type === MessageType.VOICE ? 'أرسل رسالة صوتية'
+          : mapped.type === MessageType.GIFT ? 'أرسل هدية'
+          : 'لديك رسالة جديدة';
+        void this.notifications.sendDirectMessagePush(p.userId, {
+          conversationId,
+          messageId: String(mapped.id),
+          senderId,
+          senderName: String(sender.displayName || sender.username || 'JEHO CHAT'),
+          avatarUrl: sender.avatarUrl || null,
+          body: preview,
+        });
+      }
       this.realtime?.emitToUser(p.userId, 'chat:conversation:updated', {
         conversationId, lastMessage: mapped,
         unreadCount: p.userId === senderId ? 0 : Number(p.unreadCount || 0),
