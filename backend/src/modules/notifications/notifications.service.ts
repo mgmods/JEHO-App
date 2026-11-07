@@ -347,6 +347,41 @@ export class NotificationsService {
     return { count };
   }
 
+  /** Send a data-only direct-message push without adding it to Official News. */
+  async sendDirectMessagePush(
+    recipientUserId: string,
+    payload: {
+      conversationId: string;
+      messageId: string;
+      senderId: string;
+      senderName: string;
+      avatarUrl?: string | null;
+      body: string;
+    },
+  ): Promise<boolean> {
+    if (!recipientUserId || !payload.conversationId || !payload.messageId) return false;
+    try {
+      return await this.sendFcm(
+        recipientUserId,
+        payload.senderName || 'JEHO CHAT',
+        payload.body || 'لديك رسالة جديدة',
+        {
+          type: 'chat',
+          notificationKind: 'direct_message',
+          conversationId: payload.conversationId,
+          messageId: payload.messageId,
+          senderId: payload.senderId,
+          peer_id: payload.senderId,
+          senderName: payload.senderName || 'JEHO CHAT',
+          avatarUrl: payload.avatarUrl || '',
+        },
+      );
+    } catch (err) {
+      this.logger.warn(`Direct-message push failed: ${(err as Error).message}`);
+      return false;
+    }
+  }
+
   async sendFcm(
     userId: string,
     title: string,
