@@ -12099,17 +12099,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim();
         boolean highWin = multiplier >= 10d || wonCoins >= 1000L;
         boolean isWinner = senderId != null && myUserId != null && sameUser(senderId, myUserId);
-        if (highWin && isWinner) {
-            // The winner alone sees their personal dashboard-configured room toast.
-            GlobalCelebrationToast.showRoomCenter(
-                    this, who, line, safeAvatar, null, key,
-                    Math.max(0d, multiplier), 0L, who,
-                    "lucky_hit_high", roomId);
+        if (highWin) {
+            // The high-win toast is shared with everyone who receives the room event.
+            // The winner additionally gets the personal center presentation in their room.
+            GlobalCelebrationToast.show(
+                    this, who, line, safeAvatar, null, key + "-global",
+                    28, Math.max(0d, multiplier), 0L, who, "lucky_hit_high", roomId);
+            if (isWinner) {
+                GlobalCelebrationToast.showRoomCenter(
+                        this, who, line, safeAvatar, null, key + "-winner-center",
+                        Math.max(0d, multiplier), 0L, who,
+                        "lucky_hit_high", roomId);
+            }
         } else {
-            // Everyone else in the room sees only the standard shared toast.
-            // Small wins/returns remain room-local and never become app-wide.
-            String kind = highWin ? "lucky_hit_high"
-                    : (multiplier > 0d && multiplier < 1d ? "lucky_hit_return" : "lucky_hit_normal");
+            String kind = multiplier > 0d && multiplier < 1d
+                    ? "lucky_hit_return" : "lucky_hit_normal";
             GlobalCelebrationToast.show(
                     this, who, line, safeAvatar, null, key,
                     28, Math.max(0d, multiplier), 0L, who, kind, roomId);
