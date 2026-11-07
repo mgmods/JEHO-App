@@ -81,6 +81,12 @@ const routes = [
         meta: { titleKey: 'routes.gifts' },
       },
       {
+        path: 'lucky-gift-odds',
+        name: 'lucky-gift-odds',
+        component: () => import('@/views/LuckyGiftOddsView.vue'),
+        meta: { titleKey: 'routes.gifts' },
+      },
+      {
         path: 'banners',
         name: 'banners',
         component: () => import('@/views/BannersView.vue'),
