@@ -38,7 +38,7 @@ export class CpController {
   }
 
   @Post('store/purchase')
-  @ApiOperation({ summary: 'Purchase and auto-equip an item from the CP-only store' })
+  @ApiOperation({ summary: "Purchase an item from the CP-only store and add it to the CP bag" })
   purchaseStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
     return this.cp.purchaseStoreItem(userId, body?.cosmeticId);
   }
@@ -47,6 +47,12 @@ export class CpController {
   @ApiOperation({ summary: 'Equip an owned item from the CP-only store' })
   equipStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
     return this.cp.equipStoreItem(userId, body?.cosmeticId);
+  }
+
+  @Post('store/unequip')
+  @ApiOperation({ summary: 'Unequip an owned CP-only item without deleting ownership' })
+  unequipStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
+    return this.cp.unequipStoreItem(userId, body?.cosmeticId);
   }
 
   @Get('catalog')

@@ -50,6 +50,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     return this.cosmetics.equipCpStoreItem(userId, cosmeticId);
   }
 
+  async unequipStoreItem(userId: string, cosmeticId: string) {
+    if (!UUID_REGEX.test(String(cosmeticId || ''))) throw new BadRequestException('معرّف عنصر CP غير صالح');
+    return this.cosmetics.unequipCpStoreItem(userId, cosmeticId);
+  }
+
   async onModuleInit() {
     // Backward-compatible schema adjustment: profile-origin CP requests have no room/payment.
     await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
@@ -118,9 +123,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     // Expiry processing only touches CP requests and their wallet ledger rows.
     this.expiryTimer = setInterval(() => {
       void this.expireDueRequests().catch(() => undefined);
+      void this.cosmetics.expireCpStoreCosmetics().catch(() => undefined);
     }, 60_000);
     this.expiryTimer.unref?.();
     void this.expireDueRequests().catch(() => undefined);
+    void this.cosmetics.expireCpStoreCosmetics().catch(() => undefined);
   }
 
   onModuleDestroy() {
