@@ -15,7 +15,7 @@ import {
 import { User } from '../../database/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RoomGameAccessService } from './room-game-access.service';
-import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { clampGamePayout, gamePayoutLimits } from './game-payout-guard';
 import { getGameWinRate, isGameEnabled } from './game-odds-runtime';
 
 type CasualGameId =
@@ -71,7 +71,7 @@ export class CasualBetService {
       balance: Number(wallet.coins || 0),
       currency: 'coins',
       minBet: 50,
-      maxBet: Math.min(20_000, GAME_PAYOUT.maxBet),
+      maxBet: Math.min(20_000, gamePayoutLimits().maxBet),
       chips: [50, 100, 500, 1000, 5000, 10_000],
       games: ALL_CASUAL.filter((gameId) => isGameEnabled(gameId)), 
     };
@@ -93,8 +93,8 @@ export class CasualBetService {
     if (!isGameEnabled(gameId)) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');
     await this.roomAccess.assertParticipant(body?.roomId, userId);
     const amount = Math.floor(Number(body?.amount));
-    if (!Number.isFinite(amount) || amount < 50 || amount > Math.min(20_000, GAME_PAYOUT.maxBet)) {
-      throw new BadRequestException(`Bet must be between 50 and ${Math.min(20_000, GAME_PAYOUT.maxBet)} coins`);
+    if (!Number.isFinite(amount) || amount < 50 || amount > Math.min(20_000, gamePayoutLimits().maxBet)) {
+      throw new BadRequestException(`Bet must be between 50 and ${Math.min(20_000, gamePayoutLimits().maxBet)} coins`);
     }
 
     const outcome = this.resolveOutcomeWithConfiguredRate(gameId, body?.choice);
