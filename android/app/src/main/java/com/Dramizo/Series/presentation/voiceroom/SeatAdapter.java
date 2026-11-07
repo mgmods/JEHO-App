@@ -824,7 +824,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         setSeatSize(holder.b.imgAvatar, avatar, ctx);
         setSeatSize(holder.b.imgFrame, frame, ctx);
         setSeatSize(holder.b.imgHostBadge, frame, ctx);
-        if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, 32, ctx);
+        if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, 30, ctx);
         if (holder.b.seatHostSignal != null) {
             setSeatSize(holder.b.seatHostSignal, frame, ctx);
         }
@@ -894,8 +894,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     ? parentParams.width : Math.round(74f * density);
             int parentHeight = parentParams != null && parentParams.height > 0
                     ? parentParams.height : Math.round(74f * density);
-            // Keep the medal anchored to the avatar corner, with a 10dp outward offset.
-            int offset = Math.round(10f * density);
+            // Sit directly on the avatar's upper corner; no outward gap.
+            int offset = 0;
             int left = Math.round((parentWidth - avatarWidth) / 2f - size / 2f) - offset;
             int top = Math.round((parentHeight - avatarHeight) / 2f - size / 2f) - offset;
             lp.width = size;

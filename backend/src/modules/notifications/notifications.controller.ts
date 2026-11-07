@@ -61,6 +61,13 @@ class RegisterDeviceDto {
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
+  @Get('admin/fcm-status')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ summary: 'Admin-only FCM readiness and registered-device counts' })
+  fcmDeliveryStatus() {
+    return this.notificationsService.fcmDeliveryStatus();
+  }
+
   @Get()
   list(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
     return this.notificationsService.list(userId, query);

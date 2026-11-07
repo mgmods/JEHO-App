@@ -382,6 +382,23 @@ export class NotificationsService {
     }
   }
 
+  /** Admin-only diagnostics: counts only, never returns device tokens or credentials. */
+  async fcmDeliveryStatus() {
+    const activeDevices = await this.devicesRepo.count({ where: { isActive: true } });
+    const tokenDevices = await this.devicesRepo.createQueryBuilder('device')
+      .where('device.isActive = :active', { active: true })
+      .andWhere('device.fcmToken IS NOT NULL')
+      .andWhere("device.fcmToken <> ''")
+      .getCount();
+    return {
+      firebaseReady: this.firebase.isReady(),
+      activeDevices,
+      tokenDevices,
+      activeDevicesMissingToken: Math.max(0, activeDevices - tokenDevices),
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
   async sendFcm(
     userId: string,
     title: string,
@@ -391,9 +408,26 @@ export class NotificationsService {
     const devices = await this.devicesRepo.find({
       where: { userId, isActive: true },
     });
-    const tokens = devices.map((d) => d.fcmToken).filter(Boolean) as string[];
-    if (!tokens.length) return false;
+    const tokens = Array.from(new Set(
+      devices.map((d) => d.fcmToken).filter((token): token is string => !!token && !!token.trim()),
+    ));
+    if (!tokens.length) {
+      this.logger.warn(`FCM not sent: no active device token for user=${userId}`);
+      return false;
+    }
+    if (!this.firebase.isReady()) {
+      this.logger.error(`FCM not sent: Firebase Admin unavailable user=${userId} devices=${devices.length}`);
+      return false;
+    }
     const result = await this.firebase.sendToTokens(tokens, title, body, data);
+    if (result.invalidTokens?.length) {
+      await this.devicesRepo.update(
+        { fcmToken: In(result.invalidTokens) },
+        { isActive: false, fcmToken: null },
+      );
+      this.logger.warn(`Deactivated ${result.invalidTokens.length} expired FCM token(s)`);
+    }
+    this.logger.log(`FCM delivery user=${userId} devices=${devices.length} tokens=${tokens.length} success=${result.success} failure=${result.failure}`);
     return result.success > 0;
   }
 
