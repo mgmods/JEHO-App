@@ -417,6 +417,10 @@ export class BadgesService {
   /** Award configured room-support medal to the supported user; progress is isolated per room. */
   async recordRoomSupportProgress(userId: string, roomId: string, role: 'supporter' | 'receiver', metrics: { coins?: number; diamonds?: number; gifts?: number }): Promise<any | null> {
     if (!userId || !roomId) return null;
+    // Room-support medals are a one-time lifetime award per person, regardless
+    // of whether the person qualifies later as supporter or receiver.
+    const priorRoomSupportGrant = await this.userBadges.findOne({ where: { userId, source: 'room_support' } });
+    if (priorRoomSupportGrant) return null;
     const row = await this.dataSource.getRepository(AppSetting).findOne({ where: { key: 'room_support_medals_config' } });
     if (!row?.value) return null;
     let config: any; try { config = JSON.parse(row.value); } catch { return null; }
@@ -471,7 +475,12 @@ export class BadgesService {
     const expiresAt = days > 0 ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
     let newlyGranted = false;
     await this.dataSource.transaction(async (manager) => {
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room-support-grant:${userId}:${badge!.id}`]);
+      // Serialize all supporter/receiver grant attempts for this user, not just one badge.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room-support-grant:${userId}`]);
+      const anyPriorRoomSupportGrant = await manager.findOne(UserBadge, {
+        where: { userId, source: 'room_support' }, lock: { mode: 'pessimistic_write' },
+      });
+      if (anyPriorRoomSupportGrant) return;
       let owned = await manager.findOne(UserBadge, { where: { userId, badgeId: badge!.id }, lock: { mode: 'pessimistic_write' } });
       if (!owned || (owned.expiresAt && new Date(owned.expiresAt).getTime() <= Date.now())) {
         if (!owned) owned = manager.create(UserBadge, { userId, badgeId: badge!.id });
@@ -485,6 +494,7 @@ export class BadgesService {
         await manager.save(profile);
       }
     });
+    if (!newlyGranted) return null;
     if (newlyGranted) {
       await this.notifications.notifyUser(userId, NotificationType.SYSTEM, 'ميدالية دعم جديدة! 🏅',
         `حصلت على ميدالية ${badge.name} ${role === 'supporter' ? 'لدعمك' : 'لاستقبالك الدعم'} داخل الغرفة.`,
