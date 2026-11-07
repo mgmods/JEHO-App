@@ -61,7 +61,9 @@ public final class GameUrls {
             String h = host.toLowerCase(Locale.US);
             if (h.endsWith("jieyou.shop")
                     || h.endsWith("sruner.com")
-                    || h.endsWith("zkruner.com")) {
+                    || h.endsWith("zkruner.com")
+                    || h.endsWith("api.adnova.bbs.tr")
+                    || h.endsWith("jeho-own-backend.mgs.blitz.cloud")) {
                 android.net.Uri.Builder builder = u.buildUpon();
                 android.net.Uri canonical = android.net.Uri.parse(ApiOrigin.origin());
                 builder.scheme(canonical.getScheme());
