@@ -1,13 +1,12 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Badge } from '../../database/entities/badge.entity';
 import { UserBadge } from '../../database/entities/user-badge.entity';
 import { User } from '../../database/entities/user.entity';
 import { Follow } from '../../database/entities/follow.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
-import { AppSetting } from '../../database/entities/app-setting.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
 
@@ -19,15 +18,6 @@ export interface UpsertBadgeDto {
   awardType?: string;
   achievementKey?: string | null;
   achievementThreshold?: number;
-  hiddenTaskEnabled?: boolean;
-  hiddenTaskEvent?: string | null;
-  hiddenTaskTarget?: number;
-  hiddenTaskDays?: number;
-  manualTaskEnabled?: boolean;
-  manualTaskVisibility?: string;
-  manualTaskTitle?: string;
-  manualTaskDescription?: string;
-  manualTaskDays?: number;
   isActive?: boolean;
   isAnimated?: boolean;
   sortOrder?: number;
@@ -42,28 +32,16 @@ export class BadgesService {
     @InjectRepository(Follow) private readonly follows: Repository<Follow>,
     @InjectRepository(Wallet) private readonly wallets: Repository<Wallet>,
     @InjectRepository(UserProfile) private readonly profiles: Repository<UserProfile>,
-    private readonly dataSource: DataSource,
     private readonly notifications: NotificationsService,
   ) {}
-
-  /** Resolve a dashboard-entered account ID without ever forcing a non-UUID value through the UUID column. */
-  private async resolveUserByIdentifier(identifier: string, select?: any) {
-    const value = (identifier || '').trim();
-    if (!value) return null;
-
-    // UUID-looking values may be safely queried against users.id. Everything else
-    // must be matched through the varchar publicId column first; otherwise Postgres
-    // can cast a numeric/vanity ID to uuid and throw "invalid input syntax for type uuid".
-    if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(value)) {
-      return this.users.findOne({ where: { id: value }, ...(select ? { select } : {}) });
-    }
-    return this.users.findOne({ where: { publicId: value }, ...(select ? { select } : {}) });
-  }
 
   async catalogForIdentifier(identifier: string) {
     const value = (identifier || '').trim();
     if (!value) throw new BadRequestException('User ID is required');
-    const user = await this.resolveUserByIdentifier(value, { id: true, publicId: true });
+    const user = await this.users.findOne({
+      where: [{ id: value }, { publicId: value }],
+      select: { id: true, publicId: true },
+    });
     if (!user) throw new NotFoundException('User not found');
     return this.catalog(user.id);
   }
@@ -72,9 +50,11 @@ export class BadgesService {
   async earnedForIdentifier(identifier: string) {
     const value = (identifier || '').trim();
     if (!value) throw new BadRequestException('User ID is required');
-    const user = await this.resolveUserByIdentifier(value, { id: true, publicId: true });
+    const user = await this.users.findOne({
+      where: [{ id: value }, { publicId: value }],
+      select: { id: true, publicId: true },
+    });
     if (!user) throw new NotFoundException('User not found');
-    await this.cleanupExpiredDisplayedMedals(user.id);
     const grants = await this.userBadges.find({
       where: { userId: user.id },
       relations: { badge: true },
@@ -83,29 +63,16 @@ export class BadgesService {
     return grants
       .filter((grant) => !!grant.badge)
       .filter((grant) => !grant.expiresAt || new Date(grant.expiresAt).getTime() > Date.now())
-      .map((grant) => {
-        const publicBadge: any = { ...grant.badge };
-        delete publicBadge.hiddenTaskEnabled;
-        delete publicBadge.hiddenTaskEvent;
-        delete publicBadge.hiddenTaskTarget;
-        delete publicBadge.hiddenTaskDays;
-        delete publicBadge.manualTaskEnabled;
-        delete publicBadge.manualTaskVisibility;
-        delete publicBadge.manualTaskTitle;
-        delete publicBadge.manualTaskDescription;
-        delete publicBadge.manualTaskDays;
-        return {
-          ...publicBadge,
-          earned: true,
-          grantedAt: grant.grantedAt,
-          expiresAt: grant.expiresAt ?? null,
-          source: grant.source,
-        };
-      });
+      .map((grant) => ({
+        ...grant.badge,
+        earned: true,
+        grantedAt: grant.grantedAt,
+        expiresAt: grant.expiresAt ?? null,
+        source: grant.source,
+      }));
   }
 
   async catalog(userId: string) {
-    await this.cleanupExpiredDisplayedMedals(userId);
     // Reconcile configured achievement badges against the user's real, persisted metrics.
     // The unique user/badge index plus INSERT .. ON CONFLICT DO NOTHING makes this idempotent.
     await this.awardEligibleAchievementBadges(userId);
@@ -124,138 +91,12 @@ export class BadgesService {
     // visible to their owner even when no longer offered to new users.
     return catalog
       .filter((badge) => badge.isActive || ownedById.has(badge.id))
-      .map((badge) => {
-        const publicBadge: any = { ...badge };
-        delete publicBadge.hiddenTaskEnabled;
-        delete publicBadge.hiddenTaskEvent;
-        delete publicBadge.hiddenTaskTarget;
-        delete publicBadge.hiddenTaskDays;
-        if (!publicBadge.manualTaskEnabled || publicBadge.manualTaskVisibility !== 'visible') {
-          delete publicBadge.manualTaskTitle;
-          delete publicBadge.manualTaskDescription;
-        }
-        delete publicBadge.manualTaskEnabled;
-        delete publicBadge.manualTaskVisibility;
-        delete publicBadge.manualTaskDays;
-        return {
-          ...publicBadge,
-          earned: ownedById.has(badge.id),
-          grantedAt: ownedById.get(badge.id)?.grantedAt ?? null,
-          source: ownedById.get(badge.id)?.source ?? null,
-        };
-      });
-  }
-
-  /** Visible manual medal missions for the existing task center. Hidden missions never leave the admin API. */
-  async visibleManualTasks(userId: string) {
-    if (!userId) return [];
-    const [configured, owned] = await Promise.all([
-      this.badges.find({
-        where: { isActive: true, manualTaskEnabled: true, manualTaskVisibility: 'visible' },
-        order: { sortOrder: 'ASC', name: 'ASC' },
-      }),
-      this.userBadges.createQueryBuilder('ub')
-        .where('ub.userId = :userId', { userId })
-        .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
-        .getMany(),
-    ]);
-    const ownedIds = new Set(owned.map((row) => row.badgeId));
-    return configured.filter((badge) => !ownedIds.has(badge.id)).map((badge) => ({
-      id: `medal_${badge.id}`,
-      title: badge.manualTaskTitle?.trim() || `مهمة الحصول على ميدالية ${badge.name}`,
-      type: 'medal_manual',
-      audience: 'all',
-      section: 'medals',
-      current: 0,
-      target: 1,
-      claimed: false,
-      claimable: false,
-      progressLabel: 'بانتظار اعتماد الإدارة',
-      rewardPoints: 0,
-      rewardSilver: 0,
-      medalId: badge.id,
-      medalName: badge.name,
-      medalImageUrl: badge.imageUrl,
-      description: badge.manualTaskDescription || badge.description || '',
-    }));
-  }
-
-  /** Remove expired medal IDs from the profile showcase so timed medals disappear everywhere. */
-  private async cleanupExpiredDisplayedMedals(userId: string): Promise<void> {
-    const expired = await this.userBadges.createQueryBuilder('ub')
-      .select('ub.badgeId', 'badgeId')
-      .where('ub.userId = :userId', { userId })
-      .andWhere('ub.expiresAt IS NOT NULL AND ub.expiresAt <= NOW()')
-      .getRawMany<{ badgeId: string }>();
-    if (!expired.length) return;
-    const expiredIds = new Set(expired.map((row) => String(row.badgeId)));
-    const profile = await this.profiles.findOne({ where: { userId } });
-    if (!profile || !Array.isArray(profile.displayedMedalIds)) return;
-    const next = profile.displayedMedalIds.filter((id) => !expiredIds.has(String(id)));
-    if (next.length !== profile.displayedMedalIds.length) {
-      profile.displayedMedalIds = next;
-      await this.profiles.save(profile);
-    }
-  }
-
-  /** Track secret medal conditions from real server activity; no task record/event/API is created. */
-  async recordHiddenTaskProgress(userId: string, event: string, amount = 1): Promise<void> {
-    if (!userId || !event || amount <= 0) return;
-    const raw = String(event).toLowerCase();
-    const family = (raw.startsWith('rooms') || raw.startsWith('host_room') || raw.startsWith('host_visit')) ? 'rooms'
-      : (raw.startsWith('gift') || raw.startsWith('host_gift')) ? 'gift'
-      : raw.startsWith('follow') ? 'follow'
-      : (raw.startsWith('mic') || raw.startsWith('host_mic')) ? 'mic'
-      : (raw.startsWith('checkin') || raw.startsWith('host_checkin')) ? 'checkin'
-      : (raw.startsWith('recharge') || raw.startsWith('exchange')) ? 'recharge'
-      : raw.startsWith('game') || raw.startsWith('host_game') ? 'game'
-      : raw.startsWith('win') ? 'win'
-      : (raw.startsWith('ad') || raw.includes('rewarded')) ? 'ad'
-      : (raw.startsWith('chat') || raw.startsWith('host_chat') || raw.startsWith('message') || raw.startsWith('dm')) ? 'chat'
-      : '';
-    if (!family) return;
-
-    const configured = await this.badges.find({
-      where: { isActive: true, hiddenTaskEnabled: true, hiddenTaskEvent: family },
-      select: { id: true, hiddenTaskTarget: true, hiddenTaskDays: true },
-    });
-    for (const medal of configured) {
-      const target = Math.max(1, Math.min(1_000_000_000, Math.floor(Number(medal.hiddenTaskTarget) || 1)));
-      const key = `hidden_medal_progress:${userId}:${medal.id}`;
-      let shouldGrant = false;
-      await this.dataSource.transaction(async (manager) => {
-        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
-        let row = await manager.findOne(AppSetting, { where: { key }, lock: { mode: 'pessimistic_write' } });
-        let state: { current: number; awarded: boolean } = { current: 0, awarded: false };
-        try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
-        if (!state.awarded) {
-          state.current = Math.min(target, Math.max(0, Number(state.current) || 0) + amount);
-          shouldGrant = state.current >= target;
-          if (!row) row = manager.create(AppSetting, { key, value: '', description: 'Private medal condition progress' });
-          row.value = JSON.stringify(state);
-          await manager.save(row);
-        }
-      });
-      if (!shouldGrant) continue;
-      try {
-        const granted = await this.grantForTask(userId, medal.id, medal.hiddenTaskDays, 'hidden_task', true);
-        const alreadyOwned = !granted && !!(await this.userBadges.createQueryBuilder('ub')
-          .where('ub.userId = :userId AND ub.badgeId = :badgeId', { userId, badgeId: medal.id })
-          .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
-          .getOne());
-        if (granted || alreadyOwned) {
-          const row = await this.dataSource.getRepository(AppSetting).findOne({ where: { key } });
-          if (row?.value) {
-            const state = JSON.parse(row.value);
-            state.awarded = true;
-            row.value = JSON.stringify(state);
-            await this.dataSource.getRepository(AppSetting).save(row);
-          }
-        }
-      } catch (error) {
-        console.error('[Badges] Private medal grant failed', error instanceof Error ? error.message : String(error));
-      }
-    }
+      .map((badge) => ({
+        ...badge,
+        earned: ownedById.has(badge.id),
+        grantedAt: ownedById.get(badge.id)?.grantedAt ?? null,
+        source: ownedById.get(badge.id)?.source ?? null,
+      }));
   }
 
   private async awardEligibleAchievementBadges(userId: string): Promise<void> {
@@ -329,182 +170,6 @@ export class BadgesService {
     )));
   }
 
-  async isActiveForTask(badgeId: string): Promise<boolean> {
-    if (!badgeId) return false;
-    return !!(await this.badges.findOne({
-      where: { id: badgeId, isActive: true },
-      select: { id: true },
-    }));
-  }
-
-  /**
-   * Automatic task reward. A per-user/per-medal advisory lock prevents duplicate
-   * grants. The medal is pinned into the public profile showcase even if it was
-   * already owned, so completing the task always equips it automatically.
-   */
-  async grantForTask(userId: string, badgeId: string, durationDaysRaw = 0, source = 'task', notify = true): Promise<boolean> {
-    const badge = await this.badges.findOne({ where: { id: badgeId, isActive: true } });
-    if (!badge || !userId) return false;
-
-    const durationDays = Math.max(0, Math.min(3650, Math.floor(Number(durationDaysRaw) || 0)));
-    const expiresAt = durationDays > 0
-      ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000)
-      : null;
-
-    const granted = await this.dataSource.transaction(async (manager) => {
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-        `task-medal:${userId}:${badgeId}`,
-      ]);
-      const existing = await manager.findOne(UserBadge, {
-        where: { userId, badgeId },
-        lock: { mode: 'pessimistic_write' },
-      });
-      let newlyGranted = false;
-      if (!existing || (existing.expiresAt && new Date(existing.expiresAt).getTime() <= Date.now())) {
-        if (existing) {
-          existing.grantedAt = new Date();
-          existing.grantedByAdminId = null;
-          existing.source = source;
-          existing.expiresAt = expiresAt;
-          await manager.save(existing);
-        } else {
-          await manager.save(manager.create(UserBadge, {
-            userId,
-            badgeId,
-            grantedByAdminId: null,
-            source,
-            expiresAt,
-          }));
-        }
-        newlyGranted = true;
-      }
-
-      let profile = await manager.findOne(UserProfile, {
-        where: { userId },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!profile) profile = manager.create(UserProfile, { userId });
-      const displayed = Array.isArray(profile.displayedMedalIds) ? profile.displayedMedalIds : [];
-      profile.displayedMedalIds = [
-        badgeId,
-        ...displayed.filter((id) => id !== badgeId),
-      ].slice(0, 5);
-      await manager.save(profile);
-      return newlyGranted;
-    });
-
-    if (granted && notify) {
-      try {
-        await this.notifications.notifyUser(
-          userId,
-          NotificationType.SYSTEM,
-          'ميدالية جديدة! 🏅',
-          source === 'hidden_task'
-            ? `مبروك! أكملت المهمة السرّية وحصلت على ميدالية ${badge.name}.`
-            : source === 'cp_level'
-              ? `مبروك! وصلت إلى مستوى جديد في CP وحصلت تلقائياً على شارة ${badge.name}.`
-              : `أكملت المهمة وحصلت تلقائياً على ميدالية ${badge.name}`,
-          { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, source },
-        );
-      } catch (error) {
-        // Notification delivery must never roll back a successfully granted medal.
-        console.error('[Badges] Task medal notification failed', error instanceof Error ? error.message : String(error));
-      }
-    }
-    return granted;
-  }
-
-  /** Award configured room-support medal to the supported user; progress is isolated per room. */
-  async recordRoomSupportProgress(userId: string, roomId: string, role: 'supporter' | 'receiver', metrics: { coins?: number; diamonds?: number; gifts?: number }): Promise<any | null> {
-    if (!userId || !roomId) return null;
-    // Room-support medals are a one-time lifetime award per person, regardless
-    // of whether the person qualifies later as supporter or receiver.
-    const priorRoomSupportGrant = await this.userBadges.findOne({ where: { userId, source: 'room_support' } });
-    if (priorRoomSupportGrant) return null;
-    const row = await this.dataSource.getRepository(AppSetting).findOne({ where: { key: 'room_support_medals_config' } });
-    if (!row?.value) return null;
-    let config: any; try { config = JSON.parse(row.value); } catch { return null; }
-    if (config?.enabled === false || config?.scope !== 'per_room') return null;
-    const medals = role === 'supporter'
-      ? (Array.isArray(config.supporterMedals) ? config.supporterMedals : [])
-      : (Array.isArray(config.receiverMedals) ? config.receiverMedals : []);
-    const ordered = medals.filter((m: any) => m && m.isActive !== false && String(m.imageUrl || '').trim())
-      .map((m: any, index: number) => ({ ...m, index }))
-      .sort((a: any, b: any) => Number(a.threshold || 0) - Number(b.threshold || 0));
-    if (!ordered.length) return null;
-    let highest: any = null;
-    for (const cfg of ordered) {
-      const type = ['coins', 'diamonds', 'gifts'].includes(String(cfg.criteriaType)) ? String(cfg.criteriaType) : 'coins';
-      const amount = Math.max(0, Math.floor(Number(metrics?.[type] || 0)));
-      if (amount <= 0) continue;
-      const target = Math.max(1, Math.floor(Number(cfg.threshold) || 1));
-      const key = `room_support_medal_progress:${roomId}:${userId}:${role}:${cfg.index}`;
-      let reached = false; let current = 0;
-      await this.dataSource.transaction(async (manager) => {
-        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
-        let stateRow = await manager.findOne(AppSetting, { where: { key }, lock: { mode: 'pessimistic_write' } });
-        let state: any = { current: 0, awarded: false };
-        try { if (stateRow?.value) state = { ...state, ...JSON.parse(stateRow.value) }; } catch {}
-        if (!state.awarded) {
-          state.current = Math.min(target, Math.max(0, Number(state.current) || 0) + amount);
-          reached = state.current >= target; current = state.current;
-          if (!stateRow) stateRow = manager.create(AppSetting, { key, value: '' });
-          stateRow.value = JSON.stringify(state); await manager.save(stateRow);
-        } else current = target;
-      });
-      if (reached || current >= target) highest = cfg;
-    }
-    if (!highest) return null;
-    const badgeKey = `room_support:${role}:${highest.index}`;
-    let badge = await this.badges.findOne({ where: { category: 'room_support', achievementKey: badgeKey } });
-    if (!badge) {
-      badge = this.badges.create({
-        name: String(highest.name || 'مدالية دعم الغرفة').trim().slice(0, 80),
-        description: `${role === 'supporter' ? 'مدالية داعم الغرفة' : 'مدالية مستلم دعم الغرفة'} · ${String(highest.criteriaType || 'coins')}`,
-        imageUrl: String(highest.imageUrl || '').trim().slice(0, 512),
-        category: 'room_support', awardType: 'room_support', achievementKey: badgeKey,
-        isActive: true, isAnimated: false, sortOrder: Number(highest.index) || 0,
-      });
-      await this.badges.save(badge);
-    } else {
-      badge.name = String(highest.name || badge.name).trim().slice(0, 80) || badge.name;
-      badge.imageUrl = String(highest.imageUrl || badge.imageUrl).trim().slice(0, 512) || badge.imageUrl;
-      badge.isActive = true; await this.badges.save(badge);
-    }
-    const days = Math.max(0, Math.min(3650, Math.floor(Number(highest.durationDays) || 0)));
-    const expiresAt = days > 0 ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
-    let newlyGranted = false;
-    await this.dataSource.transaction(async (manager) => {
-      // Serialize all supporter/receiver grant attempts for this user, not just one badge.
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room-support-grant:${userId}`]);
-      const anyPriorRoomSupportGrant = await manager.findOne(UserBadge, {
-        where: { userId, source: 'room_support' }, lock: { mode: 'pessimistic_write' },
-      });
-      if (anyPriorRoomSupportGrant) return;
-      let owned = await manager.findOne(UserBadge, { where: { userId, badgeId: badge!.id }, lock: { mode: 'pessimistic_write' } });
-      if (!owned || (owned.expiresAt && new Date(owned.expiresAt).getTime() <= Date.now())) {
-        if (!owned) owned = manager.create(UserBadge, { userId, badgeId: badge!.id });
-        owned.grantedByAdminId = null; owned.source = 'room_support'; owned.grantedAt = new Date(); owned.expiresAt = expiresAt;
-        await manager.save(owned); newlyGranted = true;
-      }
-      const profile = await manager.findOne(UserProfile, { where: { userId }, lock: { mode: 'pessimistic_write' } });
-      if (profile) {
-        const displayed = Array.isArray(profile.displayedMedalIds) ? profile.displayedMedalIds : [];
-        profile.displayedMedalIds = [badge!.id, ...displayed.filter((id) => id !== badge!.id)].slice(0, 5);
-        await manager.save(profile);
-      }
-    });
-    if (!newlyGranted) return null;
-    if (newlyGranted) {
-      await this.notifications.notifyUser(userId, NotificationType.SYSTEM, 'ميدالية دعم جديدة! 🏅',
-        `حصلت على ميدالية ${badge.name} ${role === 'supporter' ? 'لدعمك' : 'لاستقبالك الدعم'} داخل الغرفة.`,
-        { kind: 'room_support_medal', role, badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, roomId }).catch(() => undefined);
-    }
-    return { id: badge.id, name: badge.name, imageUrl: badge.imageUrl, userId, roomId,
-      role, threshold: Number(highest.threshold) || 0, criteriaType: String(highest.criteriaType || 'coins'),
-      expiresAt: expiresAt?.toISOString() || null, newlyGranted };
-  }
-
   listAdmin() {
     return this.badges.find({ order: { sortOrder: 'ASC', name: 'ASC' } });
   }
@@ -518,15 +183,6 @@ export class BadgesService {
       awardType: dto.awardType ?? 'manual',
       achievementKey: dto.achievementKey ?? null,
       achievementThreshold: dto.achievementThreshold ?? 0,
-      hiddenTaskEnabled: dto.hiddenTaskEnabled ?? false,
-      hiddenTaskEvent: dto.hiddenTaskEvent ?? null,
-      hiddenTaskTarget: Math.max(1, Math.floor(Number(dto.hiddenTaskTarget) || 1)),
-      hiddenTaskDays: Math.max(0, Math.min(3650, Math.floor(Number(dto.hiddenTaskDays) || 0))),
-      manualTaskEnabled: dto.manualTaskEnabled ?? false,
-      manualTaskVisibility: dto.manualTaskVisibility === 'visible' ? 'visible' : 'hidden',
-      manualTaskTitle: (dto.manualTaskTitle || '').trim(),
-      manualTaskDescription: (dto.manualTaskDescription || '').trim(),
-      manualTaskDays: Math.max(0, Math.min(3650, Math.floor(Number(dto.manualTaskDays) || 0))),
       isActive: dto.isActive ?? true,
       isAnimated: dto.isAnimated ?? false,
       sortOrder: dto.sortOrder ?? 0,
@@ -539,12 +195,6 @@ export class BadgesService {
     const merged = { ...badge, ...dto };
     this.validate(merged);
     Object.assign(badge, dto);
-    if (dto.hiddenTaskTarget !== undefined) badge.hiddenTaskTarget = Math.max(1, Math.floor(Number(dto.hiddenTaskTarget) || 1));
-    if (dto.hiddenTaskDays !== undefined) badge.hiddenTaskDays = Math.max(0, Math.min(3650, Math.floor(Number(dto.hiddenTaskDays) || 0)));
-    if (dto.manualTaskVisibility !== undefined) badge.manualTaskVisibility = dto.manualTaskVisibility === 'visible' ? 'visible' : 'hidden';
-    if (dto.manualTaskDays !== undefined) badge.manualTaskDays = Math.max(0, Math.min(3650, Math.floor(Number(dto.manualTaskDays) || 0)));
-    if (dto.manualTaskTitle !== undefined) badge.manualTaskTitle = String(dto.manualTaskTitle || '').trim();
-    if (dto.manualTaskDescription !== undefined) badge.manualTaskDescription = String(dto.manualTaskDescription || '').trim();
     return this.badges.save(badge);
   }
 
@@ -560,33 +210,11 @@ export class BadgesService {
     if (!badge) throw new NotFoundException('Medal not found');
     const identifier = (userIdentifier || '').trim();
     if (!identifier) throw new BadRequestException('User ID is required');
-    // Resolve the recipient by the current account UUID/public ID first.
-    // A purchased vanity ID can also be owned by the account while it is applied
-    // to a room/agency, so it must still resolve to ownerUserId for direct admin gifts.
-    let user = await this.resolveUserByIdentifier(identifier, { id: true, publicId: true, username: true, displayName: true });
-
-    if (!user && /^\\d{3,12}$/.test(identifier)) {
-      const vanityOwner = await this.dataSource.query(
-        `SELECT "ownerUserId" AS "ownerUserId"
-           FROM "vanity_ids"
-          WHERE "publicId" = $1
-            AND "status" = 'owned'
-            AND "ownerUserId" IS NOT NULL
-            AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
-            AND ("targetType" = 'account' OR "targetType" IS NULL OR "targetType" IN ('room', 'agency'))
-          LIMIT 1`,
-        [identifier],
-      );
-      const ownerUserId = vanityOwner?.[0]?.ownerUserId;
-      if (ownerUserId) {
-        user = await this.users.findOne({
-          where: { id: String(ownerUserId) },
-          select: { id: true, publicId: true, username: true, displayName: true },
-        });
-      }
-    }
-
-    if (!user) throw new NotFoundException('User not found by UUID, public ID, or owned vanity ID');
+    const user = await this.users.findOne({
+      where: [{ id: identifier }, { publicId: identifier }],
+      select: { id: true, publicId: true, username: true, displayName: true },
+    });
+    if (!user) throw new NotFoundException('User not found by UUID or public ID');
     const durationDays = durationDaysRaw == null || durationDaysRaw === 0
       ? 0
       : Math.min(3650, Math.max(1, Math.floor(Number(durationDaysRaw))));
@@ -610,19 +238,13 @@ export class BadgesService {
         badgeId, userId: user.id, grantedByAdminId: adminId, source: 'manual', expiresAt,
       }));
     }
-    let notification: any = null;
-    try {
-      notification = await this.notifications.notifyUser(
-        user.id,
-        NotificationType.SYSTEM,
-        'تم إهداؤك ميدالية جديدة! 🏅',
-        `مبروك! تمت إضافة ميدالية ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
-        { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
-      );
-    } catch (error) {
-      // A push-provider failure must not undo or hide a successful medal grant.
-      console.error('[Badges] Manual medal notification failed', error instanceof Error ? error.message : String(error));
-    }
+    const notification = await this.notifications.notifyUser(
+      user.id,
+      NotificationType.SYSTEM,
+      'تم إهداؤك ميدالية جديدة! 🏅',
+      `مبروك! تمت إضافة ميدالية ${badge.name} إلى حسابك. افتح ملفك الشخصي لعرضها.`,
+      { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
+    );
     return {
       ...grant,
       user: { id: user.id, publicId: user.publicId, username: user.username, displayName: user.displayName },
@@ -716,7 +338,7 @@ export class BadgesService {
   async revoke(badgeId: string, userIdentifier: string) {
     const identifier = (userIdentifier || '').trim();
     if (!identifier) throw new BadRequestException('User ID is required');
-    const user = await this.resolveUserByIdentifier(identifier);
+    const user = await this.users.findOne({ where: [{ id: identifier }, { publicId: identifier }] });
     if (!user) throw new NotFoundException('User not found by UUID or public ID');
     const grant = await this.userBadges.findOne({ where: { badgeId, userId: user.id } });
     if (!grant) throw new NotFoundException('Medal ownership not found');
@@ -728,28 +350,12 @@ export class BadgesService {
     if (!dto.name?.trim()) throw new BadRequestException('Medal name is required');
     if (!dto.imageUrl?.trim()) throw new BadRequestException('Medal image URL is required');
     if (dto.name.length > 80 || dto.imageUrl.length > 512) throw new BadRequestException('Medal field is too long');
-    if (dto.manualTaskTitle && dto.manualTaskTitle.length > 120) throw new BadRequestException('Manual task title is too long');
-    if (dto.manualTaskDescription && dto.manualTaskDescription.length > 500) throw new BadRequestException('Manual task description is too long');
-    if (dto.manualTaskVisibility && !['visible', 'hidden'].includes(dto.manualTaskVisibility)) throw new BadRequestException('Manual task visibility is invalid');
-    if (dto.manualTaskDays !== undefined && (!Number.isFinite(Number(dto.manualTaskDays)) || Number(dto.manualTaskDays) < 0 || Number(dto.manualTaskDays) > 3650)) throw new BadRequestException('Manual task duration must be between 0 and 3650 days');
     if (dto.awardType === 'achievement') {
       if (!dto.achievementKey || !['level', 'experience', 'followers', 'recharge', 'support', 'received'].includes(dto.achievementKey)) {
         throw new BadRequestException('Achievement key must be level, experience, followers, recharge, support, or received');
       }
       if (!Number.isFinite(Number(dto.achievementThreshold)) || Number(dto.achievementThreshold) <= 0) {
         throw new BadRequestException('Achievement threshold must be a positive number');
-      }
-    }
-    if (dto.hiddenTaskEnabled) {
-      const allowedEvents = ['rooms', 'gift', 'follow', 'mic', 'checkin', 'recharge', 'game', 'win', 'chat', 'ad'];
-      if (!dto.hiddenTaskEvent || !allowedEvents.includes(dto.hiddenTaskEvent)) {
-        throw new BadRequestException('Private medal activity type is invalid');
-      }
-      if (!Number.isFinite(Number(dto.hiddenTaskTarget)) || Number(dto.hiddenTaskTarget) < 1) {
-        throw new BadRequestException('Private medal target must be at least 1');
-      }
-      if (!Number.isFinite(Number(dto.hiddenTaskDays)) || Number(dto.hiddenTaskDays) < 0 || Number(dto.hiddenTaskDays) > 3650) {
-        throw new BadRequestException('Private medal duration must be between 0 and 3650 days');
       }
     }
   }
