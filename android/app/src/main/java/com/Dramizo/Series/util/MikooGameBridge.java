@@ -412,24 +412,8 @@ public final class MikooGameBridge {
         if (session.gameType > 0) {
             builder.appendQueryParameter("gameType", String.valueOf(session.gameType));
         }
-        if (session.routeUrl != null && !session.routeUrl.isEmpty()) {
-            // BaiShun DOMAIN must be origin only — path like /games/route/ breaks
-            // jeho-force-local WebSocket host rewrite (LOCAL_WS becomes .../games/route).
-            String domain = session.routeUrl;
-            try {
-                Uri d = Uri.parse(domain);
-                if (d.getScheme() != null && d.getHost() != null) {
-                    domain = d.getScheme() + "://" + d.getHost();
-                    if (d.getPort() > 0) domain += ":" + d.getPort();
-                    domain += "/";
-                }
-            } catch (Exception ignored) {
-            }
-            builder.appendQueryParameter("DOMAIN", domain);
-        } else if (session.containerUrl != null && !session.containerUrl.isEmpty()) {
-            // Hash games use WSS container; BaiShun prefers HTTP route base when provided.
-            builder.appendQueryParameter("DOMAIN", session.containerUrl);
-        }
+        // Do not pass a game-controlled DOMAIN override. The WebView bridge
+        // derives HTTP and WSS endpoints from the active JEHO origin.
         return builder.build().toString();
     }
 
