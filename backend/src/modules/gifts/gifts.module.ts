@@ -26,6 +26,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { HostTargetModule } from '../host-target/host-target.module';
 import { CpModule } from '../cp/cp.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { BadgesModule } from '../badges/badges.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     HostTargetModule,
     CpModule,
     NotificationsModule,
+    BadgesModule,
   ],
   controllers: [GiftsController],
   providers: [GiftsService],

@@ -1593,11 +1593,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                         room.announceLuckyWinChat(who, chat, session.getAvatarUrl());
                         String meId = session.getUserId();
                         if (meId != null && !meId.isEmpty()) {
-                            room.showLuckyReturnOnMics(
-                                    java.util.Collections.singletonList(meId), wonCoins);
-                            // One light rain only — not a second full particle storm.
-                            room.playCoinRainToUsers(
-                                    java.util.Collections.singletonList(meId), 8);
+                            // Lucky return is now text/toast only. Do not spawn the old
+                            // center-screen lucky coin return or coin rain effect.
                         }
                         if (sfxCtx != null) {
                             GiftAudioFx.playLuckyCoins(sfxCtx, 1);

@@ -704,6 +704,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
             bindStaffSeatBadge(holder, seat.user);
             bindCustomDisplayRank(holder, seat.user);
+            bindRoomSupportMedal(holder, seat.user);
             if (holder.b.tvStatus != null) {
                 holder.b.tvStatus.setVisibility(View.GONE);
             }
@@ -731,6 +732,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         bindStaffSeatBadge(holder, null);
         bindCustomDisplayRank(holder, null);
+        bindRoomSupportMedal(holder, null);
         if (holder.b.tvGiftCount != null) {
             holder.b.tvGiftCount.setVisibility(View.GONE);
         }
@@ -822,6 +824,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         setSeatSize(holder.b.imgAvatar, avatar, ctx);
         setSeatSize(holder.b.imgFrame, frame, ctx);
         setSeatSize(holder.b.imgHostBadge, frame, ctx);
+        if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, scaleMode == SCALE_COMPACT ? 21 : 24, ctx);
         if (holder.b.seatHostSignal != null) {
             setSeatSize(holder.b.seatHostSignal, frame, ctx);
         }
@@ -865,6 +868,24 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         lp.width = px;
         lp.height = px;
         view.setLayoutParams(lp);
+    }
+
+
+    private void bindRoomSupportMedal(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (holder.b.imgRoomSupportMedal == null) return;
+        String url = user != null && user.roomSupportMedal != null ? user.roomSupportMedal.imageUrl : null;
+        if (url == null || url.trim().isEmpty()) {
+            holder.b.imgRoomSupportMedal.setVisibility(View.GONE);
+            Glide.with(holder.b.imgRoomSupportMedal).clear(holder.b.imgRoomSupportMedal);
+            return;
+        }
+        holder.b.imgRoomSupportMedal.setVisibility(View.VISIBLE);
+        holder.b.imgRoomSupportMedal.bringToFront();
+        Glide.with(holder.b.imgRoomSupportMedal)
+                .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(url))
+                .fitCenter()
+                .dontAnimate()
+                .into(holder.b.imgRoomSupportMedal);
     }
 
     private void bindGiftCount(VH holder, String userId) {

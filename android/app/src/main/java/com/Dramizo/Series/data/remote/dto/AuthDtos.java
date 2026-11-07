@@ -142,6 +142,8 @@ public final class AuthDtos {
         @SerializedName("nameStyle") public java.util.Map<String, Object> nameStyle;
         @SerializedName("bio") public String bio;
         @SerializedName("displayedMedalIds") public java.util.List<String> displayedMedalIds;
+        /** Highest active room-support medal earned in the current room-support system. */
+        @SerializedName("roomSupportMedal") public RoomSupportMedalDto roomSupportMedal;
         @SerializedName("gender") public String gender;
         @SerializedName("level") public int level;
         @SerializedName("experience") public long experience;
@@ -215,5 +217,12 @@ public final class AuthDtos {
             if (publicId != null && !publicId.trim().isEmpty()) return publicId.trim();
             return "";
         }
+
+    public static class RoomSupportMedalDto {
+        @SerializedName("id") public String id;
+        @SerializedName("name") public String name;
+        @SerializedName("imageUrl") public String imageUrl;
+        @SerializedName("expiresAt") public String expiresAt;
+    }
     }
 }

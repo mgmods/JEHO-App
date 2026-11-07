@@ -16147,6 +16147,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Toast.makeText(this, "المضيف غادر مؤقتاً · الغرفة ما زالت مفتوحة",
                         Toast.LENGTH_SHORT).show();
             }
+        } else if ("room_support_medal:earned".equals(event)) {
+            // The medal is awarded to the supported account, never to the sender.
+            // Refresh the authoritative seat DTO immediately so it appears above that user's mic.
+            requestRoomRefresh(false);
+            String medalUserId = memberStr(payload, "userId");
+            if (medalUserId != null && myUserId != null && sameUser(medalUserId, myUserId)) {
+                try {
+                    Toast.makeText(this, "حصلت على ميدالية دعم الغرفة 🏅", Toast.LENGTH_SHORT).show();
+                } catch (Exception ignored) {}
+            }
         } else if ("gift:animation".equals(event)) {
             scheduleSupporterRefresh(1_200L);
             String name = memberStr(payload, "giftName");

@@ -55,6 +55,7 @@ import { CpService } from '../cp/cp.service';
 import { VipPlan } from '../../database/entities/vip-plan.entity';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { BadgesService } from '../badges/badges.service';
 
 type LuckyRoll = {
   luckyMultiplier: number | null;
@@ -111,6 +112,7 @@ export class GiftsService implements OnModuleInit {
     private readonly tasksService: TasksService,
     @Optional() private readonly realtime?: RealtimeGateway,
     @Optional() private readonly notifications?: NotificationsService,
+    private readonly badgesService: BadgesService,
     @Optional()
     @Inject(forwardRef(() => ContestsService))
     private readonly contestsService?: ContestsService,
@@ -3104,6 +3106,56 @@ export class GiftsService implements OnModuleInit {
           ?.addScore(receiverId, spent, 'popular', contestContext)
           .catch(() => undefined);
       }
+      if (dto.roomId && result.send?.receiverId) {
+        const roomSupportMedal = await this.badgesService.recordRoomSupportProgress(
+          result.send.receiverId,
+          dto.roomId,
+          {
+            coins: Number(result.send.totalCoins || totalCoins),
+            diamonds: Number(result.hostDiamonds || result.send.diamondsAwarded || 0),
+            gifts: Math.max(1, Number(result.send.quantity) || qty),
+          },
+        ).catch((err) => {
+          this.log.warn(`room support medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
+          return null;
+        });
+        if (roomSupportMedal) {
+          this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+            roomId: dto.roomId,
+            event: 'room_support_medal:earned',
+            payload: roomSupportMedal,
+            from: { userId: result.send.receiverId },
+            at: new Date().toISOString(),
+          });
+        }
+      }
+
+      if (dto.roomId) {
+        for (const rid of receiverIds) {
+          const roomSupportMedal = await this.badgesService.recordRoomSupportProgress(
+            rid,
+            dto.roomId,
+            {
+              coins: coinPrice * qty,
+              diamonds: Number(result.micShares?.[rid] || 0),
+              gifts: Math.max(1, qty),
+            },
+          ).catch((err) => {
+            this.log.warn(`room support medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
+            return null;
+          });
+          if (roomSupportMedal) {
+            this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+              roomId: dto.roomId,
+              event: 'room_support_medal:earned',
+              payload: roomSupportMedal,
+              from: { userId: rid },
+              at: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
       const sender = await this.usersRepo.findOne({ where: { id: senderId } });
       const senderProfile = await this.profilesRepo.findOne({ where: { userId: senderId } });
       const vip = await this.userVipRepo.findOne({

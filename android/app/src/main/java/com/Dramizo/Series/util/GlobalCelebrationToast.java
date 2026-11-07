@@ -574,6 +574,18 @@ public final class GlobalCelebrationToast {
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
                 margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
         MAIN.post(() -> {
+            // Lucky returns are transient: keep only the newest result. Never let an
+            // old queued toast surface after the user's finger has already been released.
+            if (isLuckyToastKind(kind)) {
+                PENDING.removeIf(item -> isLuckyToastKind(item.kind));
+                View active = current.get();
+                if (active != null && active.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) active.getParent()).removeView(active);
+                    current.clear();
+                }
+                showing = false;
+                if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
+            }
             PENDING.addLast(request);
             showNext();
         });

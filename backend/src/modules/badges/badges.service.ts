@@ -414,6 +414,85 @@ export class BadgesService {
     return granted;
   }
 
+  /** Award configured room-support medal to the supported user; progress is isolated per room. */
+  async recordRoomSupportProgress(userId: string, roomId: string, metrics: { coins?: number; diamonds?: number; gifts?: number }): Promise<any | null> {
+    if (!userId || !roomId) return null;
+    const row = await this.dataSource.getRepository(AppSetting).findOne({ where: { key: 'room_support_medals_config' } });
+    if (!row?.value) return null;
+    let config: any; try { config = JSON.parse(row.value); } catch { return null; }
+    if (config?.enabled === false || config?.scope !== 'per_room') return null;
+    const medals = Array.isArray(config.medals) ? config.medals : [];
+    const ordered = medals.filter((m: any) => m && m.isActive !== false && String(m.imageUrl || '').trim())
+      .map((m: any, index: number) => ({ ...m, index }))
+      .sort((a: any, b: any) => Number(a.threshold || 0) - Number(b.threshold || 0));
+    if (!ordered.length) return null;
+    let highest: any = null;
+    for (const cfg of ordered) {
+      const type = ['coins', 'diamonds', 'gifts'].includes(String(cfg.criteriaType)) ? String(cfg.criteriaType) : 'coins';
+      const amount = Math.max(0, Math.floor(Number(metrics?.[type] || 0)));
+      if (amount <= 0) continue;
+      const target = Math.max(1, Math.floor(Number(cfg.threshold) || 1));
+      const key = `room_support_medal_progress:${roomId}:${userId}:${cfg.index}`;
+      let reached = false; let current = 0;
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+        let stateRow = await manager.findOne(AppSetting, { where: { key }, lock: { mode: 'pessimistic_write' } });
+        let state: any = { current: 0, awarded: false };
+        try { if (stateRow?.value) state = { ...state, ...JSON.parse(stateRow.value) }; } catch {}
+        if (!state.awarded) {
+          state.current = Math.min(target, Math.max(0, Number(state.current) || 0) + amount);
+          reached = state.current >= target; current = state.current;
+          if (!stateRow) stateRow = manager.create(AppSetting, { key, value: '' });
+          stateRow.value = JSON.stringify(state); await manager.save(stateRow);
+        } else current = target;
+      });
+      if (reached || current >= target) highest = cfg;
+    }
+    if (!highest) return null;
+    const badgeKey = `room_support:${highest.index}`;
+    let badge = await this.badges.findOne({ where: { category: 'room_support', achievementKey: badgeKey } });
+    if (!badge) {
+      badge = this.badges.create({
+        name: String(highest.name || 'مدالية دعم الغرفة').trim().slice(0, 80),
+        description: `مدالية دعم الغرفة · ${String(highest.criteriaType || 'coins')}`,
+        imageUrl: String(highest.imageUrl || '').trim().slice(0, 512),
+        category: 'room_support', awardType: 'room_support', achievementKey: badgeKey,
+        isActive: true, isAnimated: false, sortOrder: Number(highest.index) || 0,
+      });
+      await this.badges.save(badge);
+    } else {
+      badge.name = String(highest.name || badge.name).trim().slice(0, 80) || badge.name;
+      badge.imageUrl = String(highest.imageUrl || badge.imageUrl).trim().slice(0, 512) || badge.imageUrl;
+      badge.isActive = true; await this.badges.save(badge);
+    }
+    const days = Math.max(0, Math.min(3650, Math.floor(Number(highest.durationDays) || 0)));
+    const expiresAt = days > 0 ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
+    let newlyGranted = false;
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room-support-grant:${userId}:${badge!.id}`]);
+      let owned = await manager.findOne(UserBadge, { where: { userId, badgeId: badge!.id }, lock: { mode: 'pessimistic_write' } });
+      if (!owned || (owned.expiresAt && new Date(owned.expiresAt).getTime() <= Date.now())) {
+        if (!owned) owned = manager.create(UserBadge, { userId, badgeId: badge!.id });
+        owned.grantedByAdminId = null; owned.source = 'room_support'; owned.grantedAt = new Date(); owned.expiresAt = expiresAt;
+        await manager.save(owned); newlyGranted = true;
+      }
+      const profile = await manager.findOne(UserProfile, { where: { userId }, lock: { mode: 'pessimistic_write' } });
+      if (profile) {
+        const displayed = Array.isArray(profile.displayedMedalIds) ? profile.displayedMedalIds : [];
+        profile.displayedMedalIds = [badge!.id, ...displayed.filter((id) => id !== badge!.id)].slice(0, 5);
+        await manager.save(profile);
+      }
+    });
+    if (newlyGranted) {
+      await this.notifications.notifyUser(userId, NotificationType.SYSTEM, 'ميدالية دعم جديدة! 🏅',
+        `حصلت على ميدالية ${badge.name} لدعمك داخل الغرفة.`,
+        { kind: 'room_support_medal', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl, roomId }).catch(() => undefined);
+    }
+    return { id: badge.id, name: badge.name, imageUrl: badge.imageUrl, userId, roomId,
+      threshold: Number(highest.threshold) || 0, criteriaType: String(highest.criteriaType || 'coins'),
+      expiresAt: expiresAt?.toISOString() || null, newlyGranted };
+  }
+
   listAdmin() {
     return this.badges.find({ order: { sortOrder: 'ASC', name: 'ASC' } });
   }
