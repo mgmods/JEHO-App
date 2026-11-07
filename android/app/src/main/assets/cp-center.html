@@ -256,7 +256,7 @@ header button{font-size:25px}
 </section>
 <section id="tasks" class="hidden"><div class="panel"><h2 class="title">🎁 مهمات CP ومكافآتها</h2><p class="note">أكمل المهمات لاستلام نقاط العلاقة، وإذا عيّنت الإدارة هدية CP للمهمة فستُضاف إلى حقيبتك عند المطالبة.</p><div id="tasksView"><p class="empty">جارٍ تحميل المهمات…</p></div></div></section>
 <section id="rules" class="hidden"><div class="panel"><h2 class="title">💖 قواعد CP</h2><div id="rulesList"></div></div></section>
-<section id="store" class="hidden"><div class="panel"><h2 class="title">🛍️ متجر CP</h2><p class="note">اختر الخلفية أو الشعار أو الإطار الذي يعجبك. شاهد المعاينة أولاً، واشترِ بالكوينز؛ عناصر CP تُركّب تلقائياً بعد نجاح الشراء.</p><div id="storeView"><p class="empty">جارٍ تحميل عناصر متجر CP…</p></div></div></section>
+<section id="store" class="hidden"><div class="panel"><h2 class="title">🛍️ متجر CP</h2><p class="note">اشترِ العنصر ليُضاف إلى حقيبتك، ثم ارتده أو اخلعه متى شئت. لكل خانة عنصر واحد فقط؛ ارتداء عنصر جديد يستبدل السابق.</p><div class="tabs cp-store-tabs"><button class="active" data-store-mode="store">المتجر</button><button data-store-mode="bag">حقيبتي</button></div><div id="storeView"><p class="empty">جارٍ تحميل عناصر متجر CP…</p></div></div></section>
 </main>
 <nav class="bottom" style="grid-template-columns:repeat(4,1fr)"><button data-page="weekly"><span class="navicon">🏆</span>الثنائيات</button><button data-page="relationship"><span class="navicon">❤️</span>علاقاتي</button><button data-page="store"><span class="navicon">🛍️</span>المتجر</button><button data-page="tasks"><span class="navicon">🎁</span>المهمات</button></nav>
 </div>
@@ -264,6 +264,8 @@ header button{font-size:25px}
 <script>
 const API_ENDPOINTS={weekly:"/api/cp/weekly",relationship:"/api/cp/relationship",levels:"/api/cp/levels",invites:"/api/cp/invites",rewards:"/api/cp/rewards",rules:"/api/cp/rules"};
 const data={weekly:{featured:null,leaderboard:[],world:[]},relationship:{active:false,invites:[]},rewards:[],rules:["تبدأ علاقة CP بإرسال هدية ارتباط CP من داخل الروم الصوتي.","لا تنشأ العلاقة إلا بعد موافقة المستلم على الطلب.","تظهر العلاقات النشطة والنقاط والأسماء والصور حسب بيانات خادم JEHO.","يمكن لأي طرف إنهاء العلاقة وفق قواعد التطبيق.","تُحدد النقاط والمكافآت من إعدادات خادم JEHO."]};
+let cpStoreBagMode=false;
+let cpStoreItems=[];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function score(n){n=Number(n)||0;if(n>=1000000)return(n/1000000).toFixed(1).replace(/\.0$/,"")+"M";if(n>=1000)return(n/1000).toFixed(1).replace(/\.0$/,"")+"K";return String(n);}
@@ -319,7 +321,7 @@ document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>page(b.dataset
 document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===b));["ranking","world","rewards"].forEach(id=>$(id+"View").classList.toggle("hidden",id!==b.dataset.tab));if(b.dataset.tab==="ranking"&&window.JehoCP)JehoCP.loadLeaderboard("weekly");if(b.dataset.tab==="world"&&window.JehoCP)JehoCP.loadLeaderboard("world");if(b.dataset.tab==="rewards"&&window.JehoCP)JehoCP.loadCatalog();});
 $("back").onclick=()=>{if(!$("relationship").classList.contains("hidden")||!$("store").classList.contains("hidden")||!$("tasks").classList.contains("hidden")||!$("rules").classList.contains("hidden"))page("weekly");else if(window.JehoCP)JehoCP.back();};
 $("help").onclick=()=>page("rules");
-document.addEventListener("click",e=>{const b=e.target.closest("[data-user-name]");if(b)modal(b.dataset.userName,b.dataset.userId);const r=e.target.closest("[data-response]");if(r&&window.JehoCP)JehoCP.respondRequest(r.dataset.response,r.dataset.accept==="true");const buy=e.target.closest("[data-store-purchase]");if(buy&&window.JehoCP){buy.disabled=true;JehoCP.purchaseStoreItem(buy.dataset.storePurchase);}const wear=e.target.closest("[data-store-equip]");if(wear&&window.JehoCP){wear.disabled=true;JehoCP.equipStoreItem(wear.dataset.storeEquip);}const end=e.target.closest("[data-end-cp]");if(end&&window.JehoCP){if(window.confirm("هل أنت متأكد من إلغاء ارتباط CP؟ سيتم إنهاء العلاقة وإزالة ظهورها من ملفك.")){end.disabled=true;JehoCP.endRelationship(end.dataset.endCp);}}});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-user-name]");if(b)modal(b.dataset.userName,b.dataset.userId);const r=e.target.closest("[data-response]");if(r&&window.JehoCP)JehoCP.respondRequest(r.dataset.response,r.dataset.accept==="true");const mode=e.target.closest("[data-store-mode]");if(mode){cpStoreBagMode=mode.dataset.storeMode==="bag";document.querySelectorAll("[data-store-mode]").forEach(x=>x.classList.toggle("active",x===mode));window.renderCpStore(cpStoreItems);}const buy=e.target.closest("[data-store-purchase]");if(buy&&window.JehoCP){buy.disabled=true;JehoCP.purchaseStoreItem(buy.dataset.storePurchase);}const wear=e.target.closest("[data-store-equip]");if(wear&&window.JehoCP){wear.disabled=true;JehoCP.equipStoreItem(wear.dataset.storeEquip);}const remove=e.target.closest("[data-store-unequip]");if(remove&&window.JehoCP){remove.disabled=true;JehoCP.unequipStoreItem(remove.dataset.storeUnequip);}const end=e.target.closest("[data-end-cp]");if(end&&window.JehoCP){if(window.confirm("هل أنت متأكد من إلغاء ارتباط CP؟ سيتم إنهاء العلاقة وإزالة ظهورها من ملفك.")){end.disabled=true;JehoCP.endRelationship(end.dataset.endCp);}}});
 window.onCpRelationshipEnded=function(success,message){const button=document.querySelector('[data-end-cp]');if(button)button.disabled=false;toast(message||(success?"تم إلغاء ارتباط CP بنجاح.":"تعذر إلغاء الارتباط، حاول مرة أخرى."));if(!success)return;data.relationship.active=false;data.relationship.id=null;data.relationship.partner=null;data.relationship.me=null;data.relationship.profileSummary=null;data.weekly.featured=null;render();page("relationship");if(window.JehoCP){JehoCP.loadHome();JehoCP.loadDiscover("");JehoCP.loadLeaderboard("weekly");JehoCP.loadLeaderboard("world");}};window.renderCpHome=function(rows){rows=Array.isArray(rows)?rows:[];const active=rows.filter(r=>r.status==="active");const partner=active[0];data.relationship.active=!!partner;data.relationship.id=partner?.id||null;data.relationship.legacy=partner?.legacy===true;data.relationship.me=partner?.self?{id:partner.self.id,name:partner.self.displayName||partner.self.username,avatar:partner.self.avatarUrl}:null;data.relationship.partner=partner?.partner?{id:partner.partner.id,name:partner.partner.displayName||partner.partner.username,avatar:partner.partner.avatarUrl}:null;data.relationship.points=partner?.points||0;data.relationship.durationDays=partner?.durationDays||0;data.relationship.durationLabel=partner?.durationLabel||'';data.relationship.profileSummary=partner?{self:partner.self,partner:partner.partner,partnerDisplayName:partner.partner?.displayName||partner.partner?.username,partnerAvatarUrl:partner.partner?.avatarUrl,level:partner.level,levelName:partner.levelName,profileTitle:partner.profileTitle,presentation:partner.presentation,durationDays:partner.durationDays,durationLabel:partner.durationLabel}:null;data.weekly.featured=partner?{a:{id:partner.self?.id,name:partner.self?.displayName||partner.self?.username,avatar:partner.self?.avatarUrl,nameColor:partner.self?.nameColor},b:{id:partner.partner?.id,name:partner.partner?.displayName||partner.partner?.username,avatar:partner.partner?.avatarUrl,nameColor:partner.partner?.nameColor},score:partner.points||0,days:partner.durationDays||0,level:partner.level,levelName:partner.levelName,presentation:partner.presentation}:null;render();};window.renderCpRequests=function(incoming,sent){const inc=Array.isArray(incoming)?incoming:[];data.relationship.invites=inc.filter(r=>r.status==="pending").map(r=>({id:r.id,name:r.sender?.displayName||r.sender?.username,sender:r.sender,type:r.type,giftName:r.giftName,giftIconUrl:r.giftIconUrl,priceCoins:r.priceCoins,expiresAt:r.expiresAt,status:r.status,statusText:"أرسل لك هدية ارتباط CP — اختر القبول أو الرفض",pending:true}));render();};
 window.renderCpLeaderboard=function(rows,period){const mapped=(Array.isArray(rows)?rows:[]).map(r=>({a:{id:r.userA?.id,name:r.userA?.displayName||r.userA?.username,avatar:r.userA?.avatarUrl,nameColor:r.userA?.nameColor},b:{id:r.userB?.id,name:r.userB?.displayName||r.userB?.username,avatar:r.userB?.avatarUrl,nameColor:r.userB?.nameColor},score:period==="world"?(r.points||0):(r.weeklyPoints||0),level:r.level||1,days:r.durationDays||r.days||0,isWeeklyChampion:period!=="world"&&!!r.isWeeklyChampion,isWorld:period==="world"}));if(period==="world")data.weekly.world=mapped;else{data.weekly.leaderboard=mapped;data.weekly.featured=mapped.find(r=>r.isWeeklyChampion)||null;}render();};
 window.renderCpRewards=function(groups){data.rewards=(Array.isArray(groups)?groups:[]).flatMap(g=>(Array.isArray(g.levels)?g.levels:[]).map(l=>({...l,typeLabel:g.type||"CP",title:l.name||l.presentation?.title||(g.type||"CP")+" · المستوى "+(l.level||1),description:l.description||("النقاط المطلوبة: "+(l.pointsRequired||0)+(l.reward?" · المكافأة: "+l.reward:""))})));render();};
@@ -346,23 +348,37 @@ document.querySelectorAll("[data-claim-task]").forEach(button=>button.onclick=()
 };
 
 window.renderCpStore=function(rows){
- const items=Array.isArray(rows)?rows:[];
- if(!items.length){$("storeView").innerHTML='<p class="empty">لا توجد عناصر متاحة في متجر CP حالياً. ستظهر هنا الخلفيات والشعارات والإطارات التي تضيفها الإدارة.</p>';return;}
+ cpStoreItems=Array.isArray(rows)?rows:[];
+ const now=Date.now();
+ const normalized=cpStoreItems.map(item=>{
+  const expiry=item.expiresAt?Date.parse(item.expiresAt):NaN;
+  const activeLease=!item.expiresAt||(!Number.isNaN(expiry)&&expiry>now);
+  return {...item,owned:item.owned===true&&activeLease,equipped:item.equipped===true&&activeLease};
+ });
+ const items=cpStoreBagMode?normalized.filter(item=>item.owned):normalized;
+ if(!items.length){
+  $("storeView").innerHTML='<p class="empty">'+(cpStoreBagMode?'حقيبتك فارغة حالياً. اشترِ عنصراً من المتجر ليظهر هنا.':'لا توجد عناصر متاحة في متجر CP حالياً. ستظهر هنا الخلفيات والشعارات والإطارات التي تضيفها الإدارة.')+'</p>';
+  return;
+ }
  $("storeView").innerHTML='<div class="cp-store-grid">'+items.map(item=>{
   const id=String(item.id||"");
   const image=item.previewUrl||item.animationUrl||fallback;
   const price=Math.max(0,Number(item.coinPrice)||0);
-  const lease=Number(item.meta?.leaseDays||30);
-  const kind=({cp_background:"خلفية CP",cp_logo:"شعار CP",vip_badge:"إطار صورة شخصية",host_badge:"شارة خاصة",profile_card:"بطاقة الملف",nameplate:"لوحة الاسم",level_badge:"شارة مستوى",entry_effect:"تأثير دخول",room_card:"بطاقة روم",chat_bubble:"فقاعة دردشة"})[item.type]||"مكافأة CP";
+  const lease=Math.max(1,Number(item.meta?.leaseDays)||30);
+  const kind=({cp_background:"خلفية CP",cp_logo:"شعار CP",vip_badge:"إطار صورة شخصية",host_badge:"إطار صورة شخصية",profile_card:"بطاقة الملف",nameplate:"لوحة الاسم",level_badge:"شارة مستوى",entry_effect:"تأثير دخول",room_card:"بطاقة روم",chat_bubble:"فقاعة دردشة"})[item.type]||"مكافأة CP";
   const expiry=item.expiresAt?Date.parse(item.expiresAt):NaN;
-  const owned=item.owned===true&&(!item.expiresAt||Number.isNaN(expiry)||expiry>Date.now());
+  const owned=item.owned===true;
   const equipped=owned&&item.equipped===true;
+  const state=equipped?'<div class="pill">مرتدى حالياً ✓</div>':owned?'<div class="pill">موجود في حقيبتك</div>':'';
   const button=equipped
-   ? '<button class="cp-store-action" disabled>مركّب تلقائياً ✓</button>'
+   ? '<button class="cp-store-action" data-store-unequip="'+esc(id)+'">خلع العنصر</button>'
    : owned
-    ? '<button class="cp-store-action" data-store-equip="'+esc(id)+'">تركيب الآن</button>'
-    : '<button class="cp-store-action" data-store-purchase="'+esc(id)+'">شراء وتركيب · '+score(price)+' كوين</button>';
-  return '<article class="cp-store-card"><img class="cp-store-preview" src="'+esc(image)+'" alt="'+esc(item.name||"عنصر CP")+'" loading="lazy" onerror="this.onerror=null;this.src=\''+fallback+'\'"><div class="cp-store-kind">'+esc(kind)+'</div><h3>'+esc(item.name||"عنصر CP")+'</h3><p>'+esc(item.description||"عنصر تجميلي خاص بمتجر CP")+'</p><div class="cp-store-price">'+score(price)+' كوين · '+score(lease)+' يوم</div>'+button+'</article>';
+    ? '<button class="cp-store-action" data-store-equip="'+esc(id)+'">ارتداء</button>'
+    : '<button class="cp-store-action" data-store-purchase="'+esc(id)+'">'+(item.expiresAt&&!Number.isNaN(expiry)&&expiry<=now?'شراء مجدداً · ':'شراء · ')+score(price)+' كوين</button>';
+  const duration=owned&&item.expiresAt&&!Number.isNaN(expiry)
+   ? 'متبقي '+Math.max(0,Math.ceil((expiry-now)/86400000))+' يوم'
+   : owned?'ملكية دائمة':score(lease)+' يوم';
+  return '<article class="cp-store-card"><img class="cp-store-preview" src="'+esc(image)+'" alt="'+esc(item.name||"عنصر CP")+'" loading="lazy" onerror="this.onerror=null;this.src=\''+fallback+'\'"><div class="cp-store-kind">'+esc(kind)+'</div><h3>'+esc(item.name||"عنصر CP")+'</h3><p>'+esc(item.description||"عنصر تجميلي خاص بمتجر CP")+'</p><div class="cp-store-price">'+(owned?esc(duration):score(price)+' كوين · '+score(lease)+' يوم')+'</div>'+state+button+'</article>';
  }).join("")+'</div>';
 };
 window.showCpRewardPopup=function(title,detail,imageUrl){const image=/^https?:\/\//i.test(String(imageUrl||""))?'<img src="'+esc(imageUrl)+'" alt="المكافأة" onerror="this.style.display=\'none\'">':'';$("modalRoot").innerHTML='<div class="cp-reward-popup-bg" id="cpRewardPopupBg"><section class="cp-reward-popup" role="dialog" aria-modal="true"><div class="popup-spark">🎁 ✨ 💖</div><h2>'+esc(title||"مبروك! استلمت مكافأتك")+'</h2>'+(image||'<div class="popup-spark">🏆</div>')+'<p>'+esc(detail||"تمت إضافة مكافأتك إلى حسابك بنجاح.")+'</p><button class="action" id="cpRewardPopupClose">رائع ❤️</button></section></div>';$("cpRewardPopupClose").onclick=()=>$("modalRoot").innerHTML="";$("cpRewardPopupBg").onclick=e=>{if(e.target.id==="cpRewardPopupBg")$("modalRoot").innerHTML="";};};
