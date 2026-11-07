@@ -469,8 +469,10 @@ async function saveOdds() {
   const ratesMatch = Object.entries(expectedRates).every(([id, value]) => Number(stored.gameWinRates?.[id]) === value)
   const expectedRtpRates = Object.fromEntries(safeManageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)]))
   const rtpRatesMatch = Object.entries(expectedRtpRates).every(([id, value]) => Math.abs(Number(stored.gameRtpRates?.[id]) - value) < 0.000001)
-  if (expectedDisabled !== actualDisabled || !ratesMatch || !rtpRatesMatch) {
-    error.value = 'الخادم لم يُرجع كل حالات التشغيل ونسب الفوز والعائد لكل لعبة كما حُفظت؛ لم يتم تأكيد الحفظ.'
+  const numericKeys = ['playerRtp', 'spinHitRate', 'fishingHitRate', 'crashCashoutRake', 'hiloPayoutMult', 'royalBattlePayGate', 'maxBet', 'maxWinMult', 'maxWinAbsolute', 'maxCrashRatio']
+  const globalSettingsMatch = numericKeys.every((key) => Math.abs(Number(stored[key]) - Number(odds[key])) < 0.000001)
+  if (expectedDisabled !== actualDisabled || !ratesMatch || !rtpRatesMatch || !globalSettingsMatch) {
+    error.value = 'الخادم لم يُرجع جميع إعدادات الألعاب وحدود الرهان ونسب الفوز والعائد كما حُفظت؛ لم يتم تأكيد الحفظ.'
     toast().danger(error.value)
     return
   }
