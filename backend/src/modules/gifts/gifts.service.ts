@@ -3130,32 +3130,6 @@ export class GiftsService implements OnModuleInit {
         }
       }
 
-      if (dto.roomId) {
-        for (const rid of receiverIds) {
-          const roomSupportMedal = await this.badgesService.recordRoomSupportProgress(
-            rid,
-            dto.roomId,
-            {
-              coins: coinPrice * qty,
-              diamonds: Number(result.micShares?.[rid] || 0),
-              gifts: Math.max(1, qty),
-            },
-          ).catch((err) => {
-            this.log.warn(`room support medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
-            return null;
-          });
-          if (roomSupportMedal) {
-            this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-              roomId: dto.roomId,
-              event: 'room_support_medal:earned',
-              payload: roomSupportMedal,
-              from: { userId: rid },
-              at: new Date().toISOString(),
-            });
-          }
-        }
-      }
-
       const sender = await this.usersRepo.findOne({ where: { id: senderId } });
       const senderProfile = await this.profilesRepo.findOne({ where: { userId: senderId } });
       const vip = await this.userVipRepo.findOne({
@@ -3329,54 +3303,6 @@ export class GiftsService implements OnModuleInit {
           from: { userId: senderId },
           at: animationPayload.at,
         });
-        if (gift.type === GiftType.LUCKY) {
-          const luckyMultiplier = Number(result.luckyMultiplier || 0);
-          const luckyCoinsWon = Math.max(0, Number(result.luckyCoinsWon || 0));
-          const luckyEventId = `lucky:${senderId}:${animationPayload.at}`;
-          // Losses are silent; only positive payouts and partial returns produce a room message.
-          if (luckyCoinsWon > 0) {
-            this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-              roomId: dto.roomId,
-              event: 'lucky:hit',
-              payload: {
-                eventId: luckyEventId,
-                senderId,
-                senderName: animationPayload.senderName,
-                senderAvatarUrl: animationPayload.senderAvatarUrl,
-                giftName: gift.name,
-                giftIconUrl: gift.iconUrl,
-                coinPrice: gift.coinPrice,
-                quantity: qty,
-                luckyMultiplier,
-                luckyCoinsWon,
-                formula: luckyMultiplier > 0
-                  ? `${gift.coinPrice * qty} × ${luckyMultiplier}`
-                  : 'no_payout',
-              },
-              from: { userId: senderId },
-              at: animationPayload.at,
-            });
-          }
-          this.broadcastLuckyCelebration({
-            roomId: dto.roomId,
-            senderId,
-            displayName:
-              typeof animationPayload.senderName === 'string'
-                ? animationPayload.senderName
-                : undefined,
-            avatarUrl:
-              typeof animationPayload.senderAvatarUrl === 'string'
-                ? animationPayload.senderAvatarUrl
-                : undefined,
-            giftName: gift.name,
-            giftIconUrl: gift.iconUrl,
-            coinPrice: gift.coinPrice,
-            quantity: qty,
-            luckyMultiplier,
-            luckyCoinsWon,
-            eventId: luckyEventId,
-          });
-        }
         if (taskRoom?.agencyId) {
           const agencyRooms = await this.roomsRepo.find({
             where: { agencyId: taskRoom.agencyId, status: RoomStatus.OPEN },
@@ -3795,6 +3721,32 @@ export class GiftsService implements OnModuleInit {
             );
           });
       }
+      if (dto.roomId) {
+        for (const rid of receiverIds) {
+          const roomSupportMedal = await this.badgesService.recordRoomSupportProgress(
+            rid,
+            dto.roomId,
+            {
+              coins: coinPrice * qty,
+              diamonds: Number(result.micShares?.[rid] || 0),
+              gifts: Math.max(1, qty),
+            },
+          ).catch((err) => {
+            this.log.warn(`room support medal progress failed: ${err instanceof Error ? err.message : String(err)}`);
+            return null;
+          });
+          if (roomSupportMedal) {
+            this.realtime?.emitToRoom(dto.roomId, 'room:event', {
+              roomId: dto.roomId,
+              event: 'room_support_medal:earned',
+              payload: roomSupportMedal,
+              from: { userId: rid },
+              at: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
       const perTargetCoins = coinPrice * qty;
       for (const rid of receiverIds) {
         await this.contestsService
@@ -3886,47 +3838,6 @@ export class GiftsService implements OnModuleInit {
         from: { userId: senderId },
         at,
       });
-      if (gift.type === GiftType.LUCKY) {
-        const luckyMultiplier = Number(result.luckyMultiplier || 0);
-        const luckyCoinsWon = Math.max(0, Number(result.luckyCoinsWon || 0));
-        const luckyEventId = `lucky:${senderId}:${at}`;
-        this.realtime?.emitToRoom(dto.roomId, 'room:event', {
-          roomId: dto.roomId,
-          event: 'lucky:hit',
-          payload: {
-            eventId: luckyEventId,
-            senderId,
-            senderName: animationPayload.senderName,
-            senderAvatarUrl: animationPayload.senderAvatarUrl,
-            giftName: gift.name,
-            giftIconUrl: gift.iconUrl,
-            coinPrice: gift.coinPrice,
-            quantity: qty,
-            personCount,
-            luckyMultiplier,
-            luckyCoinsWon,
-            formula: luckyMultiplier > 0
-              ? `${totalCoins} × ${luckyMultiplier}`
-              : 'no_payout',
-            allMic: true,
-          },
-          from: { userId: senderId },
-          at,
-        });
-        this.broadcastLuckyCelebration({
-          roomId: dto.roomId,
-          senderId,
-          displayName: animationPayload.senderName ?? undefined,
-          avatarUrl: animationPayload.senderAvatarUrl ?? undefined,
-          giftName: gift.name,
-          giftIconUrl: gift.iconUrl,
-          coinPrice: gift.coinPrice,
-          quantity: qty * Math.max(1, personCount),
-          luckyMultiplier,
-          luckyCoinsWon,
-          eventId: luckyEventId,
-        });
-      }
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
       return result;
     });
