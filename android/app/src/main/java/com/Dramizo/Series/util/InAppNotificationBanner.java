@@ -18,14 +18,14 @@ import com.Dramizo.Series.R;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Lightweight, serialized in-app notification queue for foreground events. */
 public final class InAppNotificationBanner {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ArrayDeque<Request> QUEUE = new ArrayDeque<>();
-    private static final Set<String> PENDING_KEYS = new HashSet<>();
+    private static final Map<String, Long> RECENT_KEYS = new HashMap<>();
     private static WeakReference<View> currentBanner = new WeakReference<>(null);
     private static Runnable hideRunnable;
     private static boolean showing;
@@ -74,7 +74,23 @@ public final class InAppNotificationBanner {
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
         Request request = new Request(activity, title, body, type, tapIntent, dedupeKey, avatarUrl);
         MAIN.post(() -> {
-            if (dedupeKey != null && !PENDING_KEYS.add(dedupeKey)) return;
+            if (dedupeKey != null) {
+                long now = System.currentTimeMillis();
+                Long last = RECENT_KEYS.get(dedupeKey);
+                if (last != null && now - last < 10_000L) return;
+                RECENT_KEYS.put(dedupeKey, now);
+                if (RECENT_KEYS.size() > 200) {
+                    String oldestKey = null;
+                    long oldestAt = Long.MAX_VALUE;
+                    for (Map.Entry<String, Long> entry : RECENT_KEYS.entrySet()) {
+                        if (entry.getValue() < oldestAt) {
+                            oldestAt = entry.getValue();
+                            oldestKey = entry.getKey();
+                        }
+                    }
+                    if (oldestKey != null) RECENT_KEYS.remove(oldestKey);
+                }
+            }
             QUEUE.addLast(request);
             showNext();
         });
@@ -169,9 +185,8 @@ public final class InAppNotificationBanner {
     }
 
     private static void releaseKey(Request request) {
-        if (request != null && request.dedupeKey != null) {
-            PENDING_KEYS.remove(request.dedupeKey);
-        }
+        // Recent keys are retained for a short dedupe window after display,
+        // preventing duplicate FCM/socket deliveries from reappearing.
     }
 
     private static int iconForType(String type) {
