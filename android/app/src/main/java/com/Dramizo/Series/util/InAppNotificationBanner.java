@@ -139,6 +139,8 @@ public final class InAppNotificationBanner {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.gravity = Gravity.TOP;
+        lp.leftMargin = dp(activity, 14);
+        lp.rightMargin = dp(activity, 14);
         WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(root);
         int statusBarTop = insets != null
                 ? insets.getInsets(WindowInsetsCompat.Type.statusBars()).top : 0;
