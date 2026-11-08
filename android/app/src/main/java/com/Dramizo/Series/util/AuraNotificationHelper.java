@@ -70,6 +70,9 @@ public final class AuraNotificationHelper {
         String safeBody = body != null ? body : "";
         String safeType = type != null ? type : "system";
         String url = AssetCatalog.absoluteUrl(avatarUrl);
+        boolean directChat = ("chat".equalsIgnoreCase(safeType) || "message".equalsIgnoreCase(safeType))
+                && isChatIntent(tapIntent);
+        if (directChat) rememberChatMessage(app, notificationId, safeTitle, safeBody);
 
         // Show immediately with placeholder, then refresh when avatar loads (Redmi-safe).
         post(app, channelId, safeTitle, safeBody, safeType, tapIntent, notificationId, null);
@@ -205,10 +208,35 @@ public final class AuraNotificationHelper {
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(!isChat)
-                .setContentIntent(pi)
-                .setCustomContentView(compact)
-                .setCustomBigContentView(expanded)
-                .setCustomHeadsUpContentView(compact);
+                .setContentIntent(pi);
+
+        if (isChat) {
+            builder.setStyle(buildChatMessagingStyle(context, notificationId, title, avatar));
+            android.app.RemoteInput remoteInput = new android.app.RemoteInput.Builder(
+                    NotificationQuickReplyReceiver.EXTRA_REPLY)
+                    .setLabel("اكتب ردك…")
+                    .build();
+            Intent replyIntent = new Intent(context, NotificationQuickReplyReceiver.class);
+            replyIntent.putExtra(NotificationQuickReplyReceiver.EXTRA_CONVERSATION_ID,
+                    launch.getStringExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID));
+            replyIntent.putExtra(NotificationQuickReplyReceiver.EXTRA_NOTIFICATION_ID, notificationId);
+            PendingIntent replyPendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    notificationId ^ 0x51A7,
+                    replyIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+            NotificationCompat.Action replyAction = new NotificationCompat.Action.Builder(
+                    R.drawable.ic_stat_jeho, "رد", replyPendingIntent)
+                    .addRemoteInput(remoteInput)
+                    .setAllowGeneratedReplies(true)
+                    .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+                    .build();
+            builder.addAction(replyAction);
+        } else {
+            builder.setCustomContentView(compact)
+                    .setCustomBigContentView(expanded)
+                    .setCustomHeadsUpContentView(compact);
+        }
 
         if (isChat) {
             // Keep one updatable notification per conversation and let Android group
@@ -286,6 +314,52 @@ public final class AuraNotificationHelper {
         } catch (SecurityException ignored) {
             // Notification permission may be revoked while the app is running.
         }
+    }
+
+    private static void rememberChatMessage(Context context, int notificationId,
+                                             String sender, String body) {
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences(
+                    "jeho_dm_notification_history", Context.MODE_PRIVATE);
+            String key = "conversation_" + notificationId;
+            org.json.JSONArray messages = new org.json.JSONArray(prefs.getString(key, "[]"));
+            org.json.JSONObject item = new org.json.JSONObject();
+            item.put("sender", sender);
+            item.put("body", body);
+            item.put("time", System.currentTimeMillis());
+            messages.put(item);
+            org.json.JSONArray trimmed = new org.json.JSONArray();
+            int start = Math.max(0, messages.length() - 10);
+            for (int i = start; i < messages.length(); i++) trimmed.put(messages.getJSONObject(i));
+            prefs.edit().putString(key, trimmed.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static NotificationCompat.MessagingStyle buildChatMessagingStyle(
+            Context context, int notificationId, String senderName, @Nullable Bitmap avatar) {
+        androidx.core.app.Person.Builder personBuilder = new androidx.core.app.Person.Builder()
+                .setName(senderName);
+        if (avatar != null) {
+            personBuilder.setIcon(androidx.core.graphics.drawable.IconCompat.createWithBitmap(avatar));
+        }
+        androidx.core.app.Person sender = personBuilder.build();
+        NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(
+                new androidx.core.app.Person.Builder().setName("أنت").build())
+                .setConversationTitle(senderName)
+                .setGroupConversation(false);
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences(
+                    "jeho_dm_notification_history", Context.MODE_PRIVATE);
+            org.json.JSONArray messages = new org.json.JSONArray(
+                    prefs.getString("conversation_" + notificationId, "[]"));
+            for (int i = 0; i < messages.length(); i++) {
+                org.json.JSONObject item = messages.getJSONObject(i);
+                style.addMessage(item.optString("body"), item.optLong("time"), sender);
+            }
+        } catch (Exception ignored) {
+        }
+        return style;
     }
 
     @Nullable
