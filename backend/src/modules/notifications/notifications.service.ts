@@ -30,13 +30,12 @@ function isDirectMessageNotification(notification: Notification): boolean {
   return notification.type === NotificationType.CHAT && data.type === 'chat' && typeof data.conversationId === 'string';
 }
 
-/** Lucky-gift win celebrations stay in the live room/app; never send an external FCM push. */
-function isLuckyWinPayload(data?: Record<string, unknown>, title?: string, body?: string): boolean {
-  // Inspect all payload strings (including nested metadata) because older
-  // producers used different keys such as eventType, giftType or rewardSource.
+/** Room/game/gift win celebrations are room/app-only, never external FCM alerts. */
+function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, body?: string): boolean {
   const values: string[] = [];
+  const keys: string[] = [];
   const collect = (value: unknown, depth = 0) => {
-    if (depth > 4 || value == null) return;
+    if (depth > 5 || value == null) return;
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       values.push(String(value).toLowerCase());
       return;
@@ -46,17 +45,19 @@ function isLuckyWinPayload(data?: Record<string, unknown>, title?: string, body?
       return;
     }
     if (typeof value === 'object') {
-      Object.values(value as Record<string, unknown>).forEach(item => collect(item, depth + 1));
+      Object.entries(value as Record<string, unknown>).forEach(([key, item]) => {
+        keys.push(key.toLowerCase());
+        collect(item, depth + 1);
+      });
     }
   };
   collect(data);
-  const markers = values.join(' ');
-  const copy = `${String(title || '')} ${String(body || '')}`.toLowerCase();
-  const luckyKind = /(lucky|luckygift|lucky_gift|lucky-box|lucky_box|هدية الحظ|الهدية المحظوظة|محظوظ)/i.test(markers);
-  const winKind = /(hit|win|reward|won|success|payout|فوز|فاز|ربح|ربحت)/i.test(markers);
-  const arabicWin = /((فاز|فازت|ربح|ربحت|فوز|مكسب).{0,28}(هدية الحظ|الهدية المحظوظة|محظوظ)|(هدية الحظ|الهدية المحظوظة|محظوظ).{0,28}(فاز|فازت|ربح|ربحت|فوز|مكسب))/i.test(copy);
-  const englishWin = /(lucky|luckygift|lucky_gift|lucky-box|lucky_box).{0,32}(hit|win|reward|won|success|payout)|(hit|win|reward|won|success|payout).{0,32}(lucky|luckygift|lucky_gift|lucky-box|lucky_box)/i.test(copy);
-  return (luckyKind && winKind) || arabicWin || englishWin;
+  const markers = [...keys, ...values].join(' ');
+  const copy = `${String(title || '')} ${String(body || '')} `.toLowerCase();
+  const winSignal = /(win|won|winner|game_win|slot_win|reward|payout|coinswon|wincoins|profit|hit|فوز|فاز|ربح|ربحت|مردود)/i.test(markers)
+    || /(فوز|فاز|ربح|ربحت|مكسب|مردود|مبروك).{0,35}(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين|ربح)|(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين).{0,35}(فوز|فاز|ربح|ربحت|مكسب|مردود)/i.test(copy);
+  const roomGameGiftContext = /(room|roomid|game|gameid|slot|gift|giftid|gifttype|lucky|luckygift|room:|غرفة|روم|هدية|محظوظ|الحظ)/i.test(markers + ' ' + copy);
+  return winSignal && roomGameGiftContext;
 }
 
 export class CreateNotificationDto {
