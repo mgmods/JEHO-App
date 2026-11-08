@@ -65,8 +65,17 @@ export class FirebaseAdminService implements OnModuleInit {
       }
 
       if (!serviceAccount) {
-        this.initFailure = 'credentials_missing';
-        this.logger.error('Firebase credentials not found (FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, or FIREBASE_CREDENTIALS_PATH / GOOGLE_APPLICATION_CREDENTIALS) — push disabled');
+        const legacyServerKey = String(
+          this.config.get<string>('app.fcm.serverKey') || process.env.FCM_SERVER_KEY || '',
+        ).trim();
+        this.initFailure = legacyServerKey
+          ? 'legacy_fcm_server_key_ignored_use_firebase_admin_service_account'
+          : 'credentials_missing';
+        this.logger.error(
+          legacyServerKey
+            ? 'FCM_SERVER_KEY is a legacy key and cannot authenticate Firebase Admin SDK. Configure FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, or FIREBASE_CREDENTIALS_PATH — push disabled.'
+            : 'Firebase credentials not found (FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, or FIREBASE_CREDENTIALS_PATH / GOOGLE_APPLICATION_CREDENTIALS) — push disabled',
+        );
         return;
       }
       const projectId = String(serviceAccount.project_id || '').trim();
