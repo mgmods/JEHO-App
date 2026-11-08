@@ -140,6 +140,8 @@ export default registerAs('app', () => {
     requirePublisherApi: process.env.GOOGLE_PLAY_REQUIRE_PUBLISHER === 'true',
   },
   fcm: {
+    projectId: process.env.FIREBASE_PROJECT_ID || 'jeho-fe429',
+    // FCM_SERVER_KEY is legacy and is not used by Firebase Admin SDK.
     serverKey: process.env.FCM_SERVER_KEY || '',
     credentialsPath: process.env.FIREBASE_CREDENTIALS_PATH || '',
   },
