@@ -404,7 +404,7 @@ export class BaishunWsHandler {
               const rewardLevel = win >= betAmount * 3 ? 2 : win > 0 ? 1 : 0;
               const roundId = randomUUID();
               const puzzle = this.cleopatraPuzzle();
-              const puzzleInfo = this.slot777PuzzleInfo(win, mult);
+              const puzzleInfo = gameSlug === 'slot777' ? this.slot777PuzzleInfo(win, mult) : this.slot777PuzzleInfo();
               const isPlinko = gameSlug === 'football-plinko';
               const plinkoIdx = isPlinko
                 ? Math.max(0, Math.min(15, win > 0 ? Math.min(15, Math.floor(mult) || 1) : 0))
@@ -2114,7 +2114,15 @@ export class BaishunWsHandler {
    * symbols. Symbol 1 is the 777 jackpot symbol, with lower symbols used for
    * progressively smaller server multipliers.
    */
-  private slot777PuzzleInfo(win: number, mult: number): number[] {
+  private slot777PuzzleInfo(win?: number, mult?: number): number[] {
+    // Preserve the original random filler for other games that share this response shape.
+    if (win === undefined || mult === undefined) {
+      return [
+        1 + Math.floor(Math.random() * 8),
+        1 + Math.floor(Math.random() * 8),
+        1 + Math.floor(Math.random() * 8),
+      ];
+    }
     if (win > 0) {
       const symbol = mult >= 20 ? 1 : mult >= 10 ? 2 : mult >= 4 ? 3 : 4;
       return [symbol, symbol, symbol];
