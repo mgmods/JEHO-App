@@ -155,14 +155,15 @@ public class AuraMessagingService extends FirebaseMessagingService {
     }
 
     private static int stableNotificationId(String type, String conversationId, Map<String, String> data) {
-        if (conversationId != null && !conversationId.isEmpty()) {
-            return ("chat:" + conversationId).hashCode();
-        }
-        if (data != null) {
-            String nid = data.get("notificationId");
-            if (nid != null && !nid.isEmpty()) return nid.hashCode();
-        }
-        String key = (type != null ? type : "system") + ":" + System.currentTimeMillis();
+        // Each message must get its own notification slot. Using conversationId here
+        // made every new DM replace the previous notification from that conversation.
+        // Keep conversationId exclusively for routing; use the event/message identity
+        // for the Android notification ID and PendingIntent request code.
+        String eventId = firstNonEmpty(data, "messageId", "message_id", "notificationId");
+        String eventType = type != null ? type : "system";
+        String key = eventId != null
+                ? "event:" + eventType + ":" + eventId
+                : "event:" + eventType + ":" + java.util.UUID.randomUUID().toString();
         return key.hashCode();
     }
 
