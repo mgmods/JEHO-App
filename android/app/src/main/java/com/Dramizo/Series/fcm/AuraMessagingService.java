@@ -129,9 +129,11 @@ public class AuraMessagingService extends FirebaseMessagingService {
         // tap opens the exact conversation instead of merely opening the inbox.
         Activity active = AuraLiveApp.getForegroundActivity();
         if (active != null && !active.isFinishing() && !active.isDestroyed()) {
+            String eventId = firstNonEmpty(data, "messageId", "message_id", "notificationId");
+            if (eventId == null) eventId = java.util.UUID.randomUUID().toString();
             String dedupeKey = conversationId != null && !conversationId.isEmpty()
-                    ? "chat:" + conversationId + ":" + firstNonEmpty(data, "messageId", "message_id", "notificationId")
-                    : (data != null ? firstNonEmpty(data, "notificationId", "messageId", "message_id") : null);
+                    ? "chat:" + conversationId + ":" + eventId
+                    : eventId;
             InAppNotificationBanner.show(active, title, body, type, intent, dedupeKey, avatar);
             // While JEHO is open, direct messages use the in-app queue only.
             // Do not also post a system notification for the same foreground event.
@@ -155,14 +157,15 @@ public class AuraMessagingService extends FirebaseMessagingService {
     }
 
     private static int stableNotificationId(String type, String conversationId, Map<String, String> data) {
-        if (conversationId != null && !conversationId.isEmpty()) {
-            return ("chat:" + conversationId).hashCode();
-        }
-        if (data != null) {
-            String nid = data.get("notificationId");
-            if (nid != null && !nid.isEmpty()) return nid.hashCode();
-        }
-        String key = (type != null ? type : "system") + ":" + System.currentTimeMillis();
+        // Each message must get its own notification slot. Using conversationId here
+        // made every new DM replace the previous notification from that conversation.
+        // Keep conversationId exclusively for routing; use the event/message identity
+        // for the Android notification ID and PendingIntent request code.
+        String eventId = firstNonEmpty(data, "messageId", "message_id", "notificationId");
+        String eventType = type != null ? type : "system";
+        String key = eventId != null
+                ? "event:" + eventType + ":" + eventId
+                : "event:" + eventType + ":" + java.util.UUID.randomUUID().toString();
         return key.hashCode();
     }
 
