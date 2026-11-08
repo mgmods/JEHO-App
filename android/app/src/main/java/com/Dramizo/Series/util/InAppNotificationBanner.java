@@ -13,6 +13,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.Dramizo.Series.R;
 
@@ -137,7 +139,10 @@ public final class InAppNotificationBanner {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.gravity = Gravity.TOP;
-        lp.topMargin = dp(activity, 12);
+        WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(root);
+        int statusBarTop = insets != null
+                ? insets.getInsets(WindowInsetsCompat.Type.statusBars()).top : 0;
+        lp.topMargin = statusBarTop + dp(activity, 8);
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
         banner.setTranslationY(-dp(activity, 24));
