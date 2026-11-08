@@ -1798,7 +1798,6 @@ public class ChatConversationActivity extends ThemedActivity {
             Glide.with(this).clear(binding.imgThemeBg);
             binding.imgThemeBg.setVisibility(View.GONE);
             chatBackgroundVideo.setVisibility(View.VISIBLE);
-            chatBackgroundVideo.setVideoURI(Uri.parse(url));
             chatBackgroundVideo.setOnPreparedListener(player -> {
                 player.setLooping(true);
                 player.setVolume(0f, 0f);
@@ -1808,6 +1807,7 @@ public class ChatConversationActivity extends ThemedActivity {
                 chatBackgroundVideo.setVisibility(View.GONE);
                 return true;
             });
+            chatBackgroundVideo.setVideoURI(Uri.parse(url));
         } else {
             if (chatBackgroundVideo != null) {
                 chatBackgroundVideo.stopPlayback();
@@ -2065,6 +2065,7 @@ public class ChatConversationActivity extends ThemedActivity {
         if (adapter != null) adapter.releasePlayer();
         hideVoiceHud();
         stopRecorderQuiet();
+        if (chatBackgroundVideo != null) chatBackgroundVideo.stopPlayback();
         voiceUiHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
