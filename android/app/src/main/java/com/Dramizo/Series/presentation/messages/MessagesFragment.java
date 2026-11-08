@@ -61,6 +61,7 @@ public class MessagesFragment extends Fragment {
     private Runnable pendingGlobalSearch;
     private int globalSearchSequence = 0;
     private boolean showingArchived = false;
+    private boolean refreshInboxOnResume = false;
     private final BroadcastReceiver officialNewsReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -362,10 +363,11 @@ public class MessagesFragment extends Fragment {
 
     private void runGlobalSearch(String query, int sequence) {
         if (!isAdded() || binding == null) return;
+        final boolean archivedMode = showingArchived;
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             Result<com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationList> result =
-                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50, showingArchived));
+                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50, archivedMode));
             if (!isAdded()) return;
             requireActivity().runOnUiThread(() -> {
                 if (binding == null || sequence != globalSearchSequence) return;
@@ -589,6 +591,21 @@ public class MessagesFragment extends Fragment {
                 }
             });
         });
+    }
+
+    @Override
+    public void onPause() {
+        refreshInboxOnResume = true;
+        super.onPause();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (refreshInboxOnResume && viewModel != null && binding != null) {
+            refreshInboxOnResume = false;
+            viewModel.load(true, showingArchived);
+        }
     }
 
     @Override
