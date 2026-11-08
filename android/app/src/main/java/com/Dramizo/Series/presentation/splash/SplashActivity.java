@@ -27,6 +27,7 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.auth.LoginActivity;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.main.MainActivity;
+import com.Dramizo.Series.presentation.chat.ChatConversationActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
 import com.Dramizo.Series.presentation.profile.ProfileActivity;
 import com.Dramizo.Series.presentation.agency.AgencyActivity;
@@ -637,6 +638,45 @@ public class SplashActivity extends ThemedActivity {
         if (navigated || isFinishing()) return;
         navigated = true;
         mainHandler.removeCallbacks(hardTimeout);
+        // FCM notification+data messages are opened by Android through the
+        // launcher activity (SplashActivity). Route direct-message taps before
+        // splash ads, room restoration, or generic home navigation can consume them.
+        Intent launchIntent = getIntent();
+        String pushType = launchIntent != null ? launchIntent.getStringExtra("type") : null;
+        String pushKind = launchIntent != null ? launchIntent.getStringExtra("notificationKind") : null;
+        String normalizedType = pushType != null ? pushType.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        String normalizedKind = pushKind != null ? pushKind.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        boolean directMessagePush = "chat".equals(normalizedType)
+                || "message".equals(normalizedType)
+                || "new_message".equals(normalizedType)
+                || "chat_message".equals(normalizedType)
+                || "direct_message".equals(normalizedType)
+                || "message_received".equals(normalizedType)
+                || "direct_message".equals(normalizedKind);
+        String pushConversationId = launchIntent != null
+                ? launchIntent.getStringExtra("conversationId") : null;
+        if (pushConversationId == null && launchIntent != null) {
+            pushConversationId = launchIntent.getStringExtra("conversation_id");
+        }
+        if (directMessagePush && pushConversationId != null && !pushConversationId.trim().isEmpty()) {
+            Intent chat = new Intent(this, ChatConversationActivity.class);
+            chat.putExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID, pushConversationId);
+            if (launchIntent != null) {
+                String peerId = launchIntent.getStringExtra("senderId");
+                if (peerId == null) peerId = launchIntent.getStringExtra("peer_id");
+                String peerName = launchIntent.getStringExtra("senderName");
+                if (peerName == null) peerName = launchIntent.getStringExtra("peerName");
+                String avatar = launchIntent.getStringExtra("avatarUrl");
+                if (peerId != null) chat.putExtra(ChatConversationActivity.EXTRA_PEER_ID, peerId);
+                if (peerName != null) chat.putExtra(ChatConversationActivity.EXTRA_TITLE, peerName);
+                if (avatar != null) chat.putExtra(ChatConversationActivity.EXTRA_AVATAR, avatar);
+            }
+            chat.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            Log.i(TAG, "Opening direct conversation from FCM notification");
+            startActivity(chat);
+            finish();
+            return;
+        }
         // Resume voice room after process death / launcher reopen when still in a room.
         String activeRoom = null;
         try {
