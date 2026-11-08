@@ -1807,6 +1807,7 @@ public class ChatConversationActivity extends ThemedActivity {
 
     private void uploadChatBackground(@NonNull Uri uri, boolean video) {
         if (conversationId == null || conversationId.isEmpty()) return;
+        final String targetConversationId = conversationId;
         AppContainer container = ContainerProvider.from(this);
         Toast.makeText(this, "جارٍ رفع خلفية المحادثة…", Toast.LENGTH_SHORT).show();
         container.getIoExecutor().execute(() -> {
@@ -1836,12 +1837,15 @@ public class ChatConversationActivity extends ThemedActivity {
                     throw new IOException(UploadApi.errorMessage(response, "تعذر رفع الخلفية"));
                 }
                 String uploadedUrl = AssetCatalog.absoluteUrl(response.body().data.url);
+                if (uploadedUrl == null || uploadedUrl.isEmpty()) {
+                    throw new IOException("رابط الخلفية غير صالح");
+                }
                 runOnUiThread(() -> {
                     chatBackgroundPrefs().edit()
-                            .putString(conversationId + "_url", uploadedUrl)
-                            .putString(conversationId + "_type", video ? "video" : "image")
+                            .putString(targetConversationId + "_url", uploadedUrl)
+                            .putString(targetConversationId + "_type", video ? "video" : "image")
                             .apply();
-                    applyChatBackground();
+                    if (targetConversationId.equals(conversationId)) applyChatBackground();
                     Toast.makeText(this, "تم حفظ خلفية هذه المحادثة", Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception error) {
