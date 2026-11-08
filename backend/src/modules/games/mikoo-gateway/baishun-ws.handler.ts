@@ -158,6 +158,7 @@ export class BaishunWsHandler {
     let player: MikooPlayerContext | null = null;
     let authReady: Promise<void> = Promise.resolve();
     let spinInFlight = false;
+    let selectedBetAmount = SLOT_CHIP_LIST[0];
     const query = this.parseQuery(rawUrl);
 
     const ensurePlayer = async (
@@ -380,7 +381,7 @@ export class BaishunWsHandler {
                 data.betAmount ??
                 data.defaultBet ??
                 data.chip ??
-                SLOT_CHIP_LIST[0],
+                selectedBetAmount,
             );
             const currentBetAmount = Math.max(
               SLOT_CHIP_LIST[0],
@@ -551,11 +552,12 @@ export class BaishunWsHandler {
           }
 
           if (msgId === 'ChangeBet') {
-            betAmount = Math.max(
+            const requestedBet = Number(data.bet ?? selectedBetAmount);
+            selectedBetAmount = Math.max(
               SLOT_CHIP_LIST[0],
-              Math.floor(Number(data.bet ?? betAmount)),
+              Number.isFinite(requestedBet) ? Math.floor(requestedBet) : selectedBetAmount,
             );
-            this.replyJson(ws, 'ChangeBet', { Code: 0, Data: { bet: betAmount } });
+            this.replyJson(ws, 'ChangeBet', { Code: 0, Data: { bet: selectedBetAmount } });
             return;
           }
 
