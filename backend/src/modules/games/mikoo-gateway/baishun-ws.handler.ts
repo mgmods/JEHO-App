@@ -368,7 +368,7 @@ export class BaishunWsHandler {
               });
               return;
             }
-            if (spinInFlight) {
+            if (gameSlug === 'slot777' && spinInFlight) {
               this.replyJson(ws, msgId === 'Bet' ? 'Bet' : msgId, {
                 Code: 3,
                 ErrorTips: 'Spin already in progress',
@@ -403,7 +403,7 @@ export class BaishunWsHandler {
             // Echo the exact client value when present; otherwise omit the field.
             const clientTs = data.timestamp_ms ?? data.timeStamp ?? data.timestamp;
             const hasClientTs = clientTs !== undefined && clientTs !== null && clientTs !== '';
-            spinInFlight = true;
+            if (gameSlug === 'slot777') spinInFlight = true;
             try {
               this.logger.log(
                 `GAME_PROBE BAISHUN_SPIN game=${gameSlug} msgId=${msgId} bet=${currentBetAmount} user=${player.userId} bal=${player.balance}`,
@@ -529,7 +529,7 @@ export class BaishunWsHandler {
                 },
               });
             } finally {
-              spinInFlight = false;
+              if (gameSlug === 'slot777') spinInFlight = false;
             }
             return;
           }
