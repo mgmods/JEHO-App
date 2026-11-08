@@ -306,7 +306,9 @@ export class BaishunWsHandler {
             const isPlinko = gameSlug === 'football-plinko';
             const isCleopatra =
               gameSlug === 'cleopatra-slot' || gameSlug === 'cleopatra-slots';
+            const isSlot777 = gameSlug === 'slot777';
             const puzzle = isCleopatra ? this.cleopatraPuzzle() : undefined;
+            const slot777PuzzleInfo = isSlot777 ? this.slot777PuzzleInfo() : undefined;
             this.replyJson(ws, msgId, {
               Code: 0,
               Data: {
@@ -332,6 +334,12 @@ export class BaishunWsHandler {
                       puzzle,
                       puzzleInfo: puzzle,
                       NormalResult: puzzle,
+                    }
+                  : {}),
+                ...(slot777PuzzleInfo
+                  ? {
+                      puzzleInfo: slot777PuzzleInfo,
+                      NormalResult: slot777PuzzleInfo,
                     }
                   : {}),
                 // Football plinko: routes keyed by `${defaultRows}_${rewardMultipleIndex}`
@@ -2117,14 +2125,15 @@ export class BaishunWsHandler {
   /**
    * Slot777 sends the three middle-row symbols; the client expands them to 3×3.
    * Keep the visual result tied to the server settlement: a paid round has one
-   * matching center payline, and the 25x jackpot is represented by three 7s.
+   * matching center payline, and the 25x jackpot is represented by symbol id 1 (777).
    * Losing rounds must never accidentally render three matching symbols.
    */
   private slot777PuzzleInfo(win = 0, multiplier = 0): number[] {
     if (win > 0) {
+      // The packaged Cocos game maps symbol_1 to the 777 spine animation.
       const symbol = multiplier >= 25
-        ? 7
-        : [1, 2, 3, 4, 5, 6, 8][Math.floor(Math.random() * 7)]!;
+        ? 1
+        : [2, 3, 4, 5, 6, 7, 8][Math.floor(Math.random() * 7)]!;
       return [symbol, symbol, symbol];
     }
 
