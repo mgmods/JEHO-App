@@ -146,7 +146,8 @@ public final class AuraNotificationHelper {
             contentBitmap = circularLauncherIcon(context);
         }
 
-        boolean isChat = ("chat".equalsIgnoreCase(type) || "message".equalsIgnoreCase(type))\n                && isChatIntent(launch);
+        boolean isChat = ("chat".equalsIgnoreCase(type) || "message".equalsIgnoreCase(type))
+                && isChatIntent(launch);
         // One style for all alerts: compact horizontal, circular avatar on the LEFT.
         int compactLayout = R.layout.notification_auralive_compact;
         int expandedLayout = isChat
