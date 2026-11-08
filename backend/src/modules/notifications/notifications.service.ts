@@ -179,7 +179,7 @@ export class NotificationsService {
     } catch (err) {
       this.logger.warn(`Realtime notification emit failed: ${(err as Error).message}`);
     }
-    if (dto.sendPush !== false && !isLuckyWinPayload(dto.data, dto.title, dto.body)) {
+    if (dto.sendPush !== false && dto.type !== NotificationType.GIFT && dto.type !== NotificationType.ROOM && !isRoomRewardWinPayload(dto.data, dto.title, dto.body)) {
       try {
         const sent = await this.sendFcm(dto.userId, dto.title, dto.body, {
           ...(dto.data || {}),
