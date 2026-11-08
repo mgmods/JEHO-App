@@ -420,20 +420,35 @@ export class NotificationsService {
     }
     const title = 'JEHO CHAT';
     const body = 'هذا إشعار اختبار للتأكد من عمل إشعارات الرسائل';
-    const sent = await this.sendFcm(userId, title, body, {
+    const tokens = Array.from(new Set(
+      devices.map((device) => device.fcmToken)
+        .filter((token): token is string => !!token && !!token.trim()),
+    ));
+    const delivery = await this.firebase.sendToTokens(tokens, title, body, {
       type: 'system',
       notificationKind: 'fcm_test',
       title,
       body,
       test: 'true',
     });
+    if (delivery.invalidTokens.length) {
+      await this.devicesRepo.update(
+        { fcmToken: In(delivery.invalidTokens) },
+        { isActive: false, fcmToken: null },
+      );
+    }
+    const sent = delivery.success > 0;
     return {
       sent,
       ...firebaseDiagnostics,
       firebaseReady,
       activeDevices: devices.length,
       tokenDevices,
-      reason: sent ? null : 'fcm_rejected_or_delivery_failed',
+      successCount: delivery.success,
+      failureCount: delivery.failure,
+      errorCodes: delivery.errorCodes,
+      invalidTokenCount: delivery.invalidTokens.length,
+      reason: sent ? null : (delivery.errorCodes[0] || 'fcm_rejected_or_delivery_failed'),
     };
   }
 
