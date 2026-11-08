@@ -4536,6 +4536,14 @@ export class AdminService {
     return paginate(items, total, query.page || 1, query.limit || 20);
   }
 
+  async notificationsFcmStatus() {
+    return this.notificationsService.fcmDeliveryStatus();
+  }
+
+  async sendNotificationsFcmTest(adminUserId: string) {
+    return this.notificationsService.sendFcmTest(adminUserId);
+  }
+
   async sendNotification(body: {
     title: string;
     body: string;
