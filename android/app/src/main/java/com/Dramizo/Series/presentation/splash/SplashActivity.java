@@ -27,6 +27,7 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.auth.LoginActivity;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.main.MainActivity;
+import com.Dramizo.Series.presentation.chat.ChatConversationActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
 import com.Dramizo.Series.presentation.profile.ProfileActivity;
 import com.Dramizo.Series.presentation.agency.AgencyActivity;
@@ -203,7 +204,40 @@ public class SplashActivity extends ThemedActivity {
      * Check the dashboard-published release before routing into the app.
      * A network failure fails open so a temporary outage cannot trap existing users.
      */
+    private String directMessageConversationIdFromIntent() {
+        Intent intent = getIntent();
+        if (intent == null) return null;
+        String type = intent.getStringExtra("type");
+        String kind = intent.getStringExtra("notificationKind");
+        String normalizedType = type != null
+                ? type.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        String normalizedKind = kind != null
+                ? kind.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        boolean isDirectMessage = "chat".equals(normalizedType)
+                || "message".equals(normalizedType)
+                || "new_message".equals(normalizedType)
+                || "chat_message".equals(normalizedType)
+                || "direct_message".equals(normalizedType)
+                || "message_received".equals(normalizedType)
+                || "direct_message".equals(normalizedKind);
+        if (!isDirectMessage) return null;
+        String conversationId = intent.getStringExtra("conversationId");
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            conversationId = intent.getStringExtra("conversation_id");
+        }
+        return conversationId != null && !conversationId.trim().isEmpty()
+                ? conversationId.trim() : null;
+    }
+
     private void checkAppUpdateThenStart() {
+        // A message tap is an urgent destination: do not delay it with splash ads
+        // or the release-check network round trip. Session validation still runs.
+        if (directMessageConversationIdFromIntent() != null) {
+            updateCheckResolved = true;
+            splashDecisionResolved = true;
+            prepareSession();
+            return;
+        }
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_SKIP_UPDATE_CHECK_ONCE, false)) {
             beginRegularSplashFlow();
             return;
@@ -637,6 +671,47 @@ public class SplashActivity extends ThemedActivity {
         if (navigated || isFinishing()) return;
         navigated = true;
         mainHandler.removeCallbacks(hardTimeout);
+        // Android opens the launcher (SplashActivity) when a hybrid FCM
+        // notification is tapped from background/terminated state. Preserve the
+        // direct-message destination here instead of falling through to Home.
+        Intent pushIntent = getIntent();
+        String pushType = pushIntent != null ? pushIntent.getStringExtra("type") : null;
+        String pushKind = pushIntent != null ? pushIntent.getStringExtra("notificationKind") : null;
+        String normalizedType = pushType != null
+                ? pushType.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        String normalizedKind = pushKind != null
+                ? pushKind.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        boolean isDirectMessagePush = "chat".equals(normalizedType)
+                || "message".equals(normalizedType)
+                || "new_message".equals(normalizedType)
+                || "chat_message".equals(normalizedType)
+                || "direct_message".equals(normalizedType)
+                || "message_received".equals(normalizedType)
+                || "direct_message".equals(normalizedKind);
+        String conversationId = pushIntent != null
+                ? pushIntent.getStringExtra("conversationId") : null;
+        if ((conversationId == null || conversationId.trim().isEmpty()) && pushIntent != null) {
+            conversationId = pushIntent.getStringExtra("conversation_id");
+        }
+        if (isDirectMessagePush && conversationId != null && !conversationId.trim().isEmpty()) {
+            Intent chat = new Intent(this, ChatConversationActivity.class);
+            chat.putExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID, conversationId);
+            if (pushIntent != null) {
+                String peerId = pushIntent.getStringExtra("senderId");
+                if (peerId == null) peerId = pushIntent.getStringExtra("peer_id");
+                String peerName = pushIntent.getStringExtra("senderName");
+                if (peerName == null) peerName = pushIntent.getStringExtra("peerName");
+                String avatar = pushIntent.getStringExtra("avatarUrl");
+                if (peerId != null) chat.putExtra(ChatConversationActivity.EXTRA_PEER_ID, peerId);
+                if (peerName != null) chat.putExtra(ChatConversationActivity.EXTRA_TITLE, peerName);
+                if (avatar != null) chat.putExtra(ChatConversationActivity.EXTRA_AVATAR, avatar);
+            }
+            chat.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            Log.i(TAG, "Routing FCM tap to direct conversation");
+            startActivity(chat);
+            finish();
+            return;
+        }
         // Resume voice room after process death / launcher reopen when still in a room.
         String activeRoom = null;
         try {
