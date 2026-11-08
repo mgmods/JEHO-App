@@ -366,22 +366,18 @@ export class BaishunWsHandler {
               });
               return;
             }
+            const requestedBet = Number(
+              data.bet ??
+                data.bet_amount ??
+                data.betAmount ??
+                data.defaultBet ??
+                data.chip ??
+                SLOT_CHIP_LIST[0],
+            );
             const currentBetAmount = Math.max(
               SLOT_CHIP_LIST[0],
-              Math.floor(
-                Number(
-                  data.bet ??
-                    data.bet_amount ??
-                    data.currentBetAmount ??
-                    data.defaultBet ??
-                    data.chip ??
-                    currentBetAmount,
-                ) || SLOT_CHIP_LIST[0],
-              ),
+              Number.isFinite(requestedBet) ? Math.floor(requestedBet) : SLOT_CHIP_LIST[0],
             );
-            if (!Number.isFinite(currentBetAmount) || currentBetAmount <= 0) {
-              currentBetAmount = SLOT_CHIP_LIST[0];
-            }
             if (currentBetAmount > gamePayoutLimits().maxBet) {
               this.replyJson(ws, msgId === 'Bet' ? 'Bet' : 'Spin', {
                 Code: 1,
@@ -455,8 +451,9 @@ export class BaishunWsHandler {
                       // Cleopatra uses `puzzle` (cols×rows); Slot777 uses `puzzleInfo` (3 middles).
                       puzzle,
                       puzzleInfo,
-                      symbols: this.fakeSymbols(),
-                      rewardIcon: win > 0 ? [0, 1, 2] : [],
+                      ...(gameSlug === 'slot777' ? {} : { symbols: this.fakeSymbols() }),
+                      // Slot777 has one center payline; highlighting all three creates false win lines.
+                      rewardIcon: win > 0 ? (gameSlug === 'slot777' ? [0] : [0, 1, 2]) : [],
                       rewardLevel,
                       rewardMultipleIndex: plinkoIdx,
                       rewardFree: 0,
