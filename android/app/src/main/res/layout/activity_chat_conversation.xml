@@ -14,7 +14,7 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:alpha="0.24"
+        android:alpha="1.0"
         android:visibility="gone" />
 
     <VideoView
