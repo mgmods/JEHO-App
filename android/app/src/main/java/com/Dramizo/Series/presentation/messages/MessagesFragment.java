@@ -60,6 +60,8 @@ public class MessagesFragment extends Fragment {
     private final Handler searchHandler = new Handler(Looper.getMainLooper());
     private Runnable pendingGlobalSearch;
     private int globalSearchSequence = 0;
+    private boolean showingArchived = false;
+    private boolean refreshInboxOnResume = false;
     private final BroadcastReceiver officialNewsReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -133,7 +135,7 @@ public class MessagesFragment extends Fragment {
                 if (pendingGlobalSearch != null) searchHandler.removeCallbacks(pendingGlobalSearch);
                 if (query.isEmpty()) {
                     adapter.setSearchQuery("");
-                    viewModel.load(false);
+                    viewModel.load(false, showingArchived);
                     updateChatSearchEmptyState();
                     return;
                 }
@@ -151,6 +153,9 @@ public class MessagesFragment extends Fragment {
             @Override public void afterTextChanged(Editable s) { }
         });
         binding.btnClearChatSearch.setOnClickListener(v -> binding.etChatSearch.setText(""));
+        binding.btnActiveChats.setOnClickListener(v -> setInboxMode(false));
+        binding.btnArchivedChats.setOnClickListener(v -> setInboxMode(true));
+        updateInboxModeUi();
         binding.etChatSearch.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 v.clearFocus();
@@ -163,7 +168,7 @@ public class MessagesFragment extends Fragment {
         binding.swipe.setOnChildScrollUpCallback((parent, child) ->
                 binding.recycler != null && binding.recycler.canScrollVertically(-1));
         binding.swipe.setOnRefreshListener(() -> {
-            viewModel.load(true);
+            viewModel.load(true, showingArchived);
             loadOfficialNewsPreview();
             loadAdminMessagesPreview();
         });
@@ -230,7 +235,7 @@ public class MessagesFragment extends Fragment {
             binding.swipe.setRefreshing(false);
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
-        viewModel.load();
+        viewModel.load(false, showingArchived);
     }
 
     private void showConversationOptions(
@@ -238,15 +243,66 @@ public class MessagesFragment extends Fragment {
             View anchor) {
         if (!isAdded() || item == null || item.id == null) return;
         PopupMenu menu = new PopupMenu(requireContext(), anchor);
-        menu.getMenu().add(0, 1, 0, "حذف المحادثة");
+        if (showingArchived) menu.getMenu().add(0, 2, 0, "إلغاء الأرشفة");
+        menu.getMenu().add(0, 1, 1, "حذف المحادثة");
         menu.setOnMenuItemClickListener(selected -> {
             if (selected.getItemId() == 1) {
                 confirmDeleteConversation(item);
                 return true;
             }
+            if (selected.getItemId() == 2) {
+                setConversationArchived(item, false);
+                return true;
+            }
             return false;
         });
         menu.show();
+    }
+
+    private void setInboxMode(boolean archived) {
+        if (!isAdded() || showingArchived == archived) return;
+        showingArchived = archived;
+        globalSearchSequence++;
+        if (pendingGlobalSearch != null) searchHandler.removeCallbacks(pendingGlobalSearch);
+        if (binding.etChatSearch != null) binding.etChatSearch.setText("");
+        if (adapter != null) adapter.submit(java.util.Collections.emptyList());
+        updateInboxModeUi();
+        if (binding.tvEmpty != null) binding.tvEmpty.setVisibility(View.GONE);
+        viewModel.load(true, showingArchived);
+    }
+
+    private void updateInboxModeUi() {
+        if (binding == null) return;
+        int active = showingArchived ? 0xFFF1F2F5 : 0xFFFFE7EE;
+        int archived = showingArchived ? 0xFFFFE7EE : 0xFFF1F2F5;
+        int activeText = showingArchived ? 0xFF687080 : 0xFFE52D62;
+        int archivedText = showingArchived ? 0xFFE52D62 : 0xFF687080;
+        binding.btnActiveChats.setBackgroundTintList(android.content.res.ColorStateList.valueOf(active));
+        binding.btnArchivedChats.setBackgroundTintList(android.content.res.ColorStateList.valueOf(archived));
+        binding.btnActiveChats.setTextColor(activeText);
+        binding.btnArchivedChats.setTextColor(archivedText);
+    }
+
+    private void setConversationArchived(
+            com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationDto item, boolean archived) {
+        if (!isAdded() || item == null || item.id == null) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            java.util.Map<String, Boolean> body = new java.util.HashMap<>();
+            body.put("archived", archived);
+            Result<Object> result = ApiCall.execute(c.getChatApi().archive(item.id, body));
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null) return;
+                if (result.success) {
+                    if (adapter != null) adapter.removeConversation(item.id);
+                    Toast.makeText(requireContext(), archived ? "تمت أرشفة المحادثة" : "تمت استعادة المحادثة", Toast.LENGTH_SHORT).show();
+                    viewModel.load(true, showingArchived);
+                } else {
+                    Toast.makeText(requireContext(), result.error != null ? result.error : "تعذّر تحديث الأرشفة", Toast.LENGTH_LONG).show();
+                }
+            });
+        });
     }
 
     private void confirmDeleteConversation(
@@ -272,7 +328,7 @@ public class MessagesFragment extends Fragment {
                 if (result.success) {
                     if (adapter != null) adapter.removeConversation(item.id);
                     Toast.makeText(requireContext(), "تم حذف المحادثة من حسابك", Toast.LENGTH_SHORT).show();
-                    if (viewModel != null) viewModel.load(true);
+                    if (viewModel != null) viewModel.load(true, showingArchived);
                 } else {
                     Toast.makeText(requireContext(),
                             result.error != null ? result.error : "تعذّر حذف المحادثة، حاول مرة أخرى",
@@ -307,10 +363,11 @@ public class MessagesFragment extends Fragment {
 
     private void runGlobalSearch(String query, int sequence) {
         if (!isAdded() || binding == null) return;
+        final boolean archivedMode = showingArchived;
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             Result<com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationList> result =
-                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50));
+                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50, archivedMode));
             if (!isAdded()) return;
             requireActivity().runOnUiThread(() -> {
                 if (binding == null || sequence != globalSearchSequence) return;
@@ -336,7 +393,7 @@ public class MessagesFragment extends Fragment {
             binding.tvEmpty.setText(R.string.chat_search_no_results);
             binding.tvEmpty.setVisibility(View.VISIBLE);
         } else if (noResults) {
-            binding.tvEmpty.setText(R.string.msg_empty_chats);
+            binding.tvEmpty.setText(showingArchived ? "لا توجد محادثات مؤرشفة" : getString(R.string.msg_empty_chats));
             binding.tvEmpty.setVisibility(View.VISIBLE);
         } else {
             binding.tvEmpty.setVisibility(View.GONE);
@@ -450,8 +507,10 @@ public class MessagesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Soft reload: keep list visible; force only via pull-to-refresh.
-        if (viewModel != null) viewModel.load(false);
+        // Preserve the selected inbox (active or archived) when returning from a conversation.
+        boolean forceRefresh = refreshInboxOnResume;
+        refreshInboxOnResume = false;
+        if (viewModel != null) viewModel.load(forceRefresh, showingArchived);
         loadPendingRequestBadge();
         loadUnreadNotificationBadge();
         loadOfficialNewsPreview();
@@ -461,6 +520,7 @@ public class MessagesFragment extends Fragment {
 
     @Override
     public void onPause() {
+        refreshInboxOnResume = true;
         unregisterOfficialNewsReceiver();
         super.onPause();
     }

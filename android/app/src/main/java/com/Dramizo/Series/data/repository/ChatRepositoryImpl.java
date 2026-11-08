@@ -32,7 +32,7 @@ public class ChatRepositoryImpl implements ChatRepository {
     }
 
     @Override public Result<ChatDtos.ConversationList> getConversations() {
-        return ApiCall.execute(api.conversations());
+        return ApiCall.execute(api.conversations(false));
     }
 
     @Override public Result<ChatDtos.MessageList> getMessages(String conversationId, int page) {

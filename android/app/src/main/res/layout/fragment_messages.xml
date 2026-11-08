@@ -153,6 +153,47 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <LinearLayout
+            android:id="@+id/chatInboxModeRow"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnActiveChats"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:text="كل المحادثات"
+                android:textAllCaps="false"
+                android:textSize="12sp"
+                app:cornerRadius="12dp"
+                app:backgroundTint="#FFFFE7EE" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnArchivedChats"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:text="المحادثات المؤرشفة"
+                android:textAllCaps="false"
+                android:textSize="12sp"
+                app:cornerRadius="12dp"
+                app:backgroundTint="#FFF1F2F5" />
+        </LinearLayout>
+
         <!-- Three compact shared inbox channels: official news, admin messages, notifications. -->
         <LinearLayout
             android:id="@+id/quickActionsRow"
