@@ -2,7 +2,7 @@ name: JEHO-OWN Backend and Dashboard Checks
 
 on:
   push:
-    branches: [jeho-own, jeho-own-working-2026-10-05, MG-JEHO, MG-JEHO-dm-notifications-20261107]
+    branches: [jeho-own, jeho-own-working-2026-10-05, MG-JEHO, MG-JEHO-dm-notifications-20261107, fix/all-games-fcm-seat-medal-20261108]
     paths:
       - "backend/**"
       - ".github/workflows/**"
