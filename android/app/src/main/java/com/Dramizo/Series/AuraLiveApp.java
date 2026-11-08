@@ -229,7 +229,13 @@ public class AuraLiveApp extends Application {
         String accessToken = container.getSessionManager().getAccessToken();
         if (token == null || token.trim().isEmpty()
                 || userId == null || userId.trim().isEmpty()
-                || accessToken == null || accessToken.trim().isEmpty()) return;
+                || accessToken == null || accessToken.trim().isEmpty()) {
+            // Clear the in-memory dedupe key while logged out. Otherwise a
+            // logout/login to the same account can skip registration after the
+            // backend has marked that device inactive.
+            registeredFcmIdentity = null;
+            return;
+        }
         String identity = userId + ":" + token;
         if (identity.equals(registeredFcmIdentity)) return;
         registeredFcmIdentity = identity;
