@@ -49,6 +49,7 @@ import com.Dramizo.Series.data.remote.dto.MiscDtos
 import com.Dramizo.Series.databinding.ActivityMainBinding
 import com.Dramizo.Series.di.AppContainer
 import com.Dramizo.Series.domain.model.Result
+import com.Dramizo.Series.presentation.chat.ChatConversationActivity
 import com.Dramizo.Series.presentation.common.ContainerProvider
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper
 import com.Dramizo.Series.presentation.common.ThemedActivity
@@ -214,6 +215,7 @@ class MainActivity : ThemedActivity() {
             playInAppUpdateHelper?.checkForUpdate()
         }, 1500L)
 
+        openDirectMessageFromIntent(intent)
         maybeOpenPendingInvite(intent)
         maybeOpenPendingRoom(intent)
         b.root.postDelayed({
@@ -229,9 +231,52 @@ class MainActivity : ThemedActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (openDirectMessageFromIntent(intent)) return
         openFromIntentExtras(intent)
         maybeOpenPendingInvite(intent)
         maybeOpenPendingRoom(intent)
+    }
+
+    /**
+     * FCM notification payloads are rendered by Android while the app is backgrounded.
+     * Their tap launches MainActivity with the original data extras, so route direct
+     * messages here as well as through NotificationRouter's custom PendingIntent path.
+     */
+    private fun openDirectMessageFromIntent(intent: Intent): Boolean {
+        val type = intent.getStringExtra("type")?.lowercase().orEmpty()
+        val kind = intent.getStringExtra("notificationKind")?.lowercase().orEmpty()
+        val isDirectMessage = type in setOf(
+            "chat", "message", "new_message", "chat_message",
+            "direct_message", "message_received",
+        ) || kind == "direct_message"
+        if (!isDirectMessage) return false
+
+        val conversationId = intent.getStringExtra("conversationId")
+            ?: intent.getStringExtra("conversation_id")
+        if (conversationId.isNullOrBlank()) return false
+
+        val chatIntent = Intent(this, ChatConversationActivity::class.java).apply {
+            putExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID, conversationId)
+            intent.getStringExtra("senderId")?.let {
+                putExtra(ChatConversationActivity.EXTRA_PEER_ID, it)
+            } ?: intent.getStringExtra("peer_id")?.let {
+                putExtra(ChatConversationActivity.EXTRA_PEER_ID, it)
+            }
+            intent.getStringExtra("senderName")?.let {
+                putExtra(ChatConversationActivity.EXTRA_TITLE, it)
+            } ?: intent.getStringExtra("peerName")?.let {
+                putExtra(ChatConversationActivity.EXTRA_TITLE, it)
+            }
+            intent.getStringExtra("avatarUrl")?.let {
+                putExtra(ChatConversationActivity.EXTRA_AVATAR, it)
+            }
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        intent.removeExtra("conversationId")
+        intent.removeExtra("conversation_id")
+        intent.removeExtra("messageId")
+        startActivity(chatIntent)
+        return true
     }
 
     private fun openFromIntentExtras(intent: Intent) {

@@ -347,7 +347,7 @@ export class NotificationsService {
     return { count };
   }
 
-  /** Send a data-only direct-message push without adding it to Official News. */
+  /** Send a direct-message FCM push without adding it to Official News. */
   async sendDirectMessagePush(
     recipientUserId: string,
     payload: {
