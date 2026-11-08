@@ -140,8 +140,11 @@ public class AuraMessagingService extends FirebaseMessagingService {
 
         // Background/terminated delivery keeps the Android system notification.
         // Foreground direct messages were already handled by the in-app queue above.
+        String notificationChannel = ActiveChatTracker.isChatType(type)
+                && conversationId != null && !conversationId.isEmpty()
+                ? AuraNotificationHelper.CHANNEL_MESSAGES : CHANNEL_ID;
         AuraNotificationHelper.show(
-                this, CHANNEL_ID, title, body, type, intent, notificationId, avatar);
+                this, notificationChannel, title, body, type, intent, notificationId, avatar);
         // Refresh Official News badge on Messages tab when a general notice arrives.
         try {
             android.content.Intent refresh =
