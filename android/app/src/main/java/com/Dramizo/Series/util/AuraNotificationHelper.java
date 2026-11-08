@@ -316,6 +316,11 @@ public final class AuraNotificationHelper {
         }
     }
 
+    public static void clearChatMessageHistory(Context context, int notificationId) {
+        context.getSharedPreferences("jeho_dm_notification_history", Context.MODE_PRIVATE)
+                .edit().remove("conversation_" + notificationId).apply();
+    }
+
     private static void rememberChatMessage(Context context, int notificationId,
                                              String sender, String body) {
         try {
