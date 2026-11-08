@@ -14,6 +14,14 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
+        android:alpha="1.0"
+        android:visibility="gone" />
+
+    <VideoView
+        android:id="@+id/videoThemeBg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.24"
         android:visibility="gone" />
 
     <LinearLayout

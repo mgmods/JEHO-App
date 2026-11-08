@@ -66,27 +66,27 @@ public class AuraMessagingService extends FirebaseMessagingService {
         }
         // Defensive client-side guard for older backend versions or queued FCM messages:
         // lucky-win celebrations are room/in-app only and must never become Android push alerts.
-        if (isLuckyWinMessage(type, title, body, data)) return;
+        if (isRoomRewardWinMessage(type, title, body, data)) return;
         showNotification(title, body, type, data);
     }
 
-    private static boolean isLuckyWinMessage(String type, String title, String body,
-                                             Map<String, String> data) {
+    private static boolean isRoomRewardWinMessage(String type, String title, String body,
+                                                    Map<String, String> data) {
         StringBuilder markers = new StringBuilder();
-        markers.append(type == null ? "" : type).append(' ')
-                .append(title == null ? "" : title).append(' ')
-                .append(body == null ? "" : body);
+        if (type != null) markers.append(type).append(' ');
+        if (title != null) markers.append(title).append(' ');
+        if (body != null) markers.append(body).append(' ');
         if (data != null) {
-            for (String key : new String[]{"type", "kind", "notificationKind", "event", "source", "reason"}) {
-                String value = data.get(key);
-                if (value != null) markers.append(' ').append(value);
+            for (Map.Entry<String, String> entry : data.entrySet()) {
+                if (entry.getKey() != null) markers.append(entry.getKey()).append(' ');
+                if (entry.getValue() != null) markers.append(entry.getValue()).append(' ');
             }
         }
         String value = markers.toString().toLowerCase(java.util.Locale.ROOT);
-        boolean luckyKind = value.contains("lucky");
-        boolean winKind = value.matches("(?s).*(hit|win|reward|won|success).*");
-        boolean arabicWin = value.matches("(?s).*(حظ سعيد|ربح.{0,16}محظوظ|فاز.{0,16}محظوظ|ربحت.{0,16}حظ).*");
-        return (luckyKind && winKind) || arabicWin;
+        boolean roomGameGiftContext = value.matches("(?s).*(room|roomid|game|gameid|slot|gift|giftid|gifttype|lucky|luckygift|room:|غرفة|روم|هدية|محظوظ|الحظ).*");
+        boolean winSignal = value.matches("(?s).*(win|won|winner|game_win|slot_win|reward|payout|coinswon|wincoins|profit|hit|فوز|فاز|ربح|ربحت|مردود).*");
+        boolean arabicWinCopy = value.matches("(?s).*(فوز|فاز|ربح|ربحت|مكسب|مردود|مبروك).{0,35}(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين)|(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين).{0,35}(فوز|فاز|ربح|ربحت|مكسب|مردود).*");
+        return roomGameGiftContext && (winSignal || arabicWinCopy);
     }
 
     private void showNotification(String title, String body, String type, Map<String, String> data) {
@@ -140,8 +140,11 @@ public class AuraMessagingService extends FirebaseMessagingService {
 
         // Background/terminated delivery keeps the Android system notification.
         // Foreground direct messages were already handled by the in-app queue above.
+        String notificationChannel = ActiveChatTracker.isChatType(type)
+                && conversationId != null && !conversationId.isEmpty()
+                ? AuraNotificationHelper.CHANNEL_MESSAGES : CHANNEL_ID;
         AuraNotificationHelper.show(
-                this, CHANNEL_ID, title, body, type, intent, notificationId, avatar);
+                this, notificationChannel, title, body, type, intent, notificationId, avatar);
         // Refresh Official News badge on Messages tab when a general notice arrives.
         try {
             android.content.Intent refresh =

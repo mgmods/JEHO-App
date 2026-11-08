@@ -1299,4 +1299,8 @@
     <string name="chat_search_hint">Search chats or messages</string>
     <string name="chat_search_clear">Clear search</string>
     <string name="chat_search_no_results">No matching chats or messages</string>
+    <string name="chat_background">خلفية المحادثة</string>
+    <string name="chat_background_image">خلفية صورة</string>
+    <string name="chat_background_video">خلفية متحركة</string>
+    <string name="chat_background_remove">إزالة الخلفية</string>
 </resources>

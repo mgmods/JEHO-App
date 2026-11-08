@@ -297,6 +297,10 @@
             android:name=".util.NotificationDismissReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".util.NotificationQuickReplyReceiver"
+            android:exported="false" />
+
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3396788057301198~3280104727" />
