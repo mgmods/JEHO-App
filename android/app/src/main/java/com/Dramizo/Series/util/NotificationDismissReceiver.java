@@ -9,6 +9,7 @@ import androidx.core.app.NotificationManagerCompat;
 /** Dismisses a notification from a RemoteViews action button. */
 public final class NotificationDismissReceiver extends BroadcastReceiver {
     public static final String EXTRA_NOTIFICATION_ID = "notification_id";
+    public static final String ACTION_DISMISS = "com.mgwa.chat.action.DISMISS_MESSAGE_NOTIFICATION";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -16,7 +17,9 @@ public final class NotificationDismissReceiver extends BroadcastReceiver {
         int id = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1);
         if (id < 0) return;
         try {
-            NotificationManagerCompat.from(context.getApplicationContext()).cancel(id);
+            Context app = context.getApplicationContext();
+            NotificationManagerCompat.from(app).cancel(id);
+            AuraNotificationHelper.refreshMessageGroupSummary(app);
         } catch (Exception ignored) {
         }
     }
