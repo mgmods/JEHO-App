@@ -32,13 +32,18 @@ export class ChatController {
     @CurrentUser('sub') userId: string,
     @Query('q') q: string,
     @Query() query: PaginationDto,
+    @Query('archived') archived?: string,
   ) {
-    return this.chatService.searchConversations(userId, q, query);
+    return this.chatService.searchConversations(userId, q, query, archived === 'true');
   }
 
   @Get('conversations')
-  list(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
-    return this.chatService.listConversations(userId, query);
+  list(
+    @CurrentUser('sub') userId: string,
+    @Query() query: PaginationDto,
+    @Query('archived') archived?: string,
+  ) {
+    return this.chatService.listConversations(userId, query, archived === 'true');
   }
 
   @Get('conversations/:id')
