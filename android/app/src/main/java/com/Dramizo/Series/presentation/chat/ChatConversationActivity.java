@@ -1765,10 +1765,6 @@ public class ChatConversationActivity extends ThemedActivity {
         sheet.show();
     }
 
-    private int dp(float value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
-    }
-
     private android.graphics.drawable.GradientDrawable roundRect(int color, int radius, int strokeColor, int strokeWidth) {
         android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
         d.setColor(color);
