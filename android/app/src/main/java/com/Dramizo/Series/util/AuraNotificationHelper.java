@@ -12,6 +12,8 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
+import android.os.Build;
+import android.service.notification.StatusBarNotification;
 import android.widget.RemoteViews;
 
 import androidx.annotation.NonNull;
@@ -34,6 +36,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class AuraNotificationHelper {
+    public static final String CHANNEL_MESSAGES = "jeho_messages_v2";
+    private static final String GROUP_MESSAGES = "jeho_direct_messages";
+    private static final int GROUP_SUMMARY_ID = 0x4A45484F;
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
 
     private AuraNotificationHelper() {}
@@ -204,11 +209,81 @@ public final class AuraNotificationHelper {
                 .setCustomBigContentView(expanded)
                 .setCustomHeadsUpContentView(compact);
 
+        if (isChat) {
+            // Keep one updatable notification per conversation and let Android group
+            // separate conversations together, like mainstream messaging apps.
+            builder.setGroup(GROUP_MESSAGES)
+                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN);
+            Intent dismissed = new Intent(context, NotificationDismissReceiver.class);
+            dismissed.setAction(NotificationDismissReceiver.ACTION_DISMISS);
+            dismissed.putExtra(NotificationDismissReceiver.EXTRA_NOTIFICATION_ID, notificationId);
+            PendingIntent deletePi = PendingIntent.getBroadcast(
+                    context, notificationId + 20_000, dismissed,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.setDeleteIntent(deletePi);
+        }
+
         try {
             if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return;
-            NotificationManagerCompat.from(context).notify(notificationId, builder.build());
+            NotificationManagerCompat manager = NotificationManagerCompat.from(context);
+            manager.notify(notificationId, builder.build());
+            if (isChat) refreshMessageGroupSummary(context);
         } catch (SecurityException ignored) {
             // POST_NOTIFICATIONS denied on Android 13+.
+        }
+    }
+
+    /** Keep a quiet summary for multiple active DM conversations; each conversation
+     * retains its own notification and can be opened independently. */
+    public static void refreshMessageGroupSummary(@NonNull Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        NotificationManagerCompat manager = NotificationManagerCompat.from(context);
+        try {
+            StatusBarNotification[] active = manager.getActiveNotifications();
+            java.util.ArrayList<CharSequence> lines = new java.util.ArrayList<>();
+            for (StatusBarNotification status : active) {
+                android.app.Notification notification = status.getNotification();
+                if (!GROUP_MESSAGES.equals(notification.getGroup())
+                        || (notification.flags & android.app.Notification.FLAG_GROUP_SUMMARY) != 0) continue;
+                android.os.Bundle extras = notification.extras;
+                CharSequence title = extras != null ? extras.getCharSequence(android.app.Notification.EXTRA_TITLE) : null;
+                CharSequence body = extras != null ? extras.getCharSequence(android.app.Notification.EXTRA_TEXT) : null;
+                if (title != null || body != null) {
+                    lines.add((title == null ? "رسالة جديدة" : title) + ": " + (body == null ? "" : body));
+                }
+            }
+            if (lines.size() < 2) {
+                manager.cancel(GROUP_SUMMARY_ID);
+                return;
+            }
+            Intent openMessages = new Intent(context, MainActivity.class);
+            openMessages.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            openMessages.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
+            PendingIntent content = PendingIntent.getActivity(
+                    context, GROUP_SUMMARY_ID, openMessages,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle()
+                    .setBigContentTitle("رسائل JEHO")
+                    .setSummaryText("محادثات لديها رسائل جديدة");
+            int start = Math.max(0, lines.size() - 5);
+            for (int i = start; i < lines.size(); i++) inbox.addLine(lines.get(i));
+            NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_MESSAGES)
+                    .setSmallIcon(R.drawable.ic_stat_jeho)
+                    .setColor(ContextCompat.getColor(context, R.color.aurora_teal))
+                    .setContentTitle("رسائل JEHO")
+                    .setContentText("رسائل جديدة من " + lines.size() + " محادثات")
+                    .setNumber(lines.size())
+                    .setStyle(inbox)
+                    .setGroup(GROUP_MESSAGES)
+                    .setGroupSummary(true)
+                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
+                    .setSilent(true)
+                    .setOnlyAlertOnce(true)
+                    .setAutoCancel(true)
+                    .setContentIntent(content);
+            manager.notify(GROUP_SUMMARY_ID, summary.build());
+        } catch (SecurityException ignored) {
+            // Notification permission may be revoked while the app is running.
         }
     }
 
