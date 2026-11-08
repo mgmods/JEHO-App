@@ -168,7 +168,7 @@ public class MessagesFragment extends Fragment {
         binding.swipe.setOnChildScrollUpCallback((parent, child) ->
                 binding.recycler != null && binding.recycler.canScrollVertically(-1));
         binding.swipe.setOnRefreshListener(() -> {
-            viewModel.load(true);
+            viewModel.load(true, showingArchived);
             loadOfficialNewsPreview();
             loadAdminMessagesPreview();
         });
@@ -328,7 +328,7 @@ public class MessagesFragment extends Fragment {
                 if (result.success) {
                     if (adapter != null) adapter.removeConversation(item.id);
                     Toast.makeText(requireContext(), "تم حذف المحادثة من حسابك", Toast.LENGTH_SHORT).show();
-                    if (viewModel != null) viewModel.load(true);
+                    if (viewModel != null) viewModel.load(true, showingArchived);
                 } else {
                     Toast.makeText(requireContext(),
                             result.error != null ? result.error : "تعذّر حذف المحادثة، حاول مرة أخرى",
@@ -507,8 +507,10 @@ public class MessagesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Soft reload: keep list visible; force only via pull-to-refresh.
-        if (viewModel != null) viewModel.load(false);
+        // Preserve the selected inbox (active or archived) when returning from a conversation.
+        boolean forceRefresh = refreshInboxOnResume;
+        refreshInboxOnResume = false;
+        if (viewModel != null) viewModel.load(forceRefresh, showingArchived);
         loadPendingRequestBadge();
         loadUnreadNotificationBadge();
         loadOfficialNewsPreview();
@@ -518,6 +520,7 @@ public class MessagesFragment extends Fragment {
 
     @Override
     public void onPause() {
+        refreshInboxOnResume = true;
         unregisterOfficialNewsReceiver();
         super.onPause();
     }
@@ -591,21 +594,6 @@ public class MessagesFragment extends Fragment {
                 }
             });
         });
-    }
-
-    @Override
-    public void onPause() {
-        refreshInboxOnResume = true;
-        super.onPause();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (refreshInboxOnResume && viewModel != null && binding != null) {
-            refreshInboxOnResume = false;
-            viewModel.load(true, showingArchived);
-        }
     }
 
     @Override
