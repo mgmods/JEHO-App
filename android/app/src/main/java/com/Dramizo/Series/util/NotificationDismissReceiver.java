@@ -19,6 +19,7 @@ public final class NotificationDismissReceiver extends BroadcastReceiver {
         try {
             Context app = context.getApplicationContext();
             NotificationManagerCompat.from(app).cancel(id);
+            AuraNotificationHelper.clearChatMessageHistory(app, id);
             AuraNotificationHelper.refreshMessageGroupSummary(app);
         } catch (Exception ignored) {
         }
