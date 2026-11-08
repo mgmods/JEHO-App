@@ -493,9 +493,11 @@ public class AuraLiveApp extends Application {
                         ? ("chat:" + conversationId).hashCode()
                         : notificationIdKey(notifRowId);
                 // Custom system notification while in chat list / party / any other screen.
+                boolean directMessage = ActiveChatTracker.isChatType(type)
+                        && conversationId != null && !conversationId.isEmpty();
                 AuraNotificationHelper.show(
                         activity,
-                        "auralive_default",
+                        directMessage ? AuraNotificationHelper.CHANNEL_MESSAGES : "auralive_default",
                         title,
                         body,
                         type,
@@ -704,6 +706,15 @@ public class AuraLiveApp extends Application {
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null) {
                 nm.createNotificationChannel(channel);
+                NotificationChannel messageChannel = new NotificationChannel(
+                        com.Dramizo.Series.util.AuraNotificationHelper.CHANNEL_MESSAGES,
+                        "رسائل JEHO",
+                        NotificationManager.IMPORTANCE_HIGH);
+                messageChannel.setDescription("إشعارات الرسائل الخاصة ومحادثاتك");
+                messageChannel.setShowBadge(true);
+                messageChannel.enableVibration(true);
+                messageChannel.enableLights(true);
+                nm.createNotificationChannel(messageChannel);
                 NotificationChannel roomChannel = new NotificationChannel(
                         com.Dramizo.Series.service.VoiceRoomForegroundService.CHANNEL_ID,
                         getString(R.string.notif_room_channel),
