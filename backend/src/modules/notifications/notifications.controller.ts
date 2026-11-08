@@ -68,6 +68,13 @@ export class NotificationsController {
     return this.notificationsService.fcmDeliveryStatus();
   }
 
+  @Post('admin/fcm-test')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ summary: 'Send a real FCM test notification to the current admin device' })
+  fcmTest(@CurrentUser('sub') userId: string) {
+    return this.notificationsService.sendFcmTest(userId);
+  }
+
   @Get()
   list(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
     return this.notificationsService.list(userId, query);

@@ -391,11 +391,64 @@ export class NotificationsService {
       .andWhere("device.fcmToken <> ''")
       .getCount();
     return {
+      ...this.firebase.diagnostics(),
       firebaseReady: this.firebase.isReady(),
       activeDevices,
       tokenDevices,
       activeDevicesMissingToken: Math.max(0, activeDevices - tokenDevices),
       checkedAt: new Date().toISOString(),
+    };
+  }
+
+  /** Send a real push to the authenticated admin device for end-to-end FCM verification. */
+  async sendFcmTest(userId: string) {
+    const devices = await this.devicesRepo.find({ where: { userId, isActive: true } });
+    const tokenDevices = devices.filter((device) => !!device.fcmToken && !!device.fcmToken.trim()).length;
+    const firebaseDiagnostics = this.firebase.diagnostics();
+    const firebaseReady = firebaseDiagnostics.ready;
+    if (!firebaseReady || tokenDevices === 0) {
+      return {
+        sent: false,
+        ...firebaseDiagnostics,
+        firebaseReady,
+        activeDevices: devices.length,
+        tokenDevices,
+        reason: !firebaseReady
+          ? (firebaseDiagnostics.failureReason || 'firebase_not_ready')
+          : 'no_registered_device_token',
+      };
+    }
+    const title = 'JEHO CHAT';
+    const body = 'هذا إشعار اختبار للتأكد من عمل إشعارات الرسائل';
+    const tokens = Array.from(new Set(
+      devices.map((device) => device.fcmToken)
+        .filter((token): token is string => !!token && !!token.trim()),
+    ));
+    const delivery = await this.firebase.sendToTokens(tokens, title, body, {
+      type: 'system',
+      notificationKind: 'fcm_test',
+      title,
+      body,
+      test: 'true',
+    });
+    if (delivery.invalidTokens.length) {
+      await this.devicesRepo.update(
+        { fcmToken: In(delivery.invalidTokens) },
+        { isActive: false, fcmToken: null },
+      );
+    }
+    const sent = delivery.success > 0;
+    return {
+      sent,
+      ...firebaseDiagnostics,
+      firebaseReady,
+      activeDevices: devices.length,
+      tokenDevices,
+      successCount: delivery.success,
+      failureCount: delivery.failure,
+      errorCodes: delivery.errorCodes,
+      invalidTokenCount: delivery.invalidTokens.length,
+      reason: sent ? null : (delivery.errorCodes[0] || 'fcm_rejected_or_delivery_failed'),
     };
   }
 

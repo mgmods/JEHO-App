@@ -302,7 +302,7 @@ export class BaishunWsHandler {
           if (msgId === 'GameConfig' || msgId === 'GameDetail') {
             const bal = player ? await this.sessions.refreshBalance(player) : 0;
             const coinIcon =
-              'https://api.adnova.bbs.tr/assets/pack/ic_pass_card_coin.png';
+              '/assets/pack/ic_pass_card_coin.png';
             const isPlinko = gameSlug === 'football-plinko';
             const isCleopatra =
               gameSlug === 'cleopatra-slot' || gameSlug === 'cleopatra-slots';
