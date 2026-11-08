@@ -448,8 +448,8 @@ export class BaishunWsHandler {
                       puzzle,
                       puzzleInfo,
                       symbols: this.fakeSymbols(),
-                      // Slot777 pays the single center horizontal line represented by puzzleInfo.
-                      rewardIcon: win > 0 ? (gameSlug === 'slot777' ? [0] : [0, 1, 2]) : [],
+                      // [0, 1, 2] are the three reel positions on the center payline.
+                      rewardIcon: win > 0 ? [0, 1, 2] : [],
                       rewardLevel,
                       rewardMultipleIndex: plinkoIdx,
                       rewardFree: 0,
