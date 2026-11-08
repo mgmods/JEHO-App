@@ -157,7 +157,7 @@ export class BaishunWsHandler {
   private handleJson(ws: WebSocket, gameSlug: string, rawUrl: string) {
     let player: MikooPlayerContext | null = null;
     let authReady: Promise<void> = Promise.resolve();
-    let betAmount = SLOT_CHIP_LIST[0];
+    let spinInFlight = false;
     const query = this.parseQuery(rawUrl);
 
     const ensurePlayer = async (
@@ -359,23 +359,30 @@ export class BaishunWsHandler {
               });
               return;
             }
-            betAmount = Math.max(
+            if (spinInFlight) {
+              this.replyJson(ws, msgId === 'Bet' ? 'Bet' : msgId, {
+                Code: 3,
+                ErrorTips: 'Spin already in progress',
+              });
+              return;
+            }
+            const currentBetAmount = Math.max(
               SLOT_CHIP_LIST[0],
               Math.floor(
                 Number(
                   data.bet ??
                     data.bet_amount ??
-                    data.betAmount ??
+                    data.currentBetAmount ??
                     data.defaultBet ??
                     data.chip ??
-                    betAmount,
+                    currentBetAmount,
                 ) || SLOT_CHIP_LIST[0],
               ),
             );
-            if (!Number.isFinite(betAmount) || betAmount <= 0) {
-              betAmount = SLOT_CHIP_LIST[0];
+            if (!Number.isFinite(currentBetAmount) || currentBetAmount <= 0) {
+              currentBetAmount = SLOT_CHIP_LIST[0];
             }
-            if (betAmount > gamePayoutLimits().maxBet) {
+            if (currentBetAmount > gamePayoutLimits().maxBet) {
               this.replyJson(ws, msgId === 'Bet' ? 'Bet' : 'Spin', {
                 Code: 1,
                 ErrorTips: 'Bet too high',
@@ -391,20 +398,23 @@ export class BaishunWsHandler {
             // Echo the exact client value when present; otherwise omit the field.
             const clientTs = data.timestamp_ms ?? data.timeStamp ?? data.timestamp;
             const hasClientTs = clientTs !== undefined && clientTs !== null && clientTs !== '';
+            spinInFlight = true;
             try {
               this.logger.log(
-                `GAME_PROBE BAISHUN_SPIN game=${gameSlug} msgId=${msgId} bet=${betAmount} user=${player.userId} bal=${player.balance}`,
+                `GAME_PROBE BAISHUN_SPIN game=${gameSlug} msgId=${msgId} bet=${currentBetAmount} user=${player.userId} bal=${player.balance}`,
               );
-              const afterBet = await this.debit(player.userId, betAmount, gameSlug);
-              const { win, mult } = spinPayout(betAmount, { gameId: gameSlug });
+              const afterBet = await this.debit(player.userId, currentBetAmount, gameSlug);
+              const { win, mult } = spinPayout(currentBetAmount, { gameId: gameSlug });
               let balance = afterBet;
-              if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
+              if (win > 0) balance = await this.credit(player.userId, win, gameSlug, currentBetAmount);
               player.balance = balance;
               const rewardMultipleIndex = Math.max(0, Math.min(10, mult > 0 ? Math.min(10, mult) : 0));
-              const rewardLevel = win >= betAmount * 3 ? 2 : win > 0 ? 1 : 0;
+              const rewardLevel = win >= currentBetAmount * 3 ? 2 : win > 0 ? 1 : 0;
               const roundId = randomUUID();
               const puzzle = this.cleopatraPuzzle();
-              const puzzleInfo = this.slot777PuzzleInfo();
+              const puzzleInfo = gameSlug === 'slot777'
+                ? this.slot777PuzzleInfo(win, mult)
+                : this.slot777PuzzleInfo();
               const isPlinko = gameSlug === 'football-plinko';
               const plinkoIdx = isPlinko
                 ? Math.max(0, Math.min(15, win > 0 ? Math.min(15, Math.floor(mult) || 1) : 0))
@@ -423,14 +433,14 @@ export class BaishunWsHandler {
                       gold: balance,
                       money: balance,
                       userMoney: balance,
-                      bet: betAmount,
+                      bet: currentBetAmount,
                       roundId,
                       round_id: roundId,
                       defaultRows: 8,
                       defaultRisk: 1,
                     }
                   : {
-                      bet: betAmount,
+                      bet: currentBetAmount,
                       win,
                       reward: win,
                       win_amount: win,
@@ -480,19 +490,19 @@ export class BaishunWsHandler {
                 });
               }
               this.logger.log(
-                `baishun ${replyId} ${gameSlug} user=${player.userId} bet=${betAmount} win=${win} bal=${balance}`,
+                `baishun ${replyId} ${gameSlug} user=${player.userId} bet=${currentBetAmount} win=${win} bal=${balance}`,
               );
               void this.economy.onBetWin({
                 sessionId: player.sessionId,
                 userId: player.userId,
                 gameId: gameSlug,
-                betCoins: betAmount,
+                betCoins: currentBetAmount,
                 winCoins: win,
                 balanceAfter: balance,
               });
             } catch {
               this.logger.warn(
-                `baishun insufficient ${gameSlug} user=${player.userId} bet=${betAmount}`,
+                `baishun insufficient ${gameSlug} user=${player.userId} bet=${currentBetAmount}`,
               );
               this.replyJson(ws, replyId, {
                 Code: 2,
@@ -512,6 +522,8 @@ export class BaishunWsHandler {
                   coin: player.balance,
                 },
               });
+            } finally {
+              spinInFlight = false;
             }
             return;
           }
@@ -2105,13 +2117,26 @@ export class BaishunWsHandler {
     return cols;
   }
 
-  /** Slot777: puzzleInfo is 3 middle-row symbol ids; client expands to 3×3. */
-  private slot777PuzzleInfo(): number[] {
-    return [
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-    ];
+  /**
+   * Slot777 sends the three middle-row symbols; the client expands them to 3×3.
+   * Keep the visual result tied to the server settlement: a paid round has one
+   * matching center payline, and the 25x jackpot is represented by three 7s.
+   * Losing rounds must never accidentally render three matching symbols.
+   */
+  private slot777PuzzleInfo(win = 0, multiplier = 0): number[] {
+    if (win > 0) {
+      const symbol = multiplier >= 25
+        ? 7
+        : [1, 2, 3, 4, 5, 6, 8][Math.floor(Math.random() * 7)]!;
+      return [symbol, symbol, symbol];
+    }
+
+    const first = 1 + Math.floor(Math.random() * 8);
+    let second = 1 + Math.floor(Math.random() * 8);
+    while (second === first) second = 1 + Math.floor(Math.random() * 8);
+    let third = 1 + Math.floor(Math.random() * 8);
+    while (third === first && third === second) third = 1 + Math.floor(Math.random() * 8);
+    return [first, second, third];
   }
 
   private replyJson(ws: WebSocket, msgId: string, data: Record<string, unknown>) {
