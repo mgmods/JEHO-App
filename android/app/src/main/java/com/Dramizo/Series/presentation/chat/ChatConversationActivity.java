@@ -952,6 +952,19 @@ public class ChatConversationActivity extends ThemedActivity {
         }
     }
 
+    private static byte[] readAllLimited(InputStream in, long maxBytes) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int count;
+        long total = 0;
+        while ((count = in.read(buffer)) != -1) {
+            total += count;
+            if (total > maxBytes) throw new IOException("حجم الخلفية أكبر من الحد المسموح");
+            out.write(buffer, 0, count);
+        }
+        return out.toByteArray();
+    }
+
     private static byte[] readAll(InputStream in) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buf = new byte[8192];
@@ -1816,16 +1829,13 @@ public class ChatConversationActivity extends ThemedActivity {
                 if (mime == null || !(video ? mime.startsWith("video/") : mime.startsWith("image/"))) {
                     throw new IOException("نوع الملف غير مدعوم");
                 }
+                long limit = video ? 25L * 1024L * 1024L : 12L * 1024L * 1024L;
                 byte[] bytes;
                 try (InputStream input = getContentResolver().openInputStream(uri)) {
                     if (input == null) throw new IOException("تعذر قراءة الملف");
-                    bytes = readAll(input);
+                    bytes = readAllLimited(input, limit);
                 }
-                long limit = video ? 25L * 1024L * 1024L : 12L * 1024L * 1024L;
-                if (bytes.length == 0 || bytes.length > limit) {
-                    throw new IOException(video ? "حجم الفيديو يجب ألا يتجاوز 25 ميغابايت" :
-                            "حجم الصورة يجب ألا يتجاوز 12 ميغابايت");
-                }
+                if (bytes.length == 0) throw new IOException("الملف فارغ");
                 String ext = video ? ".mp4" : ".jpg";
                 RequestBody requestBody = RequestBody.create(bytes, MediaType.parse(mime));
                 MultipartBody.Part part = MultipartBody.Part.createFormData(
