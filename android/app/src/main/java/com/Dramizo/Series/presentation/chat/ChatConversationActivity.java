@@ -155,6 +155,18 @@ public class ChatConversationActivity extends ThemedActivity {
                 if (uri != null) previewVideoBeforeSend(uri);
             });
 
+    private final ActivityResultLauncher<String> pickChatBackgroundImage =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null) uploadChatBackground(uri, false);
+            });
+
+    private final ActivityResultLauncher<String> pickChatBackgroundVideo =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null) uploadChatBackground(uri, true);
+            });
+
+    private VideoView chatBackgroundVideo;
+
     private final ActivityResultLauncher<Intent> captureVideo =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null
@@ -214,9 +226,11 @@ public class ChatConversationActivity extends ThemedActivity {
         EdgeToEdgeHelper.apply(this);
         binding = ActivityChatConversationBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        chatBackgroundVideo = findViewById(R.id.videoThemeBg);
         applyInsetsForKeyboard();
 
         conversationId = firstExtra(getIntent(), EXTRA_CONVERSATION_ID, "conversationId");
+        applyChatBackground();
         com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
         peerId = firstExtra(getIntent(), EXTRA_PEER_ID, "peerId", "senderId", "userId");
         String title = firstExtra(getIntent(), EXTRA_TITLE, "senderName", "peerName", "name");
@@ -1695,6 +1709,10 @@ public class ChatConversationActivity extends ThemedActivity {
         } catch (Exception ignored) {}
         menu.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
+            if (id == R.id.action_chat_background) {
+                showChatBackgroundOptions();
+                return true;
+            }
             if (id == R.id.action_view_profile) {
                 openPeerProfile();
                 return true;
@@ -1715,6 +1733,123 @@ public class ChatConversationActivity extends ThemedActivity {
             return false;
         });
         menu.show();
+    }
+
+    private void showChatBackgroundOptions() {
+        String[] options = {"اختيار خلفية صورة", "اختيار خلفية متحركة", "إزالة الخلفية"};
+        new AlertDialog.Builder(this)
+                .setTitle("خلفية المحادثة")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) pickChatBackgroundImage.launch("image/*");
+                    else if (which == 1) pickChatBackgroundVideo.launch("video/*");
+                    else clearChatBackground();
+                })
+                .show();
+    }
+
+    private android.content.SharedPreferences chatBackgroundPrefs() {
+        return getSharedPreferences("jeho_chat_backgrounds", MODE_PRIVATE);
+    }
+
+    private void clearChatBackground() {
+        if (conversationId != null) {
+            chatBackgroundPrefs().edit()
+                    .remove(conversationId + "_url")
+                    .remove(conversationId + "_type")
+                    .apply();
+        }
+        if (chatBackgroundVideo != null) {
+            chatBackgroundVideo.stopPlayback();
+            chatBackgroundVideo.setVisibility(View.GONE);
+        }
+        if (binding != null && binding.imgThemeBg != null) {
+            Glide.with(this).clear(binding.imgThemeBg);
+            binding.imgThemeBg.setVisibility(View.GONE);
+        }
+        Toast.makeText(this, "تمت إزالة خلفية المحادثة", Toast.LENGTH_SHORT).show();
+    }
+
+    private void applyChatBackground() {
+        if (conversationId == null || binding == null) return;
+        String url = chatBackgroundPrefs().getString(conversationId + "_url", null);
+        String type = chatBackgroundPrefs().getString(conversationId + "_type", "image");
+        if (url == null || url.isEmpty()) {
+            if (chatBackgroundVideo != null) {
+                chatBackgroundVideo.stopPlayback();
+                chatBackgroundVideo.setVisibility(View.GONE);
+            }
+            binding.imgThemeBg.setVisibility(View.GONE);
+            return;
+        }
+        if ("video".equals(type) && chatBackgroundVideo != null) {
+            Glide.with(this).clear(binding.imgThemeBg);
+            binding.imgThemeBg.setVisibility(View.GONE);
+            chatBackgroundVideo.setVisibility(View.VISIBLE);
+            chatBackgroundVideo.setVideoURI(Uri.parse(url));
+            chatBackgroundVideo.setOnPreparedListener(player -> {
+                player.setLooping(true);
+                player.setVolume(0f, 0f);
+                chatBackgroundVideo.start();
+            });
+            chatBackgroundVideo.setOnErrorListener((player, what, extra) -> {
+                chatBackgroundVideo.setVisibility(View.GONE);
+                return true;
+            });
+        } else {
+            if (chatBackgroundVideo != null) {
+                chatBackgroundVideo.stopPlayback();
+                chatBackgroundVideo.setVisibility(View.GONE);
+            }
+            binding.imgThemeBg.setVisibility(View.VISIBLE);
+            Glide.with(this).load(url).centerCrop().into(binding.imgThemeBg);
+        }
+    }
+
+    private void uploadChatBackground(@NonNull Uri uri, boolean video) {
+        if (conversationId == null || conversationId.isEmpty()) return;
+        AppContainer container = ContainerProvider.from(this);
+        Toast.makeText(this, "جارٍ رفع خلفية المحادثة…", Toast.LENGTH_SHORT).show();
+        container.getIoExecutor().execute(() -> {
+            try {
+                String mime = getContentResolver().getType(uri);
+                if (mime == null || !(video ? mime.startsWith("video/") : mime.startsWith("image/"))) {
+                    throw new IOException("نوع الملف غير مدعوم");
+                }
+                byte[] bytes;
+                try (InputStream input = getContentResolver().openInputStream(uri)) {
+                    if (input == null) throw new IOException("تعذر قراءة الملف");
+                    bytes = readAll(input);
+                }
+                long limit = video ? 25L * 1024L * 1024L : 12L * 1024L * 1024L;
+                if (bytes.length == 0 || bytes.length > limit) {
+                    throw new IOException(video ? "حجم الفيديو يجب ألا يتجاوز 25 ميغابايت" :
+                            "حجم الصورة يجب ألا يتجاوز 12 ميغابايت");
+                }
+                String ext = video ? ".mp4" : ".jpg";
+                RequestBody requestBody = RequestBody.create(bytes, MediaType.parse(mime));
+                MultipartBody.Part part = MultipartBody.Part.createFormData(
+                        "file", "chat-background-" + System.currentTimeMillis() + ext, requestBody);
+                Response<ApiResponse<UploadApi.UploadResult>> response =
+                        container.getUploadApi().upload(part).execute();
+                if (!response.isSuccessful() || response.body() == null || !response.body().success
+                        || response.body().data == null || response.body().data.url == null) {
+                    throw new IOException(UploadApi.errorMessage(response, "تعذر رفع الخلفية"));
+                }
+                String uploadedUrl = AssetCatalog.absoluteUrl(response.body().data.url);
+                runOnUiThread(() -> {
+                    chatBackgroundPrefs().edit()
+                            .putString(conversationId + "_url", uploadedUrl)
+                            .putString(conversationId + "_type", video ? "video" : "image")
+                            .apply();
+                    applyChatBackground();
+                    Toast.makeText(this, "تم حفظ خلفية هذه المحادثة", Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> Toast.makeText(
+                        this, error.getMessage() != null ? error.getMessage() : "تعذر رفع الخلفية",
+                        Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private void archiveConversation() {
@@ -1853,6 +1988,7 @@ public class ChatConversationActivity extends ThemedActivity {
         com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
         conversationId = nextId;
         com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
+        applyChatBackground();
         peerId = firstExtra(intent, EXTRA_PEER_ID, "peerId", "senderId", "userId");
         String title = firstExtra(intent, EXTRA_TITLE, "senderName", "peerName", "name");
         String avatar = firstExtra(intent, EXTRA_AVATAR, "avatarUrl", "senderAvatarUrl");
@@ -1883,6 +2019,7 @@ public class ChatConversationActivity extends ThemedActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        applyChatBackground();
         com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
         refreshPeerBlockStatus();
         if (conversationId != null && viewModel != null) {
@@ -1893,6 +2030,9 @@ public class ChatConversationActivity extends ThemedActivity {
 
     @Override
     protected void onPause() {
+        if (chatBackgroundVideo != null && chatBackgroundVideo.isPlaying()) {
+            chatBackgroundVideo.pause();
+        }
         // Stop advertising this thread as actively viewed while backgrounded.
         // The server uses this room membership to decide whether a push is needed.
         com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
