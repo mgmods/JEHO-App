@@ -134,6 +134,7 @@ export class FirebaseAdminService implements OnModuleInit {
       return { success: 0, failure: tokens.length, invalidTokens: [], errorCodes: ['firebase_not_ready'] };
     }
     if (!tokens.length) return { success: 0, failure: 0, invalidTokens: [], errorCodes: [] };
+
     const stringData: Record<string, string> = {};
     if (data) {
       for (const [k, v] of Object.entries(data)) {
@@ -145,15 +146,35 @@ export class FirebaseAdminService implements OnModuleInit {
     stringData.body = stringData.body || body;
 
     try {
-      // Android: data-only so AuraMessagingService always runs and can render
-      // custom RemoteViews (avatar + name + message). A top-level `notification`
-      // payload would be drawn by the system (and MIUI) and skip custom layouts.
-      // iOS still gets an APNs alert.
+      /*
+       * Use a hybrid FCM message:
+       * - foreground: Android receives the message in AuraMessagingService/onMessage
+       *   and can keep the existing custom JEHO banner/avatar UI.
+       * - background/terminated: Android system renders the notification automatically.
+       *
+       * The previous data-only strategy depended on the app process being allowed
+       * to execute in the background. That is not guaranteed on Android/MIUI and
+       * caused messages to disappear when the app was backgrounded or terminated.
+       *
+       * No collapse key/tag is supplied, so consecutive DMs are not collapsed into
+       * one notification. The messageId/conversationId remain in data for exact
+       * deep-link routing after the user taps the notification.
+       */
       const res = await this.admin!.messaging().sendEachForMulticast({
         tokens,
         data: stringData,
+        notification: {
+          title,
+          body,
+        },
         android: {
           priority: 'high',
+          notification: {
+            channelId: 'auralive_default',
+            sound: 'default',
+            priority: 'high',
+            visibility: 'public',
+          },
         },
         apns: {
           payload: {
@@ -165,6 +186,7 @@ export class FirebaseAdminService implements OnModuleInit {
           },
         },
       });
+
       const invalidTokens: string[] = [];
       const errorCodes: string[] = [];
       res.responses.forEach((item, index) => {
@@ -178,7 +200,12 @@ export class FirebaseAdminService implements OnModuleInit {
         }
       });
       this.logger.log(`FCM multicast result success=${res.successCount} failure=${res.failureCount} tokens=${tokens.length}`);
-      return { success: res.successCount, failure: res.failureCount, invalidTokens, errorCodes: Array.from(new Set(errorCodes)) };
+      return {
+        success: res.successCount,
+        failure: res.failureCount,
+        invalidTokens,
+        errorCodes: Array.from(new Set(errorCodes)),
+      };
     } catch (err) {
       this.logger.error(`FCM multicast failed: ${(err as Error).message}`);
       const code = String((err as any)?.code || 'messaging/send-failed');
