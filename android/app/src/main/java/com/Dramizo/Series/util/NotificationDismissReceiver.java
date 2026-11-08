@@ -15,7 +15,7 @@ public final class NotificationDismissReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         if (context == null || intent == null) return;
         int id = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1);
-        if (id < 0) return;
+        if (id == -1) return;
         try {
             Context app = context.getApplicationContext();
             NotificationManagerCompat.from(app).cancel(id);
