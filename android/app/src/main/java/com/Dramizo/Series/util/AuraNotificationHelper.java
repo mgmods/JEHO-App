@@ -240,7 +240,7 @@ public final class AuraNotificationHelper {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
         NotificationManagerCompat manager = NotificationManagerCompat.from(context);
         try {
-            StatusBarNotification[] active = manager.getActiveNotifications();
+            java.util.List<StatusBarNotification> active = manager.getActiveNotifications();
             java.util.ArrayList<CharSequence> lines = new java.util.ArrayList<>();
             for (StatusBarNotification status : active) {
                 android.app.Notification notification = status.getNotification();
