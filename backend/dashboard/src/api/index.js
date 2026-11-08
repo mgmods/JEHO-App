@@ -213,6 +213,8 @@ export const genderVerificationsApi = {
 }
 
 export const notificationsApi = {
+  fcmStatus: () => safeRequest(() => api.get('/admin/notifications/fcm-status')),
+  fcmTest: () => safeRequest(() => api.post('/admin/notifications/fcm-test')),
   list: (params) => safeRequest(() => api.get('/admin/notifications', { params })),
   send: (data) => safeRequest(() => api.post('/admin/notifications/send', data)),
 }
