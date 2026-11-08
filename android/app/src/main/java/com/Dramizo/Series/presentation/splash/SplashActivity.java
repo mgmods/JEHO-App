@@ -204,7 +204,40 @@ public class SplashActivity extends ThemedActivity {
      * Check the dashboard-published release before routing into the app.
      * A network failure fails open so a temporary outage cannot trap existing users.
      */
+    private String directMessageConversationIdFromIntent() {
+        Intent intent = getIntent();
+        if (intent == null) return null;
+        String type = intent.getStringExtra("type");
+        String kind = intent.getStringExtra("notificationKind");
+        String normalizedType = type != null
+                ? type.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        String normalizedKind = kind != null
+                ? kind.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        boolean isDirectMessage = "chat".equals(normalizedType)
+                || "message".equals(normalizedType)
+                || "new_message".equals(normalizedType)
+                || "chat_message".equals(normalizedType)
+                || "direct_message".equals(normalizedType)
+                || "message_received".equals(normalizedType)
+                || "direct_message".equals(normalizedKind);
+        if (!isDirectMessage) return null;
+        String conversationId = intent.getStringExtra("conversationId");
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            conversationId = intent.getStringExtra("conversation_id");
+        }
+        return conversationId != null && !conversationId.trim().isEmpty()
+                ? conversationId.trim() : null;
+    }
+
     private void checkAppUpdateThenStart() {
+        // A message tap is an urgent destination: do not delay it with splash ads
+        // or the release-check network round trip. Session validation still runs.
+        if (directMessageConversationIdFromIntent() != null) {
+            updateCheckResolved = true;
+            splashDecisionResolved = true;
+            prepareSession();
+            return;
+        }
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_SKIP_UPDATE_CHECK_ONCE, false)) {
             beginRegularSplashFlow();
             return;
