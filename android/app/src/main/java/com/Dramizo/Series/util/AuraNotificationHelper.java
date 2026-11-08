@@ -212,7 +212,7 @@ public final class AuraNotificationHelper {
 
         if (isChat) {
             builder.setStyle(buildChatMessagingStyle(context, notificationId, title, avatar));
-            android.app.RemoteInput remoteInput = new android.app.RemoteInput.Builder(
+            androidx.core.app.RemoteInput remoteInput = new androidx.core.app.RemoteInput.Builder(
                     NotificationQuickReplyReceiver.EXTRA_REPLY)
                     .setLabel("اكتب ردك…")
                     .build();
