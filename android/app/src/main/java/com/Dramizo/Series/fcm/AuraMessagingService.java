@@ -129,9 +129,11 @@ public class AuraMessagingService extends FirebaseMessagingService {
         // tap opens the exact conversation instead of merely opening the inbox.
         Activity active = AuraLiveApp.getForegroundActivity();
         if (active != null && !active.isFinishing() && !active.isDestroyed()) {
+            String eventId = firstNonEmpty(data, "messageId", "message_id", "notificationId");
+            if (eventId == null) eventId = java.util.UUID.randomUUID().toString();
             String dedupeKey = conversationId != null && !conversationId.isEmpty()
-                    ? "chat:" + conversationId + ":" + firstNonEmpty(data, "messageId", "message_id", "notificationId")
-                    : (data != null ? firstNonEmpty(data, "notificationId", "messageId", "message_id") : null);
+                    ? "chat:" + conversationId + ":" + eventId
+                    : eventId;
             InAppNotificationBanner.show(active, title, body, type, intent, dedupeKey, avatar);
             // While JEHO is open, direct messages use the in-app queue only.
             // Do not also post a system notification for the same foreground event.
