@@ -460,8 +460,8 @@ export class BaishunWsHandler {
                       puzzle,
                       puzzleInfo,
                       ...(gameSlug === 'slot777' ? {} : { symbols: this.fakeSymbols() }),
-                      // Slot777 has one center payline; highlighting all three creates false win lines.
-                      rewardIcon: win > 0 ? (gameSlug === 'slot777' ? [0] : [0, 1, 2]) : [],
+                      // rewardLinesConvert adds 1 to each row index: [0,0,0] is the middle horizontal line.
+                      rewardIcon: win > 0 ? (gameSlug === 'slot777' ? [0, 0, 0] : [0, 1, 2]) : [],
                       rewardLevel,
                       rewardMultipleIndex: plinkoIdx,
                       rewardFree: 0,
