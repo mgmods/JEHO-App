@@ -404,7 +404,7 @@ export class BaishunWsHandler {
               const rewardLevel = win >= betAmount * 3 ? 2 : win > 0 ? 1 : 0;
               const roundId = randomUUID();
               const puzzle = this.cleopatraPuzzle();
-              const puzzleInfo = this.slot777PuzzleInfo();
+              const puzzleInfo = gameSlug === 'slot777' ? this.slot777PuzzleInfo(win, mult) : this.slot777PuzzleInfo();
               const isPlinko = gameSlug === 'football-plinko';
               const plinkoIdx = isPlinko
                 ? Math.max(0, Math.min(15, win > 0 ? Math.min(15, Math.floor(mult) || 1) : 0))
@@ -2105,13 +2105,33 @@ export class BaishunWsHandler {
     return cols;
   }
 
-  /** Slot777: puzzleInfo is 3 middle-row symbol ids; client expands to 3×3. */
-  private slot777PuzzleInfo(): number[] {
-    return [
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-    ];
+  /**
+   * Slot777: puzzleInfo is the three middle-row symbols shown to the player.
+   * The old implementation generated these symbols independently from the
+   * server payout, so a visible 777 could be settled as a loss (and vice versa).
+   * Build the visible line from the already-settled server result instead:
+   * every paid spin gets a matching line; a losing spin gets three distinct
+   * symbols. Symbol 1 is the 777 jackpot symbol, with lower symbols used for
+   * progressively smaller server multipliers.
+   */
+  private slot777PuzzleInfo(win?: number, mult?: number): number[] {
+    // Preserve the original random filler for other games that share this response shape.
+    if (win === undefined || mult === undefined) {
+      return [
+        1 + Math.floor(Math.random() * 8),
+        1 + Math.floor(Math.random() * 8),
+        1 + Math.floor(Math.random() * 8),
+      ];
+    }
+    if (win > 0) {
+      const symbol = mult >= 20 ? 1 : mult >= 10 ? 2 : mult >= 4 ? 3 : 4;
+      return [symbol, symbol, symbol];
+    }
+
+    const first = 1 + Math.floor(Math.random() * 8);
+    const second = (first % 8) + 1;
+    const third = ((first + 1) % 8) + 1;
+    return [first, second, third];
   }
 
   private replyJson(ws: WebSocket, msgId: string, data: Record<string, unknown>) {
