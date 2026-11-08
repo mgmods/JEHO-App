@@ -128,12 +128,12 @@ export class FirebaseAdminService implements OnModuleInit {
     title: string,
     body: string,
     data?: Record<string, unknown>,
-  ): Promise<{ success: number; failure: number; invalidTokens: string[] }> {
+  ): Promise<{ success: number; failure: number; invalidTokens: string[]; errorCodes: string[] }> {
     if (!this.isReady()) {
       this.logger.error('FCM send skipped: Firebase Admin is not initialized');
-      return { success: 0, failure: tokens.length, invalidTokens: [] };
+      return { success: 0, failure: tokens.length, invalidTokens: [], errorCodes: ['firebase_not_ready'] };
     }
-    if (!tokens.length) return { success: 0, failure: 0, invalidTokens: [] };
+    if (!tokens.length) return { success: 0, failure: 0, invalidTokens: [], errorCodes: [] };
     const stringData: Record<string, string> = {};
     if (data) {
       for (const [k, v] of Object.entries(data)) {
@@ -166,9 +166,11 @@ export class FirebaseAdminService implements OnModuleInit {
         },
       });
       const invalidTokens: string[] = [];
+      const errorCodes: string[] = [];
       res.responses.forEach((item, index) => {
         if (item.success) return;
         const code = item.error?.code || 'unknown';
+        errorCodes.push(code);
         this.logger.warn(`FCM token delivery failed index=${index} code=${code}: ${item.error?.message || 'unknown error'}`);
         if (code === 'messaging/registration-token-not-registered'
             || code === 'messaging/invalid-registration-token') {
@@ -176,10 +178,11 @@ export class FirebaseAdminService implements OnModuleInit {
         }
       });
       this.logger.log(`FCM multicast result success=${res.successCount} failure=${res.failureCount} tokens=${tokens.length}`);
-      return { success: res.successCount, failure: res.failureCount, invalidTokens };
+      return { success: res.successCount, failure: res.failureCount, invalidTokens, errorCodes: Array.from(new Set(errorCodes)) };
     } catch (err) {
       this.logger.error(`FCM multicast failed: ${(err as Error).message}`);
-      return { success: 0, failure: tokens.length, invalidTokens: [] };
+      const code = String((err as any)?.code || 'messaging/send-failed');
+      return { success: 0, failure: tokens.length, invalidTokens: [], errorCodes: [code] };
     }
   }
 }
