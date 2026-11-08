@@ -307,6 +307,7 @@ export class BaishunWsHandler {
             const isCleopatra =
               gameSlug === 'cleopatra-slot' || gameSlug === 'cleopatra-slots';
             const puzzle = isCleopatra ? this.cleopatraPuzzle() : undefined;
+            const slot777Info = gameSlug === 'slot777' ? this.slot777PuzzleInfo() : undefined;
             this.replyJson(ws, msgId, {
               Code: 0,
               Data: {
@@ -334,6 +335,7 @@ export class BaishunWsHandler {
                       NormalResult: puzzle,
                     }
                   : {}),
+                ...(slot777Info ? { puzzleInfo: slot777Info } : {}),
                 // Football plinko: routes keyed by `${defaultRows}_${rewardMultipleIndex}`
                 ...(isPlinko
                   ? {
@@ -404,7 +406,7 @@ export class BaishunWsHandler {
               const rewardLevel = win >= betAmount * 3 ? 2 : win > 0 ? 1 : 0;
               const roundId = randomUUID();
               const puzzle = this.cleopatraPuzzle();
-              const puzzleInfo = this.slot777PuzzleInfo();
+              const puzzleInfo = this.slot777PuzzleInfo(gameSlug === 'slot777' && win > 0 ? mult : 0);
               const isPlinko = gameSlug === 'football-plinko';
               const plinkoIdx = isPlinko
                 ? Math.max(0, Math.min(15, win > 0 ? Math.min(15, Math.floor(mult) || 1) : 0))
@@ -446,6 +448,7 @@ export class BaishunWsHandler {
                       puzzle,
                       puzzleInfo,
                       symbols: this.fakeSymbols(),
+                      // [0, 1, 2] are the three reel positions on the center payline.
                       rewardIcon: win > 0 ? [0, 1, 2] : [],
                       rewardLevel,
                       rewardMultipleIndex: plinkoIdx,
@@ -480,7 +483,7 @@ export class BaishunWsHandler {
                 });
               }
               this.logger.log(
-                `baishun ${replyId} ${gameSlug} user=${player.userId} bet=${betAmount} win=${win} bal=${balance}`,
+                `baishun ${replyId} ${gameSlug} user=${player.userId} bet=${betAmount} win=${win} mult=${mult} symbols=${gameSlug === 'slot777' ? puzzleInfo.join(',') : '-'} bal=${balance}`,
               );
               void this.economy.onBetWin({
                 sessionId: player.sessionId,
@@ -2105,13 +2108,34 @@ export class BaishunWsHandler {
     return cols;
   }
 
-  /** Slot777: puzzleInfo is 3 middle-row symbol ids; client expands to 3×3. */
-  private slot777PuzzleInfo(): number[] {
-    return [
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-    ];
+  /**
+   * Slot777: puzzleInfo is the authoritative middle payline (three symbol ids).
+   * Keep the rendered symbols tied to the server settlement:
+   * - a losing spin never renders a three-of-a-kind on the payline;
+   * - a winning spin renders one matching symbol on the payline;
+   * - symbol 7 is reserved for the top 25x 777 combination.
+   * The Cocos client fills the two decorative rows itself.
+   */
+  private slot777PuzzleInfo(multiplier = 0): number[] {
+    const mult = Math.max(0, Number(multiplier) || 0);
+    const symbolId =
+      mult >= 25 ? 7 :
+      mult >= 20 ? 6 :
+      mult >= 15 ? 5 :
+      mult >= 10 ? 4 :
+      mult >= 4 ? 3 :
+      mult >= 3 ? 2 :
+      mult >= 2 ? 1 : 0;
+
+    if (symbolId > 0) return [symbolId, symbolId, symbolId];
+
+    // A loss must not accidentally display a winning center-line combination.
+    const first = 1 + Math.floor(Math.random() * 8);
+    let second = 1 + Math.floor(Math.random() * 8);
+    while (second === first) second = 1 + Math.floor(Math.random() * 8);
+    let third = 1 + Math.floor(Math.random() * 8);
+    while (third === first || third === second) third = 1 + Math.floor(Math.random() * 8);
+    return [first, second, third];
   }
 
   private replyJson(ws: WebSocket, msgId: string, data: Record<string, unknown>) {
