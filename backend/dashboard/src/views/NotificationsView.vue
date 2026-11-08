@@ -11,6 +11,34 @@
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
+    <div class="glass p-3 mb-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+        <div>
+          <h3 class="h6 fw-semibold mb-1">فحص إشعارات FCM المباشر</h3>
+          <div class="small text-muted">يعرض حالة Firebase والأجهزة المسجّلة، ويرسل اختباراً حقيقياً إلى جهاز المدير الحالي.</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-ghost btn-sm" type="button" @click="loadFcmStatus" :disabled="fcmLoading">تحديث الفحص</button>
+          <button class="btn btn-aurora btn-sm" type="button" @click="sendFcmTest" :disabled="fcmTesting">إرسال إشعار اختبار</button>
+        </div>
+      </div>
+      <div v-if="fcmError" class="alert alert-warning py-2 mb-2">{{ fcmError }}</div>
+      <div v-if="fcmResult" class="small mb-2" :class="fcmResult.sent ? 'text-success' : 'text-danger'">
+        {{ fcmResult.sent ? 'تم قبول إرسال إشعار الاختبار من Firebase.' : 'فشل إرسال إشعار الاختبار: ' + (fcmResult.reason || fcmResult.failureReason || 'سبب غير محدد') }}
+        <span v-if="fcmResult.errorCodes?.length"> — {{ fcmResult.errorCodes.join(', ') }}</span>
+      </div>
+      <div v-if="fcmStatus" class="row g-2 small">
+        <div class="col-6 col-md-3"><span class="text-muted d-block">Firebase</span><strong>{{ fcmStatus.firebaseReady ? 'جاهز' : 'غير جاهز' }}</strong></div>
+        <div class="col-6 col-md-3"><span class="text-muted d-block">المشروع</span><strong dir="ltr">{{ fcmStatus.projectId || 'غير محدد' }}</strong></div>
+        <div class="col-6 col-md-3"><span class="text-muted d-block">أجهزة نشطة</span><strong>{{ fcmStatus.activeDevices ?? '—' }}</strong></div>
+        <div class="col-6 col-md-3"><span class="text-muted d-block">أجهزة معها Token</span><strong>{{ fcmStatus.tokenDevices ?? '—' }}</strong></div>
+        <div class="col-12 text-muted" v-if="fcmStatus.failureReason || fcmStatus.activeDevicesMissingToken">
+          {{ fcmStatus.failureReason || ('أجهزة نشطة بلا رمز FCM: ' + fcmStatus.activeDevicesMissingToken) }}
+        </div>
+      </div>
+      <div v-else-if="fcmLoading" class="small text-muted">جارٍ فحص خدمة الإشعارات…</div>
+    </div>
+
     <div class="row g-3">
       <div class="col-lg-6">
         <div class="glass p-4">
@@ -247,6 +275,11 @@ const form = reactive({
   type: 'system',
 })
 const history = ref([])
+const fcmStatus = ref(null)
+const fcmResult = ref(null)
+const fcmLoading = ref(false)
+const fcmTesting = ref(false)
+const fcmError = ref('')
 const loading = ref(false)
 const sending = ref(false)
 const uploading = ref(false)
@@ -302,6 +335,33 @@ async function onImagePicked(e) {
   }
   form.imageUrl = url
   toast().success(t('notifications.imageReady'))
+}
+
+async function loadFcmStatus() {
+  fcmLoading.value = true
+  fcmError.value = ''
+  const { data, error: err } = await notificationsApi.fcmStatus()
+  fcmLoading.value = false
+  if (err) {
+    fcmError.value = err.message
+    return
+  }
+  fcmStatus.value = data?.data || data || null
+}
+
+async function sendFcmTest() {
+  fcmTesting.value = true
+  fcmError.value = ''
+  fcmResult.value = null
+  const { data, error: err } = await notificationsApi.fcmTest()
+  fcmTesting.value = false
+  if (err) {
+    fcmError.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  fcmResult.value = data?.data || data || null
+  await loadFcmStatus()
 }
 
 async function loadHistory() {
@@ -361,7 +421,7 @@ async function send() {
   await loadHistory()
 }
 
-onMounted(loadHistory)
+onMounted(() => { loadHistory(); loadFcmStatus() })
 </script>
 
 <style scoped>
