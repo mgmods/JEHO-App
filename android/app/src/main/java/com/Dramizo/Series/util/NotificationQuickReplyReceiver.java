@@ -49,6 +49,7 @@ public final class NotificationQuickReplyReceiver extends BroadcastReceiver {
                         int notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1);
                         if (notificationId != -1) {
                             NotificationManagerCompat.from(app).cancel(notificationId);
+                            AuraNotificationHelper.clearChatMessageHistory(app, notificationId);
                             AuraNotificationHelper.refreshMessageGroupSummary(app);
                         }
                     } else if (AuraLiveApp.getForegroundActivity() != null) {
