@@ -9,6 +9,7 @@ import com.Dramizo.Series.data.remote.dto.ChatDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.realtime.RealtimeClient;
+import com.Dramizo.Series.util.ApiCall;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,6 +21,7 @@ public class MessagesViewModel extends ViewModel {
             new MutableLiveData<>(Collections.emptyList());
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private long lastLoadAtMs = 0L;
+    private boolean lastArchivedMode = false;
     private static final long MIN_RELOAD_MS = 8_000L;
     private final RealtimeClient.UserListener presenceListener = new RealtimeClient.UserListener() {
         @Override
@@ -129,20 +131,20 @@ public class MessagesViewModel extends ViewModel {
     public LiveData<List<ChatDtos.ConversationDto>> getConversations() { return conversations; }
     public LiveData<String> getError() { return error; }
 
-    public void load() {
-        load(false);
-    }
+    public void load() { load(false, false); }
 
-    /** @param force true from pull-to-refresh / deleted / missing conversation */
-    public void load(boolean force) {
+    public void load(boolean force) { load(force, lastArchivedMode); }
+
+    /** Loads only this account's active or archived conversations. */
+    public void load(boolean force, boolean archived) {
         long now = System.currentTimeMillis();
         List<ChatDtos.ConversationDto> cached = conversations.getValue();
-        if (!force && cached != null && !cached.isEmpty() && now - lastLoadAtMs < MIN_RELOAD_MS) {
-            return;
-        }
+        if (!force && archived == lastArchivedMode && cached != null && !cached.isEmpty()
+                && now - lastLoadAtMs < MIN_RELOAD_MS) return;
+        lastArchivedMode = archived;
         lastLoadAtMs = now;
         c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.ConversationList> r = c.getConversationsUseCase.execute();
+            Result<ChatDtos.ConversationList> r = ApiCall.execute(c.getChatApi().conversations(archived));
             if (r.success && r.data != null && r.data.items != null) {
                 conversations.postValue(r.data.items);
             } else {
