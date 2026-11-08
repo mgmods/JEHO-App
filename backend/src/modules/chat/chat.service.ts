@@ -1193,7 +1193,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     this.realtime?.emitToUser(userId, 'chat:conversation:deleted', {
       conversationId,
       byUserId: userId,
-      archived: true,
+      archived,
       at: new Date().toISOString(),
     });
     return { archived };
