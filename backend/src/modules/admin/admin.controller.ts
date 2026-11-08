@@ -1461,6 +1461,22 @@ export class AdminController {
   // ─── Notifications / Settings / Logs ───────────────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('notifications/fcm-status')
+  @ApiOperation({ summary: 'Inspect live FCM readiness and registered device counts' })
+  notificationsFcmStatus() {
+    return this.adminService.notificationsFcmStatus();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('notifications/fcm-test')
+  @ApiOperation({ summary: 'Send a real FCM test notification to the current admin device' })
+  sendNotificationsFcmTest(@CurrentUser('sub') adminUserId: string) {
+    return this.adminService.sendNotificationsFcmTest(adminUserId);
+  }
+
   @Get('notifications')
   listNotifications(@Query() query: PaginationDto) {
     return this.adminService.listNotifications(query);
