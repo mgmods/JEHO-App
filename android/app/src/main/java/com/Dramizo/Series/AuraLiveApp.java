@@ -648,8 +648,10 @@ public class AuraLiveApp extends Application {
     }
 
     /**
-     * Android 13+ blocks every app notification until the runtime permission is granted.
-     * Ask once when the signed-in user reaches the main screen, not during the splash flow.
+     * Android 13+ blocks app notifications until runtime permission is granted.
+     * Ask on the main screen and allow one retry after a real denial (when Android
+     * reports that a rationale should be shown). If permission was denied permanently,
+     * stop prompting on every launch; the user can enable it in system app settings.
      */
     private void requestNotificationPermission(Activity activity) {
         if (Build.VERSION.SDK_INT < 33 || activity == null
@@ -661,10 +663,25 @@ public class AuraLiveApp extends Application {
         if (base == null) return;
         android.content.SharedPreferences prefs =
                 base.getSharedPreferences(NOTIFICATION_PERMISSION_PREFS, MODE_PRIVATE);
-        if (prefs.getBoolean("prompted", false)) return;
-        prefs.edit().putBoolean("prompted", true).apply();
+        boolean prompted = prefs.getBoolean("prompted", false);
+        boolean retryPrompted = prefs.getBoolean("retry_prompted", false);
+        boolean shouldExplain = androidx.core.app.ActivityCompat
+                .shouldShowRequestPermissionRationale(
+                        activity, android.Manifest.permission.POST_NOTIFICATIONS);
+        if (prompted && (!shouldExplain || retryPrompted)) return;
+
+        // Persist before opening the system dialog to avoid duplicate prompts if
+        // MainActivity resumes while the permission request is still in progress.
+        android.content.SharedPreferences.Editor editor = prefs.edit()
+                .putBoolean("prompted", true);
+        if (prompted) editor.putBoolean("retry_prompted", true);
+        editor.apply();
+
         activity.getWindow().getDecorView().post(() -> {
-            if (!activity.isFinishing() && !activity.isDestroyed()) {
+            if (!activity.isFinishing() && !activity.isDestroyed()
+                    && androidx.core.content.ContextCompat.checkSelfPermission(
+                            activity, android.Manifest.permission.POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 androidx.core.app.ActivityCompat.requestPermissions(
                         activity,
                         new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
