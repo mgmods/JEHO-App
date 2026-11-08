@@ -1982,7 +1982,7 @@ public class ChatConversationActivity extends ThemedActivity {
         final ScaleGestureDetector scaleDetector = new ScaleGestureDetector(this,
                 new ScaleGestureDetector.SimpleOnScaleGestureListener() {
                     @Override public boolean onScale(ScaleGestureDetector detector) {
-                        matrix.postScale(detector.getScaleFactor(), detector.getFocusX(), detector.getFocusY());
+                        matrix.postScale(detector.getScaleFactor(), detector.getScaleFactor(), detector.getFocusX(), detector.getFocusY());
                         preview.setImageMatrix(matrix);
                         return true;
                     }
