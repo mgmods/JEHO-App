@@ -106,6 +106,15 @@ export class UsersService {
 
   async getRoomPresence(viewerId: string, targetId: string) {
     if (!viewerId || !targetId || viewerId === targetId) return { inRoom: false };
+    // A block in either direction always overrides room-tracking audience settings.
+    const blocked = await this.blocksRepo.findOne({
+      where: [
+        { blockerId: viewerId, blockedId: targetId },
+        { blockerId: targetId, blockedId: viewerId },
+      ],
+      select: ['id'],
+    });
+    if (blocked) return { inRoom: false };
     const privacy = await this.getRoomTrackingPrivacy(targetId);
     let allowed = privacy.audience === 'everyone';
     if (!allowed && privacy.audience === 'followers') {
