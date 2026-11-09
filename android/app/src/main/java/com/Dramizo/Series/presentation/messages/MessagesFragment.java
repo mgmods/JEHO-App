@@ -151,6 +151,8 @@ public class MessagesFragment extends Fragment {
             @Override public void afterTextChanged(Editable s) { }
         });
         if (binding.btnArchivedConversations != null) {
+            binding.btnArchivedConversations.setText(viewModel.isArchivedInbox()
+                    ? "العودة إلى المحادثات" : "المحادثات المؤرشفة");
             binding.btnArchivedConversations.setOnClickListener(v -> {
                 if (binding.etChatSearch != null) binding.etChatSearch.setText("");
                 viewModel.setArchivedInbox(!viewModel.isArchivedInbox());
@@ -347,7 +349,7 @@ public class MessagesFragment extends Fragment {
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             Result<com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationList> result =
-                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50));
+                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50, viewModel != null && viewModel.isArchivedInbox()));
             if (!isAdded()) return;
             requireActivity().runOnUiThread(() -> {
                 if (binding == null || sequence != globalSearchSequence) return;
