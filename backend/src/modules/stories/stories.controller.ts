@@ -24,6 +24,11 @@ export class StoriesController {
   react(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string, @Body('emoji') emoji: string) {
     return this.stories.react(id, userId, emoji);
   }
+  @Get(':id/viewers')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  viewers(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
+    return this.stories.viewers(id, userId);
+  }
   @Post(':id/view')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   view(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
