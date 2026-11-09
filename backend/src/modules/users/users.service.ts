@@ -79,6 +79,48 @@ export class UsersService {
     @Optional() private readonly tasksService?: TasksService,
   ) {}
 
+  private roomTrackingSettingKey(userId: string) { return `room_tracking:${userId}`; }
+
+  async getRoomTrackingPrivacy(userId: string) {
+    const rows = await this.dataSource.query(
+      'SELECT value FROM app_settings WHERE key = $1 LIMIT 1',
+      [this.roomTrackingSettingKey(userId)],
+    );
+    const audience = String(rows?.[0]?.value || 'everyone').toLowerCase();
+    return { audience: ['everyone', 'followers', 'friends', 'nobody'].includes(audience) ? audience : 'everyone' };
+  }
+
+  async setRoomTrackingPrivacy(userId: string, audience: string) {
+    const normalized = String(audience || '').trim().toLowerCase();
+    if (!['everyone', 'followers', 'friends', 'nobody'].includes(normalized)) {
+      throw new BadRequestException('Invalid room tracking audience');
+    }
+    await this.dataSource.query(
+      `INSERT INTO app_settings (key, value, description)
+       VALUES ($1, $2, 'User room presence privacy')
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, "updatedAt" = NOW()`,
+      [this.roomTrackingSettingKey(userId), normalized],
+    );
+    return { audience: normalized };
+  }
+
+  async getRoomPresence(viewerId: string, targetId: string) {
+    if (!viewerId || !targetId || viewerId === targetId) return { inRoom: false };
+    const privacy = await this.getRoomTrackingPrivacy(targetId);
+    let allowed = privacy.audience === 'everyone';
+    if (!allowed && privacy.audience === 'followers') {
+      allowed = !!(await this.followsRepo.findOne({ where: { followerId: viewerId, followingId: targetId } }));
+    } else if (!allowed && privacy.audience === 'friends') {
+      allowed = !!(await this.socialRepo.findOne({ where: [
+        { fromUserId: viewerId, toUserId: targetId, type: SocialRequestType.FRIEND, status: SocialRequestStatus.ACCEPTED },
+        { fromUserId: targetId, toUserId: viewerId, type: SocialRequestType.FRIEND, status: SocialRequestStatus.ACCEPTED },
+      ] }));
+    }
+    if (!allowed || privacy.audience === 'nobody') return { inRoom: false };
+    const roomId = await this.realtimeGateway.activeRoomForUser(targetId);
+    return roomId ? { inRoom: true, roomId } : { inRoom: false };
+  }
+
   /** Expired timed medals must disappear from the profile showcase on every profile read. */
   private async cleanupExpiredMedalShowcase(userId: string, profile?: UserProfile | null): Promise<void> {
     if (!profile || !Array.isArray(profile.displayedMedalIds) || !profile.displayedMedalIds.length) return;
