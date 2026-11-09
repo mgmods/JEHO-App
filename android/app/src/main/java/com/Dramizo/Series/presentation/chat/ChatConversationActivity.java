@@ -71,6 +71,7 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
