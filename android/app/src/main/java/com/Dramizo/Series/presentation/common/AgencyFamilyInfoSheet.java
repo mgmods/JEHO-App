@@ -79,6 +79,7 @@ public final class AgencyFamilyInfoSheet {
         TextView tvClubSummary = sheet.findViewById(R.id.tvAgencyClubSummary);
         TextView tvClubMembers = sheet.findViewById(R.id.tvAgencyClubMembers);
         TextView btnClubJoin = sheet.findViewById(R.id.btnAgencyClubJoin);
+        TextView btnClubRequests = sheet.findViewById(R.id.btnAgencyClubRequests);
 
         if (btnClubJoin != null) {
             btnClubJoin.setOnClickListener(v -> {
@@ -282,8 +283,12 @@ public final class AgencyFamilyInfoSheet {
                             formatCount(supporters) + " داعم" +
                             (pending > 0 ? " • " + formatCount(pending) + " طلب بانتظارك" : ""));
                 }
-                if (tvClubSummary != null && Boolean.TRUE.equals(data.get("canReview")) && pending > 0) {
-                    tvClubSummary.setOnClickListener(v -> loadClubRequests(activity, dialog, container, id));
+                if (btnClubRequests != null) {
+                    boolean canReview = Boolean.TRUE.equals(data.get("canReview"));
+                    btnClubRequests.setVisibility(canReview && pending > 0 ? View.VISIBLE : View.GONE);
+                    btnClubRequests.setText("مراجعة طلبات الانضمام • " + formatCount(pending));
+                    btnClubRequests.setOnClickListener(v ->
+                            loadClubRequests(activity, dialog, container, id));
                 }
                 Object membersValue = data.get("members");
                 java.util.ArrayList<String> rosterItems = new java.util.ArrayList<>();
