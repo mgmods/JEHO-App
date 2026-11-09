@@ -35,7 +35,7 @@ function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, 
   const values: string[] = [];
   const keys: string[] = [];
   const collect = (value: unknown, depth = 0) => {
-    if (depth > 5 || value == null) return;
+    if (depth > 6 || value == null) return;
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       values.push(String(value).toLowerCase());
       return;
@@ -53,11 +53,19 @@ function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, 
   };
   collect(data);
   const markers = [...keys, ...values].join(' ');
-  const copy = `${String(title || '')} ${String(body || '')} `.toLowerCase();
-  const winSignal = /(win|won|winner|game_win|slot_win|reward|payout|coinswon|wincoins|profit|hit|فوز|فاز|ربح|ربحت|مردود)/i.test(markers)
-    || /(فوز|فاز|ربح|ربحت|مكسب|مردود|مبروك).{0,35}(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين|ربح)|(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين).{0,35}(فوز|فاز|ربح|ربحت|مكسب|مردود)/i.test(copy);
-  const roomGameGiftContext = /(room|roomid|game|gameid|slot|gift|giftid|gifttype|lucky|luckygift|room:|غرفة|روم|هدية|محظوظ|الحظ)/i.test(markers + ' ' + copy);
-  return winSignal && roomGameGiftContext;
+  const copy = `${String(title || '')} ${String(body || '')}`.toLowerCase();
+  const winPattern = /(win|won|winner|winning|game_win|slot_win|lucky_win|reward|payout|coinswon|wincoins|profit|hit|فوز|فاز|فازت|فازوا|ربح|ربحت|ربحوا|مردود|مكسب)/i;
+  const winSignal = winPattern.test(markers) || winPattern.test(copy);
+  const gameKeys = /(gameid|game_id|game|slot|lucky|wheel|wincoins|win_coins|payout|profit|rewardamount|reward_amount|winner|roomid|room_id)/i;
+  const roomGameGiftContext = /(room|roomid|game|gameid|slot|gift|giftid|gifttype|lucky|luckygift|wheel|room:|غرفة|روم|هدية|محظوظ|الحظ|لعبة|كوين|عملة)/i.test(markers + ' ' + copy);
+  const explicitGameEvent = gameKeys.test(keys.join(' ')) ||
+    /(game_win|slot_win|lucky_win|game_result|slot_result|winner|payout|wincoins)/i.test(markers);
+  // A short "فلان ربح" / "X won" alert is itself a win announcement even
+  // when an older producer omitted room/game metadata. Keep it in-app only.
+  const explicitWinAnnouncement =
+    /(ربح|ربحت|ربحوا|فاز|فازت|فازوا|مردود|مكسب)/i.test(copy) ||
+    /\b(won|winner|winning|payout|profit)\b/i.test(copy);
+  return winSignal && (roomGameGiftContext || explicitGameEvent || explicitWinAnnouncement);
 }
 
 export class CreateNotificationDto {
@@ -459,6 +467,13 @@ export class NotificationsService {
     body: string,
     data?: Record<string, unknown>,
   ): Promise<boolean> {
+    // Central fail-safe: every push path (including dashboard push-only sends)
+    // passes here. Game/lucky/win announcements are delivered only over the
+    // in-app realtime channel and must never reach Android/iOS notification trays.
+    if (isRoomRewardWinPayload(data, title, body)) {
+      this.logger.log(`External FCM suppressed for in-app game win user=${userId}`);
+      return false;
+    }
     const devices = await this.devicesRepo.find({
       where: { userId, isActive: true },
     });
