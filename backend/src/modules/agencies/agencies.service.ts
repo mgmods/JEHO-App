@@ -3369,7 +3369,12 @@ export class AgenciesService implements OnModuleInit {
         SELECT
           (SELECT COUNT(*)::int FROM agency_club_members WHERE "agencyId" = $1 AND status = 'active') AS supporters,
           (SELECT COUNT(*)::int FROM agency_club_members WHERE "agencyId" = $1 AND status = 'pending') AS pending,
-          (SELECT COUNT(*)::int FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role IN ('owner','manager','host')) AS staff,
+          (SELECT COUNT(*)::int FROM (
+            SELECT "userId" FROM agency_members
+            WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role IN ('owner','manager','host')
+            UNION
+            SELECT "ownerId" AS "userId" FROM agencies WHERE id = $1
+          ) staff_roster) AS staff,
           (SELECT COUNT(*)::int FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role = 'member') AS "agencyMembers",
           (SELECT COUNT(*)::int FROM (
             SELECT "userId" FROM agency_club_members WHERE "agencyId" = $1 AND status = 'active'
