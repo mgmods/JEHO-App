@@ -16,7 +16,7 @@ public interface ChatApi {
             @Query("q") String query, @Query("page") int page, @Query("limit") int limit);
 
     @GET("chat/conversations")
-    Call<ApiResponse<ChatDtos.ConversationList>> conversations();
+    Call<ApiResponse<ChatDtos.ConversationList>> conversations(@Query("archived") boolean archived);
 
     @GET("chat/conversations/{id}")
     Call<ApiResponse<ChatDtos.ConversationDto>> conversation(@Path("id") String id);
