@@ -239,11 +239,11 @@ export const settingsApi = {
   update: (data) => safeRequest(() => api.patch('/admin/settings', data)),
 }
 
-export const dramaApi = {
-  settings: () => safeRequest(() => api.get('/admin/drama/settings')),
-  patchSettings: (data) => safeRequest(() => api.patch('/admin/drama/settings', data)),
-  series: () => safeRequest(() => api.get('/admin/drama/series')),
-  seriesGet: (id) => safeRequest(() => api.get(`/admin/drama/series/${id}`)),
+export const storiesAdminApi = {
+  config: () => safeRequest(() => api.get('/admin/stories/config', { headers: { 'Cache-Control': 'no-cache, no-store' } })),
+  update: (data) => safeRequest(() => api.patch('/admin/stories/config', data, { timeout: 30000 })),
+  list: () => safeRequest(() => api.get('/admin/stories', { params: { limit: 150 } })),
+  remove: (id) => safeRequest(() => api.delete(`/admin/stories/${id}`)),
 }
 
 export const gameAdsApi = {
