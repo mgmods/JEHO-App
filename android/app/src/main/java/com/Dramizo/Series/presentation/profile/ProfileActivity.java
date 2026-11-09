@@ -393,7 +393,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.btnRoomTrackingPrivacy.setVisibility(ownProfile ? View.VISIBLE : View.GONE);
             }
             if (ownProfile) {
-                binding.btnRoomTracking.setVisibility(View.GONE);
+                com.Dramizo.Series.util.RoomTrackingIndicator.setActive(binding.btnRoomTracking, false);
                 profileHandler.removeCallbacks(roomPresenceRefresh);
             } else {
                 refreshRoomPresence(user.id);
@@ -609,8 +609,8 @@ public class ProfileActivity extends ThemedActivity {
                         || !targetId.equals(loadedProfileId)) return;
                 roomTrackingRoomId = roomId;
                 if (binding.btnRoomTracking != null) {
-                    binding.btnRoomTracking.setVisibility(inRoom && roomId != null && !roomId.isEmpty()
-                            ? View.VISIBLE : View.GONE);
+                    com.Dramizo.Series.util.RoomTrackingIndicator.setActive(
+                            binding.btnRoomTracking, inRoom && roomId != null && !roomId.isEmpty());
                 }
             });
         });
