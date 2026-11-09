@@ -330,6 +330,25 @@ public class StoriesFragment extends Fragment {
         TextView close = text("×", 34, 0xFFFFFFFF, true); close.setGravity(Gravity.CENTER);
         FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(dp(54),dp(60),Gravity.TOP|Gravity.END);
         frame.addView(close,cp); close.setOnClickListener(v -> dialog.dismiss());
+        if (story.isMine) {
+            LinearLayout ownerTools = new LinearLayout(requireContext());
+            ownerTools.setGravity(Gravity.CENTER);
+            ownerTools.setPadding(dp(12), dp(8), dp(12), dp(8));
+            ownerTools.setBackground(round(0xCC17131D, dp(18)));
+            TextView viewers = text("👁  المشاهدون · " + story.viewCount, 14, 0xFFFFFFFF, true);
+            viewers.setGravity(Gravity.CENTER);
+            viewers.setPadding(dp(12), dp(10), dp(12), dp(10));
+            viewers.setOnClickListener(v -> showStoryViewers(story));
+            ownerTools.addView(viewers, new LinearLayout.LayoutParams(0, dp(46), 1));
+            TextView delete = text("حذف الستوري", 14, 0xFFFFB6C7, true);
+            delete.setGravity(Gravity.CENTER);
+            delete.setPadding(dp(12), dp(10), dp(12), dp(10));
+            delete.setOnClickListener(v -> confirmDeleteStory(story, dialog));
+            ownerTools.addView(delete, new LinearLayout.LayoutParams(-2, dp(46)));
+            FrameLayout.LayoutParams ownerParams = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
+            ownerParams.setMargins(dp(10), 0, dp(10), dp(18));
+            frame.addView(ownerTools, ownerParams);
+        } else {
         LinearLayout actions = new LinearLayout(requireContext()); actions.setOrientation(LinearLayout.VERTICAL);
         actions.setPadding(dp(14),dp(10),dp(14),dp(18)); actions.setBackground(round(0xCC17131D,dp(18)));
         LinearLayout reactions = new LinearLayout(requireContext()); reactions.setGravity(Gravity.CENTER);
@@ -355,6 +374,7 @@ public class StoriesFragment extends Fragment {
         actions.addView(replyRow,new LinearLayout.LayoutParams(-1,dp(48)));
         FrameLayout.LayoutParams actionParams = new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);
         actionParams.setMargins(dp(10),0,dp(10),dp(18)); frame.addView(actions,actionParams);
+        }
         frame.setOnClickListener(v -> { if (index + 1 < group.size()) { dialog.dismiss(); openViewer(group,index+1); } });
         dialog.setContentView(frame);
         Window w = dialog.getWindow(); if(w!=null)w.setLayout(-1,-1);
@@ -386,6 +406,56 @@ public class StoriesFragment extends Fragment {
             }
         }
         c.getIoExecutor().execute(() -> ApiCall.execute(c.getStoriesApi().view(story.id)));
+    }
+
+    private void showStoryViewers(StoriesDtos.StoryDto story) {
+        if (story == null || story.id == null || !story.isMine) return;
+        c.getIoExecutor().execute(() -> {
+            com.Dramizo.Series.domain.model.Result<StoriesDtos.ViewersResult> result =
+                    ApiCall.execute(c.getStoriesApi().viewers(story.id));
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (!isAdded()) return;
+                if (!result.success || result.data == null) {
+                    Toast.makeText(requireContext(), "تعذر تحميل قائمة المشاهدين", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                StringBuilder list = new StringBuilder("عدد المشاهدات: ").append(result.data.viewCount);
+                if (result.data.viewers != null && !result.data.viewers.isEmpty()) {
+                    for (StoriesDtos.StoryViewerDto viewer : result.data.viewers) {
+                        String name = viewer.displayName != null && !viewer.displayName.trim().isEmpty()
+                                ? viewer.displayName : (viewer.username == null ? "مستخدم JEHO" : viewer.username);
+                        list.append("\n• ").append(name);
+                        if (viewer.publicId != null && !viewer.publicId.trim().isEmpty())
+                            list.append("  ·  ID ").append(viewer.publicId);
+                    }
+                } else list.append("\nلم يشاهدها أحد بعد");
+                new android.app.AlertDialog.Builder(requireContext())
+                        .setTitle("مشاهدو الستوري").setMessage(list.toString())
+                        .setPositiveButton("إغلاق", null).show();
+            });
+        });
+    }
+
+    private void confirmDeleteStory(StoriesDtos.StoryDto story, Dialog viewer) {
+        if (story == null || story.id == null || !story.isMine) return;
+        new android.app.AlertDialog.Builder(requireContext())
+                .setTitle("حذف الستوري؟")
+                .setMessage("سيتم حذف الستوري نهائياً وإزالتها من قائمة جميع المستخدمين.")
+                .setNegativeButton("إلغاء", null)
+                .setPositiveButton("حذف", (d, which) -> c.getIoExecutor().execute(() -> {
+                    com.Dramizo.Series.domain.model.Result<Void> result =
+                            ApiCall.execute(c.getStoriesApi().delete(story.id));
+                    if (!isAdded()) return;
+                    requireActivity().runOnUiThread(() -> {
+                        if (!isAdded()) return;
+                        if (result.success) {
+                            viewer.dismiss();
+                            Toast.makeText(requireContext(), "تم حذف الستوري", Toast.LENGTH_SHORT).show();
+                            load();
+                        } else Toast.makeText(requireContext(), "تعذر حذف الستوري", Toast.LENGTH_SHORT).show();
+                    });
+                })).show();
     }
 
     private void sendStoryReaction(StoriesDtos.StoryDto story, String emoji) {
