@@ -109,7 +109,8 @@ export class StoriesService implements OnModuleInit {
     }
     return this.db.query(`SELECT s.id,s."userId",s."mediaType",s."mediaUrl",s.caption,s.visibility,
       s."viewCount",s."createdAt",s."expiresAt",u.username,u."displayName",u."avatarUrl",u."publicId",
-      EXISTS(SELECT 1 FROM "jeho_own"."story_views" v WHERE v."storyId"=s.id AND v."userId"=$1) AS "viewedByMe"
+      EXISTS(SELECT 1 FROM "jeho_own"."story_views" v WHERE v."storyId"=s.id AND v."userId"=$1) AS "viewedByMe",
+      (s."userId"=$1) AS "isMine"
       FROM "jeho_own"."stories" s JOIN "jeho_own"."users" u ON u.id=s."userId"
       WHERE s."isActive"=true AND s."expiresAt">now() AND u.status='active'
       AND (s."userId"=$1 OR EXISTS (SELECT 1 FROM "jeho_own"."follows" f WHERE f."followerId"=$1 AND f."followingId"=s."userId"))
@@ -152,6 +153,20 @@ export class StoriesService implements OnModuleInit {
     const inserted = await this.db.query('INSERT INTO "jeho_own"."story_views" ("storyId","userId") VALUES ($1,$2) ON CONFLICT ("storyId","userId") DO NOTHING RETURNING id',[id,userId]);
     if (inserted.length) await this.db.query('UPDATE "jeho_own"."stories" SET "viewCount"="viewCount"+1 WHERE id=$1',[id]);
     return { recorded: true, counted: inserted.length > 0 };
+  }
+
+  async viewers(id: string, ownerId: string) {
+    const [story] = await this.db.query(
+      'SELECT id,"viewCount" FROM "jeho_own"."stories" WHERE id=$1 AND "userId"=$2 AND "isActive"=true AND "expiresAt">now()',
+      [id, ownerId],
+    );
+    if (!story) throw new NotFoundException('Story not found');
+    const viewers = await this.db.query(`SELECT u.id,u.username,u."displayName",u."avatarUrl",u."publicId",v."viewedAt"
+      FROM "jeho_own"."story_views" v
+      JOIN "jeho_own"."users" u ON u.id=v."userId"
+      WHERE v."storyId"=$1 AND u.status='active'
+      ORDER BY v."viewedAt" DESC LIMIT 500`, [id]);
+    return { storyId: id, viewCount: Number(story.viewCount || 0), viewers };
   }
 
   async react(id: string, userId: string, rawEmoji: string) {
