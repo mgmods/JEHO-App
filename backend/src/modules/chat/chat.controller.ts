@@ -44,7 +44,6 @@ export class ChatController {
     @CurrentUser('sub') userId: string,
     @Query('page') page: string,
     @Query('limit') limit: string,
-    @Query('archived') archived: string,
   ) {
     return this.chatService.listConversations(
       userId, this.pagination(page, limit),
