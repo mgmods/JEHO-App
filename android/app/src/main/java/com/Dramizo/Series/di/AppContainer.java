@@ -31,6 +31,7 @@ import com.Dramizo.Series.data.remote.api.RoomApi;
 import com.Dramizo.Series.data.remote.api.RoomCupApi;
 import com.Dramizo.Series.data.remote.api.LuckyBoxesApi;
 import com.Dramizo.Series.data.remote.api.DramaApi;
+import com.Dramizo.Series.data.remote.api.StoriesApi;
 import com.Dramizo.Series.data.remote.api.GameAdsApi;
 import com.Dramizo.Series.data.remote.api.UploadApi;
 import com.Dramizo.Series.data.remote.api.UserApi;
@@ -142,6 +143,7 @@ public class AppContainer {
     private final GiftApi giftApiRef;
     private final LuckyBoxesApi luckyBoxesApi;
     private final DramaApi dramaApi;
+    private final StoriesApi storiesApi;
     private final GameAdsApi gameAdsApi;
     private final NotificationApi notificationApi;
     private final AdminApi adminApi;
@@ -284,6 +286,7 @@ public class AppContainer {
         this.giftApiRef = giftApi;
         this.luckyBoxesApi = retrofit.create(LuckyBoxesApi.class);
         this.dramaApi = retrofit.create(DramaApi.class);
+        this.storiesApi = retrofit.create(StoriesApi.class);
         this.gameAdsApi = retrofit.create(GameAdsApi.class);
         this.notificationApi = notificationApi;
         this.adminApi = retrofit.create(AdminApi.class);
@@ -386,6 +389,7 @@ public class AppContainer {
     public GiftApi getGiftApi() { return giftApiRef; }
     public LuckyBoxesApi getLuckyBoxesApi() { return luckyBoxesApi; }
     public DramaApi getDramaApi() { return dramaApi; }
+    public StoriesApi getStoriesApi() { return storiesApi; }
     public GameAdsApi getGameAdsApi() { return gameAdsApi; }
     public NotificationApi getNotificationApi() { return notificationApi; }
     public AdminApi getAdminApi() { return adminApi; }
