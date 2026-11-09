@@ -80,21 +80,51 @@ public final class AgencyFamilyInfoSheet {
         TextView tvClubMembers = sheet.findViewById(R.id.tvAgencyClubMembers);
         TextView btnClubJoin = sheet.findViewById(R.id.btnAgencyClubJoin);
         TextView btnClubRequests = sheet.findViewById(R.id.btnAgencyClubRequests);
+        final boolean[] isActiveClubSupporter = {false};
 
         if (btnClubJoin != null) {
             btnClubJoin.setOnClickListener(v -> {
+                if (isActiveClubSupporter[0]) {
+                    new android.app.AlertDialog.Builder(activity)
+                            .setTitle("مغادرة نادي الوكالة")
+                            .setMessage("هل تريد مغادرة نادي هذه الوكالة؟")
+                            .setNegativeButton("إلغاء", null)
+                            .setPositiveButton("مغادرة", (d, which) -> {
+                                btnClubJoin.setEnabled(false);
+                                container.getIoExecutor().execute(() -> {
+                                    Result<Map<String, Object>> result = ApiCall.execute(
+                                            container.getAgencyApi().leaveClub(id));
+                                    activity.runOnUiThread(() -> {
+                                        if (!dialog.isShowing()) return;
+                                        if (result.success) {
+                                            isActiveClubSupporter[0] = false;
+                                            btnClubJoin.setText("طلب الانضمام إلى النادي");
+                                            btnClubJoin.setEnabled(true);
+                                            Toast.makeText(activity, "غادرت نادي الوكالة", Toast.LENGTH_SHORT).show();
+                                        } else {
+                                            btnClubJoin.setEnabled(true);
+                                            Toast.makeText(activity,
+                                                    result.error != null ? result.error : activity.getString(R.string.error_generic),
+                                                    Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                });
+                            })
+                            .show();
+                    return;
+                }
                 btnClubJoin.setEnabled(false);
                 container.getIoExecutor().execute(() -> {
                     Result<Map<String, Object>> request = ApiCall.execute(
                             container.getAgencyApi().requestClubJoin(id));
                     activity.runOnUiThread(() -> {
-                        btnClubJoin.setEnabled(true);
                         if (!dialog.isShowing()) return;
                         if (request.success) {
-                            btnClubJoin.setText("تم إرسال طلب الانضمام — بانتظار موافقة المالك");
+                            btnClubJoin.setText("تم إرسال الطلب — بانتظار موافقة صاحب الوكالة");
                             btnClubJoin.setEnabled(false);
                             Toast.makeText(activity, "تم إرسال طلبك إلى صاحب الوكالة", Toast.LENGTH_SHORT).show();
                         } else {
+                            btnClubJoin.setEnabled(true);
                             Toast.makeText(activity,
                                     request.error != null ? request.error : activity.getString(R.string.error_generic),
                                     Toast.LENGTH_SHORT).show();
@@ -333,8 +363,9 @@ public final class AgencyFamilyInfoSheet {
                         btnClubJoin.setText("أنت عضو في هذه الوكالة");
                         btnClubJoin.setEnabled(false);
                     } else if ("active".equals(myStatus)) {
-                        btnClubJoin.setText("أنت داعم في هذا النادي");
-                        btnClubJoin.setEnabled(false);
+                        isActiveClubSupporter[0] = true;
+                        btnClubJoin.setText("مغادرة النادي");
+                        btnClubJoin.setEnabled(true);
                     } else if ("pending".equals(myStatus)) {
                         btnClubJoin.setText("طلبك قيد مراجعة صاحب الوكالة");
                         btnClubJoin.setEnabled(false);
