@@ -32,6 +32,7 @@ public final class StoriesDtos {
         @SerializedName("publicId") public String publicId;
         @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("viewedByMe") public boolean viewedByMe;
+        @SerializedName("isMine") public boolean isMine;
     }
 
     public static class CreateStoryDto {
@@ -41,6 +42,21 @@ public final class StoriesDtos {
         @SerializedName("visibility") public String visibility = "public";
         @SerializedName("sizeBytes") public long sizeBytes;
         @SerializedName("durationSeconds") public int durationSeconds;
+    }
+
+    public static class ViewersResult {
+        @SerializedName("storyId") public String storyId;
+        @SerializedName("viewCount") public long viewCount;
+        @SerializedName("viewers") public java.util.List<StoryViewerDto> viewers;
+    }
+
+    public static class StoryViewerDto {
+        @SerializedName("id") public String id;
+        @SerializedName("username") public String username;
+        @SerializedName("displayName") public String displayName;
+        @SerializedName("publicId") public String publicId;
+        @SerializedName("avatarUrl") public String avatarUrl;
+        @SerializedName("viewedAt") public String viewedAt;
     }
 
     public static class ViewResult {
