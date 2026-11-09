@@ -281,6 +281,9 @@ public final class AgencyFamilyInfoSheet {
                             formatCount(supporters) + " داعم" +
                             (pending > 0 ? " • " + formatCount(pending) + " طلب بانتظارك" : ""));
                 }
+                if (tvClubSummary != null && Boolean.TRUE.equals(data.get("canReview")) && pending > 0) {
+                    tvClubSummary.setOnClickListener(v -> loadClubRequests(activity, dialog, container, id));
+                }
                 Object membersValue = data.get("members");
                 StringBuilder roster = new StringBuilder();
                 if (membersValue instanceof java.util.List) {
@@ -319,6 +322,57 @@ public final class AgencyFamilyInfoSheet {
         });
 
         dialog.show();
+    }
+
+    private static void loadClubRequests(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
+            @NonNull AppContainer container, @NonNull String agencyId) {
+        container.getIoExecutor().execute(() -> {
+            Result<java.util.List<Map<String, Object>>> result = ApiCall.execute(container.getAgencyApi().clubRequests(agencyId));
+            activity.runOnUiThread(() -> {
+                if (!parent.isShowing()) return;
+                if (!result.success || result.data == null || result.data.isEmpty()) {
+                    Toast.makeText(activity, "لا توجد طلبات انضمام معلّقة", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showNextClubRequest(activity, parent, container, agencyId, result.data, 0);
+            });
+        });
+    }
+
+    private static void showNextClubRequest(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
+            @NonNull AppContainer container, @NonNull String agencyId,
+            @NonNull java.util.List<Map<String, Object>> requests, int index) {
+        if (!parent.isShowing() || index >= requests.size()) {
+            Toast.makeText(activity, "تمت مراجعة طلبات النادي", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Map<String, Object> request = requests.get(index);
+        String userId = String.valueOf(request.get("userId"));
+        Object rawName = request.get("displayName");
+        String name = rawName == null ? String.valueOf(request.get("username")) : String.valueOf(rawName);
+        new android.app.AlertDialog.Builder(activity)
+            .setTitle("طلب انضمام إلى النادي")
+            .setMessage(name + " يريد الانضمام إلى نادي الوكالة. هل توافق؟")
+            .setPositiveButton("قبول", (d, which) -> reviewClubRequest(activity, parent, container, agencyId, userId, true))
+            .setNegativeButton("رفض", (d, which) -> reviewClubRequest(activity, parent, container, agencyId, userId, false))
+            .setNeutralButton("لاحقًا", (d, which) -> { })
+            .show();
+    }
+
+    private static void reviewClubRequest(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
+            @NonNull AppContainer container, @NonNull String agencyId, @NonNull String userId, boolean approve) {
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(approve
+                ? container.getAgencyApi().approveClubRequest(agencyId, userId)
+                : container.getAgencyApi().rejectClubRequest(agencyId, userId));
+            activity.runOnUiThread(() -> {
+                if (!result.success) {
+                    Toast.makeText(activity, result.error != null ? result.error : activity.getString(R.string.error_generic), Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                loadClubRequests(activity, parent, container, agencyId);
+            });
+        });
     }
 
     private static void applyFollowUi(@Nullable TextView btn, boolean following) {
