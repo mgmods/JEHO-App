@@ -148,8 +148,9 @@ export class StoriesService implements OnModuleInit {
   async recordView(id: string, userId: string) {
     const c = await this.getConfig();
     if (!c.enabled || !c.viewingEnabled) throw new ForbiddenException('Stories viewing is disabled');
-    const [story] = await this.db.query('SELECT id FROM "jeho_own"."stories" WHERE id=$1 AND "isActive"=true AND "expiresAt">now()',[id]);
+    const [story] = await this.db.query('SELECT id,"userId" FROM "jeho_own"."stories" WHERE id=$1 AND "isActive"=true AND "expiresAt">now()',[id]);
     if (!story) throw new NotFoundException('Story not found or expired');
+    if (story.userId === userId) return { recorded: true, counted: false, owner: true };
     const inserted = await this.db.query('INSERT INTO "jeho_own"."story_views" ("storyId","userId") VALUES ($1,$2) ON CONFLICT ("storyId","userId") DO NOTHING RETURNING id',[id,userId]);
     if (inserted.length) await this.db.query('UPDATE "jeho_own"."stories" SET "viewCount"="viewCount"+1 WHERE id=$1',[id]);
     return { recorded: true, counted: inserted.length > 0 };
