@@ -1687,12 +1687,17 @@ public class ProfileActivity extends ThemedActivity {
             bindMysteriousMode(true);
             profileHandler.removeCallbacks(mysteriousModeRefresh);
             profileHandler.postDelayed(mysteriousModeRefresh, 60_000L);
+        } else if (loadedProfileId != null && !loadedProfileId.isEmpty()) {
+            profileHandler.removeCallbacks(roomPresenceRefresh);
+            refreshRoomPresence(loadedProfileId);
+            profileHandler.postDelayed(roomPresenceRefresh, 15_000L);
         }
     }
 
     @Override
     protected void onPause() {
         profileHandler.removeCallbacks(mysteriousModeRefresh);
+        profileHandler.removeCallbacks(roomPresenceRefresh);
         super.onPause();
     }
 
