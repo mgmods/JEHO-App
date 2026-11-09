@@ -1970,12 +1970,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     // Resolve the account-wide agency club identity once for every participant in this room.
     const clubUserIds = [...new Set([room.hostId, ...(loadedSeats || []).map((seat: any) => seat.userId)].filter(Boolean))];
     const clubBadgeRows = clubUserIds.length ? await this.dataSource.query(
-      "SELECT DISTINCT ON (x.\"userId\") x.\"userId\", x.\"agencyId\", x.\"agencyName\", x.role FROM (SELECT am.\"userId\", a.id AS \"agencyId\", a.name AS \"agencyName\", CASE WHEN am.role = 'host' THEN 'host' WHEN am.role = 'member' THEN 'member' ELSE 'staff' END AS role, CASE WHEN am.role = 'host' THEN 0 WHEN am.role IN ('owner','manager') THEN 1 WHEN am.role = 'member' THEN 2 ELSE 3 END AS priority FROM agency_members am JOIN agencies a ON a.id = am.\"agencyId\" WHERE am.\"userId\" = ANY($1::uuid[]) AND am.status = 'active' AND am.\"isActive\" = true AND a.status = 'active' AND am.role IN ('owner','manager','host','member') UNION ALL SELECT cm.\"userId\", a.id, a.name, 'supporter' AS role, 2 AS priority FROM agency_club_members cm JOIN agencies a ON a.id = cm.\"agencyId\" WHERE cm.\"userId\" = ANY($1::uuid[]) AND cm.status = 'active' AND a.status = 'active') x ORDER BY x.\"userId\", x.priority",
+      "SELECT DISTINCT ON (x.\"userId\") x.\"userId\", x.\"agencyId\", x.\"agencyName\", x.role FROM (SELECT am.\"userId\", a.id AS \"agencyId\", a.name AS \"agencyName\", CASE WHEN am.role = 'host' THEN 'host' WHEN am.role = 'owner' THEN 'owner' WHEN am.role = 'manager' THEN 'manager' WHEN am.role = 'member' THEN 'member' ELSE 'staff' END AS role, CASE WHEN am.role = 'host' THEN 0 WHEN am.role IN ('owner','manager') THEN 1 WHEN am.role = 'member' THEN 2 ELSE 3 END AS priority FROM agency_members am JOIN agencies a ON a.id = am.\"agencyId\" WHERE am.\"userId\" = ANY($1::uuid[]) AND am.status = 'active' AND am.\"isActive\" = true AND a.status = 'active' AND am.role IN ('owner','manager','host','member') UNION ALL SELECT cm.\"userId\", a.id, a.name, 'supporter' AS role, 2 AS priority FROM agency_club_members cm JOIN agencies a ON a.id = cm.\"agencyId\" WHERE cm.\"userId\" = ANY($1::uuid[]) AND cm.status = 'active' AND a.status = 'active') x ORDER BY x.\"userId\", x.priority",
       [clubUserIds],
     ) : [];
     const clubBadgeMap = new Map<string, any>();
     for (const row of clubBadgeRows || []) {
-      const prefix = row.role === 'host' ? 'مضيف' : row.role === 'staff' ? 'إدارة' : row.role === 'member' ? 'عضو' : 'داعم';
+      const prefix = row.role === 'host' ? 'مضيف' : row.role === 'owner' ? 'صاحب' : row.role === 'manager' || row.role === 'staff' ? 'إدارة' : row.role === 'member' ? 'عضو' : 'داعم';
       clubBadgeMap.set(row.userId, { agencyId: row.agencyId, agencyName: row.agencyName, role: row.role, label: prefix + ' وكالة ' + row.agencyName });
     }
     if (room.host) (room.host as any).agencyClub = clubBadgeMap.get(room.hostId) || null;
