@@ -3358,7 +3358,7 @@ export class AgenciesService implements OnModuleInit {
                u."avatarUrl", u."publicId", am.role::text AS role, am.status::text AS status
         FROM agency_members am JOIN users u ON u.id = am."userId"
         WHERE am."agencyId" = $1 AND am.status = 'active' AND am."isActive" = true
-          AND am.role IN ('owner','manager','host')
+          AND am.role IN ('owner','manager','host','member')
         ORDER BY CASE am.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END,
                  am."joinedAt" DESC LIMIT 100
       `, [agencyId]),
