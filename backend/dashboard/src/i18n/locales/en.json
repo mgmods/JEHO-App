@@ -82,7 +82,6 @@
     "contests": "Contests",
     "games": "Games",
     "gameAds": "Game ads",
-    "drama": "Drama",
     "luckyBoxes": "Lucky boxes",
     "tasks": "Tasks",
     "ranking": "Ranking",
@@ -94,7 +93,8 @@
     "settings": "General settings",
     "logs": "Logs",
     "policyBrochure": "Platform policy PDF",
-    "cpSettings": "CP relationship settings"
+    "cpSettings": "CP relationship settings",
+    "stories": "Stories"
   },
   "routes": {
     "login": "Login",
@@ -121,7 +121,6 @@
     "contests": "Contests",
     "games": "Games",
     "gameAds": "Game Ads",
-    "drama": "Drama",
     "luckyBoxes": "Lucky Boxes",
     "tasks": "Tasks",
     "ranking": "Ranking",
@@ -133,9 +132,10 @@
     "genderVerifications": "Hostess verification",
     "notifications": "Notifications",
     "cpSettings": "CP Relationship Settings",
-  "settings": "Settings",
+    "settings": "Settings",
     "logs": "Logs",
-    "policyBrochure": "Platform policy PDF"
+    "policyBrochure": "Platform policy PDF",
+    "stories": "Stories"
   },
   "login": {
     "title": "JEHO CHAT Admin",
@@ -769,7 +769,6 @@
     "imageUrl": "Image URL",
     "link": "Link",
     "noData": "No data yet",
-    "saved": "Saved successfully",
     "deleted": "Deleted successfully",
     "failedLoad": "Failed to load",
     "untitled": "Untitled",
