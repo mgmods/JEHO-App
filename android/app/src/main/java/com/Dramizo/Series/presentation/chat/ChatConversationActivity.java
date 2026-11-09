@@ -2388,6 +2388,7 @@ public class ChatConversationActivity extends ThemedActivity {
     @Override
     protected void onPause() {
         roomTrackingHandler.removeCallbacks(roomTrackingRefresh);
+        com.Dramizo.Series.util.RoomTrackingIndicator.setActive(binding != null ? binding.btnRoomTracking : null, false);
         if (chatBackgroundVideo != null && chatBackgroundVideo.isPlaying()) {
             chatBackgroundVideo.pause();
         }
