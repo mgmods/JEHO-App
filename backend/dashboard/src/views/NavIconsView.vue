@@ -143,11 +143,11 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 const { t } = useI18n()
 const ORIGIN = (import.meta.env.VITE_API_ORIGIN || window.location.origin).replace(/\/$/, '')
 
-const KEYS = ['party', 'drama', 'games', 'chat', 'me']
+const KEYS = ['party', 'stories', 'games', 'chat', 'me']
 
 const tabs = computed(() => [
   { key: 'party', label: t('navIcons.tabs.party') },
-  { key: 'drama', label: t('navIcons.tabs.drama') },
+  { key: 'stories', label: t('navIcons.tabs.stories') },
   { key: 'games', label: t('navIcons.tabs.games') },
   { key: 'chat', label: t('navIcons.tabs.chat') },
   { key: 'me', label: t('navIcons.tabs.me') },
@@ -224,7 +224,7 @@ function applyConfig(cfg) {
     version.value = Math.max(1, Number(cfg.version) || 1)
     profileActions.value = cfg.profileActions && typeof cfg.profileActions === 'object' ? { ...cfg.profileActions } : {}
     for (const k of KEYS) {
-      const p = cfg[k] || cfg.tabs?.[k] || {}
+      const p = cfg[k] || cfg.tabs?.[k] || (k === 'stories' ? (cfg.drama || cfg.tabs?.drama || {}) : {})
       next[k].normal = p.normal || p.icon || ''
       next[k].selected = p.selected || ''
     }
@@ -371,7 +371,7 @@ async function save() {
     version: Math.max(1, Number(version.value) || 1) + 1,
     updatedAt: new Date().toISOString(),
     party: { ...form.party },
-    drama: { ...form.drama },
+    stories: { ...form.stories },
     games: { ...form.games },
     chat: { ...form.chat },
     me: { ...form.me },
