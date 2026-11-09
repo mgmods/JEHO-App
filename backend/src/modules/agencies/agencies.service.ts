@@ -3392,7 +3392,8 @@ export class AgenciesService implements OnModuleInit {
         supporters: Number(counts?.[0]?.supporters || 0),
         staff: Number(counts?.[0]?.staff || 0),
         agencyMembers: Number(counts?.[0]?.agencyMembers || 0),
-        total: Number(counts?.[0]?.supporters || 0) + Number(counts?.[0]?.staff || 0) + Number(counts?.[0]?.agencyMembers || 0),
+        // Count unique accounts: a staff member must not be double-counted if they also have a legacy supporter row.
+        total: members.length,
         pending: agency.ownerId === viewerId ? Number(counts?.[0]?.pending || 0) : undefined,
       },
       members,
