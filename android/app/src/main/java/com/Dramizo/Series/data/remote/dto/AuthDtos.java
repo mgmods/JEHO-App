@@ -97,8 +97,16 @@ public final class AuthDtos {
         @SerializedName("debugCode") public String debugCode;
     }
 
+    public static class AgencyClubDto {
+        @SerializedName("agencyId") public String agencyId;
+        @SerializedName("agencyName") public String agencyName;
+        @SerializedName("role") public String role;
+        @SerializedName("label") public String label;
+    }
+
     public static class UserDto {
         @SerializedName("id") public String id;
+        @SerializedName("agencyClub") public AgencyClubDto agencyClub;
         @SerializedName("email") public String email;
         @SerializedName("phone") public String phone;
         @SerializedName("username") public String username;
