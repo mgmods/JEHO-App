@@ -656,6 +656,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgMuted.setVisibility(View.GONE);
             }
 
+            if (holder.b.tvAgencyClub != null) {
+                String clubLabel = seat.user != null && seat.user.agencyClub != null
+                        ? seat.user.agencyClub.label : null;
+                holder.b.tvAgencyClub.setText(clubLabel == null ? "" : clubLabel);
+                holder.b.tvAgencyClub.setVisibility(clubLabel == null || clubLabel.trim().isEmpty() ? View.GONE : View.VISIBLE);
+            }
             if (seat.user != null) {
                 holder.b.tvName.setText(seat.user.displayName != null
                         ? seat.user.displayName
@@ -718,6 +724,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             return;
         }
 
+        if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
         bindEmptySeatShell(holder, false);
         holder.b.seatRing.setVisibility(View.GONE);
         holder.b.imgAvatar.setVisibility(View.GONE);
