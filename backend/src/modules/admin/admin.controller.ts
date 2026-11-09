@@ -54,6 +54,7 @@ import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
 import { PatchLiveKitSettingsDto } from '../livekit/dto/patch-livekit-settings.dto';
 import { ImportZegoFromUrlDto } from '../zego/dto/import-zego-from-url.dto';
 import { DramaService } from '../drama/drama.service';
+import { StoriesService } from '../stories/stories.service';
 import { GameAdsService } from '../games/game-ads.service';
 import { IdentityVerificationService } from '../users/identity-verification.service';
 import { GenderVerificationStatus } from '../../database/entities/female-identity-verification.entity';
@@ -119,6 +120,7 @@ export class AdminController {
     private readonly zegoSettingsService: ZegoSettingsService,
     private readonly liveKitSettingsService: LiveKitSettingsService,
     private readonly dramaService: DramaService,
+    private readonly storiesService: StoriesService,
     private readonly gameAdsService: GameAdsService,
     private readonly identityVerification: IdentityVerificationService,
     private readonly shield: SecurityShieldService,
@@ -2077,7 +2079,33 @@ export class AdminController {
     return this.gameAdsService.adminPatchSettings(body as any);
   }
 
-  // ─── Drama / short series ──────────────────────────────────
+  // ─── Stories: live controls and moderation ─────────────────
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('stories/config')
+  storiesConfig() { return this.storiesService.getConfig(); }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('stories/config')
+  patchStoriesConfig(@Body() body: Record<string, unknown>) {
+    return this.storiesService.adminUpdateConfig((body || {}) as any);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('stories')
+  adminStories(@Query('limit') limit?: string) {
+    return this.storiesService.adminList(Number(limit) || 100);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Delete('stories/:id')
+  adminDeleteStory(@Param('id', ParseUUIDPipe) id: string) {
+    return this.storiesService.adminRemove(id);
+  }
+
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('drama/settings')
