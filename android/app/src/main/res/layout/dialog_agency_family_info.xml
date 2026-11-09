@@ -342,6 +342,21 @@
             android:textSize="11sp" />
 
         <TextView
+            android:id="@+id/btnAgencyClubRequests"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_user_card_stat_cell"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="مراجعة طلبات الانضمام"
+            android:textColor="#FFFFD978"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/tvAgencyClubMembers"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
