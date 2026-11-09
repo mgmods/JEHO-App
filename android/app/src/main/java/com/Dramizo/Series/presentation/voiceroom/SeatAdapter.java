@@ -610,6 +610,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         boolean occupied = seat.user != null || (userId != null && !userId.isEmpty());
 
         if (seat.locked()) {
+            if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
             bindEmptySeatShell(holder, true);
             holder.b.seatRing.setVisibility(View.GONE);
             holder.b.tvName.setText(String.valueOf(displaySeatNo(seat)));
