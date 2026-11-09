@@ -197,7 +197,7 @@ public class StoriesFragment extends Fragment {
             if (!upload.isSuccessful() || upload.body() == null || upload.body().data == null || upload.body().data.url == null)
                 throw new IllegalStateException(UploadApi.errorMessage(upload, "تعذر رفع الستوري"));
             String url = upload.body().data.url.trim();
-            if (url.startsWith("/")) url = com.Dramizo.Series.util.ApiOrigin.origin() + url;
+            // Persist only JEHO relative upload paths; the backend rejects arbitrary external URLs.
             StoriesDtos.CreateStoryDto dto = new StoriesDtos.CreateStoryDto();
             dto.mediaType = type; dto.mediaUrl = url; dto.sizeBytes = bytes.length; dto.durationSeconds = duration;
             com.Dramizo.Series.domain.model.Result<StoriesDtos.StoryDto> saved = ApiCall.execute(c.getStoriesApi().create(dto));
@@ -235,14 +235,14 @@ public class StoriesFragment extends Fragment {
         View media;
         if ("video".equalsIgnoreCase(story.mediaType)) {
             VideoView video = new VideoView(requireContext());
-            video.setVideoURI(Uri.parse(story.mediaUrl));
+            video.setVideoURI(Uri.parse(resolveMediaUrl(story.mediaUrl)));
             video.setOnPreparedListener(mp -> { mp.setLooping(false); video.start(); });
             video.setOnCompletionListener(mp -> { if (index + 1 < group.size()) { dialog.dismiss(); openViewer(group,index+1); } });
             media = video;
         } else {
             ImageView image = new ImageView(requireContext());
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            Glide.with(this).load(story.mediaUrl).diskCacheStrategy(config != null && config.cacheEnabled ? DiskCacheStrategy.AUTOMATIC : DiskCacheStrategy.NONE).into(image);
+            Glide.with(this).load(resolveMediaUrl(story.mediaUrl)).diskCacheStrategy(config != null && config.cacheEnabled ? DiskCacheStrategy.AUTOMATIC : DiskCacheStrategy.NONE).into(image);
             media = image;
         }
         frame.addView(media, new FrameLayout.LayoutParams(-1,-1));
@@ -258,6 +258,12 @@ public class StoriesFragment extends Fragment {
         Window w = dialog.getWindow(); if(w!=null)w.setLayout(-1,-1);
         dialog.show(); if(w!=null)w.setLayout(-1,-1);
         c.getIoExecutor().execute(() -> ApiCall.execute(c.getStoriesApi().view(story.id)));
+    }
+
+    private String resolveMediaUrl(String value) {
+        if (value == null || value.trim().isEmpty()) return "";
+        String path = value.trim();
+        return path.startsWith("/") ? com.Dramizo.Series.util.ApiOrigin.origin() + path : path;
     }
 
     private String shortName(StoriesDtos.StoryDto s) { String n=s.displayName!=null?s.displayName:s.username; if(n==null||n.trim().isEmpty())n="مستخدم"; return n.length()>10?n.substring(0,9)+"…":n; }
