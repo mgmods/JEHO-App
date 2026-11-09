@@ -214,7 +214,7 @@ public final class AuraNotificationHelper {
 
         // Custom RemoteViews only: one avatar inside the layout.
         // No setLargeIcon / no DecoratedCustomViewStyle — those duplicate the photo / app icon.
-        // Heads-up always uses COMPACT (never the tall expanded card).
+        // Chat heads-up includes the two requested actions; other alerts use the compact card.
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_jeho)
                 .setColor(ContextCompat.getColor(context, R.color.aurora_teal))
