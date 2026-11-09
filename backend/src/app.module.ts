@@ -36,6 +36,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { LuckyBoxesModule } from './modules/lucky-boxes/lucky-boxes.module';
 import { RechargeAgentsModule } from './modules/recharge-agents/recharge-agents.module';
 import { DramaModule } from './modules/drama/drama.module';
+import { StoriesModule } from './modules/stories/stories.module';
 import { HostTargetModule } from './modules/host-target/host-target.module';
 import { InvitesModule } from './modules/invites/invites.module';
 import { RoomCupModule } from './modules/room-cup/room-cup.module';
@@ -246,6 +247,7 @@ const entityList = Object.values(entities).filter(
     LuckyBoxesModule,
     RechargeAgentsModule,
     DramaModule,
+    StoriesModule,
     HostTargetModule,
     InvitesModule,
     RoomCupModule,
