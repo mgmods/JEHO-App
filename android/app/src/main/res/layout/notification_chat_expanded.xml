@@ -86,6 +86,7 @@
         <TextView
             android:id="@+id/btnNotifRead"
             android:layout_width="wrap_content"
+            android:background="@drawable/bg_notif_chat_read"
             android:layout_height="32dp"
             android:gravity="center"
             android:paddingHorizontal="16dp"
