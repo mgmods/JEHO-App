@@ -101,6 +101,7 @@ public class StoriesFragment extends Fragment {
                 if (root == null) return;
                 progress.setVisibility(View.GONE);
                 config = cfg.success && cfg.data != null ? cfg.data : new StoriesDtos.StoriesConfigDto();
+                if (!cfg.success || cfg.data == null) config.enabled = false;
                 if (!config.enabled || !config.viewingEnabled) {
                     status.setText("ميزة الستوريات متوقفة حالياً");
                     storyRow.removeAllViews();
