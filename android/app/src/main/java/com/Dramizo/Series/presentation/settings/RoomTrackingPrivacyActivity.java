@@ -56,6 +56,10 @@ public class RoomTrackingPrivacyActivity extends ThemedActivity {
             if (!ready || !binding.switchEnabled.isChecked()) return;
             String value = audienceForId(checkedId);
             if (value == null) return;
+            if ("nobody".equals(value)) {
+                binding.switchEnabled.setChecked(false);
+                return;
+            }
             selectedAudience = value;
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putString(LAST_AUDIENCE, value).apply();
