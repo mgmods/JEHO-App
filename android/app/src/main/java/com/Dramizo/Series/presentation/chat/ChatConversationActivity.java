@@ -86,6 +86,7 @@ public class ChatConversationActivity extends ThemedActivity {
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_PEER_ID = "peer_id";
     public static final String EXTRA_AVATAR = "avatar";
+    public static final String EXTRA_FOCUS_COMPOSER = "focus_composer_from_notification";
     public static final String EXTRA_HOST_BADGE = "host_badge";
 
     private ActivityChatConversationBinding binding;
@@ -2314,6 +2315,7 @@ public class ChatConversationActivity extends ThemedActivity {
         if (nextId == null || nextId.isEmpty()) return;
         if (nextId.equals(conversationId)) {
             if (viewModel != null) viewModel.load(conversationId);
+            focusComposerFromNotification();
             return;
         }
         com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
@@ -2347,9 +2349,27 @@ public class ChatConversationActivity extends ThemedActivity {
         return null;
     }
 
+    private void focusComposerFromNotification() {
+        Intent launch = getIntent();
+        if (launch == null || !launch.getBooleanExtra(EXTRA_FOCUS_COMPOSER, false)) return;
+        launch.removeExtra(EXTRA_FOCUS_COMPOSER);
+        if (binding == null || binding.etMessage == null) return;
+        binding.etMessage.post(() -> {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            binding.etMessage.requestFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(binding.etMessage,
+                        android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        focusComposerFromNotification();
         applyChatBackground();
         com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
         refreshPeerBlockStatus();
