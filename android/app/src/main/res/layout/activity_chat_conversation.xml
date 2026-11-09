@@ -178,18 +178,18 @@
             <TextView
                 android:id="@+id/btnRoomTracking"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
+                android:layout_height="36dp"
                 android:layout_marginEnd="5dp"
                 android:background="@drawable/bg_room_tracking_chip"
                 android:clickable="true"
                 android:focusable="true"
                 android:contentDescription="الانتقال إلى الغرفة الحالية"
                 android:gravity="center"
-                android:paddingStart="9dp"
-                android:paddingEnd="9dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
                 android:text="● في الغرفة"
                 android:textColor="#167A43"
-                android:textSize="10sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
