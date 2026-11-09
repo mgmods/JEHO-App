@@ -296,7 +296,8 @@ public final class AgencyFamilyInfoSheet {
                         String role = String.valueOf(member.get("role") == null ? "" : member.get("role"));
                         String roleLabel = "host".equalsIgnoreCase(role) ? "مضيف" :
                                 ("owner".equalsIgnoreCase(role) ? "المالك" :
-                                ("manager".equalsIgnoreCase(role) ? "إدارة" : "داعم"));
+                                ("manager".equalsIgnoreCase(role) ? "إدارة" :
+                                ("member".equalsIgnoreCase(role) ? "عضو وكالة" : "داعم")));
                         if (roster.length() > 0) roster.append(" • ");
                         roster.append(roleLabel).append(": ").append(name == null ? "مستخدم" : name);
                         if (roster.length() > 240) { roster.append(" …"); break; }
