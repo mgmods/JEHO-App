@@ -21,6 +21,23 @@ public interface AgencyApi {
     @GET("agencies/{id}")
     Call<ApiResponse<MiscDtos.AgencyDto>> get(@Path("id") String id);
 
+    @GET("agencies/{id}/club")
+    Call<ApiResponse<Map<String, Object>>> getClub(@Path("id") String id);
+
+    @POST("agencies/{id}/club/request")
+    Call<ApiResponse<Map<String, Object>>> requestClubJoin(@Path("id") String id);
+
+    @GET("agencies/{id}/club/requests")
+    Call<ApiResponse<java.util.List<Map<String, Object>>>> clubRequests(@Path("id") String id);
+
+    @POST("agencies/{id}/club/requests/{userId}/approve")
+    Call<ApiResponse<Map<String, Object>>> approveClubRequest(@Path("id") String id, @Path("userId") String userId);
+
+    @POST("agencies/{id}/club/requests/{userId}/reject")
+    Call<ApiResponse<Map<String, Object>>> rejectClubRequest(@Path("id") String id, @Path("userId") String userId);
+
+    @DELETE("agencies/{id}/club/leave")
+    Call<ApiResponse<Map<String, Object>>> leaveClub(@Path("id") String id);
     @POST("agencies/{id}/follow")
     Call<ApiResponse<Map<String, Object>>> followAgency(@Path("id") String id);
 
