@@ -59,6 +59,15 @@ public interface UserApi {
     @GET("users/{id}")
     Call<ApiResponse<AuthDtos.UserDto>> getUser(@Path("id") String id);
 
+    @GET("users/{id}/room-presence")
+    Call<ApiResponse<Map<String, Object>>> roomPresence(@Path("id") String id);
+
+    @GET("users/me/room-tracking-privacy")
+    Call<ApiResponse<Map<String, Object>>> roomTrackingPrivacy();
+
+    @PATCH("users/me/room-tracking-privacy")
+    Call<ApiResponse<Map<String, Object>>> updateRoomTrackingPrivacy(@Body Map<String, String> body);
+
     @GET("users/{id}/badges")
     Call<ApiResponse<List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> badges(@Path("id") String id);
 

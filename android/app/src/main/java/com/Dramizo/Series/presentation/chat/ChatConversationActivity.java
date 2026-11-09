@@ -71,6 +71,7 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -92,6 +93,15 @@ public class ChatConversationActivity extends ThemedActivity {
     private MessageAdapter adapter;
     private String conversationId;
     private String peerId;
+    private String peerRoomTrackingId;
+    private final Handler roomTrackingHandler = new Handler(Looper.getMainLooper());
+    private final Runnable roomTrackingRefresh = new Runnable() {
+        @Override public void run() {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            refreshPeerRoomPresence();
+            roomTrackingHandler.postDelayed(this, 15_000L);
+        }
+    };
     private boolean peerBlocked;
     private String peerLastSeenAt;
     private boolean peerOnline;
@@ -270,6 +280,9 @@ public class ChatConversationActivity extends ThemedActivity {
         }
         if (binding.peerProfileStrip != null) {
             binding.peerProfileStrip.setOnClickListener(openPeerProfile);
+        }
+        if (binding.btnRoomTracking != null) {
+            binding.btnRoomTracking.setOnClickListener(v -> openPeerTrackedRoom());
         }
         binding.btnBack.setOnClickListener(v -> navigateUp());
         bindGiftButton();
@@ -975,6 +988,55 @@ public class ChatConversationActivity extends ThemedActivity {
         return out.toByteArray();
     }
 
+    private void refreshPeerRoomPresence() {
+        final String targetId = peerId;
+        if (targetId == null || targetId.trim().isEmpty() || binding == null) {
+            if (binding != null && binding.btnRoomTracking != null) binding.btnRoomTracking.setVisibility(View.GONE);
+            return;
+        }
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(
+                    ContainerProvider.from(this).getUserApi().roomPresence(targetId));
+            boolean inRoom = result.success && result.data != null
+                    && Boolean.TRUE.equals(result.data.get("inRoom"));
+            String roomId = inRoom && result.data.get("roomId") != null
+                    ? String.valueOf(result.data.get("roomId")) : null;
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed() || !targetId.equals(peerId)) return;
+                peerRoomTrackingId = roomId;
+                if (binding.btnRoomTracking != null) {
+                    binding.btnRoomTracking.setVisibility(inRoom && roomId != null && !roomId.isEmpty()
+                            ? View.VISIBLE : View.GONE);
+                }
+            });
+        });
+    }
+
+    private void openPeerTrackedRoom() {
+        final String targetId = peerId;
+        if (targetId == null || targetId.trim().isEmpty()) return;
+        // Re-check on tap so a stale room id can never bypass a newly changed privacy choice.
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(
+                    ContainerProvider.from(this).getUserApi().roomPresence(targetId));
+            String roomId = result.success && result.data != null
+                    && Boolean.TRUE.equals(result.data.get("inRoom"))
+                    && result.data.get("roomId") != null
+                    ? String.valueOf(result.data.get("roomId")) : null;
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed() || !targetId.equals(peerId)) return;
+                peerRoomTrackingId = roomId;
+                if (roomId == null || roomId.trim().isEmpty()) {
+                    if (binding.btnRoomTracking != null) binding.btnRoomTracking.setVisibility(View.GONE);
+                    return;
+                }
+                Intent intent = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
+                intent.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
+                startActivity(intent);
+            });
+        });
+    }
+
     private void loadPeerHeader() {
         ContainerProvider.from(this).getIoExecutor().execute(() -> {
             AuthDtos.UserDto peer = null;
@@ -1013,6 +1075,7 @@ public class ChatConversationActivity extends ThemedActivity {
             runOnUiThread(() -> {
                 bindPeerProfile(finalPeer);
                 requestPeerPresence();
+                refreshPeerRoomPresence();
             });
         });
     }
@@ -2311,6 +2374,9 @@ public class ChatConversationActivity extends ThemedActivity {
         applyChatBackground();
         com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
         refreshPeerBlockStatus();
+        roomTrackingHandler.removeCallbacks(roomTrackingRefresh);
+        refreshPeerRoomPresence();
+        roomTrackingHandler.postDelayed(roomTrackingRefresh, 15_000L);
         if (conversationId != null && viewModel != null) {
             viewModel.load(conversationId);
             restorePendingVideoUpload();
@@ -2319,6 +2385,7 @@ public class ChatConversationActivity extends ThemedActivity {
 
     @Override
     protected void onPause() {
+        roomTrackingHandler.removeCallbacks(roomTrackingRefresh);
         if (chatBackgroundVideo != null && chatBackgroundVideo.isPlaying()) {
             chatBackgroundVideo.pause();
         }
@@ -2334,6 +2401,7 @@ public class ChatConversationActivity extends ThemedActivity {
     @Override
     protected void onDestroy() {
         com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
+        roomTrackingHandler.removeCallbacksAndMessages(null);
         RealtimeClient.getInstance().removeUserListener(presenceListener);
         if (typingStop != null && binding != null) binding.etMessage.removeCallbacks(typingStop);
         if (conversationId != null && viewModel != null) viewModel.setTyping(false);

@@ -20,6 +20,8 @@ public class MessagesViewModel extends ViewModel {
             new MutableLiveData<>(Collections.emptyList());
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private long lastLoadAtMs = 0L;
+    private volatile boolean archivedInbox = false;
+    private volatile long inboxRequestGeneration = 0L;
     private static final long MIN_RELOAD_MS = 8_000L;
     private final RealtimeClient.UserListener presenceListener = new RealtimeClient.UserListener() {
         @Override
@@ -133,6 +135,15 @@ public class MessagesViewModel extends ViewModel {
         load(false);
     }
 
+    public boolean isArchivedInbox() { return archivedInbox; }
+
+    public void setArchivedInbox(boolean archived) {
+        if (archivedInbox == archived) return;
+        archivedInbox = archived;
+        lastLoadAtMs = 0L;
+        load(true);
+    }
+
     /** @param force true from pull-to-refresh / deleted / missing conversation */
     public void load(boolean force) {
         long now = System.currentTimeMillis();
@@ -141,8 +152,13 @@ public class MessagesViewModel extends ViewModel {
             return;
         }
         lastLoadAtMs = now;
+        final boolean requestArchived = archivedInbox;
+        final long requestGeneration = ++inboxRequestGeneration;
         c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.ConversationList> r = c.getConversationsUseCase.execute();
+            Result<ChatDtos.ConversationList> r = c.getConversationsUseCase.execute(requestArchived);
+            // A slower response from the previous inbox (normal/archived) must never
+            // overwrite the list after the user has switched tabs.
+            if (requestGeneration != inboxRequestGeneration || requestArchived != archivedInbox) return;
             if (r.success && r.data != null && r.data.items != null) {
                 conversations.postValue(r.data.items);
             } else {

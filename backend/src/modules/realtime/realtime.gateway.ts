@@ -319,6 +319,24 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     void this.emitRoomMembers(roomId);
   }
 
+  /** Resolve a user's currently joined voice room from authenticated Socket.IO presence. */
+  async activeRoomForUser(userId: string): Promise<string | null> {
+    if (!userId) return null;
+    const sockets = await this.server.in(`user:${userId}`).fetchSockets();
+    for (const socket of sockets) {
+      const profiles = (socket.data as any)?.roomProfiles || {};
+      for (const roomId of Object.keys(profiles)) {
+        if (!socket.rooms.has(`room:${roomId}`)) continue;
+        const room = await this.roomsRepo.findOne({
+          where: { id: roomId },
+          select: ['id', 'status'],
+        });
+        if (room && room.status !== RoomStatus.CLOSED) return room.id;
+      }
+    }
+    return null;
+  }
+
   @SubscribeMessage('room:join')
   async onRoomJoin(
     @ConnectedSocket() client: AuthSocket,

@@ -150,6 +150,16 @@ public class MessagesFragment extends Fragment {
             }
             @Override public void afterTextChanged(Editable s) { }
         });
+        if (binding.btnArchivedConversations != null) {
+            binding.btnArchivedConversations.setText(viewModel.isArchivedInbox()
+                    ? "العودة إلى المحادثات" : "المحادثات المؤرشفة");
+            binding.btnArchivedConversations.setOnClickListener(v -> {
+                if (binding.etChatSearch != null) binding.etChatSearch.setText("");
+                viewModel.setArchivedInbox(!viewModel.isArchivedInbox());
+                binding.btnArchivedConversations.setText(viewModel.isArchivedInbox()
+                        ? "العودة إلى المحادثات" : "المحادثات المؤرشفة");
+            });
+        }
         binding.btnClearChatSearch.setOnClickListener(v -> binding.etChatSearch.setText(""));
         binding.etChatSearch.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
@@ -238,8 +248,14 @@ public class MessagesFragment extends Fragment {
             View anchor) {
         if (!isAdded() || item == null || item.id == null) return;
         PopupMenu menu = new PopupMenu(requireContext(), anchor);
-        menu.getMenu().add(0, 1, 0, "حذف المحادثة");
+        menu.getMenu().add(0, 2, 0, viewModel != null && viewModel.isArchivedInbox()
+                ? "إلغاء الأرشفة" : "أرشفة المحادثة");
+        menu.getMenu().add(0, 1, 1, "حذف المحادثة");
         menu.setOnMenuItemClickListener(selected -> {
+            if (selected.getItemId() == 2) {
+                setConversationArchived(item, viewModel == null || !viewModel.isArchivedInbox());
+                return true;
+            }
             if (selected.getItemId() == 1) {
                 confirmDeleteConversation(item);
                 return true;
@@ -247,6 +263,29 @@ public class MessagesFragment extends Fragment {
             return false;
         });
         menu.show();
+    }
+
+    private void setConversationArchived(
+            com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationDto item, boolean archived) {
+        if (!isAdded() || item == null || item.id == null) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            java.util.Map<String, Boolean> body = new java.util.HashMap<>();
+            body.put("archived", archived);
+            Result<Object> result = ApiCall.execute(c.getChatApi().archive(item.id, body));
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null) return;
+                if (result.success) {
+                    Toast.makeText(requireContext(), archived ? "تمت أرشفة المحادثة" : "تمت إعادة المحادثة",
+                            Toast.LENGTH_SHORT).show();
+                    if (viewModel != null) viewModel.load(true);
+                } else {
+                    Toast.makeText(requireContext(), result.error != null ? result.error
+                            : "تعذر تحديث الأرشفة", Toast.LENGTH_LONG).show();
+                }
+            });
+        });
     }
 
     private void confirmDeleteConversation(
@@ -310,7 +349,7 @@ public class MessagesFragment extends Fragment {
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             Result<com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationList> result =
-                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50));
+                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50, viewModel != null && viewModel.isArchivedInbox()));
             if (!isAdded()) return;
             requireActivity().runOnUiThread(() -> {
                 if (binding == null || sequence != globalSearchSequence) return;

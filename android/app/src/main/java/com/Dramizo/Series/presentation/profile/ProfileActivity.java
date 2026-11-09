@@ -90,6 +90,16 @@ public class ProfileActivity extends ThemedActivity {
     private String cpProfileOwnVipTouUrl = "";
     private String cpProfileOwnHostBadgeUrl = "";
     private Map<String, Object> cpProfileOwnHostBadgeMeta;
+    private String roomTrackingRoomId;
+    private final Runnable roomPresenceRefresh = new Runnable() {
+        @Override public void run() {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            if (!isOwnProfile && loadedProfileId != null && !loadedProfileId.isEmpty()) {
+                refreshRoomPresence(loadedProfileId);
+                profileHandler.postDelayed(this, 15_000L);
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -305,6 +315,12 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
         binding.btnBack.setOnClickListener(v -> navigateUp());
+        if (binding.btnRoomTracking != null) {
+            binding.btnRoomTracking.setOnClickListener(v -> openTrackedRoom());
+        }
+        if (binding.btnRoomTrackingPrivacy != null) {
+            binding.btnRoomTrackingPrivacy.setOnClickListener(v -> showRoomTrackingPrivacyDialog());
+        }
         binding.btnMessage.setOnClickListener(v -> {
             if (userId == null || userId.isEmpty()) return;
             if (myId != null && userId.equals(myId)) {
@@ -372,6 +388,17 @@ public class ProfileActivity extends ThemedActivity {
                 profileHandler.postDelayed(mysteriousModeRefresh, 60_000L);
             } else {
                 profileHandler.removeCallbacks(mysteriousModeRefresh);
+            }
+            if (binding.btnRoomTrackingPrivacy != null) {
+                binding.btnRoomTrackingPrivacy.setVisibility(ownProfile ? View.VISIBLE : View.GONE);
+            }
+            if (ownProfile) {
+                binding.btnRoomTracking.setVisibility(View.GONE);
+                profileHandler.removeCallbacks(roomPresenceRefresh);
+            } else {
+                refreshRoomPresence(user.id);
+                profileHandler.removeCallbacks(roomPresenceRefresh);
+                profileHandler.postDelayed(roomPresenceRefresh, 15_000L);
             }
             loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl,
                     user.vipLevel, user.vipTouUrl, user.hostBadgeUrl, user.hostBadgeMeta);
@@ -567,6 +594,71 @@ public class ProfileActivity extends ThemedActivity {
         if (userId != null) vm.loadUser(userId); else vm.loadMe();
     }
 
+
+    private void refreshRoomPresence(String targetId) {
+        if (targetId == null || targetId.trim().isEmpty() || container == null) return;
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().roomPresence(targetId));
+            boolean inRoom = result.success && result.data != null
+                    && Boolean.TRUE.equals(result.data.get("inRoom"));
+            String roomId = inRoom && result.data.get("roomId") != null
+                    ? String.valueOf(result.data.get("roomId")) : null;
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()
+                        || !targetId.equals(loadedProfileId)) return;
+                roomTrackingRoomId = roomId;
+                if (binding.btnRoomTracking != null) {
+                    binding.btnRoomTracking.setVisibility(inRoom && roomId != null && !roomId.isEmpty()
+                            ? View.VISIBLE : View.GONE);
+                }
+            });
+        });
+    }
+
+    private void openTrackedRoom() {
+        String roomId = roomTrackingRoomId;
+        if (roomId == null || roomId.trim().isEmpty()) return;
+        Intent intent = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
+        intent.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
+        startActivity(intent);
+    }
+
+    private void showRoomTrackingPrivacyDialog() {
+        if (container == null) return;
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().roomTrackingPrivacy());
+            String current = result.success && result.data != null && result.data.get("audience") != null
+                    ? String.valueOf(result.data.get("audience")) : "everyone";
+            String[] values = {"everyone", "followers", "friends", "nobody"};
+            String[] labels = {"الجميع", "المتابعون", "الأصدقاء", "لا أحد"};
+            int selected = 0;
+            for (int i = 0; i < values.length; i++) if (values[i].equals(current)) selected = i;
+            final int checked = selected;
+            runOnUiThread(() -> new AlertDialog.Builder(this)
+                    .setTitle("من يستطيع تتبعي؟")
+                    .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                        dialog.dismiss();
+                        saveRoomTrackingPrivacy(values[which]);
+                    })
+                    .setNegativeButton("إغلاق", null)
+                    .show());
+        });
+    }
+
+    private void saveRoomTrackingPrivacy(String audience) {
+        container.getIoExecutor().execute(() -> {
+            Map<String, String> body = new HashMap<>();
+            body.put("audience", audience);
+            Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().updateRoomTrackingPrivacy(body));
+            runOnUiThread(() -> Toast.makeText(this,
+                    result.success ? "تم تحديث خصوصية تتبع الغرف" :
+                            (result.error != null ? result.error : "تعذر حفظ إعداد الخصوصية"),
+                    Toast.LENGTH_SHORT).show());
+        });
+    }
 
     private void openBadgeCabinet(String profileId) {
         if (profileId == null || profileId.trim().isEmpty()) return;
@@ -1595,12 +1687,17 @@ public class ProfileActivity extends ThemedActivity {
             bindMysteriousMode(true);
             profileHandler.removeCallbacks(mysteriousModeRefresh);
             profileHandler.postDelayed(mysteriousModeRefresh, 60_000L);
+        } else if (loadedProfileId != null && !loadedProfileId.isEmpty()) {
+            profileHandler.removeCallbacks(roomPresenceRefresh);
+            refreshRoomPresence(loadedProfileId);
+            profileHandler.postDelayed(roomPresenceRefresh, 15_000L);
         }
     }
 
     @Override
     protected void onPause() {
         profileHandler.removeCallbacks(mysteriousModeRefresh);
+        profileHandler.removeCallbacks(roomPresenceRefresh);
         super.onPause();
     }
 

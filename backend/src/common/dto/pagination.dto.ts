@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class PaginationDto {
@@ -39,6 +39,14 @@ export class PaginationDto {
   @IsOptional()
   @IsString()
   type?: string;
+
+  // Chat inbox compatibility: older clients may request archived conversations
+  // through the shared pagination query. Default remains the normal inbox.
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  archived?: boolean = false;
 
   get skip(): number {
     return ((this.page || 1) - 1) * (this.limit || 20);
