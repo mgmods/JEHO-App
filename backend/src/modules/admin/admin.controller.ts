@@ -53,8 +53,6 @@ import { PatchZegoSettingsDto } from '../zego/dto/patch-zego-settings.dto';
 import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
 import { PatchLiveKitSettingsDto } from '../livekit/dto/patch-livekit-settings.dto';
 import { ImportZegoFromUrlDto } from '../zego/dto/import-zego-from-url.dto';
-import { DramaService } from '../drama/drama.service';
-import { StoriesService } from '../stories/stories.service';
 import { GameAdsService } from '../games/game-ads.service';
 import { IdentityVerificationService } from '../users/identity-verification.service';
 import { GenderVerificationStatus } from '../../database/entities/female-identity-verification.entity';
@@ -119,8 +117,6 @@ export class AdminController {
     private readonly paymentsService: PaymentsService,
     private readonly zegoSettingsService: ZegoSettingsService,
     private readonly liveKitSettingsService: LiveKitSettingsService,
-    private readonly dramaService: DramaService,
-    private readonly storiesService: StoriesService,
     private readonly gameAdsService: GameAdsService,
     private readonly identityVerification: IdentityVerificationService,
     private readonly shield: SecurityShieldService,
@@ -2079,7 +2075,6 @@ export class AdminController {
     return this.gameAdsService.adminPatchSettings(body as any);
   }
 
-  // ─── Stories: live controls and moderation ─────────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('stories/config')
