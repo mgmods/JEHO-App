@@ -274,10 +274,11 @@ public final class AgencyFamilyInfoSheet {
                 int total = counts.get("total") instanceof Number ? ((Number) counts.get("total")).intValue() : 0;
                 int hosts = counts.get("staff") instanceof Number ? ((Number) counts.get("staff")).intValue() : 0;
                 int supporters = counts.get("supporters") instanceof Number ? ((Number) counts.get("supporters")).intValue() : 0;
+                int agencyMembers = counts.get("agencyMembers") instanceof Number ? ((Number) counts.get("agencyMembers")).intValue() : 0;
                 int pending = counts.get("pending") instanceof Number ? ((Number) counts.get("pending")).intValue() : 0;
                 if (tvClubSummary != null) {
                     tvClubSummary.setText("نادي الوكالة • " + formatCount(total) +
-                            " عضو • " + formatCount(hosts) + " مضيف/إدارة • " +
+                            " عضو • " + formatCount(hosts) + " مضيف/إدارة • " + formatCount(agencyMembers) + " عضو وكالة • " +
                             formatCount(supporters) + " داعم" +
                             (pending > 0 ? " • " + formatCount(pending) + " طلب بانتظارك" : ""));
                 }
@@ -304,8 +305,11 @@ public final class AgencyFamilyInfoSheet {
                 if (tvClubMembers != null) tvClubMembers.setText(roster.length() == 0 ? "لا يوجد أعضاء بعد" : roster.toString());
                 String myStatus = String.valueOf(data.get("myStatus"));
                 if (btnClubJoin != null) {
-                    if ("active_staff".equals(myStatus)) {
+                    if ("active_staff".equals(myStatus) || "active_host".equals(myStatus)) {
                         btnClubJoin.setText("أنت ضمن طاقم هذه الوكالة");
+                        btnClubJoin.setEnabled(false);
+                    } else if ("active_member".equals(myStatus)) {
+                        btnClubJoin.setText("أنت عضو في هذه الوكالة");
                         btnClubJoin.setEnabled(false);
                     } else if ("active".equals(myStatus)) {
                         btnClubJoin.setText("أنت داعم في هذا النادي");
