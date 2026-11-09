@@ -5,5 +5,6 @@ import com.Dramizo.Series.domain.repository.ChatRepository;
 public class GetConversationsUseCase {
     private final ChatRepository repo;
     public GetConversationsUseCase(ChatRepository repo) { this.repo = repo; }
-    public Result<ChatDtos.ConversationList> execute() { return repo.getConversations(); }
+    public Result<ChatDtos.ConversationList> execute() { return repo.getConversations(false); }
+    public Result<ChatDtos.ConversationList> execute(boolean archived) { return repo.getConversations(archived); }
 }
