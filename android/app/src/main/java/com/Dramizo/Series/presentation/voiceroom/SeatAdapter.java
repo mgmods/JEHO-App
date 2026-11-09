@@ -300,6 +300,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && Objects.equals(a.user.vipBadgeUrl, b.user.vipBadgeUrl)
                 && Objects.equals(a.user.levelBadgeUrl, b.user.levelBadgeUrl)
                 && Objects.equals(a.user.nameStyle, b.user.nameStyle)
+                && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.label,
+                        b.user.agencyClub == null ? null : b.user.agencyClub.label)
                 && Objects.equals(a.user.hostBadgeMeta, b.user.hostBadgeMeta)
                 && a.user.level == b.user.level
                 && a.user.vipLevel == b.user.vipLevel;
