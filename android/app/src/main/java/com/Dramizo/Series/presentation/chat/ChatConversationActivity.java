@@ -991,7 +991,8 @@ public class ChatConversationActivity extends ThemedActivity {
     private void refreshPeerRoomPresence() {
         final String targetId = peerId;
         if (targetId == null || targetId.trim().isEmpty() || binding == null) {
-            if (binding != null && binding.btnRoomTracking != null) binding.btnRoomTracking.setVisibility(View.GONE);
+            if (binding != null && binding.btnRoomTracking != null)
+                com.Dramizo.Series.util.RoomTrackingIndicator.setActive(binding.btnRoomTracking, false);
             return;
         }
         ContainerProvider.from(this).getIoExecutor().execute(() -> {
@@ -1005,8 +1006,8 @@ public class ChatConversationActivity extends ThemedActivity {
                 if (binding == null || isFinishing() || isDestroyed() || !targetId.equals(peerId)) return;
                 peerRoomTrackingId = roomId;
                 if (binding.btnRoomTracking != null) {
-                    binding.btnRoomTracking.setVisibility(inRoom && roomId != null && !roomId.isEmpty()
-                            ? View.VISIBLE : View.GONE);
+                    com.Dramizo.Series.util.RoomTrackingIndicator.setActive(
+                            binding.btnRoomTracking, inRoom && roomId != null && !roomId.isEmpty());
                 }
             });
         });
@@ -1027,7 +1028,8 @@ public class ChatConversationActivity extends ThemedActivity {
                 if (binding == null || isFinishing() || isDestroyed() || !targetId.equals(peerId)) return;
                 peerRoomTrackingId = roomId;
                 if (roomId == null || roomId.trim().isEmpty()) {
-                    if (binding.btnRoomTracking != null) binding.btnRoomTracking.setVisibility(View.GONE);
+                    if (binding.btnRoomTracking != null)
+                        com.Dramizo.Series.util.RoomTrackingIndicator.setActive(binding.btnRoomTracking, false);
                     return;
                 }
                 Intent intent = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
