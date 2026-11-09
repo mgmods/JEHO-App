@@ -20,7 +20,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.databinding.FragmentProfileBinding;
-import com.Dramizo.Series.data.remote.dto.MiscDtos;
+import com.Dramizo.Series.data.remote.dto.MiscDtos;\nimport com.Dramizo.Series.data.remote.dto.StoriesDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.agency.AgencyActivity;
@@ -59,7 +59,7 @@ public class ProfileFragment extends Fragment {
     private MiscDtos.AgencyMineDto agencyMine;
     private long lastWalletRefreshAtMs = 0L;
     private AnimatorSet myCpHeartAnimator;
-    private static final long MIN_WALLET_REFRESH_MS = 15_000L;
+    private static final long MIN_WALLET_REFRESH_MS = 15_000L;\n    private TextView myStoryBadge;\n    private View myStoryRing;
 
     @Nullable
     @Override
@@ -112,7 +112,7 @@ public class ProfileFragment extends Fragment {
             } else {
                 openProfile.onClick(v);
             }
-        });
+        });\n        addMyStoryProfileIndicator();
         // Dashboard-managed custom icons for the Me page; empty URLs retain native defaults.
         bindDashboardProfileIcon(R.id.imgMeVipActionIcon, "vip", R.drawable.ic_me_vip_card);
         bindDashboardProfileIcon(R.id.imgMeLevelActionIcon, "level", R.drawable.ic_me_level_card);
@@ -216,6 +216,7 @@ public class ProfileFragment extends Fragment {
             if (user == null) return;
             myId = user.id;
             bindMyCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
+            refreshMyStoryProfileIndicator(user.id);
             binding.tvDisplayName.setText(user.displayName != null && !user.displayName.trim().isEmpty()
                     ? user.displayName : (user.username != null ? user.username : "مستخدم"));
             // Keep the purchased animated account-name style active on the Me/profile page.
@@ -335,6 +336,72 @@ public class ProfileFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.loadMe();
+    }
+
+    private void addMyStoryProfileIndicator() {
+        if (binding == null || myStoryBadge != null) return;
+        android.view.ViewGroup avatarParent = (android.view.ViewGroup) binding.imgAvatar.getParent();
+        if (avatarParent == null) return;
+
+        android.widget.FrameLayout.LayoutParams ringLp =
+                new android.widget.FrameLayout.LayoutParams(dp(94), dp(94), android.view.Gravity.CENTER);
+        myStoryRing = new View(requireContext());
+        android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFFFFB347, 0xFFE6428A, 0xFF8D5CF6});
+        ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        ring.setBackground(ring);
+        myStoryRing.setVisibility(View.GONE);
+        avatarParent.addView(myStoryRing, 0, ringLp);
+
+        myStoryBadge = new TextView(requireContext());
+        myStoryBadge.setText("قصتي");
+        myStoryBadge.setTextSize(10);
+        myStoryBadge.setTypeface(null, android.graphics.Typeface.BOLD);
+        myStoryBadge.setTextColor(0xFFFFFFFF);
+        myStoryBadge.setGravity(android.view.Gravity.CENTER);
+        myStoryBadge.setBackground(roundProfile(0xFFB82768, dp(14)));
+        myStoryBadge.setVisibility(View.GONE);
+        android.widget.FrameLayout.LayoutParams badgeLp =
+                new android.widget.FrameLayout.LayoutParams(dp(52), dp(28), android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL);
+        badgeLp.bottomMargin = dp(4);
+        avatarParent.addView(myStoryBadge, badgeLp);
+        myStoryBadge.setOnClickListener(v -> {
+            if (myId != null && requireActivity() instanceof com.Dramizo.Series.presentation.main.MainActivity)
+                ((com.Dramizo.Series.presentation.main.MainActivity) requireActivity()).openOwnStory(myId);
+        });
+    }
+
+    private void refreshMyStoryProfileIndicator(String userId) {
+        if (myStoryBadge == null || myStoryRing == null || userId == null) return;
+        AppContainer container = ContainerProvider.from(requireActivity());
+        container.getIoExecutor().execute(() -> {
+            Result<java.util.List<StoriesDtos.StoryDto>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(container.getStoriesApi().feed());
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                boolean hasStory = result.success && result.data != null;
+                if (hasStory) {
+                    for (StoriesDtos.StoryDto story : result.data) {
+                        if (userId.equals(story.userId)) { hasStory = true; break; }
+                        hasStory = false;
+                    }
+                }
+                myStoryRing.setVisibility(hasStory ? View.VISIBLE : View.GONE);
+                myStoryBadge.setVisibility(hasStory ? View.VISIBLE : View.GONE);
+            });
+        });
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private android.graphics.drawable.GradientDrawable roundProfile(int color, int radius) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(radius);
+        return d;
     }
 
     /** Loads the profile-only banner; home carousel banners are managed independently. */
