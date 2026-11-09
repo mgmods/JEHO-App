@@ -333,7 +333,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       relations: ['participants', 'participants.user', 'participants.user.profile'],
     });
     if (conv) {
-      // Re-opening a deleted/archived chat restores it for this user
+      // Re-opening a deleted chat restores it for this user
       await this.partRepo.update(
         { conversationId: conv.id, userId },
         { isDeleted: false, isArchived: false },
