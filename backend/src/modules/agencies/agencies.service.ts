@@ -3382,6 +3382,19 @@ export class AgenciesService implements OnModuleInit {
       if (seen.has(m.userId)) return false;
       seen.add(m.userId); return true;
     });
+    // The agency owner is part of the club roster even on legacy agencies
+    // that predate the owner AgencyMember row.
+    if (owner?.id && !seen.has(owner.id)) {
+      members.unshift({
+        userId: owner.id,
+        displayName: owner.displayName,
+        username: owner.username,
+        avatarUrl: owner.avatarUrl,
+        role: 'owner',
+        status: 'active',
+      });
+      seen.add(owner.id);
+    }
     const status = mine?.[0]?.status || null;
     const staffMembership = await this.membersRepo.findOne({
       where: { agencyId, userId: viewerId, status: AgencyMemberStatus.ACTIVE, isActive: true }
