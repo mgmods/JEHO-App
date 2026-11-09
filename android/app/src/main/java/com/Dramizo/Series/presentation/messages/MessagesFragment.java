@@ -39,6 +39,7 @@ import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.presentation.friends.FriendsActivity;
 import com.Dramizo.Series.presentation.notifications.NotificationsActivity;
 import com.Dramizo.Series.presentation.profile.VisitorsActivity;
+import com.Dramizo.Series.presentation.stories.StoriesFragment;
 import com.Dramizo.Series.presentation.notifications.OfficialNewsActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AppLoadingOverlay;
@@ -84,6 +85,11 @@ public class MessagesFragment extends Fragment {
         viewModel = new ViewModelProvider(
                 this, new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(MessagesViewModel.class);
+        if (getChildFragmentManager().findFragmentById(R.id.messagesStoriesStrip) == null) {
+            getChildFragmentManager().beginTransaction()
+                    .replace(R.id.messagesStoriesStrip, StoriesFragment.newCompactInstance())
+                    .commit();
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.contentRoot, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());

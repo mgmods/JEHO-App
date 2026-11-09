@@ -158,6 +158,12 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <FrameLayout
+            android:id="@+id/messagesStoriesStrip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="112dp" />
+
         <!-- Three compact shared inbox channels: official news, admin messages, notifications. -->
         <LinearLayout
             android:id="@+id/quickActionsRow"

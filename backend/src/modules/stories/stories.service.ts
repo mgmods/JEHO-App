@@ -31,6 +31,15 @@ export class StoriesService implements OnModuleInit {
         "createdAt" timestamptz NOT NULL DEFAULT now(), "expiresAt" timestamptz NOT NULL
       )`);
     await this.db.query(`
+      CREATE TABLE IF NOT EXISTS "jeho_own"."story_reactions" (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "storyId" uuid NOT NULL REFERENCES "jeho_own"."stories"(id) ON DELETE CASCADE,
+        "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
+        emoji varchar(16) NOT NULL,
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT "UQ_story_reactions_story_user" UNIQUE ("storyId","userId")
+      )`);
+    await this.db.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."story_views" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "storyId" uuid NOT NULL REFERENCES "jeho_own"."stories"(id) ON DELETE CASCADE,
@@ -41,6 +50,7 @@ export class StoriesService implements OnModuleInit {
     await this.db.query('CREATE INDEX IF NOT EXISTS "IDX_stories_expiry" ON "jeho_own"."stories" ("expiresAt" DESC) WHERE "isActive" = true');
     await this.db.query('CREATE INDEX IF NOT EXISTS "IDX_stories_user_expiry" ON "jeho_own"."stories" ("userId","expiresAt" DESC)');
     await this.db.query('CREATE INDEX IF NOT EXISTS "IDX_story_views_story" ON "jeho_own"."story_views" ("storyId")');
+    await this.db.query('CREATE INDEX IF NOT EXISTS "IDX_story_reactions_story" ON "jeho_own"."story_reactions" ("storyId")');
     await this.db.query('INSERT INTO "jeho_own"."app_settings" (key,value,description) VALUES ($1,$2,$3) ON CONFLICT (key) DO NOTHING',
       [KEY, JSON.stringify(DEFAULTS), 'Stories feature controls']);
   }
@@ -102,6 +112,7 @@ export class StoriesService implements OnModuleInit {
       EXISTS(SELECT 1 FROM "jeho_own"."story_views" v WHERE v."storyId"=s.id AND v."userId"=$1) AS "viewedByMe"
       FROM "jeho_own"."stories" s JOIN "jeho_own"."users" u ON u.id=s."userId"
       WHERE s."isActive"=true AND s."expiresAt">now() AND u.status='active'
+      AND (s."userId"=$1 OR EXISTS (SELECT 1 FROM "jeho_own"."follows" f WHERE f."followerId"=$1 AND f."followingId"=s."userId"))
       AND (s.visibility='public' OR s."userId"=$1 OR (s.visibility='followers' AND EXISTS
         (SELECT 1 FROM "jeho_own"."follows" f WHERE f."followerId"=$1 AND f."followingId"=s."userId")))
       ORDER BY s."createdAt" DESC LIMIT 300`,[viewerId]);
@@ -141,6 +152,18 @@ export class StoriesService implements OnModuleInit {
     const inserted = await this.db.query('INSERT INTO "jeho_own"."story_views" ("storyId","userId") VALUES ($1,$2) ON CONFLICT ("storyId","userId") DO NOTHING RETURNING id',[id,userId]);
     if (inserted.length) await this.db.query('UPDATE "jeho_own"."stories" SET "viewCount"="viewCount"+1 WHERE id=$1',[id]);
     return { recorded: true, counted: inserted.length > 0 };
+  }
+
+  async react(id: string, userId: string, rawEmoji: string) {
+    const allowed = ['❤️','😍','😂','😮','👏','🔥'];
+    const emoji = String(rawEmoji || '').trim();
+    if (!allowed.includes(emoji)) throw new BadRequestException('Unsupported story reaction');
+    const [story] = await this.db.query('SELECT id,"userId" FROM "jeho_own"."stories" WHERE id=$1 AND "isActive"=true AND "expiresAt">now()',[id]);
+    if (!story) throw new NotFoundException('Story not found or expired');
+    if (story.userId === userId) throw new BadRequestException('You cannot react to your own story');
+    await this.db.query(`INSERT INTO "jeho_own"."story_reactions" ("storyId","userId",emoji) VALUES ($1,$2,$3)
+      ON CONFLICT ("storyId","userId") DO UPDATE SET emoji=EXCLUDED.emoji,"createdAt"=now()`,[id,userId,emoji]);
+    return { reacted: true, emoji };
   }
 
   async remove(id: string, userId: string) {

@@ -23,6 +23,7 @@ import androidx.fragment.app.Fragment;
 import com.Dramizo.Series.data.remote.api.UploadApi;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.data.remote.dto.StoriesDtos;
+import com.Dramizo.Series.data.remote.dto.ChatDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.util.ApiCall;
@@ -37,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -46,6 +48,14 @@ import retrofit2.Response;
 /** Native Stories tab. Media bytes go through the existing durable upload service. */
 public class StoriesFragment extends Fragment {
     private static final int PICK_IMAGE = 7101, PICK_VIDEO = 7102;
+    private static final String ARG_COMPACT = "compact_inbox";
+    private boolean compactMode;
+
+    public static StoriesFragment newCompactInstance() {
+        StoriesFragment fragment = new StoriesFragment();
+        Bundle args = new Bundle(); args.putBoolean(ARG_COMPACT, true);
+        fragment.setArguments(args); return fragment;
+    }
     private AppContainer c;
     private LinearLayout root, storyRow;
     private TextView status;
@@ -56,10 +66,24 @@ public class StoriesFragment extends Fragment {
     @Nullable @Override public View onCreateView(@NonNull android.view.LayoutInflater inflater,
             @Nullable ViewGroup parent, @Nullable Bundle state) {
         c = ContainerProvider.from(requireActivity());
+        compactMode = getArguments() != null && getArguments().getBoolean(ARG_COMPACT, false);
         root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(14), dp(14), dp(20));
-        root.setBackgroundColor(0xFFF7F7FA);
+        root.setPadding(compactMode ? dp(10) : dp(14), compactMode ? dp(3) : dp(14), compactMode ? dp(10) : dp(14), compactMode ? dp(3) : dp(20));
+        root.setBackgroundColor(0x00FFFFFF);
+        if (compactMode) {
+            LinearLayout heading = new LinearLayout(requireContext()); heading.setGravity(Gravity.CENTER_VERTICAL);
+            TextView label = text("الستوريات",14,0xFF39323D,true); heading.addView(label,new LinearLayout.LayoutParams(0,dp(25),1));
+            TextView hint = text("قصص المتابعين",11,0xFF8A8390,false); heading.addView(hint,new LinearLayout.LayoutParams(-2,dp(25)));
+            root.addView(heading,match());
+            status = text("",11,0xFF88838D,false); status.setVisibility(View.GONE); root.addView(status,match());
+            progress = new ProgressBar(requireContext()); progress.setVisibility(View.GONE); root.addView(progress,new LinearLayout.LayoutParams(0,0));
+            android.widget.HorizontalScrollView compactScroll = new android.widget.HorizontalScrollView(requireContext());
+            compactScroll.setHorizontalScrollBarEnabled(false); compactScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            storyRow = new LinearLayout(requireContext()); storyRow.setOrientation(LinearLayout.HORIZONTAL);
+            compactScroll.addView(storyRow); root.addView(compactScroll,new LinearLayout.LayoutParams(-1,dp(88)));
+            load(); return root;
+        }
         TextView title = text("الستوريات", 25, 0xFF24212B, true);
         root.addView(title, match());
         TextView subtitle = text("شارك لحظاتك وشاهد قصص أصدقائك", 13, 0xFF898591, false);
@@ -95,6 +119,8 @@ public class StoriesFragment extends Fragment {
         return root;
     }
 
+    @Override public void onResume() { super.onResume(); if (compactMode && c != null) load(); }
+
     private void load() {
         if (c == null) return;
         c.getIoExecutor().execute(() -> {
@@ -122,6 +148,16 @@ public class StoriesFragment extends Fragment {
 
     private void bindStories() {
         storyRow.removeAllViews();
+        if (compactMode) {
+            LinearLayout addItem = new LinearLayout(requireContext()); addItem.setOrientation(LinearLayout.VERTICAL);
+            addItem.setGravity(Gravity.CENTER); addItem.setPadding(dp(5),dp(2),dp(5),dp(2));
+            FrameLayout addCircle = new FrameLayout(requireContext()); addCircle.setBackground(round(0xFFFCE8F1,dp(36)));
+            TextView plus = text("＋",28,0xFFB82768,false); plus.setGravity(Gravity.CENTER); addCircle.addView(plus,new FrameLayout.LayoutParams(-1,-1));
+            addItem.addView(addCircle,new LinearLayout.LayoutParams(dp(58),dp(58)));
+            TextView addLabel = text("قصتي",10,0xFF49444F,true); addLabel.setGravity(Gravity.CENTER);
+            addItem.addView(addLabel,new LinearLayout.LayoutParams(dp(66),dp(22)));
+            addItem.setOnClickListener(v -> chooseMedia()); storyRow.addView(addItem);
+        }
         Map<String,List<StoriesDtos.StoryDto>> grouped = new LinkedHashMap<>();
         for (StoriesDtos.StoryDto s : feed) grouped.computeIfAbsent(s.userId == null ? s.id : s.userId, k -> new ArrayList<>()).add(s);
         for (List<StoriesDtos.StoryDto> group : grouped.values()) {
@@ -131,14 +167,18 @@ public class StoriesFragment extends Fragment {
             item.setOrientation(LinearLayout.VERTICAL);
             item.setGravity(Gravity.CENTER);
             item.setPadding(dp(7), dp(4), dp(7), dp(4));
-            ImageView avatar = new ImageView(requireContext());
-            avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            android.graphics.drawable.GradientDrawable ring = round(story.viewedByMe ? 0xFFB7B3BD : 0xFFE6428A, dp(40));
-            avatar.setBackground(ring);
-            avatar.setClipToOutline(true);
+            FrameLayout avatarWrap = new FrameLayout(requireContext());
+            android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    story.viewedByMe ? new int[]{0xFFB7B3BD,0xFFCBC8D0,0xFFB7B3BD} : new int[]{0xFFFFB347,0xFFE6428A,0xFF8D5CF6,0xFFFFB347});
+            ring.setShape(android.graphics.drawable.GradientDrawable.OVAL); avatarWrap.setBackground(ring);
+            ImageView avatar = new ImageView(requireContext()); avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            avatar.setBackground(round(0xFFFFFFFF,dp(28))); avatar.setClipToOutline(true);
             if (story.avatarUrl != null) Glide.with(this).load(story.avatarUrl).circleCrop().diskCacheStrategy(config != null && config.cacheEnabled ? DiskCacheStrategy.AUTOMATIC : DiskCacheStrategy.NONE).into(avatar);
-            else avatar.setImageDrawable(round(0xFFE8DCE4, dp(40)));
-            item.addView(avatar, new LinearLayout.LayoutParams(dp(62), dp(62)));
+            else avatar.setImageDrawable(round(0xFFE8DCE4,dp(28)));
+            FrameLayout.LayoutParams avatarParams = new FrameLayout.LayoutParams(dp(54),dp(54),Gravity.CENTER);
+            avatarWrap.addView(avatar,avatarParams); item.addView(avatarWrap,new LinearLayout.LayoutParams(dp(62),dp(62)));
+            if (!story.viewedByMe) { android.animation.ObjectAnimator ringAnimator = android.animation.ObjectAnimator.ofFloat(avatarWrap,"rotation",0f,360f); ringAnimator.setDuration(5200); ringAnimator.setRepeatCount(android.animation.ValueAnimator.INFINITE); ringAnimator.start(); }
             TextView name = text(shortName(story), 11, 0xFF49444F, false);
             name.setGravity(Gravity.CENTER);
             name.setMaxWidth(dp(76));
@@ -146,7 +186,7 @@ public class StoriesFragment extends Fragment {
             item.setOnClickListener(v -> openViewer(group, 0));
             storyRow.addView(item);
         }
-        if (feed.isEmpty()) status.setText("لا توجد ستوريات حالياً — كن أول من يشارك");
+        if (feed.isEmpty() && !compactMode) status.setText("لا توجد ستوريات حالياً — كن أول من يشارك");
     }
 
     private void chooseMedia() {
@@ -257,6 +297,24 @@ public class StoriesFragment extends Fragment {
         TextView close = text("×", 34, 0xFFFFFFFF, true); close.setGravity(Gravity.CENTER);
         FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(dp(54),dp(60),Gravity.TOP|Gravity.END);
         frame.addView(close,cp); close.setOnClickListener(v -> dialog.dismiss());
+        LinearLayout actions = new LinearLayout(requireContext()); actions.setOrientation(LinearLayout.VERTICAL);
+        actions.setPadding(dp(14),dp(10),dp(14),dp(18)); actions.setBackground(round(0xCC17131D,dp(18)));
+        LinearLayout reactions = new LinearLayout(requireContext()); reactions.setGravity(Gravity.CENTER);
+        String[] emojis = {"❤️","😍","😂","😮","👏","🔥"};
+        for (String emoji : emojis) { TextView reaction=text(emoji,23,0xFFFFFFFF,false); reaction.setGravity(Gravity.CENTER);
+            reactions.addView(reaction,new LinearLayout.LayoutParams(0,dp(42),1)); reaction.setOnClickListener(v -> sendStoryReaction(story,emoji)); }
+        actions.addView(reactions,new LinearLayout.LayoutParams(-1,dp(42)));
+        LinearLayout replyRow = new LinearLayout(requireContext()); replyRow.setGravity(Gravity.CENTER_VERTICAL);
+        android.widget.EditText reply = new android.widget.EditText(requireContext()); reply.setSingleLine(true); reply.setTextSize(13);
+        reply.setTextColor(0xFFFFFFFF); reply.setHintTextColor(0xFFBEB8C5); reply.setHint("الرد على الستوري…");
+        reply.setPadding(dp(12),0,dp(12),0); reply.setBackground(round(0xFF39323F,dp(22)));
+        replyRow.addView(reply,new LinearLayout.LayoutParams(0,dp(44),1));
+        TextView send = text("إرسال",13,0xFFFFB8D5,true); send.setGravity(Gravity.CENTER);
+        replyRow.addView(send,new LinearLayout.LayoutParams(dp(58),dp(44)));
+        send.setOnClickListener(v -> { String message=reply.getText().toString().trim(); if(!message.isEmpty()) sendStoryReply(story,message,dialog); });
+        actions.addView(replyRow,new LinearLayout.LayoutParams(-1,dp(48)));
+        FrameLayout.LayoutParams actionParams = new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);
+        actionParams.setMargins(dp(10),0,dp(10),dp(18)); frame.addView(actions,actionParams);
         frame.setOnClickListener(v -> { if (index + 1 < group.size()) { dialog.dismiss(); openViewer(group,index+1); } });
         dialog.setContentView(frame);
         Window w = dialog.getWindow(); if(w!=null)w.setLayout(-1,-1);
@@ -285,6 +343,26 @@ public class StoriesFragment extends Fragment {
             }
         }
         c.getIoExecutor().execute(() -> ApiCall.execute(c.getStoriesApi().view(story.id)));
+    }
+
+    private void sendStoryReaction(StoriesDtos.StoryDto story, String emoji) {
+        if (story == null || story.id == null) return;
+        c.getIoExecutor().execute(() -> { com.Dramizo.Series.domain.model.Result<Object> result = ApiCall.execute(c.getStoriesApi().react(story.id,Collections.singletonMap("emoji",emoji)));
+            if (!isAdded()) return; requireActivity().runOnUiThread(() -> Toast.makeText(requireContext(),result.success?"تم إرسال التفاعل":"تعذر إرسال التفاعل",Toast.LENGTH_SHORT).show()); });
+    }
+
+    private void sendStoryReply(StoriesDtos.StoryDto story, String message, Dialog dialog) {
+        if (story == null || story.userId == null || story.userId.trim().isEmpty()) return;
+        c.getIoExecutor().execute(() -> {
+            com.Dramizo.Series.domain.model.Result<ChatDtos.ConversationDto> conversation = ApiCall.execute(c.getChatApi().create(Collections.singletonMap("peerId",story.userId)));
+            boolean sent=false;
+            if (conversation.success && conversation.data != null && conversation.data.id != null) {
+                ChatDtos.SendMessageRequest request = new ChatDtos.SendMessageRequest("رد على الستوري: " + message,"text",null);
+                sent=ApiCall.execute(c.getChatApi().send(conversation.data.id,request)).success;
+            }
+            final boolean ok=sent; if(!isAdded())return;
+            requireActivity().runOnUiThread(() -> { Toast.makeText(requireContext(),ok?"تم إرسال الرد برسالة خاصة":"تعذر إرسال الرد",Toast.LENGTH_SHORT).show(); if(ok)dialog.dismiss(); });
+        });
     }
 
     private File cachedStoryFile(String storyId) throws Exception {

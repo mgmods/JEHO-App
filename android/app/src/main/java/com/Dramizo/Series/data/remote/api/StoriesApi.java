@@ -23,6 +23,9 @@ public interface StoriesApi {
     @POST("stories/{id}/view")
     Call<ApiResponse<StoriesDtos.ViewResult>> view(@Path("id") String id);
 
+    @POST("stories/{id}/reaction")
+    Call<ApiResponse<Object>> react(@Path("id") String id, @Body java.util.Map<String,String> body);
+
     @DELETE("stories/{id}")
     Call<ApiResponse<Void>> delete(@Path("id") String id);
 }
