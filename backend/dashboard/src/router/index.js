@@ -197,11 +197,12 @@ const routes = [
         meta: { titleKey: 'routes.gameAds' },
       },
       {
-        path: 'drama',
-        name: 'drama',
-        component: () => import('@/views/DramaView.vue'),
-        meta: { titleKey: 'routes.drama' },
+        path: 'stories',
+        name: 'stories',
+        component: () => import('@/views/StoriesView.vue'),
+        meta: { titleKey: 'routes.stories', module: 'drama' },
       },
+      { path: 'drama', redirect: { name: 'stories' } },
       {
         path: 'lucky-boxes',
         name: 'lucky-boxes',
