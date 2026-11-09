@@ -112,7 +112,7 @@ public class StoriesFragment extends Fragment {
                     return;
                 }
                 if (!config.publishingEnabled || config.emergencyMode) status.setText("النشر متوقف مؤقتاً — يمكنك مشاهدة الستوريات");
-                else status.setText(rows.success ? "" : (rows.message == null ? "تعذر تحميل الستوريات" : rows.message));
+                else status.setText(rows.success ? "" : (rows.error == null ? "تعذر تحميل الستوريات" : rows.error));
                 feed.clear();
                 if (rows.success && rows.data != null) feed.addAll(rows.data);
                 bindStories();
@@ -204,7 +204,7 @@ public class StoriesFragment extends Fragment {
             StoriesDtos.CreateStoryDto dto = new StoriesDtos.CreateStoryDto();
             dto.mediaType = type; dto.mediaUrl = url; dto.sizeBytes = bytes.length; dto.durationSeconds = duration;
             com.Dramizo.Series.domain.model.Result<StoriesDtos.StoryDto> saved = ApiCall.execute(c.getStoriesApi().create(dto));
-            if (!saved.success) throw new IllegalStateException(saved.message == null ? "تعذر نشر الستوري" : saved.message);
+            if (!saved.success) throw new IllegalStateException(saved.error == null ? "تعذر نشر الستوري" : saved.error);
             requireActivity().runOnUiThread(() -> { Toast.makeText(requireContext(), "تم نشر الستوري", Toast.LENGTH_SHORT).show(); load(); });
         } catch (Exception e) {
             if (isAdded()) requireActivity().runOnUiThread(() -> Toast.makeText(requireContext(), e.getMessage() == null ? "تعذر نشر الستوري" : e.getMessage(), Toast.LENGTH_LONG).show());
