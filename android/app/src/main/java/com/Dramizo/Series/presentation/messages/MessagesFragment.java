@@ -324,7 +324,7 @@ public class MessagesFragment extends Fragment {
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             Result<com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationList> result =
-                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50, viewModel != null && viewModel.isArchivedInbox()));
+                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50, false));
             if (!isAdded()) return;
             requireActivity().runOnUiThread(() -> {
                 if (binding == null || sequence != globalSearchSequence) return;
