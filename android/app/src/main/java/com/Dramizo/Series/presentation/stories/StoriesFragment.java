@@ -27,6 +27,7 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.util.ApiCall;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -132,7 +133,7 @@ public class StoriesFragment extends Fragment {
             android.graphics.drawable.GradientDrawable ring = round(story.viewedByMe ? 0xFFB7B3BD : 0xFFE6428A, dp(40));
             avatar.setBackground(ring);
             avatar.setClipToOutline(true);
-            if (story.avatarUrl != null) Glide.with(this).load(story.avatarUrl).circleCrop().into(avatar);
+            if (story.avatarUrl != null) Glide.with(this).load(story.avatarUrl).circleCrop().diskCacheStrategy(config != null && config.cacheEnabled ? DiskCacheStrategy.AUTOMATIC : DiskCacheStrategy.NONE).into(avatar);
             else avatar.setImageDrawable(round(0xFFE8DCE4, dp(40)));
             item.addView(avatar, new LinearLayout.LayoutParams(dp(62), dp(62)));
             TextView name = text(shortName(story), 11, 0xFF49444F, false);
@@ -241,7 +242,7 @@ public class StoriesFragment extends Fragment {
         } else {
             ImageView image = new ImageView(requireContext());
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            Glide.with(this).load(story.mediaUrl).into(image);
+            Glide.with(this).load(story.mediaUrl).diskCacheStrategy(config != null && config.cacheEnabled ? DiskCacheStrategy.AUTOMATIC : DiskCacheStrategy.NONE).into(image);
             media = image;
         }
         frame.addView(media, new FrameLayout.LayoutParams(-1,-1));
