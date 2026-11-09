@@ -169,7 +169,7 @@ const sections = computed(() => [
     items: [
       { name: 'games', icon: 'bi-controller', label: t('nav.games'), module: 'games' },
       { name: 'game-ads', icon: 'bi-badge-ad', label: t('nav.gameAds') },
-      { name: 'drama', icon: 'bi-film', label: t('nav.drama') },
+      { name: 'stories', icon: 'bi-camera-reels', label: t('nav.stories'), module: 'drama' },
       { name: 'banners', icon: 'bi-images', label: t('nav.banners') },
       { name: 'splash', icon: 'bi-megaphone', label: 'السبلاش — تغيير الصورة', module: 'banners' },
       { name: 'nav-icons', icon: 'bi-grid-1x2', label: t('nav.navIcons') },
