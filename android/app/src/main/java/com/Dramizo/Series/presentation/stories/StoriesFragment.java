@@ -29,12 +29,15 @@ import com.Dramizo.Series.util.ApiCall;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
@@ -233,11 +236,12 @@ public class StoriesFragment extends Fragment {
         FrameLayout frame = new FrameLayout(requireContext());
         frame.setBackgroundColor(0xFF08070A);
         View media;
+        VideoView storyVideo = null;
         if ("video".equalsIgnoreCase(story.mediaType)) {
             VideoView video = new VideoView(requireContext());
-            video.setVideoURI(Uri.parse(resolveMediaUrl(story.mediaUrl)));
             video.setOnPreparedListener(mp -> { mp.setLooping(false); video.start(); });
             video.setOnCompletionListener(mp -> { if (index + 1 < group.size()) { dialog.dismiss(); openViewer(group,index+1); } });
+            storyVideo = video;
             media = video;
         } else {
             ImageView image = new ImageView(requireContext());
@@ -257,7 +261,62 @@ public class StoriesFragment extends Fragment {
         dialog.setContentView(frame);
         Window w = dialog.getWindow(); if(w!=null)w.setLayout(-1,-1);
         dialog.show(); if(w!=null)w.setLayout(-1,-1);
+        if (storyVideo != null) {
+            final VideoView target = storyVideo;
+            final String mediaUrl = resolveMediaUrl(story.mediaUrl);
+            if (config != null && config.cacheEnabled) {
+                c.getIoExecutor().execute(() -> {
+                    try {
+                        File cached = cachedStoryFile(story.id);
+                        if (!cached.exists() || cached.length() == 0) downloadStoryToCache(mediaUrl, cached);
+                        if (!isAdded()) return;
+                        requireActivity().runOnUiThread(() -> {
+                            if (dialog.isShowing()) target.setVideoPath(cached.getAbsolutePath());
+                        });
+                    } catch (Exception cacheError) {
+                        if (!isAdded()) return;
+                        requireActivity().runOnUiThread(() -> {
+                            if (dialog.isShowing()) target.setVideoURI(Uri.parse(mediaUrl));
+                        });
+                    }
+                });
+            } else {
+                target.setVideoURI(Uri.parse(mediaUrl));
+            }
+        }
         c.getIoExecutor().execute(() -> ApiCall.execute(c.getStoriesApi().view(story.id)));
+    }
+
+    private File cachedStoryFile(String storyId) throws Exception {
+        File directory = new File(requireContext().getCacheDir(), "stories");
+        if (!directory.exists() && !directory.mkdirs()) throw new IllegalStateException("تعذر إنشاء ذاكرة الستوري المؤقتة");
+        String safeId = storyId == null ? "story" : storyId.replaceAll("[^A-Za-z0-9_-]", "");
+        return new File(directory, safeId + ".media");
+    }
+
+    private void downloadStoryToCache(String url, File destination) throws Exception {
+        File temporary = new File(destination.getParentFile(), destination.getName() + ".part");
+        okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                .callTimeout(90, TimeUnit.SECONDS).build();
+        okhttp3.Request request = new okhttp3.Request.Builder().url(url).build();
+        try (okhttp3.Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful() || response.body() == null) throw new IllegalStateException("تعذر تحميل فيديو الستوري");
+            try (InputStream input = response.body().byteStream();
+                 FileOutputStream output = new FileOutputStream(temporary)) {
+                byte[] buffer = new byte[16 * 1024];
+                int count;
+                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                output.flush();
+            }
+        } catch (Exception error) {
+            if (temporary.exists()) temporary.delete();
+            throw error;
+        }
+        if (destination.exists()) destination.delete();
+        if (!temporary.renameTo(destination)) {
+            temporary.delete();
+            throw new IllegalStateException("تعذر حفظ فيديو الستوري مؤقتاً");
+        }
     }
 
     private String resolveMediaUrl(String value) {
