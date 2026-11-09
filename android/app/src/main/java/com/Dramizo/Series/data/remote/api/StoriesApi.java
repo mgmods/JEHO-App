@@ -20,6 +20,9 @@ public interface StoriesApi {
     @POST("stories")
     Call<ApiResponse<StoriesDtos.StoryDto>> create(@Body StoriesDtos.CreateStoryDto body);
 
+    @GET("stories/{id}/viewers")
+    Call<ApiResponse<StoriesDtos.ViewersResult>> viewers(@Path("id") String id);
+
     @POST("stories/{id}/view")
     Call<ApiResponse<StoriesDtos.ViewResult>> view(@Path("id") String id);
 
