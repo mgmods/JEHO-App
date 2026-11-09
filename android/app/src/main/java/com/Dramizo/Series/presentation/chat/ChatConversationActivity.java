@@ -1814,8 +1814,6 @@ public class ChatConversationActivity extends ThemedActivity {
                 "اختيار صورة أو خلفية متحركة وتخصيصها", false, () -> { sheet.dismiss(); showChatBackgroundOptions(); });
 
         addMenuSectionLabel(root, "إدارة المحادثة");
-        addChatMenuRow(root, android.R.drawable.ic_menu_save, "أرشفة المحادثة",
-                "إخفاؤها من قائمة المحادثات", false, () -> { sheet.dismiss(); archiveConversation(); });
         addChatMenuRow(root, android.R.drawable.ic_lock_lock,
                 peerBlocked ? "إلغاء حظر المستخدم" : "حظر المستخدم",
                 peerBlocked ? "السماح باستقبال الرسائل مجدداً" : "منع الرسائل والتواصل من هذا المستخدم",
@@ -2201,25 +2199,6 @@ public class ChatConversationActivity extends ThemedActivity {
                         this, error.getMessage() != null ? error.getMessage() : "تعذر رفع الخلفية",
                         Toast.LENGTH_LONG).show());
             }
-        });
-    }
-
-    private void archiveConversation() {
-        if (conversationId == null) return;
-        AppContainer c = ContainerProvider.from(this);
-        c.getIoExecutor().execute(() -> {
-            java.util.Map<String, Boolean> body = new java.util.HashMap<>();
-            body.put("archived", true);
-            Result<Object> r = ApiCall.execute(c.getChatApi().archive(conversationId, body));
-            runOnUiThread(() -> {
-                if (r.success) {
-                    Toast.makeText(this, R.string.conversation_archived, Toast.LENGTH_SHORT).show();
-                    finish();
-                } else {
-                    Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic),
-                            Toast.LENGTH_SHORT).show();
-                }
-            });
         });
     }
 
