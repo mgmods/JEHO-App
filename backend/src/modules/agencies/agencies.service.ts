@@ -3435,13 +3435,17 @@ export class AgenciesService implements OnModuleInit {
       SET status = 'pending', "updatedAt" = NOW()
     `, [agencyId, userId]);
     const requester = await this.usersRepo.findOne({ where: { id: userId } });
-    await this.notificationsService.create({
-      userId: agency.ownerId, type: NotificationType.AGENCY,
-      title: 'طلب انضمام إلى نادي الوكالة',
-      body: `${requester?.displayName || requester?.username || 'مستخدم'} يريد الانضمام إلى نادي وكالة ${agency.name}`,
-      data: { action: 'agency_club_request', agencyId, agencyName: agency.name, requesterId: userId },
-      sendPush: true,
-    });
+    try {
+      await this.notificationsService.create({
+        userId: agency.ownerId, type: NotificationType.AGENCY,
+        title: 'طلب انضمام إلى نادي الوكالة',
+        body: `${requester?.displayName || requester?.username || 'مستخدم'} يريد الانضمام إلى نادي وكالة ${agency.name}`,
+        data: { action: 'agency_club_request', agencyId, agencyName: agency.name, requesterId: userId },
+        sendPush: true,
+      });
+    } catch (error) {
+      this.logger.warn(`agency club request notification failed: ${(error as Error).message}`);
+    }
     return { status: 'pending', requested: true };
   }
 
@@ -3461,22 +3465,24 @@ export class AgenciesService implements OnModuleInit {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
     if (agency.ownerId !== actorId) throw new ForbiddenException('صاحب الوكالة فقط يمكنه قبول أو رفض الطلب');
-    const rows = await this.dataSource.query(
-      `SELECT status FROM agency_club_members WHERE "agencyId" = $1 AND "userId" = $2 LIMIT 1`,
-      [agencyId, memberUserId]
-    );
-    if (!rows?.length || rows[0].status !== 'pending') throw new NotFoundException('طلب النادي غير موجود');
-    await this.dataSource.query(`
-      UPDATE agency_club_members SET status = $3, "updatedAt" = NOW()
-      WHERE "agencyId" = $1 AND "userId" = $2
+    const updated = await this.dataSource.query(`
+      UPDATE agency_club_members
+      SET status = $3, "updatedAt" = NOW()
+      WHERE "agencyId" = $1 AND "userId" = $2 AND status = 'pending'
+      RETURNING "userId"
     `, [agencyId, memberUserId, approve ? 'active' : 'rejected']);
-    await this.notificationsService.create({
-      userId: memberUserId, type: NotificationType.AGENCY,
-      title: approve ? 'تم قبول طلب النادي' : 'تم رفض طلب النادي',
-      body: approve ? `تم قبولك ضمن نادي وكالة ${agency.name}` : `لم تتم الموافقة على انضمامك إلى نادي وكالة ${agency.name}`,
-      data: { action: approve ? 'agency_club_approved' : 'agency_club_rejected', agencyId, agencyName: agency.name },
-      sendPush: true,
-    });
+    if (!updated?.length) throw new NotFoundException('طلب النادي غير موجود أو تمت مراجعته مسبقاً');
+    try {
+      await this.notificationsService.create({
+        userId: memberUserId, type: NotificationType.AGENCY,
+        title: approve ? 'تم قبول طلب النادي' : 'تم رفض طلب النادي',
+        body: approve ? `تم قبولك ضمن نادي وكالة ${agency.name}` : `لم تتم الموافقة على انضمامك إلى نادي وكالة ${agency.name}`,
+        data: { action: approve ? 'agency_club_approved' : 'agency_club_rejected', agencyId, agencyName: agency.name },
+        sendPush: true,
+      });
+    } catch (error) {
+      this.logger.warn(`agency club review notification failed: ${(error as Error).message}`);
+    }
     return { status: approve ? 'active' : 'rejected', agencyId };
   }
 
