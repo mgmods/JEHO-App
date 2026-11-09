@@ -1102,8 +1102,8 @@
 <string name="boss_attempts_default">Attempts left: 0</string>
 <string name="close">Close</string>
 <string name="ok">OK</string>
-<string name="tab_drama">Drama</string>
-<string name="drama_tab_title">Short Drama</string>
+<string name="tab_drama">Stories</string>
+<string name="drama_tab_title">Stories</string>
 <string name="unlock_episode_badge">Needs an ad</string>
 <string name="unlock_episode_title">Episode locked</string>
 <string name="unlock_episode_message">Watch an ad to continue</string>
