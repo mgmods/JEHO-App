@@ -44,6 +44,7 @@ import { RankingModule } from '../ranking/ranking.module';
 import { UsersModule } from '../users/users.module';
 import { RechargeAgentsModule } from '../recharge-agents/recharge-agents.module';
 import { DramaModule } from '../drama/drama.module';
+import { StoriesModule } from '../stories/stories.module';
 import { AgencyApplication } from '../../database/entities/agency-application.entity';
 import { RoomSeat } from '../../database/entities/room-seat.entity';
 import { AgenciesModule } from '../agencies/agencies.module';
@@ -91,6 +92,7 @@ import { GiftsModule } from '../gifts/gifts.module';
     UsersModule,
     RechargeAgentsModule,
     DramaModule,
+    StoriesModule,
     AgenciesModule,
     GiftsModule,
     JwtModule.registerAsync({
