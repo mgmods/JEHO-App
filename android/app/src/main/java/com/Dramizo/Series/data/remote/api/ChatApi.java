@@ -40,9 +40,6 @@ public interface ChatApi {
     @POST("chat/messages/{id}/unsend")
     Call<ApiResponse<ChatDtos.MessageDto>> unsend(@Path("id") String id);
 
-    @POST("chat/conversations/{id}/archive")
-    Call<ApiResponse<Object>> archive(@Path("id") String id, @Body java.util.Map<String, Boolean> body);
-
     @POST("chat/conversations/{id}/delete")
     Call<ApiResponse<Object>> deleteConversation(@Path("id") String id);
 }
