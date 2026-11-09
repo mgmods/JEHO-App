@@ -86,6 +86,7 @@ public class ChatConversationActivity extends ThemedActivity {
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_PEER_ID = "peer_id";
     public static final String EXTRA_AVATAR = "avatar";
+    public static final String EXTRA_FOCUS_COMPOSER = "focus_composer_from_notification";
     public static final String EXTRA_HOST_BADGE = "host_badge";
 
     private ActivityChatConversationBinding binding;
@@ -1814,8 +1815,6 @@ public class ChatConversationActivity extends ThemedActivity {
                 "اختيار صورة أو خلفية متحركة وتخصيصها", false, () -> { sheet.dismiss(); showChatBackgroundOptions(); });
 
         addMenuSectionLabel(root, "إدارة المحادثة");
-        addChatMenuRow(root, android.R.drawable.ic_menu_save, "أرشفة المحادثة",
-                "إخفاؤها من قائمة المحادثات", false, () -> { sheet.dismiss(); archiveConversation(); });
         addChatMenuRow(root, android.R.drawable.ic_lock_lock,
                 peerBlocked ? "إلغاء حظر المستخدم" : "حظر المستخدم",
                 peerBlocked ? "السماح باستقبال الرسائل مجدداً" : "منع الرسائل والتواصل من هذا المستخدم",
@@ -2204,25 +2203,6 @@ public class ChatConversationActivity extends ThemedActivity {
         });
     }
 
-    private void archiveConversation() {
-        if (conversationId == null) return;
-        AppContainer c = ContainerProvider.from(this);
-        c.getIoExecutor().execute(() -> {
-            java.util.Map<String, Boolean> body = new java.util.HashMap<>();
-            body.put("archived", true);
-            Result<Object> r = ApiCall.execute(c.getChatApi().archive(conversationId, body));
-            runOnUiThread(() -> {
-                if (r.success) {
-                    Toast.makeText(this, R.string.conversation_archived, Toast.LENGTH_SHORT).show();
-                    finish();
-                } else {
-                    Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic),
-                            Toast.LENGTH_SHORT).show();
-                }
-            });
-        });
-    }
-
     private void confirmDeleteConversation() {
         AuraDialogHelper.confirmRes(this,
                 R.string.delete_conversation,
@@ -2335,6 +2315,7 @@ public class ChatConversationActivity extends ThemedActivity {
         if (nextId == null || nextId.isEmpty()) return;
         if (nextId.equals(conversationId)) {
             if (viewModel != null) viewModel.load(conversationId);
+            focusComposerFromNotification();
             return;
         }
         com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
@@ -2368,9 +2349,27 @@ public class ChatConversationActivity extends ThemedActivity {
         return null;
     }
 
+    private void focusComposerFromNotification() {
+        Intent launch = getIntent();
+        if (launch == null || !launch.getBooleanExtra(EXTRA_FOCUS_COMPOSER, false)) return;
+        launch.removeExtra(EXTRA_FOCUS_COMPOSER);
+        if (binding == null || binding.etMessage == null) return;
+        binding.etMessage.post(() -> {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            binding.etMessage.requestFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(binding.etMessage,
+                        android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        focusComposerFromNotification();
         applyChatBackground();
         com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
         refreshPeerBlockStatus();

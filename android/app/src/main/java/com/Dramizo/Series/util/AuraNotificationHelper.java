@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class AuraNotificationHelper {
-    public static final String CHANNEL_MESSAGES = "jeho_messages_v2";
+    public static final String CHANNEL_MESSAGES = "jeho_messages_v4";
     private static final String GROUP_MESSAGES = "jeho_direct_messages";
     private static final int GROUP_SUMMARY_ID = 0x4A45484F;
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
@@ -177,15 +177,35 @@ public final class AuraNotificationHelper {
         if (isChat) {
             expanded.setViewVisibility(R.id.rowNotifChatActions, android.view.View.VISIBLE);
             expanded.setViewVisibility(R.id.tvNotificationAction, android.view.View.GONE);
-            expanded.setOnClickPendingIntent(R.id.btnNotifOpen, pi);
-            Intent dismiss = new Intent(context, NotificationDismissReceiver.class);
-            dismiss.putExtra(NotificationDismissReceiver.EXTRA_NOTIFICATION_ID, notificationId);
-            PendingIntent dismissPi = PendingIntent.getBroadcast(
-                    context,
-                    notificationId + 10_000,
-                    dismiss,
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            expanded.setOnClickPendingIntent(R.id.btnNotifDismiss, dismissPi);
+            // "مقروء" opens this exact thread; loading its messages clears unreadCount
+            // and emits the normal read receipt on the backend.
+            expanded.setTextViewText(R.id.btnNotifRead, "مقروء");
+            expanded.setTextViewText(R.id.btnNotifReply, "رد");
+            expanded.setOnClickPendingIntent(R.id.btnNotifRead, pi);
+
+            // The visible heads-up "رد" button opens the exact conversation with
+            // the composer focused. Native RemoteInput below still supports true
+            // inline quick reply from the expanded system notification actions.
+            Intent replyActivity = new Intent(launch);
+            replyActivity.putExtra(ChatConversationActivity.EXTRA_FOCUS_COMPOSER, true);
+            replyActivity.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            PendingIntent replyActivityPi;
+            if (isVoiceRoomAlive(context)) {
+                replyActivity.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                replyActivityPi = PendingIntent.getActivity(
+                        context, notificationId + 30_000, replyActivity,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            } else {
+                Intent replyHome = new Intent(home);
+                replyHome.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
+                replyActivityPi = TaskStackBuilder.create(context)
+                        .addNextIntent(replyHome)
+                        .addNextIntent(replyActivity)
+                        .getPendingIntent(notificationId + 30_000,
+                                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            }
+            expanded.setOnClickPendingIntent(R.id.btnNotifReply, replyActivityPi);
         } else {
             expanded.setViewVisibility(R.id.rowNotifChatActions, android.view.View.GONE);
             expanded.setViewVisibility(R.id.tvNotificationAction, android.view.View.VISIBLE);
@@ -194,7 +214,7 @@ public final class AuraNotificationHelper {
 
         // Custom RemoteViews only: one avatar inside the layout.
         // No setLargeIcon / no DecoratedCustomViewStyle — those duplicate the photo / app icon.
-        // Heads-up always uses COMPACT (never the tall expanded card).
+        // Chat heads-up includes the two requested actions; other alerts use the compact card.
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_jeho)
                 .setColor(ContextCompat.getColor(context, R.color.aurora_teal))
@@ -211,7 +231,12 @@ public final class AuraNotificationHelper {
                 .setContentIntent(pi);
 
         if (isChat) {
-            builder.setStyle(buildChatMessagingStyle(context, notificationId, title, avatar));
+            builder.setCustomContentView(compact)
+                    .setCustomBigContentView(expanded)
+                    // Use the same compact, bounded card for the heads-up surface.
+                    // Android owns its placement below the status bar.
+                    .setCustomHeadsUpContentView(expanded)
+                    .setStyle(buildChatMessagingStyle(context, notificationId, title, avatar));
             androidx.core.app.RemoteInput remoteInput = new androidx.core.app.RemoteInput.Builder(
                     NotificationQuickReplyReceiver.EXTRA_REPLY)
                     .setLabel("اكتب ردك…")
