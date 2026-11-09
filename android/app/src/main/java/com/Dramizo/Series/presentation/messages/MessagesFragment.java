@@ -151,14 +151,7 @@ public class MessagesFragment extends Fragment {
             @Override public void afterTextChanged(Editable s) { }
         });
         if (binding.btnArchivedConversations != null) {
-            binding.btnArchivedConversations.setText(viewModel.isArchivedInbox()
-                    ? "العودة إلى المحادثات" : "المحادثات المؤرشفة");
-            binding.btnArchivedConversations.setOnClickListener(v -> {
-                if (binding.etChatSearch != null) binding.etChatSearch.setText("");
-                viewModel.setArchivedInbox(!viewModel.isArchivedInbox());
-                binding.btnArchivedConversations.setText(viewModel.isArchivedInbox()
-                        ? "العودة إلى المحادثات" : "المحادثات المؤرشفة");
-            });
+            binding.btnArchivedConversations.setVisibility(View.GONE);
         }
         binding.btnClearChatSearch.setOnClickListener(v -> binding.etChatSearch.setText(""));
         binding.etChatSearch.setOnEditorActionListener((v, actionId, event) -> {
@@ -190,7 +183,7 @@ public class MessagesFragment extends Fragment {
             binding.btnFriends.setOnClickListener(openHub);
         }
         if (binding.btnMsgMenu != null) {
-            binding.btnMsgMenu.setOnClickListener(openHub);
+            binding.btnMsgMenu.setOnClickListener(v -> showInboxMenu(v));
         }
         if (binding.btnRequests != null) {
             binding.btnRequests.setOnClickListener(openHub);
@@ -241,6 +234,27 @@ public class MessagesFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.load();
+    }
+
+    private void showInboxMenu(View anchor) {
+        if (!isAdded() || viewModel == null) return;
+        PopupMenu menu = new PopupMenu(requireContext(), anchor);
+        menu.getMenu().add(0, 10, 0, viewModel.isArchivedInbox()
+                ? "العودة إلى المحادثات" : "الرسائل المؤرشفة");
+        menu.getMenu().add(0, 11, 1, "تحديث المحادثات");
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 10) {
+                if (binding != null && binding.etChatSearch != null) binding.etChatSearch.setText("");
+                viewModel.setArchivedInbox(!viewModel.isArchivedInbox());
+                return true;
+            }
+            if (item.getItemId() == 11) {
+                viewModel.load(true);
+                return true;
+            }
+            return false;
+        });
+        menu.show();
     }
 
     private void showConversationOptions(

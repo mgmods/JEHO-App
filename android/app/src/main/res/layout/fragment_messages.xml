@@ -78,9 +78,14 @@
             <!-- Kept for binding compatibility; hidden — one hub icon only. -->
             <ImageButton
                 android:id="@+id/btnMsgMenu"
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:visibility="gone" />
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="خيارات الرسائل"
+                android:padding="11dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_chat_menu_more"
+                android:visibility="visible" />
 
             <ImageButton
                 android:id="@+id/btnRequests"

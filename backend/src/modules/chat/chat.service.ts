@@ -417,7 +417,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async searchConversations(userId: string, rawQuery: string, query: PaginationDto) {
+  async searchConversations(userId: string, rawQuery: string, query: PaginationDto, archived = false) {
     const term = String(rawQuery || '').trim().slice(0, 120);
     if (term.length < 2) return paginate([], 0, query.page || 1, query.limit || 20);
     const needle = `%${term.toLocaleLowerCase()}%`;
@@ -434,7 +434,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       .andWhere('COALESCE(p.isDeleted, false) = false')
       // Older production rows may predate the archive columns' NOT NULL defaults.
       // Treat NULL as the normal inbox state so legacy conversations never vanish.
-      .andWhere('COALESCE(p.isArchived, false) = :archived', { archived: query.archived === true })
+      .andWhere('COALESCE(p.isArchived, false) = :archived', { archived })
       .andWhere(
         "(LOWER(COALESCE(c.title, '')) LIKE :needle OR LOWER(COALESCE(peer.username, '')) LIKE :needle OR LOWER(COALESCE(peer.displayName, '')) LIKE :needle OR LOWER(CAST(peer.id AS text)) LIKE :needle OR LOWER(COALESCE(matchedMessage.content, '')) LIKE :needle)",
         { needle },
@@ -461,7 +461,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     return paginate(items, total, query.page || 1, Math.min(Math.max(query.limit || 20, 1), 50));
   }
 
-  async listConversations(userId: string, query: PaginationDto) {
+  async listConversations(userId: string, query: PaginationDto, archived = false) {
     const qb = this.partRepo
       .createQueryBuilder('p')
       .innerJoinAndSelect('p.conversation', 'c')
@@ -472,7 +472,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       .andWhere('COALESCE(p.isDeleted, false) = false')
       // Older production rows may predate the archive columns' NOT NULL defaults.
       // Treat NULL as the normal inbox state so legacy conversations never vanish.
-      .andWhere('COALESCE(p.isArchived, false) = :archived', { archived: query.archived === true })
+      .andWhere('COALESCE(p.isArchived, false) = :archived', { archived })
       .orderBy('p.isPinned', 'DESC')
       .addOrderBy('c.lastMessageAt', 'DESC', 'NULLS LAST')
       .skip(query.skip)
@@ -1194,10 +1194,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
   async archive(conversationId: string, userId: string, archived = true) {
     await this.getConversation(conversationId, userId);
     await this.partRepo.update({ conversationId, userId }, { isArchived: archived });
-    this.realtime?.emitToUser(userId, 'chat:conversation:deleted', {
+    // Archive is reversible and must never be broadcast as a deletion.
+    this.realtime?.emitToUser(userId, 'chat:conversation:updated', {
       conversationId,
-      byUserId: userId,
-      archived: true,
+      archived,
       at: new Date().toISOString(),
     });
     return { archived };
