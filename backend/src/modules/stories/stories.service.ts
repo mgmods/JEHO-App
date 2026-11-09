@@ -104,7 +104,11 @@ export class StoriesService implements OnModuleInit {
     if (type === 'image' && !c.imagesEnabled) throw new ForbiddenException('Story images are disabled');
     if (type === 'video' && !c.videosEnabled) throw new ForbiddenException('Story videos are disabled');
     const url = String(body?.mediaUrl || '').trim();
-    if (!url || url.length > 1024 || !(/^(https:\/\/|\/uploads\/[a-zA-Z0-9._-]+$)/i.test(url))) throw new BadRequestException('Invalid uploaded media URL');
+    // Stories must reference files created by JEHO's authenticated upload pipeline.
+    // Reject arbitrary remote URLs to prevent hotlinking, SSRF-style abuse, and
+    // untrusted third-party media from being attached to a story.
+    const ownedUploadPath = /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|gif|webp|mp4|mov|webm|3gp)$/i;
+    if (!ownedUploadPath.test(url)) throw new BadRequestException('Story media must use a JEHO uploaded file');
     if (Number(body?.sizeBytes || 0) > c.maxMediaMb * 1024 * 1024) throw new BadRequestException('Story file exceeds configured size limit');
     if (type === 'video' && Number(body?.durationSeconds || 0) > c.maxVideoSeconds) throw new BadRequestException('Story video is too long');
     const visibility = ['public','followers','private'].includes(body?.visibility) ? body.visibility : 'public';
