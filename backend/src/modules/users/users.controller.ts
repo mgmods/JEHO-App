@@ -33,6 +33,30 @@ export class UsersController {
     return this.usersService.getMe(userId);
   }
 
+  @Get('me/room-tracking-privacy')
+  @ApiOperation({ summary: 'Get current room-tracking privacy' })
+  getRoomTrackingPrivacy(@CurrentUser('sub') userId: string) {
+    return this.usersService.getRoomTrackingPrivacy(userId);
+  }
+
+  @Patch('me/room-tracking-privacy')
+  @ApiOperation({ summary: 'Update current room-tracking privacy' })
+  setRoomTrackingPrivacy(
+    @CurrentUser('sub') userId: string,
+    @Body('audience') audience: string,
+  ) {
+    return this.usersService.setRoomTrackingPrivacy(userId, audience);
+  }
+
+  @Get(':id/room-presence')
+  @ApiOperation({ summary: 'Get a peer room only when their privacy allows it' })
+  getRoomPresence(
+    @CurrentUser('sub') viewerId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.getRoomPresence(viewerId, id);
+  }
+
   @Get('me/gender-verification')
   @ApiOperation({ summary: 'Female identity verification status' })
   getGenderVerification(@CurrentUser('sub') userId: string) {
