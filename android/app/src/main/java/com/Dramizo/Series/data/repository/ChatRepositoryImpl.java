@@ -31,8 +31,8 @@ public class ChatRepositoryImpl implements ChatRepository {
         catch (Exception ignored) {}
     }
 
-    @Override public Result<ChatDtos.ConversationList> getConversations() {
-        return ApiCall.execute(api.conversations());
+    @Override public Result<ChatDtos.ConversationList> getConversations(boolean archived) {
+        return ApiCall.execute(api.conversations(archived));
     }
 
     @Override public Result<ChatDtos.MessageList> getMessages(String conversationId, int page) {
