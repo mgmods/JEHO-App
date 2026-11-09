@@ -150,6 +150,14 @@ public class MessagesFragment extends Fragment {
             }
             @Override public void afterTextChanged(Editable s) { }
         });
+        if (binding.btnArchivedConversations != null) {
+            binding.btnArchivedConversations.setOnClickListener(v -> {
+                if (binding.etChatSearch != null) binding.etChatSearch.setText("");
+                viewModel.setArchivedInbox(!viewModel.isArchivedInbox());
+                binding.btnArchivedConversations.setText(viewModel.isArchivedInbox()
+                        ? "العودة إلى المحادثات" : "المحادثات المؤرشفة");
+            });
+        }
         binding.btnClearChatSearch.setOnClickListener(v -> binding.etChatSearch.setText(""));
         binding.etChatSearch.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
