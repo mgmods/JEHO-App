@@ -44,7 +44,7 @@ import androidx.fragment.app.Fragment
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.Dramizo.Series.R
-import com.Dramizo.Series.data.remote.dto.DramaDtos
+import com.Dramizo.Series.data.remote.dto.StoriesDtos
 import com.Dramizo.Series.data.remote.dto.MiscDtos
 import com.Dramizo.Series.databinding.ActivityMainBinding
 import com.Dramizo.Series.di.AppContainer
@@ -52,7 +52,7 @@ import com.Dramizo.Series.domain.model.Result
 import com.Dramizo.Series.presentation.common.ContainerProvider
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper
 import com.Dramizo.Series.presentation.common.ThemedActivity
-import com.Dramizo.Series.presentation.drama.DramaFragment
+import com.Dramizo.Series.presentation.stories.StoriesFragment
 import com.Dramizo.Series.presentation.games.GamesFragment
 import com.Dramizo.Series.presentation.home.HomeFragment
 import com.Dramizo.Series.presentation.messages.MessagesFragment
@@ -102,7 +102,7 @@ class MainActivity : ThemedActivity() {
     private var binding: ActivityMainBinding? = null
     private var mainPager: ViewPager2? = null
     private var currentPage: Int = 0
-    private var dramaEnabled: Boolean = true
+    private var storiesEnabled: Boolean = true
     private var agencyMine: MiscDtos.AgencyMineDto? = null
     private var agencyStateLoaded: Boolean = false
     private var activeRoomDragConfigured: Boolean = false
@@ -191,7 +191,7 @@ class MainActivity : ThemedActivity() {
 
         loadAgencyAction(container)
         highlightPage(0)
-        loadDramaConfig(container)
+        loadStoriesConfig(container)
         maybeShowDailyLoginReward(container)
 
         intent?.let { openFromIntentExtras(it) }
@@ -332,7 +332,7 @@ class MainActivity : ThemedActivity() {
         val page = destToPage(destId)
         val pager = mainPager
         if (page < 0 || pager == null) return
-        if (page == 1 && !dramaEnabled) return
+        if (page == 1 && !storiesEnabled) return
         if (pager.currentItem == page) return
         if (destId != R.id.nav_create_room && page < pageWarmed.size && !pageWarmed[page]) {
             AppLoadingOverlay.showUntilReady(this)
@@ -354,7 +354,7 @@ class MainActivity : ThemedActivity() {
         pager.offscreenPageLimit = 4
         pager.adapter = object : FragmentStateAdapter(this) {
             override fun createFragment(position: Int): Fragment = when (position) {
-                1 -> DramaFragment()
+                1 -> StoriesFragment()
                 2 -> GamesFragment()
                 3 -> MessagesFragment()
                 4 -> ProfileFragment()
@@ -416,7 +416,7 @@ class MainActivity : ThemedActivity() {
     }
 
     private fun pageScreenKey(page: Int): String = when (page) {
-        1 -> "drama"
+        1 -> "stories"
         2 -> "game"
         3 -> "chat"
         4 -> "profile"
@@ -489,7 +489,7 @@ class MainActivity : ThemedActivity() {
     }
 
     /**
-     * Drama tab show/hide comes only from dashboard drama config.enabled.
+     * Stories tab visibility follows the live dashboard Stories switch.
      */
     private fun maybeShowDailyLoginReward(container: AppContainer) {
         val prefs = getSharedPreferences("daily_login_popup", MODE_PRIVATE)
@@ -820,14 +820,14 @@ class MainActivity : ThemedActivity() {
         return drawable
     }
 
-    private fun loadDramaConfig(container: AppContainer) {
+    private fun loadStoriesConfig(container: AppContainer) {
         container.ioExecutor.execute {
-            val r: Result<DramaDtos.DramaConfigDto> =
-                ApiCall.execute(container.dramaApi.config())
+            val r: Result<StoriesDtos.DramaConfigDto> =
+                ApiCall.execute(container.storiesApi.config())
             runOnUiThread {
                 val b = binding ?: return@runOnUiThread
                 val show = r.success && r.data != null && r.data.enabled
-                dramaEnabled = show
+                storiesEnabled = show
                 b.tabDramaWrap.visibility = if (show) View.VISIBLE else View.GONE
                 if (show) {
                     RemoteNavIcons.bind(
