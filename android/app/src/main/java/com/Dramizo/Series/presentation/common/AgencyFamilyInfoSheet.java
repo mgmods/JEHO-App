@@ -76,6 +76,33 @@ public final class AgencyFamilyInfoSheet {
         TextView tvOwner = sheet.findViewById(R.id.tvOwnerName);
         TextView tvMedals = sheet.findViewById(R.id.tvMedals);
         TextView btnFollow = sheet.findViewById(R.id.btnFollowAgency);
+        TextView tvClubSummary = sheet.findViewById(R.id.tvAgencyClubSummary);
+        TextView tvClubMembers = sheet.findViewById(R.id.tvAgencyClubMembers);
+        TextView btnClubJoin = sheet.findViewById(R.id.btnAgencyClubJoin);
+
+        if (btnClubJoin != null) {
+            btnClubJoin.setOnClickListener(v -> {
+                btnClubJoin.setEnabled(false);
+                container.getIoExecutor().execute(() -> {
+                    Result<Map<String, Object>> request = ApiCall.execute(
+                            container.getAgencyApi().requestClubJoin(id));
+                    activity.runOnUiThread(() -> {
+                        btnClubJoin.setEnabled(true);
+                        if (!dialog.isShowing()) return;
+                        if (request.success) {
+                            btnClubJoin.setText("تم إرسال طلب الانضمام — بانتظار موافقة المالك");
+                            btnClubJoin.setEnabled(false);
+                            Toast.makeText(activity, "تم إرسال طلبك إلى صاحب الوكالة", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(activity,
+                                    request.error != null ? request.error : activity.getString(R.string.error_generic),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                });
+            });
+        }
+
         TextView btnOpen = sheet.findViewById(R.id.btnOpenAgencyManage);
 
         final String[] gidHold = {""};
@@ -232,6 +259,62 @@ public final class AgencyFamilyInfoSheet {
                 }
 
                 AgencyUi.bindLogo(imgLogo, a.logoUrl, a.coverUrl);
+            });
+        });
+
+
+        // Club membership is distinct from following the agency and from host employment.
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> club = ApiCall.execute(container.getAgencyApi().getClub(id));
+            activity.runOnUiThread(() -> {
+                if (!dialog.isShowing() || !club.success || club.data == null) return;
+                Map<String, Object> data = club.data;
+                Object countsValue = data.get("counts");
+                Map<?, ?> counts = countsValue instanceof Map ? (Map<?, ?>) countsValue : java.util.Collections.emptyMap();
+                int total = counts.get("total") instanceof Number ? ((Number) counts.get("total")).intValue() : 0;
+                int hosts = counts.get("staff") instanceof Number ? ((Number) counts.get("staff")).intValue() : 0;
+                int supporters = counts.get("supporters") instanceof Number ? ((Number) counts.get("supporters")).intValue() : 0;
+                int pending = counts.get("pending") instanceof Number ? ((Number) counts.get("pending")).intValue() : 0;
+                if (tvClubSummary != null) {
+                    tvClubSummary.setText("نادي الوكالة • " + formatCount(total) +
+                            " عضو • " + formatCount(hosts) + " مضيف/إدارة • " +
+                            formatCount(supporters) + " داعم" +
+                            (pending > 0 ? " • " + formatCount(pending) + " طلب بانتظارك" : ""));
+                }
+                Object membersValue = data.get("members");
+                StringBuilder roster = new StringBuilder();
+                if (membersValue instanceof java.util.List) {
+                    for (Object item : (java.util.List<?>) membersValue) {
+                        if (!(item instanceof Map)) continue;
+                        Map<?, ?> member = (Map<?, ?>) item;
+                        Object name = member.get("displayName");
+                        if (name == null) name = member.get("username");
+                        String role = String.valueOf(member.get("role") == null ? "" : member.get("role"));
+                        String roleLabel = "host".equalsIgnoreCase(role) ? "مضيف" :
+                                ("owner".equalsIgnoreCase(role) ? "المالك" :
+                                ("manager".equalsIgnoreCase(role) ? "إدارة" : "داعم"));
+                        if (roster.length() > 0) roster.append(" • ");
+                        roster.append(roleLabel).append(": ").append(name == null ? "مستخدم" : name);
+                        if (roster.length() > 240) { roster.append(" …"); break; }
+                    }
+                }
+                if (tvClubMembers != null) tvClubMembers.setText(roster.length() == 0 ? "لا يوجد أعضاء بعد" : roster.toString());
+                String myStatus = String.valueOf(data.get("myStatus"));
+                if (btnClubJoin != null) {
+                    if ("active_staff".equals(myStatus)) {
+                        btnClubJoin.setText("أنت ضمن طاقم هذه الوكالة");
+                        btnClubJoin.setEnabled(false);
+                    } else if ("active".equals(myStatus)) {
+                        btnClubJoin.setText("أنت داعم في هذا النادي");
+                        btnClubJoin.setEnabled(false);
+                    } else if ("pending".equals(myStatus)) {
+                        btnClubJoin.setText("طلبك قيد مراجعة صاحب الوكالة");
+                        btnClubJoin.setEnabled(false);
+                    } else {
+                        btnClubJoin.setText("طلب الانضمام إلى النادي");
+                        btnClubJoin.setEnabled(true);
+                    }
+                }
             });
         });
 
