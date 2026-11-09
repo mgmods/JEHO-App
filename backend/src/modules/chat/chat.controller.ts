@@ -120,9 +120,8 @@ export class ChatController {
   archive(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('sub') userId: string,
-    @Body('archived') archived: boolean,
   ) {
-    return this.chatService.archive(id, userId, false);
+    return this.chatService.archive(id, userId);
   }
 
   @Post('conversations/:id/delete')
