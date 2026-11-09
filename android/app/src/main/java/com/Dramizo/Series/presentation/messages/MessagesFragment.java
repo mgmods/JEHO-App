@@ -79,6 +79,11 @@ public class MessagesFragment extends Fragment {
         return binding.getRoot();
     }
 
+    public void openOwnStory(String userId) {
+        Fragment stories = getChildFragmentManager().findFragmentById(R.id.messagesStoriesStrip);
+        if (stories instanceof StoriesFragment) ((StoriesFragment) stories).openOwnStory(userId);
+    }
+
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         applySectionWallpaper();

@@ -102,8 +102,7 @@ class MainActivity : ThemedActivity() {
     private var binding: ActivityMainBinding? = null
     private var mainPager: ViewPager2? = null
     private var currentPage: Int = 0
-    private var storiesEnabled: Boolean = true
-    private var agencyMine: MiscDtos.AgencyMineDto? = null
+        private var agencyMine: MiscDtos.AgencyMineDto? = null
     private var agencyStateLoaded: Boolean = false
     private var activeRoomDragConfigured: Boolean = false
     private var taskInviteListener: RealtimeClient.RoomListener? = null
@@ -111,7 +110,7 @@ class MainActivity : ThemedActivity() {
     private var hasResumedOnce: Boolean = false
 
     /** First open of each tab may show a short loader; revisits stay stable. */
-    private val pageWarmed = BooleanArray(5)
+    private val pageWarmed = BooleanArray(4)
 
     private val notifPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -177,12 +176,10 @@ class MainActivity : ThemedActivity() {
         setupMainPager()
 
         b.tabPartyWrap.setOnClickListener { go(R.id.nav_home) }
-        b.tabDramaWrap.setOnClickListener { go(R.id.nav_drama) }
         b.tabGamesWrap.setOnClickListener { go(R.id.nav_games) }
         b.tabChatWrap.setOnClickListener { go(R.id.nav_messages) }
         b.tabMeWrap.setOnClickListener { go(R.id.nav_profile) }
         b.tabParty.setOnClickListener { go(R.id.nav_home) }
-        b.tabDrama.setOnClickListener { go(R.id.nav_drama) }
         b.tabGames.setOnClickListener { go(R.id.nav_games) }
         b.tabChat.setOnClickListener { go(R.id.nav_messages) }
         b.tabMe.setOnClickListener { go(R.id.nav_profile) }
@@ -191,7 +188,6 @@ class MainActivity : ThemedActivity() {
 
         loadAgencyAction(container)
         highlightPage(0)
-        loadStoriesConfig(container)
         maybeShowDailyLoginReward(container)
 
         intent?.let { openFromIntentExtras(it) }
@@ -332,7 +328,6 @@ class MainActivity : ThemedActivity() {
         val page = destToPage(destId)
         val pager = mainPager
         if (page < 0 || pager == null) return
-        if (page == 1 && !storiesEnabled) return
         if (pager.currentItem == page) return
         if (destId != R.id.nav_create_room && page < pageWarmed.size && !pageWarmed[page]) {
             AppLoadingOverlay.showUntilReady(this)
@@ -354,14 +349,13 @@ class MainActivity : ThemedActivity() {
         pager.offscreenPageLimit = 4
         pager.adapter = object : FragmentStateAdapter(this) {
             override fun createFragment(position: Int): Fragment = when (position) {
-                1 -> StoriesFragment()
-                2 -> GamesFragment()
-                3 -> MessagesFragment()
-                4 -> ProfileFragment()
+                1 -> GamesFragment()
+                2 -> MessagesFragment()
+                3 -> ProfileFragment()
                 else -> HomeFragment()
             }
 
-            override fun getItemCount(): Int = 5
+            override fun getItemCount(): Int = 4
         }
         pager.registerOnPageChangeCallback(
             object : ViewPager2.OnPageChangeCallback() {
@@ -378,10 +372,9 @@ class MainActivity : ThemedActivity() {
 
     private fun destToPage(destId: Int): Int = when (destId) {
         R.id.nav_home -> 0
-        R.id.nav_drama -> 1
-        R.id.nav_games -> 2
-        R.id.nav_messages -> 3
-        R.id.nav_profile -> 4
+        R.id.nav_games -> 1
+        R.id.nav_messages -> 2
+        R.id.nav_profile -> 3
         else -> -1
     }
 
@@ -393,33 +386,32 @@ class MainActivity : ThemedActivity() {
             AssetIcons.TAB_PARTY_NORMAL, AssetIcons.TAB_PARTY_SELECTED,
         )
         highlightTab(
-            page == 1, b.tabDrama, b.labelDrama,
+            false, b.tabDrama, b.labelDrama,
             RemoteNavIcons.TAB_DRAMA,
             AssetIcons.TAB_DRAMA_NORMAL, AssetIcons.TAB_DRAMA_SELECTED,
         )
         highlightTab(
-            page == 2, b.tabGames, b.labelGames,
+            page == 1, b.tabGames, b.labelGames,
             RemoteNavIcons.TAB_GAMES,
             AssetIcons.TAB_GAME_NORMAL, AssetIcons.TAB_GAME_SELECTED,
         )
         highlight(false, b.tabCreateRoom, b.labelCreateRoom)
         highlightTab(
-            page == 3, b.tabChat, b.labelChat,
+            page == 2, b.tabChat, b.labelChat,
             RemoteNavIcons.TAB_CHAT,
             AssetIcons.TAB_CHAT_NORMAL, AssetIcons.TAB_CHAT_SELECTED,
         )
         highlightTab(
-            page == 4, b.tabMe, b.labelMe,
+            page == 3, b.tabMe, b.labelMe,
             RemoteNavIcons.TAB_ME,
             AssetIcons.TAB_ME_NORMAL, AssetIcons.TAB_ME_SELECTED,
         )
     }
 
     private fun pageScreenKey(page: Int): String = when (page) {
-        1 -> "stories"
-        2 -> "game"
-        3 -> "chat"
-        4 -> "profile"
+        1 -> "game"
+        2 -> "chat"
+        3 -> "profile"
         else -> "home"
     }
 
@@ -820,26 +812,15 @@ class MainActivity : ThemedActivity() {
         return drawable
     }
 
-    private fun loadStoriesConfig(container: AppContainer) {
-        container.ioExecutor.execute {
-            val r: Result<StoriesDtos.StoriesConfigDto> =
-                ApiCall.execute(container.storiesApi.config())
-            runOnUiThread {
-                val b = binding ?: return@runOnUiThread
-                val show = r.success && r.data != null && r.data.enabled
-                storiesEnabled = show
-                b.tabDramaWrap.visibility = if (show) View.VISIBLE else View.GONE
-                if (show) {
-                    RemoteNavIcons.bind(
-                        b.tabDrama, RemoteNavIcons.TAB_DRAMA, currentPage == 1,
-                        AssetIcons.TAB_DRAMA_NORMAL, AssetIcons.TAB_DRAMA_SELECTED,
-                    )
-                }
-                if (!show && mainPager?.currentItem == 1) {
-                    mainPager?.setCurrentItem(0, false)
-                }
-            }
-        }
+
+    /** Opens the current user's active story from the profile avatar via the inbox story viewer. */
+    fun openOwnStory(userId: String) {
+        if (userId.isBlank()) return
+        go(R.id.nav_messages)
+        binding?.mainPager?.postDelayed({
+            val inbox = supportFragmentManager.findFragmentByTag("f2") as? MessagesFragment
+            inbox?.openOwnStory(userId)
+        }, 360L)
     }
 
     private fun currentScreenKey(): String =

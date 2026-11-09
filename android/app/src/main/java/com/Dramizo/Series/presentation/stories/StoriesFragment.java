@@ -26,6 +26,7 @@ import com.Dramizo.Series.data.remote.dto.StoriesDtos;
 import com.Dramizo.Series.data.remote.dto.ChatDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.profile.ProfileActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
@@ -50,6 +51,7 @@ public class StoriesFragment extends Fragment {
     private static final int PICK_IMAGE = 7101, PICK_VIDEO = 7102;
     private static final String ARG_COMPACT = "compact_inbox";
     private boolean compactMode;
+    private String pendingOpenUserId;
 
     public static StoriesFragment newCompactInstance() {
         StoriesFragment fragment = new StoriesFragment();
@@ -119,6 +121,11 @@ public class StoriesFragment extends Fragment {
         return root;
     }
 
+    public void openOwnStory(String userId) {
+        pendingOpenUserId = userId;
+        load();
+    }
+
     @Override public void onResume() { super.onResume(); if (compactMode && c != null) load(); }
 
     private void load() {
@@ -142,6 +149,18 @@ public class StoriesFragment extends Fragment {
                 feed.clear();
                 if (rows.success && rows.data != null) feed.addAll(rows.data);
                 bindStories();
+                if (pendingOpenUserId != null) {
+                    String requested = pendingOpenUserId;
+                    pendingOpenUserId = null;
+                    List<StoriesDtos.StoryDto> ownStories = new ArrayList<>();
+                    for (StoriesDtos.StoryDto item : feed) if (requested.equals(item.userId)) ownStories.add(item);
+                    if (!ownStories.isEmpty()) openViewer(ownStories, 0);
+                    else {
+                        Intent profile = new Intent(requireContext(), ProfileActivity.class);
+                        profile.putExtra(ProfileActivity.EXTRA_USER_ID, requested);
+                        startActivity(profile);
+                    }
+                }
             });
         });
     }
@@ -281,6 +300,10 @@ public class StoriesFragment extends Fragment {
             VideoView video = new VideoView(requireContext());
             video.setOnPreparedListener(mp -> { mp.setLooping(false); video.start(); });
             video.setOnCompletionListener(mp -> { if (index + 1 < group.size()) { dialog.dismiss(); openViewer(group,index+1); } });
+            video.setOnErrorListener((mp, what, extra) -> {
+                Toast.makeText(requireContext(), "تعذر تشغيل الفيديو، حاول تحديث الستوري", Toast.LENGTH_SHORT).show();
+                return true;
+            });
             storyVideo = video;
             media = video;
         } else {
@@ -325,7 +348,7 @@ public class StoriesFragment extends Fragment {
             if (config != null && config.cacheEnabled) {
                 c.getIoExecutor().execute(() -> {
                     try {
-                        File cached = cachedStoryFile(story.id);
+                        File cached = cachedStoryFile(story.id, story.mediaUrl);
                         if (!cached.exists() || cached.length() == 0) downloadStoryToCache(mediaUrl, cached);
                         if (!isAdded()) return;
                         requireActivity().runOnUiThread(() -> {
@@ -365,11 +388,20 @@ public class StoriesFragment extends Fragment {
         });
     }
 
-    private File cachedStoryFile(String storyId) throws Exception {
+    private File cachedStoryFile(String storyId, String mediaUrl) throws Exception {
         File directory = new File(requireContext().getCacheDir(), "stories");
         if (!directory.exists() && !directory.mkdirs()) throw new IllegalStateException("تعذر إنشاء ذاكرة الستوري المؤقتة");
         String safeId = storyId == null ? "story" : storyId.replaceAll("[^A-Za-z0-9_-]", "");
-        return new File(directory, safeId + ".media");
+        String extension = ".mp4";
+        if (mediaUrl != null) {
+            String path = mediaUrl.split("\\?")[0].toLowerCase(Locale.ROOT);
+            int dot = path.lastIndexOf('.');
+            if (dot >= 0) {
+                String candidate = path.substring(dot);
+                if (candidate.equals(".mp4") || candidate.equals(".mov") || candidate.equals(".webm") || candidate.equals(".3gp")) extension = candidate;
+            }
+        }
+        return new File(directory, safeId + extension);
     }
 
     private void downloadStoryToCache(String url, File destination) throws Exception {

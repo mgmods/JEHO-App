@@ -106,7 +106,13 @@ public class ProfileFragment extends Fragment {
             startActivity(i);
         };
         binding.headerProfile.setOnClickListener(openProfile);
-        binding.imgAvatar.setOnClickListener(openProfile);
+        binding.imgAvatar.setOnClickListener(v -> {
+            if (myId != null && requireActivity() instanceof com.Dramizo.Series.presentation.main.MainActivity) {
+                ((com.Dramizo.Series.presentation.main.MainActivity) requireActivity()).openOwnStory(myId);
+            } else {
+                openProfile.onClick(v);
+            }
+        });
         // Dashboard-managed custom icons for the Me page; empty URLs retain native defaults.
         bindDashboardProfileIcon(R.id.imgMeVipActionIcon, "vip", R.drawable.ic_me_vip_card);
         bindDashboardProfileIcon(R.id.imgMeLevelActionIcon, "level", R.drawable.ic_me_level_card);
