@@ -358,7 +358,7 @@ public class StoriesFragment extends Fragment {
             reaction.setGravity(Gravity.CENTER);
             reaction.setClickable(true);
             reaction.setFocusable(true);
-            reaction.setBackground(round(0x223FFFFFF, dp(18)));
+            reaction.setBackground(round(0x22FFFFFF, dp(18)));
             reaction.setOnClickListener(v -> sendStoryReaction(story, emoji));
             reactions.addView(reaction, new LinearLayout.LayoutParams(0, dp(42), 1));
         }
