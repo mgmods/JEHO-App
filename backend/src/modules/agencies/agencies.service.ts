@@ -3369,7 +3369,8 @@ export class AgenciesService implements OnModuleInit {
         SELECT
           (SELECT COUNT(*)::int FROM agency_club_members WHERE "agencyId" = $1 AND status = 'active') AS supporters,
           (SELECT COUNT(*)::int FROM agency_club_members WHERE "agencyId" = $1 AND status = 'pending') AS pending,
-          (SELECT COUNT(*)::int FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role IN ('owner','manager','host')) AS staff
+          (SELECT COUNT(*)::int FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role IN ('owner','manager','host')) AS staff,
+          (SELECT COUNT(*)::int FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role = 'member') AS "agencyMembers"
       `, [agencyId]),
     ]);
     const owner = agency.owner ? {
@@ -3382,7 +3383,7 @@ export class AgenciesService implements OnModuleInit {
       seen.add(m.userId); return true;
     });
     const status = mine?.[0]?.status || null;
-    const isStaff = await this.membersRepo.exist({
+    const staffMembership = await this.membersRepo.findOne({
       where: { agencyId, userId: viewerId, status: AgencyMemberStatus.ACTIVE, isActive: true }
     });
     return {
@@ -3390,11 +3391,12 @@ export class AgenciesService implements OnModuleInit {
       counts: {
         supporters: Number(counts?.[0]?.supporters || 0),
         staff: Number(counts?.[0]?.staff || 0),
-        total: Number(counts?.[0]?.supporters || 0) + Number(counts?.[0]?.staff || 0),
+        agencyMembers: Number(counts?.[0]?.agencyMembers || 0),
+        total: Number(counts?.[0]?.supporters || 0) + Number(counts?.[0]?.staff || 0) + Number(counts?.[0]?.agencyMembers || 0),
         pending: agency.ownerId === viewerId ? Number(counts?.[0]?.pending || 0) : undefined,
       },
       members,
-      myStatus: isStaff ? 'active_staff' : status,
+      myStatus: staffMembership ? (staffMembership.role === AgencyRole.HOST ? 'active_host' : staffMembership.role === AgencyRole.MEMBER ? 'active_member' : 'active_staff') : status,
       canReview: agency.ownerId === viewerId,
     };
   }
