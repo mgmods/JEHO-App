@@ -153,6 +153,26 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <TextView
+            android:id="@+id/btnArchivedConversations"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_gravity="end"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="14dp"
+            android:layout_marginBottom="4dp"
+            android:background="@drawable/bg_unread_badge"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="المحادثات المؤرشفة"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
         <!-- Three compact shared inbox channels: official news, admin messages, notifications. -->
         <LinearLayout
             android:id="@+id/quickActionsRow"
