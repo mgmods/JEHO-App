@@ -286,7 +286,8 @@ public final class AgencyFamilyInfoSheet {
                     tvClubSummary.setOnClickListener(v -> loadClubRequests(activity, dialog, container, id));
                 }
                 Object membersValue = data.get("members");
-                StringBuilder roster = new StringBuilder();
+                java.util.ArrayList<String> rosterItems = new java.util.ArrayList<>();
+                StringBuilder rosterPreview = new StringBuilder();
                 if (membersValue instanceof java.util.List) {
                     for (Object item : (java.util.List<?>) membersValue) {
                         if (!(item instanceof Map)) continue;
@@ -294,16 +295,30 @@ public final class AgencyFamilyInfoSheet {
                         Object name = member.get("displayName");
                         if (name == null) name = member.get("username");
                         String role = String.valueOf(member.get("role") == null ? "" : member.get("role"));
-                        String roleLabel = "host".equalsIgnoreCase(role) ? "مضيف" :
-                                ("owner".equalsIgnoreCase(role) ? "المالك" :
-                                ("manager".equalsIgnoreCase(role) ? "إدارة" :
-                                ("member".equalsIgnoreCase(role) ? "عضو وكالة" : "داعم")));
-                        if (roster.length() > 0) roster.append(" • ");
-                        roster.append(roleLabel).append(": ").append(name == null ? "مستخدم" : name);
-                        if (roster.length() > 240) { roster.append(" …"); break; }
+                        String roleLabel = "host".equalsIgnoreCase(role) ? "مضيف الوكالة" :
+                                ("owner".equalsIgnoreCase(role) ? "صاحب الوكالة" :
+                                ("manager".equalsIgnoreCase(role) ? "إدارة الوكالة" :
+                                ("member".equalsIgnoreCase(role) ? "عضو الوكالة" : "داعم النادي")));
+                        String display = (name == null ? "مستخدم" : String.valueOf(name)) + "  ·  " + roleLabel;
+                        rosterItems.add(display);
+                        if (rosterPreview.length() < 150) {
+                            if (rosterPreview.length() > 0) rosterPreview.append("  •  ");
+                            rosterPreview.append(display);
+                        }
                     }
                 }
-                if (tvClubMembers != null) tvClubMembers.setText(roster.length() == 0 ? "لا يوجد أعضاء بعد" : roster.toString());
+                if (tvClubMembers != null) {
+                    tvClubMembers.setText(rosterItems.isEmpty() ? "لا يوجد أعضاء بعد" :
+                            rosterPreview + (rosterItems.size() > 3 ? "  ·  عرض الكل" : ""));
+                    tvClubMembers.setOnClickListener(v -> {
+                        if (rosterItems.isEmpty()) return;
+                        new android.app.AlertDialog.Builder(activity)
+                                .setTitle("أعضاء نادي الوكالة")
+                                .setItems(rosterItems.toArray(new String[0]), (d, which) -> { })
+                                .setPositiveButton("إغلاق", null)
+                                .show();
+                    });
+                }
                 String myStatus = String.valueOf(data.get("myStatus"));
                 if (btnClubJoin != null) {
                     if ("active_staff".equals(myStatus) || "active_host".equals(myStatus)) {
