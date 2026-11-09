@@ -36,7 +36,7 @@ public final class AssetIcons {
     /** Bottom tab: me / profile */
     public static final String TAB_ME_NORMAL = "ic_home_tab_me_normal";
     public static final String TAB_ME_SELECTED = "ic_home_tab_me_selected";
-    /** Bottom tab: drama (hidden when feature flag off) */
+    /** Bottom tab: Stories (hidden when feature flag off) */
     public static final String TAB_DRAMA_NORMAL = "ic_home_tab_drama_normal";
     public static final String TAB_DRAMA_SELECTED = "ic_home_tab_drama_selected";
     /** Optional explore (alias available if needed) */
