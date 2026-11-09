@@ -319,22 +319,54 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     void this.emitRoomMembers(roomId);
   }
 
-  /** Resolve a user's currently joined voice room from authenticated Socket.IO presence. */
+  /**
+   * Resolve a user's current voice room. Prefer authenticated Socket.IO membership,
+   * then fall back to the server-created session/access and occupied-seat records.
+   *
+   * The fallback is important for room-presence cards: HTTP room join can succeed
+   * before the realtime socket finishes joining (or while it reconnects). Relying
+   * only on roomProfiles made the tracking chip silently stay hidden for those users.
+   * Permanent room unlocks are deliberately excluded; only active SESSION grants count.
+   */
   async activeRoomForUser(userId: string): Promise<string | null> {
     if (!userId) return null;
-    const sockets = await this.server.in(`user:${userId}`).fetchSockets();
-    for (const socket of sockets) {
-      const profiles = (socket.data as any)?.roomProfiles || {};
-      for (const roomId of Object.keys(profiles)) {
-        if (!socket.rooms.has(`room:${roomId}`)) continue;
-        const room = await this.roomsRepo.findOne({
-          where: { id: roomId },
-          select: ['id', 'status'],
-        });
-        if (room && room.status !== RoomStatus.CLOSED) return room.id;
+    if (this.server) {
+      const sockets = await this.server.in(`user:${userId}`).fetchSockets();
+      for (const socket of sockets) {
+        const profiles = (socket.data as any)?.roomProfiles || {};
+        for (const roomId of Object.keys(profiles)) {
+          if (!socket.rooms.has(`room:${roomId}`)) continue;
+          const room = await this.roomsRepo.findOne({
+            where: { id: roomId },
+            select: ['id', 'status'],
+          });
+          if (room && room.status !== RoomStatus.CLOSED) return room.id;
+        }
       }
     }
-    return null;
+
+    const livePresence = await this.roomsRepo
+      .createQueryBuilder('room')
+      .leftJoin(
+        RoomSeat,
+        'presenceSeat',
+        'presenceSeat.roomId = room.id AND presenceSeat.userId = :userId',
+        { userId },
+      )
+      .leftJoin(
+        RoomAccess,
+        'presenceAccess',
+        'presenceAccess.roomId = room.id AND presenceAccess.userId = :userId AND presenceAccess.grantType = :session AND (presenceAccess.expiresAt IS NULL OR presenceAccess.expiresAt > NOW())',
+        { userId, session: RoomAccessGrant.SESSION },
+      )
+      .where('room.status <> :closed', { closed: RoomStatus.CLOSED })
+      .andWhere('(presenceSeat.id IS NOT NULL OR presenceAccess.id IS NOT NULL)')
+      .orderBy('room.liveSessionStartedAt', 'DESC', 'NULLS LAST')
+      .addOrderBy('room.updatedAt', 'DESC')
+      .select('room.id', 'id')
+      .getRawOne<{ id: string }>();
+
+    return livePresence?.id || null;
   }
 
   @SubscribeMessage('room:join')

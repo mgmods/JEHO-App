@@ -393,7 +393,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.btnRoomTrackingPrivacy.setVisibility(ownProfile ? View.VISIBLE : View.GONE);
             }
             if (ownProfile) {
-                binding.btnRoomTracking.setVisibility(View.GONE);
+                com.Dramizo.Series.util.RoomTrackingIndicator.setActive(binding.btnRoomTracking, false);
                 profileHandler.removeCallbacks(roomPresenceRefresh);
             } else {
                 refreshRoomPresence(user.id);
@@ -609,19 +609,36 @@ public class ProfileActivity extends ThemedActivity {
                         || !targetId.equals(loadedProfileId)) return;
                 roomTrackingRoomId = roomId;
                 if (binding.btnRoomTracking != null) {
-                    binding.btnRoomTracking.setVisibility(inRoom && roomId != null && !roomId.isEmpty()
-                            ? View.VISIBLE : View.GONE);
+                    com.Dramizo.Series.util.RoomTrackingIndicator.setActive(
+                            binding.btnRoomTracking, inRoom && roomId != null && !roomId.isEmpty());
                 }
             });
         });
     }
 
     private void openTrackedRoom() {
-        String roomId = roomTrackingRoomId;
-        if (roomId == null || roomId.trim().isEmpty()) return;
-        Intent intent = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
-        intent.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
-        startActivity(intent);
+        final String targetId = loadedProfileId;
+        if (targetId == null || targetId.trim().isEmpty() || container == null) return;
+        // Re-check live presence and privacy on tap; never navigate using a stale room id.
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().roomPresence(targetId));
+            String roomId = result.success && result.data != null
+                    && Boolean.TRUE.equals(result.data.get("inRoom"))
+                    && result.data.get("roomId") != null
+                    ? String.valueOf(result.data.get("roomId")) : null;
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()
+                        || !targetId.equals(loadedProfileId)) return;
+                roomTrackingRoomId = roomId;
+                boolean active = roomId != null && !roomId.trim().isEmpty();
+                com.Dramizo.Series.util.RoomTrackingIndicator.setActive(binding.btnRoomTracking, active);
+                if (!active) return;
+                Intent intent = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
+                intent.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
+                startActivity(intent);
+            });
+        });
     }
 
     private void showRoomTrackingPrivacyDialog() {
@@ -1698,6 +1715,7 @@ public class ProfileActivity extends ThemedActivity {
     protected void onPause() {
         profileHandler.removeCallbacks(mysteriousModeRefresh);
         profileHandler.removeCallbacks(roomPresenceRefresh);
+        com.Dramizo.Series.util.RoomTrackingIndicator.setActive(binding != null ? binding.btnRoomTracking : null, false);
         super.onPause();
     }
 
