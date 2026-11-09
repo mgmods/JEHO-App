@@ -245,6 +245,8 @@
         <activity android:name=".presentation.search.SearchActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
+        <activity android:name=".presentation.settings.RoomTrackingPrivacyActivity" android:exported="false"
+            android:screenOrientation="portrait" />
         <activity android:name=".presentation.settings.PrivacyActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.settings.AboutActivity" android:exported="false" 
