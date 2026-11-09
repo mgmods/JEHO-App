@@ -48,7 +48,7 @@ import retrofit2.Response;
 
 /** Native Stories tab. Media bytes go through the existing durable upload service. */
 public class StoriesFragment extends Fragment {
-    private static final int PICK_IMAGE = 7101, PICK_VIDEO = 7102;
+    private static final int PICK_MEDIA = 7103;
     private static final String ARG_COMPACT = "compact_inbox";
     private boolean compactMode;
     private String pendingOpenUserId;
@@ -212,26 +212,31 @@ public class StoriesFragment extends Fragment {
         if (config == null || !config.enabled || !config.publishingEnabled || config.emergencyMode) {
             Toast.makeText(requireContext(), "نشر الستوريات متوقف حالياً", Toast.LENGTH_SHORT).show(); return;
         }
-        String[] choices = {"إضافة صورة", "إضافة فيديو"};
-        new android.app.AlertDialog.Builder(requireContext()).setTitle("إنشاء ستوري")
-                .setItems(choices, (d, which) -> {
-                    if (which == 0 && config.imagesEnabled) pick("image/*", PICK_IMAGE);
-                    else if (which == 1 && config.videosEnabled) pick("video/*", PICK_VIDEO);
-                    else Toast.makeText(requireContext(), "هذا النوع متوقف من لوحة التحكم", Toast.LENGTH_SHORT).show();
-                }).show();
+        pickMedia();
     }
 
-    private void pick(String mime, int request) {
+    private void pickMedia() {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        i.setType(mime); i.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(i, request);
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(i, PICK_MEDIA);
     }
 
     @Override public void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
         if (result != android.app.Activity.RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
-        String type = request == PICK_VIDEO ? "video" : "image";
+        String mime = requireContext().getContentResolver().getType(uri);
+        String name = displayName(uri).toLowerCase(Locale.ROOT);
+        String type = (mime != null && mime.toLowerCase(Locale.ROOT).startsWith("video/"))
+                || name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".webm") || name.endsWith(".3gp")
+                ? "video" : "image";
+        if ((type.equals("video") && (config == null || !config.videosEnabled))
+                || (type.equals("image") && (config == null || !config.imagesEnabled))) {
+            Toast.makeText(requireContext(), "هذا النوع من الستوريات متوقف من لوحة التحكم", Toast.LENGTH_SHORT).show();
+            return;
+        }
         c.getIoExecutor().execute(() -> uploadAndPublish(uri, type));
     }
 
