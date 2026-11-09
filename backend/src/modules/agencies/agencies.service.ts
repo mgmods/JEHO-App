@@ -3422,7 +3422,7 @@ export class AgenciesService implements OnModuleInit {
         pending: agency.ownerId === viewerId ? Number(counts?.[0]?.pending || 0) : undefined,
       },
       members,
-      myStatus: staffMembership ? (staffMembership.role === AgencyRole.HOST ? 'active_host' : staffMembership.role === AgencyRole.MEMBER ? 'active_member' : 'active_staff') : status,
+      myStatus: agency.ownerId === viewerId ? 'active_staff' : staffMembership ? (staffMembership.role === AgencyRole.HOST ? 'active_host' : staffMembership.role === AgencyRole.MEMBER ? 'active_member' : 'active_staff') : status,
       canReview: agency.ownerId === viewerId,
     };
   }
@@ -3430,6 +3430,7 @@ export class AgenciesService implements OnModuleInit {
   async requestClubJoin(agencyId: string, userId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency || agency.status !== AgencyStatus.ACTIVE) throw new NotFoundException('Agency not found');
+    if (agency.ownerId === userId) return { status: 'active_staff', alreadyMember: true };
     const staff = await this.membersRepo.findOne({
       where: { agencyId, userId, status: AgencyMemberStatus.ACTIVE, isActive: true }
     });
