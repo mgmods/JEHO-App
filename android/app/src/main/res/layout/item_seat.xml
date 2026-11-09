@@ -1,16 +1,4 @@
-<?xml vers
-        <TextView
-            android:id="@+id/tvAgencyClub"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:maxWidth="82dp"
-            android:maxLines="1"
-            android:textColor="#FFFFD88A"
-            android:textSize="8sp"
-            android:visibility="gone" />ion="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!-- Mikoo item_rv_multi_audio_micro: 80dp cell, 55dp avatar/empty seat -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -219,6 +207,19 @@
             android:maxLines="1"
             android:textColor="#80FFFFFF"
             android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/tvAgencyClub"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxWidth="82dp"
+            android:maxLines="1"
+            android:textColor="#FFFFD88A"
+            android:textSize="8sp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- Decorative admin-assigned rank. This is separate from platform staff permissions. -->
