@@ -34,7 +34,7 @@ export const ROUTE_MODULE = {
   'room-cup': 'roomCup',
   games: 'games',
   'game-ads': 'gameAds',
-  drama: 'drama',
+  stories: 'drama',
   banners: 'banners',
   splash: 'banners',
   'nav-icons': 'navIcons',
