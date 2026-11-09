@@ -467,9 +467,6 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       .leftJoinAndSelect('u.profile', 'up')
       .where('p.userId = :userId', { userId })
       .andWhere('COALESCE(p.isDeleted, false) = false')
-      // Older production rows may predate the archive columns' NOT NULL defaults.
-      // Treat NULL as the normal inbox state so legacy conversations never vanish.
-      .andWhere('COALESCE(p.isArchived, false) = :archived', { archived })
       .orderBy('p.isPinned', 'DESC')
       .addOrderBy('c.lastMessageAt', 'DESC', 'NULLS LAST')
       .skip(query.skip)
