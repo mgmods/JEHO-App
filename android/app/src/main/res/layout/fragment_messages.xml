@@ -162,14 +162,14 @@
             android:layout_marginTop="2dp"
             android:layout_marginEnd="14dp"
             android:layout_marginBottom="4dp"
-            android:background="@drawable/bg_unread_badge"
+            android:background="@drawable/bg_archived_conversations_chip"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
             android:paddingStart="14dp"
             android:paddingEnd="14dp"
-            android:text="المحادثات المؤرشفة"
-            android:textColor="@color/white"
+            android:text="▤  المحادثات المؤرشفة"
+            android:textColor="#5F6877"
             android:textSize="12sp"
             android:textStyle="bold" />
 
