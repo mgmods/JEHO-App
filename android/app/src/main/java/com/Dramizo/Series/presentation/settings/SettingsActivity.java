@@ -49,6 +49,7 @@ public class SettingsActivity extends ThemedActivity {
         label(binding.rowTheme.getRoot(), R.string.settings_theme);
         label(binding.rowLanguage.getRoot(), R.string.language);
         label(binding.rowNotifications.getRoot(), R.string.settings_notifications);
+        label(binding.rowTrackingPrivacy.getRoot(), "خصوصية التتبع");
         label(binding.rowMessages.getRoot(), R.string.settings_messages);
         label(binding.rowBindAccount.getRoot(), R.string.settings_bind_account);
         label(binding.rowPassword.getRoot(), R.string.settings_password);
@@ -91,6 +92,8 @@ public class SettingsActivity extends ThemedActivity {
         }
         // Mikoo: open system notification settings — never a custom dialog.
         binding.rowNotifications.getRoot().setOnClickListener(v -> openSystemNotificationSettings());
+        binding.rowTrackingPrivacy.getRoot().setOnClickListener(v ->
+                startActivity(new Intent(this, RoomTrackingPrivacyActivity.class)));
         binding.rowMessages.getRoot().setOnClickListener(v ->
                 startActivity(new Intent(this, MessageSettingsActivity.class)));
         binding.rowBindAccount.getRoot().setOnClickListener(v ->
