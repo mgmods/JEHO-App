@@ -181,6 +181,11 @@ public class SettingsActivity extends ThemedActivity {
         if (tv != null) tv.setText(titleRes);
     }
 
+    private static void label(View row, String title) {
+        TextView tv = row.findViewById(R.id.tvSettingTitle);
+        if (tv != null) tv.setText(title);
+    }
+
     private void openPolicy(String path, String title) {
         Intent i = new Intent(this, com.Dramizo.Series.presentation.web.PromoWebActivity.class);
         i.putExtra(com.Dramizo.Series.presentation.web.PromoWebActivity.EXTRA_URL,
