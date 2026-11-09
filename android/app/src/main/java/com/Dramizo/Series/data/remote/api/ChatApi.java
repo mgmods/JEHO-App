@@ -13,11 +13,10 @@ import retrofit2.http.Query;
 public interface ChatApi {
     @GET("chat/search")
     Call<ApiResponse<ChatDtos.ConversationList>> searchConversations(
-            @Query("q") String query, @Query("page") int page, @Query("limit") int limit,
-            @Query("archived") boolean archived);
+            @Query("q") String query, @Query("page") int page, @Query("limit") int limit);
 
     @GET("chat/conversations")
-    Call<ApiResponse<ChatDtos.ConversationList>> conversations(@Query("archived") boolean archived);
+    Call<ApiResponse<ChatDtos.ConversationList>> conversations();
 
     @GET("chat/conversations/{id}")
     Call<ApiResponse<ChatDtos.ConversationDto>> conversation(@Path("id") String id);
