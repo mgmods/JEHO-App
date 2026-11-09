@@ -2065,27 +2065,6 @@ public class ChatConversationActivity extends ThemedActivity {
             return true;
         });
 
-        android.widget.LinearLayout zoom = new android.widget.LinearLayout(this);
-        zoom.setGravity(android.view.Gravity.CENTER);
-        zoom.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        android.widget.LinearLayout.LayoutParams zoomLp = new android.widget.LinearLayout.LayoutParams(-1, dp(48));
-        zoomLp.topMargin = dp(8);
-        root.addView(zoom, zoomLp);
-        android.widget.TextView minus = menuText("−", 25, 0xFF454A58, true);
-        minus.setGravity(android.view.Gravity.CENTER);
-        minus.setBackground(roundRect(0xFFF1F2F6, dp(22), 0, 0));
-        zoom.addView(minus, new android.widget.LinearLayout.LayoutParams(dp(46), dp(42)));
-        android.widget.TextView reset = menuText("إعادة ضبط", 12, 0xFF5E6370, true);
-        reset.setGravity(android.view.Gravity.CENTER);
-        zoom.addView(reset, new android.widget.LinearLayout.LayoutParams(dp(100), dp(42)));
-        android.widget.TextView plus = menuText("+", 23, 0xFF454A58, true);
-        plus.setGravity(android.view.Gravity.CENTER);
-        plus.setBackground(roundRect(0xFFF1F2F6, dp(22), 0, 0));
-        zoom.addView(plus, new android.widget.LinearLayout.LayoutParams(dp(46), dp(42)));
-        minus.setOnClickListener(v -> { matrix.postScale(0.85f, 0.85f, preview.getWidth()/2f, preview.getHeight()/2f); preview.setImageMatrix(matrix); });
-        plus.setOnClickListener(v -> { matrix.postScale(1.18f, 1.18f, preview.getWidth()/2f, preview.getHeight()/2f); preview.setImageMatrix(matrix); });
-        reset.setOnClickListener(v -> fit.run());
-
         android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
         actions.setGravity(android.view.Gravity.CENTER_VERTICAL);
         actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
