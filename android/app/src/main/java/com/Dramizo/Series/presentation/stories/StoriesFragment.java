@@ -303,10 +303,15 @@ public class StoriesFragment extends Fragment {
         VideoView storyVideo = null;
         if ("video".equalsIgnoreCase(story.mediaType)) {
             VideoView video = new VideoView(requireContext());
-            video.setOnPreparedListener(mp -> { mp.setLooping(false); video.start(); });
+            video.setKeepScreenOn(true);
+            video.setOnPreparedListener(mp -> {
+                mp.setLooping(false);
+                mp.setVolume(1f, 1f);
+                video.start();
+            });
             video.setOnCompletionListener(mp -> { if (index + 1 < group.size()) { dialog.dismiss(); openViewer(group,index+1); } });
             video.setOnErrorListener((mp, what, extra) -> {
-                Toast.makeText(requireContext(), "تعذر تشغيل الفيديو، حاول تحديث الستوري", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "تعذر تشغيل هذا الفيديو. تحقق من صيغة الملف أو أعد رفعه", Toast.LENGTH_LONG).show();
                 return true;
             });
             storyVideo = video;
@@ -329,8 +334,15 @@ public class StoriesFragment extends Fragment {
         actions.setPadding(dp(14),dp(10),dp(14),dp(18)); actions.setBackground(round(0xCC17131D,dp(18)));
         LinearLayout reactions = new LinearLayout(requireContext()); reactions.setGravity(Gravity.CENTER);
         String[] emojis = {"❤️","😍","😂","😮","👏","🔥"};
-        for (String emoji : emojis) { TextView reaction=text(emoji,23,0xFFFFFFFF,false); reaction.setGravity(Gravity.CENTER);
-            reactions.addView(reaction,new LinearLayout.LayoutParams(0,dp(42),1)); reaction.setOnClickListener(v -> sendStoryReaction(story,emoji)); }
+        for (String emoji : emojis) {
+            TextView reaction = text(emoji, 23, 0xFFFFFFFF, false);
+            reaction.setGravity(Gravity.CENTER);
+            reaction.setClickable(true);
+            reaction.setFocusable(true);
+            reaction.setBackground(round(0x223FFFFFF, dp(18)));
+            reaction.setOnClickListener(v -> sendStoryReaction(story, emoji));
+            reactions.addView(reaction, new LinearLayout.LayoutParams(0, dp(42), 1));
+        }
         actions.addView(reactions,new LinearLayout.LayoutParams(-1,dp(42)));
         LinearLayout replyRow = new LinearLayout(requireContext()); replyRow.setGravity(Gravity.CENTER_VERTICAL);
         android.widget.EditText reply = new android.widget.EditText(requireContext()); reply.setSingleLine(true); reply.setTextSize(13);
@@ -349,6 +361,9 @@ public class StoriesFragment extends Fragment {
         dialog.show(); if(w!=null)w.setLayout(-1,-1);
         if (storyVideo != null) {
             final VideoView target = storyVideo;
+            android.widget.MediaController controls = new android.widget.MediaController(requireContext());
+            controls.setAnchorView(target);
+            target.setMediaController(controls);
             final String mediaUrl = resolveMediaUrl(story.mediaUrl);
             if (config != null && config.cacheEnabled) {
                 c.getIoExecutor().execute(() -> {
