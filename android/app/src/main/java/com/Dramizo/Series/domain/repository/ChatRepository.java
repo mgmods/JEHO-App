@@ -4,8 +4,7 @@ import com.Dramizo.Series.data.remote.dto.ChatDtos;
 import com.Dramizo.Series.domain.model.Result;
 
 public interface ChatRepository {
-    Result<ChatDtos.ConversationList> getConversations(boolean archived);
-    default Result<ChatDtos.ConversationList> getConversations() { return getConversations(false); }
+    Result<ChatDtos.ConversationList> getConversations();
     Result<ChatDtos.MessageList> getMessages(String conversationId, int page);
     /** Local Room cache for instant conversation open (may be empty). */
     java.util.List<ChatDtos.MessageDto> getCachedMessages(String conversationId);

@@ -13,11 +13,10 @@ import retrofit2.http.Query;
 public interface ChatApi {
     @GET("chat/search")
     Call<ApiResponse<ChatDtos.ConversationList>> searchConversations(
-            @Query("q") String query, @Query("page") int page, @Query("limit") int limit,
-            @Query("archived") boolean archived);
+            @Query("q") String query, @Query("page") int page, @Query("limit") int limit);
 
     @GET("chat/conversations")
-    Call<ApiResponse<ChatDtos.ConversationList>> conversations(@Query("archived") boolean archived);
+    Call<ApiResponse<ChatDtos.ConversationList>> conversations();
 
     @GET("chat/conversations/{id}")
     Call<ApiResponse<ChatDtos.ConversationDto>> conversation(@Path("id") String id);
@@ -39,9 +38,6 @@ public interface ChatApi {
 
     @POST("chat/messages/{id}/unsend")
     Call<ApiResponse<ChatDtos.MessageDto>> unsend(@Path("id") String id);
-
-    @POST("chat/conversations/{id}/archive")
-    Call<ApiResponse<Object>> archive(@Path("id") String id, @Body java.util.Map<String, Boolean> body);
 
     @POST("chat/conversations/{id}/delete")
     Call<ApiResponse<Object>> deleteConversation(@Path("id") String id);
