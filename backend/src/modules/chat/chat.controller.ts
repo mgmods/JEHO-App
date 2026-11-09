@@ -33,10 +33,9 @@ export class ChatController {
     @Query('q') q: string,
     @Query('page') page: string,
     @Query('limit') limit: string,
-    @Query('archived') archived: string,
   ) {
     return this.chatService.searchConversations(
-      userId, q, this.pagination(page, limit), archived === 'true',
+      userId, q, this.pagination(page, limit),
     );
   }
 
@@ -48,7 +47,7 @@ export class ChatController {
     @Query('archived') archived: string,
   ) {
     return this.chatService.listConversations(
-      userId, this.pagination(page, limit), archived === 'true',
+      userId, this.pagination(page, limit),
     );
   }
 
@@ -124,7 +123,7 @@ export class ChatController {
     @CurrentUser('sub') userId: string,
     @Body('archived') archived: boolean,
   ) {
-    return this.chatService.archive(id, userId, archived !== false);
+    return this.chatService.archive(id, userId, false);
   }
 
   @Post('conversations/:id/delete')
