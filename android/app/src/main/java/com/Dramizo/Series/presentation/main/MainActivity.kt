@@ -822,7 +822,7 @@ class MainActivity : ThemedActivity() {
 
     private fun loadStoriesConfig(container: AppContainer) {
         container.ioExecutor.execute {
-            val r: Result<StoriesDtos.DramaConfigDto> =
+            val r: Result<StoriesDtos.StoriesConfigDto> =
                 ApiCall.execute(container.storiesApi.config())
             runOnUiThread {
                 val b = binding ?: return@runOnUiThread
