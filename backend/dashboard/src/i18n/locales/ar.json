@@ -1189,10 +1189,10 @@
     "badFormat": "الصيغة المسموحة: PNG أو JPG أو SVG",
     "tabs": {
       "party": "حفلة / رئيسية",
-      "drama": "دراما",
       "games": "ألعاب",
       "chat": "دردشة",
-      "me": "أنا"
+      "me": "أنا",
+      "stories": "الستوريات"
     }
   },
   "seatStickers": {
