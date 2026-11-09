@@ -16,6 +16,7 @@ const DEFAULTS: StoriesConfig = {
 @Injectable()
 export class StoriesService implements OnModuleInit {
   private readonly logger = new Logger(StoriesService.name);
+  private lastExpiryCleanupAt = 0;
   constructor(private readonly db: DataSource) {}
 
   async onModuleInit() {
@@ -84,8 +85,18 @@ export class StoriesService implements OnModuleInit {
   async feed(viewerId: string) {
     const c = await this.getConfig();
     if (!c.enabled || !c.viewingEnabled) return [];
-    await this.db.query(`DELETE FROM "jeho_own"."stories" WHERE id IN
-      (SELECT id FROM "jeho_own"."stories" WHERE "expiresAt" <= now() ORDER BY "expiresAt" LIMIT 250)`);
+    // Keep expiry cleanup off the hot path for every feed request. Each API
+    // instance performs at most one bounded cleanup every 15 minutes.
+    const now = Date.now();
+    if (now - this.lastExpiryCleanupAt >= 15 * 60 * 1000) {
+      this.lastExpiryCleanupAt = now;
+      try {
+        await this.db.query(`DELETE FROM "jeho_own"."stories" WHERE id IN
+          (SELECT id FROM "jeho_own"."stories" WHERE "expiresAt" <= now() ORDER BY "expiresAt" LIMIT 250)`);
+      } catch (error) {
+        this.logger.warn('Expired story cleanup deferred: ' + (error instanceof Error ? error.message : 'unknown error'));
+      }
+    }
     return this.db.query(`SELECT s.id,s."userId",s."mediaType",s."mediaUrl",s.caption,s.visibility,
       s."viewCount",s."createdAt",s."expiresAt",u.username,u."displayName",u."avatarUrl",u."publicId",
       EXISTS(SELECT 1 FROM "jeho_own"."story_views" v WHERE v."storyId"=s.id AND v."userId"=$1) AS "viewedByMe"
