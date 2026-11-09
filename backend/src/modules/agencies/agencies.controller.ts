@@ -373,4 +373,37 @@ export class AgenciesController {
   ) {
     return this.agenciesService.removeMember(id, userId, memberUserId);
   }
+
+  @Get(':id/club')
+  @ApiOperation({ summary: 'Agency club overview: active hosts and approved supporters' })
+  getClub(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
+    return this.agenciesService.getClub(id, userId);
+  }
+
+  @Post(':id/club/request')
+  requestClubJoin(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
+    return this.agenciesService.requestClubJoin(id, userId);
+  }
+
+  @Get(':id/club/requests')
+  listClubRequests(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
+    return this.agenciesService.listClubRequests(id, userId);
+  }
+
+  @Post(':id/club/requests/:userId/approve')
+  approveClubRequest(@Param('id', ParseUUIDPipe) id: string, @Param('userId', ParseUUIDPipe) memberId: string, @CurrentUser('sub') userId: string) {
+    return this.agenciesService.reviewClubRequest(id, userId, memberId, true);
+  }
+
+  @Post(':id/club/requests/:userId/reject')
+  rejectClubRequest(@Param('id', ParseUUIDPipe) id: string, @Param('userId', ParseUUIDPipe) memberId: string, @CurrentUser('sub') userId: string) {
+    return this.agenciesService.reviewClubRequest(id, userId, memberId, false);
+  }
+
+  @Delete(':id/club/leave')
+  leaveClub(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
+    return this.agenciesService.leaveClub(id, userId);
+  }
+
+
 }
