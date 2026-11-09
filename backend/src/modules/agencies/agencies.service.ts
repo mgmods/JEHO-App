@@ -3370,7 +3370,14 @@ export class AgenciesService implements OnModuleInit {
           (SELECT COUNT(*)::int FROM agency_club_members WHERE "agencyId" = $1 AND status = 'active') AS supporters,
           (SELECT COUNT(*)::int FROM agency_club_members WHERE "agencyId" = $1 AND status = 'pending') AS pending,
           (SELECT COUNT(*)::int FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role IN ('owner','manager','host')) AS staff,
-          (SELECT COUNT(*)::int FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role = 'member') AS "agencyMembers"
+          (SELECT COUNT(*)::int FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role = 'member') AS "agencyMembers",
+          (SELECT COUNT(*)::int FROM (
+            SELECT "userId" FROM agency_club_members WHERE "agencyId" = $1 AND status = 'active'
+            UNION
+            SELECT "userId" FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role IN ('owner','manager','host','member')
+            UNION
+            SELECT "ownerId" AS "userId" FROM agencies WHERE id = $1
+          ) club_roster) AS total
       `, [agencyId]),
     ]);
     const owner = agency.owner ? {
@@ -3406,7 +3413,7 @@ export class AgenciesService implements OnModuleInit {
         staff: Number(counts?.[0]?.staff || 0),
         agencyMembers: Number(counts?.[0]?.agencyMembers || 0),
         // Count unique accounts: a staff member must not be double-counted if they also have a legacy supporter row.
-        total: members.length,
+        total: Number(counts?.[0]?.total ?? members.length),
         pending: agency.ownerId === viewerId ? Number(counts?.[0]?.pending || 0) : undefined,
       },
       members,
