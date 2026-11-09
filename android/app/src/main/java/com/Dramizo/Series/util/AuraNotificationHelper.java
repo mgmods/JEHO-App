@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class AuraNotificationHelper {
-    public static final String CHANNEL_MESSAGES = "jeho_messages_v2";
+    public static final String CHANNEL_MESSAGES = "jeho_messages_v3";
     private static final String GROUP_MESSAGES = "jeho_direct_messages";
     private static final int GROUP_SUMMARY_ID = 0x4A45484F;
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
@@ -211,6 +211,13 @@ public final class AuraNotificationHelper {
                 .setContentIntent(pi);
 
         if (isChat) {
+            // Android owns the heads-up window position and places it below the status bar.
+            // Use a short, restrained custom heads-up card so it never imitates or covers
+            // battery/network indicators; the expanded shade keeps native MessagingStyle.
+            compact.setOnClickPendingIntent(R.id.imgNotificationContent, pi);
+            compact.setOnClickPendingIntent(R.id.tvNotificationTitle, pi);
+            compact.setOnClickPendingIntent(R.id.tvNotificationBody, pi);
+            builder.setCustomHeadsUpContentView(compact);
             builder.setStyle(buildChatMessagingStyle(context, notificationId, title, avatar));
             androidx.core.app.RemoteInput remoteInput = new androidx.core.app.RemoteInput.Builder(
                     NotificationQuickReplyReceiver.EXTRA_REPLY)
@@ -232,6 +239,13 @@ public final class AuraNotificationHelper {
                     .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
                     .build();
             builder.addAction(replyAction);
+            // "مقروء" opens the exact conversation; the conversation screen's normal
+            // read-receipt flow marks its messages read. This is not a dismiss-only action.
+            NotificationCompat.Action readAction = new NotificationCompat.Action.Builder(
+                    R.drawable.ic_stat_jeho, "مقروء", pi)
+                    .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ)
+                    .build();
+            builder.addAction(readAction);
         } else {
             builder.setCustomContentView(compact)
                     .setCustomBigContentView(expanded)
