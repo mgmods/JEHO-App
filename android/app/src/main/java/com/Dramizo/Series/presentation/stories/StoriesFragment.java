@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
 import android.view.View;
@@ -216,11 +217,18 @@ public class StoriesFragment extends Fragment {
     }
 
     private void pickMedia() {
-        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        i.setType("*/*");
+        // Open the media gallery directly, rather than the Documents/file browser.
+        Intent i = new Intent(Intent.ACTION_PICK);
+        i.setDataAndType(MediaStore.Files.getContentUri("external"), "*/*");
         i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
-        i.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(i, PICK_MEDIA);
+        try {
+            startActivityForResult(i, PICK_MEDIA);
+        } catch (android.content.ActivityNotFoundException e) {
+            Intent fallback = new Intent(Intent.ACTION_PICK);
+            fallback.setType("*/*");
+            fallback.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+            startActivityForResult(fallback, PICK_MEDIA);
+        }
     }
 
     @Override public void onActivityResult(int request, int result, Intent data) {
@@ -420,21 +428,97 @@ public class StoriesFragment extends Fragment {
                     Toast.makeText(requireContext(), "تعذر تحميل قائمة المشاهدين", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                StringBuilder list = new StringBuilder("عدد المشاهدات: ").append(result.data.viewCount);
-                if (result.data.viewers != null && !result.data.viewers.isEmpty()) {
-                    for (StoriesDtos.StoryViewerDto viewer : result.data.viewers) {
-                        String name = viewer.displayName != null && !viewer.displayName.trim().isEmpty()
-                                ? viewer.displayName : (viewer.username == null ? "مستخدم JEHO" : viewer.username);
-                        list.append("\n• ").append(name);
-                        if (viewer.publicId != null && !viewer.publicId.trim().isEmpty())
-                            list.append("  ·  ID ").append(viewer.publicId);
-                    }
-                } else list.append("\nلم يشاهدها أحد بعد");
-                new android.app.AlertDialog.Builder(requireContext())
-                        .setTitle("مشاهدو الستوري").setMessage(list.toString())
-                        .setPositiveButton("إغلاق", null).show();
+                showViewersSheet(result.data);
             });
         });
+    }
+
+    private void showViewersSheet(StoriesDtos.ViewersResult data) {
+        Dialog sheet = new Dialog(requireContext());
+        LinearLayout panel = new LinearLayout(requireContext());
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(18), dp(10), dp(18), dp(18));
+        panel.setBackground(round(0xFFFDFBFD, dp(26)));
+
+        TextView handle = text("—", 24, 0xFFD2CCD5, true);
+        handle.setGravity(Gravity.CENTER);
+        panel.addView(handle, new LinearLayout.LayoutParams(-1, dp(26)));
+
+        LinearLayout titleRow = new LinearLayout(requireContext());
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text("المشاهدون", 19, 0xFF211D25, true);
+        titleRow.addView(title, new LinearLayout.LayoutParams(0, dp(38), 1));
+        TextView count = text(String.valueOf(data.viewCount), 16, 0xFFB82768, true);
+        count.setGravity(Gravity.CENTER);
+        count.setBackground(round(0xFFFCE8F1, dp(18)));
+        titleRow.addView(count, new LinearLayout.LayoutParams(dp(48), dp(34)));
+        panel.addView(titleRow);
+
+        TextView subtitle = text(data.viewCount == 0 ? "لا توجد مشاهدات بعد" : "الحسابات التي شاهدت قصتك", 12, 0xFF8C8590, false);
+        panel.addView(subtitle, new LinearLayout.LayoutParams(-1, dp(28)));
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(requireContext());
+        LinearLayout list = new LinearLayout(requireContext());
+        list.setOrientation(LinearLayout.VERTICAL);
+        if (data.viewers == null || data.viewers.isEmpty()) {
+            TextView empty = text("لم يشاهدها أحد بعد", 14, 0xFF77717A, false);
+            empty.setGravity(Gravity.CENTER);
+            list.addView(empty, new LinearLayout.LayoutParams(-1, dp(150)));
+        } else {
+            for (StoriesDtos.StoryViewerDto viewer : data.viewers) {
+                LinearLayout row = new LinearLayout(requireContext());
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(0, dp(7), 0, dp(7));
+                ImageView avatar = new ImageView(requireContext());
+                avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                avatar.setBackground(round(0xFFECE7ED, dp(24)));
+                if (viewer.avatarUrl != null && !viewer.avatarUrl.trim().isEmpty())
+                    Glide.with(this).load(viewer.avatarUrl).circleCrop().into(avatar);
+                row.addView(avatar, new LinearLayout.LayoutParams(dp(48), dp(48)));
+                LinearLayout info = new LinearLayout(requireContext());
+                info.setOrientation(LinearLayout.VERTICAL);
+                info.setPadding(dp(12), 0, dp(8), 0);
+                String name = viewer.displayName != null && !viewer.displayName.trim().isEmpty()
+                        ? viewer.displayName : (viewer.username == null ? "مستخدم JEHO" : viewer.username);
+                TextView n = text(name, 14, 0xFF28242C, true);
+                info.addView(n, new LinearLayout.LayoutParams(-1, dp(25)));
+                String id = viewer.publicId == null ? "" : viewer.publicId.trim();
+                TextView pid = text(id.isEmpty() ? "شاهد قصتك" : "ID " + id, 11, 0xFF8A8390, false);
+                info.addView(pid, new LinearLayout.LayoutParams(-1, dp(22)));
+                row.addView(info, new LinearLayout.LayoutParams(0, dp(62), 1));
+                row.setOnClickListener(v -> {
+                    if (viewer.id == null || viewer.id.trim().isEmpty()) return;
+                    Intent profile = new Intent(requireContext(), ProfileActivity.class);
+                    profile.putExtra(ProfileActivity.EXTRA_USER_ID, viewer.id);
+                    startActivity(profile);
+                });
+                list.addView(row);
+            }
+        }
+        scroll.addView(list);
+        panel.addView(scroll, new LinearLayout.LayoutParams(-1, dp(0), 1));
+
+        TextView close = text("إغلاق", 14, 0xFFB82768, true);
+        close.setGravity(Gravity.CENTER);
+        close.setBackground(round(0xFFFCE8F1, dp(22)));
+        panel.addView(close, new LinearLayout.LayoutParams(-1, dp(46)));
+        close.setOnClickListener(v -> sheet.dismiss());
+
+        sheet.setContentView(panel);
+        Window w = sheet.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            w.setGravity(Gravity.BOTTOM);
+            w.setDimAmount(0.55f);
+        }
+        sheet.setOnShowListener(d -> {
+            Window ww = sheet.getWindow();
+            if (ww != null) {
+                ww.setLayout(-1, (int)(getResources().getDisplayMetrics().heightPixels * 0.72f));
+                ww.setGravity(Gravity.BOTTOM);
+            }
+        });
+        sheet.show();
     }
 
     private void confirmDeleteStory(StoriesDtos.StoryDto story, Dialog viewer) {
@@ -450,6 +534,8 @@ public class StoriesFragment extends Fragment {
                     requireActivity().runOnUiThread(() -> {
                         if (!isAdded()) return;
                         if (result.success) {
+                            feed.removeIf(item -> story.id.equals(item.id));
+                            bindStories();
                             viewer.dismiss();
                             Toast.makeText(requireContext(), "تم حذف الستوري", Toast.LENGTH_SHORT).show();
                             load();
