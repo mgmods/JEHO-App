@@ -417,7 +417,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async searchConversations(userId: string, rawQuery: string, query: PaginationDto, archived = false) {
+  async searchConversations(userId: string, rawQuery: string, query: PaginationDto) {
     const term = String(rawQuery || '').trim().slice(0, 120);
     if (term.length < 2) return paginate([], 0, query.page || 1, query.limit || 20);
     const needle = `%${term.toLocaleLowerCase()}%`;
@@ -432,9 +432,6 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       .leftJoin('c.messages', 'matchedMessage', 'matchedMessage.isUnsent = false')
       .where('p.userId = :userId', { userId })
       .andWhere('COALESCE(p.isDeleted, false) = false')
-      // Older production rows may predate the archive columns' NOT NULL defaults.
-      // Treat NULL as the normal inbox state so legacy conversations never vanish.
-      .andWhere('COALESCE(p.isArchived, false) = :archived', { archived })
       .andWhere(
         "(LOWER(COALESCE(c.title, '')) LIKE :needle OR LOWER(COALESCE(peer.username, '')) LIKE :needle OR LOWER(COALESCE(peer.displayName, '')) LIKE :needle OR LOWER(CAST(peer.id AS text)) LIKE :needle OR LOWER(COALESCE(matchedMessage.content, '')) LIKE :needle)",
         { needle },
@@ -461,7 +458,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     return paginate(items, total, query.page || 1, Math.min(Math.max(query.limit || 20, 1), 50));
   }
 
-  async listConversations(userId: string, query: PaginationDto, archived = false) {
+  async listConversations(userId: string, query: PaginationDto) {
     const qb = this.partRepo
       .createQueryBuilder('p')
       .innerJoinAndSelect('p.conversation', 'c')
@@ -1191,16 +1188,19 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     return { pinned };
   }
 
-  async archive(conversationId: string, userId: string, archived = true) {
+  /**
+   * Backward-compatible endpoint for older APKs. Conversation archiving is disabled:
+   * every non-deleted participant conversation belongs in the normal inbox.
+   */
+  async archive(conversationId: string, userId: string, _archived = false) {
     await this.getConversation(conversationId, userId);
-    await this.partRepo.update({ conversationId, userId }, { isArchived: archived });
-    // Archive is reversible and must never be broadcast as a deletion.
+    await this.partRepo.update({ conversationId, userId }, { isArchived: false });
     this.realtime?.emitToUser(userId, 'chat:conversation:updated', {
       conversationId,
-      archived,
+      archived: false,
       at: new Date().toISOString(),
     });
-    return { archived };
+    return { archived: false, archiveDisabled: true };
   }
 
   async deleteForMe(conversationId: string, userId: string) {
