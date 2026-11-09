@@ -25,6 +25,7 @@ import com.Dramizo.Series.databinding.ItemAgencyMenuRowBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
@@ -46,10 +47,12 @@ import java.util.Locale;
 /** Agency manage hub — custom menu rows + custom bottom-sheet dialogs. */
 public class AgencyManageActivity extends ThemedActivity {
     public static final String EXTRA_AGENCY_ID = "agency_id";
+    public static final String EXTRA_OPEN_AGENCY_CLUB = "open_agency_club";
 
     private ActivityAgencyManageBinding binding;
     private AgencyViewModel vm;
     private String agencyId;
+    private boolean openAgencyClubFromNotification;
     private boolean isOwner;
     private boolean isPlatformSuper;
     private MiscDtos.AgencyMineDto myAgency;
@@ -72,6 +75,7 @@ public class AgencyManageActivity extends ThemedActivity {
         binding = ActivityAgencyManageBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         agencyId = getIntent().getStringExtra(EXTRA_AGENCY_ID);
+        openAgencyClubFromNotification = getIntent().getBooleanExtra(EXTRA_OPEN_AGENCY_CLUB, false);
         if (agencyId == null || agencyId.isEmpty()) {
             Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
             finish();
@@ -288,6 +292,13 @@ public class AgencyManageActivity extends ThemedActivity {
                         || (myAgency != null && myAgency.isEligibleHost()
                         && myAgency.agency != null && agencyId.equals(myAgency.agency.id));
                 binding.menuLive.setVisibility(canOpen ? View.VISIBLE : View.GONE);
+
+                if (openAgencyClubFromNotification) {
+                    openAgencyClubFromNotification = false;
+                    binding.getRoot().post(() -> {
+                        if (!isFinishing()) AgencyFamilyInfoSheet.show(this, agencyId);
+                    });
+                }
             });
         });
     }

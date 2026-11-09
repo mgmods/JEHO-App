@@ -207,7 +207,26 @@
             android:maxLines="1"
             android:textColor="#80FFFFFF"
             android:textSize="11sp" />
+
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvAgencyClub"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_agency_affiliation_badge"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxWidth="104dp"
+        android:maxLines="1"
+        android:paddingHorizontal="7dp"
+        android:paddingVertical="2dp"
+        android:textColor="#FFFFE4A6"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
     <!-- Decorative admin-assigned rank. This is separate from platform staff permissions. -->
     <LinearLayout

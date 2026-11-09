@@ -96,9 +96,11 @@ public final class NotificationRouter {
             return i;
         }
         String action = first(data, "action");
-        if ("agency".equals(t) && "join_request".equalsIgnoreCase(action != null ? action : "")) {
+        if ("agency".equals(t) && ("join_request".equalsIgnoreCase(action != null ? action : "")
+                || "agency_club_request".equalsIgnoreCase(action != null ? action : ""))) {
             Intent i = new Intent(context, AgencyManageActivity.class);
             put(i, AgencyManageActivity.EXTRA_AGENCY_ID, first(data, "agency_id", "agencyId"));
+            i.putExtra(AgencyManageActivity.EXTRA_OPEN_AGENCY_CLUB, true);
             return i;
         }
         if ("system".equals(t) || "agency".equals(t)

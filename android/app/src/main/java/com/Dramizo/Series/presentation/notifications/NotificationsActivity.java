@@ -195,6 +195,10 @@ public class NotificationsActivity extends ThemedActivity {
         // A dashboard-awarded badge belongs in the recipient's personal inbox.
         if (isBadgeAwardNotification(n)) return true;
         if (n.data != null) {
+            Object action = n.data.get("action");
+            if (action != null && String.valueOf(action).toLowerCase().startsWith("agency_club_")) {
+                return true;
+            }
             Object nested = n.data.get("type");
             Object kind = n.data.get("notificationKind");
             Object eventType = n.data.get("eventType");

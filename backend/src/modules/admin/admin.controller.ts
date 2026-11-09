@@ -53,7 +53,6 @@ import { PatchZegoSettingsDto } from '../zego/dto/patch-zego-settings.dto';
 import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
 import { PatchLiveKitSettingsDto } from '../livekit/dto/patch-livekit-settings.dto';
 import { ImportZegoFromUrlDto } from '../zego/dto/import-zego-from-url.dto';
-import { DramaService } from '../drama/drama.service';
 import { GameAdsService } from '../games/game-ads.service';
 import { IdentityVerificationService } from '../users/identity-verification.service';
 import { GenderVerificationStatus } from '../../database/entities/female-identity-verification.entity';
@@ -118,7 +117,6 @@ export class AdminController {
     private readonly paymentsService: PaymentsService,
     private readonly zegoSettingsService: ZegoSettingsService,
     private readonly liveKitSettingsService: LiveKitSettingsService,
-    private readonly dramaService: DramaService,
     private readonly gameAdsService: GameAdsService,
     private readonly identityVerification: IdentityVerificationService,
     private readonly shield: SecurityShieldService,
@@ -2075,86 +2073,6 @@ export class AdminController {
   @Patch('games/ads')
   patchGameAdsSettings(@Body() body: Record<string, unknown>) {
     return this.gameAdsService.adminPatchSettings(body as any);
-  }
-
-  // ─── Drama / short series ──────────────────────────────────
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Get('drama/settings')
-  dramaSettings() {
-    return this.dramaService.adminGetSettings();
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Patch('drama/settings')
-  patchDramaSettings(@Body() body: Record<string, unknown>) {
-    return this.dramaService.adminPatchSettings(body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Get('drama/series')
-  adminDramaSeries() {
-    return this.dramaService.adminListSeries();
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Get('drama/series/:id')
-  adminDramaSeriesGet(@Param('id') id: string) {
-    return this.dramaService.adminGetSeries(id);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Post('drama/series')
-  adminDramaSeriesCreate(@Body() body: Record<string, unknown>) {
-    return this.dramaService.adminCreateSeries(body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Patch('drama/series/:id')
-  adminDramaSeriesUpdate(
-    @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.dramaService.adminUpdateSeries(id, body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Delete('drama/series/:id')
-  adminDramaSeriesDelete(@Param('id') id: string) {
-    return this.dramaService.adminDeleteSeries(id);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Post('drama/series/:id/episodes')
-  adminDramaEpisodeCreate(
-    @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.dramaService.adminCreateEpisode(id, body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Patch('drama/episodes/:id')
-  adminDramaEpisodeUpdate(
-    @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.dramaService.adminUpdateEpisode(id, body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Delete('drama/episodes/:id')
-  adminDramaEpisodeDelete(@Param('id') id: string) {
-    return this.dramaService.adminDeleteEpisode(id);
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)

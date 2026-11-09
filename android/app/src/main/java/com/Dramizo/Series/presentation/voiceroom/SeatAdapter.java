@@ -300,6 +300,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && Objects.equals(a.user.vipBadgeUrl, b.user.vipBadgeUrl)
                 && Objects.equals(a.user.levelBadgeUrl, b.user.levelBadgeUrl)
                 && Objects.equals(a.user.nameStyle, b.user.nameStyle)
+                && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.label,
+                        b.user.agencyClub == null ? null : b.user.agencyClub.label)
                 && Objects.equals(a.user.hostBadgeMeta, b.user.hostBadgeMeta)
                 && a.user.level == b.user.level
                 && a.user.vipLevel == b.user.vipLevel;
@@ -610,6 +612,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         boolean occupied = seat.user != null || (userId != null && !userId.isEmpty());
 
         if (seat.locked()) {
+            if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
             bindEmptySeatShell(holder, true);
             holder.b.seatRing.setVisibility(View.GONE);
             holder.b.tvName.setText(String.valueOf(displaySeatNo(seat)));
@@ -656,6 +659,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgMuted.setVisibility(View.GONE);
             }
 
+            if (holder.b.tvAgencyClub != null) {
+                String clubLabel = seat.user != null && seat.user.agencyClub != null
+                        ? seat.user.agencyClub.label : null;
+                holder.b.tvAgencyClub.setText(clubLabel == null ? "" : clubLabel);
+                holder.b.tvAgencyClub.setVisibility(clubLabel == null || clubLabel.trim().isEmpty() ? View.GONE : View.VISIBLE);
+            }
             if (seat.user != null) {
                 holder.b.tvName.setText(seat.user.displayName != null
                         ? seat.user.displayName
@@ -718,6 +727,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             return;
         }
 
+        if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
         bindEmptySeatShell(holder, false);
         holder.b.seatRing.setVisibility(View.GONE);
         holder.b.imgAvatar.setVisibility(View.GONE);

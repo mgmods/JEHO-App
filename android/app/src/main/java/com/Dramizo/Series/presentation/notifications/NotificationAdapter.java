@@ -88,6 +88,7 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             case "relation": return context.getString(R.string.notification_friendship);
             case "withdraw": return context.getString(R.string.notification_withdrawal);
             case "system": return context.getString(R.string.notification_system);
+            case "agency": return "نادي الوكالة";
             default: return type;
         }
     }

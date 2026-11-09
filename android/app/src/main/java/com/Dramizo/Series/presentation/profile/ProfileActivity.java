@@ -798,13 +798,46 @@ public class ProfileActivity extends ThemedActivity {
         if (binding == null || binding.tvAgencyRoleBadge == null) return;
         com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency =
                 user == null ? null : user.agency;
-        String agencyRole = agency == null || agency.role == null
-                ? "" : agency.role.trim().toLowerCase(java.util.Locale.US);
+        com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club =
+                user == null ? null : user.agencyClub;
+
+        // Staff identity comes from the agency membership record. Supporter-club
+        // identity is independent and must still be visible when the user is not staff.
         if (agency == null || agency.id == null || agency.id.trim().isEmpty()
                 || agency.name == null || agency.name.trim().isEmpty()) {
-            binding.tvAgencyRoleBadge.setVisibility(View.GONE);
+            if (club == null || club.label == null || club.label.trim().isEmpty()) {
+                binding.tvAgencyRoleBadge.setVisibility(View.GONE);
+                return;
+            }
+            String clubRole = club.role == null ? "" : club.role.trim().toLowerCase(java.util.Locale.US);
+            int start = 0xFFEDE7FF;
+            int end = 0xFFD8CCFF;
+            int textColor = 0xFF5636A5;
+            int strokeColor = 0xFFB6A0F0;
+            if ("owner".equals(clubRole)) {
+                start = 0xFFFFF0CC;
+                end = 0xFFFFD778;
+                textColor = 0xFF765000;
+                strokeColor = 0xFFE8BD57;
+            } else if ("host".equals(clubRole)) {
+                start = 0xFFDDF8F2;
+                end = 0xFFBCEDE2;
+                textColor = 0xFF126B5B;
+                strokeColor = 0xFF83D2C1;
+            }
+            GradientDrawable chip = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT, new int[]{start, end});
+            chip.setCornerRadius(100f * getResources().getDisplayMetrics().density);
+            chip.setStroke((int) (1 * getResources().getDisplayMetrics().density), strokeColor);
+            binding.tvAgencyRoleBadge.setText(club.label.trim());
+            binding.tvAgencyRoleBadge.setTextColor(textColor);
+            binding.tvAgencyRoleBadge.setBackground(chip);
+            binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
             return;
         }
+
+        String agencyRole = agency.role == null
+                ? "" : agency.role.trim().toLowerCase(java.util.Locale.US);
 
         // Pending requests are not an active agency identity and must not appear on profiles.
         if (agencyRole.contains("pending") || agencyRole.contains("request")) {
@@ -812,8 +845,6 @@ public class ProfileActivity extends ThemedActivity {
             return;
         }
 
-        // Keep the public profile role explicit: agency owner, agency administrator,
-        // and a host who joined an agency are three different identities.
         final String label;
         final int start;
         final int end;
@@ -833,7 +864,6 @@ public class ProfileActivity extends ThemedActivity {
             textColor = 0xFF5636A5;
             strokeColor = 0xFFB6A0F0;
         } else {
-            // HOST (and legacy active MEMBER records) are ordinary agency hosts.
             label = "●  مضيف وكالة";
             start = 0xFFDDF8F2;
             end = 0xFFBCEDE2;

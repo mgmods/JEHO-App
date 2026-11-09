@@ -76,6 +76,64 @@ public final class AgencyFamilyInfoSheet {
         TextView tvOwner = sheet.findViewById(R.id.tvOwnerName);
         TextView tvMedals = sheet.findViewById(R.id.tvMedals);
         TextView btnFollow = sheet.findViewById(R.id.btnFollowAgency);
+        TextView tvClubSummary = sheet.findViewById(R.id.tvAgencyClubSummary);
+        TextView tvClubMembers = sheet.findViewById(R.id.tvAgencyClubMembers);
+        TextView btnClubJoin = sheet.findViewById(R.id.btnAgencyClubJoin);
+        TextView btnClubRequests = sheet.findViewById(R.id.btnAgencyClubRequests);
+        final boolean[] isActiveClubSupporter = {false};
+
+        if (btnClubJoin != null) {
+            btnClubJoin.setOnClickListener(v -> {
+                if (isActiveClubSupporter[0]) {
+                    new android.app.AlertDialog.Builder(activity)
+                            .setTitle("مغادرة نادي الوكالة")
+                            .setMessage("هل تريد مغادرة نادي هذه الوكالة؟")
+                            .setNegativeButton("إلغاء", null)
+                            .setPositiveButton("مغادرة", (d, which) -> {
+                                btnClubJoin.setEnabled(false);
+                                container.getIoExecutor().execute(() -> {
+                                    Result<Map<String, Object>> result = ApiCall.execute(
+                                            container.getAgencyApi().leaveClub(id));
+                                    activity.runOnUiThread(() -> {
+                                        if (!dialog.isShowing()) return;
+                                        if (result.success) {
+                                            isActiveClubSupporter[0] = false;
+                                            btnClubJoin.setText("طلب الانضمام إلى النادي");
+                                            btnClubJoin.setEnabled(true);
+                                            Toast.makeText(activity, "غادرت نادي الوكالة", Toast.LENGTH_SHORT).show();
+                                        } else {
+                                            btnClubJoin.setEnabled(true);
+                                            Toast.makeText(activity,
+                                                    result.error != null ? result.error : activity.getString(R.string.error_generic),
+                                                    Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                });
+                            })
+                            .show();
+                    return;
+                }
+                btnClubJoin.setEnabled(false);
+                container.getIoExecutor().execute(() -> {
+                    Result<Map<String, Object>> request = ApiCall.execute(
+                            container.getAgencyApi().requestClubJoin(id));
+                    activity.runOnUiThread(() -> {
+                        if (!dialog.isShowing()) return;
+                        if (request.success) {
+                            btnClubJoin.setText("تم إرسال الطلب — بانتظار موافقة صاحب الوكالة");
+                            btnClubJoin.setEnabled(false);
+                            Toast.makeText(activity, "تم إرسال طلبك إلى صاحب الوكالة", Toast.LENGTH_SHORT).show();
+                        } else {
+                            btnClubJoin.setEnabled(true);
+                            Toast.makeText(activity,
+                                    request.error != null ? request.error : activity.getString(R.string.error_generic),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                });
+            });
+        }
+
         TextView btnOpen = sheet.findViewById(R.id.btnOpenAgencyManage);
 
         final String[] gidHold = {""};
@@ -235,7 +293,142 @@ public final class AgencyFamilyInfoSheet {
             });
         });
 
+
+        // Club membership is distinct from following the agency and from host employment.
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> club = ApiCall.execute(container.getAgencyApi().getClub(id));
+            activity.runOnUiThread(() -> {
+                if (!dialog.isShowing() || !club.success || club.data == null) return;
+                Map<String, Object> data = club.data;
+                Object countsValue = data.get("counts");
+                Map<?, ?> counts = countsValue instanceof Map ? (Map<?, ?>) countsValue : java.util.Collections.emptyMap();
+                int total = counts.get("total") instanceof Number ? ((Number) counts.get("total")).intValue() : 0;
+                int hosts = counts.get("staff") instanceof Number ? ((Number) counts.get("staff")).intValue() : 0;
+                int supporters = counts.get("supporters") instanceof Number ? ((Number) counts.get("supporters")).intValue() : 0;
+                int agencyMembers = counts.get("agencyMembers") instanceof Number ? ((Number) counts.get("agencyMembers")).intValue() : 0;
+                int pending = counts.get("pending") instanceof Number ? ((Number) counts.get("pending")).intValue() : 0;
+                if (tvClubSummary != null) {
+                    tvClubSummary.setText("نادي الوكالة • " + formatCount(total) +
+                            " عضو • " + formatCount(hosts) + " مضيف/إدارة • " + formatCount(agencyMembers) + " عضو وكالة • " +
+                            formatCount(supporters) + " داعم" +
+                            (pending > 0 ? " • " + formatCount(pending) + " طلب بانتظارك" : ""));
+                }
+                if (btnClubRequests != null) {
+                    boolean canReview = Boolean.TRUE.equals(data.get("canReview"));
+                    btnClubRequests.setVisibility(canReview && pending > 0 ? View.VISIBLE : View.GONE);
+                    btnClubRequests.setText("مراجعة طلبات الانضمام • " + formatCount(pending));
+                    btnClubRequests.setOnClickListener(v ->
+                            loadClubRequests(activity, dialog, container, id));
+                }
+                Object membersValue = data.get("members");
+                java.util.ArrayList<String> rosterItems = new java.util.ArrayList<>();
+                StringBuilder rosterPreview = new StringBuilder();
+                if (membersValue instanceof java.util.List) {
+                    for (Object item : (java.util.List<?>) membersValue) {
+                        if (!(item instanceof Map)) continue;
+                        Map<?, ?> member = (Map<?, ?>) item;
+                        Object name = member.get("displayName");
+                        if (name == null) name = member.get("username");
+                        String role = String.valueOf(member.get("role") == null ? "" : member.get("role"));
+                        String roleLabel = "host".equalsIgnoreCase(role) ? "مضيف الوكالة" :
+                                ("owner".equalsIgnoreCase(role) ? "صاحب الوكالة" :
+                                ("manager".equalsIgnoreCase(role) ? "إدارة الوكالة" :
+                                ("member".equalsIgnoreCase(role) ? "عضو الوكالة" : "داعم النادي")));
+                        String display = (name == null ? "مستخدم" : String.valueOf(name)) + "  ·  " + roleLabel;
+                        rosterItems.add(display);
+                        if (rosterPreview.length() < 150) {
+                            if (rosterPreview.length() > 0) rosterPreview.append("  •  ");
+                            rosterPreview.append(display);
+                        }
+                    }
+                }
+                if (tvClubMembers != null) {
+                    tvClubMembers.setText(rosterItems.isEmpty() ? "لا يوجد أعضاء بعد" :
+                            rosterPreview + (rosterItems.size() > 3 ? "  ·  عرض الكل" : ""));
+                    tvClubMembers.setOnClickListener(v -> {
+                        if (rosterItems.isEmpty()) return;
+                        new android.app.AlertDialog.Builder(activity)
+                                .setTitle("أعضاء نادي الوكالة")
+                                .setItems(rosterItems.toArray(new String[0]), (d, which) -> { })
+                                .setPositiveButton("إغلاق", null)
+                                .show();
+                    });
+                }
+                String myStatus = String.valueOf(data.get("myStatus"));
+                if (btnClubJoin != null) {
+                    if ("active_staff".equals(myStatus) || "active_host".equals(myStatus)) {
+                        btnClubJoin.setText("أنت ضمن طاقم هذه الوكالة");
+                        btnClubJoin.setEnabled(false);
+                    } else if ("active_member".equals(myStatus)) {
+                        btnClubJoin.setText("أنت عضو في هذه الوكالة");
+                        btnClubJoin.setEnabled(false);
+                    } else if ("active".equals(myStatus)) {
+                        isActiveClubSupporter[0] = true;
+                        btnClubJoin.setText("مغادرة النادي");
+                        btnClubJoin.setEnabled(true);
+                    } else if ("pending".equals(myStatus)) {
+                        btnClubJoin.setText("طلبك قيد مراجعة صاحب الوكالة");
+                        btnClubJoin.setEnabled(false);
+                    } else {
+                        btnClubJoin.setText("طلب الانضمام إلى النادي");
+                        btnClubJoin.setEnabled(true);
+                    }
+                }
+            });
+        });
+
         dialog.show();
+    }
+
+    private static void loadClubRequests(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
+            @NonNull AppContainer container, @NonNull String agencyId) {
+        container.getIoExecutor().execute(() -> {
+            Result<java.util.List<Map<String, Object>>> result = ApiCall.execute(container.getAgencyApi().clubRequests(agencyId));
+            activity.runOnUiThread(() -> {
+                if (!parent.isShowing()) return;
+                if (!result.success || result.data == null || result.data.isEmpty()) {
+                    Toast.makeText(activity, "لا توجد طلبات انضمام معلّقة", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showNextClubRequest(activity, parent, container, agencyId, result.data, 0);
+            });
+        });
+    }
+
+    private static void showNextClubRequest(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
+            @NonNull AppContainer container, @NonNull String agencyId,
+            @NonNull java.util.List<Map<String, Object>> requests, int index) {
+        if (!parent.isShowing() || index >= requests.size()) {
+            Toast.makeText(activity, "تمت مراجعة طلبات النادي", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Map<String, Object> request = requests.get(index);
+        String userId = String.valueOf(request.get("userId"));
+        Object rawName = request.get("displayName");
+        String name = rawName == null ? String.valueOf(request.get("username")) : String.valueOf(rawName);
+        new android.app.AlertDialog.Builder(activity)
+            .setTitle("طلب انضمام إلى النادي")
+            .setMessage(name + " يريد الانضمام إلى نادي الوكالة. هل توافق؟")
+            .setPositiveButton("قبول", (d, which) -> reviewClubRequest(activity, parent, container, agencyId, userId, true))
+            .setNegativeButton("رفض", (d, which) -> reviewClubRequest(activity, parent, container, agencyId, userId, false))
+            .setNeutralButton("لاحقًا", (d, which) -> { })
+            .show();
+    }
+
+    private static void reviewClubRequest(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
+            @NonNull AppContainer container, @NonNull String agencyId, @NonNull String userId, boolean approve) {
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(approve
+                ? container.getAgencyApi().approveClubRequest(agencyId, userId)
+                : container.getAgencyApi().rejectClubRequest(agencyId, userId));
+            activity.runOnUiThread(() -> {
+                if (!result.success) {
+                    Toast.makeText(activity, result.error != null ? result.error : activity.getString(R.string.error_generic), Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                loadClubRequests(activity, parent, container, agencyId);
+            });
+        });
     }
 
     private static void applyFollowUi(@Nullable TextView btn, boolean following) {

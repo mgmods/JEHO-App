@@ -90,7 +90,7 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   'room-cup': 'roomCup',
   games: 'games',
   'game-ads': 'gameAds',
-  drama: 'drama',
+  stories: 'drama',
   banners: 'banners',
   'nav-icons': 'navIcons',
   'seat-stickers': 'seatStickers',

@@ -43,7 +43,6 @@ import { TasksModule } from '../tasks/tasks.module';
 import { RankingModule } from '../ranking/ranking.module';
 import { UsersModule } from '../users/users.module';
 import { RechargeAgentsModule } from '../recharge-agents/recharge-agents.module';
-import { DramaModule } from '../drama/drama.module';
 import { AgencyApplication } from '../../database/entities/agency-application.entity';
 import { RoomSeat } from '../../database/entities/room-seat.entity';
 import { AgenciesModule } from '../agencies/agencies.module';
@@ -90,7 +89,6 @@ import { GiftsModule } from '../gifts/gifts.module';
     RankingModule,
     UsersModule,
     RechargeAgentsModule,
-    DramaModule,
     AgenciesModule,
     GiftsModule,
     JwtModule.registerAsync({

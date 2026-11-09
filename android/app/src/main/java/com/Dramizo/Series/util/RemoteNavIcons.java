@@ -32,7 +32,7 @@ import java.util.concurrent.Executors;
  */
 public final class RemoteNavIcons {
     public static final String TAB_PARTY = "party";
-    public static final String TAB_DRAMA = "drama";
+    public static final String TAB_DRAMA = "stories";
     public static final String TAB_GAMES = "games";
     public static final String TAB_CHAT = "chat";
     public static final String TAB_ME = "me";

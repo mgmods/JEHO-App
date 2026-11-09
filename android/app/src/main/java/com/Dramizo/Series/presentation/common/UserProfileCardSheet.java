@@ -337,6 +337,15 @@ public final class UserProfileCardSheet {
                 bindEntryRide(imgEntryRide, firstNonEmpty(u.entryAnimationUrl, u.entryEffectUrl));
                 bindVipMedal(imgVipMedal, liveVip, u.levelBadgeUrl);
                 bindAgency(activity, rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, u.agency);
+                if (u.agencyClub != null && u.agencyClub.label != null && !u.agencyClub.label.trim().isEmpty()) {
+                    if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
+                    if (tvAgencyName != null) tvAgencyName.setText(u.agencyClub.label);
+                    if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
+                    if (imgAgencyLogo != null) imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                    if (rowAgency != null) rowAgency.setOnClickListener(v -> {
+                        if (u.agencyClub.agencyId != null) AgencyFamilyInfoSheet.show(activity, u.agencyClub.agencyId);
+                    });
+                }
                 AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, liveVip);
                 // Dashboard-uploaded profile-card art and nameplate are applied from equipped cosmetics.
                 String vipProfileCard = firstNonEmpty(u.profileCardUrl, u.vipCardUrl);

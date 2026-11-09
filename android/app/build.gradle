@@ -30,8 +30,8 @@ android {
         applicationId "com.mgwa.chat"
         minSdk 24
         targetSdk 36
-        versionCode 50
-        versionName "2.0.52"
+        versionCode 51
+        versionName "2.0.53"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Never bake ZEGO AppSign into the APK. AppID comes from the server (/config/zego + join token).
         buildConfigField "long", "ZEGO_APP_ID", "0L"
