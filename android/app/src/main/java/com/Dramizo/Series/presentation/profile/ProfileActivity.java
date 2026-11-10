@@ -851,7 +851,7 @@ public class ProfileActivity extends ThemedActivity {
         final int textColor;
         final int strokeColor;
         if ("owner".equals(agencyRole)) {
-            label = "♛  صاحب وكالة";
+            label = "♛  قائد وكالة";
             start = 0xFFFFF0CC;
             end = 0xFFFFD778;
             textColor = 0xFF765000;

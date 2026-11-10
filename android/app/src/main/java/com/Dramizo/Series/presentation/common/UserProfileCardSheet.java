@@ -337,7 +337,31 @@ public final class UserProfileCardSheet {
                 bindEntryRide(imgEntryRide, firstNonEmpty(u.entryAnimationUrl, u.entryEffectUrl));
                 bindVipMedal(imgVipMedal, liveVip, u.levelBadgeUrl);
                 bindAgency(activity, rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, u.agency);
-                if (u.agencyClub != null && u.agencyClub.label != null && !u.agencyClub.label.trim().isEmpty()) {
+                boolean isAgencyOwner = u.agency != null && "owner".equalsIgnoreCase(u.agency.role);
+                if (isAgencyOwner) {
+                    if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
+                    if (tvAgencyName != null) {
+                        String agencyName = u.agency.name == null ? "" : u.agency.name.trim();
+                        tvAgencyName.setText(agencyName.isEmpty()
+                                ? "♛  قائد وكالة"
+                                : "♛  قائد وكالة · " + agencyName);
+                    }
+                    if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
+                    if (imgAgencyLogo != null) {
+                        String ownerAgencyLogo = u.agency.logoUrl;
+                        if (ownerAgencyLogo != null && !ownerAgencyLogo.trim().isEmpty()) {
+                            Glide.with(activity).load(AssetCatalog.absoluteUrl(ownerAgencyLogo))
+                                    .placeholder(R.drawable.icon_agency)
+                                    .error(R.drawable.icon_agency)
+                                    .centerCrop().into(imgAgencyLogo);
+                        } else {
+                            imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                        }
+                    }
+                    if (rowAgency != null) rowAgency.setOnClickListener(v -> {
+                        if (u.agency.id != null) AgencyFamilyInfoSheet.show(activity, u.agency.id);
+                    });
+                } else if (u.agencyClub != null && u.agencyClub.label != null && !u.agencyClub.label.trim().isEmpty()) {
                     if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
                     if (tvAgencyName != null) tvAgencyName.setText(u.agencyClub.label);
                     if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
