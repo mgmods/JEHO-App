@@ -81,6 +81,44 @@
             android:textColor="@color/text_hint"
             android:textSize="13sp" />
 
+        <LinearLayout
+            android:id="@+id/rowNotificationActions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="start"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/btnNotificationApprove"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_agency_invite_yes"
+                android:gravity="center"
+                android:text="موافقة"
+                android:textColor="@android:color/white"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <Space
+                android:layout_width="10dp"
+                android:layout_height="1dp" />
+
+            <TextView
+                android:id="@+id/btnNotificationReject"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_notification_action_reject"
+                android:gravity="center"
+                android:text="رفض"
+                android:textColor="#FFB423"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/tvTime"
             android:layout_width="wrap_content"
