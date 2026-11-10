@@ -231,29 +231,12 @@ export class AgenciesService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`ensure agency_follows: ${(err as Error).message}`);
     }
+    // The legacy agency club is retired. Remove its storage; agency follows and
+    // agency_members remain the only social-follow and staff-membership sources.
     try {
-      // Supporter club is separate from agency staff employment/activation.
-      await this.dataSource.query(`
-        CREATE TABLE IF NOT EXISTS agency_club_members (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
-          "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          status varchar(16) NOT NULL DEFAULT 'pending',
-          "createdAt" timestamptz NOT NULL DEFAULT NOW(),
-          "updatedAt" timestamptz NOT NULL DEFAULT NOW(),
-          UNIQUE ("agencyId", "userId")
-        )
-      `);
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS "IDX_agency_club_members_agency_status"
-        ON agency_club_members ("agencyId", status, "createdAt" DESC)
-      `);
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS "IDX_agency_club_members_user"
-        ON agency_club_members ("userId", status)
-      `);
+      await this.dataSource.query('DROP TABLE IF EXISTS agency_club_members');
     } catch (err) {
-      this.logger.warn(`ensure agency supporter club: ${(err as Error).message}`);
+      this.logger.warn(`drop retired agency club table: ${(err as Error).message}`);
     }
     try {
       // Mark catalog agency frames as admin-only exclusive when meta missing.
@@ -1246,6 +1229,53 @@ export class AgenciesService implements OnModuleInit {
     agency.publicId = fallback;
     await this.agenciesRepo.update({ id: agency.id }, { publicId: fallback });
     return agency;
+  }
+
+  /** Public agency profile roster. Owner is always first, followed by active managers, hosts and members. */
+  async publicMembers(agencyId: string, page = 1, limit = 30) {
+    const agency = await this.agenciesRepo.findOne({ where: [{ id: agencyId }, { publicId: String(agencyId || '').trim() }], relations: ['owner'] });
+    if (!agency || agency.status !== AgencyStatus.ACTIVE) throw new NotFoundException('Agency not found');
+    const safeLimit = Math.min(50, Math.max(1, Number(limit) || 30));
+    const safePage = Math.max(1, Number(page) || 1);
+    const rows = await this.membersRepo.createQueryBuilder('m')
+      .leftJoinAndSelect('m.user', 'u')
+      .where('m.agencyId = :agencyId', { agencyId: agency.id })
+      .andWhere('m.status = :status AND m.isActive = true', { status: AgencyMemberStatus.ACTIVE })
+      .orderBy(`CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 WHEN 'host' THEN 2 ELSE 3 END`, 'ASC')
+      .addOrderBy('m.joinedAt', 'ASC')
+      .skip((safePage - 1) * safeLimit).take(safeLimit).getMany();
+    const items = rows.map(m => ({
+      userId: m.userId, role: m.role, joinedAt: m.joinedAt,
+      user: m.user ? { id: m.user.id, publicId: m.user.publicId, username: m.user.username,
+        displayName: m.user.displayName, avatarUrl: m.user.avatarUrl, level: m.user.level } : null,
+    }));
+    if (safePage === 1 && !items.some(m => m.userId === agency.ownerId) && agency.owner) {
+      items.unshift({ userId: agency.owner.id, role: AgencyRole.OWNER, joinedAt: agency.createdAt,
+        user: { id: agency.owner.id, publicId: agency.owner.publicId, username: agency.owner.username,
+          displayName: agency.owner.displayName, avatarUrl: agency.owner.avatarUrl, level: agency.owner.level } });
+    }
+    const total = await this.membersRepo.count({ where: { agencyId: agency.id, status: AgencyMemberStatus.ACTIVE, isActive: true } });
+    return { items, total: Math.max(total, items.length), page: safePage, limit: safeLimit };
+  }
+
+  /** Public, paginated follower list; following is separate from agency employment. */
+  async publicFollowers(agencyId: string, page = 1, limit = 30) {
+    const agency = await this.agenciesRepo.findOne({ where: [{ id: agencyId }, { publicId: String(agencyId || '').trim() }] });
+    if (!agency || agency.status !== AgencyStatus.ACTIVE) throw new NotFoundException('Agency not found');
+    const safeLimit = Math.min(50, Math.max(1, Number(limit) || 30));
+    const safePage = Math.max(1, Number(page) || 1);
+    const [items, count] = await Promise.all([
+      this.dataSource.query(`
+        SELECT u.id AS "userId", u."publicId", u.username, u."displayName", u."avatarUrl", u.level,
+               f."createdAt" AS "followedAt"
+        FROM agency_follows f JOIN users u ON u.id = f."userId"
+        WHERE f."agencyId" = $1
+        ORDER BY f."createdAt" DESC
+        LIMIT $2 OFFSET $3
+      `, [agency.id, safeLimit, (safePage - 1) * safeLimit]),
+      this.dataSource.query('SELECT COUNT(*)::int AS total FROM agency_follows WHERE "agencyId" = $1', [agency.id]),
+    ]);
+    return { items, total: Number(count?.[0]?.total || 0), page: safePage, limit: safeLimit };
   }
 
   async followAgency(agencyId: string, userId: string) {
@@ -3404,230 +3434,5 @@ export class AgenciesService implements OnModuleInit {
   }
 
   /** Club overview combines existing active staff (owner/manager/host) with approved supporters. */
-  async getClub(agencyId: string, viewerId: string) {
-    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId }, relations: ['owner'] });
-    if (!agency || agency.status !== AgencyStatus.ACTIVE) throw new NotFoundException('Agency not found');
-    const [supporters, staff, mine, counts] = await Promise.all([
-      this.dataSource.query(`
-        SELECT cm."userId", cm."createdAt" AS "joinedAt", u."displayName", u.username,
-               u."avatarUrl", u."publicId", 'supporter' AS role, 'active' AS status
-        FROM agency_club_members cm JOIN users u ON u.id = cm."userId"
-        WHERE cm."agencyId" = $1 AND cm.status = 'active'
-          AND NOT EXISTS (SELECT 1 FROM agencies a WHERE a.id = cm."agencyId" AND a."ownerId" = cm."userId")
-          AND NOT EXISTS (
-            SELECT 1 FROM agency_members am
-            WHERE am."agencyId" = cm."agencyId" AND am."userId" = cm."userId"
-              AND am.status = 'active' AND am."isActive" = true
-          )
-        ORDER BY cm."createdAt" DESC LIMIT 100
-      `, [agencyId]),
-      this.dataSource.query(`
-        SELECT am."userId", am."joinedAt", u."displayName", u.username,
-               u."avatarUrl", u."publicId", am.role::text AS role, am.status::text AS status
-        FROM agency_members am JOIN users u ON u.id = am."userId"
-        WHERE am."agencyId" = $1 AND am.status = 'active' AND am."isActive" = true
-          AND am.role IN ('owner','manager','host','member')
-        ORDER BY CASE am.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END,
-                 am."joinedAt" DESC LIMIT 100
-      `, [agencyId]),
-      this.dataSource.query(`
-        SELECT status FROM agency_club_members WHERE "agencyId" = $1 AND "userId" = $2 LIMIT 1
-      `, [agencyId, viewerId]),
-      this.dataSource.query(`
-        SELECT
-          (SELECT COUNT(*)::int FROM agency_club_members cm
-            WHERE cm."agencyId" = $1 AND cm.status = 'active'
-              AND NOT EXISTS (SELECT 1 FROM agencies a WHERE a.id = cm."agencyId" AND a."ownerId" = cm."userId")
-              AND NOT EXISTS (
-                SELECT 1 FROM agency_members am
-                WHERE am."agencyId" = cm."agencyId" AND am."userId" = cm."userId"
-                  AND am.status = 'active' AND am."isActive" = true
-              )) AS supporters,
-          (SELECT COUNT(*)::int FROM agency_club_members WHERE "agencyId" = $1 AND status = 'pending') AS pending,
-          (SELECT COUNT(*)::int FROM (
-            SELECT "userId" FROM agency_members
-            WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role IN ('owner','manager','host')
-            UNION
-            SELECT "ownerId" AS "userId" FROM agencies WHERE id = $1
-          ) staff_roster) AS staff,
-          (SELECT COUNT(*)::int FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role = 'member') AS "agencyMembers",
-          (SELECT COUNT(*)::int FROM (
-            SELECT "userId" FROM agency_club_members WHERE "agencyId" = $1 AND status = 'active'
-            UNION
-            SELECT "userId" FROM agency_members WHERE "agencyId" = $1 AND status = 'active' AND "isActive" = true AND role IN ('owner','manager','host','member')
-            UNION
-            SELECT "ownerId" AS "userId" FROM agencies WHERE id = $1
-          ) club_roster) AS total
-      `, [agencyId]),
-    ]);
-    const owner = agency.owner ? {
-      id: agency.owner.id, displayName: agency.owner.displayName,
-      username: agency.owner.username, avatarUrl: agency.owner.avatarUrl, role: 'owner'
-    } : null;
-    const seen = new Set<string>();
-    const members = [...staff, ...supporters].filter((m: any) => {
-      if (seen.has(m.userId)) return false;
-      seen.add(m.userId); return true;
-    });
-    // The agency owner is part of the club roster even on legacy agencies
-    // that predate the owner AgencyMember row.
-    if (owner?.id && !seen.has(owner.id)) {
-      members.unshift({
-        userId: owner.id,
-        displayName: owner.displayName,
-        username: owner.username,
-        avatarUrl: owner.avatarUrl,
-        role: 'owner',
-        status: 'active',
-      });
-      seen.add(owner.id);
-    }
-    const status = mine?.[0]?.status || null;
-    const staffMembership = await this.membersRepo.findOne({
-      where: { agencyId, userId: viewerId, status: AgencyMemberStatus.ACTIVE, isActive: true }
-    });
-    const canReviewClub = agency.ownerId === viewerId || await this.membersRepo.exist({
-      where: {
-        agencyId, userId: viewerId, role: AgencyRole.MANAGER,
-        status: AgencyMemberStatus.ACTIVE, isActive: true,
-      },
-    });
-    return {
-      agencyId, agencyName: agency.name, owner,
-      counts: {
-        supporters: Number(counts?.[0]?.supporters || 0),
-        staff: Number(counts?.[0]?.staff || 0),
-        agencyMembers: Number(counts?.[0]?.agencyMembers || 0),
-        // Count unique accounts: a staff member must not be double-counted if they also have a legacy supporter row.
-        total: Number(counts?.[0]?.total ?? members.length),
-        pending: canReviewClub ? Number(counts?.[0]?.pending || 0) : undefined,
-      },
-      members,
-      myStatus: agency.ownerId === viewerId ? 'active_staff' : staffMembership ? (staffMembership.role === AgencyRole.HOST ? 'active_host' : staffMembership.role === AgencyRole.MEMBER ? 'active_member' : 'active_staff') : status,
-      canReview: canReviewClub,
-    };
-  }
-
-  async requestClubJoin(agencyId: string, userId: string) {
-    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
-    if (!agency || agency.status !== AgencyStatus.ACTIVE) throw new NotFoundException('Agency not found');
-    if (agency.ownerId === userId) return { status: 'active_staff', alreadyMember: true };
-    const staff = await this.membersRepo.findOne({
-      where: { agencyId, userId, status: AgencyMemberStatus.ACTIVE, isActive: true }
-    });
-    if (staff) return { status: 'active_staff', alreadyMember: true };
-    // Insert/reopen atomically. Concurrent taps must create one pending request
-    // and one notification only; an already-pending request is left untouched.
-    const created = await this.dataSource.query(`
-      INSERT INTO agency_club_members ("agencyId", "userId", status)
-      VALUES ($1, $2, 'pending')
-      ON CONFLICT ("agencyId", "userId") DO UPDATE
-      SET status = 'pending', "updatedAt" = NOW()
-      WHERE agency_club_members.status = 'rejected'
-      RETURNING "userId"
-    `, [agencyId, userId]);
-    if (!created?.length) {
-      const existing = await this.dataSource.query(
-        `SELECT status FROM agency_club_members WHERE "agencyId" = $1 AND "userId" = $2 LIMIT 1`,
-        [agencyId, userId]
-      );
-      if (existing?.[0]?.status === 'active') return { status: 'active', alreadyMember: true };
-      if (existing?.[0]?.status === 'pending') return { status: 'pending', alreadyRequested: true };
-      // A concurrently changed/deleted row can safely retry through the same
-      // idempotent insert path on the next user action.
-      return { status: 'pending', alreadyRequested: true };
-    }
-    const requester = await this.usersRepo.findOne({ where: { id: userId } });
-    try {
-      const managers = await this.membersRepo.find({
-        where: {
-          agencyId, role: AgencyRole.MANAGER,
-          status: AgencyMemberStatus.ACTIVE, isActive: true,
-        },
-        select: ['userId'],
-      });
-      const recipients = Array.from(new Set([
-        agency.ownerId,
-        ...managers.map((manager) => manager.userId),
-      ].filter(Boolean)));
-      await Promise.all(recipients.map((recipientId) => this.notificationsService.create({
-        userId: recipientId, type: NotificationType.AGENCY,
-        title: 'طلب انضمام إلى نادي الوكالة',
-        body: `${requester?.displayName || requester?.username || 'مستخدم'} يريد الانضمام إلى نادي وكالة ${agency.name}`,
-        data: { action: 'agency_club_request', agencyId, agencyName: agency.name, agencyLogoUrl: agency.logoUrl || null, requesterId: userId },
-        sendPush: true,
-      })));
-    } catch (error) {
-      this.logger.warn(`agency club request notification failed: ${(error as Error).message}`);
-    }
-    return { status: 'pending', requested: true };
-  }
-
-  async listClubRequests(agencyId: string, actorId: string) {
-    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
-    if (!agency) throw new NotFoundException('Agency not found');
-    const canReview = agency.ownerId === actorId || await this.membersRepo.exist({
-      where: {
-        agencyId, userId: actorId, role: AgencyRole.MANAGER,
-        status: AgencyMemberStatus.ACTIVE, isActive: true,
-      },
-    });
-    if (!canReview) throw new ForbiddenException('هذه الصلاحية لصاحب الوكالة أو مدير معتمد');
-    return this.dataSource.query(`
-      SELECT cm."userId", cm."createdAt", u."displayName", u.username, u."avatarUrl", u."publicId"
-      FROM agency_club_members cm JOIN users u ON u.id = cm."userId"
-      WHERE cm."agencyId" = $1 AND cm.status = 'pending'
-      ORDER BY cm."createdAt" ASC LIMIT 100
-    `, [agencyId]);
-  }
-
-  async reviewClubRequest(agencyId: string, actorId: string, memberUserId: string, approve: boolean) {
-    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
-    if (!agency) throw new NotFoundException('Agency not found');
-    const canReview = agency.ownerId === actorId || await this.membersRepo.exist({
-      where: {
-        agencyId, userId: actorId, role: AgencyRole.MANAGER,
-        status: AgencyMemberStatus.ACTIVE, isActive: true,
-      },
-    });
-    if (!canReview) throw new ForbiddenException('هذه الصلاحية لصاحب الوكالة أو مدير معتمد');
-    const updated = await this.dataSource.query(`
-      UPDATE agency_club_members
-      SET status = $3, "updatedAt" = NOW()
-      WHERE "agencyId" = $1 AND "userId" = $2 AND status = 'pending'
-      RETURNING "userId"
-    `, [agencyId, memberUserId, approve ? 'active' : 'rejected']);
-    if (!updated?.length) throw new NotFoundException('طلب النادي غير موجود أو تمت مراجعته مسبقاً');
-    try {
-      await this.notificationsService.create({
-        userId: memberUserId, type: NotificationType.AGENCY,
-        title: approve ? 'تم قبول طلب النادي' : 'تم رفض طلب النادي',
-        body: approve ? `تم قبولك ضمن نادي وكالة ${agency.name}` : `لم تتم الموافقة على انضمامك إلى نادي وكالة ${agency.name}`,
-        data: { action: approve ? 'agency_club_approved' : 'agency_club_rejected', agencyId, agencyName: agency.name },
-        sendPush: true,
-      });
-    } catch (error) {
-      this.logger.warn(`agency club review notification failed: ${(error as Error).message}`);
-    }
-    return { status: approve ? 'active' : 'rejected', agencyId };
-  }
-
-  async leaveClub(agencyId: string, userId: string) {
-    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
-    if (!agency) throw new NotFoundException('Agency not found');
-    if (agency.ownerId === userId) {
-      throw new ForbiddenException('صاحب الوكالة لا يغادر نادي وكالته');
-    }
-    const staff = await this.membersRepo.findOne({
-      where: { agencyId, userId, status: AgencyMemberStatus.ACTIVE, isActive: true }
-    });
-    if (staff) throw new ForbiddenException('صفة المضيف أو الإدارة مرتبطة بعضوية الوكالة الوظيفية؛ راجع صاحب الوكالة');
-    await this.dataSource.query(
-      `DELETE FROM agency_club_members WHERE "agencyId" = $1 AND "userId" = $2`,
-      [agencyId, userId]
-    );
-    return { left: true, agencyId };
-  }
-
 
 }
