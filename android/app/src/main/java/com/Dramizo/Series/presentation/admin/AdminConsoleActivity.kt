@@ -513,7 +513,7 @@ class AdminConsoleActivity : ThemedActivity() {
      */
     private fun showHome() {
         currentSection = "home"
-        titleView.text = "لوحة الإدارة"
+        titleView.text = "الرئيسية"
         backButton.visibility = View.GONE
         body.removeAllViews()
         body.layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -562,7 +562,12 @@ class AdminConsoleActivity : ThemedActivity() {
                     setPadding(dp(14), dp(14), dp(14), dp(14))
                     background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(18).toFloat(); setStroke(dp(1), 0xFFE7E4F1.toInt()) }
                     elevation = dp(2).toFloat(); isClickable = true; isFocusable = true
-                    layoutParams = LinearLayout.LayoutParams(0, dp(116), 1f).apply { marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(9) }
+                    foreground = android.graphics.drawable.RippleDrawable(
+                        android.content.res.ColorStateList.valueOf(0x226B4CC2),
+                        roundRect(0xFFF0ECFF.toInt(), 18),
+                        null
+                    )
+                    layoutParams = LinearLayout.LayoutParams(0, dp(124), 1f).apply { marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(10) }
                     setOnClickListener { openModule(module.key) }
                 }
                 val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
@@ -1727,7 +1732,9 @@ class AdminConsoleActivity : ThemedActivity() {
         val role = value(item, "staffRole", "role") ?: "بدون رتبة إدارية"
         val publicId = value(item, "publicId")
         val roomTitle = value(item, "title", "name", "roomName") ?: name
-        val accessMode = value(item, "accessMode") ?: "public"
+        val accessMode = value(item, "accessMode")?.trim()?.lowercase()?.let {
+            if (it == "public") "free" else it
+        } ?: "free"
         val entryFee = value(item, "entryFeeCoins") ?: "0"
 
         val content = LinearLayout(this).apply {

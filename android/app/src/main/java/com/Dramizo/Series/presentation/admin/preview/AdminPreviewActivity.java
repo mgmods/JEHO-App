@@ -87,15 +87,15 @@ public final class AdminPreviewActivity extends ThemedActivity {
         try {
             user = ContainerProvider.from(this).getSessionManager().getUser();
         } catch (Exception ignored) { }
-        // The hub is available to authenticated staff, while every section is filtered by role.
         if (!StaffRoleHelper.isStaff(user)) {
             Toast.makeText(this, "مركز الإدارة مخصص لحسابات فريق JEHO", Toast.LENGTH_LONG).show();
             finish();
             return;
         }
-        currentRole = StaffRoleHelper.normalize(user);
-        buildScreen();
-        renderSection(activeSection, "");
+        // All staff roles now enter the same real native administration home.
+        // The former "تصميم أصلي · أقسام الإدارة المتصلة" hub is intentionally retired.
+        startActivity(new Intent(this, com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class));
+        finish();
     }
 
     private void buildScreen() {
