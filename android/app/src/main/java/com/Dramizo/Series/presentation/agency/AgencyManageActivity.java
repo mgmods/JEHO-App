@@ -48,11 +48,13 @@ import java.util.Locale;
 public class AgencyManageActivity extends ThemedActivity {
     public static final String EXTRA_AGENCY_ID = "agency_id";
     public static final String EXTRA_OPEN_AGENCY_CLUB = "open_agency_club";
+    public static final String EXTRA_OPEN_PENDING_REQUESTS = "open_agency_pending_requests";
 
     private ActivityAgencyManageBinding binding;
     private AgencyViewModel vm;
     private String agencyId;
     private boolean openAgencyClubFromNotification;
+    private boolean openPendingRequestsFromNotification;
     private boolean isOwner;
     private boolean isPlatformSuper;
     private MiscDtos.AgencyMineDto myAgency;
@@ -76,6 +78,7 @@ public class AgencyManageActivity extends ThemedActivity {
         setContentView(binding.getRoot());
         agencyId = getIntent().getStringExtra(EXTRA_AGENCY_ID);
         openAgencyClubFromNotification = getIntent().getBooleanExtra(EXTRA_OPEN_AGENCY_CLUB, false);
+        openPendingRequestsFromNotification = getIntent().getBooleanExtra(EXTRA_OPEN_PENDING_REQUESTS, false);
         if (agencyId == null || agencyId.isEmpty()) {
             Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
             finish();
@@ -297,6 +300,11 @@ public class AgencyManageActivity extends ThemedActivity {
                     openAgencyClubFromNotification = false;
                     binding.getRoot().post(() -> {
                         if (!isFinishing()) AgencyFamilyInfoSheet.show(this, agencyId);
+                    });
+                } else if (openPendingRequestsFromNotification) {
+                    openPendingRequestsFromNotification = false;
+                    binding.getRoot().post(() -> {
+                        if (!isFinishing()) dialogPending();
                     });
                 }
             });
