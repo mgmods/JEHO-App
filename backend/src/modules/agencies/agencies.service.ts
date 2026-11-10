@@ -1452,6 +1452,41 @@ export class AgenciesService implements OnModuleInit {
     return this.joinSelf(agency.id, userId);
   }
 
+  async rejectInvite(agencyId: string, userId: string, rawCode: string) {
+    const code = normalizeActivationCode(rawCode);
+    if (code.length < 4 || code.length > 16) {
+      throw new BadRequestException('كود الدعوة غير صالح');
+    }
+    const agency = await this.agenciesRepo.findOne({
+      where: { id: agencyId, activationCode: code, status: AgencyStatus.ACTIVE },
+    });
+    if (!agency) {
+      throw new NotFoundException('الدعوة غير صالحة أو انتهت صلاحيتها');
+    }
+    if (agency.ownerId !== userId) {
+      try {
+        const user = await this.usersRepo.findOne({ where: { id: userId } });
+        await this.notificationsService.create({
+          userId: agency.ownerId,
+          type: NotificationType.AGENCY,
+          title: 'تم رفض دعوة الوكالة',
+          body: `${user?.displayName || user?.username || 'المستخدم'} رفض دعوة الانضمام إلى «${agency.name}».`,
+          data: {
+            action: 'invite_rejected',
+            agencyId: agency.id,
+            agencyName: agency.name,
+            agencyLogoUrl: agency.logoUrl || null,
+            rejectedUserId: userId,
+          },
+          sendPush: false,
+        });
+      } catch (err) {
+        this.logger.warn(`agency invite rejection notice failed: ${(err as Error).message}`);
+      }
+    }
+    return { rejected: true };
+  }
+
   async joinByCode(userId: string, rawCode: string, rawPublicId: string) {
     const code = normalizeActivationCode(rawCode);
     if (code.length < 4) {
