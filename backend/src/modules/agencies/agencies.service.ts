@@ -3413,6 +3413,12 @@ export class AgenciesService implements OnModuleInit {
                u."avatarUrl", u."publicId", 'supporter' AS role, 'active' AS status
         FROM agency_club_members cm JOIN users u ON u.id = cm."userId"
         WHERE cm."agencyId" = $1 AND cm.status = 'active'
+          AND NOT EXISTS (SELECT 1 FROM agencies a WHERE a.id = cm."agencyId" AND a."ownerId" = cm."userId")
+          AND NOT EXISTS (
+            SELECT 1 FROM agency_members am
+            WHERE am."agencyId" = cm."agencyId" AND am."userId" = cm."userId"
+              AND am.status = 'active' AND am."isActive" = true
+          )
         ORDER BY cm."createdAt" DESC LIMIT 100
       `, [agencyId]),
       this.dataSource.query(`
