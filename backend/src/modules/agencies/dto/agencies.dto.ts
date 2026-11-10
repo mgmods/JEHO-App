@@ -146,12 +146,13 @@ export class UpdateCommissionDto {
  * The agency identifier is a route UUID, never the user's 16-char publicId.
  */
 export class AcceptAgencyInviteDto {
-  @ApiProperty({ example: 'A7K2M9QX', description: 'Private agency activation code embedded in the invite' })
+  @ApiPropertyOptional({ example: 'A7K2M9QX', description: 'Private agency activation code embedded in the invite. Optional for legacy invite cards; the agency UUID still creates a pending request.' })
+  @IsOptional()
   @Transform(trim)
   @IsString()
   @MinLength(4)
   @MaxLength(16)
-  code: string;
+  code?: string;
 }
 
 export class JoinByCodeDto {
