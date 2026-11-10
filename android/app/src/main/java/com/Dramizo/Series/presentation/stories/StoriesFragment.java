@@ -460,7 +460,7 @@ public class StoriesFragment extends Fragment {
                             if (activeVideo != null) {
                                 if (!activeVideo.isPlaying()) activeVideo.start();
                             } else {
-                                storyHandler.postDelayed(imageAdvance[0], 5000L);
+                                scheduleImageAdvance[0].run();
                             }
                         }
                     } else if (Math.abs(dx) < dp(18) && Math.abs(dy) < dp(18)) {
