@@ -8625,6 +8625,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             row.setVisibility(View.GONE);
             return;
         }
+
         java.util.ArrayList<String> labels = new java.util.ArrayList<>();
         String staff = user.staffRole == null ? "" : user.staffRole.trim().toLowerCase(java.util.Locale.ROOT);
         if ("super".equals(staff) || "super_admin".equals(staff) || "superadmin".equals(staff)) {
@@ -8634,19 +8635,36 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else if ("manager".equals(staff) || "platform_manager".equals(staff)) {
             labels.add("MANAGER");
         }
+
         com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency = user.agency;
-        if (agency != null && agency.name != null && !agency.name.trim().isEmpty()) {
+        if (agency != null) {
             String role = agency.role == null ? "" : agency.role.trim().toLowerCase(java.util.Locale.ROOT);
-            if ("owner".equals(role)) labels.add("صاحب وكالة · " + agency.name.trim());
-            else if ("manager".equals(role)) labels.add("مدير وكالة · " + agency.name.trim());
-            else if ("host".equals(role) || "moderator".equals(role)) labels.add("موظف وكالة · " + agency.name.trim());
-            else labels.add("عضو وكالة · " + agency.name.trim());
+            String agencyName = agency.name == null ? "" : agency.name.trim();
+
+            // Agency leader is a permanent identity badge and remains visible in every room.
+            if ("owner".equals(role)) {
+                labels.add(agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName);
+            } else {
+                // Hosts/moderators are shown only inside the room belonging to that same agency.
+                RoomDtos.RoomDto liveRoom = viewModel != null ? viewModel.getRoom().getValue() : null;
+                String roomAgencyId = liveRoom != null && liveRoom.agencyId != null
+                        ? liveRoom.agencyId.trim() : "";
+                String memberAgencyId = agency.id == null ? "" : agency.id.trim();
+                boolean sameAgencyRoom = isAgencyRoom && !roomAgencyId.isEmpty()
+                        && !memberAgencyId.isEmpty() && roomAgencyId.equals(memberAgencyId);
+                if (sameAgencyRoom) {
+                    if ("host".equals(role)) labels.add("مضيف");
+                    else if ("moderator".equals(role)) labels.add("مشرفة");
+                }
+            }
         }
+
         if (user.isRechargeAgent) labels.add("وكيل شحن");
         if (labels.isEmpty()) {
             row.setVisibility(View.GONE);
             return;
         }
+
         float density = getResources().getDisplayMetrics().density;
         for (String label : labels) {
             TextView chip = new TextView(this);
