@@ -462,7 +462,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     setTextColor(MUTED)
                 })
                 tile.addView(top)
-                addText(tile, module.title, 13f, true, TEXT)
+                addText(tile, module.title, 14f, true, TEXT)
                 tile.addView(TextView(this).apply {
                     text = module.subtitle
                     textSize = 10.5f
@@ -560,14 +560,14 @@ class AdminConsoleActivity : ThemedActivity() {
                 val tile = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL
                     setPadding(dp(14), dp(14), dp(14), dp(14))
-                    background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(18).toFloat(); setStroke(dp(1), 0xFFE7E4F1.toInt()) }
+                    background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(20).toFloat(); setStroke(dp(1), 0xFFE7E4F1.toInt()) }
                     elevation = dp(2).toFloat(); isClickable = true; isFocusable = true
                     foreground = android.graphics.drawable.RippleDrawable(
                         android.content.res.ColorStateList.valueOf(0x226B4CC2),
-                        roundRect(0xFFF0ECFF.toInt(), 18),
+                        roundRect(0xFFF0ECFF.toInt(), 20),
                         null
                     )
-                    layoutParams = LinearLayout.LayoutParams(0, dp(124), 1f).apply { marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(10) }
+                    layoutParams = LinearLayout.LayoutParams(0, dp(132), 1f).apply { marginStart = dp(5); marginEnd = dp(5); bottomMargin = dp(11) }
                     setOnClickListener { openModule(module.key) }
                 }
                 val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
@@ -1160,37 +1160,7 @@ class AdminConsoleActivity : ThemedActivity() {
         panel.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
         body.addView(panel)
 
-        val accessCard = card().apply {
-            setPadding(dp(13), dp(11), dp(13), dp(11))
-        }
-        val accessTop = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-        }
-        val roleLabel = when (currentRole) {
-            StaffRoleHelper.SUPER -> "سوبر أدمن"
-            StaffRoleHelper.ADMIN -> "أدمن"
-            else -> "مانجر"
-        }
-        val rolePill = TextView(this).apply {
-            text = "صلاحياتك · $roleLabel"
-            textSize = 11f
-            setTextColor(ACCENT)
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(dp(10), dp(7), dp(10), dp(7))
-            background = roundRect(0xFFF0ECFB.toInt(), 18)
-        }
-        accessTop.addView(rolePill, LinearLayout.LayoutParams(0, -2, 1f))
-        accessTop.addView(button("↻ تحديث") { openModule(module.key) })
-        accessCard.addView(accessTop)
-        val scopeText = when (currentRole) {
-            StaffRoleHelper.SUPER -> "صلاحيات الإدارة الكاملة المتاحة لهذا القسم، مع تأكيد العمليات الحساسة."
-            StaffRoleHelper.ADMIN -> "تظهر لك إجراءات الإشراف المسموحة لرتبتك؛ التحقق النهائي يتم على الخادم."
-            else -> "وصول إشرافي محدود حسب القسم؛ لا تتوفر أدوات السوبر أدمن أو تغيير الإعدادات العامة."
-        }
-        addText(accessCard, scopeText, 11f, false, MUTED)
-        body.addView(accessCard)
+
     }
 
     private fun loadUsers(search: String) {
@@ -3039,20 +3009,23 @@ class AdminConsoleActivity : ThemedActivity() {
         textSize = 14f
         isAllCaps = false
         gravity = Gravity.CENTER
-        minHeight = dp(48)
-        minimumHeight = dp(48)
+        minHeight = dp(52)
+        minimumHeight = dp(52)
         minWidth = 0
         setTextColor(Color.WHITE)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         textDirection = View.TEXT_DIRECTION_RTL
         layoutDirection = View.LAYOUT_DIRECTION_RTL
-        val shape = GradientDrawable().apply {
-            setColor(ACCENT)
+        includeFontPadding = false
+        val shape = GradientDrawable(
+            GradientDrawable.Orientation.RIGHT_LEFT,
+            intArrayOf(0xFF7659D2.toInt(), 0xFF5B42B0.toInt())
+        ).apply {
             cornerRadius = dp(15).toFloat()
             setStroke(dp(1), 0xFF8069D0.toInt())
         }
         val pressed = GradientDrawable().apply {
-            setColor(0xFF4F369D.toInt())
+            setColor(0xFF49358F.toInt())
             cornerRadius = dp(15).toFloat()
         }
         background = android.graphics.drawable.RippleDrawable(
@@ -3061,11 +3034,15 @@ class AdminConsoleActivity : ThemedActivity() {
             pressed
         )
         backgroundTintList = null
-        elevation = dp(2).toFloat()
+        elevation = dp(1).toFloat()
         stateListAnimator = null
-        setPadding(dp(16), dp(8), dp(16), dp(8))
+        setPadding(dp(16), dp(10), dp(16), dp(10))
         contentDescription = label
-        setOnClickListener { action() }
+        layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(4)
+            bottomMargin = dp(7)
+        }
+        setOnClickListener { isEnabled = false; action(); post { isEnabled = true } }
     }
 
     private fun roundRect(color: Int, radius: Int): GradientDrawable =
