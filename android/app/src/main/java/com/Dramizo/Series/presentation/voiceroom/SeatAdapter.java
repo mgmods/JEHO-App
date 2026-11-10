@@ -63,6 +63,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     @Nullable private String selfAvatarUrl;
     private boolean agencyRoom;
     @Nullable private String roomAgencyId;
+    private final Set<String> roomAgencyModeratorIds = new HashSet<>();
     private final Set<String> speakingUsers = new HashSet<>();
     private final Map<String, Float> speakingLevels = new HashMap<>();
     private final Map<String, Float> lastPaintedSpeakLevel = new HashMap<>();
@@ -128,12 +129,23 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         setAgencyContext(agency, null);
     }
 
-    public void setAgencyContext(boolean agency, @Nullable String agencyId) {
+    public void setAgencyContext(boolean agency, @Nullable String agencyId,
+                                 @Nullable List<String> moderatorIds) {
         String normalizedId = agencyId == null ? null : agencyId.trim();
         if (normalizedId != null && normalizedId.isEmpty()) normalizedId = null;
-        if (agencyRoom == agency && Objects.equals(roomAgencyId, normalizedId)) return;
+        Set<String> nextModerators = new HashSet<>();
+        if (moderatorIds != null) {
+            for (String id : moderatorIds) {
+                String normalized = normalizeUserId(id);
+                if (!normalized.isEmpty()) nextModerators.add(normalized);
+            }
+        }
+        if (agencyRoom == agency && Objects.equals(roomAgencyId, normalizedId)
+                && roomAgencyModeratorIds.equals(nextModerators)) return;
         agencyRoom = agency;
         roomAgencyId = normalizedId;
+        roomAgencyModeratorIds.clear();
+        roomAgencyModeratorIds.addAll(nextModerators);
         notifyItemRangeChanged(0, getItemCount(), "wear");
     }
 
@@ -1222,8 +1234,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 label = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
             } else if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
                     && !agencyId.isEmpty() && roomAgencyId.equals(agencyId)) {
+                String userId = user.id == null ? "" : normalizeUserId(user.id);
                 if ("host".equals(role)) label = "مضيفة";
-                else if ("moderator".equals(role)) label = "مشرفة";
+                else if (!userId.isEmpty() && roomAgencyModeratorIds.contains(userId)) label = "مشرفة";
             }
         }
         holder.b.tvAgencyRoleBadge.setText(label == null ? "" : label);
