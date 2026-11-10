@@ -249,7 +249,7 @@ public final class AgencyFamilyInfoSheet {
 
         TextView membersTab = sheet.findViewById(R.id.btnAgencyMembersTab);
         TextView followersTab = sheet.findViewById(R.id.btnAgencyFollowersTab);
-        TextView rosterSummary = sheet.findViewById(R.id.tvAgencyClubSummary);
+        TextView rosterSummary = sheet.findViewById(R.id.tvAgencyRosterSummary);
         android.widget.LinearLayout peopleList = sheet.findViewById(R.id.agencyPeopleList);
         if (membersTab != null) membersTab.setOnClickListener(v -> {
             applyAgencyTabUi(membersTab, followersTab, false);
@@ -345,7 +345,8 @@ public final class AgencyFamilyInfoSheet {
                     title.setTypeface(null, android.graphics.Typeface.BOLD);
                     details.addView(title);
                     TextView idLine = new TextView(activity);
-                    idLine.setText("ID: " + publicId);
+                    String country = String.valueOf(user.get("country") == null ? "" : user.get("country"));
+                    idLine.setText("ID: " + publicId + (country.trim().isEmpty() || "null".equals(country) ? "" : "   •   " + country));
                     idLine.setTextColor(0xFFB6C1CC);
                     idLine.setTextSize(11);
                     details.addView(idLine);
