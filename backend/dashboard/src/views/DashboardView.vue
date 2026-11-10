@@ -1,5 +1,6 @@
 <template>
   <div class="sauti-home">
+    <AdminHomeMenu />
     <AlertMessage v-if="error" :message="error" :title="t('dashboard.apiUnavailable')" type="warning" @dismiss="error = ''" />
 
     <!-- KPI cards are permission-scoped; a dashboard grant alone must not expose every metric. -->
@@ -155,6 +156,7 @@ import { extractList, formatNumber, formatMoney } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { useAuthStore } from '@/stores/auth'
 import StatCard from '@/components/StatCard.vue'
+import AdminHomeMenu from '@/components/AdminHomeMenu.vue'
 import ServerHealthCard from '@/components/ServerHealthCard.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
