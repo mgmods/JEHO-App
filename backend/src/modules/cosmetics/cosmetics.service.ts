@@ -171,7 +171,12 @@ export class CosmeticsService implements OnModuleInit {
   async purchaseCpStoreItem(userId: string, cosmeticId: string) {
     const item = await this.cosmeticsRepo.findOne({ where: { id: cosmeticId, isActive: true } });
     if (!item || !this.isCpStoreCosmetic(item)) throw new NotFoundException('عنصر متجر CP غير موجود أو غير متاح');
-    return this.purchase(userId, cosmeticId, { allowCpStore: true });
+    // A successful CP-store purchase is immediately worn in its matching slot.
+    // equip() replaces the previously worn item in that slot while preserving
+    // the old item's ownership in the user's inventory.
+    const purchase = await this.purchase(userId, cosmeticId, { allowCpStore: true });
+    const equipped = await this.equipCpStoreItem(userId, cosmeticId);
+    return { ...purchase, equipped: true, cosmetic: equipped.cosmetic };
   }
 
   async equipCpStoreItem(userId: string, cosmeticId: string) {
@@ -377,7 +382,10 @@ export class CosmeticsService implements OnModuleInit {
         await this.clearExpiredCosmeticWear(row);
       }
     }
-    return cpRows.filter(row => !row.expiresAt || row.expiresAt.getTime() > now);
+    // Keep every owned CP item visible in the bag, including expired leases
+    // and items hidden from the public catalog. Expiry only removes wear; it
+    // must never erase the user's purchase history or hide the bag entry.
+    return cpRows;
   }
 
   /** Periodic expiry cleanup for CP-only cosmetics; never deletes ownership or catalog data. */
