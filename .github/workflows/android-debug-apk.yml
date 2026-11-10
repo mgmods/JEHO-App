@@ -1,4 +1,5 @@
 name: Android Universal APK
+# JEHO Stories build validation pipeline
 
 on:
   push:
