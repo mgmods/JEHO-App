@@ -36,7 +36,7 @@ public final class AgencyFamilyInfoSheet {
     private AgencyFamilyInfoSheet() {}
 
     public static void show(@NonNull FragmentActivity activity, @Nullable String agencyId) {
-        show(activity, agencyId, null, null);
+        show(activity, agencyId, null, null, false);
     }
 
     public static void show(
@@ -44,6 +44,20 @@ public final class AgencyFamilyInfoSheet {
             @Nullable String agencyId,
             @Nullable String logoHint,
             @Nullable String coverHint) {
+        show(activity, agencyId, logoHint, coverHint, false);
+    }
+
+    public static void showClubRequests(
+            @NonNull FragmentActivity activity, @Nullable String agencyId) {
+        show(activity, agencyId, null, null, true);
+    }
+
+    private static void show(
+            @NonNull FragmentActivity activity,
+            @Nullable String agencyId,
+            @Nullable String logoHint,
+            @Nullable String coverHint,
+            boolean openRequestsOnLoad) {
         if (agencyId == null || agencyId.trim().isEmpty()) {
             Toast.makeText(activity, R.string.error_generic, Toast.LENGTH_SHORT).show();
             return;
@@ -335,6 +349,13 @@ public final class AgencyFamilyInfoSheet {
                     btnClubRequests.setText("مراجعة طلبات الانضمام • " + formatCount(pending));
                     btnClubRequests.setOnClickListener(v ->
                             loadClubRequests(activity, dialog, container, id));
+                    if (openRequestsOnLoad && canReview && pending > 0) {
+                        btnClubRequests.post(() -> {
+                            if (dialog.isShowing()) loadClubRequests(activity, dialog, container, id);
+                        });
+                    } else if (openRequestsOnLoad && canReview) {
+                        Toast.makeText(activity, "لا توجد طلبات انضمام معلّقة حالياً", Toast.LENGTH_SHORT).show();
+                    }
                 }
                 Object membersValue = data.get("members");
                 java.util.ArrayList<String> rosterItems = new java.util.ArrayList<>();
