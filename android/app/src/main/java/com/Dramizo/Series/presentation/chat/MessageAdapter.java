@@ -678,8 +678,20 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             row.setVisibility(View.GONE);
             return;
         }
-        TextView chip = new TextView(holder.itemView.getContext());
         String agencyName = club.agencyName == null ? "" : club.agencyName.trim();
+        if (club.agencyLogoUrl != null && !club.agencyLogoUrl.trim().isEmpty()) {
+            ImageView logo = new ImageView(holder.itemView.getContext());
+            logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            logo.setBackgroundResource(R.drawable.icon_agency);
+            logo.setClipToOutline(true);
+            Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(club.agencyLogoUrl))
+                    .placeholder(R.drawable.icon_agency).error(R.drawable.icon_agency)
+                    .centerCrop().into(logo);
+            LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(holder, 18), dp(holder, 18));
+            logoLp.setMargins(0, 0, dp(holder, 4), 0);
+            row.addView(logo, logoLp);
+        }
+        TextView chip = new TextView(holder.itemView.getContext());
         chip.setText(agencyName.isEmpty() ? "♛ نادي الوكالة" : "♛ نادي " + agencyName);
         chip.setTextColor(0xFF805A19);
         chip.setTextSize(10);
