@@ -272,6 +272,13 @@ class AdminConsoleActivity : ThemedActivity() {
      * Every destination opens an existing API-backed module and is filtered
      * through the same role gate used by the module router.
      */
+    private fun primaryNavigationModules(): Set<String> = when (currentRole) {
+        StaffRoleHelper.SUPER -> setOf("users", "walletTransactions", "cosmetics")
+        StaffRoleHelper.ADMIN -> setOf("users", "cosmetics")
+        StaffRoleHelper.MANAGER -> setOf("rooms", "cosmetics")
+        else -> emptySet()
+    }
+
     private fun buildBottomNavigation(): View {
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -281,17 +288,28 @@ class AdminConsoleActivity : ThemedActivity() {
             setBackgroundColor(Color.WHITE)
             elevation = dp(12).toFloat()
         }
-        val destinations = listOf(
-            Triple("الرئيسية", "⌂", "home"),
-            Triple("المجتمع", "♙", "users"),
-            Triple("المالية", "◈", "walletTransactions"),
-            Triple("المظهر", "✧", "cosmetics"),
-            Triple("المزيد", "☷", "more")
-        )
+        val primary = primaryNavigationModules()
+        val destinations = mutableListOf<Triple<String, String, List<String>>>()
+        destinations += Triple("الرئيسية", "⌂", listOf("home"))
+        val community = if (currentRole == StaffRoleHelper.MANAGER) listOf("rooms") else listOf("users")
+        val visibleCommunity = community.filter { roleCanAccessModule(it) }
+        if (visibleCommunity.isNotEmpty()) destinations += Triple("المجتمع", "♙", visibleCommunity)
+        val finance = if (currentRole == StaffRoleHelper.SUPER) {
+            listOf("walletTransactions", "recharges", "withdrawals", "rechargeAgents", "rechargeApplications", "walletAdjust")
+        } else emptyList()
+        val visibleFinance = finance.filter { roleCanAccessModule(it) }
+        if (visibleFinance.isNotEmpty()) destinations += Triple("المالية", "◈", visibleFinance)
+        if (roleCanAccessModule("cosmetics")) destinations += Triple("المظهر", "✧", listOf("cosmetics"))
+        val moreKeys = modules.filter { roleCanAccessModule(it.key) && it.key !in primary }
+            .map { it.key }
+        if (moreKeys.isNotEmpty()) destinations += Triple("المزيد", "☷", moreKeys)
+
         destinations.forEach { item ->
-            val selected = (item.third == "home" && currentSection == "home") ||
-                (item.third == "more" && currentSection in setOf("logs", "operators", "staffIdentity", "notifications")) ||
-                (item.third != "home" && item.third != "more" && currentSection == item.third)
+            val selected = if (item.third == listOf("home")) {
+                currentSection == "home"
+            } else if (item.first == "المزيد") {
+                currentSection == "more" || currentSection in item.third
+            } else currentSection in item.third
             val cell = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
@@ -305,20 +323,12 @@ class AdminConsoleActivity : ThemedActivity() {
                     null
                 )
                 setOnClickListener {
-                    when (item.third) {
-                        "home" -> showHome()
-                        "more" -> {
-                            val target = listOf("logs", "operators", "staffIdentity", "notifications", "supportChest")
-                                .firstOrNull { roleCanAccessModule(it) }
-                            if (target != null) openModule(target) else showHome()
-                        }
-                        else -> if (roleCanAccessModule(item.third)) openModule(item.third) else {
-                            val fallback = when (item.third) {
-                                "users" -> listOf("rooms", "streams", "reports")
-                                "walletTransactions" -> listOf("vip", "recharges", "withdrawals")
-                                else -> listOf("gifts", "grantCosmetics", "vip")
-                            }.firstOrNull { roleCanAccessModule(it) }
-                            if (fallback != null) openModule(fallback) else toast("لا توجد أقسام متاحة لهذه الرتبة هنا")
+                    when {
+                        item.third == listOf("home") -> showHome()
+                        item.first == "المزيد" -> showMoreModules()
+                        else -> {
+                            val target = item.third.firstOrNull { roleCanAccessModule(it) }
+                            if (target != null) openModule(target)
                         }
                     }
                 }
@@ -343,6 +353,58 @@ class AdminConsoleActivity : ThemedActivity() {
             nav.addView(cell, LinearLayout.LayoutParams(0, -1, 1f))
         }
         return nav
+    }
+
+    /**
+     * Role-filtered directory for every remaining API-backed admin module.
+     * No hidden module is exposed here; every tile is checked again by openModule.
+     */
+    private fun showMoreModules() {
+        currentSection = "more"
+        titleView.text = "المزيد من أدوات الإدارة"
+        backButton.visibility = View.VISIBLE
+        body.removeAllViews()
+        val roleName = when (currentRole) {
+            StaffRoleHelper.SUPER -> "السوبر أدمن"
+            StaffRoleHelper.ADMIN -> "الأدمن"
+            else -> "المانجر"
+        }
+        addText(body, "الأقسام المتاحة لرتبة $roleName", 14f, true, TEXT)
+        addText(body, "كل قسم مرتبط بوظيفته الفعلية، ولا تظهر هنا إلا الأدوات المسموحة لصلاحيات حسابك.", 12f, false, MUTED)
+        val excluded = primaryNavigationModules()
+        val available = modules.filter { it.key !in excluded && roleCanAccessModule(it.key) }
+        if (available.isEmpty()) {
+            val empty = card()
+            addText(empty, "لا توجد أدوات إضافية متاحة لهذه الرتبة حالياً", 13f, false, MUTED)
+            body.addView(empty)
+            return
+        }
+        available.forEach { module ->
+            val tile = card().apply { setPadding(dp(13), dp(12), dp(13), dp(12)) }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+            }
+            val icon = TextView(this).apply {
+                text = module.icon
+                textSize = 23f
+                gravity = Gravity.CENTER
+                background = roundRect(0xFFF0ECFB.toInt(), 13)
+                layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(11) }
+            }
+            row.addView(icon)
+            val copy = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+            }
+            addText(copy, module.title, 14f, true, TEXT)
+            addText(copy, module.subtitle, 11f, false, MUTED)
+            row.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(button("فتح") { openModule(module.key) })
+            tile.addView(row)
+            body.addView(tile)
+        }
     }
 
     /**
