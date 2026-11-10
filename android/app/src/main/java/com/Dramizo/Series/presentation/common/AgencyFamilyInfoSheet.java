@@ -47,10 +47,7 @@ public final class AgencyFamilyInfoSheet {
         show(activity, agencyId, logoHint, coverHint, false);
     }
 
-    public static void showClubRequests(
-            @NonNull FragmentActivity activity, @Nullable String agencyId) {
-        show(activity, agencyId, null, null, true);
-    }
+
 
     private static void show(
             @NonNull FragmentActivity activity,
@@ -90,80 +87,6 @@ public final class AgencyFamilyInfoSheet {
         TextView tvOwner = sheet.findViewById(R.id.tvOwnerName);
         TextView tvMedals = sheet.findViewById(R.id.tvMedals);
         TextView btnFollow = sheet.findViewById(R.id.btnFollowAgency);
-        TextView tvClubSummary = sheet.findViewById(R.id.tvAgencyClubSummary);
-        TextView tvClubMembers = sheet.findViewById(R.id.tvAgencyClubMembers);
-        TextView btnClubJoin = sheet.findViewById(R.id.btnAgencyClubJoin);
-        TextView btnClubRequests = sheet.findViewById(R.id.btnAgencyClubRequests);
-        final boolean[] isActiveClubSupporter = {false};
-
-        if (btnClubJoin != null) {
-            btnClubJoin.setOnClickListener(v -> {
-                if (isActiveClubSupporter[0]) {
-                    new android.app.AlertDialog.Builder(activity)
-                            .setTitle("مغادرة نادي الوكالة")
-                            .setMessage("هل تريد مغادرة نادي هذه الوكالة؟")
-                            .setNegativeButton("إلغاء", null)
-                            .setPositiveButton("مغادرة", (d, which) -> {
-                                btnClubJoin.setEnabled(false);
-                                container.getIoExecutor().execute(() -> {
-                                    Result<Map<String, Object>> result = ApiCall.execute(
-                                            container.getAgencyApi().leaveClub(id));
-                                    activity.runOnUiThread(() -> {
-                                        if (!dialog.isShowing()) return;
-                                        if (result.success) {
-                                            isActiveClubSupporter[0] = false;
-                                            btnClubJoin.setText("طلب الانضمام إلى النادي");
-                                            btnClubJoin.setEnabled(true);
-                                            Toast.makeText(activity, "غادرت نادي الوكالة", Toast.LENGTH_SHORT).show();
-                                        } else {
-                                            btnClubJoin.setEnabled(true);
-                                            Toast.makeText(activity,
-                                                    result.error != null ? result.error : activity.getString(R.string.error_generic),
-                                                    Toast.LENGTH_SHORT).show();
-                                        }
-                                    });
-                                });
-                            })
-                            .show();
-                    return;
-                }
-                btnClubJoin.setEnabled(false);
-                container.getIoExecutor().execute(() -> {
-                    Result<Map<String, Object>> request = ApiCall.execute(
-                            container.getAgencyApi().requestClubJoin(id));
-                    activity.runOnUiThread(() -> {
-                        if (!dialog.isShowing()) return;
-                        if (request.success) {
-                            String clubStatus = request.data == null ? "pending"
-                                    : String.valueOf(request.data.get("status"));
-                            if ("active".equalsIgnoreCase(clubStatus)
-                                    || "active_staff".equalsIgnoreCase(clubStatus)
-                                    || "active_host".equalsIgnoreCase(clubStatus)
-                                    || "active_member".equalsIgnoreCase(clubStatus)) {
-                                isActiveClubSupporter[0] = "active".equalsIgnoreCase(clubStatus);
-                                btnClubJoin.setText(isActiveClubSupporter[0]
-                                        ? "مغادرة النادي" : "أنت ضمن أعضاء/طاقم هذه الوكالة");
-                                Toast.makeText(activity, "أنت بالفعل ضمن نادي أو طاقم الوكالة",
-                                        Toast.LENGTH_SHORT).show();
-                            } else {
-                                btnClubJoin.setText("طلبك قيد مراجعة صاحب الوكالة");
-                                Toast.makeText(activity,
-                                        Boolean.TRUE.equals(request.data == null ? null : request.data.get("alreadyRequested"))
-                                                ? "طلبك موجود مسبقاً وقيد المراجعة"
-                                                : "تم إرسال طلبك إلى إدارة الوكالة",
-                                        Toast.LENGTH_SHORT).show();
-                            }
-                            btnClubJoin.setEnabled(isActiveClubSupporter[0]);
-                        } else {
-                            btnClubJoin.setEnabled(true);
-                            Toast.makeText(activity,
-                                    request.error != null ? request.error : activity.getString(R.string.error_generic),
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                });
-            });
-        }
 
         TextView btnOpen = sheet.findViewById(R.id.btnOpenAgencyManage);
 
@@ -324,274 +247,118 @@ public final class AgencyFamilyInfoSheet {
         });
 
 
-        // Club membership is distinct from following the agency and from host employment.
-        container.getIoExecutor().execute(() -> {
-            Result<Map<String, Object>> club = ApiCall.execute(container.getAgencyApi().getClub(id));
-            activity.runOnUiThread(() -> {
-                if (!dialog.isShowing() || !club.success || club.data == null) return;
-                Map<String, Object> data = club.data;
-                Object countsValue = data.get("counts");
-                Map<?, ?> counts = countsValue instanceof Map ? (Map<?, ?>) countsValue : java.util.Collections.emptyMap();
-                int total = counts.get("total") instanceof Number ? ((Number) counts.get("total")).intValue() : 0;
-                int hosts = counts.get("staff") instanceof Number ? ((Number) counts.get("staff")).intValue() : 0;
-                int supporters = counts.get("supporters") instanceof Number ? ((Number) counts.get("supporters")).intValue() : 0;
-                int agencyMembers = counts.get("agencyMembers") instanceof Number ? ((Number) counts.get("agencyMembers")).intValue() : 0;
-                int pending = counts.get("pending") instanceof Number ? ((Number) counts.get("pending")).intValue() : 0;
-                if (tvClubSummary != null) {
-                    tvClubSummary.setText("نادي الوكالة • " + formatCount(total) +
-                            " عضو • " + formatCount(hosts) + " مضيف/إدارة • " + formatCount(agencyMembers) + " عضو وكالة • " +
-                            formatCount(supporters) + " داعم" +
-                            (pending > 0 ? " • " + formatCount(pending) + " طلب بانتظارك" : ""));
-                }
-                if (btnClubRequests != null) {
-                    boolean canReview = Boolean.TRUE.equals(data.get("canReview"));
-                    btnClubRequests.setVisibility(canReview && pending > 0 ? View.VISIBLE : View.GONE);
-                    btnClubRequests.setText("مراجعة طلبات الانضمام • " + formatCount(pending));
-                    btnClubRequests.setOnClickListener(v ->
-                            loadClubRequests(activity, dialog, container, id));
-                    if (openRequestsOnLoad && canReview && pending > 0) {
-                        btnClubRequests.post(() -> {
-                            if (dialog.isShowing()) loadClubRequests(activity, dialog, container, id);
-                        });
-                    } else if (openRequestsOnLoad && canReview) {
-                        Toast.makeText(activity, "لا توجد طلبات انضمام معلّقة حالياً", Toast.LENGTH_SHORT).show();
-                    }
-                }
-                Object membersValue = data.get("members");
-                java.util.ArrayList<String> rosterItems = new java.util.ArrayList<>();
-                StringBuilder rosterPreview = new StringBuilder();
-                if (membersValue instanceof java.util.List) {
-                    for (Object item : (java.util.List<?>) membersValue) {
-                        if (!(item instanceof Map)) continue;
-                        Map<?, ?> member = (Map<?, ?>) item;
-                        Object name = member.get("displayName");
-                        if (name == null) name = member.get("username");
-                        String role = String.valueOf(member.get("role") == null ? "" : member.get("role"));
-                        String roleLabel = "host".equalsIgnoreCase(role) ? "مضيف الوكالة" :
-                                ("owner".equalsIgnoreCase(role) ? "صاحب الوكالة" :
-                                ("manager".equalsIgnoreCase(role) ? "إدارة الوكالة" :
-                                ("member".equalsIgnoreCase(role) ? "عضو الوكالة" : "داعم النادي")));
-                        String display = (name == null ? "مستخدم" : String.valueOf(name)) + "  ·  " + roleLabel;
-                        rosterItems.add(display);
-                        if (rosterPreview.length() < 150) {
-                            if (rosterPreview.length() > 0) rosterPreview.append("  •  ");
-                            rosterPreview.append(display);
-                        }
-                    }
-                }
-                if (tvClubMembers != null) {
-                    tvClubMembers.setText(rosterItems.isEmpty() ? "لا يوجد أعضاء بعد" :
-                            rosterPreview + (rosterItems.size() > 3 ? "  ·  عرض الكل" : ""));
-                    tvClubMembers.setOnClickListener(v -> {
-                        if (rosterItems.isEmpty()) return;
-                        new android.app.AlertDialog.Builder(activity)
-                                .setTitle("أعضاء نادي الوكالة")
-                                .setItems(rosterItems.toArray(new String[0]), (d, which) -> { })
-                                .setPositiveButton("إغلاق", null)
-                                .show();
-                    });
-                }
-                String myStatus = String.valueOf(data.get("myStatus"));
-                if (btnClubJoin != null) {
-                    if ("active_staff".equals(myStatus) || "active_host".equals(myStatus)) {
-                        btnClubJoin.setText("أنت ضمن طاقم هذه الوكالة");
-                        btnClubJoin.setEnabled(false);
-                    } else if ("active_member".equals(myStatus)) {
-                        btnClubJoin.setText("أنت عضو في هذه الوكالة");
-                        btnClubJoin.setEnabled(false);
-                    } else if ("active".equals(myStatus)) {
-                        isActiveClubSupporter[0] = true;
-                        btnClubJoin.setText("مغادرة النادي");
-                        btnClubJoin.setEnabled(true);
-                    } else if ("pending".equals(myStatus)) {
-                        btnClubJoin.setText("طلبك قيد مراجعة صاحب الوكالة");
-                        btnClubJoin.setEnabled(false);
-                    } else {
-                        btnClubJoin.setText("طلب الانضمام إلى النادي");
-                        btnClubJoin.setEnabled(true);
-                    }
-                }
-            });
+        TextView membersTab = sheet.findViewById(R.id.btnAgencyMembersTab);
+        TextView followersTab = sheet.findViewById(R.id.btnAgencyFollowersTab);
+        TextView rosterSummary = sheet.findViewById(R.id.tvAgencyClubSummary);
+        android.widget.LinearLayout peopleList = sheet.findViewById(R.id.agencyPeopleList);
+        if (membersTab != null) membersTab.setOnClickListener(v -> {
+            applyAgencyTabUi(membersTab, followersTab, false);
+            loadAgencyPeople(activity, container, id, peopleList, rosterSummary, false);
         });
-
+        if (followersTab != null) followersTab.setOnClickListener(v -> {
+            applyAgencyTabUi(membersTab, followersTab, true);
+            loadAgencyPeople(activity, container, id, peopleList, rosterSummary, true);
+        });
+        loadAgencyPeople(activity, container, id, peopleList, rosterSummary, false);
         dialog.show();
     }
 
-    private static void loadClubRequests(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
-            @NonNull AppContainer container, @NonNull String agencyId) {
+
+    private static void applyAgencyTabUi(@Nullable TextView members, @Nullable TextView followers, boolean showFollowers) {
+        if (members != null) members.setTextColor(showFollowers ? 0xBFFFFFFF : 0xFFFFFFFF);
+        if (followers != null) followers.setTextColor(showFollowers ? 0xFFFFFFFF : 0xBFFFFFFF);
+    }
+
+    private static void loadAgencyPeople(@NonNull FragmentActivity activity, @NonNull AppContainer container,
+            @NonNull String agencyId, @Nullable android.widget.LinearLayout list,
+            @Nullable TextView summary, boolean followers) {
+        if (list == null) return;
+        list.removeAllViews();
+        TextView loading = new TextView(activity);
+        loading.setText("جارٍ تحميل القائمة...");
+        loading.setTextColor(0xBFFFFFFF);
+        loading.setGravity(android.view.Gravity.CENTER);
+        list.addView(loading);
         container.getIoExecutor().execute(() -> {
-            Result<java.util.List<Map<String, Object>>> result = ApiCall.execute(container.getAgencyApi().clubRequests(agencyId));
+            Result<Map<String, Object>> result = ApiCall.execute(followers
+                    ? container.getAgencyApi().publicFollowers(agencyId, 1, 40)
+                    : container.getAgencyApi().publicMembers(agencyId, 1, 40));
             activity.runOnUiThread(() -> {
-                if (!parent.isShowing()) return;
-                if (!result.success) {
-                    Toast.makeText(activity,
-                            result.error != null ? result.error : "تعذر تحميل طلبات النادي. تحقق من الاتصال وحاول مجدداً.",
-                            Toast.LENGTH_LONG).show();
+                if (activity.isFinishing()) return;
+                list.removeAllViews();
+                if (!result.success || result.data == null) {
+                    TextView error = new TextView(activity);
+                    error.setText("تعذر تحميل القائمة");
+                    error.setTextColor(0xFFFF8A8A);
+                    error.setGravity(android.view.Gravity.CENTER);
+                    list.addView(error);
                     return;
                 }
-                if (result.data == null || result.data.isEmpty()) {
-                    Toast.makeText(activity, "لا توجد طلبات انضمام معلّقة حالياً", Toast.LENGTH_SHORT).show();
+                Object raw = result.data.get("items");
+                java.util.List<?> rows = raw instanceof java.util.List ? (java.util.List<?>) raw : java.util.Collections.emptyList();
+                Object count = result.data.get("total");
+                long total = count instanceof Number ? ((Number) count).longValue() : rows.size();
+                if (summary != null) summary.setText((followers ? "المتابعون • " : "الأعضاء • ") + formatCount(total));
+                if (rows.isEmpty()) {
+                    TextView empty = new TextView(activity);
+                    empty.setText(followers ? "لا يوجد متابعون حتى الآن" : "لا يوجد أعضاء حتى الآن");
+                    empty.setTextColor(0xBFFFFFFF);
+                    empty.setGravity(android.view.Gravity.CENTER);
+                    empty.setPadding(0, dp(activity, 18), 0, dp(activity, 18));
+                    list.addView(empty);
                     return;
                 }
-                showClubRequestList(activity, parent, container, agencyId, result.data);
+                for (Object value : rows) {
+                    if (!(value instanceof Map)) continue;
+                    Map<?, ?> row = (Map<?, ?>) value;
+                    Map<?, ?> user = row.get("user") instanceof Map ? (Map<?, ?>) row.get("user") : row;
+                    String name = String.valueOf(user.get("displayName") != null ? user.get("displayName") :
+                            (user.get("username") != null ? user.get("username") : "مستخدم"));
+                    String publicId = String.valueOf(user.get("publicId") == null ? "—" : user.get("publicId"));
+                    String avatar = user.get("avatarUrl") == null ? null : String.valueOf(user.get("avatarUrl"));
+                    String role = String.valueOf(row.get("role") == null ? "" : row.get("role"));
+                    String roleLabel = followers ? "متابع للوكالة" :
+                            "owner".equalsIgnoreCase(role) ? "قائد الوكالة" :
+                            "manager".equalsIgnoreCase(role) ? "مشرف الوكالة" :
+                            "host".equalsIgnoreCase(role) ? "مضيف الوكالة" : "عضو الوكالة";
+                    android.widget.LinearLayout card = new android.widget.LinearLayout(activity);
+                    card.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                    card.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                    card.setPadding(dp(activity, 10), dp(activity, 8), dp(activity, 10), dp(activity, 8));
+                    android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+                    bg.setColor(0xFF151F28);
+                    bg.setCornerRadius(dp(activity, 14));
+                    bg.setStroke(dp(activity, 1), 0xFF34414D);
+                    card.setBackground(bg);
+                    android.widget.ImageView avatarView = new android.widget.ImageView(activity);
+                    android.widget.LinearLayout.LayoutParams avatarLp = new android.widget.LinearLayout.LayoutParams(dp(activity, 46), dp(activity, 46));
+                    avatarLp.setMarginEnd(dp(activity, 10));
+                    card.addView(avatarView, avatarLp);
+                    AvatarCosmetics.bindAvatar(avatarView, avatar);
+                    android.widget.LinearLayout details = new android.widget.LinearLayout(activity);
+                    details.setOrientation(android.widget.LinearLayout.VERTICAL);
+                    card.addView(details, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
+                    TextView title = new TextView(activity);
+                    title.setText(roleLabel + "  •  " + name);
+                    title.setTextColor(0xFFFFFFFF);
+                    title.setTextSize(14);
+                    title.setTypeface(null, android.graphics.Typeface.BOLD);
+                    details.addView(title);
+                    TextView idLine = new TextView(activity);
+                    idLine.setText("ID: " + publicId);
+                    idLine.setTextColor(0xFFB6C1CC);
+                    idLine.setTextSize(11);
+                    details.addView(idLine);
+                    android.widget.LinearLayout.LayoutParams cardLp = new android.widget.LinearLayout.LayoutParams(-1, -2);
+                    cardLp.bottomMargin = dp(activity, 7);
+                    list.addView(card, cardLp);
+                }
             });
         });
     }
 
-    /** Full request-management list: each applicant can be approved or rejected in place. */
-    private static void showClubRequestList(@NonNull FragmentActivity activity,
-            @NonNull BottomSheetDialog parent, @NonNull AppContainer container,
-            @NonNull String agencyId, @NonNull java.util.List<Map<String, Object>> requests) {
-        android.widget.ScrollView scroll = new android.widget.ScrollView(activity);
-        android.widget.LinearLayout list = new android.widget.LinearLayout(activity);
-        list.setOrientation(android.widget.LinearLayout.VERTICAL);
-        list.setPadding(0, 0, 0, 0);
-        scroll.addView(list, new android.widget.ScrollView.LayoutParams(-1, -2));
-        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(activity)
-                .setTitle("طلبات الانضمام إلى النادي")
-                .setView(scroll)
-                .setPositiveButton("إغلاق", null)
-                .create();
-
-        for (Map<String, Object> request : requests) {
-            String userId = String.valueOf(request.get("userId"));
-            Object rawName = request.get("displayName");
-            String name = rawName == null ? String.valueOf(request.get("username")) : String.valueOf(rawName);
-            Object rawPublicId = request.get("publicId");
-            String publicId = rawPublicId == null ? "" : String.valueOf(rawPublicId).trim();
-
-            android.widget.LinearLayout card = new android.widget.LinearLayout(activity);
-            card.setOrientation(android.widget.LinearLayout.VERTICAL);
-            card.setPadding(14, 12, 14, 12);
-            android.graphics.drawable.GradientDrawable cardBg = new android.graphics.drawable.GradientDrawable();
-            cardBg.setColor(0xFFF8F5FA);
-            cardBg.setCornerRadius(18f * activity.getResources().getDisplayMetrics().density);
-            cardBg.setStroke(Math.max(1, (int) activity.getResources().getDisplayMetrics().density), 0xFFE8E0EB);
-            card.setBackground(cardBg);
-            android.widget.LinearLayout.LayoutParams cardLp =
-                    new android.widget.LinearLayout.LayoutParams(-1, -2);
-            cardLp.setMargins(12, 8, 12, 4);
-            list.addView(card, cardLp);
-
-            TextView title = new TextView(activity);
-            title.setText(name == null || name.trim().isEmpty() ? "مستخدم JEHO" : name);
-            title.setTextColor(0xFF27212D);
-            title.setTextSize(15);
-            title.setTypeface(null, android.graphics.Typeface.BOLD);
-            card.addView(title, new android.widget.LinearLayout.LayoutParams(-1, -2));
-
-            if (!publicId.isEmpty()) {
-                TextView id = new TextView(activity);
-                id.setText("ID: " + publicId);
-                id.setTextColor(0xFF817887);
-                id.setTextSize(12);
-                card.addView(id, new android.widget.LinearLayout.LayoutParams(-1, -2));
-            }
-
-            android.widget.LinearLayout actions = new android.widget.LinearLayout(activity);
-            actions.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
-            actions.setPadding(0, 10, 0, 0);
-            card.addView(actions, new android.widget.LinearLayout.LayoutParams(-1, -2));
-
-            TextView reject = new TextView(activity);
-            reject.setText("رفض");
-            reject.setTextColor(0xFFB32645);
-            reject.setTextSize(13);
-            reject.setGravity(android.view.Gravity.CENTER);
-            reject.setPadding(18, 9, 18, 9);
-            reject.setBackground(roundClubAction(0xFFFFE9EE, activity));
-            actions.addView(reject, new android.widget.LinearLayout.LayoutParams(-2, -2));
-
-            TextView approve = new TextView(activity);
-            approve.setText("موافقة");
-            approve.setTextColor(0xFFFFFFFF);
-            approve.setTextSize(13);
-            approve.setTypeface(null, android.graphics.Typeface.BOLD);
-            approve.setGravity(android.view.Gravity.CENTER);
-            approve.setPadding(18, 9, 18, 9);
-            approve.setBackground(roundClubAction(0xFFB82768, activity));
-            android.widget.LinearLayout.LayoutParams approveLp =
-                    new android.widget.LinearLayout.LayoutParams(-2, -2);
-            approveLp.setMargins(8, 0, 0, 0);
-            actions.addView(approve, approveLp);
-
-            View.OnClickListener decision = v -> {
-                approve.setEnabled(false);
-                reject.setEnabled(false);
-                boolean accepted = v == approve;
-                container.getIoExecutor().execute(() -> {
-                    Result<Map<String, Object>> response = ApiCall.execute(accepted
-                            ? container.getAgencyApi().approveClubRequest(agencyId, userId)
-                            : container.getAgencyApi().rejectClubRequest(agencyId, userId));
-                    activity.runOnUiThread(() -> {
-                        if (!dialog.isShowing()) return;
-                        if (!response.success) {
-                            approve.setEnabled(true);
-                            reject.setEnabled(true);
-                            Toast.makeText(activity,
-                                    response.error != null ? response.error : "تعذر تنفيذ القرار",
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        list.removeView(card);
-                        Toast.makeText(activity, accepted ? "تم قبول العضو في النادي" : "تم رفض طلب الانضمام",
-                                Toast.LENGTH_SHORT).show();
-                        if (list.getChildCount() == 0) dialog.dismiss();
-                    });
-                });
-            };
-            approve.setOnClickListener(decision);
-            reject.setOnClickListener(decision);
-        }
-        dialog.show();
-    }
-
-    private static android.graphics.drawable.GradientDrawable roundClubAction(int color, Context context) {
-        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-        bg.setColor(color);
-        bg.setCornerRadius(24f * context.getResources().getDisplayMetrics().density);
-        return bg;
-    }
-
-    private static void showNextClubRequest(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
-            @NonNull AppContainer container, @NonNull String agencyId,
-            @NonNull java.util.List<Map<String, Object>> requests, int index) {
-        if (!parent.isShowing() || index >= requests.size()) {
-            Toast.makeText(activity, "تمت مراجعة طلبات النادي", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Map<String, Object> request = requests.get(index);
-        String userId = String.valueOf(request.get("userId"));
-        Object rawName = request.get("displayName");
-        String name = rawName == null ? String.valueOf(request.get("username")) : String.valueOf(rawName);
-        Object rawPublicId = request.get("publicId");
-        String publicId = rawPublicId == null ? "" : String.valueOf(rawPublicId).trim();
-        String details = "يرغب " + name + " بالانضمام إلى نادي الوكالة.";
-        if (!publicId.isEmpty()) details += "\nمعرّف المستخدم: " + publicId;
-        AuraDialogHelper.confirm(
-                activity,
-                "طلب انضمام إلى نادي الوكالة",
-                details,
-                "موافقة",
-                () -> reviewClubRequest(activity, parent, container, agencyId, userId, true),
-                "رفض",
-                () -> reviewClubRequest(activity, parent, container, agencyId, userId, false));
-    }
-
-    private static void reviewClubRequest(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
-            @NonNull AppContainer container, @NonNull String agencyId, @NonNull String userId, boolean approve) {
-        container.getIoExecutor().execute(() -> {
-            Result<Map<String, Object>> result = ApiCall.execute(approve
-                ? container.getAgencyApi().approveClubRequest(agencyId, userId)
-                : container.getAgencyApi().rejectClubRequest(agencyId, userId));
-            activity.runOnUiThread(() -> {
-                if (!result.success) {
-                    Toast.makeText(activity, "تعذر تنفيذ القرار. حدّث الطلبات وحاول مرة أخرى.", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                loadClubRequests(activity, parent, container, agencyId);
-            });
-        });
+    private static int dp(Context context, int value) {
+        return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 
     private static void applyFollowUi(@Nullable TextView btn, boolean following) {
