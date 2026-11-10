@@ -1379,6 +1379,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Agency rooms show agency GID; personal rooms show host publicId.
             String idLabel = RoomUiHelper.isAgencyRoom(room) ? "GID:" : "ID:";
             binding.tvRoomId.setText(idLabel + com.Dramizo.Series.util.RoomUiHelper.displayRoomId(room));
+            // Agency profile is public and shared: open it from the agency name, GID, or room badge.
+            if (agencyRoom && room.agencyId != null && !room.agencyId.trim().isEmpty()) {
+                final String profileAgencyId = room.agencyId.trim();
+                View.OnClickListener openAgencyProfile = v ->
+                        AgencyFamilyInfoSheet.show(VoiceRoomActivity.this, profileAgencyId);
+                binding.tvRoomTitle.setOnClickListener(openAgencyProfile);
+                binding.tvRoomId.setOnClickListener(openAgencyProfile);
+                binding.tvRoomTitle.setClickable(true);
+                binding.tvRoomId.setClickable(true);
+                if (binding.headerHostAvatarWrap != null) {
+                    binding.headerHostAvatarWrap.setOnClickListener(openAgencyProfile);
+                    binding.headerHostAvatarWrap.setClickable(true);
+                }
+            } else {
+                binding.tvRoomTitle.setOnClickListener(null);
+                binding.tvRoomId.setOnClickListener(null);
+                if (binding.headerHostAvatarWrap != null) binding.headerHostAvatarWrap.setOnClickListener(null);
+            }
             applyRoomGiftSounds(room.giftSoundsEnabled);
             applyRoomDisplaySettings(room);
 
