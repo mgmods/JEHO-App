@@ -3429,7 +3429,14 @@ export class AgenciesService implements OnModuleInit {
       `, [agencyId, viewerId]),
       this.dataSource.query(`
         SELECT
-          (SELECT COUNT(*)::int FROM agency_club_members WHERE "agencyId" = $1 AND status = 'active') AS supporters,
+          (SELECT COUNT(*)::int FROM agency_club_members cm
+            WHERE cm."agencyId" = $1 AND cm.status = 'active'
+              AND NOT EXISTS (SELECT 1 FROM agencies a WHERE a.id = cm."agencyId" AND a."ownerId" = cm."userId")
+              AND NOT EXISTS (
+                SELECT 1 FROM agency_members am
+                WHERE am."agencyId" = cm."agencyId" AND am."userId" = cm."userId"
+                  AND am.status = 'active' AND am."isActive" = true
+              )) AS supporters,
           (SELECT COUNT(*)::int FROM agency_club_members WHERE "agencyId" = $1 AND status = 'pending') AS pending,
           (SELECT COUNT(*)::int FROM (
             SELECT "userId" FROM agency_members
