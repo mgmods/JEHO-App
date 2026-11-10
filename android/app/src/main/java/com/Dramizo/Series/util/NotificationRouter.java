@@ -100,7 +100,7 @@ public final class NotificationRouter {
         if ("agency".equals(t) && ("agency_club_approved".equalsIgnoreCase(action != null ? action : "")
                 || "agency_club_rejected".equalsIgnoreCase(action != null ? action : ""))) {
             Intent i = new Intent(context, AgencyActivity.class);
-            put(i, "splash_target_agency_id", first(data, "agency_id", "agencyId"));
+            put(i, "open_agency_club_details_id", first(data, "agency_id", "agencyId"));
             return i;
         }
         if ("agency".equals(t) && ("join_request".equalsIgnoreCase(action != null ? action : "")
