@@ -447,29 +447,13 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     const clubRows = await this.profilesRepo.manager.query(
       `SELECT a.id AS "agencyId", a.name AS "agencyName",
               a."logoUrl" AS "agencyLogoUrl",
-              CASE
-                WHEN a."ownerId" = $1 THEN 'owner'
-                WHEN am.role = 'host' THEN 'host'
-                WHEN am.role = 'owner' THEN 'owner'
-                WHEN am.role = 'manager' THEN 'manager'
-                WHEN am.role = 'member' THEN 'member'
-                ELSE 'supporter'
-              END AS role
-         FROM agencies a
-         LEFT JOIN agency_members am
-           ON am."agencyId" = a.id AND am."userId" = $1
-          AND am.status = 'active' AND am."isActive" = true
-         LEFT JOIN agency_club_members cm
-           ON cm."agencyId" = a.id AND cm."userId" = $1 AND cm.status = 'active'
-        WHERE a.status = 'active'
-          AND (a."ownerId" = $1 OR am.id IS NOT NULL OR cm.id IS NOT NULL)
-        ORDER BY CASE
-          WHEN a."ownerId" = $1 OR am.role = 'owner' THEN 0
-          WHEN am.role = 'host' THEN 1
-          WHEN am.role = 'manager' THEN 2
-          WHEN am.role = 'member' THEN 3
-          ELSE 4
-        END
+              'supporter' AS role
+         FROM agency_club_members cm
+         JOIN agencies a ON a.id = cm."agencyId"
+        WHERE cm."userId" = $1
+          AND cm.status = 'active'
+          AND a.status = 'active'
+        ORDER BY cm."createdAt" ASC
         LIMIT 1`,
       [userId],
     );
