@@ -188,6 +188,27 @@
             tools:text="30" />
     </LinearLayout>
 
+    <HorizontalScrollView
+        android:id="@+id/rowRoleBadges"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="14dp"
+        android:layout_marginTop="8dp"
+        android:scrollbars="none"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/id_layout">
+
+        <LinearLayout
+            android:id="@+id/roleBadgesContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="2dp" />
+    </HorizontalScrollView>
+
     <!-- Mikoo: three counters under ID (followers / fans / visitors) -->
     <LinearLayout
         android:id="@+id/rowSocialStats"
@@ -200,7 +221,7 @@
         android:paddingVertical="10dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/id_layout">
+        app:layout_constraintTop_toBottomOf="@id/rowRoleBadges">
 
         <LinearLayout
             android:id="@+id/cellStatFollowers"
