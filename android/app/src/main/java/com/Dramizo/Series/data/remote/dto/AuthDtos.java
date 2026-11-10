@@ -100,6 +100,7 @@ public final class AuthDtos {
     public static class AgencyClubDto {
         @SerializedName("agencyId") public String agencyId;
         @SerializedName("agencyName") public String agencyName;
+        @SerializedName("agencyLogoUrl") public String agencyLogoUrl;
         @SerializedName("role") public String role;
         @SerializedName("label") public String label;
     }
