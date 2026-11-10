@@ -142,6 +142,18 @@ export class UpdateCommissionDto {
   commissionPercent: number;
 }
 
+/** Accept an in-app invite using the agency UUID from the invite card.
+ * The agency identifier is a route UUID, never the user's 16-char publicId.
+ */
+export class AcceptAgencyInviteDto {
+  @ApiProperty({ example: 'A7K2M9QX', description: 'Private agency activation code embedded in the invite' })
+  @Transform(trim)
+  @IsString()
+  @MinLength(4)
+  @MaxLength(16)
+  code: string;
+}
+
 export class JoinByCodeDto {
   @ApiProperty({ example: '123456', description: 'Public agency ID or agency UUID from an in-app invite' })
   @Transform(trim)
