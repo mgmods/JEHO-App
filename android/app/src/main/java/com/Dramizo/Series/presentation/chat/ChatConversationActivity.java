@@ -1251,12 +1251,22 @@ public class ChatConversationActivity extends ThemedActivity {
         if (parsed == null && msg != null) {
             parsed = com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content);
         }
-        if (parsed == null || parsed.agencyId == null || parsed.code == null) {
-            Toast.makeText(this, R.string.agency_invite_missing_code, Toast.LENGTH_LONG).show();
+        if (parsed == null || parsed.agencyId == null || parsed.agencyId.trim().isEmpty()) {
+            Toast.makeText(this, "تعذر تحديد دعوة الوكالة", Toast.LENGTH_LONG).show();
             return;
         }
         final String agencyId = parsed.agencyId.trim();
-        final String code = parsed.code.trim();
+        final String code = parsed.code == null ? "" : parsed.code.trim();
+        // A legacy card without a verification code cannot be reported to the
+        // server as a verified rejection. Dismiss it locally without exposing
+        // transport/validation errors to the recipient.
+        if (code.isEmpty()) {
+            if (msg != null && msg.id != null && !msg.id.isEmpty()) {
+                viewModel.dismissMessageLocally(msg.id);
+            }
+            Toast.makeText(this, "تم تجاهل دعوة الوكالة", Toast.LENGTH_SHORT).show();
+            return;
+        }
         final String messageId = msg != null ? msg.id : null;
         AppContainer c = ContainerProvider.from(this);
         c.getIoExecutor().execute(() -> {
