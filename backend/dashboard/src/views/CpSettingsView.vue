@@ -445,6 +445,7 @@
               <option value="profile_card">بطاقة / إطار الملف الشخصي</option>
               <option value="level_badge">شارة مستوى</option>
               <option value="entry_effect">تأثير دخول</option>
+              <option value="join_toast">بطاقة / تنبيه دخول</option>
               <option value="room_card">بطاقة الروم</option>
               <option value="nameplate">لوحة الاسم</option>
               <option value="chat_bubble">فقاعة الدردشة</option>
@@ -489,22 +490,42 @@
         </div>
         <div v-if="loadingCpStore" class="text-secondary small py-3">جارٍ تحميل عناصر متجر CP…</div>
         <div v-else-if="!cpStoreItems.length" class="text-secondary small py-3">لا توجد عناصر CP خاصة بعد. أضف أول عنصر من النموذج أعلاه.</div>
-        <div v-for="item in cpStoreItems" :key="item.id" class="d-flex align-items-center gap-3 py-3 border-top flex-wrap">
-          <img :src="item.previewUrl" :alt="item.name" width="58" height="58" class="rounded-3 border" style="object-fit:contain;background:#fff">
-          <div class="flex-grow-1" style="min-width:210px">
-            <label class="form-label small mb-1">اسم العنصر</label>
-            <input v-model.trim="item.name" class="form-control form-control-sm mb-2">
-            <div class="small text-secondary mb-1">{{ cosmeticTypeLabel(item.type) }} · <code>{{ item.code }}</code></div>
-            <div class="d-flex gap-2 flex-wrap">
-              <div><label class="form-label small mb-1">السعر</label><input v-model.number="item.coinPrice" class="form-control form-control-sm" type="number" min="0" max="1000000000"></div>
-              <div><label class="form-label small mb-1">المدة بالأيام</label><input v-model.number="item.meta.leaseDays" class="form-control form-control-sm" type="number" min="1" max="3650"></div>
+        <div v-for="item in cpStoreItems" :key="item.id" class="py-3 border-top">
+          <div class="d-flex align-items-start gap-3 flex-wrap">
+            <img :src="item.previewUrl" :alt="item.name" width="64" height="64" class="rounded-3 border" style="object-fit:contain;background:#fff">
+            <div class="flex-grow-1" style="min-width:240px">
+              <div class="row g-2">
+                <div class="col-md-6"><label class="form-label small mb-1">اسم العنصر</label><input v-model.trim="item.name" class="form-control form-control-sm"></div>
+                <div class="col-md-6">
+                  <label class="form-label small mb-1">نوع العنصر</label>
+                  <select v-model="item.type" class="form-select form-select-sm">
+                    <option value="cp_background">خلفية CP</option><option value="cp_logo">شعار CP</option>
+                    <option value="profile_card">بطاقة / إطار الملف الشخصي</option><option value="vip_badge">إطار صورة شخصية</option>
+                    <option value="host_badge">إطار مضيف</option><option value="level_badge">شارة مستوى</option>
+                    <option value="entry_effect">تأثير دخول متحرك</option><option value="join_toast">بطاقة / تنبيه دخول</option>
+                    <option value="room_card">بطاقة الروم</option><option value="nameplate">لوحة الاسم</option>
+                    <option value="chat_bubble">فقاعة الدردشة</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small mb-1">رابط صورة / معاينة العنصر</label>
+                  <input v-model.trim="item.previewUrl" class="form-control form-control-sm mb-1" dir="ltr">
+                  <input class="form-control form-control-sm" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" :disabled="uploadingCpStorePreview" @change="uploadCpStorePreview($event, item)">
+                </div>
+                <div class="col-md-6"><label class="form-label small mb-1">رابط الحركة (GIF / WebP / SVGA / فيديو)</label><input v-model.trim="item.animationUrl" class="form-control form-control-sm" dir="ltr" placeholder="https://…"></div>
+                <div class="col-md-6"><label class="form-label small mb-1">الوصف</label><input v-model.trim="item.description" class="form-control form-control-sm"></div>
+                <div class="col-md-6"><div class="d-flex gap-2">
+                  <div class="flex-fill"><label class="form-label small mb-1">السعر بالعملات</label><input v-model.number="item.coinPrice" class="form-control form-control-sm" type="number" min="1" max="1000000000"></div>
+                  <div class="flex-fill"><label class="form-label small mb-1">المدة بالأيام</label><input v-model.number="item.meta.leaseDays" class="form-control form-control-sm" type="number" min="1" max="3650"></div>
+                </div></div>
+              </div>
+              <div class="small text-secondary mt-2"><code>{{ item.code }}</code> · {{ cosmeticTypeLabel(item.type) }}</div>
+            </div>
+            <div class="d-flex flex-column align-items-end gap-2">
+              <label class="form-check form-switch mb-0"><input v-model="item.isActive" class="form-check-input" type="checkbox" role="switch"><span class="form-check-label">{{ item.isActive ? 'منشور' : 'مخفي' }}</span></label>
+              <button class="btn btn-outline-primary btn-sm" :disabled="savingCpStore" @click="saveCpStoreItem(item)">حفظ التعديلات</button>
             </div>
           </div>
-          <label class="form-check form-switch mb-0">
-            <input v-model="item.isActive" class="form-check-input" type="checkbox" role="switch">
-            <span class="form-check-label">{{ item.isActive ? 'منشور' : 'مخفي' }}</span>
-          </label>
-          <button class="btn btn-outline-primary btn-sm" :disabled="savingCpStore" @click="saveCpStoreItem(item)">حفظ</button>
         </div>
       </section>
 
@@ -651,7 +672,7 @@ async function loadCpStoreItems() {
     error.value = e?.response?.data?.message || e?.message || 'تعذر تحميل عناصر متجر CP'
   } finally { loadingCpStore.value = false }
 }
-async function uploadCpStorePreview(event) {
+async function uploadCpStorePreview(event, target = cpStoreForm.value) {
   const file = event?.target?.files?.[0]
   if (!file) return
   if (!/\.(gif|webp|png|jpe?g)$/i.test(file.name)) {
@@ -672,10 +693,10 @@ async function uploadCpStorePreview(event) {
     const data = payloadOf(response)
     const uploadedUrl = data?.url || data?.path
     if (!uploadedUrl) throw new Error('رد رفع الصورة غير مكتمل.')
-    cpStoreForm.value.previewUrl = /^https?:\/\//i.test(uploadedUrl)
+    target.previewUrl = /^https?:\/\//i.test(uploadedUrl)
       ? uploadedUrl
       : new URL(uploadedUrl, window.location.origin).toString()
-    success.value = 'تم رفع صورة المعاينة. أكمل بيانات العنصر ثم أضفه إلى متجر CP.'
+    success.value = target === cpStoreForm.value ? 'تم رفع صورة المعاينة. أكمل بيانات العنصر ثم أضفه إلى متجر CP.' : 'تم رفع صورة معاينة العنصر. احفظ التعديلات لاعتمادها.'
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر رفع صورة المعاينة'
   } finally {
@@ -732,6 +753,10 @@ async function saveCpStoreItem(item) {
     }
     const response = await cpAdminApi.updateStoreItem(item.id, {
       name: item.name.trim(),
+      type: item.type,
+      previewUrl: String(item.previewUrl || '').trim(),
+      animationUrl: String(item.animationUrl || '').trim() || null,
+      description: String(item.description || '').trim(),
       coinPrice: price,
       leaseDays,
       isActive: !!item.isActive,
