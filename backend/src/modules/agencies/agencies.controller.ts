@@ -410,36 +410,16 @@ export class AgenciesController {
     return this.agenciesService.removeMember(id, userId, memberUserId);
   }
 
-  @Get(':id/club')
-  @ApiOperation({ summary: 'Agency club overview: active hosts and approved supporters' })
-  getClub(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
-    return this.agenciesService.getClub(id, userId);
+  @Public()
+  @Get(':id/public-members')
+  publicMembers(@Param('id') id: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.agenciesService.publicMembers(id, page ? Number(page) : 1, limit ? Number(limit) : 30);
   }
 
-  @Post(':id/club/request')
-  requestClubJoin(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
-    return this.agenciesService.requestClubJoin(id, userId);
+  @Public()
+  @Get(':id/followers')
+  publicFollowers(@Param('id') id: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.agenciesService.publicFollowers(id, page ? Number(page) : 1, limit ? Number(limit) : 30);
   }
-
-  @Get(':id/club/requests')
-  listClubRequests(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
-    return this.agenciesService.listClubRequests(id, userId);
-  }
-
-  @Post(':id/club/requests/:userId/approve')
-  approveClubRequest(@Param('id', ParseUUIDPipe) id: string, @Param('userId', ParseUUIDPipe) memberId: string, @CurrentUser('sub') userId: string) {
-    return this.agenciesService.reviewClubRequest(id, userId, memberId, true);
-  }
-
-  @Post(':id/club/requests/:userId/reject')
-  rejectClubRequest(@Param('id', ParseUUIDPipe) id: string, @Param('userId', ParseUUIDPipe) memberId: string, @CurrentUser('sub') userId: string) {
-    return this.agenciesService.reviewClubRequest(id, userId, memberId, false);
-  }
-
-  @Delete(':id/club/leave')
-  leaveClub(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
-    return this.agenciesService.leaveClub(id, userId);
-  }
-
 
 }
