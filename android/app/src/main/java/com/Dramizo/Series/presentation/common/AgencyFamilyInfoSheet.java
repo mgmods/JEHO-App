@@ -433,9 +433,130 @@ public final class AgencyFamilyInfoSheet {
                     Toast.makeText(activity, "لا توجد طلبات انضمام معلّقة حالياً", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                showNextClubRequest(activity, parent, container, agencyId, result.data, 0);
+                showClubRequestList(activity, parent, container, agencyId, result.data);
             });
         });
+    }
+
+    /** Full request-management list: each applicant can be approved or rejected in place. */
+    private static void showClubRequestList(@NonNull FragmentActivity activity,
+            @NonNull BottomSheetDialog parent, @NonNull AppContainer container,
+            @NonNull String agencyId, @NonNull java.util.List<Map<String, Object>> requests) {
+        android.widget.ScrollView scroll = new android.widget.ScrollView(activity);
+        android.widget.LinearLayout list = new android.widget.LinearLayout(activity);
+        list.setOrientation(android.widget.LinearLayout.VERTICAL);
+        list.setPadding(0, 0, 0, 0);
+        scroll.addView(list, new android.widget.ScrollView.LayoutParams(-1, -2));
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(activity)
+                .setTitle("طلبات الانضمام إلى النادي")
+                .setView(scroll)
+                .setPositiveButton("إغلاق", null)
+                .create();
+
+        for (Map<String, Object> request : requests) {
+            String userId = String.valueOf(request.get("userId"));
+            Object rawName = request.get("displayName");
+            String name = rawName == null ? String.valueOf(request.get("username")) : String.valueOf(rawName);
+            Object rawPublicId = request.get("publicId");
+            String publicId = rawPublicId == null ? "" : String.valueOf(rawPublicId).trim();
+
+            android.widget.LinearLayout card = new android.widget.LinearLayout(activity);
+            card.setOrientation(android.widget.LinearLayout.VERTICAL);
+            card.setPadding(14, 12, 14, 12);
+            android.graphics.drawable.GradientDrawable cardBg = new android.graphics.drawable.GradientDrawable();
+            cardBg.setColor(0xFFF8F5FA);
+            cardBg.setCornerRadius(18f * activity.getResources().getDisplayMetrics().density);
+            cardBg.setStroke(Math.max(1, (int) activity.getResources().getDisplayMetrics().density), 0xFFE8E0EB);
+            card.setBackground(cardBg);
+            android.widget.LinearLayout.LayoutParams cardLp =
+                    new android.widget.LinearLayout.LayoutParams(-1, -2);
+            cardLp.setMargins(12, 8, 12, 4);
+            list.addView(card, cardLp);
+
+            TextView title = new TextView(activity);
+            title.setText(name == null || name.trim().isEmpty() ? "مستخدم JEHO" : name);
+            title.setTextColor(0xFF27212D);
+            title.setTextSize(15);
+            title.setTypeface(null, android.graphics.Typeface.BOLD);
+            card.addView(title, new android.widget.LinearLayout.LayoutParams(-1, -2));
+
+            if (!publicId.isEmpty()) {
+                TextView id = new TextView(activity);
+                id.setText("ID: " + publicId);
+                id.setTextColor(0xFF817887);
+                id.setTextSize(12);
+                card.addView(id, new android.widget.LinearLayout.LayoutParams(-1, -2));
+            }
+
+            android.widget.LinearLayout actions = new android.widget.LinearLayout(activity);
+            actions.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
+            actions.setPadding(0, 10, 0, 0);
+            card.addView(actions, new android.widget.LinearLayout.LayoutParams(-1, -2));
+
+            TextView reject = new TextView(activity);
+            reject.setText("رفض");
+            reject.setTextColor(0xFFB32645);
+            reject.setTextSize(13);
+            reject.setGravity(android.view.Gravity.CENTER);
+            reject.setPadding(18, 9, 18, 9);
+            reject.setBackground(roundClubAction(0xFFFFE9EE, activity));
+            actions.addView(reject, new android.widget.LinearLayout.LayoutParams(-2, -2));
+
+            TextView approve = new TextView(activity);
+            approve.setText("موافقة");
+            approve.setTextColor(0xFFFFFFFF);
+            approve.setTextSize(13);
+            approve.setTypeface(null, android.graphics.Typeface.BOLD);
+            approve.setGravity(android.view.Gravity.CENTER);
+            approve.setPadding(18, 9, 18, 9);
+            approve.setBackground(roundClubAction(0xFFB82768, activity));
+            android.widget.LinearLayout.LayoutParams approveLp =
+                    new android.widget.LinearLayout.LayoutParams(-2, -2);
+            approveLp.setMargins(8, 0, 0, 0);
+            actions.addView(approve, approveLp);
+
+            View.OnClickListener decision = v -> {
+                approve.setEnabled(false);
+                reject.setEnabled(false);
+                boolean accepted = v == approve;
+                container.getIoExecutor().execute(() -> {
+                    Result<Map<String, Object>> response = ApiCall.execute(accepted
+                            ? container.getAgencyApi().approveClubRequest(agencyId, userId)
+                            : container.getAgencyApi().rejectClubRequest(agencyId, userId));
+                    activity.runOnUiThread(() -> {
+                        if (!dialog.isShowing()) return;
+                        if (!response.success) {
+                            approve.setEnabled(true);
+                            reject.setEnabled(true);
+                            Toast.makeText(activity,
+                                    response.error != null ? response.error : "تعذر تنفيذ القرار",
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        list.removeView(card);
+                        Toast.makeText(activity, accepted ? "تم قبول العضو في النادي" : "تم رفض طلب الانضمام",
+                                Toast.LENGTH_SHORT).show();
+                        if (list.getChildCount() == 0) dialog.dismiss();
+                    });
+                });
+            };
+            approve.setOnClickListener(decision);
+            reject.setOnClickListener(decision);
+        }
+        dialog.setOnDismissListener(d -> {
+            if (parent.isShowing()) {
+                // Refresh the summary/count after management without closing the agency sheet.
+                parent.findViewById(R.id.btnAgencyClubRequests);
+            }
+        });
+        dialog.show();
+    }
+
+    private static android.graphics.drawable.GradientDrawable roundClubAction(int color, Context context) {
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(color);
+        bg.setCornerRadius(24f * context.getResources().getDisplayMetrics().density);
+        return bg;
     }
 
     private static void showNextClubRequest(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
