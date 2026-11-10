@@ -377,42 +377,132 @@ class AdminConsoleActivity : ThemedActivity() {
             StaffRoleHelper.ADMIN -> "الأدمن"
             else -> "المانجر"
         }
-        addText(body, "الأقسام المتاحة لرتبة $roleName", 14f, true, TEXT)
-        addText(body, "كل قسم مرتبط بوظيفته الفعلية، ولا تظهر هنا إلا الأدوات المسموحة لصلاحيات حسابك.", 12f, false, MUTED)
-        val excluded = primaryNavigationModules()
-        val available = modules.filter { it.key !in excluded && roleCanAccessModule(it.key) }
-        if (available.isEmpty()) {
-            val empty = card()
-            addText(empty, "لا توجد أدوات إضافية متاحة لهذه الرتبة حالياً", 13f, false, MUTED)
-            body.addView(empty)
-            return
+        val available = modules.filter { roleCanAccessModule(it.key) && it.key !in primaryNavigationModules() }
+
+        val intro = card().apply {
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT,
+                intArrayOf(0xFF282052.toInt(), 0xFF6047AD.toInt())).apply {
+                cornerRadius = dp(20).toFloat()
+            }
         }
-        available.forEach { module ->
-            val tile = card().apply { setPadding(dp(13), dp(12), dp(13), dp(12)) }
+        addText(intro, "مركز الأدوات", 18f, true, Color.WHITE)
+        addText(intro, "الأقسام الإضافية المتاحة لحساب $roleName. اختر أي بطاقة لفتح أدواتها المتصلة بالخادم.", 12f, false, 0xFFE7E1FF.toInt())
+        body.addView(intro)
+
+        val search = EditText(this).apply {
+            hint = "ابحث في أقسام الإدارة..."
+            textSize = 14f
+            setSingleLine(true)
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            textDirection = View.TEXT_DIRECTION_RTL
+            gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(15).toFloat()
+                setStroke(dp(1), 0xFFE5E1F0.toInt())
+            }
+            setPadding(dp(14), dp(11), dp(14), dp(11))
+        }
+        body.addView(search, LinearLayout.LayoutParams(-1, dp(52)).apply {
+            topMargin = dp(12)
+            bottomMargin = dp(8)
+        })
+        val empty = card().apply {
+            visibility = View.GONE
+            gravity = Gravity.CENTER
+        }
+        addText(empty, "لا توجد أقسام تطابق بحثك", 13f, true, MUTED)
+        body.addView(empty)
+
+        val records = mutableListOf<Pair<View, Module>>()
+        available.chunked(2).forEach { pair ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
             }
-            val icon = TextView(this).apply {
-                text = module.icon
-                textSize = 23f
-                gravity = Gravity.CENTER
-                background = roundRect(0xFFF0ECFB.toInt(), 13)
-                layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(11) }
+            pair.forEach { module ->
+                val tile = card().apply {
+                    setPadding(dp(13), dp(13), dp(13), dp(13))
+                    minimumHeight = dp(154)
+                    isClickable = true
+                    isFocusable = true
+                    foreground = android.util.TypedValue().let {
+                        val out = android.util.TypedValue()
+                        theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
+                        if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
+                    }
+                    setOnClickListener { openModule(module.key) }
+                    layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                        marginStart = dp(4)
+                        marginEnd = dp(4)
+                        bottomMargin = dp(9)
+                    }
+                }
+                val top = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                top.addView(TextView(this).apply {
+                    text = module.icon
+                    textSize = 22f
+                    gravity = Gravity.CENTER
+                    setTextColor(ACCENT)
+                    background = roundRect(0xFFF0ECFF.toInt(), 13)
+                    layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+                })
+                top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+                top.addView(TextView(this).apply {
+                    text = "↗"
+                    textSize = 17f
+                    setTextColor(MUTED)
+                })
+                tile.addView(top)
+                addText(tile, module.title, 13f, true, TEXT)
+                tile.addView(TextView(this).apply {
+                    text = module.subtitle
+                    textSize = 10.5f
+                    setTextColor(MUTED)
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setLineSpacing(dp(2).toFloat(), 1f)
+                    setPadding(0, dp(3), 0, dp(8))
+                })
+                tile.addView(button("فتح القسم") { openModule(module.key) }, LinearLayout.LayoutParams(-1, dp(42)))
+                row.addView(tile)
+                records.add(tile to module)
             }
-            row.addView(icon)
-            val copy = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutDirection = View.LAYOUT_DIRECTION_RTL
-            }
-            addText(copy, module.title, 14f, true, TEXT)
-            addText(copy, module.subtitle, 11f, false, MUTED)
-            row.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(button("فتح") { openModule(module.key) })
-            tile.addView(row)
-            body.addView(tile)
+            if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply {
+                marginStart = dp(4)
+                marginEnd = dp(4)
+            })
+            body.addView(row)
         }
+        if (available.isEmpty()) {
+            empty.visibility = View.VISIBLE
+            empty.removeAllViews()
+            addText(empty, "لا توجد أدوات إضافية متاحة لهذه الرتبة", 13f, true, MUTED)
+        }
+        search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s?.toString()?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty()
+                var found = false
+                records.forEach { (view, module) ->
+                    val match = query.isEmpty() ||
+                        module.title.lowercase(java.util.Locale.ROOT).contains(query) ||
+                        module.subtitle.lowercase(java.util.Locale.ROOT).contains(query) ||
+                        module.key.lowercase(java.util.Locale.ROOT).contains(query)
+                    view.visibility = if (match) View.VISIBLE else View.GONE
+                    if (match) found = true
+                }
+                empty.visibility = if (query.isNotEmpty() && !found) View.VISIBLE else View.GONE
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
     }
 
     /**
@@ -582,7 +672,19 @@ class AdminConsoleActivity : ThemedActivity() {
             setPadding(dp(16), dp(12), dp(16), dp(12)); elevation = dp(1).toFloat()
         }
         body.addView(search, LinearLayout.LayoutParams(-1, dp(54)).apply {
-            topMargin = dp(2); bottomMargin = dp(12)
+            topMargin = dp(2); bottomMargin = dp(8)
+        })
+        val noSearchResults = TextView(this).apply {
+            text = "لا توجد أقسام تطابق بحثك"
+            textSize = 12f
+            setTextColor(MUTED)
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            background = roundRect(Color.WHITE, 14)
+            visibility = View.GONE
+        }
+        body.addView(noSearchResults, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(8)
         })
 
         val groups = listOf(
@@ -666,6 +768,18 @@ class AdminConsoleActivity : ThemedActivity() {
                         maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
                         setLineSpacing(dp(2).toFloat(), 1.0f); setPadding(0, dp(4), 0, 0)
                     })
+                    val openAction = TextView(this).apply {
+                        text = "فتح القسم   ←"
+                        textSize = 11f
+                        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                        setTextColor(ACCENT)
+                        gravity = Gravity.CENTER_VERTICAL or Gravity.RIGHT
+                        setPadding(0, dp(11), 0, 0)
+                        isClickable = true
+                        isFocusable = true
+                        setOnClickListener { openModule(module.key) }
+                    }
+                    tile.addView(openAction)
                     row.addView(tile)
                     tileRecords.add(tile to module)
                 }
@@ -688,13 +802,17 @@ class AdminConsoleActivity : ThemedActivity() {
                         m.key.lowercase(java.util.Locale.ROOT).contains(q)
                     pair.first.visibility = if (match) View.VISIBLE else View.GONE
                 }
+                var anyVisible = false
                 groupRecords.forEach { pair ->
-                    pair.first.visibility = if (q.isEmpty() || pair.second.any { m ->
+                    val groupVisible = q.isEmpty() || pair.second.any { m ->
                         m.title.lowercase(java.util.Locale.ROOT).contains(q) ||
                             m.subtitle.lowercase(java.util.Locale.ROOT).contains(q) ||
                             m.key.lowercase(java.util.Locale.ROOT).contains(q)
-                    }) View.VISIBLE else View.GONE
+                    }
+                    pair.first.visibility = if (groupVisible) View.VISIBLE else View.GONE
+                    if (groupVisible) anyVisible = true
                 }
+                noSearchResults.visibility = if (q.isNotEmpty() && !anyVisible) View.VISIBLE else View.GONE
             }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
