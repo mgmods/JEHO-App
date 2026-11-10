@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   ParseUUIDPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AgenciesService } from './agencies.service';
@@ -239,7 +240,10 @@ export class AgenciesController {
     @CurrentUser('sub') userId: string,
     @Body() dto: AcceptAgencyInviteDto,
   ) {
-    return this.agenciesService.acceptInvite(id, userId, dto.code);
+    if (!dto?.code?.trim()) {
+      throw new BadRequestException('كود الدعوة غير موجود أو انتهت صلاحيته');
+    }
+    return this.agenciesService.acceptInvite(id, userId, dto.code.trim());
   }
 
   @Post(':id/invites/reject')
@@ -249,7 +253,10 @@ export class AgenciesController {
     @CurrentUser('sub') userId: string,
     @Body() dto: AcceptAgencyInviteDto,
   ) {
-    return this.agenciesService.rejectInvite(id, userId, dto.code);
+    if (!dto?.code?.trim()) {
+      throw new BadRequestException('تعذر رفض الدعوة: بيانات الدعوة غير مكتملة');
+    }
+    return this.agenciesService.rejectInvite(id, userId, dto.code.trim());
   }
 
   @Post(':id/join')
