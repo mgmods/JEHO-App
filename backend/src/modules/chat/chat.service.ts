@@ -307,7 +307,39 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
-  private mapMessage(message: ChatMessage, vipLevel = 0, displayRank?: any, agencyClub?: any) {
+  private async agencyRoleMapForUsers(userIds: string[]): Promise<Map<string, any>> {
+    const ids = Array.from(new Set((userIds || []).filter(Boolean)));
+    const result = new Map<string, any>();
+    if (!ids.length) return result;
+    const rows = await this.dataSource.query(
+      `SELECT DISTINCT ON (x."userId")
+              x."userId", x.id, x.name, x.role
+       FROM (
+         SELECT am."userId", a.id, a.name, am.role, 1 AS priority
+         FROM agency_members am
+         JOIN agencies a ON a.id = am."agencyId"
+         WHERE am."userId" = ANY($1::uuid[])
+           AND am.status = 'active' AND am."isActive" = true
+           AND a.status = 'active'
+         UNION ALL
+         SELECT a."ownerId" AS "userId", a.id, a.name, 'owner' AS role, 0 AS priority
+         FROM agencies a
+         WHERE a."ownerId" = ANY($1::uuid[]) AND a.status = 'active'
+       ) x
+       ORDER BY x."userId", x.priority, x.id`,
+      [ids],
+    );
+    for (const row of rows || []) {
+      result.set(String(row.userId), {
+        id: row.id,
+        name: row.name,
+        role: row.role,
+      });
+    }
+    return result;
+  }
+
+  private mapMessage(message: ChatMessage, vipLevel = 0, displayRank?: any, agencyClub?: any, agency?: any) {
     const sender: any = message.sender;
     const profile = sender?.profile;
     const reply = (message as any).replyTo as ChatMessage | undefined;
@@ -407,8 +439,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       });
       if (msg && !msg.isUnsent) {
         const senderVip = vipByUser?.get(msg.senderId) ?? 0;
-        const clubs = await this.agencyClubMapForUsers([msg.senderId]);
-        lastMessage = this.mapMessage(msg, senderVip, displayRanks?.get(msg.senderId), clubs.get(msg.senderId));
+        const [clubs, agencyRoles] = await Promise.all([
+          this.agencyClubMapForUsers([msg.senderId]),
+          this.agencyRoleMapForUsers([msg.senderId]),
+        ]);
+        lastMessage = this.mapMessage(msg, senderVip, displayRanks?.get(msg.senderId),
+          clubs.get(msg.senderId), agencyRoles.get(msg.senderId));
       }
     }
     const peerVip = peerPart?.userId ? vipByUser?.get(peerPart.userId) ?? 0 : 0;
@@ -723,12 +759,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         where: { userId: senderId, referenceType: 'paid_message', referenceId: message.id },
       }),
     ]);
-    const [senderVipMap, senderRanks, senderClubs] = await Promise.all([
+    const [senderVipMap, senderRanks, senderClubs, senderAgencyRoles] = await Promise.all([
       this.vipMapForUsers([senderId]), this.displayRankMapForUsers([senderId]),
-      this.agencyClubMapForUsers([senderId]),
+      this.agencyClubMapForUsers([senderId]), this.agencyRoleMapForUsers([senderId]),
     ]);
     const mapped: any = this.mapMessage(full || message, senderVipMap.get(senderId) ?? 0,
-      senderRanks.get(senderId), senderClubs.get(senderId));
+      senderRanks.get(senderId), senderClubs.get(senderId), senderAgencyRoles.get(senderId));
     if (paidTransaction) {
       const paidMetadata = (paidTransaction.metadata || {}) as Record<string, unknown>;
       mapped.paidCoins = Math.abs(Number(paidTransaction.amount) || 0);
@@ -839,9 +875,9 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     });
     const items = newestFirst.slice().reverse();
     const senderIds = items.map((m) => m.senderId);
-    const [vipByUser, displayRanks, clubsByUser] = await Promise.all([
+    const [vipByUser, displayRanks, clubsByUser, agencyRolesByUser] = await Promise.all([
       this.vipMapForUsers(senderIds), this.displayRankMapForUsers(senderIds),
-      this.agencyClubMapForUsers(senderIds),
+      this.agencyClubMapForUsers(senderIds), this.agencyRoleMapForUsers(senderIds),
     ]);
     const readAt = new Date();
     await this.partRepo.update(
@@ -853,6 +889,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const peerPart = peers.find((p) => p.userId !== userId);
     const mappedItems: any[] = items.map((m) => this.mapMessage(
       m, vipByUser.get(m.senderId) ?? 0, displayRanks.get(m.senderId), clubsByUser.get(m.senderId),
+      agencyRolesByUser.get(m.senderId),
     ));
     const paidIds = items.map((m) => m.id);
     if (paidIds.length) {
@@ -930,12 +967,13 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     msg.isEdited = true;
     msg.editedAt = new Date();
     const saved = await this.msgRepo.save(msg);
-    const [senderVipMap, senderRanks, senderClubs] = await Promise.all([
+    const [senderVipMap, senderRanks, senderClubs, senderAgencyRoles] = await Promise.all([
       this.vipMapForUsers([userId]), this.displayRankMapForUsers([userId]),
-      this.agencyClubMapForUsers([userId]),
+      this.agencyClubMapForUsers([userId]), this.agencyRoleMapForUsers([userId]),
     ]);
     const mapped = this.mapMessage({ ...saved, sender: msg.sender },
-      senderVipMap.get(userId) ?? 0, senderRanks.get(userId), senderClubs.get(userId));
+      senderVipMap.get(userId) ?? 0, senderRanks.get(userId), senderClubs.get(userId),
+      senderAgencyRoles.get(userId));
     const conversation = await this.convRepo.findOne({ where: { id: msg.conversationId } });
     const touchesPreview = conversation?.lastMessageId === msg.id;
     const payload = {
@@ -1182,11 +1220,13 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       if (current) {
         const vip =
           (await this.vipMapForUsers([current.senderId])).get(current.senderId) ?? 0;
-        const [ranks, clubs] = await Promise.all([
+        const [ranks, clubs, agencyRoles] = await Promise.all([
           this.displayRankMapForUsers([current.senderId]),
           this.agencyClubMapForUsers([current.senderId]),
+          this.agencyRoleMapForUsers([current.senderId]),
         ]);
-        lastMessage = this.mapMessage(current, vip, ranks.get(current.senderId), clubs.get(current.senderId));
+        lastMessage = this.mapMessage(current, vip, ranks.get(current.senderId),
+          clubs.get(current.senderId), agencyRoles.get(current.senderId));
       }
     }
 
