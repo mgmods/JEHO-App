@@ -1234,7 +1234,7 @@ export class AgenciesService implements OnModuleInit {
   /** Public agency profile roster. Owner is always first, followed by active managers, hosts and members. */
   async publicMembers(agencyId: string, page = 1, limit = 30) {
     const key = String(agencyId || '').trim();
-    let agency = await this.agenciesRepo.findOne({ where: { publicId: key }, relations: ['owner'] });
+    let agency = await this.agenciesRepo.findOne({ where: { publicId: key }, relations: ['owner', 'owner.profile'] });
     if (!agency && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
       agency = await this.agenciesRepo.findOne({ where: { id: key }, relations: ['owner'] });
     }
@@ -3444,7 +3444,5 @@ export class AgenciesService implements OnModuleInit {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     return !!agency && agency.ownerId === actorId;
   }
-
-  /** Club overview combines existing active staff (owner/manager/host) with approved supporters. */
 
 }
