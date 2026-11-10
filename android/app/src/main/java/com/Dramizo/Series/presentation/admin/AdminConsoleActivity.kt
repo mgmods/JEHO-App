@@ -1708,9 +1708,10 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun addVanityIdPreview(parent: LinearLayout, item: Any, title: String) {
-        fun parseColor(key: String, fallback: Int): Int = try {
-            Color.parseColor(value(item, key) ?: return fallback)
-        } catch (_: Exception) { fallback }
+        fun parseColor(key: String, fallback: Int): Int {
+            val raw = value(item, key) ?: return fallback
+            return try { Color.parseColor(raw) } catch (_: Exception) { fallback }
+        }
         val c1 = parseColor("styleColor1", 0xFF52E8FF.toInt())
         val c2 = parseColor("styleColor2", 0xFFC084FC.toInt())
         val c3 = parseColor("styleColor3", 0xFFFF7AC8.toInt())

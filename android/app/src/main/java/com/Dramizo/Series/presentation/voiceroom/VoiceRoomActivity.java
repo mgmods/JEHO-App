@@ -3217,15 +3217,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String memberAgencyId = decoration.agencyId == null ? "" : decoration.agencyId.trim();
             boolean sameAgencyRoom = isAgencyRoom && !liveAgencyId.isEmpty()
                     && !memberAgencyId.isEmpty() && liveAgencyId.equals(memberAgencyId);
-            boolean roomModerator = sameAgencyRoom && liveRoom.moderatorIds != null
-                    && decoration.userId != null && liveRoom.moderatorIds.stream()
-                    .anyMatch(moderatorId -> moderatorId != null && sameUser(moderatorId, decoration.userId));
+            boolean roomModerator = false;
+            if (sameAgencyRoom && liveRoom.moderatorIds != null && decoration.userId != null) {
+                for (String moderatorId : liveRoom.moderatorIds) {
+                    if (moderatorId != null && sameUser(moderatorId, decoration.userId)) {
+                        roomModerator = true;
+                        break;
+                    }
+                }
+            }
             if (sameAgencyRoom) {
                 if ("host".equals(agencyRole)) {
                     agencyBadgeLabel = female ? "مضيفة" : "مضيف";
-                } else if ("manager".equals(agencyRole) || roomModerator) {
+                } else if ("manager".equals(agencyRole) || "staff".equals(agencyRole)
+                        || "admin".equals(agencyRole) || "agency_admin".equals(agencyRole) || roomModerator) {
                     agencyBadgeLabel = female ? "مشرفة" : "مشرف";
                 }
+            } else if (!isAgencyRoom && liveRoom != null && liveRoom.hostId != null
+                    && decoration.userId != null && sameUser(liveRoom.hostId, decoration.userId)) {
+                agencyBadgeLabel = female ? "مضيفة" : "مضيف";
             }
         }
         if (agencyBadgeLabel != null) {

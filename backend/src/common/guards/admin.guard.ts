@@ -47,7 +47,7 @@ export class AdminGuard implements CanActivate {
     if (user.authSource === 'app') {
       const role = String(user.staffRole || '').toLowerCase();
       const nativeRoomConfigEdit =
-        verb === 'PATCH' && /^\/admin\/rooms\/[^/]+$/.test(url.split('?')[0].toLowerCase().replace(/^\/api\/v\d+/, ''));
+        method.toUpperCase() === 'PATCH' && /^\/admin\/rooms\/[^/]+$/.test(url.split('?')[0].toLowerCase().replace(/^\/api\/v\d+/, ''));
       if (nativeRoomConfigEdit) {
         throw new ForbiddenException('Room configuration changes are disabled for app staff');
       }
