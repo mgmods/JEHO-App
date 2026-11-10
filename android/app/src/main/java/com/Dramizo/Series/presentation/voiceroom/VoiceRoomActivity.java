@@ -8620,6 +8620,62 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    private void bindRoomUserRoleBadges(
+            @Nullable android.widget.LinearLayout container,
+            @Nullable View row,
+            @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (container == null || row == null) return;
+        container.removeAllViews();
+        if (user == null) {
+            row.setVisibility(View.GONE);
+            return;
+        }
+        java.util.ArrayList<String> labels = new java.util.ArrayList<>();
+        String staff = user.staffRole == null ? "" : user.staffRole.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("super".equals(staff) || "super_admin".equals(staff) || "superadmin".equals(staff)) {
+            labels.add("SUPER ADMIN");
+        } else if ("admin".equals(staff) || "administrator".equals(staff)) {
+            labels.add("ADMIN");
+        } else if ("manager".equals(staff) || "platform_manager".equals(staff)) {
+            labels.add("MANAGER");
+        }
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency = user.agency;
+        if (agency != null && agency.name != null && !agency.name.trim().isEmpty()) {
+            String role = agency.role == null ? "" : agency.role.trim().toLowerCase(java.util.Locale.ROOT);
+            if ("owner".equals(role)) labels.add("صاحب وكالة · " + agency.name.trim());
+            else if ("manager".equals(role)) labels.add("مدير وكالة · " + agency.name.trim());
+            else if ("host".equals(role) || "moderator".equals(role)) labels.add("موظف وكالة · " + agency.name.trim());
+            else labels.add("عضو وكالة · " + agency.name.trim());
+        }
+        if (user.isRechargeAgent) labels.add("وكيل شحن");
+        if (labels.isEmpty()) {
+            row.setVisibility(View.GONE);
+            return;
+        }
+        float density = getResources().getDisplayMetrics().density;
+        for (String label : labels) {
+            TextView chip = new TextView(this);
+            chip.setText(label);
+            chip.setTextColor(0xFFFFFFFF);
+            chip.setTextSize(11);
+            chip.setTypeface(null, android.graphics.Typeface.BOLD);
+            chip.setGravity(android.view.Gravity.CENTER);
+            chip.setPadding((int)(10*density), (int)(6*density), (int)(10*density), (int)(6*density));
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setColor(label.startsWith("SUPER") ? 0xFF6D3CC8
+                    : label.equals("ADMIN") || label.equals("MANAGER") ? 0xFF245D9B
+                    : label.startsWith("وكيل") ? 0xFF177A68 : 0xFF8A5A24);
+            bg.setCornerRadius(18*density);
+            chip.setBackground(bg);
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.setMarginEnd((int)(6*density));
+            container.addView(chip, lp);
+        }
+        row.setVisibility(View.VISIBLE);
+    }
+
     private static String roomCpTopSymbol(String type) {
         if (type == null) return "♥";
         String value = type.trim().toLowerCase(java.util.Locale.ROOT);
@@ -8913,6 +8969,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                     bindVipUserCardMedal(imgVipMedal, liveVip, r.data.levelBadgeUrl);
                     bindUserCardAgency(rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, r.data.agency);
+                    bindRoomUserRoleBadges((android.widget.LinearLayout) sheet.findViewById(R.id.roleBadgesContainer), sheet.findViewById(R.id.rowRoleBadges), r.data);
                     com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(
                             userCardBg, moreActionsBlock, liveVip);
                     if (r.data.displayName != null && !r.data.displayName.isEmpty()) {
