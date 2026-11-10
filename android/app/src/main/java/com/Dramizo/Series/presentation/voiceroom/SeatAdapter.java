@@ -668,23 +668,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
 
             if (holder.b.tvAgencyClub != null) {
-                String clubLabel = null;
-                com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club =
-                        seat.user != null ? seat.user.agencyClub : null;
-                if (club != null) {
-                    String role = club.role == null ? "" : club.role.trim().toLowerCase(Locale.ROOT);
-                    String agencyId = club.agencyId == null ? "" : club.agencyId.trim();
-                    String agencyName = club.agencyName == null ? "" : club.agencyName.trim();
-                    if ("owner".equals(role)) {
-                        clubLabel = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
-                    } else if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
-                            && !agencyId.isEmpty() && roomAgencyId.equals(agencyId)) {
-                        if ("host".equals(role)) clubLabel = "مضيفة";
-                        else if ("moderator".equals(role)) clubLabel = "مشرفة";
-                    }
-                }
+                String clubLabel = seat.user != null && seat.user.agencyClub != null
+                        ? seat.user.agencyClub.label : null;
                 holder.b.tvAgencyClub.setText(clubLabel == null ? "" : clubLabel);
-                holder.b.tvAgencyClub.setVisibility(clubLabel == null ? View.GONE : View.VISIBLE);
+                holder.b.tvAgencyClub.setVisibility(clubLabel == null || clubLabel.trim().isEmpty() ? View.GONE : View.VISIBLE);
             }
             if (seat.user != null) {
                 holder.b.tvName.setText(seat.user.displayName != null
