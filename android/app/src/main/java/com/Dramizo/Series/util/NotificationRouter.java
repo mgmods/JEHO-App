@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.text.TextUtils;
 
 import com.Dramizo.Series.presentation.agency.AgencyManageActivity;
+import com.Dramizo.Series.presentation.agency.AgencyActivity;
 import com.Dramizo.Series.presentation.chat.ChatConversationActivity;
 import com.Dramizo.Series.presentation.contests.ContestsActivity;
 import com.Dramizo.Series.presentation.main.MainActivity;
@@ -96,6 +97,12 @@ public final class NotificationRouter {
             return i;
         }
         String action = first(data, "action");
+        if ("agency".equals(t) && ("agency_club_approved".equalsIgnoreCase(action != null ? action : "")
+                || "agency_club_rejected".equalsIgnoreCase(action != null ? action : ""))) {
+            Intent i = new Intent(context, AgencyActivity.class);
+            put(i, "splash_target_agency_id", first(data, "agency_id", "agencyId"));
+            return i;
+        }
         if ("agency".equals(t) && ("join_request".equalsIgnoreCase(action != null ? action : "")
                 || "agency_club_request".equalsIgnoreCase(action != null ? action : ""))) {
             Intent i = new Intent(context, AgencyManageActivity.class);
