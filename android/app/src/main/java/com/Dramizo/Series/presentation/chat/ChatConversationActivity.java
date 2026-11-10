@@ -339,14 +339,7 @@ public class ChatConversationActivity extends ThemedActivity {
             public void onAgencyInviteDisagree(
                     ChatDtos.MessageDto msg,
                     com.Dramizo.Series.util.AgencyInviteCodec.Parsed invite) {
-                // Reject → bubble disappears completely from this chat.
-                if (msg != null && msg.id != null) {
-                    viewModel.dismissMessageLocally(msg.id);
-                }
-                Toast.makeText(
-                        ChatConversationActivity.this,
-                        R.string.agency_invite_declined,
-                        Toast.LENGTH_SHORT).show();
+                rejectAgencyInvite(msg, invite);
             }
         });
         LinearLayoutManager lm = new LinearLayoutManager(this);
@@ -1248,6 +1241,41 @@ public class ChatConversationActivity extends ThemedActivity {
         } catch (Exception ignored) {
         }
         UserProfileCardSheet.show(this, id, name, avatar);
+    }
+
+    /** Reject the invite on the server and notify the agency owner. */
+    private void rejectAgencyInvite(
+            @Nullable ChatDtos.MessageDto msg,
+            @Nullable com.Dramizo.Series.util.AgencyInviteCodec.Parsed invite) {
+        com.Dramizo.Series.util.AgencyInviteCodec.Parsed parsed = invite;
+        if (parsed == null && msg != null) {
+            parsed = com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content);
+        }
+        if (parsed == null || parsed.agencyId == null || parsed.code == null) {
+            Toast.makeText(this, R.string.agency_invite_missing_code, Toast.LENGTH_LONG).show();
+            return;
+        }
+        final String agencyId = parsed.agencyId.trim();
+        final String code = parsed.code.trim();
+        final String messageId = msg != null ? msg.id : null;
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            java.util.Map<String, String> payload = new java.util.HashMap<>();
+            payload.put("code", code);
+            Result<Object> result = ApiCall.execute(c.getAgencyApi().rejectInvite(agencyId, payload));
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (result.success) {
+                    if (messageId != null && !messageId.isEmpty()) {
+                        viewModel.dismissMessageLocally(messageId);
+                    }
+                    Toast.makeText(this, "تم رفض دعوة الوكالة", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, result.error != null ? result.error
+                            : "تعذر رفض الدعوة", Toast.LENGTH_LONG).show();
+                }
+            });
+        });
     }
 
     /** Join family/agency from invite card; remove the card after success. */
