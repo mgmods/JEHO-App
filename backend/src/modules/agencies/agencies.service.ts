@@ -1233,12 +1233,17 @@ export class AgenciesService implements OnModuleInit {
 
   /** Public agency profile roster. Owner is always first, followed by active managers, hosts and members. */
   async publicMembers(agencyId: string, page = 1, limit = 30) {
-    const agency = await this.agenciesRepo.findOne({ where: [{ id: agencyId }, { publicId: String(agencyId || '').trim() }], relations: ['owner'] });
+    const key = String(agencyId || '').trim();
+    let agency = await this.agenciesRepo.findOne({ where: { publicId: key }, relations: ['owner'] });
+    if (!agency && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
+      agency = await this.agenciesRepo.findOne({ where: { id: key }, relations: ['owner'] });
+    }
     if (!agency || agency.status !== AgencyStatus.ACTIVE) throw new NotFoundException('Agency not found');
     const safeLimit = Math.min(50, Math.max(1, Number(limit) || 30));
     const safePage = Math.max(1, Number(page) || 1);
     const rows = await this.membersRepo.createQueryBuilder('m')
       .leftJoinAndSelect('m.user', 'u')
+      .leftJoinAndSelect('u.profile', 'profile')
       .where('m.agencyId = :agencyId', { agencyId: agency.id })
       .andWhere('m.status = :status AND m.isActive = true', { status: AgencyMemberStatus.ACTIVE })
       .orderBy(`CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 WHEN 'host' THEN 2 ELSE 3 END`, 'ASC')
@@ -1247,12 +1252,14 @@ export class AgenciesService implements OnModuleInit {
     const items = rows.map(m => ({
       userId: m.userId, role: m.role, joinedAt: m.joinedAt,
       user: m.user ? { id: m.user.id, publicId: m.user.publicId, username: m.user.username,
-        displayName: m.user.displayName, avatarUrl: m.user.avatarUrl, level: m.user.level } : null,
+        displayName: m.user.displayName, avatarUrl: m.user.avatarUrl, level: m.user.level,
+        country: m.user.profile?.country || null, city: m.user.profile?.city || null } : null,
     }));
     if (safePage === 1 && !items.some(m => m.userId === agency.ownerId) && agency.owner) {
       items.unshift({ userId: agency.owner.id, role: AgencyRole.OWNER, joinedAt: agency.createdAt,
         user: { id: agency.owner.id, publicId: agency.owner.publicId, username: agency.owner.username,
-          displayName: agency.owner.displayName, avatarUrl: agency.owner.avatarUrl, level: agency.owner.level } });
+          displayName: agency.owner.displayName, avatarUrl: agency.owner.avatarUrl, level: agency.owner.level,
+          country: agency.owner.profile?.country || null, city: agency.owner.profile?.city || null } });
     }
     const total = await this.membersRepo.count({ where: { agencyId: agency.id, status: AgencyMemberStatus.ACTIVE, isActive: true } });
     return { items, total: Math.max(total, items.length), page: safePage, limit: safeLimit };
@@ -1260,15 +1267,20 @@ export class AgenciesService implements OnModuleInit {
 
   /** Public, paginated follower list; following is separate from agency employment. */
   async publicFollowers(agencyId: string, page = 1, limit = 30) {
-    const agency = await this.agenciesRepo.findOne({ where: [{ id: agencyId }, { publicId: String(agencyId || '').trim() }] });
+    const key = String(agencyId || '').trim();
+    let agency = await this.agenciesRepo.findOne({ where: { publicId: key } });
+    if (!agency && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
+      agency = await this.agenciesRepo.findOne({ where: { id: key } });
+    }
     if (!agency || agency.status !== AgencyStatus.ACTIVE) throw new NotFoundException('Agency not found');
     const safeLimit = Math.min(50, Math.max(1, Number(limit) || 30));
     const safePage = Math.max(1, Number(page) || 1);
     const [items, count] = await Promise.all([
       this.dataSource.query(`
         SELECT u.id AS "userId", u."publicId", u.username, u."displayName", u."avatarUrl", u.level,
-               f."createdAt" AS "followedAt"
+               up.country, up.city, f."createdAt" AS "followedAt"
         FROM agency_follows f JOIN users u ON u.id = f."userId"
+        LEFT JOIN user_profiles up ON up."userId" = u.id
         WHERE f."agencyId" = $1
         ORDER BY f."createdAt" DESC
         LIMIT $2 OFFSET $3
