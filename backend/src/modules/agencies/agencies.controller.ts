@@ -20,6 +20,7 @@ import {
   UpdateMemberRoleDto,
   SubmitAgencyApplicationDto,
   JoinByCodeDto,
+  AcceptAgencyInviteDto,
   UpdateAgencySettingsDto,
   UpdateCommissionDto,
   CreateAgencyPayoutRequestDto,
@@ -230,6 +231,16 @@ export class AgenciesController {
     @Body() dto: JoinByCodeDto,
   ) {
     return this.agenciesService.joinByCode(userId, dto.code, dto.publicId);
+  }
+
+  @Post(':id/invites/accept')
+  @ApiOperation({ summary: 'Accept a private in-app agency invite by agency UUID and activation code' })
+  acceptInvite(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: AcceptAgencyInviteDto,
+  ) {
+    return this.agenciesService.acceptInvite(id, userId, dto.code);
   }
 
   @Post(':id/join')
