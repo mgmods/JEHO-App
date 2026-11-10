@@ -47,13 +47,11 @@ import java.util.Locale;
 /** Agency manage hub — custom menu rows + custom bottom-sheet dialogs. */
 public class AgencyManageActivity extends ThemedActivity {
     public static final String EXTRA_AGENCY_ID = "agency_id";
-    public static final String EXTRA_OPEN_AGENCY_CLUB = "open_agency_club";
     public static final String EXTRA_OPEN_PENDING_REQUESTS = "open_agency_pending_requests";
 
     private ActivityAgencyManageBinding binding;
     private AgencyViewModel vm;
     private String agencyId;
-    private boolean openAgencyClubFromNotification;
     private boolean openPendingRequestsFromNotification;
     private boolean isOwner;
     private boolean isPlatformSuper;
@@ -77,7 +75,6 @@ public class AgencyManageActivity extends ThemedActivity {
         binding = ActivityAgencyManageBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         agencyId = getIntent().getStringExtra(EXTRA_AGENCY_ID);
-        openAgencyClubFromNotification = getIntent().getBooleanExtra(EXTRA_OPEN_AGENCY_CLUB, false);
         openPendingRequestsFromNotification = getIntent().getBooleanExtra(EXTRA_OPEN_PENDING_REQUESTS, false);
         if (agencyId == null || agencyId.isEmpty()) {
             Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
@@ -296,12 +293,7 @@ public class AgencyManageActivity extends ThemedActivity {
                         && myAgency.agency != null && agencyId.equals(myAgency.agency.id));
                 binding.menuLive.setVisibility(canOpen ? View.VISIBLE : View.GONE);
 
-                if (openAgencyClubFromNotification) {
-                    openAgencyClubFromNotification = false;
-                    binding.getRoot().post(() -> {
-                        if (!isFinishing()) AgencyFamilyInfoSheet.showClubRequests(this, agencyId);
-                    });
-                } else if (openPendingRequestsFromNotification) {
+                if (openPendingRequestsFromNotification) {
                     openPendingRequestsFromNotification = false;
                     binding.getRoot().post(() -> {
                         if (!isFinishing()) dialogPending();
