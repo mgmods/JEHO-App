@@ -464,10 +464,24 @@ class AdminConsoleActivity : ThemedActivity() {
                     setTextColor(MUTED)
                 })
                 tile.addView(top)
-                addText(tile, module.title, 14f, true, TEXT)
+                val moreTitle = TextView(this).apply {
+                    text = module.title
+                    textSize = 14f
+                    setTextColor(TEXT)
+                    setTypeface(typeface, Typeface.BOLD)
+                    gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    textDirection = View.TEXT_DIRECTION_RTL
+                    minLines = 2
+                    maxLines = 2
+                    includeFontPadding = false
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setPadding(0, dp(6), 0, dp(2))
+                }
+                tile.addView(moreTitle)
                 tile.addView(TextView(this).apply {
                     text = module.subtitle
-                    textSize = 10.5f
+                    textSize = 11f
                     setTextColor(MUTED)
                     maxLines = 2
                     ellipsize = android.text.TextUtils.TruncateAt.END
@@ -1812,7 +1826,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     previous == "more" -> showMoreModules(false)
                     previous != null -> openModule(previous, false)
                     currentSection != "home" -> showHome(false)
-                    else -> body.smoothScrollTo(0, 0)
+                    else -> Unit
                 }
             }
         }
