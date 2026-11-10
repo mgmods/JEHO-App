@@ -1242,7 +1242,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             isPersistentRoom = room.isPersistent;
             isAgencyRoom = RoomUiHelper.isAgencyRoom(room);
             if (seatAdapter != null) {
-                seatAdapter.setAgencyContext(isAgencyRoom, room.agencyId);
+                seatAdapter.setAgencyContext(isAgencyRoom, room.agencyId, room.moderatorIds);
             }
             if (audienceAdapter != null) {
                 audienceAdapter.setAgencyRoom(isAgencyRoom);
