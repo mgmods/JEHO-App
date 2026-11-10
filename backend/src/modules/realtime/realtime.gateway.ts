@@ -382,9 +382,19 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
     const profilePayload = await this.buildJoinPayload(client.userId, data.roomId, room.hostId);
 
+    // Avoid replaying club-entry announcements on socket rejoin, duplicate tabs,
+    // or a second device. Only announce a real transition from absent to present.
+    const roomChannel = `room:${data.roomId}`;
+    const alreadyInRoomOnThisSocket = client.rooms.has(roomChannel);
+    const existingRoomSockets = alreadyInRoomOnThisSocket
+      ? []
+      : await this.server.in(roomChannel).fetchSockets();
+    const userAlreadyPresent = alreadyInRoomOnThisSocket ||
+      existingRoomSockets.some((socket) => socket.data?.userId === client.userId);
+
     client.data.roomProfiles = client.data.roomProfiles || {};
     client.data.roomProfiles[data.roomId] = profilePayload;
-    client.join(`room:${data.roomId}`);
+    client.join(roomChannel);
     const musicVolume = this.roomMusicVolumes.get(data.roomId);
     if (musicVolume !== undefined) {
       client.emit('room:event', {
@@ -400,8 +410,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
 
     // Room presence is an in-room announcement, not a phone notification.
-    if (profilePayload.agencyClub?.label) {
-      this.server.to(`room:${data.roomId}`).emit('room:event', {
+    if (!userAlreadyPresent && profilePayload.agencyClub?.label) {
+      this.server.to(roomChannel).emit('room:event', {
         roomId: data.roomId,
         event: 'agency:club_member_entered',
         payload: {
