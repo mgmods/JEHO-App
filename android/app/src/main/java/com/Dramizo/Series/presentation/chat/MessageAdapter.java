@@ -674,7 +674,10 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         row.removeAllViews();
         AuthDtos.UserDto user = mine ? me : msg.sender;
         AuthDtos.AgencyClubDto club = user != null ? user.agencyClub : null;
-        if (club == null || club.label == null || club.label.trim().isEmpty()) {
+        String role = club != null && club.role != null
+                ? club.role.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        // Chat messages have no agency-room context: only the agency leader gets a global badge.
+        if (club == null || !"owner".equals(role)) {
             row.setVisibility(View.GONE);
             return;
         }
@@ -692,7 +695,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             row.addView(logo, logoLp);
         }
         TextView chip = new TextView(holder.itemView.getContext());
-        chip.setText(agencyName.isEmpty() ? "♛ نادي الوكالة" : "♛ نادي " + agencyName);
+        chip.setText(agencyName.isEmpty() ? "♛ قائد وكالة" : "♛ قائد وكالة · " + agencyName);
         chip.setTextColor(0xFF805A19);
         chip.setTextSize(10);
         chip.setTypeface(null, android.graphics.Typeface.BOLD);
