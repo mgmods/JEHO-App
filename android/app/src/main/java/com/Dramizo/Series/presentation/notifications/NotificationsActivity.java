@@ -117,14 +117,12 @@ public class NotificationsActivity extends ThemedActivity {
     private static boolean isAgencyJoinRequestNotification(MiscDtos.NotificationDto n) {
         String action = notificationValue(n, "action");
         return "join_request".equalsIgnoreCase(action)
-                || "agency_club_request".equalsIgnoreCase(action);
+;
     }
 
     private void showAgencyJoinRequestPrompt(MiscDtos.NotificationDto n) {
         String agencyId = notificationValue(n, "agencyId");
         String userId = notificationValue(n, "applicantId");
-        boolean clubRequest = "agency_club_request".equalsIgnoreCase(notificationValue(n, "action"));
-        if (clubRequest) userId = notificationValue(n, "requesterId");
         if (agencyId == null || userId == null) {
             startActivity(NotificationRouter.build(this, n.type, n.data));
             return;
@@ -168,9 +166,9 @@ public class NotificationsActivity extends ThemedActivity {
                 .setTitle(title)
                 .setView(content)
                 .setPositiveButton("✓ موافقة", (dialog, which) ->
-                        respondToAgencyJoinRequest(agencyId, targetUserId, clubRequest, true))
+                        respondToAgencyJoinRequest(agencyId, targetUserId, true))
                 .setNegativeButton("رفض الطلب", (dialog, which) ->
-                        respondToAgencyJoinRequest(agencyId, targetUserId, clubRequest, false))
+                        respondToAgencyJoinRequest(agencyId, targetUserId, false))
                 .setNeutralButton("لاحقاً", (dialog, which) -> {
                     Intent target = NotificationRouter.build(this, n.type, n.data);
                     startActivity(target);
@@ -178,20 +176,13 @@ public class NotificationsActivity extends ThemedActivity {
                 .show();
     }
 
-    private void respondToAgencyJoinRequest(String agencyId, String userId,
-                                            boolean clubRequest, boolean accept) {
+    private void respondToAgencyJoinRequest(String agencyId, String userId, boolean accept) {
         com.Dramizo.Series.di.AppContainer container = ContainerProvider.from(this);
         container.getIoExecutor().execute(() -> {
-            com.Dramizo.Series.domain.model.Result<?> result;
-            if (clubRequest) {
-                result = com.Dramizo.Series.util.ApiCall.execute(accept
-                        ? container.getAgencyApi().approveClubRequest(agencyId, userId)
-                        : container.getAgencyApi().rejectClubRequest(agencyId, userId));
-            } else {
-                result = com.Dramizo.Series.util.ApiCall.execute(accept
-                        ? container.getAgencyApi().approveJoin(agencyId, userId)
-                        : container.getAgencyApi().rejectJoin(agencyId, userId));
-            }
+            com.Dramizo.Series.domain.model.Result<?> result =
+                    com.Dramizo.Series.util.ApiCall.execute(accept
+                            ? container.getAgencyApi().approveJoin(agencyId, userId)
+                            : container.getAgencyApi().rejectJoin(agencyId, userId));
             runOnUiThread(() -> {
                 if (isFinishing()) return;
                 String message = !result.success
@@ -295,8 +286,7 @@ public class NotificationsActivity extends ThemedActivity {
         if (isBadgeAwardNotification(n)) return true;
         if (n.data != null) {
             Object action = n.data.get("action");
-            if (action != null && (String.valueOf(action).toLowerCase().startsWith("agency_club_")
-                    || "join_request".equalsIgnoreCase(String.valueOf(action))
+            if (action != null && ("join_request".equalsIgnoreCase(String.valueOf(action))
                     || "join_request_sent".equalsIgnoreCase(String.valueOf(action)))) {
                 return true;
             }
