@@ -453,6 +453,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         WHERE cm."userId" = $1
           AND cm.status = 'active'
           AND a.status = 'active'
+          AND (a."ownerId" IS NULL OR a."ownerId" <> cm."userId")
+          AND NOT EXISTS (
+            SELECT 1 FROM agency_members am
+             WHERE am."agencyId" = a.id
+               AND am."userId" = cm."userId"
+               AND am.status = 'active'
+               AND am."isActive" = true
+          )
         ORDER BY cm."createdAt" ASC
         LIMIT 1`,
       [userId],
@@ -463,10 +471,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       agencyName: clubRow.agencyName,
       agencyLogoUrl: clubRow.agencyLogoUrl || null,
       role: clubRow.role,
-      label: (clubRow.role === 'owner' ? 'صاحب' :
-        clubRow.role === 'host' ? 'مضيف' :
-        clubRow.role === 'manager' ? 'إدارة' :
-        clubRow.role === 'member' ? 'عضو' : 'داعم') + ' وكالة ' + clubRow.agencyName,
+      label: 'عضو نادي ' + clubRow.agencyName,
     } : null;
     const activeCosmeticRows: Array<{
       type: string;
