@@ -3038,6 +3038,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private static final class RoomChatDecoration {
+        String userId;
+        String agencyId;
+        String agencyName;
+        String agencyRole;
         String publicId;
         String publicIdStyleMode;
         String publicIdColor1;
@@ -3068,9 +3072,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         container.getIoExecutor().execute(() -> {
             RoomChatDecoration decoration = new RoomChatDecoration();
+            decoration.userId = userId;
             Result<AuthDtos.UserDto> profile = ApiCall.execute(container.getUserApi().getUser(userId));
             if (profile != null && profile.success && profile.data != null) {
                 AuthDtos.UserDto user = profile.data;
+                if (user.agency != null) {
+                    decoration.agencyId = user.agency.id;
+                    decoration.agencyName = user.agency.name;
+                    decoration.agencyRole = user.agency.role;
+                }
                 decoration.publicId = user.publicId;
                 decoration.publicIdStyleMode = user.publicIdStyleMode;
                 decoration.publicIdColor1 = user.publicIdStyleColor1;
@@ -3146,6 +3156,44 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         overflow.removeAllViews();
 
         int total = 0;
+        String agencyBadgeLabel = null;
+        String agencyRole = decoration.agencyRole == null ? ""
+                : decoration.agencyRole.trim().toLowerCase(java.util.Locale.ROOT);
+        String agencyName = decoration.agencyName == null ? "" : decoration.agencyName.trim();
+        if ("owner".equals(agencyRole)) {
+            agencyBadgeLabel = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
+        } else {
+            RoomDtos.RoomDto liveRoom = viewModel != null ? viewModel.getRoom().getValue() : null;
+            String liveAgencyId = liveRoom != null && liveRoom.agencyId != null
+                    ? liveRoom.agencyId.trim() : "";
+            String memberAgencyId = decoration.agencyId == null ? "" : decoration.agencyId.trim();
+            boolean sameAgencyRoom = isAgencyRoom && !liveAgencyId.isEmpty()
+                    && !memberAgencyId.isEmpty() && liveAgencyId.equals(memberAgencyId);
+            if (sameAgencyRoom) {
+                if ("host".equals(agencyRole)) {
+                    agencyBadgeLabel = "مضيفة";
+                } else if (liveRoom.moderatorIds != null && decoration.userId != null) {
+                    for (String moderatorId : liveRoom.moderatorIds) {
+                        if (moderatorId != null && sameUser(moderatorId, decoration.userId)) {
+                            agencyBadgeLabel = "مشرفة";
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (agencyBadgeLabel != null) {
+            TextView agencyBadge = new TextView(this);
+            agencyBadge.setText(agencyBadgeLabel);
+            agencyBadge.setTextColor(0xFFFFE4A6);
+            agencyBadge.setTextSize(9f);
+            agencyBadge.setTypeface(null, android.graphics.Typeface.BOLD);
+            agencyBadge.setIncludeFontPadding(false);
+            agencyBadge.setPadding(dp(5), dp(2), dp(5), dp(2));
+            agencyBadge.setBackgroundResource(R.drawable.bg_agency_affiliation_badge);
+            agencyBadge.setLayoutParams(roomBadgeTextParams(2));
+            addRoomChatBadge(inline, overflow, agencyBadge, total++);
+        }
         if (fallbackVip > 0) {
             ImageView vip = new ImageView(this);
             vip.setContentDescription("VIP");
