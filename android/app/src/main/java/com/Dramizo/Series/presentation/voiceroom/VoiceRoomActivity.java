@@ -15690,6 +15690,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
+        if ("agency:club_member_entered".equals(event)) {
+            String enteredId = memberStr(payload, "userId");
+            String enteredName = memberStr(payload, "displayName");
+            String badgeLabel = memberStr(payload, "clubBadgeLabel");
+            if (enteredName == null || enteredName.trim().isEmpty()) enteredName = "عضو";
+            if (badgeLabel == null || badgeLabel.trim().isEmpty()) badgeLabel = "عضو نادي الوكالة";
+            appendChatLine("نادي الوكالة", "✨ " + enteredName + " دخل الروم بصفة " + badgeLabel,
+                    0, 1, null, enteredId, null);
+            return;
+        }
         if ("support_chest:config_updated".equals(event)) {
             JsonElement updatedConfig = payload.get("config");
             if (updatedConfig != null && updatedConfig.isJsonObject()) {
