@@ -438,8 +438,28 @@ public class StoriesFragment extends Fragment {
     }
 
     private boolean isOwnerStory(StoriesDtos.StoryDto story) {
-        return story != null && (story.isMine
-                || (ownerStoryUserId != null && ownerStoryUserId.equals(story.userId)));
+        if (story == null) return false;
+        // The feed already marks the owner's story with isMine. Keep a second,
+        // authoritative client-side check against the signed-in account because
+        // older/live API payloads may omit isMine. This also prevents the owner
+        // from being treated as a normal viewer when opening the story from the
+        // Chats "قصتي" strip.
+        if (story.isMine) return true;
+        String currentUserId = null;
+        try {
+            currentUserId = c != null ? c.getSessionManager().getUserId() : null;
+            if ((currentUserId == null || currentUserId.trim().isEmpty())
+                    && c != null && c.getSessionManager().getUser() != null) {
+                currentUserId = c.getSessionManager().getUser().id;
+            }
+        } catch (Exception ignored) {
+        }
+        if (currentUserId != null && story.userId != null
+                && currentUserId.trim().equalsIgnoreCase(story.userId.trim())) {
+            return true;
+        }
+        return ownerStoryUserId != null && story.userId != null
+                && ownerStoryUserId.trim().equalsIgnoreCase(story.userId.trim());
     }
 
     private void showStoryViewers(StoriesDtos.StoryDto story) {
