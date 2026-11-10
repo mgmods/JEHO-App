@@ -5,6 +5,9 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.MotionEvent;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
@@ -311,6 +314,17 @@ public class StoriesFragment extends Fragment {
         Dialog dialog = new Dialog(requireContext());
         FrameLayout frame = new FrameLayout(requireContext());
         frame.setBackgroundColor(0xFF08070A);
+        final Handler storyHandler = new Handler(Looper.getMainLooper());
+        final Runnable[] imageAdvance = new Runnable[1];
+        final boolean[] storyPaused = {false};
+        final float[] touchStart = {-1f, -1f};
+        final boolean[] swipeHandled = {false};
+        final Runnable advanceNext = () -> {
+            if (!dialog.isShowing()) return;
+            dialog.dismiss();
+            if (index + 1 < group.size()) openViewer(group, index + 1);
+        };
+        imageAdvance[0] = advanceNext;
         View media;
         VideoView storyVideo = null;
         if ("video".equalsIgnoreCase(story.mediaType)) {
@@ -321,7 +335,10 @@ public class StoriesFragment extends Fragment {
                 mp.setVolume(1f, 1f);
                 video.start();
             });
-            video.setOnCompletionListener(mp -> { if (index + 1 < group.size()) { dialog.dismiss(); openViewer(group,index+1); } });
+            video.setOnCompletionListener(mp -> {
+                storyHandler.removeCallbacks(imageAdvance[0]);
+                advanceNext.run();
+            });
             video.setOnErrorListener((mp, what, extra) -> {
                 Toast.makeText(requireContext(), "تعذر تشغيل هذا الفيديو. تحقق من صيغة الملف أو أعد رفعه", Toast.LENGTH_LONG).show();
                 return true;
@@ -387,7 +404,53 @@ public class StoriesFragment extends Fragment {
         FrameLayout.LayoutParams actionParams = new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);
         actionParams.setMargins(dp(10),0,dp(10),dp(18)); frame.addView(actions,actionParams);
         }
-        frame.setOnClickListener(v -> { if (index + 1 < group.size()) { dialog.dismiss(); openViewer(group,index+1); } });
+        // Horizontal gestures navigate stories; vertical/short taps do not accidentally skip media.
+        frame.setOnTouchListener((view, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    touchStart[0] = event.getX();
+                    touchStart[1] = event.getY();
+                    swipeHandled[0] = false;
+                    storyPaused[0] = true;
+                    storyHandler.removeCallbacks(imageAdvance[0]);
+                    if (storyVideo != null && storyVideo.isPlaying()) storyVideo.pause();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    float dx = event.getX() - touchStart[0];
+                    float dy = event.getY() - touchStart[1];
+                    if (Math.abs(dx) > dp(54) && Math.abs(dx) > Math.abs(dy) * 1.2f) {
+                        swipeHandled[0] = true;
+                        storyHandler.removeCallbacks(imageAdvance[0]);
+                        if (storyVideo != null) {
+                            try { storyVideo.stopPlayback(); } catch (Exception ignored) { }
+                        }
+                        dialog.dismiss();
+                        if (dx < 0 && index + 1 < group.size()) openViewer(group, index + 1);
+                        else if (dx > 0 && index > 0) openViewer(group, index - 1);
+                    } else {
+                        storyPaused[0] = false;
+                        if (storyVideo != null) {
+                            if (!storyVideo.isPlaying()) storyVideo.start();
+                        } else {
+                            storyHandler.removeCallbacks(imageAdvance[0]);
+                            storyHandler.postDelayed(imageAdvance[0], 5000L);
+                        }
+                    }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    storyPaused[0] = false;
+                    if (storyVideo == null) storyHandler.postDelayed(imageAdvance[0], 5000L);
+                    else if (!storyVideo.isPlaying()) storyVideo.start();
+                    return true;
+            }
+            return true;
+        });
+        dialog.setOnDismissListener(d -> {
+            storyHandler.removeCallbacks(imageAdvance[0]);
+            if (storyVideo != null) {
+                try { storyVideo.stopPlayback(); } catch (Exception ignored) { }
+            }
+        });
         dialog.setContentView(frame);
         Window w = dialog.getWindow();
         if (w != null) {
@@ -407,6 +470,9 @@ public class StoriesFragment extends Fragment {
             w.setNavigationBarColor(0xFF08070A);
             WindowCompat.setDecorFitsSystemWindows(w, true);
             w.getDecorView().setSystemUiVisibility(0);
+        }
+        if (storyVideo == null) {
+            storyHandler.postDelayed(imageAdvance[0], 5000L);
         }
         if (storyVideo != null) {
             final VideoView target = storyVideo;
