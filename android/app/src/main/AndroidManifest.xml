@@ -44,6 +44,12 @@
             android:label="اللحظات" />
 
         <activity
+            android:name=".presentation.stories.StoryPreviewActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AuraLive" />
+
+        <activity
             android:name=".presentation.splash.UpdateActivity"
             android:exported="false"
             android:screenOrientation="portrait"
