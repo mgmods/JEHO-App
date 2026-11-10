@@ -165,7 +165,7 @@ export class StoriesService implements OnModuleInit {
     const viewers = await this.db.query(`SELECT u.id,u.username,u."displayName",u."avatarUrl",u."publicId",v."viewedAt"
       FROM "jeho_own"."story_views" v
       JOIN "jeho_own"."users" u ON u.id=v."userId"
-      WHERE v."storyId"=$1 AND u.status='active'
+      WHERE v."storyId"=$1
       ORDER BY v."viewedAt" DESC LIMIT 500`, [id]);
     return { storyId: id, viewCount: Number(story.viewCount || 0), viewers };
   }
