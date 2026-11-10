@@ -1437,12 +1437,18 @@ export class AgenciesService implements OnModuleInit {
     if (code.length < 4) {
       throw new BadRequestException('كود التفعيل غير صالح');
     }
-    const publicId = normalizeAgencyPublicId(String(rawPublicId || ''));
-    if (!isValidAgencyPublicId(publicId)) {
+    const suppliedId = String(rawPublicId || '').trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedId);
+    const publicId = isUuid ? '' : normalizeAgencyPublicId(suppliedId);
+    if (!isUuid && !isValidAgencyPublicId(publicId)) {
       throw new BadRequestException('أدخل معرف الوكالة الصحيح أولاً');
     }
+    // In-app invitations may carry the agency UUID; search-form joins use
+    // the short public display ID. Support both without truncating UUIDs.
     const agency = await this.agenciesRepo.findOne({
-      where: { activationCode: code, publicId, status: AgencyStatus.ACTIVE },
+      where: isUuid
+        ? { id: suppliedId, activationCode: code, status: AgencyStatus.ACTIVE }
+        : { activationCode: code, publicId, status: AgencyStatus.ACTIVE },
     });
     if (!agency) {
       // Avoid disclosing whether a guessed activation code alone is valid.
