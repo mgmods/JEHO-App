@@ -588,8 +588,23 @@ export class VanityIdsController {
         status: VanityIdStatus.AVAILABLE,
       });
     }
-    if (target.ownerUserId && target.ownerUserId !== userId && target.status === VanityIdStatus.OWNED) {
-      throw new BadRequestException('This vanity ID is already owned; release it explicitly before reassigning');
+    // Purchased or already-granted IDs are permanently bound to their current owner.
+    // Admin grants may use only an available ID, or renew the same user's existing grant.
+    if (
+      target.status === VanityIdStatus.OWNED &&
+      target.ownerUserId &&
+      target.ownerUserId !== userId
+    ) {
+      throw new BadRequestException('هذا الآي دي مملوك لشخص آخر ولا يمكن إهداؤه أو نقله إليه');
+    }
+    if (
+      target.status === VanityIdStatus.RESERVED &&
+      target.ownerUserId &&
+      target.ownerUserId !== userId &&
+      target.reservedUntil &&
+      target.reservedUntil > new Date()
+    ) {
+      throw new BadRequestException('هذا الآي دي محجوز لمستخدم آخر حالياً');
     }
     if (target.ownerUserId && target.ownerUserId !== userId) {
       this.clearLeaseFields(target);

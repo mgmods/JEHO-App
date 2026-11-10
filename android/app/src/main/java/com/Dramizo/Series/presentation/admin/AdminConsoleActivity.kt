@@ -1628,8 +1628,16 @@ class AdminConsoleActivity : ThemedActivity() {
                     card.addView(button("إهداء هذه الميزة لمستخدم") { showGrantCosmeticDialog(code) })
                 }
                 "vanityIds" -> if (!id.isNullOrBlank() && !publicId.isNullOrBlank()) {
-                    card.addView(button("إهداء الآي دي لمستخدم") { showGrantVanityDialog(publicId) })
-                    if (currentRole == StaffRoleHelper.SUPER) when (status?.lowercase()) {
+                    // A purchased/granted ID belongs to its current owner and must never be offered as a gift again.
+                    val vanityStatus = status?.lowercase()
+                    if (vanityStatus == "owned") {
+                        addText(card, "هذا الآي دي مملوك لمستخدم ولا يمكن إهداؤه أو نقله لشخص آخر.", 12f, true, 0xFF9B3D3D.toInt())
+                    } else if (vanityStatus == "reserved") {
+                        addText(card, "هذا الآي دي محجوز حالياً ولا يمكن إهداؤه لمستخدم آخر.", 12f, true, 0xFF9B6A24.toInt())
+                    } else if (vanityStatus != "disabled") {
+                        card.addView(button("إهداء آي دي متاح لمستخدم") { showGrantVanityDialog(publicId) })
+                    }
+                    if (currentRole == StaffRoleHelper.SUPER) when (vanityStatus) {
                         "owned", "reserved" -> card.addView(button("سحب الآي دي وإعادته للسوق") {
                             confirm("سيُستعاد الآي دي السابق للمالك إن وجد، ثم يعود هذا الآي دي للسوق. متابعة؟") {
                                 load(api.revokeVanityId(id)) { toast("تمت معالجة طلب سحب الآي دي"); openModule("vanityIds") }
@@ -3157,16 +3165,22 @@ class AdminConsoleActivity : ThemedActivity() {
      * sections, with RTL layout, rounded surface and visible press feedback.
      */
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
-        text = label
+        text = label.trim().ifBlank { "إجراء" }
         textSize = 14f
         isAllCaps = false
+        isSingleLine = false
+        maxLines = 2
+        ellipsize = android.text.TextUtils.TruncateAt.END
         gravity = Gravity.CENTER
-        minHeight = dp(52)
-        minimumHeight = dp(52)
-        minWidth = 0
+        textAlignment = View.TEXT_ALIGNMENT_CENTER
+        minHeight = dp(58)
+        minimumHeight = dp(58)
+        minWidth = dp(0)
         setTextColor(Color.WHITE)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         textDirection = View.TEXT_DIRECTION_RTL
+        layoutDirection = View.LAYOUT_DIRECTION_RTL
+        includeFontPadding = true
         layoutDirection = View.LAYOUT_DIRECTION_RTL
         includeFontPadding = false
         val shape = GradientDrawable(
