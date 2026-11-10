@@ -160,6 +160,8 @@ public final class AuthDtos {
         @SerializedName("isAdmin") public boolean isAdmin;
         /** Platform staff: "manager" | "super" | null/none */
         @SerializedName("staffRole") public String staffRole;
+        /** True only while the user has an active recharge-agent assignment. */
+        @SerializedName("isRechargeAgent") public boolean isRechargeAgent;
         @SerializedName("followersCount") public int followersCount;
         @SerializedName("followingCount") public int followingCount;
         @SerializedName("friendsCount") public int friendsCount;
