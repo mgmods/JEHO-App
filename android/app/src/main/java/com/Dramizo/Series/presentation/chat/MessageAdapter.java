@@ -833,7 +833,6 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             play.setBackground(playBg);
             FrameLayout.LayoutParams playLp = new FrameLayout.LayoutParams(dp(holder, 34), dp(holder, 34),
                     android.view.Gravity.CENTER);
-            previewFrame.addView(play, playLp);
             // Keep the thumbnail and play icon as one tappable preview surface.
             card.removeView(thumbnail);
             previewFrame.addView(thumbnail, new FrameLayout.LayoutParams(-1, -1));
