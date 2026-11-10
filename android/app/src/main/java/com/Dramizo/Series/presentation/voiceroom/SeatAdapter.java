@@ -126,7 +126,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     public void setAgencyRoom(boolean agency) {
-        setAgencyContext(agency, null);
+        setAgencyContext(agency, null, null);
     }
 
     public void setAgencyContext(boolean agency, @Nullable String agencyId,
