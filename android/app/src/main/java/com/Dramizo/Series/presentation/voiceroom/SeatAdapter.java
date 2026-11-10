@@ -1230,13 +1230,20 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             String role = agency.role == null ? "" : agency.role.trim().toLowerCase(Locale.ROOT);
             String agencyId = agency.id == null ? "" : agency.id.trim();
             String agencyName = agency.name == null ? "" : agency.name.trim();
+            boolean female = user != null && "female".equalsIgnoreCase(user.gender);
             if ("owner".equals(role)) {
-                label = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
+                // The club chip already carries the global leader title when available.
+                if (user.agencyClub == null) {
+                    label = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
+                }
             } else if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
                     && !agencyId.isEmpty() && roomAgencyId.equals(agencyId)) {
                 String userId = user.id == null ? "" : normalizeUserId(user.id);
-                if ("host".equals(role)) label = "مضيفة";
-                else if (!userId.isEmpty() && roomAgencyModeratorIds.contains(userId)) label = "مشرفة";
+                if ("host".equals(role)) label = female ? "مضيفة" : "مضيف";
+                else if ("manager".equals(role)
+                        || (!userId.isEmpty() && roomAgencyModeratorIds.contains(userId))) {
+                    label = female ? "مشرفة" : "مشرف";
+                }
             }
         }
         holder.b.tvAgencyRoleBadge.setText(label == null ? "" : label);

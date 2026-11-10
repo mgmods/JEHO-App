@@ -2725,6 +2725,47 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return null;
     }
 
+    /** Room-local agency identity for the chat name chip. */
+    @Nullable
+    private String agencyRoleLabelForRoomUser(@Nullable String userId) {
+        if (userId == null || userId.trim().isEmpty()) return null;
+        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
+        if (room == null) return null;
+        AuthDtos.UserDto user = null;
+        if (room.host != null && sameUser(userId, room.hostId)) user = room.host;
+        if (user == null && room.seats != null) {
+            for (RoomDtos.SeatDto seat : room.seats) {
+                if (seat != null && seat.user != null && sameUser(userId, seat.userId)) {
+                    user = seat.user;
+                    break;
+                }
+            }
+        }
+        if (user == null && myUserId != null && sameUser(userId, myUserId)) {
+            try { user = ContainerProvider.from(this).getSessionManager().getUser(); }
+            catch (Exception ignored) { }
+        }
+        AuthDtos.AgencyClubDto club = user != null ? user.agencyClub : null;
+        if (club != null) {
+            String role = club.role == null ? "" : club.role.trim().toLowerCase(java.util.Locale.ROOT);
+            String agencyId = club.agencyId == null ? "" : club.agencyId.trim();
+            String agencyName = club.agencyName == null ? "" : club.agencyName.trim();
+            boolean female = user != null && "female".equalsIgnoreCase(user.gender);
+            if ("owner".equals(role)) {
+                return agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
+            }
+            if (isAgencyRoom && room.agencyId != null && room.agencyId.equals(agencyId)) {
+                if ("host".equals(role)) return female ? "مضيفة" : "مضيف";
+                if ("manager".equals(role) || "staff".equals(role)) return female ? "مشرفة" : "مشرف";
+            }
+        }
+        if (isAgencyRoom && roomModeratorIds.contains(userId)) {
+            boolean female = user != null && "female".equalsIgnoreCase(user.gender);
+            return female ? "مشرفة" : "مشرف";
+        }
+        return null;
+    }
+
     private void appendChatLine(String name, String text, int vipLevel, int userLevel) {
         appendChatLine(name, text, vipLevel, userLevel, null);
     }
@@ -2942,7 +2983,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             }
             boolean creator = !mysteriousLine && !system && userId != null && roomHostId != null && userId.equals(roomHostId);
-            if (hostChip != null) hostChip.setVisibility(creator ? View.VISIBLE : View.GONE);
+            String agencyRoleLabel = !mysteriousLine && !system ? agencyRoleLabelForRoomUser(userId) : null;
+            if (hostChip != null) {
+                if (agencyRoleLabel != null && !agencyRoleLabel.trim().isEmpty()) {
+                    hostChip.setText(agencyRoleLabel);
+                    hostChip.setVisibility(View.VISIBLE);
+                } else if (creator && !isAgencyRoom) {
+                    hostChip.setText("مضيف");
+                    hostChip.setVisibility(View.VISIBLE);
+                } else {
+                    hostChip.setVisibility(View.GONE);
+                    hostChip.setText("");
+                }
+            }
 
             // VIP/CP/ID/medals now sit inline beside the display name.
             // Legacy moon/heart/level counters are intentionally not shown in chat.

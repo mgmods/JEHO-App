@@ -1970,13 +1970,26 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     // Resolve the account-wide agency club identity once for every participant in this room.
     const clubUserIds = [...new Set([room.hostId, ...(loadedSeats || []).map((seat: any) => seat.userId)].filter(Boolean))];
     const clubBadgeRows = clubUserIds.length ? await this.dataSource.query(
-      "SELECT DISTINCT ON (x.\"userId\") x.\"userId\", x.\"agencyId\", x.\"agencyName\", x.role FROM (SELECT a.\"ownerId\" AS \"userId\", a.id AS \"agencyId\", a.name AS \"agencyName\", 'owner' AS role, 0 AS priority FROM agencies a WHERE a.\"ownerId\" = ANY($1::uuid[]) AND a.status = 'active' UNION ALL SELECT am.\"userId\", a.id AS \"agencyId\", a.name AS \"agencyName\", CASE WHEN am.role = 'host' THEN 'host' WHEN am.role = 'owner' THEN 'owner' WHEN am.role = 'manager' THEN 'manager' WHEN am.role = 'member' THEN 'member' ELSE 'staff' END AS role, CASE WHEN am.role = 'host' THEN 1 WHEN am.role = 'owner' THEN 0 WHEN am.role = 'manager' THEN 2 WHEN am.role = 'member' THEN 3 ELSE 4 END AS priority FROM agency_members am JOIN agencies a ON a.id = am.\"agencyId\" WHERE am.\"userId\" = ANY($1::uuid[]) AND am.status = 'active' AND am.\"isActive\" = true AND a.status = 'active' AND am.role IN ('owner','manager','host','member') UNION ALL SELECT cm.\"userId\", a.id, a.name, 'supporter' AS role, 4 AS priority FROM agency_club_members cm JOIN agencies a ON a.id = cm.\"agencyId\" WHERE cm.\"userId\" = ANY($1::uuid[]) AND cm.status = 'active' AND a.status = 'active') x ORDER BY x.\"userId\", x.priority",
-      [clubUserIds],
+      "SELECT DISTINCT ON (x.\"userId\") x.\"userId\", x.\"agencyId\", x.\"agencyName\", x.role, u.gender\nFROM (\n  SELECT a.\"ownerId\" AS \"userId\", a.id AS \"agencyId\", a.name AS \"agencyName\", 'owner' AS role, 0 AS priority\n  FROM agencies a WHERE a.\"ownerId\" = ANY($1::uuid[]) AND a.status = 'active'\n  UNION ALL\n  SELECT am.\"userId\", a.id AS \"agencyId\", a.name AS \"agencyName\",\n    CASE WHEN am.role = 'host' THEN 'host' WHEN am.role = 'owner' THEN 'owner'\n         WHEN am.role = 'manager' THEN 'manager' WHEN am.role = 'member' THEN 'member' ELSE 'staff' END AS role,\n    CASE WHEN am.role = 'host' THEN 1 WHEN am.role = 'owner' THEN 0\n         WHEN am.role = 'manager' THEN 2 WHEN am.role = 'member' THEN 3 ELSE 4 END AS priority\n  FROM agency_members am JOIN agencies a ON a.id = am.\"agencyId\"\n  WHERE am.\"userId\" = ANY($1::uuid[]) AND am.status = 'active'\n    AND am.\"isActive\" = true AND a.status = 'active' AND a.id = $2\n    AND am.role IN ('owner','manager','host','member')\n  UNION ALL\n  SELECT cm.\"userId\", a.id, a.name, 'supporter' AS role, 4 AS priority\n  FROM agency_club_members cm JOIN agencies a ON a.id = cm.\"agencyId\"\n  WHERE cm.\"userId\" = ANY($1::uuid[]) AND cm.status = 'active'\n    AND a.status = 'active' AND a.id = $2\n) x JOIN users u ON u.id = x.\"userId\"\nORDER BY x.\"userId\", x.priority",
+      [clubUserIds, room.agencyId || null],
     ) : [];
     const clubBadgeMap = new Map<string, any>();
     for (const row of clubBadgeRows || []) {
-      const prefix = row.role === 'host' ? 'مضيف' : row.role === 'owner' ? 'صاحب' : row.role === 'manager' || row.role === 'staff' ? 'إدارة' : row.role === 'member' ? 'عضو' : 'داعم';
-      clubBadgeMap.set(row.userId, { agencyId: row.agencyId, agencyName: row.agencyName, role: row.role, label: prefix + ' وكالة ' + row.agencyName });
+      const sameAgencyRoom = !!room.agencyId && String(row.agencyId) === String(room.agencyId);
+      const female = String(row.gender || '').toLowerCase() === 'female';
+      let label: string | null = null;
+      // Leaders keep their title in every room; host / supervisor labels are room-scoped.
+      if (row.role === 'owner') {
+        label = 'قائد وكالة ' + row.agencyName;
+      } else if (sameAgencyRoom && row.role === 'host') {
+        label = female ? 'مضيفة' : 'مضيف';
+      } else if (sameAgencyRoom && (row.role === 'manager' || row.role === 'staff')) {
+        label = female ? 'مشرفة' : 'مشرف';
+      }
+      clubBadgeMap.set(row.userId, {
+        agencyId: row.agencyId, agencyName: row.agencyName,
+        role: row.role, gender: row.gender || null, label,
+      });
     }
     if (room.host) (room.host as any).agencyClub = clubBadgeMap.get(room.hostId) || null;
     for (const seat of loadedSeats as any[]) if (seat.user) seat.user.agencyClub = clubBadgeMap.get(seat.userId) || null;
