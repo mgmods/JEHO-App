@@ -3166,15 +3166,16 @@ class AdminConsoleActivity : ThemedActivity() {
      */
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label.trim().ifBlank { "إجراء" }
-        textSize = 12f
+        textSize = 11f
         isAllCaps = false
         isSingleLine = false
-        maxLines = 2
-        ellipsize = android.text.TextUtils.TruncateAt.END
+        maxLines = 3
+        // Never truncate an action label: its purpose must remain visible to staff.
+        ellipsize = null
         gravity = Gravity.CENTER
         textAlignment = View.TEXT_ALIGNMENT_CENTER
-        minHeight = dp(40)
-        minimumHeight = dp(40)
+        minHeight = dp(36)
+        minimumHeight = dp(36)
         minWidth = dp(0)
         setTextColor(Color.WHITE)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -3200,7 +3201,7 @@ class AdminConsoleActivity : ThemedActivity() {
         backgroundTintList = null
         elevation = dp(1).toFloat()
         stateListAnimator = null
-        setPadding(dp(9), dp(4), dp(9), dp(4))
+        setPadding(dp(8), dp(3), dp(8), dp(3))
         contentDescription = label
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
             topMargin = dp(2)
