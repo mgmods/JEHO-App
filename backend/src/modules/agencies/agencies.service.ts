@@ -1432,6 +1432,26 @@ export class AgenciesService implements OnModuleInit {
    * Join using the agency's private activation code (chat invite + manual code field).
    * Code only proves the invite — owner/manager must still approve (PENDING).
    */
+  /**
+   * Accept a private invite card without putting the agency UUID into the
+   * user's short publicId DTO field. The agency UUID is validated by the route.
+   */
+  async acceptInvite(agencyId: string, userId: string, rawCode: string) {
+    const code = normalizeActivationCode(rawCode);
+    if (code.length < 4 || code.length > 16) {
+      throw new BadRequestException('كود الدعوة غير صالح');
+    }
+    const agency = await this.agenciesRepo.findOne({
+      where: { id: agencyId, activationCode: code, status: AgencyStatus.ACTIVE },
+    });
+    if (!agency) {
+      throw new NotFoundException('الدعوة غير صالحة أو انتهت صلاحيتها');
+    }
+    // This creates a PENDING membership and notifies the agency owner/managers
+    // with the agency logo and explicit approve/reject actions.
+    return this.joinSelf(agency.id, userId);
+  }
+
   async joinByCode(userId: string, rawCode: string, rawPublicId: string) {
     const code = normalizeActivationCode(rawCode);
     if (code.length < 4) {
