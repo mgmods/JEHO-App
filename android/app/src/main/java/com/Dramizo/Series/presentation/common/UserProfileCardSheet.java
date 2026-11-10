@@ -341,7 +341,17 @@ public final class UserProfileCardSheet {
                     if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
                     if (tvAgencyName != null) tvAgencyName.setText(u.agencyClub.label);
                     if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
-                    if (imgAgencyLogo != null) imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                    if (imgAgencyLogo != null) {
+                        String clubLogo = u.agencyClub.agencyLogoUrl;
+                        if (clubLogo != null && !clubLogo.trim().isEmpty()) {
+                            Glide.with(activity).load(AssetCatalog.absoluteUrl(clubLogo))
+                                    .placeholder(R.drawable.icon_agency)
+                                    .error(R.drawable.icon_agency)
+                                    .centerCrop().into(imgAgencyLogo);
+                        } else {
+                            imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                        }
+                    }
                     if (rowAgency != null) rowAgency.setOnClickListener(v -> {
                         if (u.agencyClub.agencyId != null) AgencyFamilyInfoSheet.show(activity, u.agencyClub.agencyId);
                     });
