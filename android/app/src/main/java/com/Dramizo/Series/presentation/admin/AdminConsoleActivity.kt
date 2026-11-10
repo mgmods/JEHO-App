@@ -819,15 +819,19 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun roleCanAccessModule(key: String): Boolean {
+        // Client-side visibility is intentionally narrower than the backend's
+        // AdminGuard. The server remains authoritative for every request.
         return when (currentRole) {
             StaffRoleHelper.SUPER -> true
+            // Admin: user/room and agency operations, plus system messaging
+            // and gift catalog visibility. Financial, VIP, cosmetics and
+            // platform-configuration tools remain Super Admin only.
             StaffRoleHelper.ADMIN -> key in setOf(
-                "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
-                "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds"
+                "users", "rooms", "agencies", "agencyApplications",
+                "notifications", "gifts"
             )
-            StaffRoleHelper.MANAGER -> key in setOf(
-                "rooms", "streams", "reports", "cosmetics", "gifts", "grantCosmetics"
-            )
+            // Manager: operational room and live-stream supervision only.
+            StaffRoleHelper.MANAGER -> key in setOf("rooms", "streams")
             else -> false
         }
     }
