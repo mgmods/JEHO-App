@@ -49,10 +49,12 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
         holder.b.tvBody.setText(n.body != null ? n.body : "");
         holder.b.tvTypeChip.setText(typeLabel);
         String badgeImage = badgeImageUrl(n);
-        if (badgeImage != null) {
-            Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(badgeImage))
-                    .placeholder(R.drawable.ic_medal_default)
-                    .error(R.drawable.ic_medal_default)
+        String agencyImage = agencyImageUrl(n);
+        String image = badgeImage != null ? badgeImage : agencyImage;
+        if (image != null) {
+            Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(image))
+                    .placeholder(R.drawable.jeho_logo)
+                    .error(R.drawable.jeho_logo)
                     .into(holder.b.imgNotificationType);
         } else {
             Glide.with(holder.itemView).clear(holder.b.imgNotificationType);
@@ -101,6 +103,18 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
     private static String badgeImageUrl(MiscDtos.NotificationDto n) {
         if (!isBadgeAward(n)) return null;
         Object value = n.data.get("imageUrl");
+        String url = value == null ? "" : String.valueOf(value).trim();
+        return url.isEmpty() ? null : url;
+    }
+
+    private static String agencyImageUrl(MiscDtos.NotificationDto n) {
+        if (n == null || n.data == null || !"agency".equalsIgnoreCase(n.type)) return null;
+        Object action = n.data.get("action");
+        if (action == null) return null;
+        String kind = String.valueOf(action);
+        if (!"join_request".equalsIgnoreCase(kind)
+                && !"agency_club_request".equalsIgnoreCase(kind)) return null;
+        Object value = n.data.get("agencyLogoUrl");
         String url = value == null ? "" : String.valueOf(value).trim();
         return url.isEmpty() ? null : url;
     }
