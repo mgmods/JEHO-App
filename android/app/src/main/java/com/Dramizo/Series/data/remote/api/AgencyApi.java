@@ -96,6 +96,12 @@ public interface AgencyApi {
     Call<ApiResponse<Object>> joinByCode(@Body Map<String, String> body);
 
     /** In-app invite: agency UUID is a route parameter, not the user's publicId. */
+    /** Legacy invite cards without an activation code still enter the normal approval queue. */
+    @POST("agencies/{id}/join")
+    Call<ApiResponse<Object>> joinLegacyInvite(
+            @Path("id") String agencyId,
+            @Body Map<String, String> body);
+
     @POST("agencies/{id}/invites/accept")
     Call<ApiResponse<Object>> acceptInvite(
             @Path("id") String agencyId,
