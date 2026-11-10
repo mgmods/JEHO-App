@@ -132,13 +132,44 @@ public class NotificationsActivity extends ThemedActivity {
         final String targetUserId = userId;
         String title = n.title == null ? "طلب انضمام جديد" : n.title;
         String message = n.body == null ? "يوجد طلب انضمام إلى الوكالة." : n.body;
+        android.widget.LinearLayout content = new android.widget.LinearLayout(this);
+        content.setOrientation(android.widget.LinearLayout.VERTICAL);
+        content.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        content.setPadding(pad, pad, pad, 0);
+        android.widget.ImageView logo = new android.widget.ImageView(this);
+        logo.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        logo.setBackgroundResource(R.drawable.bg_notification_avatar);
+        logo.setClipToOutline(true);
+        android.widget.LinearLayout.LayoutParams logoLp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(76 * getResources().getDisplayMetrics().density),
+                Math.round(76 * getResources().getDisplayMetrics().density));
+        logoLp.bottomMargin = Math.round(12 * getResources().getDisplayMetrics().density);
+        content.addView(logo, logoLp);
+        String logoUrl = notificationValue(n, "agencyLogoUrl");
+        if (logoUrl != null) {
+            com.bumptech.glide.Glide.with(this)
+                    .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(logoUrl))
+                    .placeholder(R.drawable.icon_agency)
+                    .error(R.drawable.icon_agency)
+                    .circleCrop()
+                    .into(logo);
+        } else {
+            logo.setImageResource(R.drawable.icon_agency);
+        }
+        android.widget.TextView details = new android.widget.TextView(this);
+        details.setText(message);
+        details.setTextColor(0xFF514B5C);
+        details.setTextSize(15);
+        details.setGravity(android.view.Gravity.CENTER);
+        details.setPadding(0, 0, 0, pad);
+        content.addView(details, new android.widget.LinearLayout.LayoutParams(-1, -2));
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setIcon(R.drawable.jeho_logo)
                 .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton("موافقة", (dialog, which) ->
+                .setView(content)
+                .setPositiveButton("✓ موافقة", (dialog, which) ->
                         respondToAgencyJoinRequest(agencyId, targetUserId, clubRequest, true))
-                .setNegativeButton("رفض", (dialog, which) ->
+                .setNegativeButton("رفض الطلب", (dialog, which) ->
                         respondToAgencyJoinRequest(agencyId, targetUserId, clubRequest, false))
                 .setNeutralButton("لاحقاً", (dialog, which) -> {
                     Intent target = NotificationRouter.build(this, n.type, n.data);
@@ -264,7 +295,9 @@ public class NotificationsActivity extends ThemedActivity {
         if (isBadgeAwardNotification(n)) return true;
         if (n.data != null) {
             Object action = n.data.get("action");
-            if (action != null && String.valueOf(action).toLowerCase().startsWith("agency_club_")) {
+            if (action != null && (String.valueOf(action).toLowerCase().startsWith("agency_club_")
+                    || "join_request".equalsIgnoreCase(String.valueOf(action))
+                    || "join_request_sent".equalsIgnoreCase(String.valueOf(action)))) {
                 return true;
             }
             Object nested = n.data.get("type");
