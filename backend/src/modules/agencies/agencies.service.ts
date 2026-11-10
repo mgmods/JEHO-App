@@ -3473,6 +3473,12 @@ export class AgenciesService implements OnModuleInit {
     const staffMembership = await this.membersRepo.findOne({
       where: { agencyId, userId: viewerId, status: AgencyMemberStatus.ACTIVE, isActive: true }
     });
+    const canReviewClub = agency.ownerId === viewerId || await this.membersRepo.exist({
+      where: {
+        agencyId, userId: viewerId, role: AgencyRole.MANAGER,
+        status: AgencyMemberStatus.ACTIVE, isActive: true,
+      },
+    });
     return {
       agencyId, agencyName: agency.name, owner,
       counts: {
@@ -3481,11 +3487,11 @@ export class AgenciesService implements OnModuleInit {
         agencyMembers: Number(counts?.[0]?.agencyMembers || 0),
         // Count unique accounts: a staff member must not be double-counted if they also have a legacy supporter row.
         total: Number(counts?.[0]?.total ?? members.length),
-        pending: agency.ownerId === viewerId ? Number(counts?.[0]?.pending || 0) : undefined,
+        pending: canReviewClub ? Number(counts?.[0]?.pending || 0) : undefined,
       },
       members,
       myStatus: agency.ownerId === viewerId ? 'active_staff' : staffMembership ? (staffMembership.role === AgencyRole.HOST ? 'active_host' : staffMembership.role === AgencyRole.MEMBER ? 'active_member' : 'active_staff') : status,
-      canReview: agency.ownerId === viewerId,
+      canReview: canReviewClub,
     };
   }
 
@@ -3536,7 +3542,13 @@ export class AgenciesService implements OnModuleInit {
   async listClubRequests(agencyId: string, actorId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
-    if (agency.ownerId !== actorId) throw new ForbiddenException('صاحب الوكالة فقط يمكنه مراجعة طلبات النادي');
+    const canReview = agency.ownerId === actorId || await this.membersRepo.exist({
+      where: {
+        agencyId, userId: actorId, role: AgencyRole.MANAGER,
+        status: AgencyMemberStatus.ACTIVE, isActive: true,
+      },
+    });
+    if (!canReview) throw new ForbiddenException('هذه الصلاحية لصاحب الوكالة أو مدير معتمد');
     return this.dataSource.query(`
       SELECT cm."userId", cm."createdAt", u."displayName", u.username, u."avatarUrl", u."publicId"
       FROM agency_club_members cm JOIN users u ON u.id = cm."userId"
@@ -3548,7 +3560,13 @@ export class AgenciesService implements OnModuleInit {
   async reviewClubRequest(agencyId: string, actorId: string, memberUserId: string, approve: boolean) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
-    if (agency.ownerId !== actorId) throw new ForbiddenException('صاحب الوكالة فقط يمكنه قبول أو رفض الطلب');
+    const canReview = agency.ownerId === actorId || await this.membersRepo.exist({
+      where: {
+        agencyId, userId: actorId, role: AgencyRole.MANAGER,
+        status: AgencyMemberStatus.ACTIVE, isActive: true,
+      },
+    });
+    if (!canReview) throw new ForbiddenException('هذه الصلاحية لصاحب الوكالة أو مدير معتمد');
     const updated = await this.dataSource.query(`
       UPDATE agency_club_members
       SET status = $3, "updatedAt" = NOW()
