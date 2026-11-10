@@ -95,6 +95,12 @@ public interface AgencyApi {
     @POST("agencies/join-by-code")
     Call<ApiResponse<Object>> joinByCode(@Body Map<String, String> body);
 
+    /** In-app invite: agency UUID is a route parameter, not the user's publicId. */
+    @POST("agencies/{id}/invites/accept")
+    Call<ApiResponse<Object>> acceptInvite(
+            @Path("id") String agencyId,
+            @Body Map<String, String> body);
+
     @retrofit2.http.PATCH("agencies/{id}/settings")
     Call<ApiResponse<Object>> updateSettings(@Path("id") String id, @Body Map<String, String> body);
 
