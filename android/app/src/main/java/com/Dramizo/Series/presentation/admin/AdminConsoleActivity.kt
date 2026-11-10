@@ -57,6 +57,7 @@ class AdminConsoleActivity : ThemedActivity() {
     @Volatile private var roleRefreshInFlight = false
     private var notificationImageUrl: String? = null
     private var notificationImageStatus: TextView? = null
+    private var notificationImagePreview: ImageView? = null
     private var notificationImageUploadInProgress = false
     private val staffIdentityFields = mutableMapOf<String, EditText>()
     private var pendingIdentityFieldKey: String? = null
@@ -525,8 +526,7 @@ class AdminConsoleActivity : ThemedActivity() {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             setPadding(dp(18), dp(18), dp(18), dp(18))
-            background = GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFF21194B.toInt(), 0xFF49329A.toInt(), 0xFF7656D8.toInt())).apply { cornerRadius = dp(22).toFloat() }
+            background = GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, intArrayOf(0xFF21194B.toInt(), 0xFF49329A.toInt(), 0xFF7656D8.toInt())).apply { cornerRadius = dp(22).toFloat() }
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
             elevation = dp(3).toFloat()
         }
@@ -547,14 +547,13 @@ class AdminConsoleActivity : ThemedActivity() {
         })
         hero.addView(brand)
         body.addView(hero)
-
         val keys = when (currentRole) {
-            StaffRoleHelper.SUPER -> listOf("users", "agencyApplications", "agencies", "notifications", "gifts", "grantCosmetics", "vanityIds", "vip")
-            StaffRoleHelper.ADMIN -> listOf("users", "agencyApplications", "agencies", "notifications", "gifts")
-            StaffRoleHelper.MANAGER -> listOf("rooms", "streams")
+            StaffRoleHelper.SUPER -> modules.map { it.key }
+            StaffRoleHelper.ADMIN -> listOf("users", "rooms", "streams", "reports", "agencies", "agencyApplications", "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds")
+            StaffRoleHelper.MANAGER -> listOf("rooms", "streams", "reports", "cosmetics", "gifts", "grantCosmetics")
             else -> emptyList()
         }
-        val visible = keys.filter { roleCanAccessModule(it) }.mapNotNull { key -> modules.firstOrNull { it.key == key } }
+        val visible = keys.distinct().filter { roleCanAccessModule(it) }.mapNotNull { key -> modules.firstOrNull { it.key == key } }
         visible.chunked(2).forEach { pair ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
             pair.forEach { module ->
@@ -583,11 +582,10 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun roleCanAccessModule(key: String): Boolean {
-        // The backend AdminGuard remains authoritative; only assigned actions are rendered here.
         return when (currentRole) {
-            StaffRoleHelper.SUPER -> key in setOf("users", "agencyApplications", "agencies", "notifications", "gifts", "grantCosmetics", "vanityIds", "vip")
-            StaffRoleHelper.ADMIN -> key in setOf("users", "agencyApplications", "agencies", "notifications", "gifts")
-            StaffRoleHelper.MANAGER -> key in setOf("rooms", "streams")
+            StaffRoleHelper.SUPER -> key in modules.map { it.key }.toSet()
+            StaffRoleHelper.ADMIN -> key in setOf("users", "rooms", "streams", "reports", "agencies", "agencyApplications", "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds")
+            StaffRoleHelper.MANAGER -> key in setOf("rooms", "streams", "reports", "cosmetics", "gifts", "grantCosmetics")
             else -> false
         }
     }
@@ -1787,18 +1785,6 @@ class AdminConsoleActivity : ThemedActivity() {
             val detailPanel = section("تفاصيل إضافية")
             details.forEach { (label, value) -> addText(detailPanel, "$label: $value", 12f, false, MUTED) }
         }
-        val permissions = section("الصلاحيات حسب رتبتك")
-        val permissionText = if (isUser) when (currentRole) {
-            StaffRoleHelper.SUPER -> "سوبر أدمن: تعديل الرتبة والحالة، الحظر الدائم أو إلغاؤه، الحظر المؤقت، والحذف عند الضرورة."
-            StaffRoleHelper.ADMIN -> "أدمن: الحظر المؤقت حتى 24 ساعة وفك الحظر المؤقت الذي أصدرته أنت. لا يملك تغيير الرتب أو الحظر الدائم أو حذف الحساب."
-            else -> "مانجر: لا يملك أدوات تغيير الحسابات؛ يقتصر دوره على الرومات والبث والبلاغات حسب صلاحيات الخادم."
-        } else when (currentRole) {
-            StaffRoleHelper.SUPER -> "سوبر أدمن: إدارة إعدادات الروم وإغلاقه وفق صلاحيات الخادم."
-            StaffRoleHelper.ADMIN -> "أدمن: إجراءات الروم المتاحة له وفق صلاحيات الخادم."
-            else -> "مانجر: إشراف الروم وإجراءاته المحددة من الخادم."
-        }
-        addText(permissions, permissionText, 12f, false, MUTED)
-
         if (isUser) {
             val actions = section("إجراءات الحساب", "تظهر الإجراءات وفق رتبتك، ويظل الخادم المرجع النهائي للصلاحيات.")
             if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
@@ -2555,6 +2541,14 @@ class AdminConsoleActivity : ThemedActivity() {
             setPadding(0, dp(6), 0, dp(6))
         }
         imageRow.addView(notificationImageStatus)
+        val imagePreview = ImageView(this).apply {
+            visibility = View.GONE
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = roundRect(0xFFF5F4FA.toInt(), 14)
+            contentDescription = "معاينة صورة الرسالة المرفقة"
+        }
+        imageRow.addView(imagePreview, LinearLayout.LayoutParams(-1, dp(156)).apply { topMargin = dp(6) })
+        notificationImagePreview = imagePreview
         form.first.addView(imageRow, 2)
         AlertDialog.Builder(this).setTitle("إرسال رسالة الإدارة").setView(form.first)
             .setNegativeButton("إلغاء", null).setPositiveButton("معاينة وإرسال", null)
@@ -2569,7 +2563,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         val b1u = form.second[5].text.toString().trim()
                         val b2t = form.second[6].text.toString().trim()
                         val b2u = form.second[7].text.toString().trim()
-                        val link = if (rawLink.matches(Regex("\\d+"))) "https://jeho-own-backend.mgs.blitz.cloud/open/room/" + rawLink else rawLink
+                        val link = if (rawLink.matches(Regex("\\d+"))) "jeho://room/" + rawLink else rawLink
                         if (title.isBlank() || message.isBlank()) { toast("عنوان الرسالة ونصها مطلوبان"); return@setOnClickListener }
                         if (notificationImageUploadInProgress) { toast("انتظر حتى يكتمل رفع الصورة"); return@setOnClickListener }
                         if ((b1t.isBlank() != b1u.isBlank()) || (b2t.isBlank() != b2u.isBlank())) {
@@ -2639,6 +2633,10 @@ class AdminConsoleActivity : ThemedActivity() {
                     val result = response.body()?.getData()
                     if (response.isSuccessful && response.body()?.success == true && !result?.url.isNullOrBlank()) {
                         notificationImageUrl = result!!.url
+                        notificationImagePreview?.let { preview ->
+                            preview.visibility = View.VISIBLE
+                            Glide.with(this@AdminConsoleActivity).load(AssetCatalog.absoluteUrl(result.url) ?: result.url).centerCrop().into(preview)
+                        }
                         notificationImageStatus?.text = "✓ تم رفع الصورة بنجاح"
                         notificationImageStatus?.setTextColor(0xFF23834B.toInt())
                     } else {
