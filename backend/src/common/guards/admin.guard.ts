@@ -40,6 +40,10 @@ export class AdminGuard implements CanActivate {
 
     const method = String(request.method || 'GET');
     const url = String(request.originalUrl || request.url || '');
+    const normalizedPath = url.split('?')[0].toLowerCase().replace(/^\/api\/v\d+/, '');
+    if (method.toUpperCase() === 'PATCH' && /^\/admin\/rooms\/[^/]+$/.test(normalizedPath)) {
+      throw new ForbiddenException('Room configuration changes are disabled for all staff roles');
+    }
 
     // Native Android staff policy. The role is reloaded from the database by JwtAuthGuard.
     // Keep this as an explicit allow-list: a newly added dashboard endpoint must not
