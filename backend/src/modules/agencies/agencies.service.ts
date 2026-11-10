@@ -3602,6 +3602,9 @@ export class AgenciesService implements OnModuleInit {
   async leaveClub(agencyId: string, userId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
+    if (agency.ownerId === userId) {
+      throw new ForbiddenException('صاحب الوكالة لا يغادر نادي وكالته');
+    }
     const staff = await this.membersRepo.findOne({
       where: { agencyId, userId, status: AgencyMemberStatus.ACTIVE, isActive: true }
     });
