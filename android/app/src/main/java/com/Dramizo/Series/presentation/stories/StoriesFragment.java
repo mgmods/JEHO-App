@@ -162,7 +162,11 @@ public class StoriesFragment extends Fragment {
                     pendingOpenUserId = null;
                     List<StoriesDtos.StoryDto> ownStories = new ArrayList<>();
                     for (StoriesDtos.StoryDto item : feed) if (requested.equals(item.userId)) ownStories.add(item);
-                    if (!ownStories.isEmpty()) openViewer(ownStories, 0);
+                    if (!ownStories.isEmpty()) {
+                        // Feed is newest-first; play a user's story sequence oldest-to-newest.
+                        Collections.reverse(ownStories);
+                        openViewer(ownStories, 0);
+                    }
                     else {
                         Intent profile = new Intent(requireContext(), ProfileActivity.class);
                         profile.putExtra(ProfileActivity.EXTRA_USER_ID, requested);
@@ -189,7 +193,9 @@ public class StoriesFragment extends Fragment {
         for (StoriesDtos.StoryDto s : feed) grouped.computeIfAbsent(s.userId == null ? s.id : s.userId, k -> new ArrayList<>()).add(s);
         for (List<StoriesDtos.StoryDto> group : grouped.values()) {
             if (group.isEmpty()) continue;
-            StoriesDtos.StoryDto story = group.get(0);
+            // The API feed is newest-first; playback is chronological, while the ring previews latest.
+            Collections.reverse(group);
+            StoriesDtos.StoryDto story = group.get(group.size() - 1);
             LinearLayout item = new LinearLayout(requireContext());
             item.setOrientation(LinearLayout.VERTICAL);
             item.setGravity(Gravity.CENTER);
