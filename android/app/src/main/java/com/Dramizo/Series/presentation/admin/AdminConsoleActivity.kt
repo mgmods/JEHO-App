@@ -588,7 +588,8 @@ class AdminConsoleActivity : ThemedActivity() {
                         roundRect(0xFFF0ECFF.toInt(), 20),
                         null
                     )
-                    layoutParams = LinearLayout.LayoutParams(0, dp(128), 1f).apply { marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(8) }
+                    // Compact card with enough room for a readable action name and purpose.
+                    layoutParams = LinearLayout.LayoutParams(0, dp(124), 1f).apply { marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(8) }
                     setOnClickListener { openModule(module.key) }
                 }
                 val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
@@ -600,29 +601,33 @@ class AdminConsoleActivity : ThemedActivity() {
                 top.addView(TextView(this).apply { text = "↗"; textSize = 18f; setTextColor(MUTED) })
                 tile.addView(top)
                 val tileTitle = TextView(this).apply {
-                    text = module.title
-                    textSize = 14f
-                    setTextColor(TEXT)
+                    text = module.title.ifBlank { "قسم " + module.key }
+                    textSize = 13f
+                    setTextColor(0xFF211B35.toInt())
                     setTypeface(typeface, Typeface.BOLD)
                     gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
                     textDirection = View.TEXT_DIRECTION_RTL
-                    minLines = 2
+                    minLines = 1
                     maxLines = 2
-                    includeFontPadding = false
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    setLineSpacing(dp(2).toFloat(), 1f)
-                    setPadding(0, dp(7), 0, dp(2))
+                    includeFontPadding = true
+                    ellipsize = null
+                    setLineSpacing(dp(1).toFloat(), 1f)
+                    setPadding(0, dp(5), 0, dp(2))
                 }
-                tile.addView(tileTitle, LinearLayout.LayoutParams(-1, 0, 1f))
+                tile.addView(tileTitle, LinearLayout.LayoutParams(-1, -2))
                 val tileSubtitle = TextView(this).apply {
-                    text = module.subtitle
-                    textSize = 9f
-                    setTextColor(MUTED)
+                    text = module.subtitle.ifBlank { "اضغط لفتح هذا القسم" }
+                    textSize = 10f
+                    setTextColor(0xFF625B70.toInt())
+                    minLines = 1
                     maxLines = 2
                     ellipsize = android.text.TextUtils.TruncateAt.END
                     gravity = Gravity.RIGHT
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    textDirection = View.TEXT_DIRECTION_RTL
+                    includeFontPadding = true
+                    setPadding(0, dp(2), 0, 0)
                 }
                 tile.addView(tileSubtitle, LinearLayout.LayoutParams(-1, -2))
                 row.addView(tile)
