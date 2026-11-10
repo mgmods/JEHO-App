@@ -62,6 +62,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     @Nullable private String selfDisplayName;
     @Nullable private String selfAvatarUrl;
     private boolean agencyRoom;
+    @Nullable private String roomAgencyId;
     private final Set<String> speakingUsers = new HashSet<>();
     private final Map<String, Float> speakingLevels = new HashMap<>();
     private final Map<String, Float> lastPaintedSpeakLevel = new HashMap<>();
@@ -124,8 +125,15 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     public void setAgencyRoom(boolean agency) {
-        if (agencyRoom == agency) return;
+        setAgencyContext(agency, null);
+    }
+
+    public void setAgencyContext(boolean agency, @Nullable String agencyId) {
+        String normalizedId = agencyId == null ? null : agencyId.trim();
+        if (normalizedId != null && normalizedId.isEmpty()) normalizedId = null;
+        if (agencyRoom == agency && Objects.equals(roomAgencyId, normalizedId)) return;
         agencyRoom = agency;
+        roomAgencyId = normalizedId;
         notifyItemRangeChanged(0, getItemCount(), "wear");
     }
 
@@ -660,10 +668,23 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
 
             if (holder.b.tvAgencyClub != null) {
-                String clubLabel = seat.user != null && seat.user.agencyClub != null
-                        ? seat.user.agencyClub.label : null;
+                String clubLabel = null;
+                com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club =
+                        seat.user != null ? seat.user.agencyClub : null;
+                if (club != null) {
+                    String role = club.role == null ? "" : club.role.trim().toLowerCase(Locale.ROOT);
+                    String agencyId = club.agencyId == null ? "" : club.agencyId.trim();
+                    String agencyName = club.agencyName == null ? "" : club.agencyName.trim();
+                    if ("owner".equals(role)) {
+                        clubLabel = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
+                    } else if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
+                            && !agencyId.isEmpty() && roomAgencyId.equals(agencyId)) {
+                        if ("host".equals(role)) clubLabel = "مضيفة";
+                        else if ("moderator".equals(role)) clubLabel = "مشرفة";
+                    }
+                }
                 holder.b.tvAgencyClub.setText(clubLabel == null ? "" : clubLabel);
-                holder.b.tvAgencyClub.setVisibility(clubLabel == null || clubLabel.trim().isEmpty() ? View.GONE : View.VISIBLE);
+                holder.b.tvAgencyClub.setVisibility(clubLabel == null ? View.GONE : View.VISIBLE);
             }
             if (seat.user != null) {
                 holder.b.tvName.setText(seat.user.displayName != null
