@@ -350,6 +350,17 @@ public final class AgencyFamilyInfoSheet {
                     idLine.setTextColor(0xFFB6C1CC);
                     idLine.setTextSize(11);
                     details.addView(idLine);
+                    String city = String.valueOf(user.get("city") == null ? "" : user.get("city"));
+                    Object levelRaw = user.get("level");
+                    String extra = !city.trim().isEmpty() && !"null".equals(city) ? city : "";
+                    if (levelRaw instanceof Number) extra += (extra.isEmpty() ? "" : "   •   ") + "المستوى " + ((Number) levelRaw).intValue();
+                    if (!extra.isEmpty()) {
+                        TextView metaLine = new TextView(activity);
+                        metaLine.setText(extra);
+                        metaLine.setTextColor(0xFF8997A6);
+                        metaLine.setTextSize(10);
+                        details.addView(metaLine);
+                    }
                     android.widget.LinearLayout.LayoutParams cardLp = new android.widget.LinearLayout.LayoutParams(-1, -2);
                     cardLp.bottomMargin = dp(activity, 7);
                     list.addView(card, cardLp);
