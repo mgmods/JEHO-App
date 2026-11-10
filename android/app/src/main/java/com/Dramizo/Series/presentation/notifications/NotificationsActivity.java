@@ -64,6 +64,10 @@ public class NotificationsActivity extends ThemedActivity {
                 showCpRequestPrompt(n);
                 return;
             }
+            if (isAgencyJoinRequestNotification(n)) {
+                showAgencyJoinRequestPrompt(n);
+                return;
+            }
             if (n != null) {
                 Intent target = NotificationRouter.build(this, n.type, n.data);
                 if (!(target.getComponent() != null
@@ -102,6 +106,70 @@ public class NotificationsActivity extends ThemedActivity {
         String body = intent.getStringExtra(EXTRA_CP_REQUEST_BODY);
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
                 () -> showCpRequestPrompt(requestId, title, body), 250);
+    }
+
+    private static String notificationValue(MiscDtos.NotificationDto n, String key) {
+        if (n == null || n.data == null || n.data.get(key) == null) return null;
+        String value = String.valueOf(n.data.get(key)).trim();
+        return value.isEmpty() || "null".equalsIgnoreCase(value) ? null : value;
+    }
+
+    private static boolean isAgencyJoinRequestNotification(MiscDtos.NotificationDto n) {
+        String action = notificationValue(n, "action");
+        return "join_request".equalsIgnoreCase(action)
+                || "agency_club_request".equalsIgnoreCase(action);
+    }
+
+    private void showAgencyJoinRequestPrompt(MiscDtos.NotificationDto n) {
+        String agencyId = notificationValue(n, "agencyId");
+        String userId = notificationValue(n, "applicantId");
+        boolean clubRequest = "agency_club_request".equalsIgnoreCase(notificationValue(n, "action"));
+        if (clubRequest) userId = notificationValue(n, "requesterId");
+        if (agencyId == null || userId == null) {
+            startActivity(NotificationRouter.build(this, n.type, n.data));
+            return;
+        }
+        final String targetUserId = userId;
+        String title = n.title == null ? "طلب انضمام جديد" : n.title;
+        String message = n.body == null ? "يوجد طلب انضمام إلى الوكالة." : n.body;
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setIcon(R.drawable.jeho_logo)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("موافقة", (dialog, which) ->
+                        respondToAgencyJoinRequest(agencyId, targetUserId, clubRequest, true))
+                .setNegativeButton("رفض", (dialog, which) ->
+                        respondToAgencyJoinRequest(agencyId, targetUserId, clubRequest, false))
+                .setNeutralButton("لاحقاً", (dialog, which) -> {
+                    Intent target = NotificationRouter.build(this, n.type, n.data);
+                    startActivity(target);
+                })
+                .show();
+    }
+
+    private void respondToAgencyJoinRequest(String agencyId, String userId,
+                                            boolean clubRequest, boolean accept) {
+        com.Dramizo.Series.di.AppContainer container = ContainerProvider.from(this);
+        container.getIoExecutor().execute(() -> {
+            com.Dramizo.Series.domain.model.Result<?> result;
+            if (clubRequest) {
+                result = com.Dramizo.Series.util.ApiCall.execute(accept
+                        ? container.getAgencyApi().approveClubRequest(agencyId, userId)
+                        : container.getAgencyApi().rejectClubRequest(agencyId, userId));
+            } else {
+                result = com.Dramizo.Series.util.ApiCall.execute(accept
+                        ? container.getAgencyApi().approveJoin(agencyId, userId)
+                        : container.getAgencyApi().rejectJoin(agencyId, userId));
+            }
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                String message = !result.success
+                        ? (result.error != null ? result.error : "تعذرت معالجة طلب الانضمام")
+                        : (accept ? "تم قبول طلب الانضمام بنجاح" : "تم رفض طلب الانضمام");
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                vm.load();
+            });
+        });
     }
 
     private void showCpRequestPrompt(MiscDtos.NotificationDto notification) {
