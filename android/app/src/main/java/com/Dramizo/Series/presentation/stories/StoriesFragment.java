@@ -427,13 +427,28 @@ public class StoriesFragment extends Fragment {
                     float dy = event.getY() - touchStart[1];
                     if (Math.abs(dx) > dp(54) && Math.abs(dx) > Math.abs(dy) * 1.2f) {
                         swipeHandled[0] = true;
-                        storyHandler.removeCallbacks(imageAdvance[0]);
-                        if (activeVideo != null) {
-                            try { activeVideo.stopPlayback(); } catch (Exception ignored) { }
+                        if (dx < 0 && index + 1 < group.size()) {
+                            storyHandler.removeCallbacks(imageAdvance[0]);
+                            if (activeVideo != null) {
+                                try { activeVideo.stopPlayback(); } catch (Exception ignored) { }
+                            }
+                            dialog.dismiss();
+                            openViewer(group, index + 1);
+                        } else if (dx > 0 && index > 0) {
+                            storyHandler.removeCallbacks(imageAdvance[0]);
+                            if (activeVideo != null) {
+                                try { activeVideo.stopPlayback(); } catch (Exception ignored) { }
+                            }
+                            dialog.dismiss();
+                            openViewer(group, index - 1);
+                        } else {
+                            storyPaused[0] = false;
+                            if (activeVideo != null) {
+                                if (!activeVideo.isPlaying()) activeVideo.start();
+                            } else {
+                                storyHandler.postDelayed(imageAdvance[0], 5000L);
+                            }
                         }
-                        dialog.dismiss();
-                        if (dx < 0 && index + 1 < group.size()) openViewer(group, index + 1);
-                        else if (dx > 0 && index > 0) openViewer(group, index - 1);
                     } else {
                         storyPaused[0] = false;
                         if (activeVideo != null) {
