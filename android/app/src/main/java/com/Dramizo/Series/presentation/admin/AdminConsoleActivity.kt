@@ -299,14 +299,11 @@ class AdminConsoleActivity : ThemedActivity() {
                 setPadding(dp(3), dp(4), dp(3), dp(3))
                 isClickable = true
                 isFocusable = true
-                background = android.util.TypedValue().let {
-                    android.util.TypedValue().apply { android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 0f, resources.displayMetrics) }
-                    android.graphics.drawable.RippleDrawable(
-                        android.content.res.ColorStateList.valueOf(0x226B4CC2),
-                        roundRect(if (selected) 0xFFF0ECFF.toInt() else Color.TRANSPARENT, 13),
-                        null
-                    )
-                }
+                background = android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(0x226B4CC2),
+                    roundRect(if (selected) 0xFFF0ECFF.toInt() else Color.TRANSPARENT, 13),
+                    null
+                )
                 setOnClickListener {
                     when (item.third) {
                         "home" -> showHome()
