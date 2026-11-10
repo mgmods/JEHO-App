@@ -1280,7 +1280,11 @@ public class ChatConversationActivity extends ThemedActivity {
         Toast.makeText(this, R.string.loading, Toast.LENGTH_SHORT).show();
         AppContainer c = ContainerProvider.from(this);
         c.getIoExecutor().execute(() -> {
-            Result<Object> r = c.getAgencyRepository().joinByCode(agencyPublicId, joinCode);
+            java.util.Map<String, String> payload = new java.util.HashMap<>();
+            payload.put("code", joinCode);
+            // Do not send the 36-character agency UUID as publicId. The invite
+            // endpoint accepts it as a UUID path parameter and validates code separately.
+            Result<Object> r = ApiCall.execute(c.getAgencyApi().acceptInvite(agencyPublicId, payload));
             runOnUiThread(() -> {
                 if (r.success) {
                     if (messageId != null && !messageId.isEmpty()) {
