@@ -352,8 +352,8 @@ window.renderCpStore=function(rows){
  const now=Date.now();
  const normalized=cpStoreItems.map(item=>{
   const expiry=item.expiresAt?Date.parse(item.expiresAt):NaN;
-  const activeLease=!item.expiresAt||(!Number.isNaN(expiry)&&expiry>now);
-  return {...item,owned:item.owned===true&&activeLease,equipped:item.equipped===true&&activeLease};
+  const activeLease=!item.expiresAt||Number.isNaN(expiry)||expiry>now;
+  return {...item,owned:item.owned===true,equipped:item.equipped===true&&activeLease};
  });
  const items=cpStoreBagMode?normalized.filter(item=>item.owned):normalized;
  if(!items.length){
@@ -365,21 +365,24 @@ window.renderCpStore=function(rows){
   const image=item.previewUrl||item.animationUrl||fallback;
   const price=Math.max(0,Number(item.coinPrice)||0);
   const lease=Math.max(1,Number(item.meta?.leaseDays)||30);
-  const kind=({cp_background:"خلفية CP",cp_logo:"شعار CP",vip_badge:"إطار صورة شخصية",host_badge:"إطار صورة شخصية",profile_card:"بطاقة الملف",nameplate:"لوحة الاسم",level_badge:"شارة مستوى",entry_effect:"تأثير دخول",room_card:"بطاقة روم",chat_bubble:"فقاعة دردشة"})[item.type]||"مكافأة CP";
+  const kind=({cp_background:"خلفية CP",cp_logo:"شعار CP",vip_badge:"إطار صورة شخصية",host_badge:"إطار صورة شخصية",profile_card:"بطاقة الملف",nameplate:"لوحة الاسم",level_badge:"شارة مستوى",entry_effect:"تأثير دخول",join_toast:"تأثير دخول",room_card:"بطاقة روم",chat_bubble:"فقاعة دردشة"})[item.type]||"مكافأة CP";
   const expiry=item.expiresAt?Date.parse(item.expiresAt):NaN;
   const owned=item.owned===true;
-  const equipped=owned&&item.equipped===true;
-  const state=equipped?'<div class="pill">مرتدى حالياً ✓</div>':owned?'<div class="pill">موجود في حقيبتك</div>':'';
+  const expired=owned&&item.expiresAt&&!Number.isNaN(expiry)&&expiry<=now;
+  const equipped=owned&&item.equipped===true&&!expired;
+  const state=expired?'<div class="pill">منتهي</div>':equipped?'<div class="pill">مرتدى حالياً ✓</div>':owned?'<div class="pill">موجود في حقيبتك</div>':'';
   const button=equipped
    ? '<button class="cp-store-action" data-store-unequip="'+esc(id)+'">خلع العنصر</button>'
-   : owned
-    ? '<button class="cp-store-action" data-store-equip="'+esc(id)+'">ارتداء</button>'
-    : '<button class="cp-store-action" data-store-purchase="'+esc(id)+'">'+(item.expiresAt&&!Number.isNaN(expiry)&&expiry<=now?'شراء مجدداً · ':'شراء · ')+score(price)+' كوين</button>';
+   : expired
+    ? (item.isActive===false?'<button class="cp-store-action" disabled>غير متاح حالياً</button>':'<button class="cp-store-action" data-store-purchase="'+esc(id)+'">شراء مجدداً · '+score(price)+' كوين</button>')
+    : owned
+     ? '<button class="cp-store-action" data-store-equip="'+esc(id)+'">ارتداء</button>'
+     : '<button class="cp-store-action" data-store-purchase="'+esc(id)+'">شراء · '+score(price)+' كوين</button>';
   const duration=owned&&item.expiresAt&&!Number.isNaN(expiry)
-   ? 'متبقي '+Math.max(0,Math.ceil((expiry-now)/86400000))+' يوم'
+   ? (expired?'انتهت مدة الملكية':'متبقي '+Math.max(0,Math.ceil((expiry-now)/86400000))+' يوم')
    : owned?'ملكية دائمة':score(lease)+' يوم';
   return '<article class="cp-store-card"><img class="cp-store-preview" src="'+esc(image)+'" alt="'+esc(item.name||"عنصر CP")+'" loading="lazy" onerror="this.onerror=null;this.src=\''+fallback+'\'"><div class="cp-store-kind">'+esc(kind)+'</div><h3>'+esc(item.name||"عنصر CP")+'</h3><p>'+esc(item.description||"عنصر تجميلي خاص بمتجر CP")+'</p><div class="cp-store-price">'+(owned?esc(duration):score(price)+' كوين · '+score(lease)+' يوم')+'</div>'+state+button+'</article>';
- }).join("")+'</div>';
+ }).join('')+'</div>';
 };
 window.showCpRewardPopup=function(title,detail,imageUrl){const image=/^https?:\/\//i.test(String(imageUrl||""))?'<img src="'+esc(imageUrl)+'" alt="المكافأة" onerror="this.style.display=\'none\'">':'';$("modalRoot").innerHTML='<div class="cp-reward-popup-bg" id="cpRewardPopupBg"><section class="cp-reward-popup" role="dialog" aria-modal="true"><div class="popup-spark">🎁 ✨ 💖</div><h2>'+esc(title||"مبروك! استلمت مكافأتك")+'</h2>'+(image||'<div class="popup-spark">🏆</div>')+'<p>'+esc(detail||"تمت إضافة مكافأتك إلى حسابك بنجاح.")+'</p><button class="action" id="cpRewardPopupClose">رائع ❤️</button></section></div>';$("cpRewardPopupClose").onclick=()=>$("modalRoot").innerHTML="";$("cpRewardPopupBg").onclick=e=>{if(e.target.id==="cpRewardPopupBg")$("modalRoot").innerHTML="";};};
 window.showCpMessage=toast;window.showCpError=m=>toast(m||"حدث خطأ");
