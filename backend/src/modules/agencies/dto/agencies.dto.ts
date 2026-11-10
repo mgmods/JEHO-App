@@ -143,11 +143,11 @@ export class UpdateCommissionDto {
 }
 
 export class JoinByCodeDto {
-  @ApiProperty({ example: '123456', description: 'Public agency ID shown in agency search' })
+  @ApiProperty({ example: '123456', description: 'Public agency ID or agency UUID from an in-app invite' })
   @Transform(trim)
   @IsString()
   @MinLength(3)
-  @MaxLength(16)
+  @MaxLength(64)
   publicId: string;
 
   @ApiProperty({ example: 'A7K2M9QX', description: 'Private agency activation code' })
