@@ -42,9 +42,9 @@ const router = useRouter()
 const userId = ref('')
 
 const roleLabel = computed(() => {
-  const role = String(auth.user?.staffRole || '').toLowerCase()
+  const role = String(auth.user?.staffRole || auth.user?.role || '').toLowerCase()
   if (auth.isSuperAdmin) return 'Super Admin'
-  if (role === 'manager') return 'Manager'
+  if (role.includes('manager')) return 'Manager'
   return 'Admin'
 })
 const initials = computed(() =>
@@ -53,10 +53,10 @@ const initials = computed(() =>
 
 const items = [
   { name: 'users', label: 'المستخدمون', icon: 'bi-people-fill', tone: 'purple', module: 'users' },
-  { name: 'agencies', label: 'طلبات الوكالات والوكالات', icon: 'bi-people-fill', tone: 'green', module: 'agencies' },
+  { name: 'agencies', label: 'الوكالات وطلبات الوكالات', icon: 'bi-people-fill', tone: 'green', module: 'agencies' },
   { name: 'rooms', label: 'الغرف', icon: 'bi-card-text', tone: 'blue', module: 'rooms' },
   { name: 'conversations', label: 'المحادثات', icon: 'bi-chat-dots-fill', tone: 'blue', module: 'conversations' },
-  { name: 'notifications', label: 'رسائل وإعلانات للجميع', icon: 'bi-envelope-paper-fill', tone: 'green', module: 'notifications' },
+  { name: 'notifications', label: 'الرسائل والإعلانات', icon: 'bi-envelope-paper-fill', tone: 'green', module: 'notifications' },
   { name: 'gifts', label: 'الهدايا', icon: 'bi-gift-fill', tone: 'pink', module: 'gifts' },
   { name: 'wallet', label: 'المحفظة والمعاملات', icon: 'bi-wallet-fill', tone: 'gold', module: 'wallet' },
   { name: 'withdrawals', label: 'طلبات السحب', icon: 'bi-cash-coin', tone: 'green', module: 'withdrawals' },
@@ -69,7 +69,7 @@ const items = [
   { name: 'settings', label: 'إعدادات التطبيق', icon: 'bi-gear-fill', tone: 'blue', module: 'settings' },
 ]
 
-const visibleItems = computed(() => items.filter((item) => auth.can(item.module, 'read')))
+const visibleItems = computed(() => items.filter((item) => auth.can(item.module, 'read') && auth.canRoute(item.name, 'read')))
 
 function openUser() {
   if (!userId.value) return
