@@ -1772,6 +1772,7 @@ export class AgenciesService implements OnModuleInit {
       const data = {
         agencyId: agency.id,
         agencyName: agency.name,
+        agencyLogoUrl: agency.logoUrl || null,
         agencyCode: agency.activationCode || null,
         applicantId,
         action: 'join_request',
@@ -3459,7 +3460,7 @@ export class AgenciesService implements OnModuleInit {
         userId: agency.ownerId, type: NotificationType.AGENCY,
         title: 'طلب انضمام إلى نادي الوكالة',
         body: `${requester?.displayName || requester?.username || 'مستخدم'} يريد الانضمام إلى نادي وكالة ${agency.name}`,
-        data: { action: 'agency_club_request', agencyId, agencyName: agency.name, requesterId: userId },
+        data: { action: 'agency_club_request', agencyId, agencyName: agency.name, agencyLogoUrl: agency.logoUrl || null, requesterId: userId },
         sendPush: true,
       });
     } catch (error) {
