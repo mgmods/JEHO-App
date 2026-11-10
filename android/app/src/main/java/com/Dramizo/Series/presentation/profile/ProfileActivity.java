@@ -586,7 +586,7 @@ public class ProfileActivity extends ThemedActivity {
                     binding.propProfileFamily,
                     agencyId,
                     null);
-            bindAgencyStrip(hasActiveAgency ? user.agency : null);
+            bindAgencyStrip(hasActiveAgency ? user.agency : null, user.agencyClub);
         });
         vm.getError().observe(this, e -> {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
@@ -883,10 +883,39 @@ public class ProfileActivity extends ThemedActivity {
 
     private void bindAgencyStrip(
             @androidx.annotation.Nullable
-            com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency) {
+            com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency,
+            @androidx.annotation.Nullable
+            com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club) {
         if (binding == null || binding.rowProfileAgency == null) return;
         if (agency == null || agency.name == null || agency.name.trim().isEmpty()) {
-            binding.rowProfileAgency.setVisibility(View.GONE);
+            if (club == null || club.label == null || club.label.trim().isEmpty()) {
+                binding.rowProfileAgency.setVisibility(View.GONE);
+                return;
+            }
+            binding.rowProfileAgency.setVisibility(View.VISIBLE);
+            if (binding.tvAgencyName != null) {
+                binding.tvAgencyName.setText(club.agencyName == null || club.agencyName.trim().isEmpty()
+                        ? club.label.trim() : club.agencyName.trim());
+            }
+            if (binding.tvAgencyGid != null) binding.tvAgencyGid.setVisibility(View.GONE);
+            if (binding.imgAgencyBannerBg != null) binding.imgAgencyBannerBg.setVisibility(View.GONE);
+            if (binding.tvAgencyLevel != null) binding.tvAgencyLevel.setVisibility(View.GONE);
+            if (binding.imgAgencyLogo != null) {
+                String logo = club.agencyLogoUrl;
+                if (logo != null && !logo.trim().isEmpty()) {
+                    com.bumptech.glide.Glide.with(this).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(logo))
+                            .placeholder(R.drawable.icon_agency).error(R.drawable.icon_agency)
+                            .centerCrop().into(binding.imgAgencyLogo);
+                } else {
+                    binding.imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                }
+            }
+            final String clubAgencyId = club.agencyId;
+            binding.rowProfileAgency.setOnClickListener(v -> {
+                if (clubAgencyId != null && !clubAgencyId.trim().isEmpty()) {
+                    AgencyFamilyInfoSheet.show(this, clubAgencyId);
+                }
+            });
             return;
         }
         binding.rowProfileAgency.setVisibility(View.VISIBLE);
