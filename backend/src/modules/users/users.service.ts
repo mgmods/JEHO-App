@@ -282,7 +282,7 @@ export class UsersService {
   }
 
     private async resolveActiveAgency(userId: string) {
-    const row = await this.agencyMembersRepo.findOne({
+    let row = await this.agencyMembersRepo.findOne({
       where: {
         userId,
         isActive: true,
@@ -291,7 +291,18 @@ export class UsersService {
       relations: ['agency'],
       order: { joinedAt: 'DESC' },
     });
-    const agency = row?.agency;
+    // Agency owners are still identified even if legacy data has no owner membership row.
+    // A deleted/inactive agency never produces a public badge.
+    let agency = row?.agency || null;
+    if (!agency) {
+      const owned = await this.dataSource.getRepository(Agency).findOne({
+        where: { ownerId: userId, status: AgencyStatus.ACTIVE },
+      });
+      if (owned) {
+        agency = owned;
+        row = { role: 'owner' } as any;
+      }
+    }
     if (!agency || agency.status !== AgencyStatus.ACTIVE) return null;
     // Prefer stored logo; fall back to any agency room cover (often the brand image).
     let coverUrl: string | null = null;
