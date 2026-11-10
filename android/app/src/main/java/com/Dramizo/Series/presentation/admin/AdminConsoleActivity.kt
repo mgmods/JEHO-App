@@ -54,6 +54,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private lateinit var backButton: TextView
     private var currentSection = "home"
     private var currentRole = StaffRoleHelper.NONE
+    private val sectionHistory = java.util.ArrayDeque<String>()
     @Volatile private var roleRefreshInFlight = false
     private var notificationImageUrl: String? = null
     private var notificationImageStatus: TextView? = null
@@ -71,7 +72,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private val modules = listOf(
         Module("users", "المستخدمون", "بحث بالـ ID وتقييد الحساب أو حظره", "👥"),
         Module("genderVerifications", "طلبات التحقق", "مراجعة طلبات التحقق المعلّقة", "🪪"),
-        Module("rooms", "إدارة الرومات", "تعديل الرومات وإغلاقها", "🏠"),
+        Module("rooms", "إدارة الرومات", "عرض الرومات وإغلاقها عند الحاجة", "🏠"),
         Module("streams", "البث المباشر", "متابعة البث وإنهاؤه عند الحاجة", "📡"),
         Module("reports", "البلاغات والمراجعة", "مراجعة بلاغات المستخدمين وتصعيد الحالات", "🛡️"),
         Module("agencies", "الوكالات", "إدارة الوكالات وتعليقها أو حذفها", "🏢"),
@@ -249,7 +250,7 @@ class AdminConsoleActivity : ThemedActivity() {
         heading.addView(titleView)
         heading.addView(subtitle)
         header.addView(heading, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        header.addView(backButton)
+        // Back navigation is kept in the bottom bar / Android system back, not the header.
         root.addView(header)
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
@@ -269,6 +270,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(buildBottomNavigation(), LinearLayout.LayoutParams(-1, dp(64)))
         // One unified role-filtered dashboard; no extra navigation sections.
         setContentView(root)
     }
@@ -312,9 +314,12 @@ class AdminConsoleActivity : ThemedActivity() {
         val moreKeys = modules.filter { roleCanAccessModule(it.key) && it.key !in primary }
             .map { it.key }
         if (moreKeys.isNotEmpty()) destinations += Triple("المزيد", "☷", moreKeys)
+        destinations += Triple("رجوع", "‹", listOf("__back"))
 
         destinations.forEach { item ->
-            val selected = if (item.third == listOf("home")) {
+            val selected = if (item.third == listOf("__back")) {
+                false
+            } else if (item.third == listOf("home")) {
                 currentSection == "home"
             } else if (item.first == "المزيد") {
                 currentSection == "more" || currentSection in item.third
@@ -333,6 +338,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 )
                 setOnClickListener {
                     when {
+                        item.third == listOf("__back") -> handleAdminBack()
                         item.third == listOf("home") -> showHome()
                         item.first == "المزيد" -> showMoreModules()
                         else -> {
@@ -368,7 +374,8 @@ class AdminConsoleActivity : ThemedActivity() {
      * Role-filtered directory for every remaining API-backed admin module.
      * No hidden module is exposed here; every tile is checked again by openModule.
      */
-    private fun showMoreModules() {
+    private fun showMoreModules(remember: Boolean = true) {
+        if (remember) rememberCurrentSection("more")
         currentSection = "more"
         titleView.text = "المزيد من أدوات الإدارة"
         backButton.visibility = View.VISIBLE
@@ -511,7 +518,8 @@ class AdminConsoleActivity : ThemedActivity() {
      * Uses a clear hierarchy, live server metrics, searchable two-column action cards,
      * role-specific visibility and compact mobile-first surfaces.
      */
-    private fun showHome() {
+    private fun showHome(remember: Boolean = true) {
+        if (remember) rememberCurrentSection("home")
         currentSection = "home"
         titleView.text = "الرئيسية"
         backButton.visibility = View.GONE
@@ -567,7 +575,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         roundRect(0xFFF0ECFF.toInt(), 20),
                         null
                     )
-                    layoutParams = LinearLayout.LayoutParams(0, dp(132), 1f).apply { marginStart = dp(5); marginEnd = dp(5); bottomMargin = dp(11) }
+                    layoutParams = LinearLayout.LayoutParams(0, dp(154), 1f).apply { marginStart = dp(5); marginEnd = dp(5); bottomMargin = dp(11) }
                     setOnClickListener { openModule(module.key) }
                 }
                 val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
@@ -578,7 +586,32 @@ class AdminConsoleActivity : ThemedActivity() {
                 top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
                 top.addView(TextView(this).apply { text = "↗"; textSize = 18f; setTextColor(MUTED) })
                 tile.addView(top)
-                addText(tile, module.title, 13f, true, TEXT)
+                val tileTitle = TextView(this).apply {
+                    text = module.title
+                    textSize = 14f
+                    setTextColor(TEXT)
+                    setTypeface(typeface, Typeface.BOLD)
+                    gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    textDirection = View.TEXT_DIRECTION_RTL
+                    minLines = 2
+                    maxLines = 2
+                    includeFontPadding = false
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setLineSpacing(dp(2).toFloat(), 1f)
+                    setPadding(0, dp(7), 0, dp(2))
+                }
+                tile.addView(tileTitle, LinearLayout.LayoutParams(-1, 0, 1f))
+                val tileSubtitle = TextView(this).apply {
+                    text = module.subtitle
+                    textSize = 10f
+                    setTextColor(MUTED)
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    gravity = Gravity.RIGHT
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                }
+                tile.addView(tileSubtitle, LinearLayout.LayoutParams(-1, -2))
                 row.addView(tile)
             }
             if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
@@ -595,11 +628,12 @@ class AdminConsoleActivity : ThemedActivity() {
         }
     }
 
-    private fun openModule(key: String) {
+    private fun openModule(key: String, remember: Boolean = true) {
         if (!roleCanAccessModule(key)) {
-            showHome()
+            showHome(false)
             return
         }
+        if (remember) rememberCurrentSection(key)
         currentSection = key
         val module = modules.firstOrNull { it.key == key }
         titleView.text = module?.title ?: "مركز إدارة JEHO"
@@ -1273,7 +1307,20 @@ class AdminConsoleActivity : ThemedActivity() {
         items.forEach { item ->
             val card = card()
             val id = value(item, "id", "userId", "roomId", "agencyId", "streamId")
-            val primary = value(item, "displayName", "name", "title", "username", "email", "roomName") ?: "عنصر بدون اسم"
+            val primary = when (type) {
+                "agencyApplications" -> value(item, "proposedName", "agencyName", "name")
+                    ?.let { "طلب وكالة · " + it }
+                    ?: valuePath(item, "applicant.displayName", "applicant.username")?.let { "طلب وكالة · " + it }
+                "rechargeApplications" -> valuePath(item, "user.displayName", "user.username")
+                    ?.let { "طلب وكيل شحن · " + it }
+                    ?: value(item, "userId")?.let { "طلب وكيل شحن · " + it.take(8) }
+                "vanityIds" -> value(item, "publicId")?.let { "آي دي مميز · " + it }
+                "gifts" -> value(item, "name", "giftName", "title") ?: id?.let { "هدية · " + it.take(8) }
+                "cosmetics", "grantCosmetics" -> value(item, "name", "displayName", "title")
+                    ?: value(item, "code")?.let { "ميزة · " + it }
+                else -> value(item, "displayName", "name", "title", "username", "email", "roomName", "publicId")
+                    ?: id?.let { "سجل · " + it.take(8) }
+            } ?: return@forEach
             val status = value(item, "status", "state", "isActive", "type")
             val role = value(item, "staffRole", "role")
             val code = value(item, "code")
@@ -1284,8 +1331,9 @@ class AdminConsoleActivity : ThemedActivity() {
             val vipLevel = value(item, "level") ?: "1"
             val vipPrice = value(item, "coinPriceMonthly", "price") ?: "0"
             addText(card, primary, 15f, true, TEXT)
-            if (type in listOf("cosmetics", "grantCosmetics", "gifts")) {
-                addLiveAssetPreview(card, item, type, primary)
+            when (type) {
+                "cosmetics", "grantCosmetics", "gifts" -> addLiveAssetPreview(card, item, type, primary)
+                "vanityIds" -> addVanityIdPreview(card, item, primary)
             }
             if (!id.isNullOrBlank()) addText(card, "معرّف السجل: $id", 11f, false, MUTED)
             if (type == "users" && !publicId.isNullOrBlank() && publicId != id) {
@@ -1308,6 +1356,32 @@ class AdminConsoleActivity : ThemedActivity() {
                 else -> listOf("createdAt", "role", "level", "membersCount", "ownerName", "coinPrice", "diamondValue")
             }
             val detail = detailKeys.mapNotNull { k -> value(item, k)?.takeIf { it.isNotBlank() }?.let { "${prettyKey(k)}: $it" } }
+            if (type == "agencyApplications") {
+                listOf(
+                    "اسم المرسل" to valuePath(item, "applicant.displayName", "applicant.username"),
+                    "ID المرسل" to valuePath(item, "applicant.publicId", "applicantId"),
+                    "اسم الوكالة المقترح" to value(item, "proposedName"),
+                    "الدولة" to value(item, "country"),
+                    "البريد الإلكتروني" to value(item, "contactEmail"),
+                    "رقم التواصل" to value(item, "contactPhone"),
+                    "خطة العمل" to value(item, "businessPlan"),
+                    "الخبرة" to value(item, "experience"),
+                    "عدد المضيفين المتوقع" to value(item, "expectedHostCount"),
+                    "رسوم الطلب" to value(item, "paidCoins")
+                ).forEach { (label, v) -> if (!v.isNullOrBlank()) addText(card, label + ": " + v, 12f, false, MUTED) }
+            } else if (type == "rechargeApplications") {
+                listOf(
+                    "اسم المرسل" to valuePath(item, "user.displayName", "user.username"),
+                    "ID المرسل" to valuePath(item, "user.publicId", "userId"),
+                    "الدولة / المنطقة" to value(item, "region"),
+                    "وسيلة التواصل" to value(item, "contact"),
+                    "العملات المطلوبة" to value(item, "requestedCoins"),
+                    "سبب الطلب" to value(item, "reason")
+                ).forEach { (label, v) -> if (!v.isNullOrBlank()) addText(card, label + ": " + v, 12f, false, MUTED) }
+            } else if (type == "vanityIds") {
+                listOf("styleMode", "styleVipLevel", "styleColor1", "styleColor2", "styleColor3", "priceCoins", "status", "expiresAt")
+                    .forEach { key -> value(item, key)?.let { addText(card, prettyKey(key) + ": " + it, 11f, false, MUTED) } }
+            }
             if (detail.isNotEmpty()) {
                 val detailPanel = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
@@ -1583,9 +1657,9 @@ class AdminConsoleActivity : ThemedActivity() {
         val assetUrl = if (type == "gifts") {
             value(item, "iconUrl", "previewUrl", "thumbnailUrl")
         } else {
-            value(item, "previewUrl", "thumbnailUrl", "iconUrl", "imageUrl")
-        }?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        val absolute = AssetCatalog.absoluteUrl(assetUrl) ?: assetUrl
+            value(item, "previewUrl", "thumbnailUrl", "iconUrl", "imageUrl", "animationUrl")
+        }?.trim()?.takeIf { it.isNotEmpty() }
+        val absolute = assetUrl?.let { AssetCatalog.absoluteUrl(it) ?: it }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -1604,29 +1678,68 @@ class AdminConsoleActivity : ThemedActivity() {
         val image = ImageView(this).apply {
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "معاينة $title"
-            background = roundRect(Color.WHITE, 10)
+            background = roundRect(0xFFF0ECFB.toInt(), 10)
         }
         row.addView(image, LinearLayout.LayoutParams(dp(94), dp(94)).apply { marginStart = dp(12) })
-        Glide.with(this).load(absolute).fitCenter().into(image)
+        if (absolute != null) Glide.with(this).load(absolute).fitCenter().into(image)
         val textCol = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
         }
-        addText(textCol, "معاينة مباشرة من الكتالوج", 12f, true, ACCENT)
-        addText(textCol, if (type == "gifts") "أيقونة الهدية الفعلية" else "صورة العنصر الفعلية", 11f, false, MUTED)
-        textCol.addView(button("تكبير المعاينة") {
-            val large = ImageView(this).apply {
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                setBackgroundColor(Color.WHITE)
-                contentDescription = "المعاينة الكاملة لـ $title"
-            }
-            Glide.with(this).load(absolute).fitCenter().into(large)
-            AlertDialog.Builder(this).setTitle(title)
-                .setView(large.apply { layoutParams = LinearLayout.LayoutParams(-1, dp(300)) })
-                .setPositiveButton("إغلاق", null).show()
-        })
+        addText(textCol, title, 13f, true, TEXT)
+        addText(textCol, if (type == "gifts") "معاينة أيقونة الهدية من الكتالوج" else "معاينة العنصر من الكتالوج", 11f, false, ACCENT)
+        if (absolute == null) {
+            addText(textCol, "الصورة غير مرفقة في بيانات هذا العنصر", 11f, false, MUTED)
+        } else {
+            textCol.addView(button("تكبير المعاينة") {
+                val large = ImageView(this).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    setBackgroundColor(Color.WHITE)
+                    contentDescription = "المعاينة الكاملة لـ $title"
+                }
+                Glide.with(this).load(absolute).fitCenter().into(large)
+                AlertDialog.Builder(this).setTitle(title)
+                    .setView(large.apply { layoutParams = LinearLayout.LayoutParams(-1, dp(300)) })
+                    .setPositiveButton("إغلاق", null).show()
+            })
+        }
         row.addView(textCol, LinearLayout.LayoutParams(0, -2, 1f))
         parent.addView(row)
+    }
+
+    private fun addVanityIdPreview(parent: LinearLayout, item: Any, title: String) {
+        fun parseColor(key: String, fallback: Int): Int = try {
+            Color.parseColor(value(item, key) ?: return fallback)
+        } catch (_: Exception) { fallback }
+        val c1 = parseColor("styleColor1", 0xFF52E8FF.toInt())
+        val c2 = parseColor("styleColor2", 0xFFC084FC.toInt())
+        val c3 = parseColor("styleColor3", 0xFFFF7AC8.toInt())
+        val preview = FrameLayout(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(c1, c2, c3)).apply {
+                cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), 0x55777777)
+            }
+            layoutParams = LinearLayout.LayoutParams(-1, dp(112)).apply {
+                topMargin = dp(8)
+                bottomMargin = dp(8)
+            }
+        }
+        val idText = TextView(this).apply {
+            text = value(item, "publicId") ?: title
+            textSize = 27f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setShadowLayer(dp(4).toFloat(), 0f, dp(2).toFloat(), 0x99000000.toInt())
+        }
+        preview.addView(idText, FrameLayout.LayoutParams(-1, -1))
+        value(item, "styleIconUrl")?.takeIf { it.isNotBlank() }?.let { raw ->
+            val icon = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_CENTER; contentDescription = "أيقونة الآي دي" }
+            preview.addView(icon, FrameLayout.LayoutParams(dp(34), dp(34), Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = dp(10) })
+            Glide.with(this).load(AssetCatalog.absoluteUrl(raw) ?: raw).into(icon)
+        }
+        parent.addView(preview)
+        addText(parent, "معاينة شكل الآي دي وألوانه الفعلية", 11f, true, ACCENT)
     }
 
     private fun showAdjustWalletDialog() {
@@ -1680,11 +1793,32 @@ class AdminConsoleActivity : ThemedActivity() {
      */
     private var detailReturnSection = "home"
 
+    private fun rememberCurrentSection(nextSection: String) {
+        val source = if (currentSection == "userDetail" || currentSection == "roomDetail") {
+            detailReturnSection
+        } else currentSection
+        if (source != nextSection && sectionHistory.peekLast() != source) {
+            sectionHistory.addLast(source)
+        }
+    }
+
     private fun handleAdminBack() {
         when (currentSection) {
-            "userDetail", "roomDetail" -> openModule(detailReturnSection)
-            "home" -> finish()
-            else -> showHome()
+            "userDetail", "roomDetail" -> openModule(detailReturnSection, false)
+            else -> {
+                var previous: String? = null
+                while (sectionHistory.isNotEmpty() && previous == null) {
+                    val candidate = sectionHistory.removeLast()
+                    if (candidate != currentSection) previous = candidate
+                }
+                when {
+                    previous == "home" -> showHome(false)
+                    previous == "more" -> showMoreModules(false)
+                    previous != null -> openModule(previous, false)
+                    currentSection != "home" -> showHome(false)
+                    else -> body.smoothScrollTo(0, 0)
+                }
+            }
         }
     }
 
@@ -1701,12 +1835,6 @@ class AdminConsoleActivity : ThemedActivity() {
         val status = value(item, "status", "state", "isActive", "type") ?: "غير محدد"
         val role = value(item, "staffRole", "role") ?: "بدون رتبة إدارية"
         val publicId = value(item, "publicId")
-        val roomTitle = value(item, "title", "name", "roomName") ?: name
-        val accessMode = value(item, "accessMode")?.trim()?.lowercase()?.let {
-            if (it == "public") "free" else it
-        } ?: "free"
-        val entryFee = value(item, "entryFeeCoins") ?: "0"
-
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -1787,12 +1915,9 @@ class AdminConsoleActivity : ThemedActivity() {
             }
         } else {
             val actions = section("إجراءات الروم", "التغييرات تُرسل إلى الخادم ولا تغيّر منطق الصوت أو اتصال ZEGO.")
-            if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
-                actions.addView(button("تعديل إعدادات الروم") {
-                    showEditRoomDialog(id, roomTitle, accessMode, entryFee)
-                })
-            }
-            if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+            if (currentRole == StaffRoleHelper.SUPER ||
+                currentRole == StaffRoleHelper.ADMIN ||
+                currentRole == StaffRoleHelper.MANAGER) {
                 actions.addView(button("إغلاق الروم") {
                     confirm("سيتم إغلاق الروم على الخادم. هذا الإجراء قد يؤثر على الموجودين فيه. هل تريد المتابعة؟") {
                         load(api.closeRoom(id)) {
@@ -2861,6 +2986,19 @@ class AdminConsoleActivity : ThemedActivity() {
             val v = item[key] ?: continue
             if (v is Map<*, *>) continue
             return v.toString().takeIf { it.isNotBlank() && it != "null" }
+        }
+        return null
+    }
+
+    private fun valuePath(item: Any, vararg paths: String): String? {
+        for (path in paths) {
+            var current: Any? = item
+            for (part in path.split(".")) {
+                current = (current as? Map<*, *>)?.get(part) ?: break
+            }
+            if (current is Map<*, *> || current is List<*>) continue
+            val text = current?.toString()?.trim()
+            if (!text.isNullOrEmpty() && text != "null") return text
         }
         return null
     }
