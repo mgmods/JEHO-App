@@ -640,6 +640,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         holder.b.tvSender.setVisibility(View.GONE);
         holder.b.tvSender.setText(name);
         VipNameStyle.bind(holder.b.tvSender, mine ? me : msg.sender);
+        bindAgencyClubBadge(holder, msg, mine);
 
         if (showAvatar && listener != null) {
             String clickUserId;
@@ -664,6 +665,37 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.avatarWrap.setOnClickListener(null);
             holder.b.avatarWrap.setClickable(false);
         }
+    }
+
+    /** Small agency-club identity chip shown with messages from active club members. */
+    private void bindAgencyClubBadge(@NonNull VH holder, @NonNull ChatDtos.MessageDto msg, boolean mine) {
+        if (!(holder.b.rowBadges instanceof LinearLayout)) return;
+        LinearLayout row = (LinearLayout) holder.b.rowBadges;
+        row.removeAllViews();
+        AuthDtos.UserDto user = mine ? me : msg.sender;
+        AuthDtos.AgencyClubDto club = user != null ? user.agencyClub : null;
+        if (club == null || club.label == null || club.label.trim().isEmpty()) {
+            row.setVisibility(View.GONE);
+            return;
+        }
+        TextView chip = new TextView(holder.itemView.getContext());
+        String agencyName = club.agencyName == null ? "" : club.agencyName.trim();
+        chip.setText(agencyName.isEmpty() ? "♛ نادي الوكالة" : "♛ نادي " + agencyName);
+        chip.setTextColor(0xFF805A19);
+        chip.setTextSize(10);
+        chip.setTypeface(null, android.graphics.Typeface.BOLD);
+        int horizontal = dp(holder, 9);
+        chip.setPadding(horizontal, dp(holder, 3), horizontal, dp(holder, 3));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xFFFFF4D7);
+        bg.setCornerRadius(dp(holder, 12));
+        bg.setStroke(dp(holder, 1), 0xFFE6C477);
+        chip.setBackground(bg);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        row.setVisibility(View.VISIBLE);
+        row.addView(chip, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(holder, 21)));
     }
 
     /** Text / meta ink for light peer, rose me, and VIP skins. */
