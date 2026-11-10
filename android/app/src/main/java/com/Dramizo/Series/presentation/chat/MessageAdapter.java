@@ -693,6 +693,8 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         chip.setBackground(bg);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         row.setVisibility(View.VISIBLE);
         row.addView(chip, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(holder, 21)));
