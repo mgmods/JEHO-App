@@ -231,13 +231,9 @@ export class AgenciesService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`ensure agency_follows: ${(err as Error).message}`);
     }
-    // The legacy agency club is retired. Remove its storage; agency follows and
-    // agency_members remain the only social-follow and staff-membership sources.
-    try {
-      await this.dataSource.query('DROP TABLE IF EXISTS agency_club_members');
-    } catch (err) {
-      this.logger.warn(`drop retired agency club table: ${(err as Error).message}`);
-    }
+    // Keep the legacy club table untouched during rollout. Older app/API
+    // instances may still reference it; dropping it here causes PostgreSQL
+    // "relation agency_club_members does not exist" errors for active clients.
     try {
       // Mark catalog agency frames as admin-only exclusive when meta missing.
       await this.dataSource.query(`
