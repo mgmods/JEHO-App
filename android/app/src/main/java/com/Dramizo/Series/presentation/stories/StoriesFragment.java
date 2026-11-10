@@ -331,6 +331,13 @@ public class StoriesFragment extends Fragment {
             if (index + 1 < group.size()) openViewer(group, index + 1);
         };
         imageAdvance[0] = advanceNext;
+        final long[] imageRemaining = {5000L};
+        final long[] imageStartedAt = {0L};
+        final Runnable[] scheduleImageAdvance = new Runnable[1];
+        scheduleImageAdvance[0] = () -> {
+            imageStartedAt[0] = android.os.SystemClock.uptimeMillis();
+            storyHandler.postDelayed(imageAdvance[0], Math.max(1L, imageRemaining[0]));
+        };
         View media;
         VideoView storyVideo = null;
         if ("video".equalsIgnoreCase(story.mediaType)) {
@@ -419,7 +426,14 @@ public class StoriesFragment extends Fragment {
                     touchStart[1] = event.getY();
                     swipeHandled[0] = false;
                     storyPaused[0] = true;
-                    storyHandler.removeCallbacks(imageAdvance[0]);
+                    if (activeVideo == null) {
+                        storyHandler.removeCallbacks(imageAdvance[0]);
+                        if (imageStartedAt[0] > 0L) {
+                            long elapsed = android.os.SystemClock.uptimeMillis() - imageStartedAt[0];
+                            imageRemaining[0] = Math.max(1L, imageRemaining[0] - elapsed);
+                            imageStartedAt[0] = 0L;
+                        }
+                    }
                     if (activeVideo != null && activeVideo.isPlaying()) activeVideo.pause();
                     return true;
                 case MotionEvent.ACTION_UP:
@@ -449,19 +463,39 @@ public class StoriesFragment extends Fragment {
                                 storyHandler.postDelayed(imageAdvance[0], 5000L);
                             }
                         }
+                    } else if (Math.abs(dx) < dp(18) && Math.abs(dy) < dp(18)) {
+                        float tapX = event.getX();
+                        float width = Math.max(1f, frame.getWidth());
+                        if (tapX < width * 0.30f && index > 0) {
+                            storyHandler.removeCallbacks(imageAdvance[0]);
+                            if (activeVideo != null) { try { activeVideo.stopPlayback(); } catch (Exception ignored) { } }
+                            dialog.dismiss();
+                            openViewer(group, index - 1);
+                        } else if (tapX > width * 0.70f && index + 1 < group.size()) {
+                            storyHandler.removeCallbacks(imageAdvance[0]);
+                            if (activeVideo != null) { try { activeVideo.stopPlayback(); } catch (Exception ignored) { } }
+                            dialog.dismiss();
+                            openViewer(group, index + 1);
+                        } else {
+                            storyPaused[0] = false;
+                            if (activeVideo != null) {
+                                if (!activeVideo.isPlaying()) activeVideo.start();
+                            } else {
+                                scheduleImageAdvance[0].run();
+                            }
+                        }
                     } else {
                         storyPaused[0] = false;
                         if (activeVideo != null) {
                             if (!activeVideo.isPlaying()) activeVideo.start();
                         } else {
-                            storyHandler.removeCallbacks(imageAdvance[0]);
-                            storyHandler.postDelayed(imageAdvance[0], 5000L);
+                            scheduleImageAdvance[0].run();
                         }
                     }
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     storyPaused[0] = false;
-                    if (activeVideo == null) storyHandler.postDelayed(imageAdvance[0], 5000L);
+                    if (activeVideo == null) scheduleImageAdvance[0].run();
                     else if (!activeVideo.isPlaying()) activeVideo.start();
                     return true;
             }
@@ -494,7 +528,8 @@ public class StoriesFragment extends Fragment {
             w.getDecorView().setSystemUiVisibility(0);
         }
         if (storyVideo == null) {
-            storyHandler.postDelayed(imageAdvance[0], 5000L);
+            imageRemaining[0] = 5000L;
+            scheduleImageAdvance[0].run();
         }
         if (storyVideo != null) {
             final VideoView target = storyVideo;
