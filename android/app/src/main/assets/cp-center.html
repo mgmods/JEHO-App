@@ -355,7 +355,7 @@ window.renderCpStore=function(rows){
   const activeLease=!item.expiresAt||Number.isNaN(expiry)||expiry>now;
   return {...item,owned:item.owned===true,equipped:item.equipped===true&&activeLease};
  });
- const items=cpStoreBagMode?normalized.filter(item=>item.owned):normalized;
+ const items=cpStoreBagMode?normalized.filter(item=>item.owned):normalized.filter(item=>item.isActive!==false);
  if(!items.length){
   $("storeView").innerHTML='<p class="empty">'+(cpStoreBagMode?'حقيبتك فارغة حالياً. اشترِ عنصراً من المتجر ليظهر هنا.':'لا توجد عناصر متاحة في متجر CP حالياً. ستظهر هنا الخلفيات والشعارات والإطارات التي تضيفها الإدارة.')+'</p>';
   return;
