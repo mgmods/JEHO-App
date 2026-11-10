@@ -406,13 +406,18 @@ public final class AgencyFamilyInfoSheet {
         String userId = String.valueOf(request.get("userId"));
         Object rawName = request.get("displayName");
         String name = rawName == null ? String.valueOf(request.get("username")) : String.valueOf(rawName);
-        new android.app.AlertDialog.Builder(activity)
-            .setTitle("طلب انضمام إلى النادي")
-            .setMessage(name + " يريد الانضمام إلى نادي الوكالة. هل توافق؟")
-            .setPositiveButton("قبول", (d, which) -> reviewClubRequest(activity, parent, container, agencyId, userId, true))
-            .setNegativeButton("رفض", (d, which) -> reviewClubRequest(activity, parent, container, agencyId, userId, false))
-            .setNeutralButton("لاحقًا", (d, which) -> { })
-            .show();
+        Object rawPublicId = request.get("publicId");
+        String publicId = rawPublicId == null ? "" : String.valueOf(rawPublicId).trim();
+        String details = "يرغب " + name + " بالانضمام إلى نادي الوكالة.";
+        if (!publicId.isEmpty()) details += "\nمعرّف المستخدم: " + publicId;
+        AuraDialogHelper.confirm(
+                activity,
+                "طلب انضمام إلى نادي الوكالة",
+                details,
+                "موافقة",
+                () -> reviewClubRequest(activity, parent, container, agencyId, userId, true),
+                "رفض",
+                () -> reviewClubRequest(activity, parent, container, agencyId, userId, false));
     }
 
     private static void reviewClubRequest(@NonNull FragmentActivity activity, @NonNull BottomSheetDialog parent,
@@ -423,7 +428,7 @@ public final class AgencyFamilyInfoSheet {
                 : container.getAgencyApi().rejectClubRequest(agencyId, userId));
             activity.runOnUiThread(() -> {
                 if (!result.success) {
-                    Toast.makeText(activity, result.error != null ? result.error : activity.getString(R.string.error_generic), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(activity, "تعذر تنفيذ القرار. حدّث الطلبات وحاول مرة أخرى.", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 loadClubRequests(activity, parent, container, agencyId);
