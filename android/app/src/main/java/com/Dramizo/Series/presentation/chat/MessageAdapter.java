@@ -48,6 +48,7 @@ import com.Dramizo.Series.util.RoomShareCodec;
 import com.Dramizo.Series.util.VipStyle;
 import com.Dramizo.Series.util.VipNameStyle;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 
@@ -810,8 +811,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 // display an MP4 URL as a still image (which leaves a blank card).
                 Glide.with(holder.itemView).asBitmap()
                         .load(AssetCatalog.absoluteUrl(thumbUrl))
-                        .frame(1_000_000L)
-                        .centerCrop()
+                        .apply(RequestOptions.frameOf(1_000_000L).centerCrop())
                         .placeholder(ImagePlaceholder.cover())
                         .into(thumbnail);
             } else {
