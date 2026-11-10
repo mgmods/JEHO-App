@@ -405,6 +405,7 @@ public class StoriesFragment extends Fragment {
         actionParams.setMargins(dp(10),0,dp(10),dp(18)); frame.addView(actions,actionParams);
         }
         // Horizontal gestures navigate stories; vertical/short taps do not accidentally skip media.
+        final VideoView activeVideo = storyVideo;
         frame.setOnTouchListener((view, event) -> {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
@@ -413,7 +414,7 @@ public class StoriesFragment extends Fragment {
                     swipeHandled[0] = false;
                     storyPaused[0] = true;
                     storyHandler.removeCallbacks(imageAdvance[0]);
-                    if (storyVideo != null && storyVideo.isPlaying()) storyVideo.pause();
+                    if (activeVideo != null && activeVideo.isPlaying()) activeVideo.pause();
                     return true;
                 case MotionEvent.ACTION_UP:
                     float dx = event.getX() - touchStart[0];
@@ -421,16 +422,16 @@ public class StoriesFragment extends Fragment {
                     if (Math.abs(dx) > dp(54) && Math.abs(dx) > Math.abs(dy) * 1.2f) {
                         swipeHandled[0] = true;
                         storyHandler.removeCallbacks(imageAdvance[0]);
-                        if (storyVideo != null) {
-                            try { storyVideo.stopPlayback(); } catch (Exception ignored) { }
+                        if (activeVideo != null) {
+                            try { activeVideo.stopPlayback(); } catch (Exception ignored) { }
                         }
                         dialog.dismiss();
                         if (dx < 0 && index + 1 < group.size()) openViewer(group, index + 1);
                         else if (dx > 0 && index > 0) openViewer(group, index - 1);
                     } else {
                         storyPaused[0] = false;
-                        if (storyVideo != null) {
-                            if (!storyVideo.isPlaying()) storyVideo.start();
+                        if (activeVideo != null) {
+                            if (!activeVideo.isPlaying()) activeVideo.start();
                         } else {
                             storyHandler.removeCallbacks(imageAdvance[0]);
                             storyHandler.postDelayed(imageAdvance[0], 5000L);
@@ -439,16 +440,16 @@ public class StoriesFragment extends Fragment {
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     storyPaused[0] = false;
-                    if (storyVideo == null) storyHandler.postDelayed(imageAdvance[0], 5000L);
-                    else if (!storyVideo.isPlaying()) storyVideo.start();
+                    if (activeVideo == null) storyHandler.postDelayed(imageAdvance[0], 5000L);
+                    else if (!activeVideo.isPlaying()) activeVideo.start();
                     return true;
             }
             return true;
         });
         dialog.setOnDismissListener(d -> {
             storyHandler.removeCallbacks(imageAdvance[0]);
-            if (storyVideo != null) {
-                try { storyVideo.stopPlayback(); } catch (Exception ignored) { }
+            if (activeVideo != null) {
+                try { activeVideo.stopPlayback(); } catch (Exception ignored) { }
             }
         });
         dialog.setContentView(frame);
