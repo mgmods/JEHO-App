@@ -278,6 +278,7 @@ public class CpCenterActivity extends ThemedActivity {
                 }
             }
             List<Map<String, Object>> items = new ArrayList<>();
+            List<String> includedIds = new ArrayList<>();
             if (catalog.success && catalog.data != null) {
                 for (Map<String, Object> item : catalog.data) {
                     if (item == null) continue;
@@ -288,6 +289,26 @@ public class CpCenterActivity extends ThemedActivity {
                     card.put("equipped", owned != null && Boolean.TRUE.equals(owned.get("equipped")));
                     card.put("expiresAt", owned == null ? null : owned.get("expiresAt"));
                     items.add(card);
+                    includedIds.add(id);
+                }
+            }
+            // The public catalog contains active items only. Append owned items
+            // missing from it (hidden/deactivated or expired) so the CP bag never
+            // loses something the user has already purchased.
+            if (inventory.success && inventory.data != null) {
+                for (Map<String, Object> owned : inventory.data) {
+                    if (owned == null) continue;
+                    Object cosmeticValue = owned.get("cosmetic");
+                    if (!(cosmeticValue instanceof Map)) continue;
+                    Map<String, Object> cosmetic = (Map<String, Object>) cosmeticValue;
+                    String id = String.valueOf(cosmetic.get("id") == null ? "" : cosmetic.get("id"));
+                    if (id.isEmpty() || includedIds.contains(id)) continue;
+                    Map<String, Object> card = new HashMap<>(cosmetic);
+                    card.put("owned", true);
+                    card.put("equipped", Boolean.TRUE.equals(owned.get("equipped")));
+                    card.put("expiresAt", owned.get("expiresAt"));
+                    items.add(card);
+                    includedIds.add(id);
                 }
             }
             js("window.renderCpStore && window.renderCpStore(" + gson.toJson(normalizeUrls(items)) + ")");
