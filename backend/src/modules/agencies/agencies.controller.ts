@@ -254,8 +254,20 @@ export class AgenciesController {
   }
 
   @Post(':id/join')
-  @ApiOperation({ summary: 'Deprecated: hosts must use POST /agencies/join-by-code' })
-  join() {
+  @ApiOperation({
+    summary: 'Compatibility: accept an in-app agency invite using the agency UUID + activation code',
+  })
+  join(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: AcceptAgencyInviteDto,
+  ) {
+    // Older Android clients used POST /agencies/:id/join directly.
+    // Keep that route working so an invite never fails just because the client
+    // has not yet switched to the explicit /invites/accept route.
+    if (dto?.code) {
+      return this.agenciesService.acceptInvite(id, userId, dto.code);
+    }
     throw new GoneException({
       code: 'AGENCY_ACTIVATION_CODE_REQUIRED',
       message: 'الانضمام يتم بكود تفعيل الوكالة فقط عبر /agencies/join-by-code',
