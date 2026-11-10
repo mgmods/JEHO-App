@@ -478,11 +478,11 @@ export class UsersService {
     );
     const agency = await this.resolveActiveAgency(userId);
     const clubRows = await this.dataSource.query(
-      "SELECT a.id, a.name, CASE WHEN a.\"ownerId\" = $1 THEN 'owner' WHEN am.role = 'host' THEN 'host' WHEN am.role = 'owner' THEN 'owner' WHEN am.role = 'manager' THEN 'manager' WHEN am.role = 'member' THEN 'member' ELSE 'supporter' END AS role FROM agencies a LEFT JOIN agency_members am ON am.\"agencyId\" = a.id AND am.\"userId\" = $1 AND am.status = 'active' AND am.\"isActive\" = true LEFT JOIN agency_club_members cm ON cm.\"agencyId\" = a.id AND cm.\"userId\" = $1 AND cm.status = 'active' WHERE a.status = 'active' AND (a.\"ownerId\" = $1 OR am.id IS NOT NULL OR cm.id IS NOT NULL) ORDER BY CASE WHEN a.\"ownerId\" = $1 OR am.role = 'owner' THEN 0 WHEN am.role = 'host' THEN 1 WHEN am.role = 'manager' THEN 2 WHEN am.role = 'member' THEN 3 ELSE 4 END LIMIT 1",
+      "SELECT a.id, a.name, a.\"logoUrl\" AS \"agencyLogoUrl\", CASE WHEN a.\"ownerId\" = $1 THEN 'owner' WHEN am.role = 'host' THEN 'host' WHEN am.role = 'owner' THEN 'owner' WHEN am.role = 'manager' THEN 'manager' WHEN am.role = 'member' THEN 'member' ELSE 'supporter' END AS role FROM agencies a LEFT JOIN agency_members am ON am.\"agencyId\" = a.id AND am.\"userId\" = $1 AND am.status = 'active' AND am.\"isActive\" = true LEFT JOIN agency_club_members cm ON cm.\"agencyId\" = a.id AND cm.\"userId\" = $1 AND cm.status = 'active' WHERE a.status = 'active' AND (a.\"ownerId\" = $1 OR am.id IS NOT NULL OR cm.id IS NOT NULL) ORDER BY CASE WHEN a.\"ownerId\" = $1 OR am.role = 'owner' THEN 0 WHEN am.role = 'host' THEN 1 WHEN am.role = 'manager' THEN 2 WHEN am.role = 'member' THEN 3 ELSE 4 END LIMIT 1",
       [userId],
     );
     const clubRow = clubRows && clubRows[0];
-    const agencyClub = clubRow ? { agencyId: clubRow.id, agencyName: clubRow.name, role: clubRow.role, label: (clubRow.role === 'host' ? 'مضيف' : clubRow.role === 'owner' ? 'صاحب' : clubRow.role === 'manager' ? 'إدارة' : clubRow.role === 'member' ? 'عضو' : 'داعم') + ' وكالة ' + clubRow.name } : null;
+    const agencyClub = clubRow ? { agencyId: clubRow.id, agencyName: clubRow.name, agencyLogoUrl: clubRow.agencyLogoUrl || null, role: clubRow.role, label: (clubRow.role === 'host' ? 'مضيف' : clubRow.role === 'owner' ? 'صاحب' : clubRow.role === 'manager' ? 'إدارة' : clubRow.role === 'member' ? 'عضو' : 'داعم') + ' وكالة ' + clubRow.name } : null;
     const flat = this.applyFixedVipWear(
       {
         ...this.flatten(user),
@@ -548,12 +548,12 @@ export class UsersService {
     }
     const agency = await this.resolveActiveAgency(id);
     const clubRows = await this.dataSource.query(
-      "SELECT a.id, a.name, CASE WHEN a.\"ownerId\" = $1 THEN 'owner' WHEN am.role = 'host' THEN 'host' WHEN am.role = 'owner' THEN 'owner' WHEN am.role = 'manager' THEN 'manager' WHEN am.role = 'member' THEN 'member' ELSE 'supporter' END AS role FROM agencies a LEFT JOIN agency_members am ON am.\"agencyId\" = a.id AND am.\"userId\" = $1 AND am.status = 'active' AND am.\"isActive\" = true LEFT JOIN agency_club_members cm ON cm.\"agencyId\" = a.id AND cm.\"userId\" = $1 AND cm.status = 'active' WHERE a.status = 'active' AND (a.\"ownerId\" = $1 OR am.id IS NOT NULL OR cm.id IS NOT NULL) ORDER BY CASE WHEN a.\"ownerId\" = $1 OR am.role = 'owner' THEN 0 WHEN am.role = 'host' THEN 1 WHEN am.role = 'manager' THEN 2 WHEN am.role = 'member' THEN 3 ELSE 4 END LIMIT 1",
+      "SELECT a.id, a.name, a.\"logoUrl\" AS \"agencyLogoUrl\", CASE WHEN a.\"ownerId\" = $1 THEN 'owner' WHEN am.role = 'host' THEN 'host' WHEN am.role = 'owner' THEN 'owner' WHEN am.role = 'manager' THEN 'manager' WHEN am.role = 'member' THEN 'member' ELSE 'supporter' END AS role FROM agencies a LEFT JOIN agency_members am ON am.\"agencyId\" = a.id AND am.\"userId\" = $1 AND am.status = 'active' AND am.\"isActive\" = true LEFT JOIN agency_club_members cm ON cm.\"agencyId\" = a.id AND cm.\"userId\" = $1 AND cm.status = 'active' WHERE a.status = 'active' AND (a.\"ownerId\" = $1 OR am.id IS NOT NULL OR cm.id IS NOT NULL) ORDER BY CASE WHEN a.\"ownerId\" = $1 OR am.role = 'owner' THEN 0 WHEN am.role = 'host' THEN 1 WHEN am.role = 'manager' THEN 2 WHEN am.role = 'member' THEN 3 ELSE 4 END LIMIT 1",
       [id],
     );
     const clubRow = clubRows && clubRows[0];
     const agencyClub = clubRow ? {
-      agencyId: clubRow.id, agencyName: clubRow.name, role: clubRow.role,
+      agencyId: clubRow.id, agencyName: clubRow.name, agencyLogoUrl: clubRow.agencyLogoUrl || null, role: clubRow.role,
       label: (clubRow.role === 'host' ? 'مضيف' : clubRow.role === 'owner' ? 'صاحب' : clubRow.role === 'manager' ? 'إدارة' : clubRow.role === 'member' ? 'عضو' : 'داعم') + ' وكالة ' + clubRow.name,
     } : null;
     const activeRechargeAgent = await this.rechargeAgentsRepo.findOne({
@@ -625,11 +625,11 @@ export class UsersService {
       order: { level: 'DESC' },
     });
     const clubRows = await this.dataSource.query(
-      "SELECT a.id, a.name, CASE WHEN a.\"ownerId\" = $1 THEN 'owner' WHEN am.role = 'host' THEN 'host' WHEN am.role = 'owner' THEN 'owner' WHEN am.role = 'manager' THEN 'manager' WHEN am.role = 'member' THEN 'member' ELSE 'supporter' END AS role FROM agencies a LEFT JOIN agency_members am ON am.\"agencyId\" = a.id AND am.\"userId\" = $1 AND am.status = 'active' AND am.\"isActive\" = true LEFT JOIN agency_club_members cm ON cm.\"agencyId\" = a.id AND cm.\"userId\" = $1 AND cm.status = 'active' WHERE a.status = 'active' AND (a.\"ownerId\" = $1 OR am.id IS NOT NULL OR cm.id IS NOT NULL) ORDER BY CASE WHEN a.\"ownerId\" = $1 OR am.role = 'owner' THEN 0 WHEN am.role = 'host' THEN 1 WHEN am.role = 'manager' THEN 2 WHEN am.role = 'member' THEN 3 ELSE 4 END LIMIT 1",
+      "SELECT a.id, a.name, a.\"logoUrl\" AS \"agencyLogoUrl\", CASE WHEN a.\"ownerId\" = $1 THEN 'owner' WHEN am.role = 'host' THEN 'host' WHEN am.role = 'owner' THEN 'owner' WHEN am.role = 'manager' THEN 'manager' WHEN am.role = 'member' THEN 'member' ELSE 'supporter' END AS role FROM agencies a LEFT JOIN agency_members am ON am.\"agencyId\" = a.id AND am.\"userId\" = $1 AND am.status = 'active' AND am.\"isActive\" = true LEFT JOIN agency_club_members cm ON cm.\"agencyId\" = a.id AND cm.\"userId\" = $1 AND cm.status = 'active' WHERE a.status = 'active' AND (a.\"ownerId\" = $1 OR am.id IS NOT NULL OR cm.id IS NOT NULL) ORDER BY CASE WHEN a.\"ownerId\" = $1 OR am.role = 'owner' THEN 0 WHEN am.role = 'host' THEN 1 WHEN am.role = 'manager' THEN 2 WHEN am.role = 'member' THEN 3 ELSE 4 END LIMIT 1",
       [user.id],
     );
     const clubRow = clubRows && clubRows[0];
-    const agencyClub = clubRow ? { agencyId: clubRow.id, agencyName: clubRow.name, role: clubRow.role, label: (clubRow.role === 'host' ? 'مضيف' : clubRow.role === 'owner' ? 'صاحب' : clubRow.role === 'manager' ? 'إدارة' : clubRow.role === 'member' ? 'عضو' : 'داعم') + ' وكالة ' + clubRow.name } : null;
+    const agencyClub = clubRow ? { agencyId: clubRow.id, agencyName: clubRow.name, agencyLogoUrl: clubRow.agencyLogoUrl || null, role: clubRow.role, label: (clubRow.role === 'host' ? 'مضيف' : clubRow.role === 'owner' ? 'صاحب' : clubRow.role === 'manager' ? 'إدارة' : clubRow.role === 'member' ? 'عضو' : 'داعم') + ' وكالة ' + clubRow.name } : null;
     const mysteriousMan = await this.isMysteriousModeAllowed(user, vip);
     const safeUser = {
       ...this.flatten(user),
