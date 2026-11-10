@@ -3526,13 +3526,24 @@ export class AgenciesService implements OnModuleInit {
     }
     const requester = await this.usersRepo.findOne({ where: { id: userId } });
     try {
-      await this.notificationsService.create({
-        userId: agency.ownerId, type: NotificationType.AGENCY,
+      const managers = await this.membersRepo.find({
+        where: {
+          agencyId, role: AgencyRole.MANAGER,
+          status: AgencyMemberStatus.ACTIVE, isActive: true,
+        },
+        select: ['userId'],
+      });
+      const recipients = Array.from(new Set([
+        agency.ownerId,
+        ...managers.map((manager) => manager.userId),
+      ].filter(Boolean)));
+      await Promise.all(recipients.map((recipientId) => this.notificationsService.create({
+        userId: recipientId, type: NotificationType.AGENCY,
         title: 'طلب انضمام إلى نادي الوكالة',
         body: `${requester?.displayName || requester?.username || 'مستخدم'} يريد الانضمام إلى نادي وكالة ${agency.name}`,
         data: { action: 'agency_club_request', agencyId, agencyName: agency.name, agencyLogoUrl: agency.logoUrl || null, requesterId: userId },
         sendPush: true,
-      });
+      })));
     } catch (error) {
       this.logger.warn(`agency club request notification failed: ${(error as Error).message}`);
     }
