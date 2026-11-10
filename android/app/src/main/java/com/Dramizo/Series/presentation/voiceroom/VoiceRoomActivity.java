@@ -15688,6 +15688,103 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private void showAgencyClubEntryBanner(@Nullable String memberName,
+                                           @Nullable String agencyName,
+                                           @Nullable String agencyLogoUrl,
+                                           @Nullable String badgeLabel) {
+        if (isFinishing() || isDestroyed()) return;
+        String safeMember = memberName == null || memberName.trim().isEmpty() ? "عضو النادي" : memberName.trim();
+        String safeAgency = agencyName == null || agencyName.trim().isEmpty() ? "الوكالة" : agencyName.trim();
+        String safeBadge = badgeLabel == null || badgeLabel.trim().isEmpty() ? "عضو نادي الوكالة" : badgeLabel.trim();
+        View contentView = findViewById(android.R.id.content);
+        if (!(contentView instanceof ViewGroup)) return;
+        ViewGroup host = (ViewGroup) contentView;
+        View previous = host.findViewWithTag("agency-club-entry-banner");
+        if (previous != null) host.removeView(previous);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setTag("agency-club-entry-banner");
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), dp(11), dp(14), dp(11));
+        GradientDrawable background = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.rgb(48, 29, 83), Color.rgb(91, 53, 112), Color.rgb(132, 91, 48)}
+        );
+        background.setCornerRadius(dp(18));
+        background.setStroke(dp(1), Color.argb(190, 232, 194, 119));
+        card.setBackground(background);
+        card.setElevation(dp(12));
+
+        ImageView logo = new ImageView(this);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        logoParams.setMarginEnd(dp(12));
+        logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        GradientDrawable logoBackground = new GradientDrawable();
+        logoBackground.setColor(Color.rgb(255, 255, 255));
+        logoBackground.setShape(GradientDrawable.OVAL);
+        logo.setBackground(logoBackground);
+        logo.setClipToOutline(true);
+        card.addView(logo, logoParams);
+        if (agencyLogoUrl != null && !agencyLogoUrl.trim().isEmpty()) {
+            try {
+                Glide.with(this).load(AssetCatalog.absoluteUrl(agencyLogoUrl.trim()))
+                        .circleCrop().into(logo);
+            } catch (Exception ignored) { }
+        }
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(labels, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView title = new TextView(this);
+        title.setText("دخول عضو نادي الوكالة");
+        title.setTextColor(Color.rgb(255, 224, 165));
+        title.setTextSize(12);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        labels.addView(title);
+
+        TextView member = new TextView(this);
+        member.setText(safeMember + "  •  " + safeBadge);
+        member.setTextColor(Color.WHITE);
+        member.setTextSize(14);
+        member.setMaxLines(1);
+        member.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        member.setTypeface(member.getTypeface(), android.graphics.Typeface.BOLD);
+        LinearLayout.LayoutParams memberParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        memberParams.topMargin = dp(3);
+        labels.addView(member, memberParams);
+
+        TextView agency = new TextView(this);
+        agency.setText(safeAgency);
+        agency.setTextColor(Color.rgb(232, 220, 241));
+        agency.setTextSize(11);
+        LinearLayout.LayoutParams agencyParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        agencyParams.topMargin = dp(2);
+        labels.addView(agency, agencyParams);
+
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        params.setMargins(dp(14), dp(68), dp(14), 0);
+        host.addView(card, params);
+        card.setAlpha(0f);
+        card.setTranslationY(-dp(46));
+        card.animate().alpha(1f).translationY(0f).setDuration(360L)
+                .setInterpolator(new DecelerateInterpolator()).start();
+        handler.postDelayed(() -> {
+            if (card.getParent() == host) {
+                card.animate().alpha(0f).translationY(-dp(30)).setDuration(260L)
+                        .withEndAction(() -> {
+                            if (card.getParent() == host) host.removeView(card);
+                        }).start();
+            }
+        }, 4400L);
+    }
+
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
         if ("agency:club_member_entered".equals(event)) {
@@ -15696,6 +15793,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String badgeLabel = memberStr(payload, "clubBadgeLabel");
             if (enteredName == null || enteredName.trim().isEmpty()) enteredName = "عضو";
             if (badgeLabel == null || badgeLabel.trim().isEmpty()) badgeLabel = "عضو نادي الوكالة";
+            showAgencyClubEntryBanner(
+                    enteredName,
+                    memberStr(payload, "agencyName"),
+                    memberStr(payload, "agencyLogoUrl"),
+                    badgeLabel
+            );
             appendChatLine("نادي الوكالة", "✨ " + enteredName + " دخل الروم بصفة " + badgeLabel,
                     0, 1, null, enteredId, null);
             return;
