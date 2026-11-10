@@ -1668,14 +1668,16 @@ class AdminConsoleActivity : ThemedActivity() {
                             }
                         }
                     })
-                    card.addView(button("حذف الوكالة نهائيًا") {
-                        confirm("تحذير: حذف الوكالة قد ينهي بث روماتها ويحذف ارتباطاتها. لا يمكن التراجع. متابعة؟") {
-                            load(api.deleteAgency(id)) {
-                                toast("استجاب الخادم لطلب حذف الوكالة")
-                                openModule("agencies")
+                    if (currentRole == StaffRoleHelper.SUPER) {
+                        card.addView(button("حذف الوكالة نهائيًا") {
+                            confirm("تحذير: حذف الوكالة قد ينهي بث روماتها ويحذف ارتباطاتها. لا يمكن التراجع. متابعة؟") {
+                                load(api.deleteAgency(id)) {
+                                    toast("استجاب الخادم لطلب حذف الوكالة")
+                                    openModule("agencies")
+                                }
                             }
-                        }
-                    })
+                        })
+                    }
                 }
                 "vipPlans" -> if (!id.isNullOrBlank()) {
                     card.addView(button("تعديل الخطة") { showEditVipPlanDialog(id, primary, vipLevel, vipPrice) })
