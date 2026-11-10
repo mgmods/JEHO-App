@@ -299,7 +299,7 @@ public class AgencyManageActivity extends ThemedActivity {
                 if (openAgencyClubFromNotification) {
                     openAgencyClubFromNotification = false;
                     binding.getRoot().post(() -> {
-                        if (!isFinishing()) AgencyFamilyInfoSheet.show(this, agencyId);
+                        if (!isFinishing()) AgencyFamilyInfoSheet.showClubRequests(this, agencyId);
                     });
                 } else if (openPendingRequestsFromNotification) {
                     openPendingRequestsFromNotification = false;
