@@ -2982,19 +2982,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     AvatarCosmetics.bindStacked(avatar, frameView, hostSignal, avatarUrl, frameUrl, null);
                 }
             }
-            boolean creator = !mysteriousLine && !system && userId != null && roomHostId != null && userId.equals(roomHostId);
-            String agencyRoleLabel = !mysteriousLine && !system ? agencyRoleLabelForRoomUser(userId) : null;
+            // Agency role is rendered once in chatBadgesRow by applyRoomChatDecorations.
+            // A second host chip beside the name duplicated the same agency label.
             if (hostChip != null) {
-                if (agencyRoleLabel != null && !agencyRoleLabel.trim().isEmpty()) {
-                    hostChip.setText(agencyRoleLabel);
-                    hostChip.setVisibility(View.VISIBLE);
-                } else if (creator && !isAgencyRoom) {
-                    hostChip.setText("مضيف");
-                    hostChip.setVisibility(View.VISIBLE);
-                } else {
-                    hostChip.setVisibility(View.GONE);
-                    hostChip.setText("");
-                }
+                hostChip.setVisibility(View.GONE);
+                hostChip.setText("");
             }
 
             // VIP/CP/ID/medals now sit inline beside the display name.
@@ -3095,6 +3087,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String agencyId;
         String agencyName;
         String agencyRole;
+        String gender;
         String publicId;
         String publicIdStyleMode;
         String publicIdColor1;
@@ -3134,6 +3127,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     decoration.agencyName = user.agency.name;
                     decoration.agencyRole = user.agency.role;
                 }
+                decoration.gender = user.gender;
                 decoration.publicId = user.publicId;
                 decoration.publicIdStyleMode = user.publicIdStyleMode;
                 decoration.publicIdColor1 = user.publicIdStyleColor1;
@@ -3213,6 +3207,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String agencyRole = decoration.agencyRole == null ? ""
                 : decoration.agencyRole.trim().toLowerCase(java.util.Locale.ROOT);
         String agencyName = decoration.agencyName == null ? "" : decoration.agencyName.trim();
+        boolean female = "female".equalsIgnoreCase(decoration.gender);
         if ("owner".equals(agencyRole)) {
             agencyBadgeLabel = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
         } else {
@@ -3222,16 +3217,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String memberAgencyId = decoration.agencyId == null ? "" : decoration.agencyId.trim();
             boolean sameAgencyRoom = isAgencyRoom && !liveAgencyId.isEmpty()
                     && !memberAgencyId.isEmpty() && liveAgencyId.equals(memberAgencyId);
+            boolean roomModerator = sameAgencyRoom && liveRoom.moderatorIds != null
+                    && decoration.userId != null && liveRoom.moderatorIds.stream()
+                    .anyMatch(moderatorId -> moderatorId != null && sameUser(moderatorId, decoration.userId));
             if (sameAgencyRoom) {
                 if ("host".equals(agencyRole)) {
-                    agencyBadgeLabel = "مضيفة";
-                } else if (liveRoom.moderatorIds != null && decoration.userId != null) {
-                    for (String moderatorId : liveRoom.moderatorIds) {
-                        if (moderatorId != null && sameUser(moderatorId, decoration.userId)) {
-                            agencyBadgeLabel = "مشرفة";
-                            break;
-                        }
-                    }
+                    agencyBadgeLabel = female ? "مضيفة" : "مضيف";
+                } else if ("manager".equals(agencyRole) || roomModerator) {
+                    agencyBadgeLabel = female ? "مشرفة" : "مشرف";
                 }
             }
         }

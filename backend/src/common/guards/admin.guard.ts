@@ -46,6 +46,11 @@ export class AdminGuard implements CanActivate {
     // silently become available to app staff.
     if (user.authSource === 'app') {
       const role = String(user.staffRole || '').toLowerCase();
+      const nativeRoomConfigEdit =
+        verb === 'PATCH' && /^\/admin\/rooms\/[^/]+$/.test(url.split('?')[0].toLowerCase().replace(/^\/api\/v\d+/, ''));
+      if (nativeRoomConfigEdit) {
+        throw new ForbiddenException('Room configuration changes are disabled for app staff');
+      }
       if (role === 'super' || user.isSuperAdmin) return true;
 
       const resolved = resolveAdminRequest(method, url);
@@ -127,7 +132,11 @@ export class AdminGuard implements CanActivate {
           if ((verb === 'GET' && path === '/vanity-ids/admin/all') || isVanityAssign) return true;
           throw new ForbiddenException('Admin may assign an existing vanity ID only');
         }
-        // Admin may manage room settings and close a room, but cannot delete it.
+        // Admin may close rooms, but cannot edit their configuration or delete them.
+        if (path.startsWith('/admin/rooms') && !readOnly) {
+          if (verb === 'POST' && /^\/admin\/rooms\/[^/]+\/close$/.test(path)) return true;
+          throw new ForbiddenException('Admin may close rooms but cannot change room configuration');
+        }
         return true;
       }
 
@@ -140,7 +149,8 @@ export class AdminGuard implements CanActivate {
           throw new ForbiddenException('Manager dashboard access is read-only');
         }
         if (path.startsWith('/admin/rooms') && !readOnly) {
-          throw new ForbiddenException('Manager cannot change room configuration or close/delete rooms');
+          if (verb === 'POST' && /^\/admin\/rooms\/[^/]+\/close$/.test(path)) return true;
+          throw new ForbiddenException('Manager may close rooms but cannot change configuration or delete rooms');
         }
         if (path.startsWith('/admin/streams') && !readOnly &&
             !/^\/admin\/streams\/[^/]+\/end$/.test(path)) {

@@ -1224,6 +1224,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (holder.b.tvAgencyRoleBadge == null) return;
         String label = null;
+        if (user != null && user.agencyClub != null
+                && user.agencyClub.label != null && !user.agencyClub.label.trim().isEmpty()) {
+            holder.b.tvAgencyRoleBadge.setText("");
+            holder.b.tvAgencyRoleBadge.setVisibility(View.GONE);
+            return;
+        }
         com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency =
                 user != null ? user.agency : null;
         if (agency != null) {
