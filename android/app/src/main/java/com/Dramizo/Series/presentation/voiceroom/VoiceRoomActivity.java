@@ -8653,8 +8653,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 boolean sameAgencyRoom = isAgencyRoom && !roomAgencyId.isEmpty()
                         && !memberAgencyId.isEmpty() && roomAgencyId.equals(memberAgencyId);
                 if (sameAgencyRoom) {
-                    if ("host".equals(role)) labels.add("مضيفة");
-                    else if ("moderator".equals(role)) labels.add("مشرفة");
+                    if ("host".equals(role)) {
+                        labels.add("مضيفة");
+                    } else if (liveRoom.moderatorIds != null && user.id != null) {
+                        for (String moderatorId : liveRoom.moderatorIds) {
+                            if (moderatorId != null && sameUser(moderatorId, user.id)) {
+                                labels.add("مشرفة");
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
