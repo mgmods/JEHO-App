@@ -543,12 +543,6 @@ public final class AgencyFamilyInfoSheet {
             approve.setOnClickListener(decision);
             reject.setOnClickListener(decision);
         }
-        dialog.setOnDismissListener(d -> {
-            if (parent.isShowing()) {
-                // Refresh the summary/count after management without closing the agency sheet.
-                parent.findViewById(R.id.btnAgencyClubRequests);
-            }
-        });
         dialog.show();
     }
 
