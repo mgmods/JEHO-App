@@ -272,7 +272,42 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
-  private mapMessage(message: ChatMessage, vipLevel = 0, displayRank?: any) {
+  private async agencyClubMapForUsers(userIds: string[]): Promise<Map<string, any>> {
+    const ids = Array.from(new Set((userIds || []).filter(Boolean)));
+    const result = new Map<string, any>();
+    if (!ids.length) return result;
+    const rows = await this.dataSource.query(
+      `SELECT cm."userId", a.id AS "agencyId", a.name AS "agencyName",
+              a."logoUrl" AS "agencyLogoUrl", 'supporter' AS role
+       FROM agency_club_members cm
+       JOIN agencies a ON a.id = cm."agencyId"
+       WHERE cm."userId" = ANY($1::uuid[])
+         AND cm.status = 'active'
+         AND a.status = 'active'
+         AND (a."ownerId" IS NULL OR a."ownerId" <> cm."userId")
+         AND NOT EXISTS (
+           SELECT 1 FROM agency_members am
+           WHERE am."agencyId" = a.id AND am."userId" = cm."userId"
+             AND am.status = 'active' AND am."isActive" = true
+         )
+       ORDER BY cm.id ASC`,
+      [ids],
+    );
+    for (const row of rows || []) {
+      if (!result.has(String(row.userId))) {
+        result.set(String(row.userId), {
+          agencyId: row.agencyId,
+          agencyName: row.agencyName,
+          agencyLogoUrl: row.agencyLogoUrl || null,
+          role: row.role || 'supporter',
+          label: 'عضو نادي ' + row.agencyName,
+        });
+      }
+    }
+    return result;
+  }
+
+  private mapMessage(message: ChatMessage, vipLevel = 0, displayRank?: any, agencyClub?: any) {
     const sender: any = message.sender;
     const profile = sender?.profile;
     const reply = (message as any).replyTo as ChatMessage | undefined;
@@ -310,6 +345,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
             level: Number(sender.level || 1),
             vipLevel: Number(vipLevel || sender._vipLevel || 0),
             genderVerified: !!sender.genderVerified,
+            agencyClub: agencyClub || null,
             ...this.economyStats(profile),
           }
         : undefined,
@@ -371,7 +407,8 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       });
       if (msg && !msg.isUnsent) {
         const senderVip = vipByUser?.get(msg.senderId) ?? 0;
-        lastMessage = this.mapMessage(msg, senderVip, displayRanks?.get(msg.senderId));
+        const clubs = await this.agencyClubMapForUsers([msg.senderId]);
+        lastMessage = this.mapMessage(msg, senderVip, displayRanks?.get(msg.senderId), clubs.get(msg.senderId));
       }
     }
     const peerVip = peerPart?.userId ? vipByUser?.get(peerPart.userId) ?? 0 : 0;
@@ -686,10 +723,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         where: { userId: senderId, referenceType: 'paid_message', referenceId: message.id },
       }),
     ]);
-    const [senderVipMap, senderRanks] = await Promise.all([
+    const [senderVipMap, senderRanks, senderClubs] = await Promise.all([
       this.vipMapForUsers([senderId]), this.displayRankMapForUsers([senderId]),
+      this.agencyClubMapForUsers([senderId]),
     ]);
-    const mapped: any = this.mapMessage(full || message, senderVipMap.get(senderId) ?? 0, senderRanks.get(senderId));
+    const mapped: any = this.mapMessage(full || message, senderVipMap.get(senderId) ?? 0,
+      senderRanks.get(senderId), senderClubs.get(senderId));
     if (paidTransaction) {
       const paidMetadata = (paidTransaction.metadata || {}) as Record<string, unknown>;
       mapped.paidCoins = Math.abs(Number(paidTransaction.amount) || 0);
@@ -800,8 +839,9 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     });
     const items = newestFirst.slice().reverse();
     const senderIds = items.map((m) => m.senderId);
-    const [vipByUser, displayRanks] = await Promise.all([
+    const [vipByUser, displayRanks, clubsByUser] = await Promise.all([
       this.vipMapForUsers(senderIds), this.displayRankMapForUsers(senderIds),
+      this.agencyClubMapForUsers(senderIds),
     ]);
     const readAt = new Date();
     await this.partRepo.update(
@@ -811,7 +851,9 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     await this.emitReadReceipt(conversationId, userId, readAt);
     const peers = await this.partRepo.find({ where: { conversationId } });
     const peerPart = peers.find((p) => p.userId !== userId);
-    const mappedItems: any[] = items.map((m) => this.mapMessage(m, vipByUser.get(m.senderId) ?? 0, displayRanks.get(m.senderId)));
+    const mappedItems: any[] = items.map((m) => this.mapMessage(
+      m, vipByUser.get(m.senderId) ?? 0, displayRanks.get(m.senderId), clubsByUser.get(m.senderId),
+    ));
     const paidIds = items.map((m) => m.id);
     if (paidIds.length) {
       const [paidRows, refundRows] = await Promise.all([
@@ -888,8 +930,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     msg.isEdited = true;
     msg.editedAt = new Date();
     const saved = await this.msgRepo.save(msg);
-    const [senderVipMap, senderRanks] = await Promise.all([this.vipMapForUsers([userId]), this.displayRankMapForUsers([userId])]);
-    const mapped = this.mapMessage({ ...saved, sender: msg.sender }, senderVipMap.get(userId) ?? 0, senderRanks.get(userId));
+    const [senderVipMap, senderRanks, senderClubs] = await Promise.all([
+      this.vipMapForUsers([userId]), this.displayRankMapForUsers([userId]),
+      this.agencyClubMapForUsers([userId]),
+    ]);
+    const mapped = this.mapMessage({ ...saved, sender: msg.sender },
+      senderVipMap.get(userId) ?? 0, senderRanks.get(userId), senderClubs.get(userId));
     const conversation = await this.convRepo.findOne({ where: { id: msg.conversationId } });
     const touchesPreview = conversation?.lastMessageId === msg.id;
     const payload = {
@@ -1136,8 +1182,11 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       if (current) {
         const vip =
           (await this.vipMapForUsers([current.senderId])).get(current.senderId) ?? 0;
-        const ranks = await this.displayRankMapForUsers([current.senderId]);
-        lastMessage = this.mapMessage(current, vip, ranks.get(current.senderId));
+        const [ranks, clubs] = await Promise.all([
+          this.displayRankMapForUsers([current.senderId]),
+          this.agencyClubMapForUsers([current.senderId]),
+        ]);
+        lastMessage = this.mapMessage(current, vip, ranks.get(current.senderId), clubs.get(current.senderId));
       }
     }
 
