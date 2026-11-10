@@ -1322,9 +1322,12 @@ public class ChatConversationActivity extends ThemedActivity {
                     if (messageId != null && !messageId.isEmpty()) {
                         viewModel.dismissMessageLocally(messageId);
                     }
-                    Toast.makeText(this, joinCode.isEmpty()
-                            ? "تم إرسال طلب الانضمام إلى الوكالة وبانتظار الموافقة"
-                            : R.string.agency_invite_joined, Toast.LENGTH_SHORT).show();
+                    if (joinCode.isEmpty()) {
+                        Toast.makeText(this, "تم إرسال طلب الانضمام إلى الوكالة وبانتظار الموافقة",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, R.string.agency_invite_joined, Toast.LENGTH_SHORT).show();
+                    }
                     try {
                         startActivity(new Intent(this,
                                 com.Dramizo.Series.presentation.agency.AgencyActivity.class));
