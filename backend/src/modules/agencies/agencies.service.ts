@@ -3497,18 +3497,27 @@ export class AgenciesService implements OnModuleInit {
       where: { agencyId, userId, status: AgencyMemberStatus.ACTIVE, isActive: true }
     });
     if (staff) return { status: 'active_staff', alreadyMember: true };
-    const existing = await this.dataSource.query(
-      `SELECT status FROM agency_club_members WHERE "agencyId" = $1 AND "userId" = $2 LIMIT 1`,
-      [agencyId, userId]
-    );
-    if (existing?.[0]?.status === 'active') return { status: 'active', alreadyMember: true };
-    if (existing?.[0]?.status === 'pending') return { status: 'pending', alreadyRequested: true };
-    await this.dataSource.query(`
+    // Insert/reopen atomically. Concurrent taps must create one pending request
+    // and one notification only; an already-pending request is left untouched.
+    const created = await this.dataSource.query(`
       INSERT INTO agency_club_members ("agencyId", "userId", status)
       VALUES ($1, $2, 'pending')
       ON CONFLICT ("agencyId", "userId") DO UPDATE
       SET status = 'pending', "updatedAt" = NOW()
+      WHERE agency_club_members.status = 'rejected'
+      RETURNING "userId"
     `, [agencyId, userId]);
+    if (!created?.length) {
+      const existing = await this.dataSource.query(
+        `SELECT status FROM agency_club_members WHERE "agencyId" = $1 AND "userId" = $2 LIMIT 1`,
+        [agencyId, userId]
+      );
+      if (existing?.[0]?.status === 'active') return { status: 'active', alreadyMember: true };
+      if (existing?.[0]?.status === 'pending') return { status: 'pending', alreadyRequested: true };
+      // A concurrently changed/deleted row can safely retry through the same
+      // idempotent insert path on the next user action.
+      return { status: 'pending', alreadyRequested: true };
+    }
     const requester = await this.usersRepo.findOne({ where: { id: userId } });
     try {
       await this.notificationsService.create({
