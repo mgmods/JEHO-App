@@ -120,9 +120,26 @@ public final class AgencyFamilyInfoSheet {
                     activity.runOnUiThread(() -> {
                         if (!dialog.isShowing()) return;
                         if (request.success) {
-                            btnClubJoin.setText("تم إرسال الطلب — بانتظار موافقة صاحب الوكالة");
-                            btnClubJoin.setEnabled(false);
-                            Toast.makeText(activity, "تم إرسال طلبك إلى صاحب الوكالة", Toast.LENGTH_SHORT).show();
+                            String clubStatus = request.data == null ? "pending"
+                                    : String.valueOf(request.data.get("status"));
+                            if ("active".equalsIgnoreCase(clubStatus)
+                                    || "active_staff".equalsIgnoreCase(clubStatus)
+                                    || "active_host".equalsIgnoreCase(clubStatus)
+                                    || "active_member".equalsIgnoreCase(clubStatus)) {
+                                isActiveClubSupporter[0] = "active".equalsIgnoreCase(clubStatus);
+                                btnClubJoin.setText(isActiveClubSupporter[0]
+                                        ? "مغادرة النادي" : "أنت ضمن أعضاء/طاقم هذه الوكالة");
+                                Toast.makeText(activity, "أنت بالفعل ضمن نادي أو طاقم الوكالة",
+                                        Toast.LENGTH_SHORT).show();
+                            } else {
+                                btnClubJoin.setText("طلبك قيد مراجعة صاحب الوكالة");
+                                Toast.makeText(activity,
+                                        Boolean.TRUE.equals(request.data == null ? null : request.data.get("alreadyRequested"))
+                                                ? "طلبك موجود مسبقاً وقيد المراجعة"
+                                                : "تم إرسال طلبك إلى إدارة الوكالة",
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                            btnClubJoin.setEnabled(isActiveClubSupporter[0]);
                         } else {
                             btnClubJoin.setEnabled(true);
                             Toast.makeText(activity,
@@ -386,8 +403,14 @@ public final class AgencyFamilyInfoSheet {
             Result<java.util.List<Map<String, Object>>> result = ApiCall.execute(container.getAgencyApi().clubRequests(agencyId));
             activity.runOnUiThread(() -> {
                 if (!parent.isShowing()) return;
-                if (!result.success || result.data == null || result.data.isEmpty()) {
-                    Toast.makeText(activity, "لا توجد طلبات انضمام معلّقة", Toast.LENGTH_SHORT).show();
+                if (!result.success) {
+                    Toast.makeText(activity,
+                            result.error != null ? result.error : "تعذر تحميل طلبات النادي. تحقق من الاتصال وحاول مجدداً.",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (result.data == null || result.data.isEmpty()) {
+                    Toast.makeText(activity, "لا توجد طلبات انضمام معلّقة حالياً", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 showNextClubRequest(activity, parent, container, agencyId, result.data, 0);
