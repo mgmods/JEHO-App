@@ -90,6 +90,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { usersApi } from '@/api'
 import { extractList } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
@@ -104,6 +105,7 @@ import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 
 const users = ref([])
 const loading = ref(false)
@@ -261,5 +263,8 @@ async function unbanUser(u) {
   await load()
 }
 
-onMounted(load)
+onMounted(() => {
+  search.value = String(route.query.search || '')
+  load()
+})
 </script>
