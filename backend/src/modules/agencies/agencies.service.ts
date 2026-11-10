@@ -1039,7 +1039,7 @@ export class AgenciesService implements OnModuleInit {
     // Do not load full members list — agencies can be huge. Use listMembers instead.
     let agency = await this.agenciesRepo.findOne({
       where: { id },
-      relations: ['owner'],
+      relations: ['owner', 'owner.profile'],
     });
     if (!agency) {
       // Also resolve by numeric public agency ID (not owner user ID).
