@@ -341,7 +341,7 @@ public class CpCenterActivity extends ThemedActivity {
                 body.put("cosmeticId", id);
                 Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().purchaseCpStoreItem(body));
                 if (result.success) {
-                    message("تم الشراء بنجاح وإضافة العنصر إلى حقيبة CP. ارتده من الحقيبة متى شئت.");
+                    message("تم الشراء وارتداء العنصر تلقائياً وإضافته إلى حقيبة CP.");
                     loadStore();
                     loadHome();
                 } else {
