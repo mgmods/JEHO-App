@@ -1045,7 +1045,7 @@ export class AgenciesService implements OnModuleInit {
       // Also resolve by numeric public agency ID (not owner user ID).
       agency = await this.agenciesRepo.findOne({
         where: { publicId: String(id || '').trim() },
-        relations: ['owner'],
+        relations: ['owner', 'owner.profile'],
       });
     }
     // Do not expose suspended/inactive agencies through stale public profile links.
@@ -1109,9 +1109,6 @@ export class AgenciesService implements OnModuleInit {
     } catch {
       followerCount = 0;
     }
-    // Also count members as social gravity on the card when follows are empty.
-    if (followerCount <= 0) followerCount = Number(agency.memberCount || 0);
-
     let isFollowing = false;
     if (viewerId) {
       try {
