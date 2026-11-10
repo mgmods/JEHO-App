@@ -478,7 +478,7 @@ export class UsersService {
     );
     const agency = await this.resolveActiveAgency(userId);
     const clubRows = await this.dataSource.query(
-      "SELECT a.id, a.name, a.\\\"logoUrl\\\" AS \\\"agencyLogoUrl\\\", 'supporter' AS role FROM agency_club_members cm JOIN agencies a ON a.id = cm.\\\"agencyId\\\" WHERE cm.\\\"userId\\\" = $1 AND cm.status = 'active' AND a.status = 'active' ORDER BY cm.id ASC LIMIT 1",
+      "SELECT a.id, a.name, a.\\\"logoUrl\\\" AS \\\"agencyLogoUrl\\\", 'supporter' AS role FROM agency_club_members cm JOIN agencies a ON a.id = cm.\\\"agencyId\\\" WHERE cm.\\\"userId\\\" = $1 AND cm.status = 'active' AND a.status = 'active' AND (a.\"ownerId\" IS NULL OR a.\"ownerId\" <> cm.\"userId\") AND NOT EXISTS (SELECT 1 FROM agency_members am WHERE am.\"agencyId\" = a.id AND am.\"userId\" = cm.\"userId\" AND am.status = 'active' AND am.\"isActive\" = true) ORDER BY cm.id ASC LIMIT 1",
       [userId],
     );
     const clubRow = clubRows && clubRows[0];
@@ -548,7 +548,7 @@ export class UsersService {
     }
     const agency = await this.resolveActiveAgency(id);
     const clubRows = await this.dataSource.query(
-      "SELECT a.id, a.name, a.\\\"logoUrl\\\" AS \\\"agencyLogoUrl\\\", 'supporter' AS role FROM agency_club_members cm JOIN agencies a ON a.id = cm.\\\"agencyId\\\" WHERE cm.\\\"userId\\\" = $1 AND cm.status = 'active' AND a.status = 'active' ORDER BY cm.id ASC LIMIT 1",
+      "SELECT a.id, a.name, a.\\\"logoUrl\\\" AS \\\"agencyLogoUrl\\\", 'supporter' AS role FROM agency_club_members cm JOIN agencies a ON a.id = cm.\\\"agencyId\\\" WHERE cm.\\\"userId\\\" = $1 AND cm.status = 'active' AND a.status = 'active' AND (a.\"ownerId\" IS NULL OR a.\"ownerId\" <> cm.\"userId\") AND NOT EXISTS (SELECT 1 FROM agency_members am WHERE am.\"agencyId\" = a.id AND am.\"userId\" = cm.\"userId\" AND am.status = 'active' AND am.\"isActive\" = true) ORDER BY cm.id ASC LIMIT 1",
       [id],
     );
     const clubRow = clubRows && clubRows[0];
@@ -625,7 +625,7 @@ export class UsersService {
       order: { level: 'DESC' },
     });
     const clubRows = await this.dataSource.query(
-      "SELECT a.id, a.name, a.\\\"logoUrl\\\" AS \\\"agencyLogoUrl\\\", 'supporter' AS role FROM agency_club_members cm JOIN agencies a ON a.id = cm.\\\"agencyId\\\" WHERE cm.\\\"userId\\\" = $1 AND cm.status = 'active' AND a.status = 'active' ORDER BY cm.id ASC LIMIT 1",
+      "SELECT a.id, a.name, a.\\\"logoUrl\\\" AS \\\"agencyLogoUrl\\\", 'supporter' AS role FROM agency_club_members cm JOIN agencies a ON a.id = cm.\\\"agencyId\\\" WHERE cm.\\\"userId\\\" = $1 AND cm.status = 'active' AND a.status = 'active' AND (a.\"ownerId\" IS NULL OR a.\"ownerId\" <> cm.\"userId\") AND NOT EXISTS (SELECT 1 FROM agency_members am WHERE am.\"agencyId\" = a.id AND am.\"userId\" = cm.\"userId\" AND am.status = 'active' AND am.\"isActive\" = true) ORDER BY cm.id ASC LIMIT 1",
       [user.id],
     );
     const clubRow = clubRows && clubRows[0];
