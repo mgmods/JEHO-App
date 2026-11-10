@@ -199,10 +199,9 @@ public final class AgencyFamilyInfoSheet {
                         btnCopy.setVisibility(gid.isEmpty() ? View.GONE : View.VISIBLE);
                     }
                 }
-                if (tvFollowers != null) {
-                    long fc = a.followerCount > 0 ? a.followerCount : Math.max(0, a.memberCount);
-                    tvFollowers.setText(formatCount(fc));
-                }
+                if (tvFollowers != null) tvFollowers.setText(formatCount(Math.max(0, a.followerCount)));
+                following[0] = Boolean.TRUE.equals(a.isFollowing);
+                applyFollowUi(btnFollow, following[0]);
                 if (tvRooms != null) tvRooms.setText(formatCount(Math.max(0, a.roomCount)));
                 if (tvMaxOnline != null) {
                     long max = Math.max(a.maxOnline, Math.max(a.liveOnline, a.liveViewerCount));
