@@ -747,9 +747,11 @@ async function saveCpStoreItem(item) {
   try {
     const price = Number(item.coinPrice)
     const leaseDays = Number(item.meta?.leaseDays || 30)
-    if (!item.name?.trim() || !Number.isSafeInteger(price) || price <= 0 ||
+    if (!item.name?.trim() || !/^https?:\/\//i.test(String(item.previewUrl || '').trim()) ||
+        (item.animationUrl && !/^https?:\/\//i.test(String(item.animationUrl).trim())) ||
+        !Number.isSafeInteger(price) || price <= 0 ||
         !Number.isInteger(leaseDays) || leaseDays < 1 || leaseDays > 3650) {
-      throw new Error('تحقق من اسم العنصر والسعر والمدة.')
+      throw new Error('تحقق من الاسم وروابط المعاينة والحركة والسعر والمدة.')
     }
     const response = await cpAdminApi.updateStoreItem(item.id, {
       name: item.name.trim(),
