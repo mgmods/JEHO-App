@@ -45,6 +45,12 @@ public final class ChatDtos {
         @SerializedName("width") public int width;
         @SerializedName("height") public int height;
         @SerializedName("duration") public int duration;
+        // JEHO story-reply preview metadata; kept inside the existing media JSON.
+        @SerializedName("storyId") public String storyId;
+        @SerializedName("storyMediaType") public String storyMediaType;
+        @SerializedName("storyMediaUrl") public String storyMediaUrl;
+        @SerializedName("storyCaption") public String storyCaption;
+        @SerializedName("storyOwnerName") public String storyOwnerName;
     }
 
     public static class SendMessageRequest {
