@@ -457,7 +457,7 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">رفع صورة معاينة العنصر</label>
-            <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" :disabled="uploadingCpStorePreview" @change="uploadCpStorePreview">
+            <input class="form-control" type="file" accept="image/*,video/mp4,video/webm,video/quicktime,.gif,.webp,.png,.jpg,.jpeg,.mp4,.webm,.mov" :disabled="uploadingCpStorePreview" @change="uploadCpStorePreview">
             <div v-if="uploadingCpStorePreview" class="small text-primary mt-2">جارٍ رفع المعاينة…</div>
           </div>
           <div class="col-md-6">
@@ -467,7 +467,8 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">رابط الحركة (اختياري)</label>
-            <input v-model.trim="cpStoreForm.animationUrl" class="form-control" dir="ltr" placeholder="https://…">
+            <input v-model.trim="cpStoreForm.animationUrl" class="form-control mb-2" dir="ltr" placeholder="https://…">
+            <input class="form-control" type="file" accept="image/gif,image/webp,video/mp4,video/webm,video/quicktime,.gif,.webp,.mp4,.webm,.mov,.svga,application/octet-stream" :disabled="uploadingCpStorePreview" @change="uploadCpStoreAnimation">
           </div>
           <div class="col-md-6">
             <label class="form-label">الوصف الذي يظهر للمستخدم</label>
@@ -510,9 +511,9 @@
                 <div class="col-md-6">
                   <label class="form-label small mb-1">رابط صورة / معاينة العنصر</label>
                   <input v-model.trim="item.previewUrl" class="form-control form-control-sm mb-1" dir="ltr">
-                  <input class="form-control form-control-sm" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" :disabled="uploadingCpStorePreview" @change="uploadCpStorePreview($event, item)">
+                  <input class="form-control form-control-sm" type="file" accept="image/*,video/mp4,video/webm,video/quicktime,.gif,.webp,.png,.jpg,.jpeg,.mp4,.webm,.mov" :disabled="uploadingCpStorePreview" @change="uploadCpStorePreview($event, item)">
                 </div>
-                <div class="col-md-6"><label class="form-label small mb-1">رابط الحركة (GIF / WebP / SVGA / فيديو)</label><input v-model.trim="item.animationUrl" class="form-control form-control-sm" dir="ltr" placeholder="https://…"></div>
+                <div class="col-md-6"><label class="form-label small mb-1">رابط الحركة (GIF / WebP / SVGA / فيديو)</label><input v-model.trim="item.animationUrl" class="form-control form-control-sm mb-1" dir="ltr" placeholder="https://…"><input class="form-control form-control-sm" type="file" accept="image/gif,image/webp,video/mp4,video/webm,video/quicktime,.gif,.webp,.mp4,.webm,.mov,.svga,application/octet-stream" :disabled="uploadingCpStorePreview" @change="uploadCpStoreAnimation($event, item)"></div>
                 <div class="col-md-6"><label class="form-label small mb-1">الوصف</label><input v-model.trim="item.description" class="form-control form-control-sm"></div>
                 <div class="col-md-6"><div class="d-flex gap-2">
                   <div class="flex-fill"><label class="form-label small mb-1">السعر بالعملات</label><input v-model.number="item.coinPrice" class="form-control form-control-sm" type="number" min="1" max="1000000000"></div>
@@ -675,8 +676,8 @@ async function loadCpStoreItems() {
 async function uploadCpStorePreview(event, target = cpStoreForm.value) {
   const file = event?.target?.files?.[0]
   if (!file) return
-  if (!/\.(gif|webp|png|jpe?g)$/i.test(file.name)) {
-    error.value = 'اختر صورة GIF أو WebP أو PNG أو JPG.'
+  if (!/\.(gif|webp|png|jpe?g|mp4|webm|mov)$/i.test(file.name)) {
+    error.value = 'اختر صورة أو ملف فيديو GIF أو WebP أو PNG أو JPG أو MP4 أو WebM أو MOV.'
     event.target.value = ''
     return
   }
@@ -699,6 +700,39 @@ async function uploadCpStorePreview(event, target = cpStoreForm.value) {
     success.value = target === cpStoreForm.value ? 'تم رفع صورة المعاينة. أكمل بيانات العنصر ثم أضفه إلى متجر CP.' : 'تم رفع صورة معاينة العنصر. احفظ التعديلات لاعتمادها.'
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر رفع صورة المعاينة'
+  } finally {
+    uploadingCpStorePreview.value = false
+    if (event?.target) event.target.value = ''
+  }
+}
+
+async function uploadCpStoreAnimation(event, target = cpStoreForm.value) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!/\.(gif|webp|mp4|webm|mov|svga)$/i.test(file.name)) {
+    error.value = 'اختر ملف حركة GIF أو WebP أو MP4 أو WebM أو MOV أو SVGA.'
+    event.target.value = ''
+    return
+  }
+  if (file.size > 100 * 1024 * 1024) {
+    error.value = 'حجم ملف الحركة يجب ألا يتجاوز 100 ميغابايت.'
+    event.target.value = ''
+    return
+  }
+  uploadingCpStorePreview.value = true
+  error.value = ''
+  try {
+    const response = await uploadsApi.upload(file)
+    if (response?.error) throw new Error(response.error.message || 'تعذر رفع ملف الحركة')
+    const data = payloadOf(response)
+    const uploadedUrl = data?.url || data?.path
+    if (!uploadedUrl) throw new Error('رد رفع ملف الحركة غير مكتمل.')
+    const url = /^https?:\/\//i.test(uploadedUrl) ? uploadedUrl : new URL(uploadedUrl, window.location.origin).toString()
+    target.animationUrl = url
+    if (!target.previewUrl) target.previewUrl = url
+    success.value = 'تم رفع ملف الحركة. احفظ العنصر لاعتماد الملف.'
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر رفع ملف الحركة'
   } finally {
     uploadingCpStorePreview.value = false
     if (event?.target) event.target.value = ''
