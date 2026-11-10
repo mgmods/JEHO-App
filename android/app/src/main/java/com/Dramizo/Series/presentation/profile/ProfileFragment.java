@@ -20,7 +20,8 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.databinding.FragmentProfileBinding;
-import com.Dramizo.Series.data.remote.dto.MiscDtos;\nimport com.Dramizo.Series.data.remote.dto.StoriesDtos;
+import com.Dramizo.Series.data.remote.dto.MiscDtos;
+import com.Dramizo.Series.data.remote.dto.StoriesDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.agency.AgencyActivity;
@@ -59,7 +60,9 @@ public class ProfileFragment extends Fragment {
     private MiscDtos.AgencyMineDto agencyMine;
     private long lastWalletRefreshAtMs = 0L;
     private AnimatorSet myCpHeartAnimator;
-    private static final long MIN_WALLET_REFRESH_MS = 15_000L;\n    private TextView myStoryBadge;\n    private View myStoryRing;
+    private static final long MIN_WALLET_REFRESH_MS = 15_000L;
+    private TextView myStoryBadge;
+    private View myStoryRing;
 
     @Nullable
     @Override
@@ -112,7 +115,8 @@ public class ProfileFragment extends Fragment {
             } else {
                 openProfile.onClick(v);
             }
-        });\n        addMyStoryProfileIndicator();
+        });
+        addMyStoryProfileIndicator();
         // Dashboard-managed custom icons for the Me page; empty URLs retain native defaults.
         bindDashboardProfileIcon(R.id.imgMeVipActionIcon, "vip", R.drawable.ic_me_vip_card);
         bindDashboardProfileIcon(R.id.imgMeLevelActionIcon, "level", R.drawable.ic_me_level_card);
