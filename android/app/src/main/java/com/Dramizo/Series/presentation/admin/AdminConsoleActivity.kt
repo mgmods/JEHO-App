@@ -263,7 +263,89 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(buildBottomNavigation(), LinearLayout.LayoutParams(-1, dp(66)))
         setContentView(root)
+    }
+
+    /**
+     * Persistent native navigation for the administration workspace.
+     * Every destination opens an existing API-backed module and is filtered
+     * through the same role gate used by the module router.
+     */
+    private fun buildBottomNavigation(): View {
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(7), dp(5), dp(7), dp(5))
+            setBackgroundColor(Color.WHITE)
+            elevation = dp(12).toFloat()
+        }
+        val destinations = listOf(
+            Triple("الرئيسية", "⌂", "home"),
+            Triple("المجتمع", "♙", "users"),
+            Triple("المالية", "◈", "walletTransactions"),
+            Triple("المظهر", "✧", "cosmetics"),
+            Triple("المزيد", "☷", "more")
+        )
+        destinations.forEach { item ->
+            val selected = (item.third == "home" && currentSection == "home") ||
+                (item.third == "more" && currentSection in setOf("logs", "operators", "staffIdentity", "notifications")) ||
+                (item.third != "home" && item.third != "more" && currentSection == item.third)
+            val cell = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(dp(3), dp(4), dp(3), dp(3))
+                isClickable = true
+                isFocusable = true
+                background = android.util.TypedValue().let {
+                    android.util.TypedValue().apply { android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 0f, resources.displayMetrics) }
+                    android.graphics.drawable.RippleDrawable(
+                        android.content.res.ColorStateList.valueOf(0x226B4CC2),
+                        roundRect(if (selected) 0xFFF0ECFF.toInt() else Color.TRANSPARENT, 13),
+                        null
+                    )
+                }
+                setOnClickListener {
+                    when (item.third) {
+                        "home" -> showHome()
+                        "more" -> {
+                            val target = listOf("logs", "operators", "staffIdentity", "notifications", "supportChest")
+                                .firstOrNull { roleCanAccessModule(it) }
+                            if (target != null) openModule(target) else showHome()
+                        }
+                        else -> if (roleCanAccessModule(item.third)) openModule(item.third) else {
+                            val fallback = when (item.third) {
+                                "users" -> listOf("rooms", "streams", "reports")
+                                "walletTransactions" -> listOf("vip", "recharges", "withdrawals")
+                                else -> listOf("gifts", "grantCosmetics", "vip")
+                            }.firstOrNull { roleCanAccessModule(it) }
+                            if (fallback != null) openModule(fallback) else toast("لا توجد أقسام متاحة لهذه الرتبة هنا")
+                        }
+                    }
+                }
+            }
+            val icon = TextView(this).apply {
+                text = item.second
+                textSize = 20f
+                gravity = Gravity.CENTER
+                setTextColor(if (selected) ACCENT else MUTED)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            }
+            val label = TextView(this).apply {
+                text = item.first
+                textSize = 10f
+                gravity = Gravity.CENTER
+                setTextColor(if (selected) ACCENT else MUTED)
+                typeface = if (selected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                setPadding(0, dp(2), 0, 0)
+            }
+            cell.addView(icon)
+            cell.addView(label)
+            nav.addView(cell, LinearLayout.LayoutParams(0, -1, 1f))
+        }
+        return nav
     }
 
     /**
