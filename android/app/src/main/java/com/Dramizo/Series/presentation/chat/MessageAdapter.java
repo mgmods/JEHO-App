@@ -803,9 +803,42 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         card.addView(thumbnail, imageLp);
         String thumbUrl = media.storyMediaUrl != null && !media.storyMediaUrl.trim().isEmpty()
                 ? media.storyMediaUrl : media.thumbnailUrl;
+        boolean storyVideo = "video".equalsIgnoreCase(media.storyMediaType);
         if (thumbUrl != null && !thumbUrl.trim().isEmpty()) {
-            Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(thumbUrl))
-                    .centerCrop().placeholder(ImagePlaceholder.cover()).into(thumbnail);
+            if (storyVideo) {
+                // Decode an actual frame from the story video instead of trying to
+                // display an MP4 URL as a still image (which leaves a blank card).
+                Glide.with(holder.itemView).asBitmap()
+                        .load(AssetCatalog.absoluteUrl(thumbUrl))
+                        .frame(1_000_000L)
+                        .centerCrop()
+                        .placeholder(ImagePlaceholder.cover())
+                        .into(thumbnail);
+            } else {
+                Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(thumbUrl))
+                        .centerCrop().placeholder(ImagePlaceholder.cover()).into(thumbnail);
+            }
+        }
+        if (storyVideo) {
+            FrameLayout previewFrame = new FrameLayout(context);
+            // The video frame remains visible underneath a clear play affordance.
+            TextView play = new TextView(context);
+            play.setText("▶");
+            play.setTextColor(Color.WHITE);
+            play.setTextSize(18);
+            play.setGravity(android.view.Gravity.CENTER);
+            GradientDrawable playBg = new GradientDrawable();
+            playBg.setColor(0x99000000);
+            playBg.setShape(GradientDrawable.OVAL);
+            play.setBackground(playBg);
+            FrameLayout.LayoutParams playLp = new FrameLayout.LayoutParams(dp(holder, 34), dp(holder, 34),
+                    android.view.Gravity.CENTER);
+            previewFrame.addView(play, playLp);
+            // Keep the thumbnail and play icon as one tappable preview surface.
+            card.removeView(thumbnail);
+            previewFrame.addView(thumbnail, new FrameLayout.LayoutParams(-1, -1));
+            previewFrame.addView(play, playLp);
+            card.addView(previewFrame, 0, imageLp);
         }
 
         LinearLayout details = new LinearLayout(context);
