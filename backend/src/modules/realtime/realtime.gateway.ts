@@ -399,6 +399,25 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       ...profilePayload,
     });
 
+    // Room presence is an in-room announcement, not a phone notification.
+    if (profilePayload.agencyClub?.label) {
+      this.server.to(`room:${data.roomId}`).emit('room:event', {
+        roomId: data.roomId,
+        event: 'agency:club_member_entered',
+        payload: {
+          roomId: data.roomId,
+          userId: client.userId,
+          displayName: profilePayload.displayName || profilePayload.username || 'عضو',
+          agencyId: profilePayload.agencyClub.agencyId,
+          agencyName: profilePayload.agencyClub.agencyName,
+          agencyLogoUrl: profilePayload.agencyClub.agencyLogoUrl || null,
+          role: profilePayload.agencyClub.role,
+          clubBadgeLabel: profilePayload.agencyClub.label,
+        },
+        at: new Date().toISOString(),
+      });
+    }
+
     const membersPayload = await this.emitRoomMembers(data.roomId);
     this.server.to(`room:${data.roomId}`).emit('room:event', {
       roomId: data.roomId,
@@ -414,6 +433,47 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   private async buildJoinPayload(userId: string, roomId: string, hostId: string) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     const profile = await this.profilesRepo.findOne({ where: { userId } });
+    // Resolve approved agency identity independently from room staff permissions.
+    const clubRows = await this.profilesRepo.manager.query(
+      `SELECT a.id AS "agencyId", a.name AS "agencyName",
+              a."logoUrl" AS "agencyLogoUrl",
+              CASE
+                WHEN a."ownerId" = $1 THEN 'owner'
+                WHEN am.role = 'host' THEN 'host'
+                WHEN am.role = 'owner' THEN 'owner'
+                WHEN am.role = 'manager' THEN 'manager'
+                WHEN am.role = 'member' THEN 'member'
+                ELSE 'supporter'
+              END AS role
+         FROM agencies a
+         LEFT JOIN agency_members am
+           ON am."agencyId" = a.id AND am."userId" = $1
+          AND am.status = 'active' AND am."isActive" = true
+         LEFT JOIN agency_club_members cm
+           ON cm."agencyId" = a.id AND cm."userId" = $1 AND cm.status = 'active'
+        WHERE a.status = 'active'
+          AND (a."ownerId" = $1 OR am.id IS NOT NULL OR cm.id IS NOT NULL)
+        ORDER BY CASE
+          WHEN a."ownerId" = $1 OR am.role = 'owner' THEN 0
+          WHEN am.role = 'host' THEN 1
+          WHEN am.role = 'manager' THEN 2
+          WHEN am.role = 'member' THEN 3
+          ELSE 4
+        END
+        LIMIT 1`,
+      [userId],
+    );
+    const clubRow = clubRows?.[0];
+    const agencyClub = clubRow ? {
+      agencyId: clubRow.agencyId,
+      agencyName: clubRow.agencyName,
+      agencyLogoUrl: clubRow.agencyLogoUrl || null,
+      role: clubRow.role,
+      label: (clubRow.role === 'owner' ? 'صاحب' :
+        clubRow.role === 'host' ? 'مضيف' :
+        clubRow.role === 'manager' ? 'إدارة' :
+        clubRow.role === 'member' ? 'عضو' : 'داعم') + ' وكالة ' + clubRow.agencyName,
+    } : null;
     const activeCosmeticRows: Array<{
       type: string;
       previewUrl: string | null;
@@ -555,6 +615,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     return {
       userId,
+      agencyClub,
       username: mysteriousMode ? 'mysterious_man' : (user?.username || displayName),
       displayName,
       avatarUrl,
