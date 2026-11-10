@@ -268,7 +268,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        root.addView(buildBottomNavigation(), LinearLayout.LayoutParams(-1, dp(66)))
+        // One unified role-filtered dashboard; no extra navigation sections.
         setContentView(root)
     }
 
@@ -512,11 +512,10 @@ class AdminConsoleActivity : ThemedActivity() {
      */
     private fun showHome() {
         currentSection = "home"
-        titleView.text = "لوحة JEHO"
+        titleView.text = "لوحة الإدارة"
         backButton.visibility = View.GONE
         body.removeAllViews()
         body.layoutDirection = View.LAYOUT_DIRECTION_RTL
-
         val roleLabel = when (currentRole) {
             StaffRoleHelper.SUPER -> "السوبر أدمن"
             StaffRoleHelper.ADMIN -> "الأدمن"
@@ -525,312 +524,69 @@ class AdminConsoleActivity : ThemedActivity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
-            setPadding(dp(20), dp(20), dp(20), dp(20))
+            setPadding(dp(18), dp(18), dp(18), dp(18))
             background = GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFF20184B.toInt(), 0xFF49329A.toInt(), 0xFF7656D8.toInt()))
-                .apply { cornerRadius = dp(26).toFloat() }
+                intArrayOf(0xFF21194B.toInt(), 0xFF49329A.toInt(), 0xFF7656D8.toInt())).apply { cornerRadius = dp(22).toFloat() }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
             elevation = dp(3).toFloat()
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(18) }
         }
-        val brandRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val mark = TextView(this).apply {
-            text = "J"; textSize = 23f; gravity = Gravity.CENTER
-            setTextColor(Color.WHITE); setTypeface(typeface, Typeface.BOLD)
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(0xFFB7A6FF.toInt(), 0xFF8165E8.toInt()))
-                .apply { cornerRadius = dp(16).toFloat() }
-            layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { marginStart = dp(12) }
-        }
-        brandRow.addView(mark)
-        val brandText = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-        }
-        addText(brandText, "JEHO  /  CONTROL CENTER", 10f, true, 0xFFDCD4FF.toInt())
-        addText(brandText, "مساحة الإدارة", 19f, true, Color.WHITE)
-        brandRow.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
-        val rolePill = TextView(this).apply {
-            text = roleLabel; textSize = 11f; gravity = Gravity.CENTER
-            setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            setPadding(dp(11), dp(8), dp(11), dp(8))
-            background = GradientDrawable().apply {
-                setColor(0x28FFFFFF); cornerRadius = dp(30).toFloat()
-                setStroke(dp(1), 0x55FFFFFF)
-            }
-        }
-        brandRow.addView(rolePill)
-        hero.addView(brandRow)
-        addText(hero, "كل شيء تحت السيطرة", 23f, true, Color.WHITE)
-        val intro = TextView(this).apply {
-            text = "إدارة المجتمع والرومات والمحفظة والمميزات من داخل تطبيق JEHO."
-            textSize = 13f; setTextColor(0xFFEAE5FF.toInt())
-            setLineSpacing(dp(3).toFloat(), 1.05f); setPadding(0, dp(4), 0, dp(15))
-        }
-        hero.addView(intro)
-        val secure = TextView(this).apply {
-            text = "●  اتصال مباشر بالخادم     •     صلاحيات حسب الرتبة"
-            textSize = 11f; setTextColor(0xFFC8F7DE.toInt())
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = GradientDrawable().apply {
-                setColor(0x18FFFFFF); cornerRadius = dp(12).toFloat()
-            }
-        }
-        hero.addView(secure)
+        val brand = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
+        brand.addView(TextView(this).apply {
+            text = "J"; textSize = 22f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); setTypeface(typeface, Typeface.BOLD)
+            background = roundRect(0xFF8068D8.toInt(), 15)
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(11) }
+        })
+        val brandText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(brandText, "JEHO  •  CONTROL CENTER", 10f, true, 0xFFE0D9FF.toInt())
+        addText(brandText, "لوحة الإدارة الموحدة", 18f, true, Color.WHITE)
+        brand.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
+        brand.addView(TextView(this).apply {
+            text = roleLabel; textSize = 11f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = GradientDrawable().apply { setColor(0x28FFFFFF); cornerRadius = dp(30).toFloat(); setStroke(dp(1), 0x55FFFFFF) }
+        })
+        hero.addView(brand)
         body.addView(hero)
 
-        val heading = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        val keys = when (currentRole) {
+            StaffRoleHelper.SUPER -> listOf("users", "agencyApplications", "agencies", "notifications", "gifts", "grantCosmetics", "vanityIds", "vip")
+            StaffRoleHelper.ADMIN -> listOf("users", "agencyApplications", "agencies", "notifications", "gifts")
+            StaffRoleHelper.MANAGER -> listOf("rooms", "streams")
+            else -> emptyList()
         }
-        val headingText = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-        }
-        addText(headingText, "نظرة عامة", 18f, true, TEXT)
-        addText(headingText, "مؤشرات النظام المتاحة", 12f, false, MUTED)
-        heading.addView(headingText, LinearLayout.LayoutParams(0, -2, 1f))
-        val refresh = TextView(this).apply {
-            text = "↻ تحديث"; textSize = 12f; gravity = Gravity.CENTER
-            setTextColor(ACCENT); setPadding(dp(12), dp(9), dp(12), dp(9))
-            background = roundRect(0xFFEDE8FF.toInt(), 20)
-            setOnClickListener { showHome() }
-        }
-        heading.addView(refresh)
-        body.addView(heading, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-
-        val metrics = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-        }
-        body.addView(metrics, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
-        load(api.overview()) { data ->
-            metrics.removeAllViews()
-            val stats = mapOfEntries(data)
-            val specs = listOf(
-                Triple("المستخدمون", listOf("users", "usersCount", "totalUsers"), "♙"),
-                Triple("الرومات", listOf("rooms", "roomsCount", "totalRooms"), "⌂"),
-                Triple("البث المباشر", listOf("activeStreams", "streamsCount", "liveStreams"), "◉"),
-                Triple("الوكالات", listOf("agencies", "agenciesCount", "totalAgencies"), "◇")
-            )
-            val known = specs.mapNotNull { spec ->
-                val key = spec.second.firstOrNull { stats.containsKey(it) }
-                if (key == null) null else Triple(spec.first, stats[key]?.toString() ?: "—", spec.third)
-            }
-            val shown = if (known.isNotEmpty()) known else stats.entries.take(4).map {
-                Triple(prettyKey(it.key), it.value?.toString() ?: "—", "✦")
-            }
-            if (shown.isEmpty()) {
-                val empty = card()
-                addText(empty, "الإحصائيات غير متاحة حاليًا", 13f, true, MUTED)
-                addText(empty, "يمكنك متابعة أقسام الإدارة أو المحاولة لاحقًا.", 12f, false, MUTED)
-                metrics.addView(empty)
-            } else shown.chunked(2).forEach { pair ->
-                val row = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
+        val visible = keys.filter { roleCanAccessModule(it) }.mapNotNull { key -> modules.firstOrNull { it.key == key } }
+        visible.chunked(2).forEach { pair ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
+            pair.forEach { module ->
+                val tile = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(14), dp(14), dp(14), dp(14))
+                    background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(18).toFloat(); setStroke(dp(1), 0xFFE7E4F1.toInt()) }
+                    elevation = dp(2).toFloat(); isClickable = true; isFocusable = true
+                    layoutParams = LinearLayout.LayoutParams(0, dp(116), 1f).apply { marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(9) }
+                    setOnClickListener { openModule(module.key) }
                 }
-                pair.forEach { item ->
-                    val cell = LinearLayout(this).apply {
-                        orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-                        setPadding(dp(14), dp(13), dp(14), dp(13))
-                        background = GradientDrawable().apply {
-                            setColor(Color.WHITE); cornerRadius = dp(19).toFloat()
-                            setStroke(dp(1), 0xFFE9E6F4.toInt())
-                        }
-                        elevation = dp(1).toFloat()
-                        layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
-                            marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(8)
-                        }
-                    }
-                    val icon = TextView(this).apply {
-                        text = item.third; textSize = 21f; gravity = Gravity.CENTER
-                        setTextColor(ACCENT); background = roundRect(0xFFF0ECFF.toInt(), 13)
-                        layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply { bottomMargin = dp(9) }
-                    }
-                    cell.addView(icon)
-                    addText(cell, item.first, 12f, true, MUTED)
-                    addText(cell, item.second, 25f, true, TEXT)
-                    row.addView(cell)
-                }
-                if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-                metrics.addView(row)
-            }
-        }
-
-        val visibleModules = modules.filter { roleCanAccessModule(it.key) }
-
-        val search = EditText(this).apply {
-            hint = "⌕   ابحث عن مستخدمين، رومات، هدايا..."
-            textSize = 14f; setSingleLine(true)
-            layoutDirection = View.LAYOUT_DIRECTION_RTL; textDirection = View.TEXT_DIRECTION_RTL
-            gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
-            setTextColor(TEXT); setHintTextColor(MUTED)
-            background = GradientDrawable().apply {
-                setColor(Color.WHITE); cornerRadius = dp(17).toFloat()
-                setStroke(dp(1), 0xFFE3E0F0.toInt())
-            }
-            setPadding(dp(16), dp(12), dp(16), dp(12)); elevation = dp(1).toFloat()
-        }
-        body.addView(search, LinearLayout.LayoutParams(-1, dp(54)).apply {
-            topMargin = dp(2); bottomMargin = dp(8)
-        })
-        val noSearchResults = TextView(this).apply {
-            text = "لا توجد أقسام تطابق بحثك"
-            textSize = 12f
-            setTextColor(MUTED)
-            gravity = Gravity.CENTER
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            background = roundRect(Color.WHITE, 14)
-            visibility = View.GONE
-        }
-        body.addView(noSearchResults, LinearLayout.LayoutParams(-1, -2).apply {
-            bottomMargin = dp(8)
-        })
-
-        val groups = listOf(
-            "إدارة المجتمع" to listOf("users", "genderVerifications", "rooms", "streams", "reports"),
-            "الوكالات والشحن" to listOf("agencies", "agencyApplications", "rechargeApplications", "rechargeAgents", "recharges", "withdrawals"),
-            "المالية والمحفظة" to listOf("walletTransactions", "walletAdjust"),
-            "المتجر والهدايا" to listOf("cosmetics", "gifts"),
-            "الرسائل وتجربة المستخدم" to listOf("notifications", "toastManager", "mysteriousMan", "luckyCannon", "supportChest", "roomPkSettings"),
-            "العضويات والمظهر" to listOf("vanityIds", "grantCosmetics", "vip", "staffIdentity"),
-            "الإدارة والأمان" to listOf("logs", "operators")
-        )
-        val tileRecords = mutableListOf<Pair<View, Module>>()
-        val groupRecords = mutableListOf<Pair<View, List<Module>>>()
-        groups.forEach { group ->
-            val groupModules = visibleModules.filter { it.key in group.second }
-            if (groupModules.isEmpty()) return@forEach
-            val block = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) }
-            }
-            val groupHeading = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-                layoutDirection = View.LAYOUT_DIRECTION_RTL; setPadding(dp(2), dp(10), dp(2), dp(10))
-            }
-            groupHeading.addView(View(this).apply {
-                background = roundRect(ACCENT, 4)
-                layoutParams = LinearLayout.LayoutParams(dp(4), dp(23)).apply { marginStart = dp(9) }
-            })
-            addText(groupHeading, group.first, 15f, true, TEXT)
-            groupHeading.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-            groupHeading.addView(TextView(this).apply {
-                text = groupModules.size.toString() + " أقسام"; textSize = 10f
-                setTextColor(MUTED); gravity = Gravity.CENTER
-                setPadding(dp(8), dp(5), dp(8), dp(5)); background = roundRect(0xFFEDEBF5.toInt(), 20)
-            })
-            block.addView(groupHeading)
-            val grid = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-            }
-            groupModules.chunked(2).forEach { pair ->
-                val row = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-                }
-                pair.forEach { module ->
-                    val tile = LinearLayout(this).apply {
-                        orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-                        gravity = Gravity.TOP; minimumHeight = dp(132)
-                        setPadding(dp(13), dp(13), dp(13), dp(13))
-                        background = GradientDrawable().apply {
-                            setColor(Color.WHITE); cornerRadius = dp(19).toFloat()
-                            setStroke(dp(1), 0xFFE7E4F1.toInt())
-                        }
-                        elevation = dp(1).toFloat(); isClickable = true; isFocusable = true
-                        foreground = android.util.TypedValue().let {
-                            val out = android.util.TypedValue()
-                            theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
-                            if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
-                        }
-                        layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
-                            marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(8)
-                        }
-                        setOnClickListener { openModule(module.key) }
-                    }
-                    val tileTop = LinearLayout(this).apply {
-                        orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-                        gravity = Gravity.CENTER_VERTICAL
-                    }
-                    tileTop.addView(TextView(this).apply {
-                        text = module.icon; textSize = 22f; gravity = Gravity.CENTER
-                        setTextColor(ACCENT); background = roundRect(0xFFF0ECFF.toInt(), 13)
-                        layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)).apply { bottomMargin = dp(11) }
-                    })
-                    tileTop.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-                    tileTop.addView(TextView(this).apply {
-                        text = "↗"; textSize = 17f; setTextColor(0xFF9992B8.toInt()); gravity = Gravity.CENTER
-                    })
-                    tile.addView(tileTop)
-                    addText(tile, module.title, 13f, true, TEXT)
-                    tile.addView(TextView(this).apply {
-                        text = module.subtitle; textSize = 10.5f; setTextColor(MUTED)
-                        maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
-                        setLineSpacing(dp(2).toFloat(), 1.0f); setPadding(0, dp(4), 0, 0)
-                    })
-                    val openAction = TextView(this).apply {
-                        text = "فتح القسم   ←"
-                        textSize = 11f
-                        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                        setTextColor(ACCENT)
-                        gravity = Gravity.CENTER_VERTICAL or Gravity.RIGHT
-                        setPadding(0, dp(11), 0, 0)
-                        isClickable = true
-                        isFocusable = true
-                        setOnClickListener { openModule(module.key) }
-                    }
-                    tile.addView(openAction)
-                    row.addView(tile)
-                    tileRecords.add(tile to module)
-                }
-                if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f).apply {
-                    marginStart = dp(4); marginEnd = dp(4)
+                val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
+                top.addView(TextView(this).apply {
+                    text = module.icon; textSize = 23f; gravity = Gravity.CENTER; setTextColor(ACCENT); background = roundRect(0xFFF0ECFF.toInt(), 13)
+                    layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
                 })
-                grid.addView(row)
+                top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+                top.addView(TextView(this).apply { text = "↗"; textSize = 18f; setTextColor(MUTED) })
+                tile.addView(top)
+                addText(tile, module.title, 13f, true, TEXT)
+                row.addView(tile)
             }
-            block.addView(grid); body.addView(block); groupRecords.add(block to groupModules)
+            if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+            body.addView(row)
         }
-
-        search.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val q = s?.toString()?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty()
-                tileRecords.forEach { pair ->
-                    val m = pair.second
-                    val match = q.isEmpty() || m.title.lowercase(java.util.Locale.ROOT).contains(q) ||
-                        m.subtitle.lowercase(java.util.Locale.ROOT).contains(q) ||
-                        m.key.lowercase(java.util.Locale.ROOT).contains(q)
-                    pair.first.visibility = if (match) View.VISIBLE else View.GONE
-                }
-                var anyVisible = false
-                groupRecords.forEach { pair ->
-                    val groupVisible = q.isEmpty() || pair.second.any { m ->
-                        m.title.lowercase(java.util.Locale.ROOT).contains(q) ||
-                            m.subtitle.lowercase(java.util.Locale.ROOT).contains(q) ||
-                            m.key.lowercase(java.util.Locale.ROOT).contains(q)
-                    }
-                    pair.first.visibility = if (groupVisible) View.VISIBLE else View.GONE
-                    if (groupVisible) anyVisible = true
-                }
-                noSearchResults.visibility = if (q.isNotEmpty() && !anyVisible) View.VISIBLE else View.GONE
-            }
-            override fun afterTextChanged(s: android.text.Editable?) {}
-        })
     }
 
     private fun roleCanAccessModule(key: String): Boolean {
-        // Client-side visibility is intentionally narrower than the backend's
-        // AdminGuard. The server remains authoritative for every request.
+        // The backend AdminGuard remains authoritative; only assigned actions are rendered here.
         return when (currentRole) {
-            StaffRoleHelper.SUPER -> true
-            // Admin: user/room and agency operations, plus system messaging
-            // and gift catalog visibility. Financial, VIP, cosmetics and
-            // platform-configuration tools remain Super Admin only.
-            StaffRoleHelper.ADMIN -> key in setOf(
-                "users", "rooms", "agencies", "agencyApplications",
-                "notifications", "gifts"
-            )
-            // Manager: operational room and live-stream supervision only.
+            StaffRoleHelper.SUPER -> key in setOf("users", "agencyApplications", "agencies", "notifications", "gifts", "grantCosmetics", "vanityIds", "vip")
+            StaffRoleHelper.ADMIN -> key in setOf("users", "agencyApplications", "agencies", "notifications", "gifts")
             StaffRoleHelper.MANAGER -> key in setOf("rooms", "streams")
             else -> false
         }
@@ -838,11 +594,7 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun openModule(key: String) {
         if (!roleCanAccessModule(key)) {
-            toast(when (currentRole) {
-                StaffRoleHelper.MANAGER -> "صلاحية المانجر تقتصر على إشراف الرومات والبث والبلاغات وإهداء الإطارات والدخوليات"
-                StaffRoleHelper.ADMIN -> "هذا القسم غير متاح لرتبة الأدمن"
-                else -> "هذا القسم مخصص لفريق الإدارة"
-            })
+            showHome()
             return
         }
         currentSection = key
@@ -855,7 +607,7 @@ class AdminConsoleActivity : ThemedActivity() {
             "users" -> {
                 val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
                 val search = EditText(this).apply {
-                    hint = "ID المستخدم أو UUID أو الاسم أو البريد"
+                    hint = "أدخل ID المستخدم للبحث"
                     textSize = 15f
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
                     textDirection = View.TEXT_DIRECTION_RTL
@@ -876,12 +628,12 @@ class AdminConsoleActivity : ThemedActivity() {
                 searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
                 searchRow.addView(button("بحث") {
                     val query = search.text.toString().trim()
-                    if (query.isBlank()) toast("أدخل ID المستخدم أو الاسم للبحث")
+                    if (query.isBlank()) toast("أدخل ID المستخدم للبحث")
                     else loadUsers(query)
                 })
                 body.addView(searchRow)
                 module?.let { addSectionIntro(it) }
-                loadUsers("")
+                // No generic users directory: search results appear only after entering an ID.
             }
             "rooms" -> load(api.rooms(1, 40)) { renderItems(it, "rooms") }
             "streams" -> load(api.streams(1, 40)) { renderItems(it, "streams") }
@@ -1441,7 +1193,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun loadUsers(search: String) {
         // Preserve the search controls and section introduction while replacing results.
         // Search row + section intro + role/access card stay in place while results refresh.
-        val fixedViews = if (body.childCount >= 3) 3 else body.childCount
+        val fixedViews = if (body.childCount >= 1) 1 else body.childCount
         if (body.childCount > fixedViews) body.removeViews(fixedViews, body.childCount - fixedViews)
         load(api.users(1, 40, search)) { renderItems(it, "users") }
     }
