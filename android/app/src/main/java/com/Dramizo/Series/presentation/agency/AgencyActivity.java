@@ -158,11 +158,14 @@ public class AgencyActivity extends ThemedActivity {
         }
         // Splash advertisements may target a specific agency ID. Reuse the existing
         // agency search instead of inventing a parallel agency-detail screen.
-        String clubAgencyId = getIntent().getStringExtra("open_agency_club_details_id");
-        if (clubAgencyId != null && !clubAgencyId.trim().isEmpty()) {
-            final String targetClubId = clubAgencyId.trim();
+        String agencyProfileId = getIntent().getStringExtra("open_agency_profile_id");
+        if (agencyProfileId == null || agencyProfileId.trim().isEmpty()) {
+            agencyProfileId = getIntent().getStringExtra("open_agency_club_details_id");
+        }
+        if (agencyProfileId != null && !agencyProfileId.trim().isEmpty()) {
+            final String targetAgencyId = agencyProfileId.trim();
             binding.getRoot().post(() -> {
-                if (!isFinishing()) AgencyFamilyInfoSheet.show(this, targetClubId);
+                if (!isFinishing()) AgencyFamilyInfoSheet.show(this, targetAgencyId);
             });
         }
         String splashAgencyId = getIntent().getStringExtra("splash_target_agency_id");
@@ -1492,19 +1495,6 @@ public class AgencyActivity extends ThemedActivity {
         description.setGravity(Gravity.CENTER);
         description.setPadding(dp(4), 0, dp(4), dp(16));
         root.addView(description);
-
-        com.google.android.material.button.MaterialButton club =
-                new com.google.android.material.button.MaterialButton(this);
-        club.setText("🏅  نادي الوكالة · المجتمع والأعضاء");
-        club.setAllCaps(false);
-        club.setCornerRadius(dp(22));
-        club.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                android.graphics.Color.rgb(34, 145, 116)));
-        club.setTextColor(android.graphics.Color.WHITE);
-        LinearLayout.LayoutParams clubParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(50));
-        clubParams.bottomMargin = dp(10);
-        root.addView(club, clubParams);
 
         com.google.android.material.button.MaterialButton follow =
                 new com.google.android.material.button.MaterialButton(this);
