@@ -2,6 +2,7 @@ package com.Dramizo.Series.presentation.chat;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.ColorDrawable;
@@ -63,6 +64,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private static final int TYPE_PEER = 0;
     private static final int TYPE_MINE = 1;
+    private static final String STORY_PREVIEW_TAG = "jeho_story_preview";
 
     public interface Listener {
         void onLongClick(ChatDtos.MessageDto msg);
@@ -765,6 +767,106 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         holder.b.tvReplyBody.setText(previewOf(reply != null ? reply : msg));
     }
 
+    private boolean isStoryPreviewMessage(@Nullable ChatDtos.MessageDto msg) {
+        return msg != null && msg.media != null
+                && "application/x-jeho-story".equalsIgnoreCase(msg.media.mimeType)
+                && msg.media.storyId != null && !msg.media.storyId.trim().isEmpty();
+    }
+
+    private void clearStoryPreview(@NonNull VH holder) {
+        LinearLayout bubble = holder.b.bubbleRoot;
+        for (int i = bubble.getChildCount() - 1; i >= 0; i--) {
+            View child = bubble.getChildAt(i);
+            if (STORY_PREVIEW_TAG.equals(child.getTag())) bubble.removeViewAt(i);
+        }
+    }
+
+    private void bindStoryPreview(@NonNull VH holder, @NonNull ChatDtos.MessageDto msg) {
+        ChatDtos.MediaDto media = msg.media;
+        Context context = holder.itemView.getContext();
+        LinearLayout card = new LinearLayout(context);
+        card.setTag(STORY_PREVIEW_TAG);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(holder, 8), dp(holder, 8), dp(holder, 8), dp(holder, 8));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xFFF7EAF1);
+        background.setCornerRadius(dp(holder, 14));
+        background.setStroke(dp(holder, 1), 0x33B82768);
+        card.setBackground(background);
+
+        ImageView thumbnail = new ImageView(context);
+        thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        thumbnail.setBackgroundColor(0xFFE8DCE4);
+        LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(dp(holder, 76), dp(holder, 82));
+        imageLp.setMarginEnd(dp(holder, 10));
+        card.addView(thumbnail, imageLp);
+        String thumbUrl = media.storyMediaUrl != null && !media.storyMediaUrl.trim().isEmpty()
+                ? media.storyMediaUrl : media.thumbnailUrl;
+        if (thumbUrl != null && !thumbUrl.trim().isEmpty()) {
+            Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(thumbUrl))
+                    .centerCrop().placeholder(ImagePlaceholder.cover()).into(thumbnail);
+        }
+
+        LinearLayout details = new LinearLayout(context);
+        details.setOrientation(LinearLayout.VERTICAL);
+        details.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        TextView label = new TextView(context);
+        label.setText("رد على الستوري");
+        label.setTextColor(0xFFB82768);
+        label.setTextSize(11);
+        label.setTypeface(null, android.graphics.Typeface.BOLD);
+        details.addView(label, new LinearLayout.LayoutParams(-1, dp(holder, 22)));
+
+        String owner = media.storyOwnerName == null || media.storyOwnerName.trim().isEmpty()
+                ? "قصة من JEHO" : media.storyOwnerName;
+        TextView title = new TextView(context);
+        title.setText(owner);
+        title.setTextColor(0xFF29232B);
+        title.setTextSize(13);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setMaxLines(1);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        details.addView(title, new LinearLayout.LayoutParams(-1, dp(holder, 22)));
+
+        String caption = media.storyCaption == null || media.storyCaption.trim().isEmpty()
+                ? ("video".equalsIgnoreCase(media.storyMediaType) ? "فيديو الستوري" : "صورة الستوري")
+                : media.storyCaption.trim();
+        TextView subtitle = new TextView(context);
+        subtitle.setText(caption);
+        subtitle.setTextColor(0xFF756A75);
+        subtitle.setTextSize(11);
+        subtitle.setMaxLines(2);
+        subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        details.addView(subtitle, new LinearLayout.LayoutParams(-1, -2));
+        card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+
+        TextView arrow = new TextView(context);
+        arrow.setText("‹");
+        arrow.setTextSize(25);
+        arrow.setTextColor(0xFFB82768);
+        arrow.setGravity(android.view.Gravity.CENTER);
+        card.addView(arrow, new LinearLayout.LayoutParams(dp(holder, 22), dp(holder, 44)));
+
+        card.setOnClickListener(v -> {
+            Intent open = new Intent(context, com.Dramizo.Series.presentation.stories.StoryPreviewActivity.class);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_STORY_ID, media.storyId);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_MEDIA_TYPE, media.storyMediaType);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_MEDIA_URL,
+                    media.storyMediaUrl != null ? media.storyMediaUrl : media.url);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_CAPTION, media.storyCaption);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_OWNER, media.storyOwnerName);
+            context.startActivity(open);
+        });
+
+        LinearLayout bubble = holder.b.bubbleRoot;
+        int insertAt = Math.min(2, bubble.getChildCount());
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                dp(holder, 236), -2);
+        cardLp.setMargins(0, dp(holder, 4), 0, dp(holder, 6));
+        bubble.addView(card, insertAt, cardLp);
+    }
+
     private void bindBody(@NonNull VH holder, ChatDtos.MessageDto msg) {
         String type = msg.type != null ? msg.type.toLowerCase(Locale.US) : "text";
         String mediaUrl = msg.media != null ? msg.media.url : null;
@@ -799,12 +901,23 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.roomShareRow.setVisibility(View.GONE);
             holder.b.roomShareRow.setOnClickListener(null);
         }
+        clearStoryPreview(holder);
         holder.b.tvContent.setVisibility(View.GONE);
         hideTranslateViews(holder);
 
         RoomShareCodec.Parsed share = RoomShareCodec.parse(msg.content);
         if (share != null && holder.b.roomShareRow != null) {
             bindLiveRoomShare(holder, msg, share);
+            return;
+        }
+
+        if (isStoryPreviewMessage(msg)) {
+            bindStoryPreview(holder, msg);
+            if (msg.content != null && !msg.content.trim().isEmpty()) {
+                holder.b.tvContent.setVisibility(View.VISIBLE);
+                holder.b.tvContent.setText(msg.content);
+                bindTranslate(holder, msg);
+            }
             return;
         }
 
