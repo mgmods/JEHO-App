@@ -592,10 +592,10 @@ export class VanityIdsController {
     // Admin grants may use only an available ID, or renew the same user's existing grant.
     if (
       target.status === VanityIdStatus.OWNED &&
-      target.ownerUserId &&
       target.ownerUserId !== userId
     ) {
-      throw new BadRequestException('هذا الآي دي مملوك لشخص آخر ولا يمكن إهداؤه أو نقله إليه');
+      // An OWNED row is never a gift candidate, even if legacy data has a missing owner.
+      throw new BadRequestException('هذا الآي دي مملوك بالفعل ولا يمكن إهداؤه أو نقله إلى شخص آخر');
     }
     if (
       target.status === VanityIdStatus.RESERVED &&
