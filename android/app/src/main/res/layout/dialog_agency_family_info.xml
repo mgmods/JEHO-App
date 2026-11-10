@@ -292,103 +292,64 @@
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/cardAgencyClub"
+        android:id="@+id/agencyProfileTabs"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/rowOwner"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/btnAgencyMembersTab"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="الأعضاء"
+            android:textColor="#FFFFFFFF"
+            android:textStyle="bold"
+            android:background="@drawable/bg_user_card_stat_cell"/>
+
+        <TextView
+            android:id="@+id/btnAgencyFollowersTab"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:gravity="center"
+            android:text="المتابعون"
+            android:textColor="#BFFFFFFF"
+            android:background="@drawable/bg_user_card_stat_cell"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvAgencyClubSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="18dp"
+        android:layout_marginTop="8dp"
+        android:text="الأعضاء"
+        android:textColor="#99FFFFFF"
+        android:textSize="12sp"
+        app:layout_constraintTop_toBottomOf="@id/agencyProfileTabs"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <LinearLayout
+        android:id="@+id/agencyPeopleList"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="14dp"
-        android:layout_marginTop="18dp"
-        android:background="@drawable/bg_agency_club_card"
+        android:layout_marginTop="8dp"
         android:orientation="vertical"
-        android:padding="14dp"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvAgencyClubSummary"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowOwner">
+        app:layout_constraintEnd_toEndOf="parent"/>
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="نادي الوكالة"
-                android:textColor="#FFFFFFFF"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvAgencyClubSummary"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_top_lv_guild"
-                android:gravity="center"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="5dp"
-                android:textColor="#FFFFD978"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                tools:text="24 عضوًا" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:text="مجتمع الوكالة • المضيفون والأعضاء والداعمون"
-            android:textColor="#BFFFFFFF"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/btnAgencyClubRequests"
-            android:layout_width="match_parent"
-            android:layout_height="42dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/bg_user_card_stat_cell"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="مراجعة طلبات الانضمام"
-            android:textColor="#FFFFD978"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/tvAgencyClubMembers"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/bg_user_card_stat_cell"
-            android:clickable="true"
-            android:ellipsize="end"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:maxLines="3"
-            android:minHeight="58dp"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="9dp"
-            android:text="استعراض أعضاء النادي"
-            android:textColor="#EFFFFFFF"
-            android:textSize="12sp"
-            tools:text="المضيفون • الأعضاء • الداعمون — اضغط لعرض القائمة" />
-
-        <TextView
-            android:id="@+id/btnAgencyClubJoin"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/bg_agency_club_cta"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="طلب الانضمام إلى النادي"
-            android:textColor="#FFFFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
+    
 
         <TextView
             android:id="@+id/btnFollowAgency"
@@ -404,7 +365,7 @@
             android:textStyle="bold"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/cardAgencyClub" />
+            app:layout_constraintTop_toBottomOf="@id/agencyPeopleList" />
 
     <TextView
         android:id="@+id/btnOpenAgencyManage"
