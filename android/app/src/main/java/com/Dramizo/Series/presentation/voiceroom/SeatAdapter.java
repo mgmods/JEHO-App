@@ -621,6 +621,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
         if (seat.locked()) {
             if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
+            bindAgencyRoleSeatBadge(holder, null);
             bindEmptySeatShell(holder, true);
             holder.b.seatRing.setVisibility(View.GONE);
             holder.b.tvName.setText(String.valueOf(displaySeatNo(seat)));
@@ -720,6 +721,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgSeatHostMark.setVisibility(isCreator ? View.VISIBLE : View.GONE);
             }
             bindStaffSeatBadge(holder, seat.user);
+            bindAgencyRoleSeatBadge(holder, seat.user);
             bindCustomDisplayRank(holder, seat.user);
             bindRoomSupportMedal(holder, seat.user);
             if (holder.b.tvStatus != null) {
@@ -736,6 +738,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
 
         if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
+        bindAgencyRoleSeatBadge(holder, null);
         bindEmptySeatShell(holder, false);
         holder.b.seatRing.setVisibility(View.GONE);
         holder.b.imgAvatar.setVisibility(View.GONE);
@@ -1203,6 +1206,28 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.imgCustomRankBadge.setVisibility(View.GONE);
             Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
         }
+    }
+
+    private void bindAgencyRoleSeatBadge(VH holder,
+            @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (holder.b.tvAgencyRoleBadge == null) return;
+        String label = null;
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency =
+                user != null ? user.agency : null;
+        if (agency != null) {
+            String role = agency.role == null ? "" : agency.role.trim().toLowerCase(Locale.ROOT);
+            String agencyId = agency.id == null ? "" : agency.id.trim();
+            String agencyName = agency.name == null ? "" : agency.name.trim();
+            if ("owner".equals(role)) {
+                label = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
+            } else if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
+                    && !agencyId.isEmpty() && roomAgencyId.equals(agencyId)) {
+                if ("host".equals(role)) label = "مضيفة";
+                else if ("moderator".equals(role)) label = "مشرفة";
+            }
+        }
+        holder.b.tvAgencyRoleBadge.setText(label == null ? "" : label);
+        holder.b.tvAgencyRoleBadge.setVisibility(label == null ? View.GONE : View.VISIBLE);
     }
 
     private void bindStaffSeatBadge(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
