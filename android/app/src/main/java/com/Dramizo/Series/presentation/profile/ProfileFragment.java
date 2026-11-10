@@ -355,7 +355,7 @@ public class ProfileFragment extends Fragment {
                 android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
                 new int[]{0xFFFFB347, 0xFFE6428A, 0xFF8D5CF6});
         ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        ring.setBackground(ring);
+        myStoryRing.setBackground(ring);
         myStoryRing.setVisibility(View.GONE);
         avatarParent.addView(myStoryRing, 0, ringLp);
 
