@@ -11,6 +11,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -21,6 +22,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.core.view.WindowCompat;
 import com.Dramizo.Series.data.remote.api.UploadApi;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.data.remote.dto.StoriesDtos;
@@ -53,6 +55,7 @@ public class StoriesFragment extends Fragment {
     private static final String ARG_COMPACT = "compact_inbox";
     private boolean compactMode;
     private String pendingOpenUserId;
+    private String ownerStoryUserId;
 
     public static StoriesFragment newCompactInstance() {
         StoriesFragment fragment = new StoriesFragment();
@@ -123,6 +126,7 @@ public class StoriesFragment extends Fragment {
     }
 
     public void openOwnStory(String userId) {
+        ownerStoryUserId = userId;
         pendingOpenUserId = userId;
         load();
     }
@@ -304,7 +308,7 @@ public class StoriesFragment extends Fragment {
     private void openViewer(List<StoriesDtos.StoryDto> group, int index) {
         if (group == null || index >= group.size()) return;
         StoriesDtos.StoryDto story = group.get(index);
-        Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        Dialog dialog = new Dialog(requireContext());
         FrameLayout frame = new FrameLayout(requireContext());
         frame.setBackgroundColor(0xFF08070A);
         View media;
@@ -338,7 +342,7 @@ public class StoriesFragment extends Fragment {
         TextView close = text("×", 34, 0xFFFFFFFF, true); close.setGravity(Gravity.CENTER);
         FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(dp(54),dp(60),Gravity.TOP|Gravity.END);
         frame.addView(close,cp); close.setOnClickListener(v -> dialog.dismiss());
-        if (story.isMine) {
+        if (isOwnerStory(story)) {
             LinearLayout ownerTools = new LinearLayout(requireContext());
             ownerTools.setGravity(Gravity.CENTER);
             ownerTools.setPadding(dp(12), dp(8), dp(12), dp(8));
@@ -385,8 +389,25 @@ public class StoriesFragment extends Fragment {
         }
         frame.setOnClickListener(v -> { if (index + 1 < group.size()) { dialog.dismiss(); openViewer(group,index+1); } });
         dialog.setContentView(frame);
-        Window w = dialog.getWindow(); if(w!=null)w.setLayout(-1,-1);
-        dialog.show(); if(w!=null)w.setLayout(-1,-1);
+        Window w = dialog.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xFF08070A));
+            w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            w.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            w.setStatusBarColor(0xFF08070A);
+            w.setNavigationBarColor(0xFF08070A);
+            WindowCompat.setDecorFitsSystemWindows(w, true);
+            w.getDecorView().setSystemUiVisibility(0);
+        }
+        dialog.show();
+        if (w != null) {
+            w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            w.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            w.setStatusBarColor(0xFF08070A);
+            w.setNavigationBarColor(0xFF08070A);
+            WindowCompat.setDecorFitsSystemWindows(w, true);
+            w.getDecorView().setSystemUiVisibility(0);
+        }
         if (storyVideo != null) {
             final VideoView target = storyVideo;
             android.widget.MediaController controls = new android.widget.MediaController(requireContext());
@@ -416,8 +437,13 @@ public class StoriesFragment extends Fragment {
         c.getIoExecutor().execute(() -> ApiCall.execute(c.getStoriesApi().view(story.id)));
     }
 
+    private boolean isOwnerStory(StoriesDtos.StoryDto story) {
+        return story != null && (story.isMine
+                || (ownerStoryUserId != null && ownerStoryUserId.equals(story.userId)));
+    }
+
     private void showStoryViewers(StoriesDtos.StoryDto story) {
-        if (story == null || story.id == null || !story.isMine) return;
+        if (story == null || story.id == null || !isOwnerStory(story)) return;
         c.getIoExecutor().execute(() -> {
             com.Dramizo.Series.domain.model.Result<StoriesDtos.ViewersResult> result =
                     ApiCall.execute(c.getStoriesApi().viewers(story.id));
@@ -522,7 +548,7 @@ public class StoriesFragment extends Fragment {
     }
 
     private void confirmDeleteStory(StoriesDtos.StoryDto story, Dialog viewer) {
-        if (story == null || story.id == null || !story.isMine) return;
+        if (story == null || story.id == null || !isOwnerStory(story)) return;
         new android.app.AlertDialog.Builder(requireContext())
                 .setTitle("حذف الستوري؟")
                 .setMessage("سيتم حذف الستوري نهائياً وإزالتها من قائمة جميع المستخدمين.")
@@ -556,7 +582,17 @@ public class StoriesFragment extends Fragment {
             com.Dramizo.Series.domain.model.Result<ChatDtos.ConversationDto> conversation = ApiCall.execute(c.getChatApi().create(Collections.singletonMap("peerId",story.userId)));
             boolean sent=false;
             if (conversation.success && conversation.data != null && conversation.data.id != null) {
-                ChatDtos.SendMessageRequest request = new ChatDtos.SendMessageRequest("رد على الستوري: " + message,"text",null);
+                ChatDtos.MediaDto storyPreview = new ChatDtos.MediaDto();
+                storyPreview.url = story.mediaUrl;
+                storyPreview.thumbnailUrl = story.mediaUrl;
+                storyPreview.mimeType = "application/x-jeho-story";
+                storyPreview.size = 0L;
+                storyPreview.storyId = story.id;
+                storyPreview.storyMediaType = story.mediaType;
+                storyPreview.storyMediaUrl = story.mediaUrl;
+                storyPreview.storyCaption = story.caption;
+                storyPreview.storyOwnerName = story.displayName != null ? story.displayName : story.username;
+                ChatDtos.SendMessageRequest request = new ChatDtos.SendMessageRequest(message,"text",null,storyPreview);
                 sent=ApiCall.execute(c.getChatApi().send(conversation.data.id,request)).success;
             }
             final boolean ok=sent; if(!isAdded())return;
