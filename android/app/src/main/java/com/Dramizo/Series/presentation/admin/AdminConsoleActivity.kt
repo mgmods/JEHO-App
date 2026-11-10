@@ -408,7 +408,7 @@ class AdminConsoleActivity : ThemedActivity() {
             setHintTextColor(MUTED)
             background = GradientDrawable().apply {
                 setColor(Color.WHITE)
-                cornerRadius = dp(15).toFloat()
+                cornerRadius = dp(11).toFloat()
                 setStroke(dp(1), 0xFFE5E1F0.toInt())
             }
             setPadding(dp(14), dp(11), dp(14), dp(11))
@@ -470,7 +470,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 tile.addView(top)
                 val moreTitle = TextView(this).apply {
                     text = module.title
-                    textSize = 14f
+                    textSize = 13f
                     setTextColor(TEXT)
                     setTypeface(typeface, Typeface.BOLD)
                     gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
@@ -580,7 +580,7 @@ class AdminConsoleActivity : ThemedActivity() {
             pair.forEach { module ->
                 val tile = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(14), dp(14), dp(14), dp(14))
+                    setPadding(dp(10), dp(9), dp(10), dp(9))
                     background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(20).toFloat(); setStroke(dp(1), 0xFFE7E4F1.toInt()) }
                     elevation = dp(2).toFloat(); isClickable = true; isFocusable = true
                     foreground = android.graphics.drawable.RippleDrawable(
@@ -588,13 +588,13 @@ class AdminConsoleActivity : ThemedActivity() {
                         roundRect(0xFFF0ECFF.toInt(), 20),
                         null
                     )
-                    layoutParams = LinearLayout.LayoutParams(0, dp(154), 1f).apply { marginStart = dp(5); marginEnd = dp(5); bottomMargin = dp(11) }
+                    layoutParams = LinearLayout.LayoutParams(0, dp(128), 1f).apply { marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(8) }
                     setOnClickListener { openModule(module.key) }
                 }
                 val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
                 top.addView(TextView(this).apply {
-                    text = module.icon; textSize = 23f; gravity = Gravity.CENTER; setTextColor(ACCENT); background = roundRect(0xFFF0ECFF.toInt(), 13)
-                    layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
+                    text = module.icon; textSize = 19f; gravity = Gravity.CENTER; setTextColor(ACCENT); background = roundRect(0xFFF0ECFF.toInt(), 13)
+                    layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
                 })
                 top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
                 top.addView(TextView(this).apply { text = "↗"; textSize = 18f; setTextColor(MUTED) })
@@ -617,7 +617,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 tile.addView(tileTitle, LinearLayout.LayoutParams(-1, 0, 1f))
                 val tileSubtitle = TextView(this).apply {
                     text = module.subtitle
-                    textSize = 10f
+                    textSize = 9f
                     setTextColor(MUTED)
                     maxLines = 2
                     ellipsize = android.text.TextUtils.TruncateAt.END
@@ -3166,21 +3166,19 @@ class AdminConsoleActivity : ThemedActivity() {
      */
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label.trim().ifBlank { "إجراء" }
-        textSize = 14f
+        textSize = 12f
         isAllCaps = false
         isSingleLine = false
         maxLines = 2
         ellipsize = android.text.TextUtils.TruncateAt.END
         gravity = Gravity.CENTER
         textAlignment = View.TEXT_ALIGNMENT_CENTER
-        minHeight = dp(58)
-        minimumHeight = dp(58)
+        minHeight = dp(40)
+        minimumHeight = dp(40)
         minWidth = dp(0)
         setTextColor(Color.WHITE)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         textDirection = View.TEXT_DIRECTION_RTL
-        layoutDirection = View.LAYOUT_DIRECTION_RTL
-        includeFontPadding = true
         layoutDirection = View.LAYOUT_DIRECTION_RTL
         includeFontPadding = false
         val shape = GradientDrawable(
@@ -3192,7 +3190,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         val pressed = GradientDrawable().apply {
             setColor(0xFF49358F.toInt())
-            cornerRadius = dp(15).toFloat()
+            cornerRadius = dp(11).toFloat()
         }
         background = android.graphics.drawable.RippleDrawable(
             android.content.res.ColorStateList.valueOf(0x33FFFFFF),
@@ -3202,11 +3200,11 @@ class AdminConsoleActivity : ThemedActivity() {
         backgroundTintList = null
         elevation = dp(1).toFloat()
         stateListAnimator = null
-        setPadding(dp(16), dp(10), dp(16), dp(10))
+        setPadding(dp(9), dp(4), dp(9), dp(4))
         contentDescription = label
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(4)
-            bottomMargin = dp(7)
+            topMargin = dp(2)
+            bottomMargin = dp(4)
         }
         setOnClickListener { isEnabled = false; action(); post { isEnabled = true } }
     }
