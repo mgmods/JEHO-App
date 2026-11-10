@@ -1378,19 +1378,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     card.addView(button("فتح تفاصيل ${if (type == "users") "المستخدم" else "الروم"} والإجراءات  ←") {
                         showEntityDetailScreen(item, type)
                     })
-                    addText(card, if (type == "users") {
-                        when (currentRole) {
-                            StaffRoleHelper.SUPER -> "رتبتك: سوبر أدمن — صلاحيات إدارة الحساب الكاملة."
-                            StaffRoleHelper.ADMIN -> "رتبتك: أدمن — إجراءات الإشراف والحظر المؤقت فقط."
-                            else -> "رتبتك: مانجر — لا تتوفر إدارة حسابات المستخدمين من هذه الصفحة."
-                        }
-                    } else {
-                        when (currentRole) {
-                            StaffRoleHelper.SUPER -> "رتبتك: سوبر أدمن — إدارة الروم وإجراءاته."
-                            StaffRoleHelper.ADMIN -> "رتبتك: أدمن — إدارة الروم وفق صلاحيات الخادم."
-                            else -> "رتبتك: مانجر — إشراف الروم ضمن الصلاحيات الممنوحة."
-                        }
-                    }, 11f, false, MUTED)
+
                 }
                 "streams" -> if (!id.isNullOrBlank()) {
                     card.addView(button("إنهاء البث") {
@@ -1819,8 +1807,6 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     }
                 })
-            } else {
-                addText(actions, "لا توجد إجراءات إضافية متاحة لرتبتك.", 12f, false, MUTED)
             }
         } else {
             val actions = section("إجراءات الروم", "التغييرات تُرسل إلى الخادم ولا تغيّر منطق الصوت أو اتصال ZEGO.")
