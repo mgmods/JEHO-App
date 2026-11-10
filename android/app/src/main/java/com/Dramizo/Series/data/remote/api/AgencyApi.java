@@ -101,6 +101,11 @@ public interface AgencyApi {
             @Path("id") String agencyId,
             @Body Map<String, String> body);
 
+    @POST("agencies/{id}/invites/reject")
+    Call<ApiResponse<Object>> rejectInvite(
+            @Path("id") String agencyId,
+            @Body Map<String, String> body);
+
     @retrofit2.http.PATCH("agencies/{id}/settings")
     Call<ApiResponse<Object>> updateSettings(@Path("id") String id, @Body Map<String, String> body);
 
