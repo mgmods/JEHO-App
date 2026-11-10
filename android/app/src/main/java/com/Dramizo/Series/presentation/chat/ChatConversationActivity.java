@@ -1289,10 +1289,8 @@ public class ChatConversationActivity extends ThemedActivity {
                     com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content);
             if (again != null && again.code != null) code = again.code.trim();
         }
-        if (code.isEmpty()) {
-            Toast.makeText(this, R.string.agency_invite_missing_code, Toast.LENGTH_LONG).show();
-            return;
-        }
+        // Older invite cards may not contain an activation code. Do not block
+        // those users: the compatibility endpoint creates a pending join request.
         final String joinCode = code;
         final String agencyPublicId = invite != null && invite.agencyId != null
                 ? invite.agencyId.trim()
@@ -1309,16 +1307,24 @@ public class ChatConversationActivity extends ThemedActivity {
         AppContainer c = ContainerProvider.from(this);
         c.getIoExecutor().execute(() -> {
             java.util.Map<String, String> payload = new java.util.HashMap<>();
-            payload.put("code", joinCode);
-            // Do not send the 36-character agency UUID as publicId. The invite
-            // endpoint accepts it as a UUID path parameter and validates code separately.
-            Result<Object> r = ApiCall.execute(c.getAgencyApi().acceptInvite(agencyPublicId, payload));
+            Result<Object> r;
+            if (!joinCode.isEmpty()) {
+                payload.put("code", joinCode);
+                // The agency UUID is a route parameter, never a publicId.
+                r = ApiCall.execute(c.getAgencyApi().acceptInvite(agencyPublicId, payload));
+            } else {
+                // Backward-compatible route: a legacy card without a code
+                // becomes a regular pending membership request, not a dead link.
+                r = ApiCall.execute(c.getAgencyApi().joinLegacyInvite(agencyPublicId, payload));
+            }
             runOnUiThread(() -> {
                 if (r.success) {
                     if (messageId != null && !messageId.isEmpty()) {
                         viewModel.dismissMessageLocally(messageId);
                     }
-                    Toast.makeText(this, R.string.agency_invite_joined, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, joinCode.isEmpty()
+                            ? "تم إرسال طلب الانضمام إلى الوكالة وبانتظار الموافقة"
+                            : R.string.agency_invite_joined, Toast.LENGTH_SHORT).show();
                     try {
                         startActivity(new Intent(this,
                                 com.Dramizo.Series.presentation.agency.AgencyActivity.class));
