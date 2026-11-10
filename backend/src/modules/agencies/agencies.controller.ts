@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   ParseUUIDPipe,
-  GoneException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AgenciesService } from './agencies.service';
@@ -262,16 +261,13 @@ export class AgenciesController {
     @CurrentUser('sub') userId: string,
     @Body() dto: AcceptAgencyInviteDto,
   ) {
-    // Older Android clients used POST /agencies/:id/join directly.
-    // Keep that route working so an invite never fails just because the client
-    // has not yet switched to the explicit /invites/accept route.
-    if (dto?.code) {
+    // Compatibility for current/older invite cards. A missing code is NOT a
+    // transport error: it simply becomes a normal pending join request.
+    // When a private activation code is present, validate the invitation first.
+    if (dto?.code?.trim()) {
       return this.agenciesService.acceptInvite(id, userId, dto.code);
     }
-    throw new GoneException({
-      code: 'AGENCY_ACTIVATION_CODE_REQUIRED',
-      message: 'الانضمام يتم بكود تفعيل الوكالة فقط عبر /agencies/join-by-code',
-    });
+    return this.agenciesService.joinSelf(id, userId);
   }
 
   @Patch(':id/settings')
