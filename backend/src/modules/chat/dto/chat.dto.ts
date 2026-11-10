@@ -38,6 +38,11 @@ export class SendMessageDto {
     width?: number;
     height?: number;
     duration?: number;
+    storyId?: string;
+    storyMediaType?: string;
+    storyMediaUrl?: string;
+    storyCaption?: string;
+    storyOwnerName?: string;
   };
 
   @ApiPropertyOptional()
