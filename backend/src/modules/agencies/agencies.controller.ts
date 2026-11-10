@@ -243,6 +243,16 @@ export class AgenciesController {
     return this.agenciesService.acceptInvite(id, userId, dto.code);
   }
 
+  @Post(':id/invites/reject')
+  @ApiOperation({ summary: 'Reject a private in-app agency invite' })
+  rejectInvite(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: AcceptAgencyInviteDto,
+  ) {
+    return this.agenciesService.rejectInvite(id, userId, dto.code);
+  }
+
   @Post(':id/join')
   @ApiOperation({ summary: 'Deprecated: hosts must use POST /agencies/join-by-code' })
   join() {
