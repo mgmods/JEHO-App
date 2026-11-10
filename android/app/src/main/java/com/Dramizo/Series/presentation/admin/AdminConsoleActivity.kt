@@ -170,7 +170,12 @@ class AdminConsoleActivity : ThemedActivity() {
                             currentRole = freshRole
                             StaffIdentityConfigCache.refresh(this@AdminConsoleActivity, null)
                             runOnUiThread {
-                                if (!isFinishing && !isDestroyed) showHome()
+                                if (!isFinishing && !isDestroyed) {
+                                    // Rebuild navigation as well as content so the new role
+                                    // cannot keep seeing destinations from the previous role.
+                                    buildShell()
+                                    showHome()
+                                }
                             }
                         }
                     } else if (response.code() == 401 || response.code() == 403) {
@@ -273,7 +278,10 @@ class AdminConsoleActivity : ThemedActivity() {
      * through the same role gate used by the module router.
      */
     private fun primaryNavigationModules(): Set<String> = when (currentRole) {
-        StaffRoleHelper.SUPER -> setOf("users", "walletTransactions", "cosmetics")
+        StaffRoleHelper.SUPER -> setOf(
+            "users", "walletTransactions", "recharges", "withdrawals",
+            "rechargeAgents", "rechargeApplications", "walletAdjust", "cosmetics"
+        )
         StaffRoleHelper.ADMIN -> setOf("users", "cosmetics")
         StaffRoleHelper.MANAGER -> setOf("rooms", "cosmetics")
         else -> emptySet()
