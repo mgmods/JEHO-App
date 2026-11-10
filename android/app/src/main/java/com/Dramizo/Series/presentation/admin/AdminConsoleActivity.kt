@@ -313,9 +313,12 @@ class AdminConsoleActivity : ThemedActivity() {
         val moreKeys = modules.filter { roleCanAccessModule(it.key) && it.key !in primary }
             .map { it.key }
         if (moreKeys.isNotEmpty()) destinations += Triple("المزيد", "☷", moreKeys)
+        destinations += Triple("رجوع", "‹", listOf("__back"))
 
         destinations.forEach { item ->
-            val selected = if (item.third == listOf("home")) {
+            val selected = if (item.third == listOf("__back")) {
+                false
+            } else if (item.third == listOf("home")) {
                 currentSection == "home"
             } else if (item.first == "المزيد") {
                 currentSection == "more" || currentSection in item.third
@@ -334,6 +337,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 )
                 setOnClickListener {
                     when {
+                        item.third == listOf("__back") -> handleAdminBack()
                         item.third == listOf("home") -> showHome()
                         item.first == "المزيد" -> showMoreModules()
                         else -> {
