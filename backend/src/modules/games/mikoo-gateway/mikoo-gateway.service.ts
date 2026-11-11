@@ -108,7 +108,7 @@ import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { biasedCrashAt, multiAreaMultipliers, pickWeightedAreaId, pickWeightedAreaIndex, spinPayout, crashCashoutRake } from './mikoo-house-edge.util';
 import { GREEDY_BOX_RATIOS, LUCK_CAR_RATIOS } from './mikoo-game-economy';
 import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
-import { getGameOdds, getGameRtp, isGameEnabled } from '../game-odds-runtime';
+import { getGameBetSettings, getGameOdds, getGameRtp, isGameBettingEnabled, isGameEnabled } from '../game-odds-runtime';
 
 type GameKind = 'crash' | 'multi' | 'spin';
 
@@ -1853,7 +1853,8 @@ export class MikooGatewayService implements OnModuleDestroy {
     style: 'doslots' | 'fortune',
   ): Promise<MikooPlayerContext> {
     const req = decodeCostBetReq(body);
-    let amount = clampBetAmount(Number(req.money) || 0, gamePayoutLimits().maxBet);
+    const betSettings = getGameBetSettings(gameSlug);
+    let amount = clampBetAmount(Number(req.money) || 0, betSettings.maxBet);
     if (amount < 1) amount = 0;
     const fail = (code: number, desc: string, tip: number) => {
       if (style === 'fortune') {
@@ -1866,8 +1867,9 @@ export class MikooGatewayService implements OnModuleDestroy {
         }));
       }
     };
-    if (amount <= 0) {
-      fail(1, 'Invalid bet', 1);
+    if (!isGameBettingEnabled(gameSlug)) { ws.close(1013, 'Betting disabled by administrator'); return player; }
+    if (amount < betSettings.minBet || amount > betSettings.maxBet) {
+      fail(1, 'Bet outside configured limits', 1);
       return player;
     }
     try {
@@ -1909,7 +1911,8 @@ export class MikooGatewayService implements OnModuleDestroy {
     style: 'olympians' | 'sugar' | 'megaways' | 'pirate' | 'cleopatra',
   ): Promise<MikooPlayerContext> {
     const req = decodeBetReq(body, style === 'pirate' ? 'pirate' : 'default');
-    let amount = clampBetAmount(Number(req.money) || 0, gamePayoutLimits().maxBet);
+    const betSettings = getGameBetSettings(gameSlug);
+    let amount = clampBetAmount(Number(req.money) || 0, betSettings.maxBet);
     if (amount < 1) amount = 0;
     this.logger.log(
       `GAME_PROBE SPIN_DECODE game=${gameSlug} style=${style} amount=${amount} roomId=${req.roomId} user=${player.userId} bal=${player.balance}`,
@@ -1940,8 +1943,9 @@ export class MikooGatewayService implements OnModuleDestroy {
         }));
       }
     };
-    if (amount <= 0) {
-      fail(1, 'Invalid bet', 1);
+    if (!isGameBettingEnabled(gameSlug)) { ws.close(1013, 'Betting disabled by administrator'); return player; }
+    if (amount < betSettings.minBet || amount > betSettings.maxBet) {
+      fail(1, 'Bet outside configured limits', 1);
       return player;
     }
     try {
@@ -1997,12 +2001,14 @@ export class MikooGatewayService implements OnModuleDestroy {
     player: MikooPlayerContext,
   ) {
     const req = decodeBetReq(body, kind === 'multi' ? 'multi' : 'default');
+    if (!isGameBettingEnabled(gameSlug)) { ws.close(1013, 'Betting disabled by administrator'); return player; }
+    const betSettings = getGameBetSettings(gameSlug);
     const rawAmount = Math.floor(Number(req.money) || 0);
     this.logger.log(
       `GAME_PROBE BET_DECODE game=${gameSlug} phase=${room.phase} amount=${rawAmount} area=${req.areaId} user=${player.userId} bal=${player.balance}`,
     );
     // All multi boards share the same stake rail (bounty used to allow 1_000_000).
-    if (rawAmount > gamePayoutLimits().maxBet) {
+    if (rawAmount > betSettings.maxBet || rawAmount > gamePayoutLimits().maxBet) {
       if (gameSlug === 'greedy-box') {
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
           code: 1, desc: 'Bet too high', userMoney: player.balance, tipType: 1, iconId: req.areaId,
@@ -2038,7 +2044,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       return player;
     }
     const amount = clampBetAmount(rawAmount, gamePayoutLimits().maxBet);
-    if (amount <= 0) {
+    if (amount < betSettings.minBet || amount > betSettings.maxBet) {
       if (gameSlug === 'greedy-box') {
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
           code: 1, desc: 'Invalid bet', userMoney: player.balance, tipType: 1, iconId: req.areaId,
