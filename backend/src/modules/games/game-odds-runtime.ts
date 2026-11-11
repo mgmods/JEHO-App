@@ -30,16 +30,16 @@ export function getGameWinRate(gameId: string): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : undefined;
 }
 
-export function getGameBetSettings(gameId: string): { minBet: number; maxBet: number; bettingEnabled: boolean } {
+export function getGameBetSettings(gameId: string): { minBet: number; maxBet: number; bettingEnabled: boolean; chips: number[] } {
   const id = String(gameId || '').trim().toLowerCase();
   const configured = live.gameBetSettings?.[id];
   const globalMax = Math.max(1, Math.floor(live.maxBet || 20_000));
-  if (!configured) return { minBet: 50, maxBet: globalMax, bettingEnabled: true };
+  if (!configured) return { minBet: 50, maxBet: globalMax, bettingEnabled: true, chips: [50, 100, 500, 1000, 5000].filter((x) => x <= globalMax) };
   const minBet = Math.max(1, Math.floor(configured.minBet || 1));
   return {
     minBet,
     maxBet: Math.max(minBet, Math.min(globalMax, Math.floor(configured.maxBet || globalMax))),
-    bettingEnabled: configured.bettingEnabled !== false,
+    bettingEnabled: configured.bettingEnabled !== false,\n    chips: Array.isArray(configured.chips) && configured.chips.length\n      ? configured.chips.filter((x) => Number.isInteger(x) && x >= minBet && x <= Math.min(globalMax, Math.floor(configured.maxBet || globalMax))).slice(0, 12)\n      : [50, 100, 500, 1000, 5000].filter((x) => x >= minBet && x <= Math.min(globalMax, Math.floor(configured.maxBet || globalMax))),
   };
 }
 
