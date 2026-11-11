@@ -99,7 +99,7 @@ export class DiceService {
     if (!cfg.enabled) throw new BadRequestException('Dice game disabled');
     const amount = Math.floor(Number(dto.amount));
     const pick = Math.floor(Number(dto.number));
-    if (amount < cfg.minBet || amount > cfg.maxBet) {
+    if (amount < cfg.minBet || amount > cfg.maxBet || !cfg.chips.includes(amount)) {
       throw new BadRequestException(`Bet must be between ${cfg.minBet} and ${cfg.maxBet}`);
     }
     if (pick < 2 || pick > 12) throw new BadRequestException('Number must be 2-12');
