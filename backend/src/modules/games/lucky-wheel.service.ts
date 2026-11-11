@@ -86,7 +86,7 @@ export class LuckyWheelService {
       config: {
         minBet: cfg.minBet,
         maxBet: cfg.maxBet,
-        chips: [100, 500, 1000, 5000, 10_000].filter((c) => c <= cfg.maxBet),
+        chips: cfg.chips.filter((c) => c >= cfg.minBet && c <= cfg.maxBet),
         multipliers: { red: 2, orange: 2, seven: 6, lose: 0 },
         sectors: WHEEL_SECTORS,
       },
