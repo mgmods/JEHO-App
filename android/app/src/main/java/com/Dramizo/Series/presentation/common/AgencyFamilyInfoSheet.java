@@ -250,29 +250,15 @@ public final class AgencyFamilyInfoSheet {
 
         TextView membersTab = sheet.findViewById(R.id.btnAgencyMembersTab);
         TextView followersTab = sheet.findViewById(R.id.btnAgencyFollowersTab);
-        TextView roomsTab = sheet.findViewById(R.id.btnAgencyRoomsTab);
-        TextView messageTab = sheet.findViewById(R.id.btnAgencyMessageTab);
         TextView rosterSummary = sheet.findViewById(R.id.tvAgencyRosterSummary);
         android.widget.LinearLayout peopleList = sheet.findViewById(R.id.agencyPeopleList);
         if (membersTab != null) membersTab.setOnClickListener(v -> {
-            applyAgencyTabUi(membersTab, followersTab, roomsTab, messageTab, 0);
+            applyAgencyTabUi(membersTab, followersTab, 0);
             loadAgencyPeople(activity, container, id, peopleList, rosterSummary, false);
         });
         if (followersTab != null) followersTab.setOnClickListener(v -> {
-            applyAgencyTabUi(membersTab, followersTab, roomsTab, messageTab, 1);
+            applyAgencyTabUi(membersTab, followersTab, 1);
             loadAgencyPeople(activity, container, id, peopleList, rosterSummary, true);
-        });
-        if (roomsTab != null) roomsTab.setOnClickListener(v -> {
-            applyAgencyTabUi(membersTab, followersTab, roomsTab, messageTab, 2);
-            loadAgencyRoom(activity, container, id, peopleList, rosterSummary, dialog);
-        });
-        if (messageTab != null) messageTab.setOnClickListener(v -> {
-            applyAgencyTabUi(membersTab, followersTab, roomsTab, messageTab, 3);
-            if (aHolder[0] != null && aHolder[0].owner != null && aHolder[0].owner.id != null) {
-                UserProfileCardSheet.show(activity, aHolder[0].owner.id, aHolder[0].owner.displayName, aHolder[0].owner.avatarUrl);
-            } else {
-                Toast.makeText(activity, "المراسلة غير متاحة حالياً", Toast.LENGTH_SHORT).show();
-            }
         });
         loadAgencyPeople(activity, container, id, peopleList, rosterSummary, false);
         dialog.show();
@@ -286,39 +272,14 @@ public final class AgencyFamilyInfoSheet {
         return 3;
     }
 
-    private static void applyAgencyTabUi(@Nullable TextView members, @Nullable TextView followers,
-            @Nullable TextView rooms, @Nullable TextView message, int selected) {
-        TextView[] tabs = {members, followers, rooms, message};
+    private static void applyAgencyTabUi(@Nullable TextView members, @Nullable TextView followers, int selected) {
+        TextView[] tabs = {members, followers};
         for (int i = 0; i < tabs.length; i++) {
             if (tabs[i] != null) {
                 tabs[i].setTextColor(i == selected ? 0xFFFFFFFF : 0xBFFFFFFF);
                 tabs[i].setTypeface(null, i == selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
             }
         }
-    }
-
-    private static void loadAgencyRoom(@NonNull FragmentActivity activity, @NonNull AppContainer container,
-            @NonNull String agencyId, @Nullable android.widget.LinearLayout list,
-            @Nullable TextView summary, @NonNull BottomSheetDialog dialog) {
-        if (list == null) return;
-        list.removeAllViews();
-        MiscDtos.AgencyDto agency = null;
-        // Room-list endpoint is not exposed by the current AgencyApi contract.
-        // Show the verified room count instead of calling a non-existent API.
-        TextView info = new TextView(activity);
-        info.setText("غرف الوكالة المسجلة: " + (summary != null ? summary.getText() : "—")
-                + "\\nيمكن فتح غرفة الوكالة من قائمة الغرف داخل التطبيق.");
-        info.setTextColor(0xFFFFFFFF);
-        info.setTextSize(14);
-        info.setGravity(android.view.Gravity.CENTER);
-        info.setPadding(dp(activity, 16), dp(activity, 22), dp(activity, 16), dp(activity, 22));
-        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-        bg.setColor(0xFF151F28);
-        bg.setCornerRadius(dp(activity, 16));
-        bg.setStroke(dp(activity, 1), 0xFF34414D);
-        info.setBackground(bg);
-        list.addView(info, new android.widget.LinearLayout.LayoutParams(-1, -2));
-        if (summary != null) summary.setText("الغرف");
     }
 
     private static void loadAgencyPeople(@NonNull FragmentActivity activity, @NonNull AppContainer container,
