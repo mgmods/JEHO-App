@@ -30,6 +30,8 @@ export type GameOddsConfig = {
   gameWinRates: Record<string, number>;
   /** Per-game player return target for shared-outcome betting games. */
   gameRtpRates: Record<string, number>;
+  /** Per-game wager controls. bettingEnabled=false rejects wagers server-side. */
+  gameBetSettings: Record<string, { minBet: number; maxBet: number; bettingEnabled: boolean }>;
 };
 
 export const DEFAULT_GAME_ODDS: GameOddsConfig = {
@@ -47,6 +49,7 @@ export const DEFAULT_GAME_ODDS: GameOddsConfig = {
   disabledGames: [],
   gameWinRates: {},
   gameRtpRates: {},
+  gameBetSettings: {},
 };
 
 /** Presets for big-app style one-click tuning (always house-positive). */
@@ -138,6 +141,16 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
           return /^[a-z0-9][a-z0-9-]{0,63}$/.test(id) && Number.isFinite(n) ? [[id, Math.min(0.82, Math.max(0.55, n))]] : [];
         }))
       : { ...d.gameRtpRates },
+    gameBetSettings: obj.gameBetSettings && typeof obj.gameBetSettings === 'object' && !Array.isArray(obj.gameBetSettings)
+      ? Object.fromEntries(Object.entries(obj.gameBetSettings as Record<string, unknown>).slice(0, 100).flatMap(([key, value]) => {
+          const id = String(key).trim().toLowerCase();
+          if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(id) || !value || typeof value !== 'object') return [];
+          const row = value as Record<string, unknown>;
+          const min = Math.floor(clamp(row.minBet, 1, 50000, 50));
+          const max = Math.floor(clamp(row.maxBet, min, 50000, 20000));
+          return [[id, { minBet: min, maxBet: Math.max(min, max), bettingEnabled: row.bettingEnabled !== false }]];
+        }))
+      : { ...d.gameBetSettings },
   };
 }
 
@@ -206,6 +219,7 @@ export function gameOddsClientPayload(cfg: GameOddsConfig) {
       Object.entries(cfg.gameWinRates).map(([id, winRate]) => [id, Math.round((100 - winRate) * 100) / 100]),
     ),
     gameRtpRates: cfg.gameRtpRates,
+    gameBetSettings: cfg.gameBetSettings,
     hints: {
       gameWinRates: 'نسبة الفوز العامة المعلنة لكل لعبة من 0 إلى 100، وتُطبّق على نتائج محرك JEHO لكل اللاعبين بالتساوي. ألعاب النتائج المشتركة تستخدم عائد اللاعب RTP، وألعاب المزوّد الخارجي تحتاج دعمًا منه.',
       playerRtp: 'نسبة ما يعود للاعب على المدى الطويل (الباقي ربح التطبيق) — لوحات الرهان المتعددة',
