@@ -1270,6 +1270,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       return;
     }
     if (kind !== 'crash' && kind !== 'multi') return;
+    const chips = getGameBetSettings(gameSlug).chips;
     const timeLeft =
       room.phase === 'betting'
         ? Math.max(1, Math.ceil((room.betEnds - Date.now()) / 1000))
@@ -1292,6 +1293,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         timeLeft,
         curTurn: room.round,
         userMoney: player?.balance ?? 0,
+        chips,
       });
       this.send(ws, '.game.TableInfoRes', body);
       this.send(ws, '.game.TableInfo', body);
@@ -1318,6 +1320,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         history: room.history,
         allAreaBets,
         myBets,
+        chips,
         totalBet,
         myTotalBet,
         turnPos,
@@ -1358,6 +1361,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         history: room.history.length ? room.history : [1, 3, 5, 2, 8, 4],
         myBets: player ? this.camelMyBets(room, player.publicId) : [],
         ratios: [...CAMEL_RACING_RATIOS],
+        chips,
       });
       this.send(ws, '.game.TableInfoRes', body);
       this.send(ws, '.game.TableInfo', body);
@@ -1377,6 +1381,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         state,
         timeLeft,
         curTurn: room.round,
+        chips,
         history: room.history.length ? room.history : [1, 3, 5, 7, 9, 2, 4, 6],
         betTotal: this.lucky77AreaBets(room),
         myAreaBet,
@@ -1399,6 +1404,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         playerNum: room.clients.size,
         timeLeft,
         totalBet,
+        chips,
         history: room.history.length ? room.history : [1, 3, 2, 1, 3, 1, 2, 3],
         betInfo: areas,
       });
@@ -1424,6 +1430,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         curTurn: room.round,
         totalBet,
         myBets,
+        chips,
       });
       this.send(ws, '.game.TableInfo', body);
       this.send(ws, '.game.TableInfoRes', body);
@@ -1453,6 +1460,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         totalBet,
         selfBet,
         flyTime,
+        availableChips: chips.slice(0, 4),
       });
       this.send(ws, '.game.TableInfo', body);
       this.send(ws, '.game.TableInfoRes', body);
@@ -1491,26 +1499,28 @@ export class MikooGatewayService implements OnModuleDestroy {
 
   /** Spin slots wait on TableInfo / chipCfg before bet UI unlocks (NaN / freeze without it). */
   private pushSpinTableInfo(ws: WebSocket, gameSlug: string) {
+    const betSettings = getGameBetSettings(gameSlug);
+    const chips = betSettings.chips;
     if (gameSlug === 'olympians') {
-      const body = encodeOlympiansTableInfo();
+      const body = encodeOlympiansTableInfo(chips);
       this.send(ws, '.game.TableInfo', body);
       this.send(ws, '.game.TableInfoRes', body);
       return;
     }
     if (gameSlug === 'pirate-king') {
-      const body = encodePirateTableInfo();
+      const body = encodePirateTableInfo(chips);
       this.send(ws, '.game.TableInfo', body);
       this.send(ws, '.game.TableInfoRes', body);
       return;
     }
     if (gameSlug === 'cleopatra-slots') {
-      const body = encodeCleopatraTableInfo();
+      const body = encodeCleopatraTableInfo(chips);
       this.send(ws, '.game.TableInfo', body);
       this.send(ws, '.game.TableInfoRes', body);
       return;
     }
     if (gameSlug === 'megaways-slots' || gameSlug === 'sugar-rush') {
-      this.send(ws, '.game.s_c_getChipCfgRes', encodeChipCfgRes());
+      this.send(ws, '.game.s_c_getChipCfgRes', encodeChipCfgRes(getGameBetSettings(gameSlug).chips));
       this.send(ws, '.game.GetChipCfgRes', encodeChipCfgRes());
       return;
     }
@@ -1781,12 +1791,14 @@ export class MikooGatewayService implements OnModuleDestroy {
       }
 
       if (name === '.game.GameCfgReq') {
+        const betSettings = getGameBetSettings(gameSlug);
+        const chips = betSettings.chips;
         if (gameSlug === 'line-slots') {
-          this.send(ws, '.game.GameCfgRsp', encodeLineSlotsGameCfgRsp());
-          this.send(ws, '.game.GameCfgRes', encodeLineSlotsGameCfgRsp());
+          this.send(ws, '.game.GameCfgRsp', encodeLineSlotsGameCfgRsp(chips, betSettings.minBet, betSettings.maxBet));
+          this.send(ws, '.game.GameCfgRes', encodeLineSlotsGameCfgRsp(chips, betSettings.minBet, betSettings.maxBet));
         } else {
-          this.send(ws, '.game.GameCfgRes', encodeFortuneGameCfgRes());
-          this.send(ws, '.game.GameCfgRsp', encodeFortuneGameCfgRes());
+          this.send(ws, '.game.GameCfgRes', encodeFortuneGameCfgRes(chips, betSettings.minBet, betSettings.maxBet));
+          this.send(ws, '.game.GameCfgRsp', encodeFortuneGameCfgRes(chips, betSettings.minBet, betSettings.maxBet));
         }
         return player;
       }
