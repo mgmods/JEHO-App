@@ -500,7 +500,7 @@ function setAllGamesEnabled(enabled) {
 async function saveOdds() {
   savingOdds.value = true
   error.value = ''
-  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), gameRtpRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), clearGameWinRates: safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).map(g => g.id), gameRtpRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
   savingOdds.value = false
   if (err) {
     error.value = err.message
@@ -520,11 +520,12 @@ async function saveOdds() {
   const actualDisabled = [...stored.disabledGames].sort().join(',')
   const expectedRates = Object.fromEntries(Object.entries(gameWinRates).filter(([id, value]) => supportsDirectWinRate(id) && value !== undefined && value !== '').map(([id, value]) => [id, Number(value)]))
   const ratesMatch = Object.entries(expectedRates).every(([id, value]) => Number(stored.gameWinRates?.[id]) === value)
+  const clearedRatesMatch = safeManageableGames.filter(g => supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).every(g => stored.gameWinRates?.[g.id] === undefined)
   const expectedRtpRates = Object.fromEntries(safeManageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)]))
   const rtpRatesMatch = Object.entries(expectedRtpRates).every(([id, value]) => Math.abs(Number(stored.gameRtpRates?.[id]) - value) < 0.000001)
   const numericKeys = ['playerRtp', 'spinHitRate', 'fishingHitRate', 'crashCashoutRake', 'hiloPayoutMult', 'royalBattlePayGate', 'maxBet', 'maxWinMult', 'maxWinAbsolute', 'maxCrashRatio']
   const globalSettingsMatch = numericKeys.every((key) => Math.abs(Number(stored[key]) - Number(odds[key])) < 0.000001)
-  if (expectedDisabled !== actualDisabled || !ratesMatch || !rtpRatesMatch || !globalSettingsMatch) {
+  if (expectedDisabled !== actualDisabled || !ratesMatch || !clearedRatesMatch || !rtpRatesMatch || !globalSettingsMatch) {
     error.value = 'الخادم لم يُرجع جميع إعدادات الألعاب وحدود الرهان ونسب الفوز والعائد كما حُفظت؛ لم يتم تأكيد الحفظ.'
     toast().danger(error.value)
     return
