@@ -68,12 +68,17 @@ export class CasualBetService {
     let wallet = await this.walletRepo.findOne({ where: { userId } });
     if (!wallet) wallet = await this.walletRepo.save(this.walletRepo.create({ userId }));
     const maxBet = Math.min(20_000, gamePayoutLimits().maxBet);
+    const gameBetSettings = Object.fromEntries(
+      ALL_CASUAL.map((gameId) => [gameId, getGameBetSettings(gameId)]),
+    );
     return {
       balance: Number(wallet.coins || 0),
       currency: 'coins',
+      // Backward-compatible defaults for older clients; new clients should use gameBetSettings[gameId].
       minBet: 50,
       maxBet,
       chips: [50, 100, 500, 1000, 5000, 10_000].filter((chip) => chip <= maxBet),
+      gameBetSettings,
       games: ALL_CASUAL.filter((gameId) => isGameEnabled(gameId)),
     };
   }
@@ -92,10 +97,14 @@ export class CasualBetService {
       throw new BadRequestException('Unknown game');
     }
     if (!isGameEnabled(gameId)) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');
+    const betSettings = getGameBetSettings(gameId);
+    if (!isGameBettingEnabled(gameId)) {
+      throw new BadRequestException('المراهنة متوقفة حالياً لهذه اللعبة');
+    }
     await this.roomAccess.assertParticipant(body?.roomId, userId);
     const amount = Math.floor(Number(body?.amount));
-    if (!Number.isFinite(amount) || amount < 50 || amount > Math.min(20_000, gamePayoutLimits().maxBet)) {
-      throw new BadRequestException(`Bet must be between 50 and ${Math.min(20_000, gamePayoutLimits().maxBet)} coins`);
+    if (!Number.isFinite(amount) || amount < betSettings.minBet || amount > Math.min(betSettings.maxBet, gamePayoutLimits().maxBet)) {
+      throw new BadRequestException(`Bet must be between ${betSettings.minBet} and ${Math.min(betSettings.maxBet, gamePayoutLimits().maxBet)} coins`);
     }
 
     const outcome = this.resolveOutcomeWithConfiguredRate(gameId, body?.choice);
