@@ -101,7 +101,7 @@ export class LuckyWheelService {
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Lucky wheel disabled');
     const amount = Math.floor(Number(dto.amount));
-    if (amount < cfg.minBet || amount > cfg.maxBet) {
+    if (amount < cfg.minBet || amount > cfg.maxBet || !cfg.chips.includes(amount)) {
       throw new BadRequestException(`Bet must be between ${cfg.minBet} and ${cfg.maxBet}`);
     }
 
