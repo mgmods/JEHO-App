@@ -291,14 +291,33 @@
             tools:text="Lv.3" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/btnFollowAgency"
+        android:layout_width="0dp"
+        android:layout_height="50dp"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_agency_follow_btn"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="8dp"
+        android:gravity="center"
+        android:text="@string/agency_family_follow"
+        android:textColor="#FFFFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/rowOwner" />
+
     <LinearLayout
         android:id="@+id/agencyProfileTabs"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="14dp"
         android:orientation="horizontal"
-        app:layout_constraintTop_toBottomOf="@id/rowOwner"
+        app:layout_constraintTop_toBottomOf="@id/btnFollowAgency"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -318,31 +337,9 @@
             android:layout_width="0dp"
             android:layout_height="42dp"
             android:layout_weight="1"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="8dp"
             android:gravity="center"
             android:text="المتابعون"
-            android:textColor="#BFFFFFFF"
-            android:background="@drawable/bg_user_card_stat_cell"/>
-
-        <TextView
-            android:id="@+id/btnAgencyRoomsTab"
-            android:layout_width="0dp"
-            android:layout_height="42dp"
-            android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:gravity="center"
-            android:text="الغرف"
-            android:textColor="#BFFFFFFF"
-            android:background="@drawable/bg_user_card_stat_cell"/>
-
-        <TextView
-            android:id="@+id/btnAgencyMessageTab"
-            android:layout_width="0dp"
-            android:layout_height="42dp"
-            android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:gravity="center"
-            android:text="مراسلة"
             android:textColor="#BFFFFFFF"
             android:background="@drawable/bg_user_card_stat_cell"/>
     </LinearLayout>
@@ -363,7 +360,7 @@
     <ScrollView
         android:id="@+id/agencyPeopleScroll"
         android:layout_width="0dp"
-        android:layout_height="220dp"
+        android:layout_height="180dp"
         android:layout_marginHorizontal="14dp"
         android:layout_marginTop="8dp"
         android:fillViewport="false"
@@ -380,22 +377,6 @@
     </ScrollView>
 
     
-
-        <TextView
-            android:id="@+id/btnFollowAgency"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_marginHorizontal="24dp"
-            android:layout_marginTop="18dp"
-            android:background="@drawable/bg_agency_follow_btn"
-            android:gravity="center"
-            android:text="@string/agency_family_follow"
-            android:textColor="#FFFFFFFF"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/agencyPeopleScroll" />
 
     <TextView
         android:id="@+id/btnOpenAgencyManage"
