@@ -549,6 +549,7 @@ function encodeBountyBetStuArr(bets: Array<{ iconId: number; money: number }>): 
 /** bounty-football TableInfoRes — unlocks board after login. */
 export function encodeBountyFootballTableInfoRes(data: {
   state: number;
+  chips?: number[];
   timeLeft: number;
   curTurn: number;
   history?: number[];
@@ -562,7 +563,7 @@ export function encodeBountyFootballTableInfoRes(data: {
   /** Wheel light stop 1..16 (never 0). */
   turnPos?: number;
 }): Buffer {
-  const chips = BOUNTY_FOOTBALL_CHIPS;
+  const chips = data.chips?.length ? data.chips : BOUNTY_FOOTBALL_CHIPS;
   const ratios = BOUNTY_FOOTBALL_RATIOS;
   const history = (data.history ?? []).slice(-12);
   const turnPos = Math.max(1, Math.min(16, data.turnPos || 1));
@@ -814,7 +815,10 @@ export function encodeTableInfo7UpDown(data: {
   history?: number[];
   /** Area pools — down=1, seven=2, up=3. */
   betInfo?: Array<{ id: number; totalBet?: number; myBet?: number; ratio?: number }>;
+  chips?: number[];
 }): Buffer {
+  const availableChips = data.chips?.length ? data.chips : SEVEN_UP_CHIPS;
+  const chipCsv = availableChips.join(',');
   const history = data.history ?? [1, 2, 3, 1, 3, 2, 1, 3];
   // Client enum: betting=1, over=2 only — never send 3.
   const state = data.state === 1 ? 1 : 2;
@@ -842,11 +846,11 @@ export function encodeTableInfo7UpDown(data: {
     parts.push(Buffer.concat([tag(8, 2), writeVarint(area.length), area]));
   }
   // betConf@9 chips: id, betMin, conf csv
-  const chips = [
-    { id: 1, min: 50, conf: SEVEN_UP_CHIP_CSV },
-    { id: 2, min: 100, conf: SEVEN_UP_CHIP_CSV },
+  const chipConfigs = [
+    { id: 1, min: availableChips[0] ?? 50, conf: chipCsv },
+    { id: 2, min: availableChips[1] ?? availableChips[0] ?? 100, conf: chipCsv },
   ];
-  for (const c of chips) {
+  for (const c of chipConfigs) {
     const row = encodeMessage([
       pbUInt32(1, c.id),
       pbUInt32(2, c.min),
@@ -855,7 +859,7 @@ export function encodeTableInfo7UpDown(data: {
     parts.push(Buffer.concat([tag(9, 2), writeVarint(row.length), row]));
   }
   // AvailableChips@14 int32 — unlocks expanded bet tray
-  for (const chip of SEVEN_UP_CHIPS) {
+  for (const chip of availableChips) {
     parts.push(pbInt32(14, chip));
   }
   return encodeMessage(parts);
@@ -1374,12 +1378,16 @@ export function encodeFortuneGemsRes(data: {
 }
 
 /** Minimal GameCfgRes for fortune gems (unlocks spin UI). */
-export function encodeFortuneGameCfgRes(): Buffer {
-  const betMult = MIKOO_BET_CHIPS.map((n) => pbUInt32(4, n));
+export function encodeFortuneGameCfgRes(
+  chips: number[] = [...MIKOO_BET_CHIPS],
+  minBet = 50,
+  maxBet = 10_000,
+): Buffer {
+  const betMult = chips.map((n) => pbUInt32(4, n));
   const cfg = encodeMessage([
     pbUInt32(1, 1), // gameSwitch on
-    pbUInt32(2, 10000), // maxBet
-    pbUInt32(3, 50), // minBet
+    pbUInt32(2, maxBet), // maxBet
+    pbUInt32(3, minBet), // minBet
     ...betMult,
   ]);
   return encodeMessage([
@@ -1394,13 +1402,17 @@ export function encodeFortuneGameCfgRes(): Buffer {
  * (after stripping quotes), so they MUST be JSON array strings like "[1,2,5]".
  * Paylines are cell indices on a 3×5 board (row-major 0..14).
  */
-export function encodeLineSlotsGameCfgRsp(): Buffer {
+export function encodeLineSlotsGameCfgRsp(
+  chips: number[] = [...MIKOO_BET_CHIPS],
+  minBet = 50,
+  maxBet = 10_000,
+): Buffer {
   const defaultCfg = encodeMessage([
-    pbInt32(1, 50), // BasicBetLimit
-    pbInt32(2, 50), // MinBet
+    pbInt32(1, maxBet), // BasicBetLimit
+    pbInt32(2, minBet), // MinBet
     pbInt32(3, 3), // ScrollGrid (rows)
     pbInt32(4, 0), // BonusTrunCount
-    pbString(5, JSON.stringify([...MIKOO_BET_CHIPS])), // BetMult — stake tray
+    pbString(5, JSON.stringify([...chips])), // BetMult — stake tray
     pbString(6, '[10,20,50,100]'), // AutoSpinCount — JSON array
   ]);
   const symbols: Buffer[] = [];
@@ -1569,6 +1581,7 @@ export function encodeLuckCarTableInfo(data: {
   curTurn?: number;
   totalBet?: number;
   myBets?: number[];
+  chips?: number[];
 }): Buffer {
   // Client enum: betting=1, over=2 only.
   const state = data.state === 1 ? 1 : 2;
@@ -1601,7 +1614,7 @@ export function encodeLuckCarTableInfo(data: {
   parts.push(pbInt32(17, 1)); // trackType
   parts.push(pbInt32(18, 0)); // trackPos
   // Client does JSON.parse(chipsConf) then pushes into Instance.chipsConf[].
-  parts.push(pbString(23, JSON.stringify(LUCK_CAR_CHIPS)));
+  parts.push(pbString(23, JSON.stringify(data.chips?.length ? data.chips : LUCK_CAR_CHIPS)));
   return encodeMessage(parts);
 }
 
