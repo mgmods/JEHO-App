@@ -39,7 +39,10 @@ export function getGameBetSettings(gameId: string): { minBet: number; maxBet: nu
   return {
     minBet,
     maxBet: Math.max(minBet, Math.min(globalMax, Math.floor(configured.maxBet || globalMax))),
-    bettingEnabled: configured.bettingEnabled !== false,\n    chips: Array.isArray(configured.chips) && configured.chips.length\n      ? configured.chips.filter((x) => Number.isInteger(x) && x >= minBet && x <= Math.min(globalMax, Math.floor(configured.maxBet || globalMax))).slice(0, 12)\n      : [50, 100, 500, 1000, 5000].filter((x) => x >= minBet && x <= Math.min(globalMax, Math.floor(configured.maxBet || globalMax))),
+    bettingEnabled: configured.bettingEnabled !== false,
+    chips: Array.isArray(configured.chips) && configured.chips.length
+      ? configured.chips.filter((x) => Number.isInteger(x) && x >= minBet && x <= Math.min(globalMax, Math.floor(configured.maxBet || globalMax))).slice(0, 12)
+      : [50, 100, 500, 1000, 5000].filter((x) => x >= minBet && x <= Math.min(globalMax, Math.floor(configured.maxBet || globalMax))),
   };
 }
 
