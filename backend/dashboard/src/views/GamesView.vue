@@ -217,11 +217,14 @@
             <div v-else class="small text-muted">محرك المزوّد الخارجي لا يتيح ضبط احتمال الفوز من خادم JEHO؛ يمكن إيقاف اللعبة بالكامل.</div>
             <hr class="my-3" />
             <div class="small fw-semibold mb-2">حدود الرهان والتحكم بالمراهنة</div>
-            <div class="row g-2">
-              <div class="col-6"><label class="form-label small mb-1">أقل رهان</label><input :value="betSetting(game.id).minBet" @input="setGameBetSetting(game.id, 'minBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
-              <div class="col-6"><label class="form-label small mb-1">أعلى رهان</label><input :value="betSetting(game.id).maxBet" @input="setGameBetSetting(game.id, 'maxBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
-            </div>
-            <div class="mt-2"><label class="form-label small mb-1">قيم أزرار الرهان (افصل بينها بفاصلة)</label><input :value="betSetting(game.id).chips.join(', ')" @change="setGameBetChips(game.id, $event.target.value)" type="text" class="form-control form-control-sm" placeholder="50, 100, 500, 1000, 5000" /><div class="form-text">مثال: 500, 1000, 5000 — حتى 12 قيمة، ضمن حدود الرهان المحددة.</div></div>
+            <div v-if="isProviderOnlyGame(game.id)" class="small text-warning mb-2">هذه اللعبة تعمل عبر مزوّد خارجي؛ لا يستطيع خادم JEHO فرض قيم الرهان أو تغيير نسب الفوز فيها. إيقاف المراهنة هنا يمنع فتح جلسة اللعبة من JEHO.</div>
+            <template v-else>
+              <div class="row g-2">
+                <div class="col-6"><label class="form-label small mb-1">أقل رهان</label><input :value="betSetting(game.id).minBet" @input="setGameBetSetting(game.id, 'minBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
+                <div class="col-6"><label class="form-label small mb-1">أعلى رهان</label><input :value="betSetting(game.id).maxBet" @input="setGameBetSetting(game.id, 'maxBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
+              </div>
+              <div class="mt-2"><label class="form-label small mb-1">قيم أزرار الرهان (افصل بينها بفاصلة)</label><input :value="betSetting(game.id).chips.join(', ')" @change="setGameBetChips(game.id, $event.target.value)" type="text" class="form-control form-control-sm" placeholder="50, 100, 500, 1000, 5000" /><div class="form-text">مثال: 500, 1000, 5000 — حتى 12 قيمة، ضمن حدود الرهان المحددة.</div></div>
+            </template>
             <label class="form-check form-switch mt-2 mb-0"><input class="form-check-input" type="checkbox" :checked="betSetting(game.id).bettingEnabled !== false" @change="setGameBetSetting(game.id, 'bettingEnabled', $event.target.checked)" /><span class="form-check-label small">السماح بالمراهنة داخل هذه اللعبة</span></label>
           </div>
         </div>
@@ -376,13 +379,13 @@ const manageableGames = [
   { id: 'camel-racing', label: 'سباق الأسود' },
   { id: 'cleopatra-slot', label: 'كليوباترا (مزود خارجي)' },
   { id: 'cleopatra-slots', label: 'فتحات كليوباترا' },
-  { id: 'crash', label: 'كراش (مزود خارجي)' },
+  { id: 'crash', label: 'كراش' },
   { id: 'fishing', label: 'صيد السمك (مزود خارجي)' },
   { id: 'football-plinko', label: 'بلينكو كرة القدم (مزود خارجي)' },
   { id: 'fortune-slot', label: 'جواهر الحظ' },
   { id: 'greedy-box', label: 'صندوق الطمع' },
   { id: 'greedy-lion', label: 'الأسد الطماع (مزود خارجي)' },
-  { id: 'hilo', label: 'هاي لو (مزود خارجي)' },
+  { id: 'hilo', label: 'هاي لو (نسخة JEHO ومزوّد خارجي)' },
   { id: 'line-slots', label: 'فتحات الخط' },
   { id: 'luck-car', label: 'سيارة الحظ' },
   { id: 'lucky77', label: 'لاكي ٧٧' },
@@ -415,9 +418,11 @@ const directWinRateGameIds = new Set([
   'cleopatra-slots','fortune-slot',
   'line-slots','megaways-slots','olympians','pirate-king','sugar-rush',
   // These game engines have dedicated server-side win-gate logic.
-  'hilo','royal-battle','crash',
+  'hilo','crash',
 ])
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
+const providerOnlyGameIds = new Set(['cleopatra-slot','fishing','football-plinko','greedy-lion','royal-battle','slot777','swimsuit-party'])
+function isProviderOnlyGame(gameId) { return providerOnlyGameIds.has(String(gameId || '').toLowerCase()) }
 const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','luck-car','lucky77'])
 function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(gameId || '').toLowerCase()) }
 function betSetting(gameId) {
