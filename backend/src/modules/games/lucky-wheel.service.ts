@@ -60,10 +60,12 @@ export class LuckyWheelService {
       const n = Number(map.get(k));
       return Number.isFinite(n) ? n : fallback;
     };
+    const adminBet = getGameBetSettings('lucky-wheel');
     return {
-      enabled: (map.get('games.lucky_wheel.enabled') ?? 'true') !== 'false',
-      maxBet: Math.min(Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), gamePayoutLimits().maxBet),
-      minBet: Math.min(Math.max(1, num('games.lucky_wheel.min_bet', 100)), Math.min(Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), gamePayoutLimits().maxBet)),
+      enabled: (map.get('games.lucky_wheel.enabled') ?? 'true') !== 'false' && isGameBettingEnabled('lucky-wheel'),
+      maxBet: Math.min(adminBet.maxBet, Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), gamePayoutLimits().maxBet),
+      minBet: Math.max(adminBet.minBet, Math.min(Math.max(1, num('games.lucky_wheel.min_bet', 100)), Math.min(adminBet.maxBet, Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), gamePayoutLimits().maxBet))),
+      chips: adminBet.chips,
       /** Very low win rate by default. */
       loseWeight: Math.max(1, num('games.lucky_wheel.lose_weight', 72)),
       x2Weight: Math.max(0, num('games.lucky_wheel.x2_weight', 24)),
