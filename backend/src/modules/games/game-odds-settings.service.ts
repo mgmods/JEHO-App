@@ -80,7 +80,22 @@ export class GameOddsSettingsService implements OnModuleInit, OnModuleDestroy {
     if (body?.preset && typeof body.preset === 'string') {
       next = applyGameOddsPreset(body.preset, current);
     } else {
-      next = sanitizeGameOdds({ ...current, ...body });
+      const incomingRates = body?.gameWinRates && typeof body.gameWinRates === 'object' && !Array.isArray(body.gameWinRates)
+        ? body.gameWinRates as Record<string, unknown>
+        : {};
+      const mergedRates: Record<string, number> = { ...current.gameWinRates };
+      for (const [id, value] of Object.entries(incomingRates)) {
+        const key = String(id).trim().toLowerCase();
+        const rate = Number(value);
+        if (key && Number.isFinite(rate)) mergedRates[key] = rate;
+      }
+      const clearRates = Array.isArray(body?.clearGameWinRates)
+        ? body.clearGameWinRates.map((id) => String(id || '').trim().toLowerCase()).filter(Boolean)
+        : [];
+      clearRates.forEach((id) => delete mergedRates[id]);
+      const patch = { ...body, gameWinRates: mergedRates };
+      delete (patch as Record<string, unknown>).clearGameWinRates;
+      next = sanitizeGameOdds({ ...current, ...patch });
     }
     next.version = (current.version || 1) + 1;
     next.updatedAt = new Date().toISOString();
