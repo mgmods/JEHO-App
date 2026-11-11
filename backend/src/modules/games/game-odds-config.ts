@@ -146,8 +146,8 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
           const id = String(key).trim().toLowerCase();
           if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(id) || !value || typeof value !== 'object') return [];
           const row = value as Record<string, unknown>;
-          const min = Math.floor(clamp(row.minBet, 1, maxBet, Math.min(50, maxBet)));
-          const max = Math.floor(clamp(row.maxBet, min, maxBet, Math.min(20000, maxBet)));
+          const min = Math.floor(clamp(Number(row.minBet), 1, maxBet, Math.min(50, maxBet)));
+          const max = Math.floor(clamp(Number(row.maxBet), min, maxBet, Math.min(20000, maxBet)));
           const safeMax = Math.max(min, max);
           const chips = Array.isArray(row.chips)
             ? [...new Set(row.chips.map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x >= min && x <= safeMax))].sort((a, b) => a - b).slice(0, 12)
