@@ -1912,7 +1912,7 @@ export class MikooGatewayService implements OnModuleDestroy {
   ): Promise<MikooPlayerContext> {
     const req = decodeBetReq(body, style === 'pirate' ? 'pirate' : 'default');
     const betSettings = getGameBetSettings(gameSlug);
-    let amount = clampBetAmount(Number(req.money) || 0, betSettings.maxBet);
+    let amount = Math.floor(Number(req.money) || 0);
     if (amount < 1) amount = 0;
     this.logger.log(
       `GAME_PROBE SPIN_DECODE game=${gameSlug} style=${style} amount=${amount} roomId=${req.roomId} user=${player.userId} bal=${player.balance}`,
