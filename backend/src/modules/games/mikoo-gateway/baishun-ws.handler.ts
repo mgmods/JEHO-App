@@ -1773,6 +1773,8 @@ export class BaishunWsHandler {
     getPlayer: () => MikooPlayerContext | null,
     setPlayer: (p: MikooPlayerContext | null) => void,
   ) {
+    const betSettings = getGameBetSettings(gameSlug);
+    const configuredChips = betSettings.chips;
     let player = getPlayer();
     if (!player) {
       const uid = Number(data.user_id ?? data.userId ?? query.user_id ?? query.userId ?? 0);
@@ -1813,7 +1815,7 @@ export class BaishunWsHandler {
         }
       }
       if (!player) {
-        this.replyFish(ws, 1002, { fishs: [], players: [], paoBei: CHIP_LIST }, 5);
+        this.replyFish(ws, 1002, { fishs: [], players: [], paoBei: configuredChips }, 5);
         return;
       }
       const bal = await this.sessions.refreshBalance(player);
@@ -1867,7 +1869,7 @@ export class BaishunWsHandler {
         user_id: uid,
         userId: uid,
         players: [self],
-        paoBei: CHIP_LIST.slice(),
+        paoBei: configuredChips,
         allProp: [],
         itemsCfg: [],
         curBank: 0,
@@ -1912,16 +1914,20 @@ export class BaishunWsHandler {
           setPlayer(player);
         }
       }
-      const cost = Math.max(10, Math.floor(Number(data.coin ?? data.bet ?? data.mul ?? 10)));
+      const cost = Math.floor(Number(data.coin ?? data.bet ?? data.mul ?? configuredChips[0] ?? betSettings.minBet));
       if (!player) {
         this.replyFish(ws, 1005, {}, 5);
+        return;
+      }
+      if (!isGameBettingEnabled(gameSlug) || cost < betSettings.minBet || cost > betSettings.maxBet || !configuredChips.includes(cost)) {
+        this.replyFish(ws, 1005, { need_recharge: false, error: 'INVALID_BET' }, 5);
         return;
       }
       const uid = player.publicId || player.userId;
       const fireToken = data.fireToken ?? data.fire ?? data.token ?? Date.now();
       const angle = Number(data.angle ?? 90);
       try {
-        const charged = Math.min(cost, 5000);
+        const charged = cost;
         const bal = await this.debit(player.userId, charged, gameSlug);
         player.balance = bal;
         let stakeMap = this.fishFireStakes.get(ws);
