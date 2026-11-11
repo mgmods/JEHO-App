@@ -414,6 +414,7 @@ function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(g
 
 function setGameWinRate(gameId, raw) {
   gameWinRates[gameId] = raw === '' ? undefined : Math.max(0, Math.min(100, Number(raw)))
+  gameLossRates[gameId] = raw === '' ? undefined : 100 - gameWinRates[gameId]
 }
 
 function gameLossRate(gameId) {
