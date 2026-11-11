@@ -6,7 +6,7 @@ import { MikooSessionService, MikooPlayerContext } from './mikoo-session.service
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { pickWeightedAreaIndex, spinPayout } from './mikoo-house-edge.util';
 import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
-import { getGameOdds, getGameRtp, getGameWinRate, isGameEnabled } from '../game-odds-runtime';
+import { getGameBetSettings, getGameOdds, getGameRtp, getGameWinRate, isGameBettingEnabled, isGameEnabled } from '../game-odds-runtime';
 import { Wallet } from '../../../database/entities/wallet.entity';
 import {
   CurrencyType,
@@ -157,7 +157,9 @@ export class BaishunWsHandler {
   private handleJson(ws: WebSocket, gameSlug: string, rawUrl: string) {
     let player: MikooPlayerContext | null = null;
     let authReady: Promise<void> = Promise.resolve();
-    let betAmount = SLOT_CHIP_LIST[0];
+    const betSettings = getGameBetSettings(gameSlug);
+    const slotChips = betSettings.chips;
+    let betAmount = slotChips[0] ?? betSettings.minBet;
     const query = this.parseQuery(rawUrl);
 
     const ensurePlayer = async (
@@ -310,14 +312,14 @@ export class BaishunWsHandler {
             this.replyJson(ws, msgId, {
               Code: 0,
               Data: {
-                min_bet: SLOT_CHIP_LIST[0],
-                max_bet: 100000,
-                bet_list: SLOT_CHIP_LIST,
-                betList: SLOT_CHIP_LIST,
-                betConfig: SLOT_CHIP_LIST,
-                chips: SLOT_CHIP_LIST,
-                defaultBet: SLOT_CHIP_LIST[0],
-                default_bet: SLOT_CHIP_LIST[0],
+                min_bet: betSettings.minBet,
+                max_bet: betSettings.maxBet,
+                bet_list: slotChips,
+                betList: slotChips,
+                betConfig: slotChips,
+                chips: slotChips,
+                defaultBet: slotChips[0] ?? betSettings.minBet,
+                default_bet: slotChips[0] ?? betSettings.minBet,
                 lines: 20,
                 currency: 'coin',
                 currencyIcon: coinIcon,
@@ -359,23 +361,10 @@ export class BaishunWsHandler {
               });
               return;
             }
-            betAmount = Math.max(
-              SLOT_CHIP_LIST[0],
-              Math.floor(
-                Number(
-                  data.bet ??
-                    data.bet_amount ??
-                    data.betAmount ??
-                    data.defaultBet ??
-                    data.chip ??
-                    betAmount,
-                ) || SLOT_CHIP_LIST[0],
-              ),
-            );
-            if (!Number.isFinite(betAmount) || betAmount <= 0) {
-              betAmount = SLOT_CHIP_LIST[0];
-            }
-            if (betAmount > gamePayoutLimits().maxBet) {
+            betAmount = Math.floor(Number(
+              data.bet ?? data.bet_amount ?? data.betAmount ?? data.defaultBet ?? data.chip ?? betAmount,
+            ) || 0);
+            if (!isGameBettingEnabled(gameSlug) || betAmount < betSettings.minBet || betAmount > betSettings.maxBet || !slotChips.includes(betAmount)) {
               this.replyJson(ws, msgId === 'Bet' ? 'Bet' : 'Spin', {
                 Code: 1,
                 ErrorTips: 'Bet too high',
@@ -534,10 +523,12 @@ export class BaishunWsHandler {
           }
 
           if (msgId === 'ChangeBet') {
-            betAmount = Math.max(
-              SLOT_CHIP_LIST[0],
-              Math.floor(Number(data.bet ?? betAmount)),
-            );
+            const requested = Math.floor(Number(data.bet ?? betAmount));
+            if (!slotChips.includes(requested) || requested < betSettings.minBet || requested > betSettings.maxBet) {
+              this.replyJson(ws, 'ChangeBet', { Code: 1, ErrorTips: 'Invalid bet amount' });
+              return;
+            }
+            betAmount = requested;
             this.replyJson(ws, 'ChangeBet', { Code: 0, Data: { bet: betAmount } });
             return;
           }
