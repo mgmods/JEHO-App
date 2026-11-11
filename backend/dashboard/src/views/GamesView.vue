@@ -357,6 +357,7 @@ const odds = reactive({
 const coveredGames = ref([])
 const disabledGames = ref([])
 const gameWinRates = reactive({})
+const gameLossRates = reactive({})
 const gameRtpRates = reactive({})
 // One stable ID per game. Mikoo/provider IDs stay separate from JEHO-owned mini-games;
  // in particular, do not duplicate crash/hilo IDs and accidentally apply the wrong controls.
@@ -419,11 +420,14 @@ function gameLossRate(gameId) {
   const win = Number(gameWinRates[gameId])
   return gameWinRates[gameId] === undefined || gameWinRates[gameId] === '' || !Number.isFinite(win)
     ? ''
-    : 100 - Math.max(0, Math.min(100, win))
+    : Number.isFinite(Number(gameLossRates[gameId]))
+      ? Number(gameLossRates[gameId])
+      : 100 - Math.max(0, Math.min(100, win))
 }
 
 function setGameLossRate(gameId, raw) {
   gameWinRates[gameId] = raw === '' ? undefined : 100 - Math.max(0, Math.min(100, Number(raw)))
+  gameLossRates[gameId] = raw === '' ? undefined : Math.max(0, Math.min(100, Number(raw)))
 }
 
 const coveredCount = computed(() => coveredGames.value.length || 22)
@@ -454,6 +458,12 @@ function applyOddsPayload(data) {
   if (data.gameWinRates && typeof data.gameWinRates === 'object') {
     Object.keys(gameWinRates).forEach((id) => delete gameWinRates[id])
     Object.entries(data.gameWinRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameWinRates[id] = Math.max(0, Math.min(100, Number(value))) })
+  }
+  if (data.gameLossRates && typeof data.gameLossRates === 'object') {
+    Object.keys(gameLossRates).forEach((id) => delete gameLossRates[id])
+    Object.entries(data.gameLossRates).forEach(([id, value]) => {
+      if (Number.isFinite(Number(value))) gameLossRates[id] = Math.max(0, Math.min(100, Number(value)))
+    })
   }
   if (data.gameRtpRates && typeof data.gameRtpRates === 'object') {
     Object.keys(gameRtpRates).forEach((id) => delete gameRtpRates[id])
