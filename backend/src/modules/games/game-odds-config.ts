@@ -200,6 +200,11 @@ export function gameOddsClientPayload(cfg: GameOddsConfig) {
     coveredCount: GAME_ODDS_COVERED_GAMES.length,
     presets: Object.keys(GAME_ODDS_PRESETS),
     gameWinRates: cfg.gameWinRates,
+    // Loss probability is the exact complement of the published win probability.
+    // It is derived server-side so the two percentages can never drift apart.
+    gameLossRates: Object.fromEntries(
+      Object.entries(cfg.gameWinRates).map(([id, winRate]) => [id, Math.round((100 - winRate) * 100) / 100]),
+    ),
     gameRtpRates: cfg.gameRtpRates,
     hints: {
       gameWinRates: 'نسبة الفوز العامة المعلنة لكل لعبة من 0 إلى 100، وتُطبّق على نتائج محرك JEHO لكل اللاعبين بالتساوي. ألعاب النتائج المشتركة تستخدم عائد اللاعب RTP، وألعاب المزوّد الخارجي تحتاج دعمًا منه.',
