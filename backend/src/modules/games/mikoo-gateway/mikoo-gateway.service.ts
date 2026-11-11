@@ -1854,7 +1854,7 @@ export class MikooGatewayService implements OnModuleDestroy {
   ): Promise<MikooPlayerContext> {
     const req = decodeCostBetReq(body);
     const betSettings = getGameBetSettings(gameSlug);
-    let amount = clampBetAmount(Number(req.money) || 0, betSettings.maxBet);
+    let amount = Math.floor(Number(req.money) || 0);
     if (amount < 1) amount = 0;
     const fail = (code: number, desc: string, tip: number) => {
       if (style === 'fortune') {
