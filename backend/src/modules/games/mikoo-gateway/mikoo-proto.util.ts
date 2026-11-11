@@ -719,7 +719,6 @@ export function encodeBountyFootballGetRankDataRes(
 /** 7updown TableInfo — different from crash. */
 const SEVEN_UP_AREA_RATIOS: Record<number, number> = { 1: 2, 2: 5, 3: 2 };
 const SEVEN_UP_CHIPS = chipsList();
-const SEVEN_UP_CHIP_CSV = MIKOO_BET_CHIPS.join(',');
 
 function encode7UpBetArea(data: {
   id: number;
