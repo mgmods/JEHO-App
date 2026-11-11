@@ -217,10 +217,10 @@ class AdminConsoleActivity : ThemedActivity() {
             orientation = LinearLayout.HORIZONTAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(15), dp(16), dp(15))
+            setPadding(dp(18), dp(14), dp(18), dp(14))
             background = GradientDrawable(
                 GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFF252A5B.toInt(), 0xFF6245A8.toInt())
+                intArrayOf(0xFF171B38.toInt(), 0xFF30245F.toInt(), 0xFF6446B6.toInt())
             )
         }
         backButton = TextView(this).apply {
@@ -237,12 +237,12 @@ class AdminConsoleActivity : ThemedActivity() {
         val heading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
         titleView = TextView(this).apply {
             text = "مركز إدارة JEHO"
-            textSize = 19f
+            textSize = 20f
             setTextColor(Color.WHITE)
             setTypeface(typeface, Typeface.BOLD)
         }
         val subtitle = TextView(this).apply {
-            text = "تحكّم مباشر من داخل التطبيق"
+            text = "مركز العمليات والإدارة"
             textSize = 12f
             setTextColor(0xFFE3DDF7.toInt())
             setPadding(0, dp(3), 0, 0)
@@ -263,7 +263,7 @@ class AdminConsoleActivity : ThemedActivity() {
         val scroll = ScrollView(this).apply {
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             clipToPadding = false
-            setPadding(dp(14), dp(12), dp(14), dp(24))
+            setPadding(dp(16), dp(16), dp(16), dp(28))
         }
         body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -553,10 +553,12 @@ class AdminConsoleActivity : ThemedActivity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            background = GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, intArrayOf(0xFF21194B.toInt(), 0xFF49329A.toInt(), 0xFF7656D8.toInt())).apply { cornerRadius = dp(22).toFloat() }
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
-            elevation = dp(3).toFloat()
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+            background = GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, intArrayOf(0xFF171B38.toInt(), 0xFF352765.toInt(), 0xFF7053C7.toInt())).apply {
+                cornerRadius = dp(24).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(18) }
+            elevation = dp(4).toFloat()
         }
         val brand = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
         brand.addView(TextView(this).apply {
@@ -587,7 +589,7 @@ class AdminConsoleActivity : ThemedActivity() {
             pair.forEach { module ->
                 val tile = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(10), dp(9), dp(10), dp(9))
+                    setPadding(dp(13), dp(12), dp(13), dp(12))
                     background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(20).toFloat(); setStroke(dp(1), 0xFFE7E4F1.toInt()) }
                     elevation = dp(2).toFloat(); isClickable = true; isFocusable = true
                     foreground = android.graphics.drawable.RippleDrawable(
@@ -595,13 +597,13 @@ class AdminConsoleActivity : ThemedActivity() {
                         roundRect(0xFFF0ECFF.toInt(), 20),
                         null
                     )
-                    layoutParams = LinearLayout.LayoutParams(0, dp(128), 1f).apply { marginStart = dp(4); marginEnd = dp(4); bottomMargin = dp(8) }
+                    layoutParams = LinearLayout.LayoutParams(0, dp(148), 1f).apply { marginStart = dp(5); marginEnd = dp(5); bottomMargin = dp(10) }
                     setOnClickListener { openModule(module.key) }
                 }
                 val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
                 top.addView(TextView(this).apply {
                     text = module.icon; textSize = 19f; gravity = Gravity.CENTER; setTextColor(ACCENT); background = roundRect(0xFFF0ECFF.toInt(), 13)
-                    layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
+                    layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
                 })
                 top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
                 top.addView(TextView(this).apply { text = "↗"; textSize = 18f; setTextColor(MUTED) })
@@ -624,7 +626,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 tile.addView(tileTitle, LinearLayout.LayoutParams(-1, 0, 1f))
                 val tileSubtitle = TextView(this).apply {
                     text = module.subtitle
-                    textSize = 9f
+                    textSize = 10f
                     setTextColor(MUTED)
                     maxLines = 2
                     ellipsize = android.text.TextUtils.TruncateAt.END
@@ -3143,13 +3145,13 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         layoutDirection = View.LAYOUT_DIRECTION_RTL
-        setPadding(dp(16), dp(15), dp(16), dp(15))
+        setPadding(dp(17), dp(16), dp(17), dp(16))
         background = GradientDrawable().apply {
             setColor(Color.WHITE)
-            cornerRadius = dp(18).toFloat()
-            setStroke(dp(1), 0xFFE8E7F2.toInt())
+            cornerRadius = dp(20).toFloat()
+            setStroke(dp(1), 0xFFE5E7F0.toInt())
         }
-        elevation = dp(1).toFloat()
+        elevation = dp(2).toFloat()
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(11) }
     }
 
@@ -3159,7 +3161,7 @@ class AdminConsoleActivity : ThemedActivity() {
             textSize = size
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             textDirection = View.TEXT_DIRECTION_RTL
-            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
             setTextColor(color)
             if (bold) setTypeface(typeface, Typeface.BOLD)
             setPadding(0, dp(2), 0, dp(3))
@@ -3173,7 +3175,7 @@ class AdminConsoleActivity : ThemedActivity() {
      */
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label.trim().ifBlank { "إجراء" }
-        textSize = 12f
+        textSize = 13f
         isAllCaps = false
         isSingleLine = false
         maxLines = 3
@@ -3181,8 +3183,8 @@ class AdminConsoleActivity : ThemedActivity() {
         ellipsize = null
         gravity = Gravity.CENTER
         textAlignment = View.TEXT_ALIGNMENT_CENTER
-        minHeight = dp(36)
-        minimumHeight = dp(36)
+        minHeight = dp(44)
+        minimumHeight = dp(44)
         minWidth = dp(0)
         setTextColor(Color.WHITE)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -3193,7 +3195,7 @@ class AdminConsoleActivity : ThemedActivity() {
             GradientDrawable.Orientation.RIGHT_LEFT,
             intArrayOf(0xFF7659D2.toInt(), 0xFF5B42B0.toInt())
         ).apply {
-            cornerRadius = dp(15).toFloat()
+            cornerRadius = dp(14).toFloat()
             setStroke(dp(1), 0xFF8069D0.toInt())
         }
         val pressed = GradientDrawable().apply {
@@ -3211,8 +3213,8 @@ class AdminConsoleActivity : ThemedActivity() {
         setPadding(dp(8), dp(3), dp(8), dp(3))
         contentDescription = label
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(2)
-            bottomMargin = dp(4)
+            topMargin = dp(5)
+            bottomMargin = dp(5)
         }
         setOnClickListener { isEnabled = false; action(); post { isEnabled = true } }
     }
@@ -3236,7 +3238,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     companion object {
-        private const val BG = 0xFFF5F6FB.toInt()
+        private const val BG = 0xFFF4F5FA.toInt()
         private const val TEXT = 0xFF252744.toInt()
         private const val MUTED = 0xFF73758D.toInt()
         private const val ACCENT = 0xFF6B4CC2.toInt()
