@@ -25,8 +25,10 @@ class CasualPlayDto {
 
   @Type(() => Number)
   @IsNumber()
-  @Min(50)
-  @Max(20_000)
+  // The authoritative per-game min/max is validated in CasualBetService.
+  // Keep only the platform-wide DTO safety ceiling here.
+  @Min(1)
+  @Max(50_000)
   amount!: number;
 
   @IsOptional()
