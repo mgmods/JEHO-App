@@ -429,11 +429,16 @@ function setGameBetSetting(gameId, key, raw) {
   else current[key] = Math.max(1, Math.min(50000, Math.floor(Number(raw) || 1)))
   if (key === 'minBet' && current.minBet > current.maxBet) current.maxBet = current.minBet
   if (key === 'maxBet' && current.maxBet < current.minBet) current.minBet = current.maxBet
+  current.chips = current.chips.filter((x) => x >= current.minBet && x <= current.maxBet)
+  if (!current.chips.length) current.chips = [current.minBet]
   gameBetSettings[gameId] = current
 }
 function setGameBetChips(gameId, raw) {
   const values = String(raw || '').split(/[ ,،]+/).map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x > 0 && x <= 50000)
-  const min = betSetting(gameId).minBet\n  const max = betSetting(gameId).maxBet\n  const chips = [...new Set(values.filter((x) => x >= min && x <= max))].sort((a, b) => a - b).slice(0, 12)\n  gameBetSettings[gameId] = { ...betSetting(gameId), chips: chips.length ? chips : [min] }
+  const min = betSetting(gameId).minBet
+  const max = betSetting(gameId).maxBet
+  const chips = [...new Set(values.filter((x) => x >= min && x <= max))].sort((a, b) => a - b).slice(0, 12)
+  gameBetSettings[gameId] = { ...betSetting(gameId), chips: chips.length ? chips : [min] }
 }
 
 function setGameWinRate(gameId, raw) {
@@ -493,6 +498,17 @@ function applyOddsPayload(data) {
   if (data.gameRtpRates && typeof data.gameRtpRates === 'object') {
     Object.keys(gameRtpRates).forEach((id) => delete gameRtpRates[id])
     Object.entries(data.gameRtpRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameRtpRates[id] = Math.max(0.55, Math.min(0.82, Number(value))) })
+  }
+  if (data.gameBetSettings && typeof data.gameBetSettings === 'object') {
+    Object.keys(gameBetSettings).forEach((id) => delete gameBetSettings[id])
+    Object.entries(data.gameBetSettings).forEach(([id, value]) => {
+      if (!value || typeof value !== 'object') return
+      const minBet = Math.max(1, Math.min(50000, Math.floor(Number(value.minBet) || 50)))
+      const maxBet = Math.max(minBet, Math.min(50000, Math.floor(Number(value.maxBet) || 20000)))
+      const chips = Array.isArray(value.chips) ? value.chips.map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x >= minBet && x <= maxBet) : [50, 100, 500, 1000, 5000].filter((x) => x >= minBet && x <= maxBet)
+      gameBetSettings[id] = { minBet, maxBet, bettingEnabled: value.bettingEnabled !== false, chips: [...new Set(chips)].sort((a, b) => a - b) }
+      if (!gameBetSettings[id].chips.length) gameBetSettings[id].chips = [minBet]
+    })
   }
 }
 
