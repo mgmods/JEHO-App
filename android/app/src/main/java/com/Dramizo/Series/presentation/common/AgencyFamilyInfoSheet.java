@@ -263,6 +263,13 @@ public final class AgencyFamilyInfoSheet {
     }
 
 
+    private static int agencyRoleOrder(@Nullable String role) {
+        if ("owner".equalsIgnoreCase(role)) return 0;
+        if ("manager".equalsIgnoreCase(role)) return 1;
+        if ("host".equalsIgnoreCase(role)) return 2;
+        return 3;
+    }
+
     private static void applyAgencyTabUi(@Nullable TextView members, @Nullable TextView followers, boolean showFollowers) {
         if (members != null) members.setTextColor(showFollowers ? 0xBFFFFFFF : 0xFFFFFFFF);
         if (followers != null) followers.setTextColor(showFollowers ? 0xFFFFFFFF : 0xBFFFFFFF);
@@ -294,7 +301,14 @@ public final class AgencyFamilyInfoSheet {
                     return;
                 }
                 Object raw = result.data.get("items");
-                java.util.List<?> rows = raw instanceof java.util.List ? (java.util.List<?>) raw : java.util.Collections.emptyList();
+                java.util.List<?> rows = raw instanceof java.util.List ? new java.util.ArrayList<>((java.util.List<?>) raw) : new java.util.ArrayList<>();
+                if (!followers) {
+                    ((java.util.List<Object>) rows).sort((left, right) -> {
+                        String lr = left instanceof Map ? String.valueOf(((Map<?, ?>) left).get("role")) : "";
+                        String rr = right instanceof Map ? String.valueOf(((Map<?, ?>) right).get("role")) : "";
+                        return Integer.compare(agencyRoleOrder(lr), agencyRoleOrder(rr));
+                    });
+                }
                 Object count = result.data.get("total");
                 long total = count instanceof Number ? ((Number) count).longValue() : rows.size();
                 if (summary != null) summary.setText((followers ? "المتابعون • " : "الأعضاء • ") + formatCount(total));
