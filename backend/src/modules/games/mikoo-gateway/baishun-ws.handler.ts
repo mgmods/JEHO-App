@@ -943,8 +943,9 @@ export class BaishunWsHandler {
 
   /** Hilo / Royal Battle / Greedy Lion — raw ClientMsg protobuf (no Packer). */
   private handleClientMsg(ws: WebSocket, gameSlug: string, rawUrl: string) {
-    let player: MikooPlayerContext | null = null;
+    const betSettings = getGameBetSettings(gameSlug);
     const query = this.parseQuery(rawUrl);
+    const configuredChips = betSettings.chips;
     const isRoyal = gameSlug === 'royal-battle';
     const isGreedy = gameSlug === 'greedy-lion';
     // Per-connection Hilo round state
@@ -965,7 +966,7 @@ export class BaishunWsHandler {
     let greedyPhase: 'bet' | 'play' | 'over' = 'bet';
     let greedyRoundTimer: ReturnType<typeof setTimeout> | null = null;
     let chain: Promise<void> = Promise.resolve();
-    const greedyChips = CHIP_LIST.length ? CHIP_LIST : [50, 100, 200, 500, 1000];
+    const greedyChips = configuredChips.length ? configuredChips : [betSettings.minBet];
     /** Mesh session publicId — MUST match native bridge userId for chip fly / auto. */
     const queryUserId = String(query.user_id || query.userId || '').trim();
 
@@ -1138,11 +1139,11 @@ export class BaishunWsHandler {
       chipIdx: number,
       count: number,
     ): Promise<{ ok: boolean; bal: number }> => {
-      const chip = Math.max(
-        1,
-        Math.min(gamePayoutLimits().maxBet, Math.floor(Number(greedyChips[chipIdx] ?? 50))),
-      );
+      const chip = Math.floor(Number(greedyChips[chipIdx] ?? betSettings.minBet));
       const stake = chip * Math.max(1, count);
+      if (!isGameBettingEnabled(gameSlug) || chip < betSettings.minBet || chip > betSettings.maxBet || !configuredChips.includes(chip) || stake > gamePayoutLimits().maxBet) {
+        return { ok: false, bal: p.balance || 0 };
+      }
       try {
         const bal = await this.debit(p.userId, stake, gameSlug);
         p.balance = bal;
@@ -1230,10 +1231,10 @@ export class BaishunWsHandler {
 
           if (msgId === HILO_MSG.ReqGameConfig) {
             const cfg = isRoyal
-              ? encodeRoyalGetConfigRes()
+              ? encodeRoyalGetConfigRes(configuredChips)
               : isGreedy
                 ? encodeGreedyGetConfigRes(greedyChips)
-                : encodeHiloGetConfigRes();
+                : encodeHiloGetConfigRes(configuredChips);
             this.sendBin(ws, encodeClientMsg(HILO_MSG.ResGameConfig, cfg));
             if (isRoyal) {
               this.sendBin(
@@ -1343,10 +1344,11 @@ export class BaishunWsHandler {
               return;
             }
             if (isRoyal) {
-              const chip = Math.max(
-                10,
-                Math.min(gamePayoutLimits().maxBet, Math.floor(Number(fields[2] ?? fields[1] ?? 100))),
-              );
+              const chip = Math.floor(Number(fields[2] ?? fields[1] ?? configuredChips[0] ?? betSettings.minBet));
+              if (!isGameBettingEnabled(gameSlug) || chip < betSettings.minBet || chip > betSettings.maxBet) {
+                this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeRoyalBetRes(p.balance || 0, royalMyBet)));
+                return;
+              }
               try {
                 const bal = await this.debit(p.userId, chip, gameSlug);
                 p.balance = bal;
@@ -1466,10 +1468,13 @@ export class BaishunWsHandler {
             }
 
             // Hilo: field1 = amount
-            const betAmount = Math.max(
-              10,
-              Math.min(gamePayoutLimits().maxBet, Math.floor(Number(fields[1] ?? 100))),
-            );
+            const betAmount = Math.floor(Number(fields[1] ?? configuredChips[0] ?? betSettings.minBet));
+            if (!isGameBettingEnabled(gameSlug) || betAmount < betSettings.minBet || betAmount > betSettings.maxBet) {
+              this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeHiloBetRes({
+                newBalance: p.balance || 0, cardId: hiloCard.id, flower: hiloCard.flower, showBet: 0, roundState: 0,
+              })));
+              return;
+            }
             try {
               const afterBet = await this.debit(p.userId, betAmount, gameSlug);
               p.balance = afterBet;
