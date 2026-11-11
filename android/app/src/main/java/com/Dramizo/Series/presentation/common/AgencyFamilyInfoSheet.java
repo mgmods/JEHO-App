@@ -92,6 +92,7 @@ public final class AgencyFamilyInfoSheet {
 
         final String[] gidHold = {""};
         final boolean[] following = {false};
+        final MiscDtos.AgencyDto[] aHolder = {null};
 
         if (btnOpen != null) {
             // Fail closed while membership/role is being verified.
@@ -171,6 +172,7 @@ public final class AgencyFamilyInfoSheet {
                     return;
                 }
                 MiscDtos.AgencyDto a = r.data;
+                aHolder[0] = a;
                 boolean isSuper = false;
                 try {
                     isSuper = StaffRoleHelper.isSuper(container.getSessionManager().getUser());
@@ -248,15 +250,29 @@ public final class AgencyFamilyInfoSheet {
 
         TextView membersTab = sheet.findViewById(R.id.btnAgencyMembersTab);
         TextView followersTab = sheet.findViewById(R.id.btnAgencyFollowersTab);
+        TextView roomsTab = sheet.findViewById(R.id.btnAgencyRoomsTab);
+        TextView messageTab = sheet.findViewById(R.id.btnAgencyMessageTab);
         TextView rosterSummary = sheet.findViewById(R.id.tvAgencyRosterSummary);
         android.widget.LinearLayout peopleList = sheet.findViewById(R.id.agencyPeopleList);
         if (membersTab != null) membersTab.setOnClickListener(v -> {
-            applyAgencyTabUi(membersTab, followersTab, false);
+            applyAgencyTabUi(membersTab, followersTab, roomsTab, messageTab, 0);
             loadAgencyPeople(activity, container, id, peopleList, rosterSummary, false);
         });
         if (followersTab != null) followersTab.setOnClickListener(v -> {
-            applyAgencyTabUi(membersTab, followersTab, true);
+            applyAgencyTabUi(membersTab, followersTab, roomsTab, messageTab, 1);
             loadAgencyPeople(activity, container, id, peopleList, rosterSummary, true);
+        });
+        if (roomsTab != null) roomsTab.setOnClickListener(v -> {
+            applyAgencyTabUi(membersTab, followersTab, roomsTab, messageTab, 2);
+            loadAgencyRoom(activity, container, id, peopleList, rosterSummary, dialog);
+        });
+        if (messageTab != null) messageTab.setOnClickListener(v -> {
+            applyAgencyTabUi(membersTab, followersTab, roomsTab, messageTab, 3);
+            if (aHolder[0] != null && aHolder[0].owner != null && aHolder[0].owner.id != null) {
+                UserProfileCardSheet.show(activity, aHolder[0].owner.id, aHolder[0].owner.displayName, aHolder[0].owner.avatarUrl);
+            } else {
+                Toast.makeText(activity, "المراسلة غير متاحة حالياً", Toast.LENGTH_SHORT).show();
+            }
         });
         loadAgencyPeople(activity, container, id, peopleList, rosterSummary, false);
         dialog.show();
@@ -270,9 +286,64 @@ public final class AgencyFamilyInfoSheet {
         return 3;
     }
 
-    private static void applyAgencyTabUi(@Nullable TextView members, @Nullable TextView followers, boolean showFollowers) {
-        if (members != null) members.setTextColor(showFollowers ? 0xBFFFFFFF : 0xFFFFFFFF);
-        if (followers != null) followers.setTextColor(showFollowers ? 0xFFFFFFFF : 0xBFFFFFFF);
+    private static void applyAgencyTabUi(@Nullable TextView members, @Nullable TextView followers,
+            @Nullable TextView rooms, @Nullable TextView message, int selected) {
+        TextView[] tabs = {members, followers, rooms, message};
+        for (int i = 0; i < tabs.length; i++) {
+            if (tabs[i] != null) {
+                tabs[i].setTextColor(i == selected ? 0xFFFFFFFF : 0xBFFFFFFF);
+                tabs[i].setTypeface(null, i == selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+            }
+        }
+    }
+
+    private static void loadAgencyRoom(@NonNull FragmentActivity activity, @NonNull AppContainer container,
+            @NonNull String agencyId, @Nullable android.widget.LinearLayout list,
+            @Nullable TextView summary, @NonNull BottomSheetDialog dialog) {
+        if (list == null) return;
+        list.removeAllViews();
+        TextView loading = new TextView(activity);
+        loading.setText("جارٍ تحميل غرفة الوكالة...");
+        loading.setTextColor(0xBFFFFFFF);
+        loading.setGravity(android.view.Gravity.CENTER);
+        list.addView(loading);
+        container.getIoExecutor().execute(() -> {
+            Result<com.Dramizo.Series.data.remote.dto.RoomDtos.RoomDto> result =
+                    ApiCall.execute(container.getAgencyApi().room(agencyId));
+            activity.runOnUiThread(() -> {
+                list.removeAllViews();
+                if (!result.success || result.data == null) {
+                    TextView error = new TextView(activity);
+                    error.setText("تعذر تحميل غرفة الوكالة");
+                    error.setTextColor(0xFFFF8A8A);
+                    error.setGravity(android.view.Gravity.CENTER);
+                    list.addView(error);
+                    return;
+                }
+                com.Dramizo.Series.data.remote.dto.RoomDtos.RoomDto room = result.data;
+                if (summary != null) summary.setText("الغرف • 1");
+                TextView roomCard = new TextView(activity);
+                roomCard.setText("غرفة الوكالة\n" + (room.title != null ? room.title : "غرفة الوكالة") + "\nاضغط للدخول");
+                roomCard.setTextColor(0xFFFFFFFF);
+                roomCard.setTextSize(14);
+                roomCard.setGravity(android.view.Gravity.CENTER);
+                roomCard.setPadding(dp(activity, 16), dp(activity, 20), dp(activity, 16), dp(activity, 20));
+                android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+                bg.setColor(0xFF151F28);
+                bg.setCornerRadius(dp(activity, 16));
+                bg.setStroke(dp(activity, 1), 0xFF34414D);
+                roomCard.setBackground(bg);
+                roomCard.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    try {
+                        Intent i = new Intent(activity, com.Dramizo.Series.presentation.room.VoiceRoomActivity.class);
+                        i.putExtra("roomId", room.id);
+                        activity.startActivity(i);
+                    } catch (Exception ignored) {}
+                });
+                list.addView(roomCard, new android.widget.LinearLayout.LayoutParams(-1, -2));
+            });
+        });
     }
 
     private static void loadAgencyPeople(@NonNull FragmentActivity activity, @NonNull AppContainer container,
