@@ -16,7 +16,7 @@ import { User } from '../../database/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RoomGameAccessService } from './room-game-access.service';
 import { clampGamePayout, gamePayoutLimits } from './game-payout-guard';
-import { getGameWinRate, isGameEnabled } from './game-odds-runtime';
+import { getGameBetSettings, getGameWinRate, isGameBettingEnabled, isGameEnabled } from './game-odds-runtime';
 
 type CasualGameId =
   | 'slots'
