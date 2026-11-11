@@ -203,7 +203,7 @@
                 </div>
                 <div class="col-6">
                   <label class="form-label small mb-1">نسبة الخسارة %</label>
-                  <input :value="gameLossRate(game.id)" @input="setGameLossRate(game.id, $event.target.value)" type="number" min="0" max="100" step="1" class="form-control form-control-sm" :disabled="gameWinRates[game.id] === undefined || gameWinRates[game.id] === ''" />
+                  <input :value="gameLossRate(game.id)" @input="setGameLossRate(game.id, $event.target.value)" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
                 </div>
               </div>
               <div class="small mt-2 text-success">{{ game.id === 'crash' ? 'احتمال وصول الجولة إلى ×1.50 أو أكثر — يتحكم به الخادم' : 'النسبتان متعاكستان ومجموعهما 100% — يتحكم بهما الخادم' }}</div>
