@@ -148,7 +148,11 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
           const row = value as Record<string, unknown>;
           const min = Math.floor(clamp(row.minBet, 1, 50000, 50));
           const max = Math.floor(clamp(row.maxBet, min, 50000, 20000));
-          const safeMax = Math.max(min, max);\n          const chips = Array.isArray(row.chips)\n            ? [...new Set(row.chips.map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x >= min && x <= safeMax))].sort((a, b) => a - b).slice(0, 12)\n            : [50, 100, 500, 1000, 5000].filter((x) => x >= min && x <= safeMax);\n          return [[id, { minBet: min, maxBet: safeMax, bettingEnabled: row.bettingEnabled !== false, chips: chips.length ? chips : [min] }]];
+          const safeMax = Math.max(min, max);
+          const chips = Array.isArray(row.chips)
+            ? [...new Set(row.chips.map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x >= min && x <= safeMax))].sort((a, b) => a - b).slice(0, 12)
+            : [50, 100, 500, 1000, 5000].filter((x) => x >= min && x <= safeMax);
+          return [[id, { minBet: min, maxBet: safeMax, bettingEnabled: row.bettingEnabled !== false, chips: chips.length ? chips : [min] }]];
         }))
       : { ...d.gameBetSettings },
   };
