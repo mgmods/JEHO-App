@@ -31,7 +31,7 @@ export type GameOddsConfig = {
   /** Per-game player return target for shared-outcome betting games. */
   gameRtpRates: Record<string, number>;
   /** Per-game wager controls. bettingEnabled=false rejects wagers server-side. */
-  gameBetSettings: Record<string, { minBet: number; maxBet: number; bettingEnabled: boolean }>;
+  gameBetSettings: Record<string, { minBet: number; maxBet: number; bettingEnabled: boolean; chips: number[] }>;
 };
 
 export const DEFAULT_GAME_ODDS: GameOddsConfig = {
@@ -148,7 +148,7 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
           const row = value as Record<string, unknown>;
           const min = Math.floor(clamp(row.minBet, 1, 50000, 50));
           const max = Math.floor(clamp(row.maxBet, min, 50000, 20000));
-          return [[id, { minBet: min, maxBet: Math.max(min, max), bettingEnabled: row.bettingEnabled !== false }]];
+          const safeMax = Math.max(min, max);\n          const chips = Array.isArray(row.chips)\n            ? [...new Set(row.chips.map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x >= min && x <= safeMax))].sort((a, b) => a - b).slice(0, 12)\n            : [50, 100, 500, 1000, 5000].filter((x) => x >= min && x <= safeMax);\n          return [[id, { minBet: min, maxBet: safeMax, bettingEnabled: row.bettingEnabled !== false, chips: chips.length ? chips : [min] }]];
         }))
       : { ...d.gameBetSettings },
   };
