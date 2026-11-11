@@ -1520,18 +1520,18 @@ export class MikooGatewayService implements OnModuleDestroy {
       return;
     }
     if (gameSlug === 'megaways-slots' || gameSlug === 'sugar-rush') {
-      this.send(ws, '.game.s_c_getChipCfgRes', encodeChipCfgRes(getGameBetSettings(gameSlug).chips));
-      this.send(ws, '.game.GetChipCfgRes', encodeChipCfgRes());
+      this.send(ws, '.game.s_c_getChipCfgRes', encodeChipCfgRes(chips));
+      this.send(ws, '.game.GetChipCfgRes', encodeChipCfgRes(chips));
       return;
     }
     if (gameSlug === 'fortune-slot') {
-      this.send(ws, '.game.GameCfgRes', encodeFortuneGameCfgRes());
-      this.send(ws, '.game.GameCfgRsp', encodeFortuneGameCfgRes());
+      this.send(ws, '.game.GameCfgRes', encodeFortuneGameCfgRes(chips, betSettings.minBet, betSettings.maxBet));
+      this.send(ws, '.game.GameCfgRsp', encodeFortuneGameCfgRes(chips, betSettings.minBet, betSettings.maxBet));
       return;
     }
     if (gameSlug === 'line-slots') {
-      this.send(ws, '.game.GameCfgRsp', encodeLineSlotsGameCfgRsp());
-      this.send(ws, '.game.GameCfgRes', encodeLineSlotsGameCfgRsp());
+      this.send(ws, '.game.GameCfgRsp', encodeLineSlotsGameCfgRsp(chips, betSettings.minBet, betSettings.maxBet));
+      this.send(ws, '.game.GameCfgRes', encodeLineSlotsGameCfgRsp(chips, betSettings.minBet, betSettings.maxBet));
     }
   }
 
@@ -1804,8 +1804,9 @@ export class MikooGatewayService implements OnModuleDestroy {
       }
 
       if (name === '.game.c_s_getChipCfgReq' || name === '.game.GetChipCfgReq') {
-        this.send(ws, '.game.s_c_getChipCfgRes', encodeChipCfgRes());
-        this.send(ws, '.game.GetChipCfgRes', encodeChipCfgRes());
+        const chips = getGameBetSettings(gameSlug).chips;
+        this.send(ws, '.game.s_c_getChipCfgRes', encodeChipCfgRes(chips));
+        this.send(ws, '.game.GetChipCfgRes', encodeChipCfgRes(chips));
         return player;
       }
 
