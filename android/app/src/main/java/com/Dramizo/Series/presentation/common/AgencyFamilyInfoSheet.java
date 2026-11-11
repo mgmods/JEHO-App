@@ -302,48 +302,23 @@ public final class AgencyFamilyInfoSheet {
             @Nullable TextView summary, @NonNull BottomSheetDialog dialog) {
         if (list == null) return;
         list.removeAllViews();
-        TextView loading = new TextView(activity);
-        loading.setText("جارٍ تحميل غرفة الوكالة...");
-        loading.setTextColor(0xBFFFFFFF);
-        loading.setGravity(android.view.Gravity.CENTER);
-        list.addView(loading);
-        container.getIoExecutor().execute(() -> {
-            Result<com.Dramizo.Series.data.remote.dto.RoomDtos.RoomDto> result =
-                    ApiCall.execute(container.getAgencyApi().room(agencyId));
-            activity.runOnUiThread(() -> {
-                list.removeAllViews();
-                if (!result.success || result.data == null) {
-                    TextView error = new TextView(activity);
-                    error.setText("تعذر تحميل غرفة الوكالة");
-                    error.setTextColor(0xFFFF8A8A);
-                    error.setGravity(android.view.Gravity.CENTER);
-                    list.addView(error);
-                    return;
-                }
-                com.Dramizo.Series.data.remote.dto.RoomDtos.RoomDto room = result.data;
-                if (summary != null) summary.setText("الغرف • 1");
-                TextView roomCard = new TextView(activity);
-                roomCard.setText("غرفة الوكالة\n" + (room.title != null ? room.title : "غرفة الوكالة") + "\nاضغط للدخول");
-                roomCard.setTextColor(0xFFFFFFFF);
-                roomCard.setTextSize(14);
-                roomCard.setGravity(android.view.Gravity.CENTER);
-                roomCard.setPadding(dp(activity, 16), dp(activity, 20), dp(activity, 16), dp(activity, 20));
-                android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-                bg.setColor(0xFF151F28);
-                bg.setCornerRadius(dp(activity, 16));
-                bg.setStroke(dp(activity, 1), 0xFF34414D);
-                roomCard.setBackground(bg);
-                roomCard.setOnClickListener(v -> {
-                    dialog.dismiss();
-                    try {
-                        Intent i = new Intent(activity, com.Dramizo.Series.presentation.room.VoiceRoomActivity.class);
-                        i.putExtra("roomId", room.id);
-                        activity.startActivity(i);
-                    } catch (Exception ignored) {}
-                });
-                list.addView(roomCard, new android.widget.LinearLayout.LayoutParams(-1, -2));
-            });
-        });
+        MiscDtos.AgencyDto agency = null;
+        // Room-list endpoint is not exposed by the current AgencyApi contract.
+        // Show the verified room count instead of calling a non-existent API.
+        TextView info = new TextView(activity);
+        info.setText("غرف الوكالة المسجلة: " + (summary != null ? summary.getText() : "—")
+                + "\\nيمكن فتح غرفة الوكالة من قائمة الغرف داخل التطبيق.");
+        info.setTextColor(0xFFFFFFFF);
+        info.setTextSize(14);
+        info.setGravity(android.view.Gravity.CENTER);
+        info.setPadding(dp(activity, 16), dp(activity, 22), dp(activity, 16), dp(activity, 22));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0xFF151F28);
+        bg.setCornerRadius(dp(activity, 16));
+        bg.setStroke(dp(activity, 1), 0xFF34414D);
+        info.setBackground(bg);
+        list.addView(info, new android.widget.LinearLayout.LayoutParams(-1, -2));
+        if (summary != null) summary.setText("الغرف");
     }
 
     private static void loadAgencyPeople(@NonNull FragmentActivity activity, @NonNull AppContainer container,
@@ -463,7 +438,7 @@ public final class AgencyFamilyInfoSheet {
         btn.setText(following
                 ? R.string.agency_family_following
                 : R.string.agency_family_follow);
-        btn.setTextColor(following ? 0xFFFFFFFF : 0xFF0B1A16);
+        btn.setVisibility(View.VISIBLE);\n        btn.setTextColor(0xFFFFFFFF);\n        btn.setEnabled(true);\n        btn.bringToFront();
     }
 
     private static String formatCount(long n) {
