@@ -17,7 +17,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { DiceRollDto } from './dto/dice.dto';
 import { RoomGameAccessService } from './room-game-access.service';
 import { clampGamePayout, gamePayoutLimits } from './game-payout-guard';
-import { getGameWinRate, isGameEnabled } from './game-odds-runtime';
+import { getGameBetSettings, getGameWinRate, isGameBettingEnabled, isGameEnabled } from './game-odds-runtime';
 
 /** Display multipliers ≈ fair × 0.75 house (true 2-dice outcomes). Peaks soft-clamped by guard. */
 export const DICE_ODDS: Record<number, number> = {
