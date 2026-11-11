@@ -84,7 +84,7 @@ export class DiceService {
       config: {
         minBet: cfg.minBet,
         maxBet: cfg.maxBet,
-        chips: [100, 500, 1000, 5000, 10_000].filter((c) => c <= cfg.maxBet),
+        chips: cfg.chips.filter((c) => c >= cfg.minBet && c <= cfg.maxBet),
         odds: DICE_ODDS,
       },
     };
