@@ -93,7 +93,16 @@ export class GameOddsSettingsService implements OnModuleInit, OnModuleDestroy {
         ? body.clearGameWinRates.map((id) => String(id || '').trim().toLowerCase()).filter(Boolean)
         : [];
       clearRates.forEach((id) => delete mergedRates[id]);
-      const patch = { ...body, gameWinRates: mergedRates };
+      const incomingBetSettings = body?.gameBetSettings && typeof body.gameBetSettings === 'object' && !Array.isArray(body.gameBetSettings)
+        ? body.gameBetSettings as Record<string, unknown>
+        : {};
+      const mergedBetSettings: Record<string, unknown> = { ...current.gameBetSettings };
+      for (const [id, value] of Object.entries(incomingBetSettings)) {
+        const key = String(id).trim().toLowerCase();
+        if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(key) || !value || typeof value !== 'object') continue;
+        mergedBetSettings[key] = { ...(mergedBetSettings[key] as Record<string, unknown> || {}), ...(value as Record<string, unknown>) };
+      }
+      const patch = { ...body, gameWinRates: mergedRates, gameBetSettings: mergedBetSettings };
       delete (patch as Record<string, unknown>).clearGameWinRates;
       next = sanitizeGameOdds({ ...current, ...patch });
     }
