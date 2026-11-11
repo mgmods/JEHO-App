@@ -687,9 +687,11 @@ export class BaishunWsHandler {
 
   /** Swimsuit Party — Packer + protobuf routes. */
   private handlePacker(ws: WebSocket, gameSlug: string, rawUrl: string) {
+    const betSettings = getGameBetSettings(gameSlug);
+    const configuredChips = betSettings.chips;
     let player: MikooPlayerContext | null = null;
     let chipIdx = 0;
-    let chipMultiple = CHIP_LIST[0];
+    let chipMultiple = configuredChips[0] ?? betSettings.minBet;
     const query = this.parseQuery(rawUrl);
 
     this.logger.log(`baishun packer attach ${gameSlug}`);
@@ -734,7 +736,7 @@ export class BaishunWsHandler {
                       chip: chipMultiple,
                       chipIdx,
                     }),
-                    channelCfg: encodeChannelCfg(),
+                    channelCfg: encodeChannelCfg(configuredChips),
                   }),
                 ),
               );
@@ -745,7 +747,7 @@ export class BaishunWsHandler {
               `baishun connect ${gameSlug} user=${player.userId} bal=${bal} room=${player.roomId || '-'}`,
             );
             chipIdx = 0;
-            chipMultiple = CHIP_LIST[0];
+            chipMultiple = configuredChips[0] ?? betSettings.minBet;
             const playerInfo = encodePlayerInfo({
               playerId: Number(player.publicId) || player.userId.length,
               userName: player.displayName || String(player.publicId),
@@ -802,8 +804,8 @@ export class BaishunWsHandler {
 
           if (route === SwimsuitRoute.PLAYER_CHANGE_CHIP) {
             const req = decodeChangeChipReq(buffer);
-            chipIdx = Math.max(0, Math.min(CHIP_LIST.length - 1, req.chipIdx | 0));
-            chipMultiple = req.chipMultiple > 0 ? req.chipMultiple : CHIP_LIST[chipIdx];
+            chipIdx = Math.max(0, Math.min(configuredChips.length - 1, req.chipIdx | 0));
+            chipMultiple = configuredChips[chipIdx] ?? betSettings.minBet;
             this.sendBin(
               ws,
               packMessage(route, seq, encodeChangeChipRes(0, chipIdx, chipMultiple)),
@@ -830,10 +832,10 @@ export class BaishunWsHandler {
               return;
             }
             const req = decodeSpinReq(buffer);
-            if (req.chipMultiple > 0) chipMultiple = req.chipMultiple;
-            if (req.chipIdx >= 0) chipIdx = req.chipIdx;
-            const betAmount = Math.max(50, Math.floor(chipMultiple || CHIP_LIST[0]));
-            if (betAmount > gamePayoutLimits().maxBet) {
+            if (req.chipIdx >= 0) chipIdx = Math.max(0, Math.min(configuredChips.length - 1, req.chipIdx));
+            chipMultiple = configuredChips[chipIdx] ?? betSettings.minBet;
+            const betAmount = Math.floor(chipMultiple || betSettings.minBet);
+            if (!isGameBettingEnabled(gameSlug) || betAmount < betSettings.minBet || betAmount > betSettings.maxBet || !configuredChips.includes(betAmount) || betAmount > gamePayoutLimits().maxBet) {
               this.sendBin(
                 ws,
                 packMessage(
