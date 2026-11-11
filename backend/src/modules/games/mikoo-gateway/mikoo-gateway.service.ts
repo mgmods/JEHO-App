@@ -1881,7 +1881,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       }
     };
     if (!isGameBettingEnabled(gameSlug)) { ws.close(1013, 'Betting disabled by administrator'); return player; }
-    if (amount < betSettings.minBet || amount > betSettings.maxBet) {
+    if (amount < betSettings.minBet || amount > betSettings.maxBet || !betSettings.chips.includes(amount)) {
       fail(1, 'Bet outside configured limits', 1);
       return player;
     }
@@ -1957,7 +1957,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       }
     };
     if (!isGameBettingEnabled(gameSlug)) { ws.close(1013, 'Betting disabled by administrator'); return player; }
-    if (amount < betSettings.minBet || amount > betSettings.maxBet) {
+    if (amount < betSettings.minBet || amount > betSettings.maxBet || !betSettings.chips.includes(amount)) {
       fail(1, 'Bet outside configured limits', 1);
       return player;
     }
@@ -2057,7 +2057,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       return player;
     }
     const amount = clampBetAmount(rawAmount, gamePayoutLimits().maxBet);
-    if (amount < betSettings.minBet || amount > betSettings.maxBet) {
+    if (amount < betSettings.minBet || amount > betSettings.maxBet || !betSettings.chips.includes(amount)) {
       if (gameSlug === 'greedy-box') {
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
           code: 1, desc: 'Invalid bet', userMoney: player.balance, tipType: 1, iconId: req.areaId,
