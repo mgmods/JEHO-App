@@ -214,7 +214,14 @@
               <input :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
               <div class="small text-muted mt-2">هذه اللعبة تعرض نتيجة مشتركة للجولة؛ لذلك نضبط العائد المتوقع بدلاً من فرض فوز أو خسارة منفصلة لكل لاعب.</div>
             </template>
-            <div v-else class="small text-muted">محرك هذه اللعبة لا يوفّر حالياً تحكماً مباشراً باحتمال الفوز.</div>
+            <div v-else class="small text-muted">محرك المزوّد الخارجي لا يتيح ضبط احتمال الفوز من خادم JEHO؛ يمكن إيقاف اللعبة بالكامل.</div>
+            <hr class="my-3" />
+            <div class="small fw-semibold mb-2">حدود الرهان والتحكم بالمراهنة</div>
+            <div class="row g-2">
+              <div class="col-6"><label class="form-label small mb-1">أقل رهان</label><input :value="betSetting(game.id).minBet" @input="setGameBetSetting(game.id, 'minBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
+              <div class="col-6"><label class="form-label small mb-1">أعلى رهان</label><input :value="betSetting(game.id).maxBet" @input="setGameBetSetting(game.id, 'maxBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
+            </div>
+            <label class="form-check form-switch mt-2 mb-0"><input class="form-check-input" type="checkbox" :checked="betSetting(game.id).bettingEnabled !== false" @change="setGameBetSetting(game.id, 'bettingEnabled', $event.target.checked)" /><span class="form-check-label small">السماح بالمراهنة داخل هذه اللعبة</span></label>
           </div>
         </div>
       </div>
@@ -359,6 +366,7 @@ const disabledGames = ref([])
 const gameWinRates = reactive({})
 const gameLossRates = reactive({})
 const gameRtpRates = reactive({})
+const gameBetSettings = reactive({})
 // One stable ID per game. Mikoo/provider IDs stay separate from JEHO-owned mini-games;
  // in particular, do not duplicate crash/hilo IDs and accidentally apply the wrong controls.
 const manageableGames = [
@@ -411,6 +419,17 @@ const directWinRateGameIds = new Set([
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
 const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
 function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(gameId || '').toLowerCase()) }
+function betSetting(gameId) {
+  return gameBetSettings[gameId] || { minBet: 50, maxBet: 20000, bettingEnabled: true }
+}
+function setGameBetSetting(gameId, key, raw) {
+  const current = { ...betSetting(gameId) }
+  if (key === 'bettingEnabled') current.bettingEnabled = Boolean(raw)
+  else current[key] = Math.max(1, Math.min(50000, Math.floor(Number(raw) || 1)))
+  if (key === 'minBet' && current.minBet > current.maxBet) current.maxBet = current.minBet
+  if (key === 'maxBet' && current.maxBet < current.minBet) current.minBet = current.maxBet
+  gameBetSettings[gameId] = current
+}
 
 function setGameWinRate(gameId, raw) {
   gameWinRates[gameId] = raw === '' ? undefined : Math.max(0, Math.min(100, Number(raw)))
@@ -500,7 +519,7 @@ function setAllGamesEnabled(enabled) {
 async function saveOdds() {
   savingOdds.value = true
   error.value = ''
-  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), clearGameWinRates: safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).map(g => g.id), gameRtpRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameBetSettings: Object.fromEntries(safeManageableGames.map(g => [g.id, betSetting(g.id)])), gameWinRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), clearGameWinRates: safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).map(g => g.id), gameRtpRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
   savingOdds.value = false
   if (err) {
     error.value = err.message
@@ -523,9 +542,11 @@ async function saveOdds() {
   const clearedRatesMatch = safeManageableGames.filter(g => supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).every(g => stored.gameWinRates?.[g.id] === undefined)
   const expectedRtpRates = Object.fromEntries(safeManageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)]))
   const rtpRatesMatch = Object.entries(expectedRtpRates).every(([id, value]) => Math.abs(Number(stored.gameRtpRates?.[id]) - value) < 0.000001)
+  const expectedBetSettings = Object.fromEntries(safeManageableGames.map(g => [g.id, betSetting(g.id)]))
+  const betSettingsMatch = Object.entries(expectedBetSettings).every(([id, value]) => Number(stored.gameBetSettings?.[id]?.minBet) === Number(value.minBet) && Number(stored.gameBetSettings?.[id]?.maxBet) === Number(value.maxBet) && (stored.gameBetSettings?.[id]?.bettingEnabled !== false) === (value.bettingEnabled !== false))
   const numericKeys = ['playerRtp', 'spinHitRate', 'fishingHitRate', 'crashCashoutRake', 'hiloPayoutMult', 'royalBattlePayGate', 'maxBet', 'maxWinMult', 'maxWinAbsolute', 'maxCrashRatio']
   const globalSettingsMatch = numericKeys.every((key) => Math.abs(Number(stored[key]) - Number(odds[key])) < 0.000001)
-  if (expectedDisabled !== actualDisabled || !ratesMatch || !clearedRatesMatch || !rtpRatesMatch || !globalSettingsMatch) {
+  if (expectedDisabled !== actualDisabled || !ratesMatch || !clearedRatesMatch || !rtpRatesMatch || !betSettingsMatch || !globalSettingsMatch) {
     error.value = 'الخادم لم يُرجع جميع إعدادات الألعاب وحدود الرهان ونسب الفوز والعائد كما حُفظت؛ لم يتم تأكيد الحفظ.'
     toast().danger(error.value)
     return
