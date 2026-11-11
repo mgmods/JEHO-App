@@ -944,6 +944,7 @@ export class BaishunWsHandler {
   /** Hilo / Royal Battle / Greedy Lion — raw ClientMsg protobuf (no Packer). */
   private handleClientMsg(ws: WebSocket, gameSlug: string, rawUrl: string) {
     const betSettings = getGameBetSettings(gameSlug);
+    let player: MikooPlayerContext | null = null;
     const query = this.parseQuery(rawUrl);
     const configuredChips = betSettings.chips;
     const isRoyal = gameSlug === 'royal-battle';
@@ -1234,7 +1235,7 @@ export class BaishunWsHandler {
               ? encodeRoyalGetConfigRes(configuredChips)
               : isGreedy
                 ? encodeGreedyGetConfigRes(greedyChips)
-                : encodeHiloGetConfigRes(configuredChips);
+                : encodeHiloGetConfigRes(betSettings.maxBet, configuredChips);
             this.sendBin(ws, encodeClientMsg(HILO_MSG.ResGameConfig, cfg));
             if (isRoyal) {
               this.sendBin(
