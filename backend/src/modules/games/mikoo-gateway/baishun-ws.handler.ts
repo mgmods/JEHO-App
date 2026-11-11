@@ -309,6 +309,7 @@ export class BaishunWsHandler {
             const isCleopatra =
               gameSlug === 'cleopatra-slot' || gameSlug === 'cleopatra-slots';
             const puzzle = isCleopatra ? this.cleopatraPuzzle() : undefined;
+            const puzzleInfo = gameSlug === 'slot777' ? this.slot777PuzzleInfo() : undefined;
             this.replyJson(ws, msgId, {
               Code: 0,
               Data: {
@@ -336,6 +337,7 @@ export class BaishunWsHandler {
                       NormalResult: puzzle,
                     }
                   : {}),
+                ...(puzzleInfo ? { puzzleInfo } : {}),
                 // Football plinko: routes keyed by `${defaultRows}_${rewardMultipleIndex}`
                 ...(isPlinko
                   ? {
@@ -393,7 +395,9 @@ export class BaishunWsHandler {
               const rewardLevel = win >= betAmount * 3 ? 2 : win > 0 ? 1 : 0;
               const roundId = randomUUID();
               const puzzle = this.cleopatraPuzzle();
-              const puzzleInfo = this.slot777PuzzleInfo();
+              const puzzleInfo = gameSlug === 'slot777'
+                ? this.slot777PuzzleInfo(win > 0, mult)
+                : this.slot777PuzzleInfo();
               const isPlinko = gameSlug === 'football-plinko';
               const plinkoIdx = isPlinko
                 ? Math.max(0, Math.min(15, win > 0 ? Math.min(15, Math.floor(mult) || 1) : 0))
@@ -534,48 +538,22 @@ export class BaishunWsHandler {
           }
 
           if (msgId === 'GameRecord' || msgId === 'GameRecordDetail') {
-            // Bet history rows (bet/reward/time) — not the same as RankList.
-            const now = Math.floor(Date.now() / 1000);
-            const history = Array.from({ length: 8 }, (_, i) => {
-              const bet = SLOT_CHIP_LIST[i % SLOT_CHIP_LIST.length];
-              const reward = i % 3 === 0 ? bet * (2 + (i % 4)) : 0;
-              return {
-                bet,
-                bet_amount: bet,
-                reward,
-                bonus: reward,
-                win: reward,
-                win_amount: reward,
-                time: now - i * 3600,
-                timestamp: now - i * 3600,
-                multiple: reward > 0 ? reward / Math.max(1, bet) : 0,
-                roundId: `r${now - i}`,
-                round_id: `r${now - i}`,
-              };
-            });
+            // Do not fabricate historical rounds. Until round-level records are persisted,
+            // return an honest empty history rather than invented wins and balances.
             this.replyJson(ws, msgId, {
               Code: 0,
               Data: {
-                list: history,
-                records: history,
-                total: history.length,
+                list: [],
+                records: [],
+                total: 0,
               },
             });
             return;
           }
 
           if (msgId === 'RankList') {
-            let ranks = await this.economy.topWinners(gameSlug, 20);
-            if (ranks.length < 5) {
-              const global = await this.economy.topWinners(undefined, 20);
-              const seen = new Set(ranks.map((r) => String(r.userId)));
-              for (const g of global) {
-                if (ranks.length >= 20) break;
-                if (seen.has(String(g.userId))) continue;
-                ranks.push(g);
-                seen.add(String(g.userId));
-              }
-            }
+            // Keep the leaderboard scoped to this game; never mix in global wins.
+            const ranks = await this.economy.topWinners(gameSlug, 20);
             const list = ranks.map((r, idx) => {
               const amount = Math.max(0, Number(r.score) || Number(r.win) || 0);
               return {
@@ -2110,13 +2088,26 @@ export class BaishunWsHandler {
     return cols;
   }
 
-  /** Slot777: puzzleInfo is 3 middle-row symbol ids; client expands to 3×3. */
-  private slot777PuzzleInfo(): number[] {
-    return [
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-    ];
+  /** Slot777: puzzleInfo is the three middle-row symbols; keep the board consistent with settlement. */
+  private slot777PuzzleInfo(won = false, multiplier = 0): number[] {
+    if (won) {
+      // Reserve symbol 7 for the top multiplier so an ordinary win is not shown as 777.
+      const symbol = multiplier >= 25 ? 7
+        : multiplier >= 20 ? 6
+          : multiplier >= 15 ? 5
+            : multiplier >= 10 ? 4
+              : multiplier >= 4 ? 3
+                : multiplier >= 3 ? 2 : 1;
+      return [symbol, symbol, symbol];
+    }
+
+    // A losing spin must not accidentally display a winning three-of-a-kind.
+    const symbols = [1, 2, 3, 4, 5, 6, 7, 8];
+    for (let i = symbols.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [symbols[i], symbols[j]] = [symbols[j]!, symbols[i]!];
+    }
+    return symbols.slice(0, 3);
   }
 
   private replyJson(ws: WebSocket, msgId: string, data: Record<string, unknown>) {
