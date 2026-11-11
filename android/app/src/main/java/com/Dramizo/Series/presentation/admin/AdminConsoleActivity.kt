@@ -249,8 +249,9 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         heading.addView(titleView)
         heading.addView(subtitle)
+        // Keep a clearly labelled back action visible inside every admin section.
+        header.addView(backButton, LinearLayout.LayoutParams(-2, dp(42)).apply { marginEnd = dp(10) })
         header.addView(heading, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        // Back navigation is kept in the bottom bar / Android system back, not the header.
         root.addView(header)
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
@@ -270,6 +271,11 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        // Persistent, visible navigation was previously built but never attached
+        // to the activity root. Attach it here so staff always see named actions.
+        root.addView(buildBottomNavigation(), LinearLayout.LayoutParams(-1, dp(68)))
+
         // Android's bottom system Back button is intercepted by OnBackPressedDispatcher.
         setContentView(root)
     }
@@ -294,7 +300,7 @@ class AdminConsoleActivity : ThemedActivity() {
             orientation = LinearLayout.HORIZONTAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(7), dp(5), dp(7), dp(5))
+            setPadding(dp(7), dp(7), dp(7), dp(7))
             setBackgroundColor(Color.WHITE)
             elevation = dp(12).toFloat()
         }
@@ -356,8 +362,9 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             val label = TextView(this).apply {
                 text = item.first
-                textSize = 10f
+                textSize = 11f
                 gravity = Gravity.CENTER
+                includeFontPadding = false
                 setTextColor(if (selected) ACCENT else MUTED)
                 typeface = if (selected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
                 setPadding(0, dp(2), 0, 0)
@@ -3166,7 +3173,7 @@ class AdminConsoleActivity : ThemedActivity() {
      */
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label.trim().ifBlank { "إجراء" }
-        textSize = 11f
+        textSize = 12f
         isAllCaps = false
         isSingleLine = false
         maxLines = 3
