@@ -35,7 +35,7 @@ export function getGameBetSettings(gameId: string): { minBet: number; maxBet: nu
   const configured = live.gameBetSettings?.[id];
   const globalMax = Math.max(1, Math.floor(live.maxBet || 20_000));
   if (!configured) return { minBet: 50, maxBet: globalMax, bettingEnabled: true, chips: [50, 100, 500, 1000, 5000].filter((x) => x <= globalMax) };
-  const minBet = Math.max(1, Math.floor(configured.minBet || 1));
+  const minBet = Math.min(globalMax, Math.max(1, Math.floor(configured.minBet || 1)));
   return {
     minBet,
     maxBet: Math.max(minBet, Math.min(globalMax, Math.floor(configured.maxBet || globalMax))),
