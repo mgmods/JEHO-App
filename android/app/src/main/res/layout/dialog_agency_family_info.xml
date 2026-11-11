@@ -318,9 +318,31 @@
             android:layout_width="0dp"
             android:layout_height="42dp"
             android:layout_weight="1"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="6dp"
             android:gravity="center"
             android:text="المتابعون"
+            android:textColor="#BFFFFFFF"
+            android:background="@drawable/bg_user_card_stat_cell"/>
+
+        <TextView
+            android:id="@+id/btnAgencyRoomsTab"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:gravity="center"
+            android:text="الغرف"
+            android:textColor="#BFFFFFFF"
+            android:background="@drawable/bg_user_card_stat_cell"/>
+
+        <TextView
+            android:id="@+id/btnAgencyMessageTab"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:gravity="center"
+            android:text="مراسلة"
             android:textColor="#BFFFFFFF"
             android:background="@drawable/bg_user_card_stat_cell"/>
     </LinearLayout>
@@ -368,7 +390,7 @@
             android:background="@drawable/bg_agency_follow_btn"
             android:gravity="center"
             android:text="@string/agency_family_follow"
-            android:textColor="#FF0B1A16"
+            android:textColor="#FFFFFFFF"
             android:textSize="15sp"
             android:textStyle="bold"
             app:layout_constraintEnd_toEndOf="parent"
