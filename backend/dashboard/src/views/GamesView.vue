@@ -428,10 +428,18 @@ function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(g
 function betSetting(gameId) {
   return gameBetSettings[gameId] || { minBet: 50, maxBet: 20000, bettingEnabled: true, chips: [50, 100, 500, 1000, 5000] }
 }
+function normalizedBetSetting(gameId) {
+  const raw = betSetting(gameId)
+  const ceiling = Math.max(1, Math.min(50000, Math.floor(Number(odds.maxBet) || 10000)))
+  const minBet = Math.min(ceiling, Math.max(1, Math.floor(Number(raw.minBet) || 50)))
+  const maxBet = Math.max(minBet, Math.min(ceiling, Math.floor(Number(raw.maxBet) || ceiling)))
+  const chips = [...new Set((raw.chips || []).map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x >= minBet && x <= maxBet))].sort((a, b) => a - b).slice(0, 12)
+  return { minBet, maxBet, bettingEnabled: raw.bettingEnabled !== false, chips: chips.length ? chips : [minBet] }
+}
 function setGameBetSetting(gameId, key, raw) {
   const current = { ...betSetting(gameId), chips: [...betSetting(gameId).chips] }
   if (key === 'bettingEnabled') current.bettingEnabled = Boolean(raw)
-  else current[key] = Math.max(1, Math.min(50000, Math.floor(Number(raw) || 1)))
+  else current[key] = Math.max(1, Math.min(Math.min(50000, Number(odds.maxBet) || 10000), Math.floor(Number(raw) || 1)))
   if (key === 'minBet' && current.minBet > current.maxBet) current.maxBet = current.minBet
   if (key === 'maxBet' && current.maxBet < current.minBet) current.minBet = current.maxBet
   current.chips = current.chips.filter((x) => x >= current.minBet && x <= current.maxBet)
@@ -545,7 +553,7 @@ function setAllGamesEnabled(enabled) {
 async function saveOdds() {
   savingOdds.value = true
   error.value = ''
-  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameBetSettings: Object.fromEntries(safeManageableGames.map(g => [g.id, betSetting(g.id)])), gameWinRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), clearGameWinRates: safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).map(g => g.id), gameRtpRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameBetSettings: Object.fromEntries(safeManageableGames.map(g => [g.id, normalizedBetSetting(g.id)])), gameWinRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), clearGameWinRates: safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).map(g => g.id), gameRtpRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
   savingOdds.value = false
   if (err) {
     error.value = err.message
@@ -568,7 +576,7 @@ async function saveOdds() {
   const clearedRatesMatch = safeManageableGames.filter(g => supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).every(g => stored.gameWinRates?.[g.id] === undefined)
   const expectedRtpRates = Object.fromEntries(safeManageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)]))
   const rtpRatesMatch = Object.entries(expectedRtpRates).every(([id, value]) => Math.abs(Number(stored.gameRtpRates?.[id]) - value) < 0.000001)
-  const expectedBetSettings = Object.fromEntries(safeManageableGames.map(g => [g.id, betSetting(g.id)]))
+  const expectedBetSettings = Object.fromEntries(safeManageableGames.map(g => [g.id, normalizedBetSetting(g.id)]))
   const betSettingsMatch = Object.entries(expectedBetSettings).every(([id, value]) => Number(stored.gameBetSettings?.[id]?.minBet) === Number(value.minBet) && Number(stored.gameBetSettings?.[id]?.maxBet) === Number(value.maxBet) && (stored.gameBetSettings?.[id]?.bettingEnabled !== false) === (value.bettingEnabled !== false) && JSON.stringify([...(stored.gameBetSettings?.[id]?.chips || [])].sort((a,b)=>a-b)) === JSON.stringify([...(value.chips || [])].sort((a,b)=>a-b)))
   const numericKeys = ['playerRtp', 'spinHitRate', 'fishingHitRate', 'crashCashoutRake', 'hiloPayoutMult', 'royalBattlePayGate', 'maxBet', 'maxWinMult', 'maxWinAbsolute', 'maxCrashRatio']
   const globalSettingsMatch = numericKeys.every((key) => Math.abs(Number(stored[key]) - Number(odds[key])) < 0.000001)
