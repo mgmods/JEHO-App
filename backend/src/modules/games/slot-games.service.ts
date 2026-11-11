@@ -21,7 +21,7 @@ import { Wallet } from '../../database/entities/wallet.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 import { findMikooGame } from './mikoo-games.catalog';
-import { isGameEnabled } from './game-odds-runtime';
+import { isGameBettingEnabled, isGameEnabled } from './game-odds-runtime';
 
 
 
@@ -351,7 +351,7 @@ export class SlotGamesService {
     const game = findMikooGame(gameId);
 
     if (!game) throw new BadRequestException('Unknown slot game');
-    if (!isGameEnabled(game.id)) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');
+    if (!isGameEnabled(game.id)) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');\n    if (!isGameBettingEnabled(game.id)) throw new BadRequestException('المراهنة متوقفة حالياً لهذه اللعبة');
 
 
 
