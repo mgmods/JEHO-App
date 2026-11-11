@@ -1227,34 +1227,90 @@ export class AgenciesService implements OnModuleInit {
   /** Public agency profile roster. Owner is always first, followed by active managers, hosts and members. */
   async publicMembers(agencyId: string, page = 1, limit = 30) {
     const key = String(agencyId || '').trim();
-    let agency = await this.agenciesRepo.findOne({ where: { publicId: key }, relations: ['owner', 'owner.profile'] });
+    let agency = await this.agenciesRepo.findOne({
+      where: { publicId: key },
+      relations: ['owner', 'owner.profile'],
+    });
     if (!agency && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
-      agency = await this.agenciesRepo.findOne({ where: { id: key }, relations: ['owner'] });
+      agency = await this.agenciesRepo.findOne({
+        where: { id: key },
+        relations: ['owner', 'owner.profile'],
+      });
     }
-    if (!agency || agency.status !== AgencyStatus.ACTIVE) throw new NotFoundException('Agency not found');
+    if (!agency || agency.status !== AgencyStatus.ACTIVE) {
+      throw new NotFoundException('Agency not found');
+    }
+
     const safeLimit = Math.min(50, Math.max(1, Number(limit) || 30));
     const safePage = Math.max(1, Number(page) || 1);
-    const rows = await this.membersRepo.createQueryBuilder('m')
-      .leftJoinAndSelect('m.user', 'u')
-      .leftJoinAndSelect('u.profile', 'profile')
-      .where('m.agencyId = :agencyId', { agencyId: agency.id })
-      .andWhere('m.status = :status AND m.isActive = true', { status: AgencyMemberStatus.ACTIVE })
-      .orderBy(`CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 WHEN 'host' THEN 2 ELSE 3 END`, 'ASC')
-      .addOrderBy('m.joinedAt', 'ASC')
-      .skip((safePage - 1) * safeLimit).take(safeLimit).getMany();
-    const items = rows.map(m => ({
-      userId: m.userId, role: m.role, joinedAt: m.joinedAt,
-      user: m.user ? { id: m.user.id, publicId: m.user.publicId, username: m.user.username,
-        displayName: m.user.displayName, avatarUrl: m.user.avatarUrl, level: m.user.level,
-        country: m.user.profile?.country || null, city: m.user.profile?.city || null } : null,
+
+    // Use the same explicit SQL/table mapping as the public followers endpoint.
+    // This avoids ORM relation-metadata failures that previously made the roster
+    // return "تعذر تحميل القائمة" while the follower list continued to work.
+    const rows = await this.dataSource.query(
+      `SELECT m."userId" AS "userId", m.role AS role, m."joinedAt" AS "joinedAt",
+              u.id AS id, u."publicId" AS "publicId", u.username AS username,
+              u."displayName" AS "displayName", u."avatarUrl" AS "avatarUrl",
+              u.level AS level, up.country AS country, up.city AS city
+       FROM agency_members m
+       JOIN users u ON u.id = m."userId"
+       LEFT JOIN user_profiles up ON up."userId" = u.id
+       WHERE m."agencyId" = $1
+         AND m.status = $2
+         AND m."isActive" = TRUE
+       ORDER BY CASE m.role
+         WHEN 'owner' THEN 0
+         WHEN 'manager' THEN 1
+         WHEN 'host' THEN 2
+         ELSE 3
+       END ASC, m."joinedAt" ASC
+       LIMIT $3 OFFSET $4`,
+      [agency.id, AgencyMemberStatus.ACTIVE, safeLimit, (safePage - 1) * safeLimit],
+    );
+
+    const items = rows.map((row: any) => ({
+      userId: row.userId,
+      role: row.role,
+      joinedAt: row.joinedAt,
+      user: {
+        id: row.id,
+        publicId: row.publicId,
+        username: row.username,
+        displayName: row.displayName,
+        avatarUrl: row.avatarUrl,
+        level: row.level,
+        country: row.country || null,
+        city: row.city || null,
+      },
     }));
-    if (safePage === 1 && !items.some(m => m.userId === agency.ownerId) && agency.owner) {
-      items.unshift({ userId: agency.owner.id, role: AgencyRole.OWNER, joinedAt: agency.createdAt,
-        user: { id: agency.owner.id, publicId: agency.owner.publicId, username: agency.owner.username,
-          displayName: agency.owner.displayName, avatarUrl: agency.owner.avatarUrl, level: agency.owner.level,
-          country: agency.owner.profile?.country || null, city: agency.owner.profile?.city || null } });
+
+    // The agency owner must appear exactly once and always lead the roster,
+    // even on older installations where an owner membership row is missing.
+    const ownerAlreadyListed = items.some((item: any) => item.userId === agency!.ownerId);
+    if (safePage === 1 && !ownerAlreadyListed && agency.owner) {
+      items.unshift({
+        userId: agency.owner.id,
+        role: AgencyRole.OWNER,
+        joinedAt: agency.createdAt,
+        user: {
+          id: agency.owner.id,
+          publicId: agency.owner.publicId,
+          username: agency.owner.username,
+          displayName: agency.owner.displayName,
+          avatarUrl: agency.owner.avatarUrl,
+          level: agency.owner.level,
+          country: agency.owner.profile?.country || null,
+          city: agency.owner.profile?.city || null,
+        },
+      });
     }
-    const total = await this.membersRepo.count({ where: { agencyId: agency.id, status: AgencyMemberStatus.ACTIVE, isActive: true } });
+
+    const countRows = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS total FROM agency_members
+       WHERE "agencyId" = $1 AND status = $2 AND "isActive" = TRUE`,
+      [agency.id, AgencyMemberStatus.ACTIVE],
+    );
+    const total = Number(countRows?.[0]?.total || 0) + (ownerAlreadyListed ? 0 : 1);
     return { items, total: Math.max(total, items.length), page: safePage, limit: safeLimit };
   }
 
