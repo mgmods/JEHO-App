@@ -103,7 +103,7 @@ export class CasualBetService {
     }
     await this.roomAccess.assertParticipant(body?.roomId, userId);
     const amount = Math.floor(Number(body?.amount));
-    if (!Number.isFinite(amount) || amount < betSettings.minBet || amount > Math.min(betSettings.maxBet, gamePayoutLimits().maxBet)) {
+    if (!Number.isFinite(amount) || amount < betSettings.minBet || amount > Math.min(betSettings.maxBet, gamePayoutLimits().maxBet) || !betSettings.chips.includes(amount)) {
       throw new BadRequestException(`Bet must be between ${betSettings.minBet} and ${Math.min(betSettings.maxBet, gamePayoutLimits().maxBet)} coins`);
     }
 
