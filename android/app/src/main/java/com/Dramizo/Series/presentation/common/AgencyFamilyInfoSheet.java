@@ -438,7 +438,10 @@ public final class AgencyFamilyInfoSheet {
         btn.setText(following
                 ? R.string.agency_family_following
                 : R.string.agency_family_follow);
-        btn.setVisibility(View.VISIBLE);\n        btn.setTextColor(0xFFFFFFFF);\n        btn.setEnabled(true);\n        btn.bringToFront();
+        btn.setVisibility(View.VISIBLE);
+        btn.setTextColor(0xFFFFFFFF);
+        btn.setEnabled(true);
+        btn.bringToFront();
     }
 
     private static String formatCount(long n) {
