@@ -221,6 +221,7 @@
               <div class="col-6"><label class="form-label small mb-1">أقل رهان</label><input :value="betSetting(game.id).minBet" @input="setGameBetSetting(game.id, 'minBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
               <div class="col-6"><label class="form-label small mb-1">أعلى رهان</label><input :value="betSetting(game.id).maxBet" @input="setGameBetSetting(game.id, 'maxBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
             </div>
+            <div class="mt-2"><label class="form-label small mb-1">قيم أزرار الرهان (افصل بينها بفاصلة)</label><input :value="betSetting(game.id).chips.join(', ')" @change="setGameBetChips(game.id, $event.target.value)" type="text" class="form-control form-control-sm" placeholder="50, 100, 500, 1000, 5000" /><div class="form-text">مثال: 500, 1000, 5000 — حتى 12 قيمة، ضمن حدود الرهان المحددة.</div></div>
             <label class="form-check form-switch mt-2 mb-0"><input class="form-check-input" type="checkbox" :checked="betSetting(game.id).bettingEnabled !== false" @change="setGameBetSetting(game.id, 'bettingEnabled', $event.target.checked)" /><span class="form-check-label small">السماح بالمراهنة داخل هذه اللعبة</span></label>
           </div>
         </div>
@@ -420,15 +421,19 @@ function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(
 const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
 function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(gameId || '').toLowerCase()) }
 function betSetting(gameId) {
-  return gameBetSettings[gameId] || { minBet: 50, maxBet: 20000, bettingEnabled: true }
+  return gameBetSettings[gameId] || { minBet: 50, maxBet: 20000, bettingEnabled: true, chips: [50, 100, 500, 1000, 5000] }
 }
 function setGameBetSetting(gameId, key, raw) {
-  const current = { ...betSetting(gameId) }
+  const current = { ...betSetting(gameId), chips: [...betSetting(gameId).chips] }
   if (key === 'bettingEnabled') current.bettingEnabled = Boolean(raw)
   else current[key] = Math.max(1, Math.min(50000, Math.floor(Number(raw) || 1)))
   if (key === 'minBet' && current.minBet > current.maxBet) current.maxBet = current.minBet
   if (key === 'maxBet' && current.maxBet < current.minBet) current.minBet = current.maxBet
   gameBetSettings[gameId] = current
+}
+function setGameBetChips(gameId, raw) {
+  const values = String(raw || '').split(/[ ,،]+/).map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x > 0 && x <= 50000)
+  gameBetSettings[gameId] = { ...betSetting(gameId), chips: [...new Set(values)].sort((a, b) => a - b).slice(0, 12) }
 }
 
 function setGameWinRate(gameId, raw) {
@@ -543,7 +548,7 @@ async function saveOdds() {
   const expectedRtpRates = Object.fromEntries(safeManageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)]))
   const rtpRatesMatch = Object.entries(expectedRtpRates).every(([id, value]) => Math.abs(Number(stored.gameRtpRates?.[id]) - value) < 0.000001)
   const expectedBetSettings = Object.fromEntries(safeManageableGames.map(g => [g.id, betSetting(g.id)]))
-  const betSettingsMatch = Object.entries(expectedBetSettings).every(([id, value]) => Number(stored.gameBetSettings?.[id]?.minBet) === Number(value.minBet) && Number(stored.gameBetSettings?.[id]?.maxBet) === Number(value.maxBet) && (stored.gameBetSettings?.[id]?.bettingEnabled !== false) === (value.bettingEnabled !== false))
+  const betSettingsMatch = Object.entries(expectedBetSettings).every(([id, value]) => Number(stored.gameBetSettings?.[id]?.minBet) === Number(value.minBet) && Number(stored.gameBetSettings?.[id]?.maxBet) === Number(value.maxBet) && (stored.gameBetSettings?.[id]?.bettingEnabled !== false) === (value.bettingEnabled !== false) && JSON.stringify([...(stored.gameBetSettings?.[id]?.chips || [])].sort((a,b)=>a-b)) === JSON.stringify([...(value.chips || [])].sort((a,b)=>a-b)))
   const numericKeys = ['playerRtp', 'spinHitRate', 'fishingHitRate', 'crashCashoutRake', 'hiloPayoutMult', 'royalBattlePayGate', 'maxBet', 'maxWinMult', 'maxWinAbsolute', 'maxCrashRatio']
   const globalSettingsMatch = numericKeys.every((key) => Math.abs(Number(stored[key]) - Number(odds[key])) < 0.000001)
   if (expectedDisabled !== actualDisabled || !ratesMatch || !clearedRatesMatch || !rtpRatesMatch || !betSettingsMatch || !globalSettingsMatch) {
