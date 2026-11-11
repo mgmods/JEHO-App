@@ -1345,7 +1345,7 @@ export class BaishunWsHandler {
             }
             if (isRoyal) {
               const chip = Math.floor(Number(fields[2] ?? fields[1] ?? configuredChips[0] ?? betSettings.minBet));
-              if (!isGameBettingEnabled(gameSlug) || chip < betSettings.minBet || chip > betSettings.maxBet) {
+              if (!isGameBettingEnabled(gameSlug) || chip < betSettings.minBet || chip > betSettings.maxBet || !configuredChips.includes(chip)) {
                 this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeRoyalBetRes(p.balance || 0, royalMyBet)));
                 return;
               }
@@ -1469,7 +1469,7 @@ export class BaishunWsHandler {
 
             // Hilo: field1 = amount
             const betAmount = Math.floor(Number(fields[1] ?? configuredChips[0] ?? betSettings.minBet));
-            if (!isGameBettingEnabled(gameSlug) || betAmount < betSettings.minBet || betAmount > betSettings.maxBet) {
+            if (!isGameBettingEnabled(gameSlug) || betAmount < betSettings.minBet || betAmount > betSettings.maxBet || !configuredChips.includes(betAmount)) {
               this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeHiloBetRes({
                 newBalance: p.balance || 0, cardId: hiloCard.id, flower: hiloCard.flower, showBet: 0, roundState: 0,
               })));
