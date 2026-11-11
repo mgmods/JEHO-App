@@ -374,14 +374,14 @@ const manageableGames = [
   { id: '7updown', label: '٧ فوق تحت' },
   { id: 'bounty-football', label: 'كرة القدم الجوائز' },
   { id: 'camel-racing', label: 'سباق الأسود' },
-  { id: 'cleopatra-slot', label: 'كليوباترا' },
+  { id: 'cleopatra-slot', label: 'كليوباترا (مزود خارجي)' },
   { id: 'cleopatra-slots', label: 'فتحات كليوباترا' },
   { id: 'crash', label: 'كراش (مزود خارجي)' },
-  { id: 'fishing', label: 'صيد السمك' },
-  { id: 'football-plinko', label: 'بلينكو كرة القدم' },
+  { id: 'fishing', label: 'صيد السمك (مزود خارجي)' },
+  { id: 'football-plinko', label: 'بلينكو كرة القدم (مزود خارجي)' },
   { id: 'fortune-slot', label: 'جواهر الحظ' },
   { id: 'greedy-box', label: 'صندوق الطمع' },
-  { id: 'greedy-lion', label: 'الأسد الطماع' },
+  { id: 'greedy-lion', label: 'الأسد الطماع (مزود خارجي)' },
   { id: 'hilo', label: 'هاي لو (مزود خارجي)' },
   { id: 'line-slots', label: 'فتحات الخط' },
   { id: 'luck-car', label: 'سيارة الحظ' },
@@ -389,10 +389,10 @@ const manageableGames = [
   { id: 'megaways-slots', label: 'ميجاوايز' },
   { id: 'olympians', label: 'الأوليمبيون' },
   { id: 'pirate-king', label: 'ملك القراصنة' },
-  { id: 'royal-battle', label: 'المعركة الملكية' },
-  { id: 'slot777', label: 'سلوت ٧٧٧' },
+  { id: 'royal-battle', label: 'المعركة الملكية (مزود خارجي)' },
+  { id: 'slot777', label: 'سلوت ٧٧٧ (مزود خارجي)' },
   { id: 'sugar-rush', label: 'سكر راش' },
-  { id: 'swimsuit-party', label: 'حفلة السباحة' },
+  { id: 'swimsuit-party', label: 'حفلة السباحة (مزود خارجي)' },
   { id: 'slots', label: 'السلوت المصغّر' },
   { id: 'roulette', label: 'الروليت' },
   { id: 'plinko', label: 'بلينكو' },
@@ -412,13 +412,13 @@ const directWinRateGameIds = new Set([
   // JEHO-owned mini-games: outcome is resolved directly in our backend.
   'slots','roulette','plinko','rps','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
   // Server-hosted Mikoo/BaiShun adapters: spinPayout reads getGameWinRate(gameId).
-  'cleopatra-slot','cleopatra-slots','football-plinko','fortune-slot','fishing',
-  'line-slots','megaways-slots','olympians','pirate-king','slot777','sugar-rush','swimsuit-party',
+  'cleopatra-slots','fortune-slot',
+  'line-slots','megaways-slots','olympians','pirate-king','sugar-rush',
   // These game engines have dedicated server-side win-gate logic.
   'hilo','royal-battle','crash',
 ])
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
-const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
+const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','luck-car','lucky77'])
 function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(gameId || '').toLowerCase()) }
 function betSetting(gameId) {
   return gameBetSettings[gameId] || { minBet: 50, maxBet: 20000, bettingEnabled: true, chips: [50, 100, 500, 1000, 5000] }
