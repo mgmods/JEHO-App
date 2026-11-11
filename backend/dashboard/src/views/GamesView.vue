@@ -414,16 +414,18 @@ const safeManageableGames = manageableGames.filter((game) => game && typeof game
 const directWinRateGameIds = new Set([
   // JEHO-owned mini-games: outcome is resolved directly in our backend.
   'slots','roulette','plinko','rps','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
-  // Server-hosted Mikoo/BaiShun adapters: spinPayout reads getGameWinRate(gameId).
-  'cleopatra-slots','fortune-slot',
+  // Server-hosted Mikoo/BaiShun adapters: JEHO settles the wallet and outcome.
+  'cleopatra-slot','cleopatra-slots','fortune-slot','fishing','football-plinko','slot777','swimsuit-party',
   'line-slots','megaways-slots','olympians','pirate-king','sugar-rush',
   // These game engines have dedicated server-side win-gate logic.
-  'hilo','crash',
+  'hilo','crash','royal-battle',
 ])
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
-const providerOnlyGameIds = new Set(['cleopatra-slot','fishing','football-plinko','greedy-lion','royal-battle','slot777','swimsuit-party'])
+// All listed Mikoo/BaiShun bridges are settled by JEHO's own backend adapters.
+// Keep per-game bet controls available; never label these as uncontrollable external providers.
+const providerOnlyGameIds = new Set()
 function isProviderOnlyGame(gameId) { return providerOnlyGameIds.has(String(gameId || '').toLowerCase()) }
-const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','luck-car','lucky77'])
+const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
 function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(gameId || '').toLowerCase()) }
 function betSetting(gameId) {
   return gameBetSettings[gameId] || { minBet: 50, maxBet: 20000, bettingEnabled: true, chips: [50, 100, 500, 1000, 5000] }
