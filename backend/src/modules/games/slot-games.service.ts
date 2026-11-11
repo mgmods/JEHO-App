@@ -351,7 +351,8 @@ export class SlotGamesService {
     const game = findMikooGame(gameId);
 
     if (!game) throw new BadRequestException('Unknown slot game');
-    if (!isGameEnabled(game.id)) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');\n    if (!isGameBettingEnabled(game.id)) throw new BadRequestException('المراهنة متوقفة حالياً لهذه اللعبة');
+    if (!isGameEnabled(game.id)) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');
+    if (!isGameBettingEnabled(game.id)) throw new BadRequestException('المراهنة متوقفة حالياً لهذه اللعبة');
 
 
 
