@@ -60,10 +60,12 @@ export class DiceService {
       const n = Number(map.get(k));
       return Number.isFinite(n) ? n : fallback;
     };
+    const adminBet = getGameBetSettings('dice');
     return {
-      enabled: (map.get('games.dice.enabled') ?? 'true') !== 'false',
-      maxBet: Math.min(Math.max(100, num('games.dice.max_bet', 10_000)), gamePayoutLimits().maxBet),
-      minBet: Math.min(Math.max(1, num('games.dice.min_bet', 100)), Math.min(Math.max(100, num('games.dice.max_bet', 10_000)), gamePayoutLimits().maxBet)),
+      enabled: (map.get('games.dice.enabled') ?? 'true') !== 'false' && isGameBettingEnabled('dice'),
+      maxBet: Math.min(adminBet.maxBet, Math.max(100, num('games.dice.max_bet', 10_000)), gamePayoutLimits().maxBet),
+      minBet: Math.max(adminBet.minBet, Math.min(Math.max(1, num('games.dice.min_bet', 100)), Math.min(adminBet.maxBet, Math.max(100, num('games.dice.max_bet', 10_000)), gamePayoutLimits().maxBet))),
+      chips: adminBet.chips,
       /** Very low hit rate (~8%). */
       winWeight: Math.max(0, num('games.dice.win_weight', 8)),
       loseWeight: Math.max(1, num('games.dice.lose_weight', 92)),
