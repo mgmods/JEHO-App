@@ -433,7 +433,7 @@ function setGameBetSetting(gameId, key, raw) {
 }
 function setGameBetChips(gameId, raw) {
   const values = String(raw || '').split(/[ ,،]+/).map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x > 0 && x <= 50000)
-  gameBetSettings[gameId] = { ...betSetting(gameId), chips: [...new Set(values)].sort((a, b) => a - b).slice(0, 12) }
+  const min = betSetting(gameId).minBet\n  const max = betSetting(gameId).maxBet\n  const chips = [...new Set(values.filter((x) => x >= min && x <= max))].sort((a, b) => a - b).slice(0, 12)\n  gameBetSettings[gameId] = { ...betSetting(gameId), chips: chips.length ? chips : [min] }
 }
 
 function setGameWinRate(gameId, raw) {
