@@ -183,21 +183,42 @@
     <div id="game-win-rates" class="glass p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <div>
-          <h3 class="h6 mb-1">نسبة الفوز لكل لعبة</h3>
-          <p class="small text-muted mb-0">نسبة عامة موحّدة لكل اللاعبين. امسح قيمة اللعبة لاستعادة إعدادها الافتراضي؛ الألعاب ذات النتيجة المشتركة تُضبط بعائد اللاعب RTP.</p>
+          <h3 class="h6 mb-1">التحكم بنسبة الربح والخسارة لكل لعبة</h3>
+          <p class="small text-muted mb-0">لكل لعبة إعداد مستقل. نسبة الخسارة تكمل نسبة الفوز إلى 100%، والتغيير يطبّق على جميع اللاعبين بالتساوي. الألعاب ذات النتيجة المشتركة لها إعداد عائد مستقل (RTP).</p>
         </div>
-        <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ نسب الفوز</button>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ إعدادات الربح والخسارة</button>
       </div>
       <div class="row g-2">
-        <div v-for="game in safeManageableGames" :key="'rate-'+game.id" class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small mb-1">{{ game.label }} — {{ game.id === 'crash' ? 'احتمال تجاوز ×1.5 %' : supportsSharedRtp(game.id) ? 'العائد للاعب %' : 'نسبة الفوز %' }}</label>
-          <input v-if="supportsDirectWinRate(game.id)" :value="gameWinRates[game.id] ?? ''" @input="gameWinRates[game.id] = $event.target.value === '' ? undefined : Math.max(0, Math.min(100, Number($event.target.value)))" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
-          <input v-else-if="supportsSharedRtp(game.id)" :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
-          <input v-else-if="game.id === 'crash'" :value="Math.round(Number(odds.crashCashoutRake) * 100)" @input="odds.crashCashoutRake = Math.max(90, Math.min(99, Number($event.target.value) || 90)) / 100" type="number" min="90" max="99" step="1" class="form-control form-control-sm" />
-          <div class="small mt-1" :class="supportsDirectWinRate(game.id) || supportsSharedRtp(game.id) || game.id === 'crash' ? 'text-success' : 'text-muted'">{{ game.id === 'crash' ? 'احتمال تجاوز ×1.5 من محرك الخادم' : supportsDirectWinRate(game.id) ? 'نسبة الفوز الفعلية من محرك الخادم' : supportsSharedRtp(game.id) ? 'عائد الجولة المشتركة من الخادم' : 'لا يوجد محرك إعدادات لهذه اللعبة' }}</div>
+        <div v-for="game in safeManageableGames" :key="'rate-'+game.id" class="col-12 col-md-6 col-xl-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+              <strong class="small">{{ game.label }}</strong>
+              <span class="badge" :class="supportsDirectWinRate(game.id) ? 'bg-success-subtle text-success-emphasis' : 'bg-info-subtle text-info-emphasis'">{{ supportsDirectWinRate(game.id) ? 'تحكم مباشر' : 'نتيجة مشتركة' }}</span>
+            </div>
+            <template v-if="supportsDirectWinRate(game.id)">
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label small mb-1">نسبة الفوز %</label>
+                  <input :value="gameWinRates[game.id] ?? ''" @input="setGameWinRate(game.id, $event.target.value)" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label small mb-1">نسبة الخسارة %</label>
+                  <input :value="gameLossRate(game.id)" @input="setGameLossRate(game.id, $event.target.value)" type="number" min="0" max="100" step="1" class="form-control form-control-sm" :disabled="gameWinRates[game.id] === undefined || gameWinRates[game.id] === ''" />
+                </div>
+              </div>
+              <div class="small mt-2 text-success">{{ game.id === 'crash' ? 'احتمال وصول الجولة إلى ×1.50 أو أكثر — يتحكم به الخادم' : 'النسبتان متعاكستان ومجموعهما 100% — يتحكم بهما الخادم' }}</div>
+              <div v-if="gameWinRates[game.id] === undefined || gameWinRates[game.id] === ''" class="small text-muted mt-1">فارغ = استخدام الاحتمال الافتراضي لمحرك اللعبة.</div>
+            </template>
+            <template v-else-if="supportsSharedRtp(game.id)">
+              <label class="form-label small mb-1">العائد للاعب RTP %</label>
+              <input :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
+              <div class="small text-muted mt-2">هذه اللعبة تعرض نتيجة مشتركة للجولة؛ لذلك نضبط العائد المتوقع بدلاً من فرض فوز أو خسارة منفصلة لكل لاعب.</div>
+            </template>
+            <div v-else class="small text-muted">محرك هذه اللعبة لا يوفّر حالياً تحكماً مباشراً باحتمال الفوز.</div>
+          </div>
         </div>
       </div>
-      <div class="small text-muted mt-2">0% = لا فوز في ألعاب الخادم التي تدعم هذا الضبط، 100% = فوز في كل محاولة مؤهلة. قد تبقى حدود الجوائز والحد الأقصى للربح مطبّقة.</div>
+      <div class="small text-muted mt-3">0% فوز = خسارة في كل محاولة مؤهلة، و100% فوز = فوز في كل محاولة مؤهلة للألعاب ذات التحكم المباشر. حدود الرهان والجوائز القصوى تبقى مطبّقة كطبقة حماية.</div>
     </div>
 
     <div class="small text-muted mb-4">تظهر لكل لعبة آلية الضبط التي يدعمها محركها: نسبة فوز مباشرة، أو عائد نتيجة مشتركة، أو خصم السحب في Crash. لا يُعرض ضبط شكلي لا يقرأه الخادم.</div>
@@ -389,6 +410,21 @@ const directWinRateGameIds = new Set([
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
 const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
 function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(gameId || '').toLowerCase()) }
+
+function setGameWinRate(gameId, raw) {
+  gameWinRates[gameId] = raw === '' ? undefined : Math.max(0, Math.min(100, Number(raw)))
+}
+
+function gameLossRate(gameId) {
+  const win = Number(gameWinRates[gameId])
+  return gameWinRates[gameId] === undefined || gameWinRates[gameId] === '' || !Number.isFinite(win)
+    ? ''
+    : 100 - Math.max(0, Math.min(100, win))
+}
+
+function setGameLossRate(gameId, raw) {
+  gameWinRates[gameId] = raw === '' ? undefined : 100 - Math.max(0, Math.min(100, Number(raw)))
+}
 
 const coveredCount = computed(() => coveredGames.value.length || 22)
 const coveredGamesLabel = computed(() =>
