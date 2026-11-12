@@ -558,7 +558,8 @@ export class CosmeticsService implements OnModuleInit {
         recipientUserId: owner?.id || (cosmetic.meta as any)?.privateOwnerUserId || null,
         recipientPublicId: owner?.publicId || null,
         recipientName: owner?.displayName || owner?.username || null,
-        durationDays: ownership?.expiresAt
+        durationDays: (cosmetic.meta as any)?.privateDurationDays ?? null,
+        remainingDays: ownership?.expiresAt
           ? Math.max(0, Math.ceil((ownership.expiresAt.getTime() - Date.now()) / 86_400_000))
           : null,
         expiresAt: ownership?.expiresAt || null,
