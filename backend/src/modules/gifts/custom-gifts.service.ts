@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
+import { DataSource, IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { Gift, GiftType } from '../../database/entities/gift.entity';
 import { CustomGiftGrant } from '../../database/entities/custom-gift-grant.entity';
 import { User } from '../../database/entities/user.entity';
@@ -99,14 +99,17 @@ export class CustomGiftsService {
     const now = new Date();
     const rows = await this.grants.find({
       where: [
-        { userId, revokedAt: IsNull(), expiresAt: IsNull() },
-        { userId, revokedAt: IsNull(), expiresAt: MoreThan(now) },
+        { userId, revokedAt: IsNull(), startsAt: LessThanOrEqual(now), expiresAt: IsNull() },
+        { userId, revokedAt: IsNull(), startsAt: LessThanOrEqual(now), expiresAt: MoreThan(now) },
       ],
       relations: ['gift'],
       order: { createdAt: 'DESC' },
     });
     return rows.filter(row => row.gift?.isActive).map(row => ({
       ...row.gift,
+      // Use the grant's uploaded media as the authoritative art for this recipient.
+      iconUrl: row.mediaUrl,
+      animationUrl: row.mediaUrl,
       category: 'custom',
       coinPrice: 0,
       diamondValue: 0,
