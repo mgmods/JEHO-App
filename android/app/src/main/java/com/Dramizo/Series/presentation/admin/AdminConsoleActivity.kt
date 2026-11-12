@@ -955,6 +955,10 @@ class AdminConsoleActivity : ThemedActivity() {
         addText(panel, "الملف يُرفع من جهازك ويُحفظ في التخزين الدائم الحالي. لن يظهر في كتالوج الهدايا العام.", 12f, false, MUTED)
         val idInput = featureField(panel, "ID المستخدم المستلم", "", "أدخل رقم ID الظاهر في الحساب")
         val nameInput = featureField(panel, "اسم الهدية", "", "مثال: VIP Gift")
+        val coinPriceInput = featureField(panel, "سعر الهدية بالكوينز", "100", "مثال: 100")
+        coinPriceInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        val diamondValueInput = featureField(panel, "قيمة الهدية بالألماسات", "80", "مثال: 80")
+        diamondValueInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER
         val durationLabel = TextView(this).apply {
             text = "مدة الصلاحية"
             textSize = 13f
@@ -1025,6 +1029,10 @@ class AdminConsoleActivity : ThemedActivity() {
                 toast("تحقق من ID المستخدم أولاً"); return@button
             }
             if (nameInput.text.toString().trim().isBlank()) { toast("اكتب اسم الهدية"); return@button }
+            val coinPrice = coinPriceInput.text.toString().toIntOrNull()
+            val diamondValue = diamondValueInput.text.toString().toIntOrNull()
+            if (coinPrice == null || coinPrice < 1) { toast("أدخل سعر الكوينز بشكل صحيح"); return@button }
+            if (diamondValue == null || diamondValue < 0) { toast("أدخل قيمة الألماسات بشكل صحيح"); return@button }
             if (customGiftUploadInProgress) { toast("انتظر حتى ينتهي رفع الملف"); return@button }
             val mediaUrl = customGiftMediaUrl
             val mediaType = customGiftMediaType
@@ -1035,7 +1043,9 @@ class AdminConsoleActivity : ThemedActivity() {
                 "name" to nameInput.text.toString().trim(),
                 "mediaUrl" to mediaUrl,
                 "mediaType" to mediaType,
-                "durationDays" to days
+                "durationDays" to days,
+                "coinPrice" to coinPrice,
+                "diamondValue" to diamondValue
             )
             confirm("إرسال الهدية إلى ID " + verifiedPublicId + "؟ ستبدأ الصلاحية لحظة الإرسال.") {
                 load(api.customGiftSend(payload)) { raw ->
