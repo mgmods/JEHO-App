@@ -135,6 +135,21 @@
                         <TextView android:id="@+id/tvMenuDelete" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center" android:text="@string/agency_manage_menu_delete" android:textColor="#B93648" android:textSize="12sp" android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:weightSum="3">
+                    <include android:id="@+id/menuManagers" layout="@layout/item_agency_menu_row"
+                        android:layout_width="0dp" android:layout_height="126dp"
+                        android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuHosts" layout="@layout/item_agency_menu_row"
+                        android:layout_width="0dp" android:layout_height="126dp"
+                        android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuMembers" layout="@layout/item_agency_menu_row"
+                        android:layout_width="0dp" android:layout_height="126dp"
+                        android:layout_weight="1" android:layout_margin="4dp" />
+                </LinearLayout>
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </LinearLayout>
