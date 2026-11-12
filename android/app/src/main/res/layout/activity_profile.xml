@@ -65,7 +65,7 @@
                 <TextView
                     android:id="@+id/btnRoomTracking"
                     android:layout_width="wrap_content"
-                    android:layout_height="44dp"
+                    android:layout_height="48dp"
                     android:layout_gravity="bottom|end"
                     android:layout_marginRight="14dp"
                     android:layout_marginBottom="54dp"
@@ -78,7 +78,7 @@
                     android:paddingEnd="16dp"
                     android:text="●  في الغرفة"
                     android:textColor="#167A43"
-                    android:textSize="14sp"
+                    android:textSize="15sp"
                     android:textStyle="bold"
                     android:visibility="gone" />
 
