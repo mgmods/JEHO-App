@@ -121,33 +121,56 @@ public class GiftViewModel extends ViewModel {
                                         (r.error != null ? r.error : "unknown error"));
                     }
                 }
-                // Merge only this account's active custom gifts into the current gift sheet.
-                Result<GiftDtos.GiftList> custom = com.Dramizo.Series.util.ApiCall.execute(c.getGiftApi().customMine());
-                if (custom.success && custom.data != null && !custom.data.isEmpty()) {
-                    List<GiftDtos.GiftDto> merged = new ArrayList<>();
-                    if (r.success && r.data != null) merged.addAll(r.data);
+                // Merge only this account's active custom gifts into this account's gift sheet.
+                // Preserve a usable public catalog when its refresh temporarily fails, and
+                // always rebuild the private tab from the current server-owned grants so an
+                // expired/revoked gift cannot leave a stale tab visible in this ViewModel.
+                Result<GiftDtos.GiftList> custom =
+                        com.Dramizo.Series.util.ApiCall.execute(c.getGiftApi().customMine());
+                List<GiftDtos.GiftDto> publicGifts;
+                if (r.success && r.data != null) {
+                    publicGifts = new ArrayList<>(r.data);
+                } else {
+                    List<GiftDtos.GiftDto> current = gifts.getValue();
+                    publicGifts = current == null
+                            ? new ArrayList<>()
+                            : new ArrayList<>(current);
+                    publicGifts.removeIf(g -> g != null && "custom".equalsIgnoreCase(g.category));
+                }
+
+                List<GiftDtos.GiftDto> merged = new ArrayList<>(publicGifts);
+                boolean hasActiveCustom = custom.success && custom.data != null
+                        && !custom.data.isEmpty();
+                if (hasActiveCustom) {
                     for (GiftDtos.GiftDto customGift : custom.data) {
                         if (customGift != null && customGift.id != null) merged.add(customGift);
                     }
-                    gifts.postValue(merged);
-                    List<GiftDtos.GiftCategoryDto> visibleCats = new ArrayList<>();
-                    if (cats.success && cats.data != null) visibleCats.addAll(cats.data);
-                    boolean hasCustom = false;
-                    for (GiftDtos.GiftCategoryDto category : visibleCats) {
-                        if ("custom".equalsIgnoreCase(category.key)) hasCustom = true;
-                    }
-                    if (!hasCustom) {
-                        GiftDtos.GiftCategoryDto customCategory = new GiftDtos.GiftCategoryDto();
-                        customCategory.id = "custom";
-                        customCategory.key = "custom";
-                        customCategory.labelAr = "الهدايا المخصصة";
-                        customCategory.labelEn = "Custom Gifts";
-                        customCategory.sortOrder = 999;
-                        customCategory.isActive = true;
-                        visibleCats.add(customCategory);
-                    }
-                    categories.postValue(visibleCats);
                 }
+                gifts.postValue(merged);
+
+                List<GiftDtos.GiftCategoryDto> visibleCats = new ArrayList<>();
+                List<GiftDtos.GiftCategoryDto> categorySource =
+                        cats.success && cats.data != null
+                                ? cats.data
+                                : categories.getValue();
+                if (categorySource != null) {
+                    for (GiftDtos.GiftCategoryDto category : categorySource) {
+                        if (category != null && !"custom".equalsIgnoreCase(category.key)) {
+                            visibleCats.add(category);
+                        }
+                    }
+                }
+                if (hasActiveCustom) {
+                    GiftDtos.GiftCategoryDto customCategory = new GiftDtos.GiftCategoryDto();
+                    customCategory.id = "custom";
+                    customCategory.key = "custom";
+                    customCategory.labelAr = "الهدايا المخصصة";
+                    customCategory.labelEn = "Custom Gifts";
+                    customCategory.sortOrder = 999;
+                    customCategory.isActive = true;
+                    visibleCats.add(customCategory);
+                }
+                categories.postValue(visibleCats);
             } catch (Exception failure) {
                 List<GiftDtos.GiftDto> current = gifts.getValue();
                 if ((current == null || current.isEmpty()) && !hadUsableCatalog) {
