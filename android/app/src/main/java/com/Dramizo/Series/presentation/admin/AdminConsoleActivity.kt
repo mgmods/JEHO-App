@@ -1183,7 +1183,7 @@ class AdminConsoleActivity : ThemedActivity() {
         panel.addView(button("＋ اختيار فيديو الدخولية (1–10 ثوانٍ)") {
             val pick = Intent(Intent.ACTION_GET_CONTENT).apply {
                 type = "video/*"
-                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("video/mp4", "video/quicktime", "video/3gpp"))
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("video/mp4", "video/quicktime", "video/3gpp", "video/webm"))
                 addCategory(Intent.CATEGORY_OPENABLE)
             }
             startActivityForResult(Intent.createChooser(pick, "اختيار فيديو الدخولية"), privateEntryUploadRequestCode)
@@ -1347,8 +1347,8 @@ class AdminConsoleActivity : ThemedActivity() {
         privateEntryVideoUrl = null
         try {
             val mime = (contentResolver.getType(uri) ?: "").lowercase()
-            if (mime !in setOf("video/mp4", "video/quicktime", "video/3gpp", "video/3gpp2")) {
-                throw IllegalArgumentException("اختر فيديو MP4 أو MOV أو 3GP")
+            if (mime !in setOf("video/mp4", "video/quicktime", "video/3gpp", "video/3gpp2", "video/webm")) {
+                throw IllegalArgumentException("اختر فيديو MP4 أو MOV أو 3GP أو WebM")
             }
             val retriever = android.media.MediaMetadataRetriever()
             val durationMs = try {
@@ -1368,6 +1368,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val ext = when (mime) {
                 "video/quicktime" -> ".mov"
                 "video/3gpp", "video/3gpp2" -> ".3gp"
+                "video/webm" -> ".webm"
                 else -> ".mp4"
             }
             val part = MultipartBody.Part.createFormData(
