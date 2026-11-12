@@ -115,14 +115,14 @@
                     android:indeterminateTint="@color/hiyoo_dark_green"
                     android:visibility="gone" /> 
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:orientation="horizontal" android:weightSum="3">
-                    <include android:id="@+id/menuPending" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
-                    <include android:id="@+id/menuAddHost" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
                     <include android:id="@+id/menuSearchHosts" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuAddHost" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuPending" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
                 </LinearLayout>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:weightSum="3">
-                    <include android:id="@+id/menuBranding" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
-                    <include android:id="@+id/menuStyle" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
                     <include android:id="@+id/menuCode" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuStyle" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuBranding" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
                 </LinearLayout>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:weightSum="3">
                     <include android:id="@+id/menuMall" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
