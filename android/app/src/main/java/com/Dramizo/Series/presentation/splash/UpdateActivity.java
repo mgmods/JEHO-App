@@ -210,7 +210,7 @@ public final class UpdateActivity extends Activity {
         body.addView(heading, params(-1, -2, 0, 0, 0, 12));
 
         TextView copy = text(message + (forceUpdate
-                ? (isArabic() ? "\\n\\nهذا التحديث مطلوب للمتابعة واستخدام جميع أقسام التطبيق." : "\\n\\nThis update is required to continue using JEHO.")
+                ? (isArabic() ? "\n\nهذا التحديث مطلوب للمتابعة واستخدام جميع أقسام التطبيق." : "\n\nThis update is required to continue using JEHO.")
                 : ""), 16, muted, false);
         copy.setGravity(Gravity.CENTER);
         copy.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
