@@ -174,7 +174,9 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         }
 
         boolean hasCode = isAgency && !TextUtils.isEmpty(codeFromData);
-        boolean hasLink = !TextUtils.isEmpty(linkFromData);
+        boolean privateEntryGift = n.data != null
+                && Boolean.TRUE.equals(n.data.get("privateEntry"));
+        boolean hasLink = !TextUtils.isEmpty(linkFromData) || privateEntryGift;
         h.rowActions.setVisibility(hasCode || hasLink ? View.VISIBLE : View.GONE);
 
         if (hasCode) {
@@ -187,9 +189,20 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         }
 
         if (hasLink) {
-            final String link = normalizeUrl(linkFromData);
             h.btnOpenLink.setVisibility(View.VISIBLE);
-            h.btnOpenLink.setOnClickListener(v -> openLink(ctx, link, title));
+            if (privateEntryGift) {
+                h.btnOpenLink.setText("عرض الدخولية");
+                h.btnOpenLink.setOnClickListener(v -> {
+                    Intent bag = new Intent(ctx, com.Dramizo.Series.presentation.cosmetics.CosmeticsActivity.class);
+                    bag.putExtra(com.Dramizo.Series.presentation.cosmetics.CosmeticsViewModel.EXTRA_TYPE, "entry_effect");
+                    bag.putExtra("bag_mode", true);
+                    ctx.startActivity(bag);
+                });
+            } else {
+                h.btnOpenLink.setText("فتح الرابط");
+                final String link = normalizeUrl(linkFromData);
+                h.btnOpenLink.setOnClickListener(v -> openLink(ctx, link, title));
+            }
         } else {
             h.btnOpenLink.setVisibility(View.GONE);
             h.btnOpenLink.setOnClickListener(null);
