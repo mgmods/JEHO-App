@@ -521,6 +521,45 @@ class AdminConsoleActivity : ThemedActivity() {
         profile.addView(roleBadge)
         body.addView(profile)
 
+        // Compact executive welcome panel: clear hierarchy without consuming
+        // the screen with oversized web-dashboard style cards.
+        val welcome = card().apply {
+            setPadding(dp(17), dp(15), dp(17), dp(15))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.RIGHT_LEFT,
+                intArrayOf(0xFF30265F.toInt(), 0xFF6049A8.toInt(), 0xFF765FC4.toInt())
+            ).apply { cornerRadius = dp(19).toFloat() }
+            elevation = dp(3).toFloat()
+        }
+        addText(welcome, "مركز إدارة JEHO", 18f, true, Color.WHITE)
+        addText(welcome, "إدارة التطبيق ومتابعة عملياته من مكان واحد", 12f, false, 0xFFEAE5FF.toInt())
+        val welcomeMeta = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(10), 0, 0)
+        }
+        val rolePill = TextView(this).apply {
+            text = "●  $roleLabel"
+            textSize = 11f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = roundRect(0x334FFFFFF, 30)
+        }
+        welcomeMeta.addView(rolePill)
+        welcomeMeta.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        welcomeMeta.addView(TextView(this).apply {
+            text = "لوحة داخل التطبيق"
+            textSize = 10f
+            setTextColor(0xFFEAE5FF.toInt())
+            gravity = Gravity.CENTER_VERTICAL
+        })
+        welcome.addView(welcomeMeta)
+        body.addView(welcome, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(15)
+        })
+
         val searchRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -559,6 +598,29 @@ class AdminConsoleActivity : ThemedActivity() {
         val keys = modules.map { it.key }
         val visible = keys.distinct().filter { roleCanAccessModule(it) }
             .mapNotNull { key -> modules.firstOrNull { it.key == key } }
+
+        val sectionHeading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(2), dp(1), dp(2), dp(9))
+        }
+        sectionHeading.addView(TextView(this).apply {
+            text = "الأقسام المتاحة"
+            textSize = 15f
+            setTextColor(TEXT)
+            typeface = Typeface.DEFAULT_BOLD
+        })
+        sectionHeading.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        sectionHeading.addView(TextView(this).apply {
+            text = "${visible.size} قسم"
+            textSize = 11f
+            setTextColor(ACCENT)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(9), dp(5), dp(9), dp(5))
+            background = roundRect(0xFFEFEAFF.toInt(), 20)
+        })
+        body.addView(sectionHeading)
 
         val empty = TextView(this).apply {
             text = "لا توجد أقسام تطابق البحث"
