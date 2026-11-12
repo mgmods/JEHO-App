@@ -3346,7 +3346,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             addRoomChatBadge(inline, overflow, medal, total++);
         }
         inline.setVisibility(total > 0 ? View.VISIBLE : View.GONE);
-        overflow.setVisibility(total > 5 ? View.VISIBLE : View.GONE);
+        overflow.setVisibility(overflow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
     }
 
     private void addRoomChatBadge(
@@ -3363,7 +3363,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (android.os.Build.VERSION.SDK_INT >= 17) badgeWidth += params.getMarginStart() + params.getMarginEnd();
         }
         badgeWidth = Math.max(dp(18), badgeWidth);
-        if (inline.getChildCount() == 0 || inlineUsed[0] + badgeWidth <= firstLineLimit) {
+        if (inlineUsed[0] + badgeWidth <= firstLineLimit) {
             inline.addView(badge);
             inlineUsed[0] += badgeWidth;
             return;
