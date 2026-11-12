@@ -2,6 +2,9 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GiftsController } from './gifts.controller';
 import { GiftsService } from './gifts.service';
+import { CustomGiftGrant } from '../../database/entities/custom-gift-grant.entity';
+import { CustomGiftsService } from './custom-gifts.service';
+import { CustomGiftsController } from './custom-gifts.controller';
 import { Gift } from '../../database/entities/gift.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
@@ -34,6 +37,7 @@ import { BadgesModule } from '../badges/badges.module';
       Gift,
       GiftCategory,
       GiftSend,
+      CustomGiftGrant,
       Cosmetic,
       UserCosmetic,
       Badge,
@@ -58,8 +62,8 @@ import { BadgesModule } from '../badges/badges.module';
     NotificationsModule,
     BadgesModule,
   ],
-  controllers: [GiftsController],
-  providers: [GiftsService],
+  controllers: [GiftsController, CustomGiftsController],
+  providers: [GiftsService, CustomGiftsService],
   exports: [GiftsService],
 })
 export class GiftsModule {}
