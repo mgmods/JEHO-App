@@ -867,6 +867,13 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (g == null || isLuckyBoxGift(g)) continue;
             boolean isCpGift = "cp".equals(giftBucket(g))
                     || (g.id != null && cpGiftTypes.containsKey(g.id));
+            if ("custom".equals(want)) {
+                // Custom gifts are fetched only from /gifts/custom/mine for this signed-in
+                // account; never mix them into public catalog tabs.
+                if ("custom".equalsIgnoreCase(g.category)) out.add(g);
+                continue;
+            }
+            if ("custom".equalsIgnoreCase(g.category)) continue;
             if ("cp".equals(want)) {
                 // Show CP-category gifts and the exact gift selected in the live dashboard
                 // configuration, even when that gift's general catalog category differs.
