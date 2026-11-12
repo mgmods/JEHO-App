@@ -167,7 +167,10 @@ public class CosmeticsViewModel extends ViewModel {
         container.getIoExecutor().execute(() -> {
             boolean needInventory;
             synchronized (ownedIds) {
-                needInventory = System.currentTimeMillis() - inventoryLoadedAtMs > INVENTORY_CACHE_MS
+                boolean openingPrivateEntryBag = bagMode
+                        && ("entry_effect".equals(loadType) || "join_toast".equals(loadType));
+                needInventory = openingPrivateEntryBag
+                        || System.currentTimeMillis() - inventoryLoadedAtMs > INVENTORY_CACHE_MS
                         || ownedIds.isEmpty();
             }
             if (needInventory) {
