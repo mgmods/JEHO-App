@@ -278,7 +278,7 @@ export class CosmeticsService implements OnModuleInit {
       const row = await this.cosmeticsRepo.findOne({
         where: { code: trimmed, isActive: true },
       });
-      if (!row) return null;
+      if (!row || this.isPrivateEntryCosmetic(row)) return null;
       const url = String(row.previewUrl || row.animationUrl || '').trim();
       return url || null;
     } catch {
@@ -334,6 +334,9 @@ export class CosmeticsService implements OnModuleInit {
   async adminUpdate(id: string, dto: Partial<Cosmetic>) {
     const row = await this.cosmeticsRepo.findOne({ where: { id } });
     if (!row) throw new NotFoundException('العنصر غير موجود');
+    if ((dto.meta as any)?.privateEntry === true) {
+      throw new BadRequestException('لا يمكن تحويل عنصر عام إلى دخولية خاصة من مسار التعديل العام');
+    }
     if (this.isPrivateEntryCosmetic(row)) {
       throw new BadRequestException('عدّل الدخولية الخاصة من قسم الدخوليات الخاصة فقط');
     }
