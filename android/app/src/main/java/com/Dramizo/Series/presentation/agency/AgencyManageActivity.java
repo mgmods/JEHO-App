@@ -234,6 +234,7 @@ public class AgencyManageActivity extends ThemedActivity {
                             ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
                     String role = mineResult.data.role != null
                             ? mineResult.data.role.toLowerCase(Locale.US) : "";
+                    if (binding.tvAgencyRoleBadge != null) binding.tvAgencyRoleBadge.setText(isPlatformSuper ? "سوبر أدمن" : roleAr(role));
                     binding.tvAgencyHeroMeta.setText(getString(
                             R.string.agency_manage_meta_format,
                             Math.max(0, knownTotalMembers > 0
