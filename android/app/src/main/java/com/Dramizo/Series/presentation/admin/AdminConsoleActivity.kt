@@ -1334,7 +1334,9 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun loadUsers(search: String) {
         // Preserve the search controls and section introduction while replacing results.
         // Search row + section intro + role/access card stay in place while results refresh.
-        val fixedViews = if (body.childCount >= 1) 1 else body.childCount
+        // Keep both persistent controls: the search row and the section introduction.
+        // Only previously rendered results are removed before the next search.
+        val fixedViews = minOf(2, body.childCount)
         if (body.childCount > fixedViews) body.removeViews(fixedViews, body.childCount - fixedViews)
         load(api.users(1, 40, search)) { renderItems(it, "users") }
     }
@@ -1392,6 +1394,29 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         countPanel.addView(count, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
         body.addView(countPanel)
+
+        // One consistent, native search control for every API-backed record list.
+        val listSearch = EditText(this).apply {
+            hint = "ابحث داخل هذا القسم بالاسم أو الحالة أو التفاصيل..."
+            textSize = 13f
+            setSingleLine(true)
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            textDirection = View.TEXT_DIRECTION_RTL
+            gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(13).toFloat()
+                setStroke(dp(1), 0xFFE4E1EF.toInt())
+            }
+            setPadding(dp(13), dp(8), dp(13), dp(8))
+        }
+        body.addView(listSearch, LinearLayout.LayoutParams(-1, dp(48)).apply {
+            bottomMargin = dp(10)
+        })
+        val renderedCards = mutableListOf<Pair<View, String>>()
         if (items.isEmpty()) {
             val empty = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -1963,7 +1988,24 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
             }
             body.addView(card)
+            // Search indexes the server-provided record values and the visible Arabic title.
+            renderedCards.add(card to (primary + " " + item.toString()).lowercase(java.util.Locale.ROOT))
         }
+
+        listSearch.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s?.toString()?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty()
+                var visibleCount = 0
+                renderedCards.forEach { (recordView, searchableText) ->
+                    val matches = query.isBlank() || searchableText.contains(query)
+                    recordView.visibility = if (matches) View.VISIBLE else View.GONE
+                    if (matches) visibleCount++
+                }
+                count.text = "$visibleCount / ${items.size}"
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
     }
 
     /**
