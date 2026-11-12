@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_agency_manage_screen">
+    android:background="@color/white">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -106,7 +106,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
                         android:letterSpacing="0.06"
-                        android:text="@string/agency_manage_legend_badge"
+                        android:id="@+id/tvAgencyRoleBadge"\n                        android:text="مالك"
                         android:textAllCaps="true"
                         android:textColor="@color/hiyoo_dark_green"
                         android:textSize="11sp"
@@ -151,120 +151,27 @@
                     android:layout_gravity="center_horizontal"
                     android:layout_marginTop="12dp"
                     android:indeterminateTint="@color/hiyoo_dark_green"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:text="@string/agency_manage_section_team"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <include
-                    android:id="@+id/menuSearchHosts"
-                    layout="@layout/item_agency_menu_row"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="10dp" />
-
-                <include
-                    android:id="@+id/menuAddHost"
-                    layout="@layout/item_agency_menu_row"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="8dp" />
-
-                <include
-                    android:id="@+id/menuPending"
-                    layout="@layout/item_agency_menu_row"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="8dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:text="@string/agency_manage_section_tools"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <include
-                    android:id="@+id/menuCode"
-                    layout="@layout/item_agency_menu_row"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="10dp" />
-
-                <include
-                    android:id="@+id/menuStyle"
-                    layout="@layout/item_agency_menu_row"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="8dp" />
-
-                <include
-                    android:id="@+id/menuBranding"
-                    layout="@layout/item_agency_menu_row"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="8dp"
-                    android:visibility="gone" />
-
-                <include
-                    android:id="@+id/menuMall"
-                    layout="@layout/item_agency_menu_row"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="8dp" />
-
-                <LinearLayout
-                    android:id="@+id/menuLive"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="16dp"
-                    android:background="@drawable/bg_agency_menu_cta_live"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:id="@+id/tvMenuLive"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/agency_manage_menu_live"
-                        android:textColor="@color/white"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
+                    android:visibility="gone" /> 
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:orientation="horizontal" android:weightSum="3">
+                    <include android:id="@+id/menuPending" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuAddHost" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuSearchHosts" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
                 </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/menuDelete"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="20dp"
-                    android:background="@drawable/bg_agency_menu_row_danger"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:id="@+id/tvMenuDelete"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/agency_manage_menu_delete"
-                        android:textColor="@color/aurora_danger"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:weightSum="3">
+                    <include android:id="@+id/menuBranding" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuStyle" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                    <include android:id="@+id/menuCode" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                </LinearLayout>
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:weightSum="3">
+                    <include android:id="@+id/menuMall" layout="@layout/item_agency_menu_row" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" />
+                    <LinearLayout android:id="@+id/menuLive" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" android:background="@drawable/bg_agency_menu_row" android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground" android:gravity="center" android:orientation="vertical" android:visibility="gone">
+                        <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@android:drawable/ic_media_play" app:tint="#D99A21" />
+                        <TextView android:id="@+id/tvMenuLive" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center" android:text="@string/agency_manage_menu_live" android:textColor="#29263A" android:textSize="12sp" android:textStyle="bold" />
+                    </LinearLayout>
+                    <LinearLayout android:id="@+id/menuDelete" android:layout_width="0dp" android:layout_height="126dp" android:layout_weight="1" android:layout_margin="4dp" android:background="@drawable/bg_agency_menu_row_danger" android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground" android:gravity="center" android:orientation="vertical" android:visibility="gone">
+                        <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@android:drawable/ic_menu_delete" app:tint="#D94D5C" />
+                        <TextView android:id="@+id/tvMenuDelete" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center" android:text="@string/agency_manage_menu_delete" android:textColor="#B93648" android:textSize="12sp" android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
