@@ -230,11 +230,17 @@ public class SplashActivity extends ThemedActivity {
                     int installedCode = BuildConfig.VERSION_CODE;
                     if (config != null
                             && config.enabled
-                            && config.latestVersionCode > installedCode
-                            && config.storeUrl != null
-                            && !config.storeUrl.trim().isEmpty()
-                            && (config.storeUrl.trim().startsWith("https://") || config.storeUrl.trim().startsWith("http://"))) {
+                            && config.latestVersionCode > installedCode) {
                         boolean mandatory = config.forceUpdate || config.minVersionCode > installedCode;
+                        boolean hasValidUpdateUrl = config.storeUrl != null
+                                && !config.storeUrl.trim().isEmpty()
+                                && (config.storeUrl.trim().startsWith("https://")
+                                || config.storeUrl.trim().startsWith("http://"));
+                        // Never let a missing/misconfigured URL bypass a mandatory release gate.
+                        if (!mandatory && !hasValidUpdateUrl) {
+                            beginRegularSplashFlow();
+                            return;
+                        }
                         boolean arabic = java.util.Locale.getDefault().getLanguage().toLowerCase(java.util.Locale.ROOT).startsWith("ar");
                         String title = arabic ? config.titleAr : config.titleEn;
                         String message = arabic ? config.messageAr : config.messageEn;
