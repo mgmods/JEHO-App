@@ -521,12 +521,18 @@ export class CosmeticsService implements OnModuleInit {
         privateVideoDurationMs: durationMs,
       },
     }));
-    const ownership = await this.userCosmeticsRepo.save(this.userCosmeticsRepo.create({
-      userId: recipient.id,
-      cosmeticId: cosmetic.id,
-      equipped: false,
-      expiresAt,
-    }));
+    let ownership: UserCosmetic;
+    try {
+      ownership = await this.userCosmeticsRepo.save(this.userCosmeticsRepo.create({
+        userId: recipient.id,
+        cosmeticId: cosmetic.id,
+        equipped: false,
+        expiresAt,
+      }));
+    } catch (error) {
+      await this.adminDelete(cosmetic.id, { allowPrivateEntry: true }).catch(() => undefined);
+      throw error;
+    }
     return {
       granted: true,
       userId: recipient.id,
