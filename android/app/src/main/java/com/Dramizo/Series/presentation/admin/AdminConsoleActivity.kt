@@ -282,7 +282,7 @@ class AdminConsoleActivity : ThemedActivity() {
             indeterminateTintList = android.content.res.ColorStateList.valueOf(ACCENT)
             minimumHeight = dp(3)
         }
-        root.addView(progress, LinearLayout.LayoutParams(-1, dp(3)))
+        // No website-style loading bar. The native page remains visible while data refreshes.
         val scroll = ScrollView(this).apply {
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             clipToPadding = false
@@ -887,6 +887,7 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "gifts" -> load(api.gifts()) { renderItems(it, "gifts") }
             "vip" -> {
+                addText(body, "كل بطاقة هنا تمثل عضوية مستخدم واحدة. ستجد اسم صاحبها وID المستخدم ومستوى VIP والحالة وتاريخ المنح والانتهاء ومصدر المنح، ثم إجراءات واضحة للسحب أو فتح ملف المستخدم.", 12f, false, MUTED)
                 body.addView(button("＋ منح عضوية VIP") { showAssignVipDialog() })
                 if (currentRole == StaffRoleHelper.SUPER) {
                     body.addView(button("＋ إنشاء خطة VIP") { showCreateVipPlanDialog() })
@@ -1386,10 +1387,20 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun load(call: Call<ApiResponse<Any>>, onSuccess: (Any?) -> Unit) {
-        progress.visibility = View.VISIBLE
+        // Keep the native page structure visible immediately. Use compact native placeholders
+        // instead of a website-style moving line or blank loading screen.
+        val placeholders = addNativeLoadingPlaceholders()
+        progress.visibility = View.GONE
         call.enqueue(object : Callback<ApiResponse<Any>> {
+            private fun clearPlaceholders() {
+                placeholders.forEach { view ->
+                    val parent = view.parent as? android.view.ViewGroup
+                    parent?.removeView(view)
+                }
+            }
+
             override fun onResponse(call: Call<ApiResponse<Any>>, response: Response<ApiResponse<Any>>) {
-                progress.visibility = View.GONE
+                clearPlaceholders()
                 val envelope = response.body()
                 if (response.isSuccessful && envelope != null && envelope.success) {
                     onSuccess(envelope.data)
@@ -1401,10 +1412,37 @@ class AdminConsoleActivity : ThemedActivity() {
             }
 
             override fun onFailure(call: Call<ApiResponse<Any>>, error: Throwable) {
-                progress.visibility = View.GONE
+                clearPlaceholders()
                 showError("تعذر الاتصال بالخادم. تحقق من الإنترنت ثم أعد المحاولة.")
             }
         })
+    }
+
+    private fun addNativeLoadingPlaceholders(): List<View> {
+        val views = mutableListOf<View>()
+        repeat(2) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(dp(14), dp(14), dp(14), dp(14))
+                background = GradientDrawable().apply {
+                    setColor(Color.WHITE)
+                    cornerRadius = dp(18).toFloat()
+                    setStroke(dp(1), 0xFFE8E5F0.toInt())
+                }
+                alpha = 0.96f
+                layoutParams = LinearLayout.LayoutParams(-1, dp(92)).apply {
+                    bottomMargin = dp(10)
+                }
+            }
+            val title = View(this).apply { background = roundRect(0xFFEDEAF4.toInt(), 8) }
+            val line = View(this).apply { background = roundRect(0xFFF3F1F7.toInt(), 7) }
+            card.addView(title, LinearLayout.LayoutParams(dp(180), dp(15)).apply { bottomMargin = dp(12) })
+            card.addView(line, LinearLayout.LayoutParams(dp(280), dp(11)))
+            body.addView(card)
+            views.add(card)
+        }
+        return views
     }
 
     private fun renderItems(data: Any?, type: String) {
@@ -1534,9 +1572,39 @@ class AdminConsoleActivity : ThemedActivity() {
             val roomTitle = value(item, "title", "name", "roomName") ?: ""
             val accessMode = value(item, "accessMode") ?: "public"
             val entryFee = value(item, "entryFeeCoins") ?: "0"
-            val vipLevel = value(item, "level") ?: "1"
+            val vipLevel = value(item, "level", "vipLevel") ?: "1"
             val vipPrice = value(item, "coinPriceMonthly", "price") ?: "0"
-            addText(card, primary, 15f, true, TEXT)
+            val vipUserId = value(item, "userId") ?: valuePath(item, "user.id", "user._id")
+            val vipUserName = valuePath(item, "user.displayName", "user.username", "user.name")
+                ?: value(item, "displayName", "username", "name")
+            if (type == "vip") {
+                val identity = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(10), dp(10), dp(10), dp(10))
+                    background = roundRect(0xFFF7F4FF.toInt(), 14)
+                }
+                val avatar = ImageView(this).apply {
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    background = roundRect(0xFFE8E3F5.toInt(), 40)
+                    clipToOutline = true
+                    contentDescription = "صورة صاحب عضوية VIP"
+                }
+                val avatarRaw = valuePath(item, "user.avatarUrl", "user.avatar", "avatarUrl", "avatar")
+                if (!avatarRaw.isNullOrBlank()) {
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(avatarRaw) ?: avatarRaw).circleCrop().into(avatar)
+                }
+                identity.addView(avatar, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(10) })
+                val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
+                addText(copy, vipUserName ?: "مستخدم غير معروف", 14f, true, TEXT)
+                addText(copy, "ID: " + (valuePath(item, "user.publicId", "publicId", "userId") ?: "غير متوفر"), 11f, false, MUTED)
+                identity.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+                card.addView(identity)
+                addText(card, "هذه العضوية تخص هذا المستخدم تحديداً. زر السحب في الأسفل يسحب العضوية من نفس السجل.", 11f, false, MUTED)
+            } else {
+                addText(card, primary, 15f, true, TEXT)
+            }
             when (type) {
                 "cosmetics", "grantCosmetics", "gifts" -> addLiveAssetPreview(card, item, type, primary)
                 "vanityIds" -> addVanityIdPreview(card, item, primary)
@@ -1568,6 +1636,8 @@ class AdminConsoleActivity : ThemedActivity() {
                     "مستوى VIP" to listOf("level", "vipLevel"),
                     "حالة العضوية" to listOf("status", "state", "isActive"),
                     "تاريخ المنح" to listOf("createdAt", "grantedAt"),
+                    "منحها بواسطة" to listOf("grantedBy.displayName", "grantedBy.username", "grantedByName", "grantedBy", "createdBy.displayName", "createdBy.username", "createdByName"),
+                    "مصدر العضوية" to listOf("source", "grantSource", "origin", "reason"),
                     "تاريخ الانتهاء" to listOf("expiresAt", "vipExpiresAt")
                 )
                 "vipPlans" -> listOf(
@@ -1857,10 +1927,19 @@ class AdminConsoleActivity : ThemedActivity() {
                     }
                 }
                 "vip" -> if (!id.isNullOrBlank()) {
+                    if (!vipUserId.isNullOrBlank()) {
+                        addRecordAction(card, "فتح ملف المستخدم") {
+                            showEntityDetailScreen(
+                                mapOf("id" to vipUserId, "userId" to vipUserId, "publicId" to valuePath(item, "user.publicId", "publicId"),
+                                    "displayName" to vipUserName),
+                                "users"
+                            )
+                        }
+                    }
                     addRecordAction(card, "سحب عضوية VIP") {
-                        confirm("سحب عضوية VIP من المستخدم؟") {
+                        confirm("سحب عضوية VIP من المستخدم المحدد؟") {
                             load(api.revokeVip(id)) {
-                                toast("استجاب الخادم لطلب سحب VIP")
+                                toast("تم سحب عضوية VIP من المستخدم المحدد")
                                 openModule("vip")
                             }
                         }
