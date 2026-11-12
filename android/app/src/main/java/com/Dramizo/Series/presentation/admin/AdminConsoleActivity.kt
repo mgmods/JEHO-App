@@ -2343,6 +2343,8 @@ class AdminConsoleActivity : ThemedActivity() {
         }
 
         val specs: List<Pair<String, List<String>>> = when(type) {
+            "operators" -> listOf("اسم المدير" to listOf("user.displayName","user.username","displayName","username"), "ID المستخدم" to listOf("user.publicId","publicId","userId"), "الرتبة" to listOf("role","staffRole"), "الصلاحيات" to listOf("permissions","scopes"), "الحالة" to listOf("active","status"), "تاريخ الإضافة" to listOf("createdAt")),
+            "vipPlans" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "السعر" to listOf("price","priceCoins"), "المدة بالأيام" to listOf("durationDays","duration"), "المزايا" to listOf("description","benefits"), "الحالة" to listOf("isActive","status")),
             "vip" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "تاريخ المنح" to listOf("createdAt","grantedAt"), "تاريخ الانتهاء" to listOf("expiresAt","vipExpiresAt"))
             "agencyApplications" -> listOf("اسم المتقدم" to listOf("applicant.displayName","applicant.username","applicantName"), "اسم الوكالة المقترح" to listOf("proposedName","agencyName"), "الدولة" to listOf("country","region"), "التواصل" to listOf("contact","contactPhone","contactEmail"), "سبب الطلب" to listOf("reason","businessPlan"), "تاريخ الطلب" to listOf("createdAt"))
             "rechargeApplications" -> listOf("اسم المستخدم" to listOf("user.displayName","user.username","userName"), "المنطقة" to listOf("region","country"), "التواصل" to listOf("contact"), "العملات المطلوبة" to listOf("requestedCoins"), "سبب الطلب" to listOf("reason"), "تاريخ الطلب" to listOf("createdAt"))
@@ -2400,8 +2402,89 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "genderVerifications" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
                 hasAction = true
-                actions.addView(button("اعتماد طلب التحقق") { confirm("اعتماد طلب التحقق؟") { load(api.reviewGenderVerification(id, mapOf("status" to "approved"))) { toast("تمت مراجعة الطلب"); openModule(type) } } })
-                actions.addView(button("رفض طلب التحقق") { confirm("رفض طلب التحقق؟") { load(api.reviewGenderVerification(id, mapOf("status" to "rejected"))) { toast("تمت مراجعة الطلب"); openModule(type) } } })
+                actions.addView(button("اعتماد طلب التحقق") { confirm("اعتماد طلب التحقق؟") { load(api.approveGenderVerification(id, mapOf("note" to "تمت المراجعة من تطبيق JEHO"))) { toast("تمت مراجعة الطلب"); openModule(type) } } })
+                actions.addView(button("رفض طلب التحقق") { confirm("رفض طلب التحقق؟") { load(api.rejectGenderVerification(id, mapOf("note" to "تمت المراجعة من تطبيق JEHO"))) { toast("تمت مراجعة الطلب"); openModule(type) } } })
+            }
+            "operators" -> if (currentRole == StaffRoleHelper.SUPER) {
+                hasAction = true
+                val active = value(item, "active", "isActive")?.equals("true", true) ?: true
+                actions.addView(button("تعديل صلاحيات المدير") { showEditOperatorDialog(id, item) })
+                actions.addView(button(if (active) "تعطيل المدير" else "تفعيل المدير") {
+                    confirm("تغيير صلاحية دخول هذا المدير؟") {
+                        load(api.updateOperator(id, mapOf("active" to !active))) { toast("تم تحديث المدير"); openModule(type) }
+                    }
+                })
+                actions.addView(button("إزالة المدير") {
+                    confirm("سحب صلاحية لوحة التحكم من هذا المدير؟") {
+                        load(api.deleteOperator(id)) { toast("تمت إزالة المدير"); openModule(type) }
+                    }
+                })
+            }
+            "vipPlans" -> if (currentRole == StaffRoleHelper.SUPER) {
+                hasAction = true
+                val active = value(item, "isActive", "active")?.equals("true", true) == true
+                actions.addView(button("تعديل خطة VIP") {
+                    showEditVipPlanDialog(id, name, value(item, "level", "vipLevel") ?: "", value(item, "price", "priceCoins") ?: "")
+                })
+                actions.addView(button(if (active) "تعطيل الخطة" else "تفعيل الخطة") {
+                    confirm("تغيير حالة خطة VIP؟") {
+                        load(api.updateVipPlan(id, mapOf("isActive" to !active))) { toast("تم تحديث الخطة"); openModule(type) }
+                    }
+                })
+            }
+            "withdrawals" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                hasAction = true
+                actions.addView(button("اعتماد السحب") {
+                    confirm("لا تعتمد إلا بعد التحقق من الدفع فعلياً. متابعة؟") {
+                        load(api.approveWithdrawal(id)) { toast("استجاب الخادم لطلب اعتماد السحب"); openModule(type) }
+                    }
+                })
+                actions.addView(button("رفض السحب") {
+                    confirm("رفض طلب السحب؟") {
+                        load(api.rejectWithdrawal(id, mapOf("adminNote" to "تم الرفض من تطبيق JEHO"))) { toast("تمت معالجة الطلب"); openModule(type) }
+                    }
+                })
+            }
+            "recharges" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                hasAction = true
+                actions.addView(button("إتمام طلب الشحن") {
+                    confirm("لا تعتمد إلا بعد التحقق من الدفع. متابعة؟") {
+                        load(api.completeRecharge(id, mapOf("note" to "تم التحقق يدوياً من تطبيق JEHO"))) { toast("تمت معالجة الطلب"); openModule(type) }
+                    }
+                })
+                actions.addView(button("إلغاء طلب الشحن") {
+                    confirm("إلغاء طلب الشحن؟") { load(api.cancelRecharge(id)) { toast("تمت معالجة الطلب"); openModule(type) } }
+                })
+            }
+            "reports" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN || currentRole == StaffRoleHelper.MANAGER) {
+                hasAction = true
+                actions.addView(button("مراجعة البلاغ واتخاذ إجراء") { showReportDecisionDialog(id, true) })
+                actions.addView(button("رفض البلاغ") { showReportDecisionDialog(id, false) })
+            }
+            "gifts" -> if (currentRole == StaffRoleHelper.SUPER) {
+                hasAction = true
+                val active = status.equals("true", true) || status.equals("active", true)
+                actions.addView(button(if (active) "تعطيل الهدية" else "تفعيل الهدية") {
+                    confirm("تغيير حالة الهدية؟") {
+                        load(api.updateGift(id, mapOf("isActive" to !active))) { toast("تم تحديث الهدية"); openModule(type) }
+                    }
+                })
+            }
+            "cosmetics" -> if (currentRole == StaffRoleHelper.SUPER) {
+                hasAction = true
+                val active = status.equals("true", true) || status.equals("active", true)
+                actions.addView(button(if (active) "تعطيل الميزة" else "تفعيل الميزة") {
+                    confirm("تغيير حالة الميزة؟") {
+                        load(api.updateCosmetic(id, mapOf("isActive" to !active))) { toast("تم تحديث الميزة"); openModule(type) }
+                    }
+                })
+            }
+            "grantCosmetics" -> {
+                val code = value(item, "code", "key", "slug")
+                if (!code.isNullOrBlank()) {
+                    hasAction = true
+                    actions.addView(button("إهداء هذه الميزة لمستخدم") { showGrantCosmeticDialog(code) })
+                }
             }
         }
         if (!hasAction) {
