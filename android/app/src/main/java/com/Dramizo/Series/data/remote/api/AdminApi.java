@@ -84,6 +84,18 @@ public interface AdminApi {
     @GET("admin/custom-gifts")
     Call<ApiResponse<Object>> customGiftGrants();
 
+    @GET("admin/private-entries")
+    Call<ApiResponse<Object>> privateEntries();
+
+    @POST("admin/private-entries/grant")
+    Call<ApiResponse<Object>> grantPrivateEntry(@Body Map<String, Object> body);
+
+    @PATCH("admin/private-entries/{id}")
+    Call<ApiResponse<Object>> updatePrivateEntry(@Path("id") String id, @Body Map<String, Object> body);
+
+    @DELETE("admin/private-entries/{id}")
+    Call<ApiResponse<Object>> deletePrivateEntry(@Path("id") String id);
+
     @GET("admin/gifts")
     Call<ApiResponse<Object>> gifts();
 
