@@ -208,10 +208,16 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun buildShell() {
+        window.statusBarColor = Color.WHITE
+        window.navigationBarColor = Color.WHITE
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(BG)
         }
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -258,6 +264,16 @@ class AdminConsoleActivity : ThemedActivity() {
         header.addView(titleView, LinearLayout.LayoutParams(0, dp(48), 1f))
         header.addView(refreshButton, LinearLayout.LayoutParams(dp(44), dp(48)))
         root.addView(header)
+
+        // Initialize the loading indicator before attaching it to the view tree.
+        // The previous order accessed this lateinit property before assignment,
+        // crashing AdminConsoleActivity on every launch.
+        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = true
+            visibility = View.GONE
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(ACCENT)
+            minimumHeight = dp(3)
+        }
         root.addView(progress, LinearLayout.LayoutParams(-1, dp(3)))
         val scroll = ScrollView(this).apply {
             layoutDirection = View.LAYOUT_DIRECTION_RTL
