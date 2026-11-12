@@ -44,11 +44,14 @@ export class CustomGiftsService {
     return { id: user.id, publicId: user.publicId, username: user.username, displayName: user.displayName, avatarUrl: user.avatarUrl };
   }
 
-  async grant(dto: { recipientPublicId: string; name: string; mediaUrl: string; mediaType?: string; durationDays?: number | null }, actorId: string) {
+  async grant(dto: { recipientPublicId: string; name: string; mediaUrl: string; mediaType?: string; durationDays?: number | null; coinPrice: number; diamondValue: number }, actorId: string) {
     const recipient = await this.lookupRecipient(dto.recipientPublicId);
     const name = String(dto.name || '').trim().slice(0, 64);
     if (!name) throw new BadRequestException('اسم الهدية مطلوب');
     const media = this.normalizeMedia(dto.mediaUrl, dto.mediaType);
+    const coinPrice = Math.max(1, Math.floor(Number(dto.coinPrice) || 0));
+    const diamondValue = Math.max(0, Math.floor(Number(dto.diamondValue) || 0));
+    if (!Number.isSafeInteger(coinPrice) || !Number.isSafeInteger(diamondValue)) throw new BadRequestException('سعر الهدية غير صحيح');
     const rawDays = dto.durationDays === null || dto.durationDays === undefined ? 0 : Number(dto.durationDays);
     if (!Number.isInteger(rawDays) || rawDays < 0 || rawDays > 3650) throw new BadRequestException('مدة الصلاحية غير صحيحة');
     const startsAt = new Date();
@@ -60,8 +63,8 @@ export class CustomGiftsService {
         description: 'هدية مخصصة من إدارة JEHO',
         iconUrl: media.url,
         animationUrl: media.url,
-        coinPrice: 0,
-        diamondValue: 0,
+        coinPrice,
+        diamondValue,
         type: GiftType.NORMAL,
         category: 'custom',
         isActive: true,
@@ -88,7 +91,7 @@ export class CustomGiftsService {
       userId: recipient.id,
       type: NotificationType.CHAT,
       title: '🎁 هدية مخصصة من إدارة JEHO',
-      body: `🎁 مبروك! تمت إهداؤك هدية مخصصة من إدارة التطبيق.\n\nاسم الهدية: ${name}\nنوع الهدية: ${media.mediaType === 'video' ? 'فيديو' : media.mediaType === 'gif' ? 'GIF' : 'صورة'}\nتاريخ البدء: ${startText}\nتاريخ الانتهاء: ${endText}\nمدة الصلاحية: ${durationText}\nمقدمة الهدية: إدارة التطبيق\n\n🎉 يمكنك الآن الدخول إلى قسم الهدايا المخصصة واستخدام هديتك وإرسالها داخل الرومات.`,
+      body: `🎁 مبروك! تمت إهداؤك هدية مخصصة من إدارة التطبيق.\n\nاسم الهدية: ${name}\nنوع الهدية: ${media.mediaType === 'video' ? 'فيديو' : media.mediaType === 'gif' ? 'GIF' : 'صورة'}\nتاريخ البدء: ${startText}\nتاريخ الانتهاء: ${endText}\nمدة الصلاحية: ${durationText}\nالسعر: ${coinPrice} كوينز · ${diamondValue} ألماسات\nمقدمة الهدية: إدارة التطبيق\n\n🎉 يمكنك الآن الدخول إلى قسم الهدايا المخصصة واستخدام هديتك وإرسالها داخل الرومات.`,
       data: { adminMessage: true, source: 'admin', customGift: true, customGiftId: saved.grant.id, giftId: saved.gift.id, mediaType: media.mediaType, startsAt: startsAt.toISOString(), expiresAt: expiresAt?.toISOString() || null, durationDays: rawDays || null, mediaUrl: media.url },
       sendPush: true,
     });
@@ -111,8 +114,9 @@ export class CustomGiftsService {
       iconUrl: row.mediaUrl,
       animationUrl: row.mediaUrl,
       category: 'custom',
-      coinPrice: 0,
-      diamondValue: 0,
+      // Keep the admin-configured price and diamond payout from the Gift row.
+      coinPrice: Number(row.gift.coinPrice) || 0,
+      diamondValue: Number(row.gift.diamondValue) || 0,
       mediaType: row.mediaType,
       startsAt: row.startsAt,
       expiresAt: row.expiresAt,
