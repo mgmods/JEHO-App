@@ -547,7 +547,7 @@ export class CosmeticsService implements OnModuleInit {
       order: { createdAt: 'DESC' },
     });
     const privateRows = rows.filter(row => this.isPrivateEntryCosmetic(row));
-    const result = [];
+    const result: Array<Record<string, unknown>> = [];
     for (const cosmetic of privateRows) {
       const ownership = await this.userCosmeticsRepo.findOne({ where: { cosmeticId: cosmetic.id } });
       const owner = ownership ? await this.usersRepo.findOne({ where: { id: ownership.userId } }) : null;
