@@ -995,12 +995,16 @@ public class ChatConversationActivity extends ThemedActivity {
                     && Boolean.TRUE.equals(result.data.get("inRoom"));
             String roomId = inRoom && result.data.get("roomId") != null
                     ? String.valueOf(result.data.get("roomId")) : null;
+            String roomName = inRoom && result.data.get("roomName") != null
+                    ? String.valueOf(result.data.get("roomName")) : "";
             runOnUiThread(() -> {
                 if (binding == null || isFinishing() || isDestroyed() || !targetId.equals(peerId)) return;
                 peerRoomTrackingId = roomId;
                 if (binding.btnRoomTracking != null) {
-                    binding.btnRoomTracking.setVisibility(inRoom && roomId != null && !roomId.isEmpty()
-                            ? View.VISIBLE : View.GONE);
+                    boolean visible = inRoom && roomId != null && !roomId.isEmpty();
+                    binding.btnRoomTracking.setText(visible
+                            ? "●  في غرفة: " + (roomName.isEmpty() ? "غرفة صوتية" : roomName) : "");
+                    binding.btnRoomTracking.setVisibility(visible ? View.VISIBLE : View.GONE);
                 }
             });
         });
