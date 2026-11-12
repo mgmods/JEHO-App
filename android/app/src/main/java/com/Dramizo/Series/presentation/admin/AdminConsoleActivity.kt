@@ -162,13 +162,15 @@ class AdminConsoleActivity : ThemedActivity() {
                     val freshUser = if (response.isSuccessful && response.body()?.isSuccess == true) result?.user else null
                     if (freshUser != null) {
                         val oldRole = currentRole
+                        val oldPermissions = session.user?.dashboardPermissions?.toMap() ?: emptyMap()
                         session.saveSession(result)
                         val freshRole = StaffRoleHelper.normalize(freshUser)
+                        val permissionsChanged = oldPermissions != (freshUser.dashboardPermissions ?: emptyMap())
                         if (!StaffRoleHelper.isStaff(freshUser)) {
                             revokeLocalStaffAccess()
                             return
                         }
-                        if (freshRole != oldRole) {
+                        if (freshRole != oldRole || permissionsChanged) {
                             currentRole = freshRole
                             StaffIdentityConfigCache.refresh(this@AdminConsoleActivity, null)
                             runOnUiThread {
@@ -540,15 +542,7 @@ class AdminConsoleActivity : ThemedActivity() {
             bottomMargin = dp(17)
         })
 
-        val keys = when (currentRole) {
-            StaffRoleHelper.SUPER -> modules.map { it.key }
-            StaffRoleHelper.ADMIN -> listOf(
-                "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
-                "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds"
-            )
-            StaffRoleHelper.MANAGER -> listOf("rooms", "streams", "reports", "cosmetics", "gifts", "grantCosmetics")
-            else -> emptyList()
-        }
+        val keys = modules.map { it.key }
         val visible = keys.distinct().filter { roleCanAccessModule(it) }
             .mapNotNull { key -> modules.firstOrNull { it.key == key } }
 
@@ -659,13 +653,37 @@ class AdminConsoleActivity : ThemedActivity() {
         })
     }
 
+    private fun dashboardPermissionKey(moduleKey: String): String? = when (moduleKey) {
+        "users" -> "users"
+        "genderVerifications" -> "genderVerifications"
+        "rooms", "streams" -> "rooms"
+        "reports" -> "reports"
+        "agencies", "agencyApplications" -> "agencies"
+        "rechargeApplications", "rechargeAgents" -> "rechargeAgents"
+        "recharges" -> "coins"
+        "withdrawals" -> "withdrawals"
+        "walletTransactions", "walletAdjust" -> "wallet"
+        "notifications" -> "notifications"
+        "toastManager", "mysteriousMan", "luckyCannon", "supportChest",
+        "roomPkSettings", "staffIdentity" -> "settings"
+        "vanityIds" -> "vanityIds"
+        "cosmetics", "grantCosmetics" -> "cosmetics"
+        "gifts" -> "gifts"
+        "vip" -> "vip"
+        "logs" -> "logs"
+        "operators" -> null // Super Admin only; never granted through a module toggle.
+        else -> null
+    }
+
     private fun roleCanAccessModule(key: String): Boolean {
-        return when (currentRole) {
-            StaffRoleHelper.SUPER -> key in modules.map { it.key }.toSet()
-            StaffRoleHelper.ADMIN -> key in setOf("users", "rooms", "streams", "reports", "agencies", "agencyApplications", "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds")
-            StaffRoleHelper.MANAGER -> key in setOf("rooms", "streams", "reports", "cosmetics", "gifts", "grantCosmetics")
-            else -> false
-        }
+        if (currentRole == StaffRoleHelper.SUPER) return true
+        if (currentRole != StaffRoleHelper.ADMIN && currentRole != StaffRoleHelper.MANAGER) return false
+        val permissionKey = dashboardPermissionKey(key) ?: return false
+        val permissions = try {
+            ContainerProvider.from(this).sessionManager.user?.dashboardPermissions
+        } catch (_: Exception) { null }
+        val level = permissions?.get(permissionKey)?.trim()?.lowercase(java.util.Locale.ROOT) ?: "none"
+        return level == "read" || level == "write" || level == "view" || level == "edit" || level == "full"
     }
 
     private fun openModule(key: String, remember: Boolean = true) {
