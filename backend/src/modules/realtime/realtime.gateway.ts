@@ -619,7 +619,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           normalizeUrl(c.previewUrl) === normalizeUrl(previewUrl) ||
           normalizeUrl(c.animationUrl) === normalizeUrl(animationUrl),
       )?.meta as Record<string, unknown> | null) ?? null;
-    const entryEffectMeta = metaFor(entryEffectUrl, entryAnimationUrl);
+    const rawEntryEffectMeta = metaFor(entryEffectUrl, entryAnimationUrl);
+    // Private-entry ownership and admin-only notes must never be broadcast to the room.
+    // Keep only the visual playback hints the existing room renderer understands.
+    const entryEffectMeta = rawEntryEffectMeta?.privateEntry === true
+      ? {
+          effectPriority: rawEntryEffectMeta.effectPriority,
+          renderMode: rawEntryEffectMeta.renderMode,
+          aspectRatio: rawEntryEffectMeta.aspectRatio,
+          textSafeArea: rawEntryEffectMeta.textSafeArea,
+          durationMs: rawEntryEffectMeta.privateVideoDurationMs ?? rawEntryEffectMeta.durationMs,
+        }
+      : rawEntryEffectMeta;
     const cosmeticMeta =
       entryEffectUrl || entryAnimationUrl ? entryEffectMeta : null;
     const metadataPriority = Number(cosmeticMeta?.effectPriority);
