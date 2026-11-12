@@ -808,6 +808,12 @@ class AdminConsoleActivity : ThemedActivity() {
         })
     }
 
+    private fun hasCustomGiftWritePermission(): Boolean {
+        val user = try { ContainerProvider.from(this).sessionManager.user } catch (_: Exception) { null }
+        val level = user?.dashboardPermissions?.get("customGifts")?.trim()?.lowercase()
+        return level == "write" || level == "edit" || level == "full"
+    }
+
     private fun roleCanAccessModule(key: String): Boolean {
         // Keep this allow-list in sync with backend AdminGuard's native-app policy.
         // A new module is hidden by default until the server explicitly allows it.
@@ -823,11 +829,11 @@ class AdminConsoleActivity : ThemedActivity() {
             )
             StaffRoleHelper.ADMIN -> key in setOf(
                 "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
-                "cosmetics", "grantCosmetics", "gifts", "customGifts", "vip", "vanityIds"
-            )
+                "cosmetics", "grantCosmetics", "gifts", "vip", "vanityIds"
+            ) || (key == "customGifts" && hasCustomGiftWritePermission())
             StaffRoleHelper.MANAGER -> key in setOf(
                 "rooms", "streams", "reports", "cosmetics", "grantCosmetics", "gifts"
-            )
+            ) || (key == "customGifts" && hasCustomGiftWritePermission())
             else -> false
         }
     }
