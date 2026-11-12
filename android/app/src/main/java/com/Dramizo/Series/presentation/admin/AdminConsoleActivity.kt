@@ -217,48 +217,47 @@ class AdminConsoleActivity : ThemedActivity() {
             orientation = LinearLayout.HORIZONTAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(18), dp(14), dp(18), dp(14))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFF171B38.toInt(), 0xFF30245F.toInt(), 0xFF6446B6.toInt())
-            )
+            setPadding(dp(14), dp(9), dp(14), dp(9))
+            setBackgroundColor(Color.WHITE)
+            elevation = dp(3).toFloat()
         }
         backButton = TextView(this).apply {
-            text = "‹ رجوع"
-            textSize = 14f
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            textDirection = View.TEXT_DIRECTION_RTL
-            setTextColor(Color.WHITE)
+            text = "➜"
+            textSize = 23f
+            setTextColor(TEXT)
             gravity = Gravity.CENTER
-            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setPadding(dp(8), dp(6), dp(8), dp(6))
             visibility = View.GONE
             setOnClickListener { handleAdminBack() }
         }
-        val heading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
         titleView = TextView(this).apply {
-            text = "مركز إدارة JEHO"
-            textSize = 20f
-            setTextColor(Color.WHITE)
+            text = "نظام المدراء"
+            textSize = 19f
+            setTextColor(TEXT)
+            gravity = Gravity.CENTER
             setTypeface(typeface, Typeface.BOLD)
         }
-        val subtitle = TextView(this).apply {
-            text = "مركز العمليات والإدارة"
-            textSize = 12f
-            setTextColor(0xFFE3DDF7.toInt())
-            setPadding(0, dp(3), 0, 0)
+        val refreshButton = TextView(this).apply {
+            text = "⟳"
+            textSize = 29f
+            setTextColor(0xFF252525.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            contentDescription = "تحديث لوحة الإدارة"
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                when (currentSection) {
+                    "home" -> showHome(false)
+                    "more" -> showMoreModules(false)
+                    else -> openModule(currentSection, false)
+                }
+            }
         }
-        heading.addView(titleView)
-        heading.addView(subtitle)
-        // Keep a clearly labelled back action visible inside every admin section.
-        header.addView(backButton, LinearLayout.LayoutParams(-2, dp(42)).apply { marginEnd = dp(10) })
-        header.addView(heading, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(backButton, LinearLayout.LayoutParams(dp(44), dp(48)))
+        header.addView(titleView, LinearLayout.LayoutParams(0, dp(48), 1f))
+        header.addView(refreshButton, LinearLayout.LayoutParams(dp(44), dp(48)))
         root.addView(header)
-
-        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            isIndeterminate = true
-            visibility = View.GONE
-            indeterminateTintList = android.content.res.ColorStateList.valueOf(ACCENT)
-        }
         root.addView(progress, LinearLayout.LayoutParams(-1, dp(3)))
         val scroll = ScrollView(this).apply {
             layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -432,7 +431,7 @@ class AdminConsoleActivity : ThemedActivity() {
         body.addView(empty)
 
         val records = mutableListOf<Pair<View, Module>>()
-        available.chunked(2).forEach { pair ->
+        available.chunked(3).forEach { pair ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -440,7 +439,7 @@ class AdminConsoleActivity : ThemedActivity() {
             pair.forEach { module ->
                 val tile = card().apply {
                     setPadding(dp(13), dp(13), dp(13), dp(13))
-                    minimumHeight = dp(154)
+                    minimumHeight = dp(128)
                     isClickable = true
                     isFocusable = true
                     foreground = android.util.TypedValue().let {
@@ -499,7 +498,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     setLineSpacing(dp(2).toFloat(), 1f)
                     setPadding(0, dp(3), 0, dp(8))
                 })
-                tile.addView(button("فتح القسم") { openModule(module.key) }, LinearLayout.LayoutParams(-1, dp(42)))
+                
                 row.addView(tile)
                 records.add(tile to module)
             }
@@ -541,104 +540,217 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun showHome(remember: Boolean = true) {
         if (remember) rememberCurrentSection("home")
         currentSection = "home"
-        titleView.text = "الرئيسية"
+        titleView.text = "نظام المدراء"
         backButton.visibility = View.GONE
         body.removeAllViews()
         body.layoutDirection = View.LAYOUT_DIRECTION_RTL
+
         val roleLabel = when (currentRole) {
-            StaffRoleHelper.SUPER -> "السوبر أدمن"
-            StaffRoleHelper.ADMIN -> "الأدمن"
-            else -> "المانجر"
+            StaffRoleHelper.SUPER -> "Super Admin"
+            StaffRoleHelper.ADMIN -> "Admin"
+            StaffRoleHelper.MANAGER -> "Manager"
+            else -> "غير مخوّل"
         }
-        val hero = LinearLayout(this).apply {
+        val user = try { ContainerProvider.from(this).sessionManager.user } catch (_: Exception) { null }
+
+        // Profile strip, matching the supplied native-app reference.
+        val profile = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), dp(5), dp(4), dp(14))
+        }
+        val avatar = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = roundRect(0xFFECEAF2.toInt(), 50)
+            clipToOutline = true
+            contentDescription = "الصورة الشخصية للحساب الإداري"
+        }
+        profile.addView(avatar, LinearLayout.LayoutParams(dp(72), dp(72)).apply { marginEnd = dp(12) })
+        val avatarUrl = user?.avatarUrl?.takeIf { it.isNotBlank() }
+        if (avatarUrl != null) {
+            val resolved = AssetCatalog.absoluteUrl(avatarUrl) ?: avatarUrl
+            Glide.with(this).load(resolved).circleCrop().into(avatar)
+        } else {
+            avatar.setImageResource(android.R.drawable.sym_def_app_icon)
+        }
+        val identity = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
-            setPadding(dp(20), dp(20), dp(20), dp(20))
-            background = GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, intArrayOf(0xFF171B38.toInt(), 0xFF352765.toInt(), 0xFF7053C7.toInt())).apply {
-                cornerRadius = dp(24).toFloat()
-            }
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(18) }
-            elevation = dp(4).toFloat()
         }
-        val brand = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
-        brand.addView(TextView(this).apply {
-            text = "J"; textSize = 22f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); setTypeface(typeface, Typeface.BOLD)
-            background = roundRect(0xFF8068D8.toInt(), 15)
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(11) }
+        val displayName = user?.displayName?.takeIf { it.isNotBlank() }
+            ?: user?.username?.takeIf { it.isNotBlank() } ?: "فريق JEHO"
+        addText(identity, displayName, 18f, true, TEXT)
+        val publicId = user?.publicId?.takeIf { it.isNotBlank() } ?: "—"
+        addText(identity, "المعرّف: $publicId", 12f, false, MUTED)
+        profile.addView(identity, LinearLayout.LayoutParams(0, -2, 1f))
+        val roleBadge = TextView(this).apply {
+            text = roleLabel
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            background = GradientDrawable().apply {
+                setColor(0xFF28B6E8.toInt())
+                cornerRadius = dp(15).toFloat()
+            }
+        }
+        profile.addView(roleBadge)
+        body.addView(profile)
+
+        val searchRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                setColor(0xFFF3F3F7.toInt())
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), 0xFFE2E2E8.toInt())
+            }
+            setPadding(dp(12), 0, dp(12), 0)
+        }
+        searchRow.addView(TextView(this).apply {
+            text = "⌕"
+            textSize = 28f
+            setTextColor(0xFF9299A5.toInt())
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(dp(34), dp(52)))
+        val search = EditText(this).apply {
+            hint = "ابحث بالقسم أو اسم الأداة"
+            textSize = 14f
+            setSingleLine(true)
+            setTextColor(TEXT)
+            setHintTextColor(0xFF9999A3.toInt())
+            background = null
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            textDirection = View.TEXT_DIRECTION_RTL
+            gravity = Gravity.CENTER_VERTICAL or Gravity.RIGHT
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            setPadding(dp(6), 0, dp(6), 0)
+        }
+        searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
+        body.addView(searchRow, LinearLayout.LayoutParams(-1, dp(54)).apply {
+            bottomMargin = dp(17)
         })
-        val brandText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        addText(brandText, "JEHO  •  CONTROL CENTER", 10f, true, 0xFFE0D9FF.toInt())
-        addText(brandText, "لوحة الإدارة الموحدة", 18f, true, Color.WHITE)
-        brand.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
-        brand.addView(TextView(this).apply {
-            text = roleLabel; textSize = 11f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-            background = GradientDrawable().apply { setColor(0x28FFFFFF); cornerRadius = dp(30).toFloat(); setStroke(dp(1), 0x55FFFFFF) }
-        })
-        hero.addView(brand)
-        body.addView(hero)
+
         val keys = when (currentRole) {
             StaffRoleHelper.SUPER -> modules.map { it.key }
-            StaffRoleHelper.ADMIN -> listOf("users", "rooms", "streams", "reports", "agencies", "agencyApplications", "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds")
+            StaffRoleHelper.ADMIN -> listOf(
+                "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
+                "cosmetics", "gifts", "grantCosmetics", "vip", "vanityIds"
+            )
             StaffRoleHelper.MANAGER -> listOf("rooms", "streams", "reports", "cosmetics", "gifts", "grantCosmetics")
             else -> emptyList()
         }
-        val visible = keys.distinct().filter { roleCanAccessModule(it) }.mapNotNull { key -> modules.firstOrNull { it.key == key } }
-        visible.chunked(2).forEach { pair ->
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
-            pair.forEach { module ->
+        val visible = keys.distinct().filter { roleCanAccessModule(it) }
+            .mapNotNull { key -> modules.firstOrNull { it.key == key } }
+
+        val empty = TextView(this).apply {
+            text = "لا توجد أقسام تطابق البحث"
+            textSize = 13f
+            setTextColor(MUTED)
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            setPadding(0, dp(22), 0, dp(22))
+        }
+        body.addView(empty)
+        val records = mutableListOf<Pair<View, Module>>()
+        visible.chunked(3).forEach { group ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+            }
+            group.forEach { module ->
                 val tile = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(13), dp(12), dp(13), dp(12))
-                    background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(20).toFloat(); setStroke(dp(1), 0xFFE7E4F1.toInt()) }
-                    elevation = dp(2).toFloat(); isClickable = true; isFocusable = true
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    setPadding(dp(7), dp(12), dp(7), dp(10))
+                    background = GradientDrawable().apply {
+                        setColor(Color.WHITE)
+                        cornerRadius = dp(21).toFloat()
+                        setStroke(dp(1), 0xFFE4E4E8.toInt())
+                    }
+                    elevation = dp(2).toFloat()
+                    isClickable = true
+                    isFocusable = true
                     foreground = android.graphics.drawable.RippleDrawable(
                         android.content.res.ColorStateList.valueOf(0x226B4CC2),
-                        roundRect(0xFFF0ECFF.toInt(), 20),
-                        null
+                        roundRect(0xFFF0ECFF.toInt(), 21), null
                     )
-                    layoutParams = LinearLayout.LayoutParams(0, dp(148), 1f).apply { marginStart = dp(5); marginEnd = dp(5); bottomMargin = dp(10) }
+                    layoutParams = LinearLayout.LayoutParams(0, dp(132), 1f).apply {
+                        marginStart = dp(4)
+                        marginEnd = dp(4)
+                        bottomMargin = dp(10)
+                    }
                     setOnClickListener { openModule(module.key) }
                 }
-                val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL }
-                top.addView(TextView(this).apply {
-                    text = module.icon; textSize = 19f; gravity = Gravity.CENTER; setTextColor(ACCENT); background = roundRect(0xFFF0ECFF.toInt(), 13)
-                    layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
-                })
-                top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-                top.addView(TextView(this).apply { text = "↗"; textSize = 18f; setTextColor(MUTED) })
-                tile.addView(top)
-                val tileTitle = TextView(this).apply {
+                val iconTint = when (module.key) {
+                    "operators", "staffIdentity" -> 0xFF8156D8.toInt()
+                    "users", "genderVerifications", "agencyApplications" -> 0xFF347FE0.toInt()
+                    "agencies", "rooms", "streams", "rechargeAgents" -> 0xFF1EAD69.toInt()
+                    "notifications", "toastManager", "supportChest" -> 0xFFE04D94.toInt()
+                    "vip", "walletAdjust", "withdrawals" -> 0xFFE0A126.toInt()
+                    else -> ACCENT
+                }
+                val icon = TextView(this).apply {
+                    text = module.icon
+                    textSize = 26f
+                    gravity = Gravity.CENTER
+                    setTextColor(iconTint)
+                    background = roundRect(0xFFF5F4F9.toInt(), 15)
+                    layoutParams = LinearLayout.LayoutParams(dp(50), dp(50))
+                }
+                tile.addView(icon)
+                tile.addView(TextView(this).apply {
                     text = module.title
-                    textSize = 14f
+                    textSize = 12f
                     setTextColor(TEXT)
-                    setTypeface(typeface, Typeface.BOLD)
-                    gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
                     textDirection = View.TEXT_DIRECTION_RTL
-                    minLines = 2
                     maxLines = 2
+                    minLines = 2
                     includeFontPadding = false
                     ellipsize = android.text.TextUtils.TruncateAt.END
-                    setLineSpacing(dp(2).toFloat(), 1f)
-                    setPadding(0, dp(7), 0, dp(2))
-                }
-                tile.addView(tileTitle, LinearLayout.LayoutParams(-1, 0, 1f))
-                val tileSubtitle = TextView(this).apply {
-                    text = module.subtitle
-                    textSize = 10f
-                    setTextColor(MUTED)
-                    maxLines = 2
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    gravity = Gravity.RIGHT
-                    layoutDirection = View.LAYOUT_DIRECTION_RTL
-                }
-                tile.addView(tileSubtitle, LinearLayout.LayoutParams(-1, -2))
+                    setPadding(dp(2), dp(9), dp(2), 0)
+                }, LinearLayout.LayoutParams(-1, -2))
                 row.addView(tile)
+                records.add(tile to module)
             }
-            if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+            if (group.size < 3) {
+                repeat(3 - group.size) {
+                    row.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f).apply {
+                        marginStart = dp(4)
+                        marginEnd = dp(4)
+                    })
+                }
+            }
             body.addView(row)
         }
+        if (visible.isEmpty()) {
+            empty.visibility = View.VISIBLE
+            empty.text = "لا توجد أقسام متاحة لهذه الرتبة"
+        }
+        search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s?.toString()?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty()
+                var found = false
+                records.forEach { (view, module) ->
+                    val match = query.isEmpty() ||
+                        module.title.lowercase(java.util.Locale.ROOT).contains(query) ||
+                        module.subtitle.lowercase(java.util.Locale.ROOT).contains(query) ||
+                        module.key.lowercase(java.util.Locale.ROOT).contains(query)
+                    view.visibility = if (match) View.VISIBLE else View.GONE
+                    if (match) found = true
+                }
+                empty.visibility = if (query.isNotEmpty() && !found) View.VISIBLE else View.GONE
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
     }
 
     private fun roleCanAccessModule(key: String): Boolean {
