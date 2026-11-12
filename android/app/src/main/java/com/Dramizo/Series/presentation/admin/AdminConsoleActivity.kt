@@ -548,7 +548,7 @@ class AdminConsoleActivity : ThemedActivity() {
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.WHITE)
             setPadding(dp(10), dp(6), dp(10), dp(6))
-            background = roundRect(0x334F4FFF.toInt(), 30)
+            background = roundRect(0xFFFFF4D6.toInt(), 30)
         }
         welcomeMeta.addView(rolePill)
         welcomeMeta.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
