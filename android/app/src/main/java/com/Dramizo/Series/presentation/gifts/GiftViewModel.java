@@ -135,7 +135,12 @@ public class GiftViewModel extends ViewModel {
                     publicGifts = current == null
                             ? new ArrayList<>()
                             : new ArrayList<>(current);
-                    publicGifts.removeIf(g -> g != null && "custom".equalsIgnoreCase(g.category));
+                    for (int i = publicGifts.size() - 1; i >= 0; i--) {
+                        GiftDtos.GiftDto item = publicGifts.get(i);
+                        if (item != null && "custom".equalsIgnoreCase(item.category)) {
+                            publicGifts.remove(i);
+                        }
+                    }
                 }
 
                 List<GiftDtos.GiftDto> merged = new ArrayList<>(publicGifts);
