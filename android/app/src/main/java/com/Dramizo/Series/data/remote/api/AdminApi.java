@@ -75,6 +75,15 @@ public interface AdminApi {
     @POST("admin/agencies/{id}/suspend")
     Call<ApiResponse<Object>> suspendAgency(@Path("id") String id, @Body Map<String, String> body);
 
+    @POST("admin/custom-gifts/lookup")
+    Call<ApiResponse<Object>> customGiftLookup(@Body Map<String, Object> body);
+
+    @POST("admin/custom-gifts/send")
+    Call<ApiResponse<Object>> customGiftSend(@Body Map<String, Object> body);
+
+    @GET("admin/custom-gifts")
+    Call<ApiResponse<Object>> customGiftGrants();
+
     @GET("admin/gifts")
     Call<ApiResponse<Object>> gifts();
 
