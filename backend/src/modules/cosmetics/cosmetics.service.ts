@@ -32,6 +32,59 @@ import { MediaCleanupService } from '../uploads/media-cleanup.service';
 import { MALL_COSMETIC_PRICES, PRICING_VERSION } from '../../common/pricing-catalog';
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 import { isStaticVipTouUrl } from '../../common/vip-visual';
+import { randomUUID } from 'crypto';
+import { UploadsService } from '../uploads/uploads.service';
+
+
+/** Read ISO-BMFF mvhd duration (MP4/MOV/3GP) without trusting client metadata. */
+function readIsoBmffDurationMs(buffer: Buffer): number | null {
+  const scan = (start: number, end: number, depth: number): number | null => {
+    if (depth > 8) return null;
+    let offset = start;
+    while (offset + 8 <= end) {
+      let size = buffer.readUInt32BE(offset);
+      const type = buffer.toString('ascii', offset + 4, offset + 8);
+      let header = 8;
+      if (size === 1) {
+        if (offset + 16 > end) return null;
+        const large = buffer.readBigUInt64BE(offset + 8);
+        if (large > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+        size = Number(large);
+        header = 16;
+      } else if (size === 0) {
+        size = end - offset;
+      }
+      if (size < header || offset + size > end) return null;
+      const payload = offset + header;
+      if (type === 'mvhd') {
+        const version = buffer[payload];
+        const timescaleOffset = payload + (version === 1 ? 20 : 12);
+        const durationOffset = payload + (version === 1 ? 24 : 16);
+        if (timescaleOffset + 4 > offset + size) return null;
+        const timescale = buffer.readUInt32BE(timescaleOffset);
+        if (!timescale) return null;
+        let duration: number;
+        if (version === 1) {
+          if (durationOffset + 8 > offset + size) return null;
+          const value = buffer.readBigUInt64BE(durationOffset);
+          if (value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+          duration = Number(value);
+        } else {
+          if (durationOffset + 4 > offset + size) return null;
+          duration = buffer.readUInt32BE(durationOffset);
+        }
+        return Math.round((duration / timescale) * 1000);
+      }
+      if (['moov', 'trak', 'mdia', 'minf', 'edts', 'udta'].includes(type)) {
+        const nested = scan(payload, offset + size, depth + 1);
+        if (nested != null) return nested;
+      }
+      offset += size;
+    }
+    return null;
+  };
+  return scan(0, buffer.length, 0);
+}
 
 type MikooCatalogItem = {
   type: CosmeticType | string;
@@ -54,6 +107,7 @@ export class CosmeticsService implements OnModuleInit {
   private mikooCatalogEnsured = false;
   private hostBadgeEnsured = false;
   private readonly logger = new Logger(CosmeticsService.name);
+  private privateEntryExpiryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(Cosmetic) private readonly cosmeticsRepo: Repository<Cosmetic>,
@@ -64,6 +118,7 @@ export class CosmeticsService implements OnModuleInit {
     @InjectRepository(UserVip) private readonly userVipRepo: Repository<UserVip>,
     @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     private readonly mediaCleanup: MediaCleanupService,
+    private readonly uploadsService: UploadsService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -99,6 +154,15 @@ export class CosmeticsService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`VIP frame gate rebind: ${(err as Error).message}`);
     }
+    if (!this.privateEntryExpiryTimer) {
+      this.privateEntryExpiryTimer = setInterval(() => {
+        void this.expirePrivateEntryCosmetics().catch((err) =>
+          this.logger.warn(`Private-entry expiry cleanup failed: ${(err as Error).message}`),
+        );
+      }, 60_000);
+      this.privateEntryExpiryTimer.unref?.();
+    }
+    void this.expirePrivateEntryCosmetics().catch(() => undefined);
     // Live DB is the catalog. Boot mutators only when BOOT_SEED_CATALOGS=1.
     if (!bootCatalogSeedEnabled()) {
       this.logger.log('Cosmetics catalog: DB authoritative (no boot seed)');
@@ -138,8 +202,13 @@ export class CosmeticsService implements OnModuleInit {
     // Keep CP Settings and CP Center access on their dedicated CP paths.
     return rows.filter((row) => {
       const meta = row.meta as any;
-      return meta?.mallHidden !== true && !this.isCpStoreCosmetic(row);
+      return meta?.mallHidden !== true && !this.isCpStoreCosmetic(row) && !this.isPrivateEntryCosmetic(row);
     });
+  }
+
+  private isPrivateEntryCosmetic(cosmetic: Partial<Cosmetic> | null | undefined): boolean {
+    const meta: any = cosmetic?.meta as any;
+    return meta?.privateEntry === true;
   }
 
   private isCpStoreCosmetic(cosmetic: Partial<Cosmetic> | null | undefined): boolean {
@@ -152,7 +221,7 @@ export class CosmeticsService implements OnModuleInit {
     const where: any = {};
     if (type) where.type = type;
     const rows = await this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', createdAt: 'DESC' } });
-    return rows.filter(row => !this.isCpStoreCosmetic(row));
+    return rows.filter(row => !this.isCpStoreCosmetic(row) && !this.isPrivateEntryCosmetic(row));
   }
 
   async adminListCpStore() {
@@ -358,13 +427,214 @@ export class CosmeticsService implements OnModuleInit {
   }
 
   async inventory(userId: string) {
+    await this.expirePrivateEntryCosmetics();
     // The normal mall bag must never list CP-exclusive items.
     const rows = await this.userCosmeticsRepo.find({
       where: { userId },
       relations: ['cosmetic'],
       order: { createdAt: 'DESC' },
     });
-    return rows.filter(row => !this.isCpStoreCosmetic(row.cosmetic));
+    const now = Date.now();
+    return rows.filter(row => {
+      if (this.isCpStoreCosmetic(row.cosmetic)) return false;
+      if (this.isPrivateEntryCosmetic(row.cosmetic)) {
+        return String((row.cosmetic.meta as any)?.privateOwnerUserId || '') === String(userId)
+          && (!row.expiresAt || row.expiresAt.getTime() > now);
+      }
+      return true;
+    });
+  }
+
+  async grantPrivateEntry(dto: {
+    recipientPublicId: string;
+    name: string;
+    videoUrl: string;
+    durationDays: number;
+    permanent?: boolean;
+    personalMessage?: string;
+    giftedByUserId: string;
+  }) {
+    const recipientId = String(dto.recipientPublicId || '').trim();
+    const name = String(dto.name || '').trim();
+    const videoUrl = String(dto.videoUrl || '').trim();
+    const personalMessage = String(dto.personalMessage || '').trim().slice(0, 500);
+    const permanent = dto.permanent === true;
+    const days = Number(dto.durationDays);
+    if (!recipientId || !name || name.length > 128 || !videoUrl) {
+      throw new BadRequestException('معرّف المستلم واسم الدخولية والفيديو مطلوبة');
+    }
+    if (!permanent && ![1, 7, 15, 30].includes(days)) {
+      throw new BadRequestException('مدة الدخولية يجب أن تكون 1 أو 7 أو 15 أو 30 يوماً أو دائمة');
+    }
+    const recipient = await this.usersRepo.findOne({
+      where: [{ publicId: recipientId }, ...(/^[0-9a-f-]{36}$/i.test(recipientId) ? [{ id: recipientId } as any] : [])],
+    });
+    if (!recipient) throw new NotFoundException('لم يتم العثور على المستخدم بهذا ID');
+
+    const uploadMatch = videoUrl.match(/\/uploads\/([^/?#]+)/i);
+    if (!uploadMatch) throw new BadRequestException('يجب رفع فيديو الدخولية إلى تخزين JEHO أولاً');
+    const stored = await this.uploadsService.getStoredFile(uploadMatch[1]);
+    if (!stored) throw new BadRequestException('تعذر قراءة فيديو الدخولية من التخزين');
+    const durationMs = readIsoBmffDurationMs(stored.buffer);
+    if (durationMs == null) {
+      throw new BadRequestException('تعذر التحقق من مدة الفيديو. استخدم MP4 أو MOV أو 3GP صالحاً.');
+    }
+    if (durationMs < 1000 || durationMs > 10_000) {
+      throw new BadRequestException('مدة فيديو الدخولية يجب أن تكون من ثانية واحدة إلى 10 ثوانٍ فقط');
+    }
+
+    const now = new Date();
+    const expiresAt = permanent ? null : new Date(now.getTime() + days * 86_400_000);
+    const code = `private_entry_${randomUUID().replace(/-/g, '')}`;
+    const cosmetic = await this.cosmeticsRepo.save(this.cosmeticsRepo.create({
+      type: CosmeticType.ENTRY_EFFECT,
+      code,
+      name,
+      description: personalMessage || 'دخولية خاصة مهداة من الإدارة',
+      previewUrl: videoUrl,
+      animationUrl: videoUrl,
+      coinPrice: 0,
+      minVipLevel: 0,
+      minUserLevel: 0,
+      isActive: true,
+      sortOrder: 2147483647,
+      meta: {
+        privateEntry: true,
+        privateOwnerUserId: recipient.id,
+        privateGiftedByUserId: dto.giftedByUserId,
+        privateGiftedAt: now.toISOString(),
+        privateDurationDays: permanent ? null : days,
+        privatePermanent: permanent,
+        privatePersonalMessage: personalMessage,
+        privateVideoDurationMs: durationMs,
+      },
+    }));
+    const ownership = await this.userCosmeticsRepo.save(this.userCosmeticsRepo.create({
+      userId: recipient.id,
+      cosmeticId: cosmetic.id,
+      equipped: false,
+      expiresAt,
+    }));
+    return {
+      granted: true,
+      userId: recipient.id,
+      recipientPublicId: recipient.publicId,
+      recipientName: recipient.displayName || recipient.username,
+      cosmetic,
+      ownership,
+      expiresAt,
+      permanent,
+      durationDays: permanent ? null : days,
+      durationMs,
+    };
+  }
+
+  async listPrivateEntries() {
+    const rows = await this.cosmeticsRepo.find({
+      where: { type: CosmeticType.ENTRY_EFFECT },
+      order: { createdAt: 'DESC' },
+    });
+    const privateRows = rows.filter(row => this.isPrivateEntryCosmetic(row));
+    const result = [];
+    for (const cosmetic of privateRows) {
+      const ownership = await this.userCosmeticsRepo.findOne({ where: { cosmeticId: cosmetic.id } });
+      const owner = ownership ? await this.usersRepo.findOne({ where: { id: ownership.userId } }) : null;
+      result.push({
+        id: cosmetic.id,
+        name: cosmetic.name,
+        videoUrl: cosmetic.animationUrl || cosmetic.previewUrl,
+        recipientUserId: owner?.id || (cosmetic.meta as any)?.privateOwnerUserId || null,
+        recipientPublicId: owner?.publicId || null,
+        recipientName: owner?.displayName || owner?.username || null,
+        durationDays: ownership?.expiresAt
+          ? Math.max(0, Math.ceil((ownership.expiresAt.getTime() - Date.now()) / 86_400_000))
+          : null,
+        expiresAt: ownership?.expiresAt || null,
+        permanent: ownership ? ownership.expiresAt == null : !!(cosmetic.meta as any)?.privatePermanent,
+        equipped: ownership?.equipped || false,
+        personalMessage: (cosmetic.meta as any)?.privatePersonalMessage || '',
+        createdAt: cosmetic.createdAt,
+      });
+    }
+    return result;
+  }
+
+  async updatePrivateEntry(id: string, dto: {
+    recipientPublicId?: string;
+    name?: string;
+    durationDays?: number;
+    permanent?: boolean;
+    personalMessage?: string;
+  }) {
+    const cosmetic = await this.cosmeticsRepo.findOne({ where: { id, type: CosmeticType.ENTRY_EFFECT } });
+    if (!cosmetic || !this.isPrivateEntryCosmetic(cosmetic)) {
+      throw new NotFoundException('الدخولية الخاصة غير موجودة');
+    }
+    const meta: any = { ...(cosmetic.meta || {}) };
+    const ownership = await this.userCosmeticsRepo.findOne({ where: { cosmeticId: id } });
+    if (!ownership) throw new NotFoundException('ملكية الدخولية غير موجودة');
+    if (dto.name !== undefined) {
+      const name = String(dto.name || '').trim();
+      if (!name || name.length > 128) throw new BadRequestException('اسم الدخولية غير صحيح');
+      cosmetic.name = name;
+    }
+    if (dto.personalMessage !== undefined) {
+      meta.privatePersonalMessage = String(dto.personalMessage || '').trim().slice(0, 500);
+      cosmetic.description = meta.privatePersonalMessage || 'دخولية خاصة مهداة من الإدارة';
+    }
+    if (dto.recipientPublicId !== undefined) {
+      const targetId = String(dto.recipientPublicId || '').trim();
+      const target = await this.usersRepo.findOne({
+        where: [{ publicId: targetId }, ...(/^[0-9a-f-]{36}$/i.test(targetId) ? [{ id: targetId } as any] : [])],
+      });
+      if (!target) throw new NotFoundException('لم يتم العثور على المستخدم الجديد');
+      if (target.id !== ownership.userId) {
+        if (ownership.equipped) await this.clearExpiredCosmeticWear({ ...ownership, cosmetic } as UserCosmetic);
+        await this.userCosmeticsRepo.delete({ id: ownership.id });
+        ownership.userId = target.id;
+        ownership.equipped = false;
+      }
+      meta.privateOwnerUserId = target.id;
+    }
+    const permanent = dto.permanent === true;
+    if (dto.permanent === true || dto.durationDays !== undefined) {
+      const days = Number(dto.durationDays);
+      if (!permanent && ![1, 7, 15, 30].includes(days)) {
+        throw new BadRequestException('مدة الدخولية يجب أن تكون 1 أو 7 أو 15 أو 30 يوماً أو دائمة');
+      }
+      ownership.expiresAt = permanent ? null : new Date(Date.now() + days * 86_400_000);
+      meta.privatePermanent = permanent;
+      meta.privateDurationDays = permanent ? null : days;
+    }
+    cosmetic.meta = meta;
+    await this.cosmeticsRepo.save(cosmetic);
+    const savedOwnership = await this.userCosmeticsRepo.save(ownership);
+    return { updated: true, cosmetic, ownership: savedOwnership };
+  }
+
+  async deletePrivateEntry(id: string) {
+    const cosmetic = await this.cosmeticsRepo.findOne({ where: { id, type: CosmeticType.ENTRY_EFFECT } });
+    if (!cosmetic || !this.isPrivateEntryCosmetic(cosmetic)) {
+      throw new NotFoundException('الدخولية الخاصة غير موجودة');
+    }
+    const ownership = await this.userCosmeticsRepo.findOne({
+      where: { cosmeticId: id },
+      relations: ['cosmetic'],
+    });
+    if (ownership?.equipped) await this.clearExpiredCosmeticWear(ownership);
+    return this.adminDelete(id);
+  }
+
+  async expirePrivateEntryCosmetics() {
+    const rows = await this.userCosmeticsRepo.find({
+      where: { equipped: true },
+      relations: ['cosmetic'],
+    });
+    const now = Date.now();
+    for (const row of rows) {
+      if (!this.isPrivateEntryCosmetic(row.cosmetic) || !row.expiresAt || row.expiresAt.getTime() > now) continue;
+      await this.clearExpiredCosmeticWear(row);
+    }
   }
 
   async cpStoreInventory(userId: string) {
@@ -656,6 +926,9 @@ export class CosmeticsService implements OnModuleInit {
     const cosmetic = await this.cosmeticsRepo.findOne({ where: { id: cosmeticId, isActive: true } });
     if (!cosmetic) throw new NotFoundException('Cosmetic not found');
     const isCpStoreItem = this.isCpStoreCosmetic(cosmetic);
+    if (this.isPrivateEntryCosmetic(cosmetic)) {
+      throw new BadRequestException('هذه الدخولية خاصة ولا يمكن شراؤها من المتجر.');
+    }
     if (isCpStoreItem && options.allowCpStore !== true) {
       throw new BadRequestException('هذا العنصر خاص بمتجر CP ولا يمكن شراؤه من المتجر العادي.');
     }
@@ -758,6 +1031,10 @@ export class CosmeticsService implements OnModuleInit {
       relations: ['cosmetic'],
     });
     if (!owned) throw new NotFoundException('You do not own this cosmetic');
+    if (this.isPrivateEntryCosmetic(owned.cosmetic) &&
+        String((owned.cosmetic.meta as any)?.privateOwnerUserId || '') !== String(userId)) {
+      throw new NotFoundException('هذه الدخولية خاصة بمستخدم آخر');
+    }
     if (this.isCpStoreCosmetic(owned.cosmetic) && opts?.allowCpStore !== true) {
       throw new BadRequestException('هذا العنصر خاص بمتجر CP ولا يمكن تركيبه من المتجر العادي.');
     }
@@ -887,6 +1164,13 @@ export class CosmeticsService implements OnModuleInit {
       relations: ['cosmetic'],
     });
     if (!owned) throw new NotFoundException('You do not own this cosmetic');
+    if (this.isPrivateEntryCosmetic(owned.cosmetic) &&
+        String((owned.cosmetic.meta as any)?.privateOwnerUserId || '') !== String(userId)) {
+      throw new NotFoundException('هذه الدخولية خاصة بمستخدم آخر');
+    }
+    if (owned.expiresAt && owned.expiresAt <= new Date()) {
+      throw new BadRequestException('انتهت صلاحية هذه الدخولية');
+    }
 
     const type = owned.cosmetic.type;
     const slotTypes = this.cosmeticSlotTypes(type);
