@@ -3711,29 +3711,28 @@ class AdminConsoleActivity : ThemedActivity() {
      * reduces long vertical stacks, and preserves the same accessible 44dp touch target.
      */
     private fun addRecordAction(parent: LinearLayout, label: String, action: () -> Unit) {
-        var grid = parent.tag as? LinearLayout
-        if (grid == null) {
-            grid = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutDirection = View.LAYOUT_DIRECTION_RTL
-                setPadding(0, dp(7), 0, 0)
-            }
-            parent.tag = grid
-            parent.addView(grid, LinearLayout.LayoutParams(-1, -2))
+        val grid = (parent.tag as? LinearLayout) ?: LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(0, dp(7), 0, 0)
+        }.also {
+            parent.tag = it
+            parent.addView(it, LinearLayout.LayoutParams(-1, -2))
         }
-        var row = if (grid.childCount > 0) grid.getChildAt(grid.childCount - 1) as? LinearLayout else null
-        if (row == null || row.childCount >= 2) {
-            row = LinearLayout(this).apply {
+        val lastRow = if (grid.childCount > 0) grid.getChildAt(grid.childCount - 1) as? LinearLayout else null
+        val row = if (lastRow == null || lastRow.childCount >= 2) {
+            LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
+            }.also {
+                grid.addView(it, LinearLayout.LayoutParams(-1, -2).apply {
+                    bottomMargin = dp(5)
+                })
             }
-            grid.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = dp(5)
-            })
-        }
+        } else lastRow
         val control = button(label, action).apply {
             textSize = 12f
-            maxLines = 2
+            maxLines = 3
             minHeight = dp(44)
             minimumHeight = dp(44)
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
