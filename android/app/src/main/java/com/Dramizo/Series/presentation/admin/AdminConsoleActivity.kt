@@ -452,9 +452,9 @@ class AdminConsoleActivity : ThemedActivity() {
         body.layoutDirection = View.LAYOUT_DIRECTION_RTL
 
         val roleLabel = when (currentRole) {
-            StaffRoleHelper.SUPER -> "Super Admin"
-            StaffRoleHelper.ADMIN -> "Admin"
-            StaffRoleHelper.MANAGER -> "Manager"
+            StaffRoleHelper.SUPER -> "سوبر أدمن"
+            StaffRoleHelper.ADMIN -> "أدمن"
+            StaffRoleHelper.MANAGER -> "مانجر"
             else -> "غير مخوّل"
         }
         val user = try { ContainerProvider.from(this).sessionManager.user } catch (_: Exception) { null }
@@ -577,7 +577,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         android.content.res.ColorStateList.valueOf(0x226B4CC2),
                         roundRect(0xFFF0ECFF.toInt(), 21), null
                     )
-                    layoutParams = LinearLayout.LayoutParams(0, dp(132), 1f).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, dp(148), 1f).apply {
                         marginStart = dp(4)
                         marginEnd = dp(4)
                         bottomMargin = dp(10)
@@ -610,10 +610,23 @@ class AdminConsoleActivity : ThemedActivity() {
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
                     textDirection = View.TEXT_DIRECTION_RTL
                     maxLines = 2
+                    minLines = 1
+                    includeFontPadding = false
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setPadding(dp(2), dp(8), dp(2), 0)
+                }, LinearLayout.LayoutParams(-1, -2))
+                tile.addView(TextView(this).apply {
+                    text = module.subtitle
+                    textSize = 9.5f
+                    setTextColor(MUTED)
+                    gravity = Gravity.CENTER
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    textDirection = View.TEXT_DIRECTION_RTL
+                    maxLines = 2
                     minLines = 2
                     includeFontPadding = false
                     ellipsize = android.text.TextUtils.TruncateAt.END
-                    setPadding(dp(2), dp(9), dp(2), 0)
+                    setPadding(dp(3), dp(3), dp(3), 0)
                 }, LinearLayout.LayoutParams(-1, -2))
                 row.addView(tile)
                 records.add(tile to module)
