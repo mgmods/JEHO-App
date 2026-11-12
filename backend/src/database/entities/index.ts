@@ -65,3 +65,5 @@ export * from './cp-point-event.entity';
 
 export * from './badge.entity';
 export * from './user-badge.entity';
+
+export * from './custom-gift-grant.entity';
