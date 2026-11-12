@@ -126,8 +126,10 @@ export class UsersService {
       ] }));
     }
     if (!allowed || privacy.audience === 'nobody') return { inRoom: false };
-    const roomId = await this.realtimeGateway.activeRoomForUser(targetId);
-    return roomId ? { inRoom: true, roomId } : { inRoom: false };
+    const activeRoom = await this.realtimeGateway.activeRoomDetailsForUser(targetId);
+    return activeRoom
+      ? { inRoom: true, roomId: activeRoom.roomId, roomName: activeRoom.roomName }
+      : { inRoom: false };
   }
 
   /** Expired timed medals must disappear from the profile showcase on every profile read. */
