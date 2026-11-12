@@ -1427,7 +1427,7 @@ class AdminConsoleActivity : ThemedActivity() {
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
         }
         addText(countPanel, "النتائج المعروضة", 12f, true, TEXT)
-        val count = TextView(this).apply {
+        val countLabel = TextView(this).apply {
             text = items.size.toString()
             textSize = 13f
             setTypeface(typeface, Typeface.BOLD)
@@ -1436,7 +1436,7 @@ class AdminConsoleActivity : ThemedActivity() {
             background = roundRect(Color.WHITE, 20)
             setPadding(dp(11), dp(4), dp(11), dp(4))
         }
-        countPanel.addView(count, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        countPanel.addView(countLabel, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
         body.addView(countPanel)
 
         // One consistent, native search control for every API-backed record list.
@@ -2046,7 +2046,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     recordView.visibility = if (matches) View.VISIBLE else View.GONE
                     if (matches) visibleCount++
                 }
-                count.text = "$visibleCount / ${items.size}"
+                countLabel.text = "$visibleCount / ${items.size}"
             }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
@@ -2431,10 +2431,10 @@ class AdminConsoleActivity : ThemedActivity() {
         val specs: List<Pair<String, List<String>>> = when(type) {
             "operators" -> listOf("اسم المدير" to listOf("user.displayName","user.username","displayName","username"), "ID المستخدم" to listOf("user.publicId","publicId","userId"), "الرتبة" to listOf("role","staffRole"), "الصلاحيات" to listOf("permissions","scopes"), "الحالة" to listOf("active","status"), "تاريخ الإضافة" to listOf("createdAt")),
             "vipPlans" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "السعر" to listOf("price","priceCoins"), "المدة بالأيام" to listOf("durationDays","duration"), "المزايا" to listOf("description","benefits"), "الحالة" to listOf("isActive","status")),
-            "vip" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "تاريخ المنح" to listOf("createdAt","grantedAt"), "تاريخ الانتهاء" to listOf("expiresAt","vipExpiresAt"))
+            "vip" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "تاريخ المنح" to listOf("createdAt","grantedAt"), "تاريخ الانتهاء" to listOf("expiresAt","vipExpiresAt")),
             "agencyApplications" -> listOf("اسم المتقدم" to listOf("applicant.displayName","applicant.username","applicantName"), "اسم الوكالة المقترح" to listOf("proposedName","agencyName"), "الدولة" to listOf("country","region"), "التواصل" to listOf("contact","contactPhone","contactEmail"), "سبب الطلب" to listOf("reason","businessPlan"), "تاريخ الطلب" to listOf("createdAt"))
             "rechargeApplications" -> listOf("اسم المستخدم" to listOf("user.displayName","user.username","userName"), "المنطقة" to listOf("region","country"), "التواصل" to listOf("contact"), "العملات المطلوبة" to listOf("requestedCoins"), "سبب الطلب" to listOf("reason"), "تاريخ الطلب" to listOf("createdAt"))
-            "rechargeAgents" -> listOf("ID المستخدم" to listOf("user.publicId","publicId","userId"), "المنطقة" to listOf("region","country"), "الرصيد المتاح" to listOf("floatCoins","balance"), "العمولة" to listOf("commission","commissionRate","commissionBps"), "الحد اليومي" to listOf("dailyLimitCoins"), "تاريخ الإضافة" to listOf("createdAt"))
+            "rechargeAgents" -> listOf("ID المستخدم" to listOf("user.publicId","publicId","userId"), "المنطقة" to listOf("region","country"), "الرصيد المتاح" to listOf("floatCoins","balance"), "العمولة" to listOf("commission","commissionRate","commissionBps"), "الحد اليومي" to listOf("dailyLimitCoins"), "تاريخ الإضافة" to listOf("createdAt")),
             "walletTransactions" -> listOf("نوع العملية" to listOf("type","transactionType"), "المبلغ" to listOf("amount","coins","diamonds"), "الرصيد قبل العملية" to listOf("balanceBefore"), "الرصيد بعد العملية" to listOf("balanceAfter"), "السبب" to listOf("reason","description"), "التاريخ" to listOf("createdAt","occurredAt"))
             "withdrawals" -> listOf("المبلغ" to listOf("amount","coins"), "وسيلة السحب" to listOf("method","payoutMethod"), "الحساب المستلم" to listOf("account","accountNumber","destination"), "التاريخ" to listOf("createdAt"))
             "recharges" -> listOf("العملات" to listOf("coins","amount"), "طريقة الشحن" to listOf("method","paymentMethod"), "رقم العملية" to listOf("reference","transactionId"), "التاريخ" to listOf("createdAt"))
