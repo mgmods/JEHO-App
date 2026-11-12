@@ -721,6 +721,9 @@
 <string name="agency_manage_menu_style">Join notice style</string>
 <string name="agency_manage_menu_branding">Name &amp; welcome</string>
 <string name="agency_manage_menu_mall">Agency mall</string>
+<string name="agency_manage_menu_managers">Agency managers</string>
+<string name="agency_manage_menu_hosts">Agency hosts</string>
+<string name="agency_manage_menu_members">Agency members</string>
 <string name="agency_manage_menu_live">Go live</string>
 <string name="agency_manage_menu_delete">Delete agency</string>
     <string name="agency_manage_section_team">Team</string>
