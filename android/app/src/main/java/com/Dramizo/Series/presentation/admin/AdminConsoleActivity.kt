@@ -66,6 +66,9 @@ class AdminConsoleActivity : ThemedActivity() {
     private var staffIdentityUploadInProgress = false
     private val notificationImageRequestCode = 7042
     private val customGiftUploadRequestCode = 7044
+    private val privateEntryUploadRequestCode = 7045
+    private var privateEntryVideoUrl: String? = null
+    private var privateEntryUploadInProgress = false
     private var customGiftMediaUrl: String? = null
     private var customGiftMediaType: String? = null
     private var customGiftUploadInProgress = false
@@ -98,6 +101,7 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("cosmetics", "كتالوج المميزات", "مراجعة المميزات المتاحة في المتجر", "🖼️"),
         Module("gifts", "كتالوج الهدايا", "مراجعة الهدايا المتاحة في النظام", "🎁"),
         Module("customGifts", "إدارة الهدايا المخصصة", "رفع هدية خاصة وإهداؤها لمستخدم بمدة محددة", "🎁"),
+        Module("privateEntries", "الدخوليات الخاصة", "إهداء فيديو دخولية حصري لمستخدم محدد وإدارة مدته", "🎬"),
         Module("grantCosmetics", "الإطارات والدخوليات", "إهداء المميزات لمدة 7 أو 15 أو 30 يومًا أو دائمًا", "✨"),
         Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
         Module("logs", "سجل العمليات", "مراجعة سجل التغييرات الإدارية", "🧾"),
@@ -825,7 +829,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 "agencies", "agencyApplications",
                 "rechargeApplications", "rechargeAgents",
                 "notifications", "vanityIds", "grantCosmetics", "vip",
-                "operators", "customGifts"
+                "operators", "customGifts", "privateEntries"
             )
             StaffRoleHelper.ADMIN -> key in setOf(
                 "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
@@ -919,6 +923,7 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "gifts" -> load(api.gifts()) { renderItems(it, "gifts") }
             "customGifts" -> showCustomGifts()
+            "privateEntries" -> showPrivateEntries()
             "vip" -> {
                 addText(body, "كل بطاقة هنا تمثل عضوية مستخدم واحدة. ستجد اسم صاحبها وID المستخدم ومستوى VIP والحالة وتاريخ المنح والانتهاء ومصدر المنح، ثم إجراءات واضحة للسحب أو فتح ملف المستخدم.", 12f, false, MUTED)
                 body.addView(button("＋ منح عضوية VIP") { showAssignVipDialog() })
@@ -1138,6 +1143,263 @@ class AdminConsoleActivity : ThemedActivity() {
                 status?.text = message
                 status?.setTextColor(if (message.startsWith("✓")) 0xFF23834B.toInt() else MUTED)
             }
+        }
+    }
+
+    private fun showPrivateEntries() {
+        privateEntryVideoUrl = null
+        body.removeAllViews()
+        val panel = card()
+        addText(panel, "إنشاء وإهداء دخولية فيديو خاصة", 17f, true, TEXT)
+        addText(panel, "تُضاف إلى حقيبة المستلم فقط، وتعمل عبر نظام الدخوليات الحالي داخل الرومات. مدة الفيديو من ثانية إلى 10 ثوانٍ.", 12f, false, MUTED)
+        val idInput = featureField(panel, "User ID المستلم", "", "أدخل ID الظاهر في حساب المستخدم")
+        val nameInput = featureField(panel, "اسم الدخولية", "", "مثال: Royal Entrance")
+        val messageInput = featureField(panel, "رسالة شخصية من الإدارة", "", "رسالة قصيرة تظهر في رسائل الإدارة")
+        messageInput.isSingleLine = false
+        messageInput.minLines = 2
+        messageInput.maxLines = 3
+        messageInput.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        addText(panel, "مدة الصلاحية", 13f, true, TEXT)
+        val durationSpinner = Spinner(this)
+        val durationLabels = listOf("يوم واحد", "7 أيام", "15 يوماً", "30 يوماً", "دائمة – بدون انتهاء")
+        val durationDays = listOf(1, 7, 15, 30, 0)
+        durationSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, durationLabels)
+        panel.addView(durationSpinner, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+        val recipientStatus = TextView(this).apply {
+            text = "لم يتم التحقق من المستخدم بعد"
+            textSize = 12f
+            setTextColor(MUTED)
+            setPadding(0, dp(6), 0, dp(8))
+        }
+        panel.addView(recipientStatus)
+        val videoStatus = TextView(this).apply {
+            tag = "private_entry_video_status"
+            text = "لم يتم اختيار فيديو"
+            textSize = 12f
+            setTextColor(MUTED)
+            setPadding(0, dp(8), 0, dp(8))
+        }
+        panel.addView(videoStatus)
+        panel.addView(button("＋ اختيار فيديو الدخولية (1–10 ثوانٍ)") {
+            val pick = Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "video/*"
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("video/mp4", "video/quicktime", "video/3gpp"))
+                addCategory(Intent.CATEGORY_OPENABLE)
+            }
+            startActivityForResult(Intent.createChooser(pick, "اختيار فيديو الدخولية"), privateEntryUploadRequestCode)
+        })
+        body.addView(panel)
+        var verifiedPublicId: String? = null
+        idInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                verifiedPublicId = null
+                recipientStatus.text = "تغيّر ID؛ أعد التحقق من الحساب"
+                recipientStatus.setTextColor(MUTED)
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        body.addView(button("التحقق من User ID") {
+            val publicId = idInput.text.toString().trim()
+            if (publicId.isBlank()) { toast("أدخل User ID أولاً"); return@button }
+            load(api.customGiftLookup(mapOf("publicId" to publicId))) { raw ->
+                val user = raw as? Map<*, *>
+                if (user == null || user["id"] == null) {
+                    verifiedPublicId = null
+                    recipientStatus.text = "تعذر التحقق من المستخدم"
+                    recipientStatus.setTextColor(0xFFC0392B.toInt())
+                } else {
+                    verifiedPublicId = publicId
+                    val display = user["displayName"]?.toString()?.takeIf { it.isNotBlank() }
+                        ?: user["username"]?.toString() ?: "مستخدم"
+                    recipientStatus.text = "✓ تم التحقق: $display · ID " + (user["publicId"] ?: publicId)
+                    recipientStatus.setTextColor(0xFF23834B.toInt())
+                }
+            }
+        })
+        body.addView(button("إهداء الدخولية الآن") {
+            val target = verifiedPublicId
+            if (target.isNullOrBlank() || target != idInput.text.toString().trim()) {
+                toast("تحقق من User ID أولاً"); return@button
+            }
+            val name = nameInput.text.toString().trim()
+            if (name.isBlank()) { toast("اكتب اسم الدخولية"); return@button }
+            if (privateEntryUploadInProgress) { toast("انتظر انتهاء رفع الفيديو"); return@button }
+            val videoUrl = privateEntryVideoUrl
+            if (videoUrl.isNullOrBlank()) { toast("ارفع فيديو الدخولية أولاً"); return@button }
+            val days = durationDays.getOrElse(durationSpinner.selectedItemPosition) { 1 }
+            val payload = linkedMapOf<String, Any>(
+                "recipientPublicId" to target,
+                "name" to name,
+                "videoUrl" to videoUrl,
+                "durationDays" to days,
+                "permanent" to (days == 0),
+                "personalMessage" to messageInput.text.toString().trim()
+            )
+            confirm("تأكيد إهداء الدخولية إلى ID $target؟") {
+                load(api.grantPrivateEntry(payload)) {
+                    toast("تم إهداء الدخولية وإرسال رسالة الإدارة")
+                    privateEntryVideoUrl = null
+                    openModule("privateEntries")
+                }
+            }
+        })
+        body.addView(button("سجل الدخوليات المُهداة") {
+            load(api.privateEntries()) { renderPrivateEntryList(it) }
+        })
+        load(api.privateEntries()) { renderPrivateEntryList(it) }
+    }
+
+    private fun renderPrivateEntryList(raw: Any?) {
+        val items = extractItems(raw)
+        addText(body, "سجل الدخوليات الخاصة", 16f, true, TEXT)
+        if (items.isEmpty()) {
+            addText(body, "لا توجد دخوليات خاصة مُهداة حتى الآن", 12f, false, MUTED)
+            return
+        }
+        items.forEach { item ->
+            val id = value(item, "id") ?: return@forEach
+            val panel = card()
+            addText(panel, value(item, "name") ?: "دخولية خاصة", 15f, true, TEXT)
+            addText(panel, "المستلم: " + (value(item, "recipientName") ?: "مستخدم") +
+                " · ID " + (value(item, "recipientPublicId") ?: "—"), 12f, false, MUTED)
+            val permanent = value(item, "permanent") == "true"
+            val expiry = value(item, "expiresAt")
+            addText(panel, if (permanent) "الصلاحية: دائمة" else "الانتهاء: " + (expiry ?: "منتهية"), 12f, false, MUTED)
+            addText(panel, "الحالة: " + if (value(item, "equipped") == "true") "مركبة" else "غير مركبة", 12f, false, MUTED)
+            val actions = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            actions.addView(button("تعديل") { showPrivateEntryEditDialog(item) }, LinearLayout.LayoutParams(0, dp(44), 1f))
+            actions.addView(button("حذف من حساب المستخدم") {
+                confirm("حذف الدخولية من حقيبة المستخدم وإلغاء استخدامها نهائياً؟") {
+                    load(api.deletePrivateEntry(id)) {
+                        toast("تم حذف الدخولية من حساب المستخدم")
+                        openModule("privateEntries")
+                    }
+                }
+            }, LinearLayout.LayoutParams(0, dp(44), 1f))
+            panel.addView(actions)
+            body.addView(panel)
+        }
+    }
+
+    private fun showPrivateEntryEditDialog(item: Any) {
+        val id = value(item, "id") ?: return
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(16), dp(8), dp(16), dp(4))
+        }
+        val name = featureField(panel, "اسم الدخولية", value(item, "name") ?: "")
+        val recipient = featureField(panel, "User ID المستلم", value(item, "recipientPublicId") ?: "")
+        val personal = featureField(panel, "رسالة الإدارة", value(item, "personalMessage") ?: "")
+        personal.isSingleLine = false
+        personal.minLines = 2
+        personal.maxLines = 3
+        personal.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        addText(panel, "مدة الصلاحية الجديدة", 13f, true, TEXT)
+        val spinner = Spinner(this)
+        val labels = listOf("يوم واحد", "7 أيام", "15 يوماً", "30 يوماً", "دائمة")
+        val days = listOf(1, 7, 15, 30, 0)
+        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
+        val selected = when {
+            value(item, "permanent") == "true" -> 4
+            else -> 1
+        }
+        spinner.setSelection(selected)
+        panel.addView(spinner, LinearLayout.LayoutParams(-1, dp(48)))
+        AlertDialog.Builder(this)
+            .setTitle("تعديل الدخولية الخاصة")
+            .setView(panel)
+            .setNegativeButton("إلغاء", null)
+            .setPositiveButton("حفظ التعديلات") { _, _ ->
+                val targetId = recipient.text.toString().trim()
+                val nameText = name.text.toString().trim()
+                if (targetId.isBlank() || nameText.isBlank()) {
+                    toast("اسم الدخولية وUser ID مطلوبان"); return@setPositiveButton
+                }
+                val chosenDays = days.getOrElse(spinner.selectedItemPosition) { 7 }
+                val payload = linkedMapOf<String, Any>(
+                    "recipientPublicId" to targetId,
+                    "name" to nameText,
+                    "personalMessage" to personal.text.toString().trim(),
+                    "durationDays" to chosenDays,
+                    "permanent" to (chosenDays == 0)
+                )
+                load(api.updatePrivateEntry(id, payload)) {
+                    toast("تم تحديث الدخولية الخاصة")
+                    openModule("privateEntries")
+                }
+            }
+            .show()
+    }
+
+    private fun uploadPrivateEntryVideo(uri: Uri) {
+        privateEntryUploadInProgress = true
+        privateEntryVideoUrl = null
+        try {
+            val mime = (contentResolver.getType(uri) ?: "").lowercase()
+            if (mime !in setOf("video/mp4", "video/quicktime", "video/3gpp", "video/3gpp2")) {
+                throw IllegalArgumentException("اختر فيديو MP4 أو MOV أو 3GP")
+            }
+            val retriever = android.media.MediaMetadataRetriever()
+            val durationMs = try {
+                retriever.setDataSource(this, uri)
+                retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            } finally {
+                try { retriever.release() } catch (_: Exception) {}
+            }
+            if (durationMs == null || durationMs < 1000L || durationMs > 10_000L) {
+                throw IllegalArgumentException("مدة الفيديو يجب أن تكون من ثانية واحدة إلى 10 ثوانٍ")
+            }
+            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: throw IllegalStateException("تعذر قراءة الفيديو")
+            if (bytes.isEmpty() || bytes.size > 50 * 1024 * 1024) {
+                throw IllegalArgumentException("حجم الفيديو يجب ألا يتجاوز 50 ميغابايت")
+            }
+            val ext = when (mime) {
+                "video/quicktime" -> ".mov"
+                "video/3gpp", "video/3gpp2" -> ".3gp"
+                else -> ".mp4"
+            }
+            val part = MultipartBody.Part.createFormData(
+                "file", "private-entry-" + System.currentTimeMillis() + ext,
+                bytes.toRequestBody(mime.toMediaType())
+            )
+            val status = body.findViewWithTag<TextView>("private_entry_video_status")
+            status?.text = "جارٍ رفع فيديو الدخولية..."
+            ContainerProvider.from(this).getUploadApi().upload(part).enqueue(object : Callback<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> {
+                override fun onResponse(
+                    call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>,
+                    response: Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>
+                ) {
+                    privateEntryUploadInProgress = false
+                    val result = response.body()?.getData()
+                    if (response.isSuccessful && response.body()?.success == true && !result?.url.isNullOrBlank()) {
+                        privateEntryVideoUrl = result!!.url
+                        status?.text = "✓ تم رفع الفيديو والتحقق من مدته (" + String.format(java.util.Locale.US, "%.1f", durationMs / 1000.0) + " ثانية)"
+                        status?.setTextColor(0xFF23834B.toInt())
+                    } else {
+                        status?.text = "فشل رفع الفيديو (HTTP " + response.code() + ")"
+                        toast("تعذر رفع فيديو الدخولية")
+                    }
+                }
+                override fun onFailure(
+                    call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>,
+                    error: Throwable
+                ) {
+                    privateEntryUploadInProgress = false
+                    status?.text = "فشل رفع الفيديو؛ تحقق من الاتصال"
+                    toast(error.message ?: "تعذر رفع الفيديو")
+                }
+            })
+        } catch (error: Exception) {
+            privateEntryUploadInProgress = false
+            body.findViewWithTag<TextView>("private_entry_video_status")?.text = error.message ?: "تعذر تجهيز الفيديو"
+            toast(error.message ?: "تعذر تجهيز الفيديو")
         }
     }
 
@@ -3614,6 +3876,7 @@ class AdminConsoleActivity : ThemedActivity() {
         if (requestCode == notificationImageRequestCode) uploadNotificationImage(uri)
         else if (requestCode == staffIdentityUploadRequestCode) uploadStaffIdentityAsset(uri)
         else if (requestCode == customGiftUploadRequestCode) uploadCustomGiftMedia(uri)
+        else if (requestCode == privateEntryUploadRequestCode) uploadPrivateEntryVideo(uri)
     }
 
     private fun uploadNotificationImage(uri: Uri) {
