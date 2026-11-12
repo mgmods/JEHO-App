@@ -1754,199 +1754,199 @@ class AdminConsoleActivity : ThemedActivity() {
             }
 
             if (type !in setOf("users", "rooms")) {
-                card.addView(button("عرض التفاصيل الكاملة  ←") { showOtherEntityDetailScreen(item, type) })
+                addRecordAction(card, "عرض التفاصيل الكاملة  ←") { showOtherEntityDetailScreen(item, type) }
             }
             when (type) {
                 "users", "rooms" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("فتح تفاصيل ${if (type == "users") "المستخدم" else "الروم"} والإجراءات  ←") {
+                    addRecordAction(card, "فتح تفاصيل ${if (type == "users") "المستخدم" else "الروم"} والإجراءات  ←") {
                         showEntityDetailScreen(item, type)
-                    })
+                    }
 
                 }
                 "streams" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("إنهاء البث") {
+                    addRecordAction(card, "إنهاء البث") {
                         confirm("سيتم إنهاء البث على الخادم. هل تريد المتابعة؟") {
                             load(api.endStream(id)) { toast("استجاب الخادم لطلب إنهاء البث"); openModule("streams") }
                         }
-                    })
+                    }
                     if (currentRole == StaffRoleHelper.SUPER) {
-                        card.addView(button("إنهاء قسري للبث") {
+                        addRecordAction(card, "إنهاء قسري للبث") {
                             confirm("استخدم الإنهاء القسري فقط إذا فشل الإنهاء العادي. متابعة؟") {
                                 load(api.forceEndStream(id, mapOf("reason" to "super_admin_force_end"))) {
                                     toast("استجاب الخادم لطلب الإنهاء القسري"); openModule("streams")
                                 }
                             }
-                        })
+                        }
                     }
                 }
                 "agencies" -> if (!id.isNullOrBlank()) {
                     val suspended = status?.contains("suspended", true) == true
-                    card.addView(button(if (suspended) "إعادة تفعيل الوكالة" else "تعليق الوكالة") {
+                    addRecordAction(card, if (suspended) "إعادة تفعيل الوكالة" else "تعليق الوكالة") {
                         confirm(if (suspended) "إعادة تفعيل الوكالة؟" else "تعليق الوكالة قد يغلق روماتها. هل تريد المتابعة؟") {
                             load(if (suspended) api.approveAgency(id) else api.suspendAgency(id, mapOf("reason" to "تم التعليق من تطبيق JEHO"))) {
                                 toast(if (suspended) "تم إرسال طلب تفعيل الوكالة" else "تم إرسال طلب تعليق الوكالة")
                                 openModule("agencies")
                             }
                         }
-                    })
+                    }
                     if (currentRole == StaffRoleHelper.SUPER) {
-                        card.addView(button("حذف الوكالة نهائيًا") {
+                        addRecordAction(card, "حذف الوكالة نهائيًا") {
                             confirm("تحذير: حذف الوكالة قد ينهي بث روماتها ويحذف ارتباطاتها. لا يمكن التراجع. متابعة؟") {
                                 load(api.deleteAgency(id)) {
                                     toast("استجاب الخادم لطلب حذف الوكالة")
                                     openModule("agencies")
                                 }
                             }
-                        })
+                        }
                     }
                 }
                 "vipPlans" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("تعديل الخطة") { showEditVipPlanDialog(id, primary, vipLevel, vipPrice) })
+                    addRecordAction(card, "تعديل الخطة") { showEditVipPlanDialog(id, primary, vipLevel, vipPrice) }
                     val active = status?.equals("true", true) == true
-                    card.addView(button(if (active) "تعطيل الخطة" else "تفعيل الخطة") {
+                    addRecordAction(card, if (active) "تعطيل الخطة" else "تفعيل الخطة") {
                         confirm("تغيير حالة خطة VIP؟") {
                             load(api.updateVipPlan(id, mapOf("isActive" to !active))) {
                                 toast("تم تحديث خطة VIP")
                                 load(api.vipPlans()) { renderItems(it, "vipPlans") }
                             }
                         }
-                    })
+                    }
                 }
                 "vip" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("سحب عضوية VIP") {
+                    addRecordAction(card, "سحب عضوية VIP") {
                         confirm("سحب عضوية VIP من المستخدم؟") {
                             load(api.revokeVip(id)) {
                                 toast("استجاب الخادم لطلب سحب VIP")
                                 openModule("vip")
                             }
                         }
-                    })
+                    }
                 }
                 "agencyApplications" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("قبول الطلب") {
+                    addRecordAction(card, "قبول الطلب") {
                         confirm("تأكيد قبول طلب الوكالة؟") {
                             load(api.approveAgencyApplication(id, mapOf("reviewNote" to "تمت الموافقة من تطبيق JEHO"))) {
                                 toast("تمت معالجة طلب الوكالة"); openModule("agencyApplications")
                             }
                         }
-                    })
-                    card.addView(button("رفض الطلب") {
+                    }
+                    addRecordAction(card, "رفض الطلب") {
                         confirm("تأكيد رفض طلب الوكالة؟") {
                             load(api.rejectAgencyApplication(id, mapOf("reviewNote" to "لم يستوفِ الطلب شروط القبول"))) {
                                 toast("تمت معالجة طلب الوكالة"); openModule("agencyApplications")
                             }
                         }
-                    })
+                    }
                 }
                 "rechargeApplications" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("قبول وكيل الشحن") { showApproveRechargeAgentDialog(id) })
-                    card.addView(button("رفض الطلب") {
+                    addRecordAction(card, "قبول وكيل الشحن") { showApproveRechargeAgentDialog(id) }
+                    addRecordAction(card, "رفض الطلب") {
                         confirm("رفض طلب وكيل الشحن؟") {
                             load(api.rejectRechargeAgentApplication(id, mapOf("note" to "لم يستوفِ الطلب شروط القبول"))) {
                                 toast("تمت معالجة طلب وكيل الشحن"); openModule("rechargeApplications")
                             }
                         }
-                    })
+                    }
                 }
                 "rechargeAgents" -> if (!id.isNullOrBlank()) {
                     val active = status?.equals("active", true) == true
-                    card.addView(button(if (active) "إيقاف الوكيل" else "تفعيل الوكيل") {
+                    addRecordAction(card, if (active) "إيقاف الوكيل" else "تفعيل الوكيل") {
                         confirm("تأكيد تغيير حالة وكيل الشحن؟") {
                             load(api.updateRechargeAgent(id, mapOf("status" to if (active) "suspended" else "active"))) {
                                 toast("تم تحديث حالة الوكيل"); openModule("rechargeAgents")
                             }
                         }
-                    })
-                    card.addView(button("تعديل رصيد الوكيل") { showAdjustFloatDialog(id) })
-                    card.addView(button("حذف وكيل الشحن") {
+                    }
+                    addRecordAction(card, "تعديل رصيد الوكيل") { showAdjustFloatDialog(id) }
+                    addRecordAction(card, "حذف وكيل الشحن") {
                         confirm("سيُحذف تسجيل الوكيل. تأكد من تسوية رصيده والتزاماته أولًا. متابعة؟") {
                             load(api.deleteRechargeAgent(id)) {
                                 toast("استجاب الخادم لطلب حذف وكيل الشحن")
                                 openModule("rechargeAgents")
                             }
                         }
-                    })
+                    }
                 }
                 "genderVerifications" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("قبول التوثيق") {
+                    addRecordAction(card, "قبول التوثيق") {
                         confirm("تأكيد قبول طلب التوثيق؟") {
                             load(api.approveGenderVerification(id, mapOf("note" to "تمت المراجعة من تطبيق JEHO"))) {
                                 toast("تمت معالجة طلب التوثيق"); openModule("genderVerifications")
                             }
                         }
-                    })
-                    card.addView(button("رفض التوثيق") {
+                    }
+                    addRecordAction(card, "رفض التوثيق") {
                         confirm("تأكيد رفض طلب التوثيق؟") {
                             load(api.rejectGenderVerification(id, mapOf("note" to "تمت المراجعة من تطبيق JEHO"))) {
                                 toast("تمت معالجة طلب التوثيق"); openModule("genderVerifications")
                             }
                         }
-                    })
+                    }
                 }
                 "operators" -> if (!id.isNullOrBlank()) {
                     val active = status?.contains("suspended", true) != true && status?.contains("inactive", true) != true
-                    card.addView(button("تعديل صلاحيات المدير") { showEditOperatorDialog(id, item) })
-                    card.addView(button(if (active) "تعطيل المدير" else "تفعيل المدير") {
+                    addRecordAction(card, "تعديل صلاحيات المدير") { showEditOperatorDialog(id, item) }
+                    addRecordAction(card, if (active) "تعطيل المدير" else "تفعيل المدير") {
                         confirm("تغيير صلاحية دخول هذا المدير؟") {
                             load(api.updateOperator(id, mapOf("active" to !active))) {
                                 toast("تم تحديث المدير"); openModule("operators")
                             }
                         }
-                    })
-                    card.addView(button("إزالة المدير") {
+                    }
+                    addRecordAction(card, "إزالة المدير") {
                         confirm("سيتم سحب صلاحية لوحة التحكم من هذا المدير. متابعة؟") {
                             load(api.deleteOperator(id)) { toast("تمت إزالة المدير"); openModule("operators") }
                         }
-                    })
+                    }
                 }
                 "reports" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("مراجعة البلاغ واتخاذ إجراء") {
+                    addRecordAction(card, "مراجعة البلاغ واتخاذ إجراء") {
                         showReportDecisionDialog(id, true)
-                    })
-                    card.addView(button("رفض البلاغ") {
+                    }
+                    addRecordAction(card, "رفض البلاغ") {
                         showReportDecisionDialog(id, false)
-                    })
+                    }
                 }
                 "withdrawals" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("اعتماد السحب") {
+                    addRecordAction(card, "اعتماد السحب") {
                         confirm("اعتماد طلب السحب؟ تحقق من الدفع فعلياً قبل الاعتماد.") {
                             load(api.approveWithdrawal(id)) { toast("استجاب الخادم لطلب اعتماد السحب"); openModule("withdrawals") }
                         }
-                    })
-                    card.addView(button("رفض السحب") {
+                    }
+                    addRecordAction(card, "رفض السحب") {
                         confirm("رفض طلب السحب؟") {
                             load(api.rejectWithdrawal(id, mapOf("adminNote" to "تم الرفض من تطبيق JEHO"))) {
                                 toast("تمت معالجة طلب السحب"); openModule("withdrawals")
                             }
                         }
-                    })
+                    }
                 }
                 "recharges" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("إتمام طلب الشحن") {
+                    addRecordAction(card, "إتمام طلب الشحن") {
                         confirm("لا تعتمد إلا بعد التحقق من الدفع. متابعة؟") {
                             load(api.completeRecharge(id, mapOf("note" to "تم التحقق يدوياً من تطبيق JEHO"))) {
                                 toast("استجاب الخادم لطلب إتمام الشحن"); openModule("recharges")
                             }
                         }
-                    })
-                    card.addView(button("إلغاء طلب الشحن") {
+                    }
+                    addRecordAction(card, "إلغاء طلب الشحن") {
                         confirm("تأكيد إلغاء طلب الشحن؟") {
                             load(api.cancelRecharge(id)) { toast("تمت معالجة طلب الشحن"); openModule("recharges") }
                         }
-                    })
+                    }
                 }
                 "gifts" -> if (!id.isNullOrBlank() && currentRole == StaffRoleHelper.SUPER) {
                     val active = status?.equals("true", true) == true || status?.equals("active", true) == true
-                    card.addView(button(if (active) "تعطيل الهدية" else "تفعيل الهدية") {
+                    addRecordAction(card, if (active) "تعطيل الهدية" else "تفعيل الهدية") {
                         confirm("تغيير حالة الهدية؟") {
                             load(api.updateGift(id, mapOf("isActive" to !active))) {
                                 toast("تم تحديث الهدية"); openModule("gifts")
                             }
                         }
-                    })
+                    }
                 }
                 "grantCosmetics" -> if (!code.isNullOrBlank()) {
-                    card.addView(button("إهداء هذه الميزة لمستخدم") { showGrantCosmeticDialog(code) })
+                    addRecordAction(card, "إهداء هذه الميزة لمستخدم") { showGrantCosmeticDialog(code) }
                 }
                 "vanityIds" -> if (!id.isNullOrBlank() && !publicId.isNullOrBlank()) {
                     // A purchased/granted ID belongs to its current owner and must never be offered as a gift again.
@@ -1956,35 +1956,35 @@ class AdminConsoleActivity : ThemedActivity() {
                     } else if (vanityStatus == "reserved") {
                         addText(card, "هذا الآي دي محجوز حالياً ولا يمكن إهداؤه لمستخدم آخر.", 12f, true, 0xFF9B6A24.toInt())
                     } else if (vanityStatus != "disabled") {
-                        card.addView(button("إهداء آي دي متاح لمستخدم") { showGrantVanityDialog(publicId) })
+                        addRecordAction(card, "إهداء آي دي متاح لمستخدم") { showGrantVanityDialog(publicId) }
                     }
                     if (currentRole == StaffRoleHelper.SUPER) when (vanityStatus) {
-                        "owned", "reserved" -> card.addView(button("سحب الآي دي وإعادته للسوق") {
+                        "owned", "reserved" -> addRecordAction(card, "سحب الآي دي وإعادته للسوق") {
                             confirm("سيُستعاد الآي دي السابق للمالك إن وجد، ثم يعود هذا الآي دي للسوق. متابعة؟") {
                                 load(api.revokeVanityId(id)) { toast("تمت معالجة طلب سحب الآي دي"); openModule("vanityIds") }
                             }
-                        })
-                        "disabled" -> card.addView(button("إعادة تفعيل الآي دي") {
+                        }
+                        "disabled" -> addRecordAction(card, "إعادة تفعيل الآي دي") {
                             confirm("إعادة الآي دي إلى السوق؟") {
                                 load(api.enableVanityId(id)) { toast("تم تفعيل الآي دي"); openModule("vanityIds") }
                             }
-                        })
-                        else -> card.addView(button("تعطيل الآي دي") {
+                        }
+                        else -> addRecordAction(card, "تعطيل الآي دي") {
                             confirm("إخفاء الآي دي من السوق؟ إذا كان مملوكاً سيُعاد الآي دي السابق لصاحبه.") {
                                 load(api.disableVanityId(id)) { toast("تم تعطيل الآي دي"); openModule("vanityIds") }
                             }
-                        })
+                        }
                     }
                 }
                 "cosmetics" -> if (!id.isNullOrBlank() && currentRole == StaffRoleHelper.SUPER) {
                     val active = status?.contains("true", true) == true || status?.contains("active", true) == true
-                    card.addView(button(if (active) "تعطيل الميزة" else "تفعيل الميزة") {
+                    addRecordAction(card, if (active) "تعطيل الميزة" else "تفعيل الميزة") {
                         confirm("تغيير حالة الميزة؟") {
                             load(api.updateCosmetic(id, mapOf("isActive" to !active))) {
                                 toast("تم تحديث الميزة"); openModule("cosmetics")
                             }
                         }
-                    })
+                    }
                 }
             }
             body.addView(card)
@@ -3706,6 +3706,46 @@ class AdminConsoleActivity : ThemedActivity() {
      * Shared JEHO-native action button. One visual language across admin
      * sections, with RTL layout, rounded surface and visible press feedback.
      */
+    /**
+     * Two-column action layout for record cards. Keeps related actions together,
+     * reduces long vertical stacks, and preserves the same accessible 44dp touch target.
+     */
+    private fun addRecordAction(parent: LinearLayout, label: String, action: () -> Unit) {
+        var grid = parent.tag as? LinearLayout
+        if (grid == null) {
+            grid = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(0, dp(7), 0, 0)
+            }
+            parent.tag = grid
+            parent.addView(grid, LinearLayout.LayoutParams(-1, -2))
+        }
+        var row = if (grid.childCount > 0) grid.getChildAt(grid.childCount - 1) as? LinearLayout else null
+        if (row == null || row.childCount >= 2) {
+            row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+            }
+            grid.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(5)
+            })
+        }
+        val control = button(label, action).apply {
+            textSize = 12f
+            maxLines = 2
+            minHeight = dp(44)
+            minimumHeight = dp(44)
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                marginStart = dp(3)
+                marginEnd = dp(3)
+                topMargin = dp(2)
+                bottomMargin = dp(2)
+            }
+        }
+        row.addView(control)
+    }
+
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label.trim().ifBlank { "إجراء" }
         textSize = 13f
