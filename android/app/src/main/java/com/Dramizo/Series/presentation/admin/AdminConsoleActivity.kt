@@ -1728,6 +1728,9 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
             }
 
+            if (type !in setOf("users", "rooms")) {
+                card.addView(button("عرض التفاصيل الكاملة  ←") { showOtherEntityDetailScreen(item, type) })
+            }
             when (type) {
                 "users", "rooms" -> if (!id.isNullOrBlank()) {
                     card.addView(button("فتح تفاصيل ${if (type == "users") "المستخدم" else "الروم"} والإجراءات  ←") {
@@ -2109,7 +2112,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private var detailReturnSection = "home"
 
     private fun rememberCurrentSection(nextSection: String) {
-        val source = if (currentSection == "userDetail" || currentSection == "roomDetail") {
+        val source = if (currentSection == "userDetail" || currentSection == "roomDetail" || currentSection == "entityDetail") {
             detailReturnSection
         } else currentSection
         if (source != nextSection && sectionHistory.peekLast() != source) {
@@ -2119,7 +2122,7 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun handleAdminBack() {
         when (currentSection) {
-            "userDetail", "roomDetail" -> openModule(detailReturnSection, false)
+            "userDetail", "roomDetail", "entityDetail" -> openModule(detailReturnSection, false)
             else -> {
                 var previous: String? = null
                 while (sectionHistory.isNotEmpty() && previous == null) {
@@ -2297,6 +2300,118 @@ class AdminConsoleActivity : ThemedActivity() {
 
         body.addView(content)
     }
+
+    /**
+     * Shared native detail view for administrative records beyond users and rooms.
+     * It displays readable business fields and reuses existing backend actions.
+     */
+    private fun showOtherEntityDetailScreen(item: Any, type: String) {
+        val id = value(item, "id", "applicationId", "agencyId", "streamId", "userId") ?: return
+        detailReturnSection = type
+        currentSection = "entityDetail"
+        val module = modules.firstOrNull { it.key == type }
+        val title = module?.title ?: "تفاصيل العنصر"
+        titleView.text = "تفاصيل $title"
+        backButton.visibility = View.VISIBLE
+        body.removeAllViews()
+
+        val name = when (type) {
+            "agencyApplications" -> value(item, "proposedName", "agencyName", "name")
+                ?: valuePath(item, "applicant.displayName", "applicant.username", "applicantName")
+            "rechargeApplications" -> valuePath(item, "user.displayName", "user.username", "userName")
+            "walletTransactions", "withdrawals", "recharges" -> valuePath(item, "user.displayName", "user.username", "userName")
+            "reports" -> valuePath(item, "target.displayName", "target.username", "targetName")
+            "logs" -> valuePath(item, "actor.displayName", "actor.username", "actorName")
+            else -> humanEntityName(item)
+        } ?: value(item, "publicId", "code", "reference") ?: title
+        val status = value(item, "status", "state", "isActive") ?: "غير محدد"
+
+        fun panel(heading: String, note: String = ""): LinearLayout {
+            val p = card()
+            p.setPadding(dp(14), dp(13), dp(14), dp(13))
+            addText(p, heading, 14f, true, TEXT)
+            if (note.isNotBlank()) addText(p, note, 11f, false, MUTED)
+            body.addView(p)
+            return p
+        }
+        val overview = panel(title, "ملخص السجل من بيانات الخادم")
+        addText(overview, name, 17f, true, TEXT)
+        overview.addView(statusChip(status))
+        valuePath(item, "user.publicId", "applicant.publicId", "publicId")?.let { publicId ->
+            addText(overview, "ID المستخدم: $publicId", 12f, true, ACCENT)
+            overview.addView(button("نسخ ID المستخدم") { copyToClipboard("ID المستخدم", publicId) })
+        }
+
+        val specs: List<Pair<String, List<String>>> = when(type) {
+            "vip" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "تاريخ المنح" to listOf("createdAt","grantedAt"), "تاريخ الانتهاء" to listOf("expiresAt","vipExpiresAt"))
+            "agencyApplications" -> listOf("اسم المتقدم" to listOf("applicant.displayName","applicant.username","applicantName"), "اسم الوكالة المقترح" to listOf("proposedName","agencyName"), "الدولة" to listOf("country","region"), "التواصل" to listOf("contact","contactPhone","contactEmail"), "سبب الطلب" to listOf("reason","businessPlan"), "تاريخ الطلب" to listOf("createdAt"))
+            "rechargeApplications" -> listOf("اسم المستخدم" to listOf("user.displayName","user.username","userName"), "المنطقة" to listOf("region","country"), "التواصل" to listOf("contact"), "العملات المطلوبة" to listOf("requestedCoins"), "سبب الطلب" to listOf("reason"), "تاريخ الطلب" to listOf("createdAt"))
+            "rechargeAgents" -> listOf("ID المستخدم" to listOf("user.publicId","publicId","userId"), "المنطقة" to listOf("region","country"), "الرصيد المتاح" to listOf("floatCoins","balance"), "العمولة" to listOf("commission","commissionRate","commissionBps"), "الحد اليومي" to listOf("dailyLimitCoins"), "تاريخ الإضافة" to listOf("createdAt"))
+            "walletTransactions" -> listOf("نوع العملية" to listOf("type","transactionType"), "المبلغ" to listOf("amount","coins","diamonds"), "الرصيد قبل العملية" to listOf("balanceBefore"), "الرصيد بعد العملية" to listOf("balanceAfter"), "السبب" to listOf("reason","description"), "التاريخ" to listOf("createdAt","occurredAt"))
+            "withdrawals" -> listOf("المبلغ" to listOf("amount","coins"), "وسيلة السحب" to listOf("method","payoutMethod"), "الحساب المستلم" to listOf("account","accountNumber","destination"), "التاريخ" to listOf("createdAt"))
+            "recharges" -> listOf("العملات" to listOf("coins","amount"), "طريقة الشحن" to listOf("method","paymentMethod"), "رقم العملية" to listOf("reference","transactionId"), "التاريخ" to listOf("createdAt"))
+            "reports" -> listOf("المبلّغ" to listOf("reporter.displayName","reporter.username","reporterName"), "نوع البلاغ" to listOf("targetType","category"), "سبب البلاغ" to listOf("reason","description"), "التاريخ" to listOf("createdAt"))
+            "agencies" -> listOf("صاحب الوكالة" to listOf("owner.displayName","ownerName","owner.username"), "عدد الأعضاء" to listOf("membersCount","memberCount"), "تاريخ الإنشاء" to listOf("createdAt"))
+            "streams" -> listOf("المضيف" to listOf("host.displayName","hostName","host.username"), "عدد المشاهدين" to listOf("viewerCount"), "بداية البث" to listOf("startedAt","createdAt"))
+            "gifts" -> listOf("السعر بالعملات" to listOf("price","coinPrice","priceCoins"), "قيمة الألماس" to listOf("diamondValue","diamonds"), "النوع" to listOf("type"), "تاريخ الإنشاء" to listOf("createdAt"))
+            "cosmetics","grantCosmetics" -> listOf("النوع" to listOf("type"), "السعر" to listOf("price","coinPrice","priceCoins"), "المدة" to listOf("duration","durationDays"), "تاريخ الإنشاء" to listOf("createdAt"))
+            "vanityIds" -> listOf("الآي دي" to listOf("publicId","value","idValue"), "السعر" to listOf("priceCoins","price"), "المدة" to listOf("duration","durationDays"), "النمط" to listOf("styleMode"), "تاريخ الانتهاء" to listOf("expiresAt"))
+            "genderVerifications" -> listOf("ID المستخدم" to listOf("user.publicId","publicId","userId"), "ملاحظة الإدارة" to listOf("adminNote","reviewNote","note"), "تاريخ الطلب" to listOf("createdAt","submittedAt"))
+            "notifications" -> listOf("العنوان" to listOf("title","subject"), "المحتوى" to listOf("message","body","content"), "المستلم" to listOf("recipient.displayName","recipient.username","recipientId"), "التاريخ" to listOf("createdAt","sentAt"))
+            "logs" -> listOf("الإجراء" to listOf("action"), "العنصر المستهدف" to listOf("targetName","target.displayName","targetId"), "ملاحظة" to listOf("note","reason"), "التاريخ" to listOf("createdAt"))
+            else -> listOf("الوصف" to listOf("description","message","reason"), "النوع" to listOf("type","category"), "السعر" to listOf("price","coinPrice","priceCoins"), "تاريخ الإنشاء" to listOf("createdAt"))
+        }
+        val values = specs.mapNotNull { (label, paths) -> valuePath(item, *paths.toTypedArray())?.let { label to it } }
+        if (values.isNotEmpty()) {
+            val details = panel("المعلومات والتفاصيل")
+            values.forEach { (label, v) ->
+                val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(5), 0, dp(5)) }
+                addText(row, label, 12f, true, MUTED)
+                row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+                row.addView(TextView(this).apply { text = v; textSize = 12f; setTextColor(TEXT); gravity = Gravity.CENTER_VERTICAL or Gravity.LEFT; maxWidth = dp(190) })
+                details.addView(row)
+            }
+        }
+        val actions = panel("الإجراءات المتاحة", "تُعرض فقط الإجراءات المعروفة لهذا القسم، ويظل الخادم مسؤولاً عن التحقق النهائي.")
+        var hasAction = false
+        when (type) {
+            "agencyApplications" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                hasAction = true
+                actions.addView(button("قبول طلب الوكالة") { confirm("تأكيد قبول طلب الوكالة؟") { load(api.approveAgencyApplication(id, mapOf("reviewNote" to "تمت الموافقة من تطبيق JEHO"))) { toast("تمت معالجة الطلب"); openModule(type) } } })
+                actions.addView(button("رفض طلب الوكالة") { confirm("تأكيد رفض طلب الوكالة؟") { load(api.rejectAgencyApplication(id, mapOf("reviewNote" to "لم يستوفِ الطلب شروط القبول"))) { toast("تمت معالجة الطلب"); openModule(type) } } })
+            }
+            "rechargeApplications" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                hasAction = true
+                actions.addView(button("قبول وكيل الشحن") { showApproveRechargeAgentDialog(id) })
+                actions.addView(button("رفض الطلب") { confirm("رفض طلب وكيل الشحن؟") { load(api.rejectRechargeAgentApplication(id, mapOf("note" to "لم يستوفِ الطلب شروط القبول"))) { toast("تمت معالجة الطلب"); openModule(type) } } })
+            }
+            "agencies" -> if (currentRole == StaffRoleHelper.SUPER) {
+                hasAction = true
+                val suspended = status.contains("suspended", true) || status.contains("موقوف")
+                actions.addView(button(if (suspended) "إعادة تفعيل الوكالة" else "تعليق الوكالة") { confirm("تأكيد تغيير حالة الوكالة؟") { load(if (suspended) api.approveAgency(id) else api.suspendAgency(id, mapOf("reason" to "إجراء من لوحة JEHO"))) { toast("تم إرسال الطلب"); openModule(type) } } })
+                actions.addView(button("حذف الوكالة نهائيًا") { confirm("حذف الوكالة نهائيًا؟") { load(api.deleteAgency(id)) { toast("تم إرسال طلب الحذف"); openModule(type) } } })
+            }
+            "streams" -> { hasAction = true; actions.addView(button("إنهاء البث") { confirm("إنهاء البث الآن؟") { load(api.endStream(id)) { toast("تم إرسال طلب إنهاء البث"); openModule(type) } } }) }
+            "vip" -> { hasAction = true; actions.addView(button("سحب عضوية VIP") { confirm("سحب العضوية؟") { load(api.revokeVip(id)) { toast("تم إرسال طلب سحب VIP"); openModule(type) } } }) }
+            "rechargeAgents" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                hasAction = true
+                val active = status.equals("active", true)
+                actions.addView(button(if (active) "إيقاف وكيل الشحن" else "تفعيل وكيل الشحن") { confirm("تغيير حالة الوكيل؟") { load(api.updateRechargeAgent(id, mapOf("status" to if (active) "suspended" else "active"))) { toast("تم تحديث حالة الوكيل"); openModule(type) } } })
+            }
+            "genderVerifications" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                hasAction = true
+                actions.addView(button("اعتماد طلب التحقق") { confirm("اعتماد طلب التحقق؟") { load(api.reviewGenderVerification(id, mapOf("status" to "approved"))) { toast("تمت مراجعة الطلب"); openModule(type) } } })
+                actions.addView(button("رفض طلب التحقق") { confirm("رفض طلب التحقق؟") { load(api.reviewGenderVerification(id, mapOf("status" to "rejected"))) { toast("تمت مراجعة الطلب"); openModule(type) } } })
+            }
+        }
+        if (!hasAction) {
+            addText(actions, "لا توجد إجراءات مباشرة متاحة لهذا السجل من هذا القسم.", 12f, false, MUTED)
+        }
+        body.addView(contentOrphanSpacer())
+        body.addView(content)
+    }
+
+    private fun contentOrphanSpacer(): View = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(1)) }
 
     private fun showEditRoomDialog(id: String, title: String, accessMode: String, entryFee: String) {
         val form = formFields(listOf("اسم الروم", "وضع الدخول: free أو paid أو permanent", "رسوم الدخول بالعملات"))
