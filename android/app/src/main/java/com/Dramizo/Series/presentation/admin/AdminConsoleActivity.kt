@@ -271,10 +271,7 @@ class AdminConsoleActivity : ThemedActivity() {
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        // Persistent, visible navigation was previously built but never attached
-        // to the activity root. Attach it here so staff always see named actions.
-        root.addView(buildBottomNavigation(), LinearLayout.LayoutParams(-1, dp(68)))
-
+        // No fixed bottom navigation: each dashboard tile opens a full native section screen.
         // Android's bottom system Back button is intercepted by OnBackPressedDispatcher.
         setContentView(root)
     }
