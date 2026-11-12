@@ -1307,6 +1307,9 @@ class AdminConsoleActivity : ThemedActivity() {
         spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
         val selected = when {
             value(item, "permanent") == "true" -> 4
+            value(item, "durationDays") == "1" -> 0
+            value(item, "durationDays") == "15" -> 2
+            value(item, "durationDays") == "30" -> 3
             else -> 1
         }
         spinner.setSelection(selected)
