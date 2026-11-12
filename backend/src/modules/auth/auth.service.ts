@@ -562,6 +562,7 @@ export class AuthService implements OnModuleInit {
         isGuest: user.isGuest,
         isAdmin: user.isAdmin || staffRole === 'super',
         staffRole,
+        dashboardPermissions: user.dashboardPermissions || null,
       },
     };
   }
