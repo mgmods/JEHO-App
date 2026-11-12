@@ -609,22 +609,27 @@ export class CosmeticsService implements OnModuleInit {
     const result: Array<Record<string, unknown>> = [];
     for (const cosmetic of privateRows) {
       const ownership = await this.userCosmeticsRepo.findOne({ where: { cosmeticId: cosmetic.id } });
-      const owner = ownership ? await this.usersRepo.findOne({ where: { id: ownership.userId } }) : null;
+      const meta: any = cosmetic.meta || {};
+      const ownerId = ownership?.userId || meta.privateOwnerUserId || null;
+      const owner = ownerId ? await this.usersRepo.findOne({ where: { id: ownerId } }) : null;
+      const revoked = !ownership || !!meta.privateRevokedAt;
       result.push({
         id: cosmetic.id,
         name: cosmetic.name,
         videoUrl: cosmetic.animationUrl || cosmetic.previewUrl,
-        recipientUserId: owner?.id || (cosmetic.meta as any)?.privateOwnerUserId || null,
+        recipientUserId: owner?.id || ownerId,
         recipientPublicId: owner?.publicId || null,
         recipientName: owner?.displayName || owner?.username || null,
-        durationDays: (cosmetic.meta as any)?.privateDurationDays ?? null,
+        durationDays: meta.privateDurationDays ?? null,
         remainingDays: ownership?.expiresAt
           ? Math.max(0, Math.ceil((ownership.expiresAt.getTime() - Date.now()) / 86_400_000))
           : null,
         expiresAt: ownership?.expiresAt || null,
-        permanent: ownership ? ownership.expiresAt == null : !!(cosmetic.meta as any)?.privatePermanent,
+        permanent: ownership ? ownership.expiresAt == null : !!meta.privatePermanent,
         equipped: ownership?.equipped || false,
-        personalMessage: (cosmetic.meta as any)?.privatePersonalMessage || '',
+        status: revoked ? 'revoked' : (ownership?.expiresAt && ownership.expiresAt.getTime() <= Date.now() ? 'expired' : 'active'),
+        revokedAt: meta.privateRevokedAt || null,
+        personalMessage: meta.privatePersonalMessage || '',
         createdAt: cosmetic.createdAt,
       });
     }
@@ -684,7 +689,7 @@ export class CosmeticsService implements OnModuleInit {
     return { updated: true, cosmetic, ownership: savedOwnership };
   }
 
-  async deletePrivateEntry(id: string) {
+  async deletePrivateEntry(id: string, revokedByUserId?: string) {
     const cosmetic = await this.cosmeticsRepo.findOne({ where: { id, type: CosmeticType.ENTRY_EFFECT } });
     if (!cosmetic || !this.isPrivateEntryCosmetic(cosmetic)) {
       throw new NotFoundException('الدخولية الخاصة غير موجودة');
@@ -694,7 +699,14 @@ export class CosmeticsService implements OnModuleInit {
       relations: ['cosmetic'],
     });
     if (ownership?.equipped) await this.clearExpiredCosmeticWear(ownership);
-    return this.adminDelete(id, { allowPrivateEntry: true });
+    if (ownership) await this.userCosmeticsRepo.delete({ id: ownership.id });
+    const meta: any = { ...(cosmetic.meta || {}) };
+    meta.privateRevokedAt = new Date().toISOString();
+    if (revokedByUserId) meta.privateRevokedByUserId = revokedByUserId;
+    cosmetic.meta = meta;
+    cosmetic.isActive = false;
+    await this.cosmeticsRepo.save(cosmetic);
+    return { deleted: true, revoked: true, id, code: cosmetic.code };
   }
 
   async expirePrivateEntryCosmetics() {
