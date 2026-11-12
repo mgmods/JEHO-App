@@ -526,13 +526,16 @@ class AdminConsoleActivity : ThemedActivity() {
         val welcome = card().apply {
             setPadding(dp(17), dp(15), dp(17), dp(15))
             background = GradientDrawable(
-                GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFF30265F.toInt(), 0xFF6049A8.toInt(), 0xFF765FC4.toInt())
-            ).apply { cornerRadius = dp(19).toFloat() }
-            elevation = dp(3).toFloat()
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFFF7F4FF.toInt(), Color.WHITE, 0xFFF0EBFF.toInt())
+            ).apply {
+                cornerRadius = dp(24).toFloat()
+                setStroke(dp(1), 0xFFE2D9FF.toInt())
+            }
+            elevation = dp(2).toFloat()
         }
-        addText(welcome, "مركز إدارة JEHO", 18f, true, Color.WHITE)
-        addText(welcome, "إدارة التطبيق ومتابعة عملياته من مكان واحد", 12f, false, 0xFFEAE5FF.toInt())
+        addText(welcome, "مركز إدارة JEHO", 18f, true, TEXT)
+        addText(welcome, "إدارة التطبيق ومتابعة عملياته من مكان واحد", 12f, false, MUTED)
         val welcomeMeta = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -642,20 +645,21 @@ class AdminConsoleActivity : ThemedActivity() {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
-                    setPadding(dp(7), dp(12), dp(7), dp(10))
-                    background = GradientDrawable().apply {
+                    setPadding(dp(8), dp(10), dp(8), dp(9))
+                    val tileShape = GradientDrawable().apply {
                         setColor(Color.WHITE)
-                        cornerRadius = dp(21).toFloat()
-                        setStroke(dp(1), 0xFFE4E4E8.toInt())
+                        cornerRadius = dp(16).toFloat()
+                        setStroke(dp(1), 0xFFEEEEEE.toInt())
                     }
-                    elevation = dp(2).toFloat()
+                    background = android.graphics.drawable.RippleDrawable(
+                        android.content.res.ColorStateList.valueOf(0x226B4CC2),
+                        tileShape,
+                        roundRect(0xFFF0ECFF.toInt(), 16)
+                    )
+                    elevation = dp(1).toFloat()
                     isClickable = true
                     isFocusable = true
-                    foreground = android.graphics.drawable.RippleDrawable(
-                        android.content.res.ColorStateList.valueOf(0x226B4CC2),
-                        roundRect(0xFFF0ECFF.toInt(), 21), null
-                    )
-                    layoutParams = LinearLayout.LayoutParams(0, dp(148), 1f).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, dp(126), 1f).apply {
                         marginStart = dp(4)
                         marginEnd = dp(4)
                         bottomMargin = dp(10)
