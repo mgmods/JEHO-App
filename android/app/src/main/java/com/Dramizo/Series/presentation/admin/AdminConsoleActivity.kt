@@ -1445,15 +1445,18 @@ class AdminConsoleActivity : ThemedActivity() {
                 "agencyApplications" -> value(item, "proposedName", "agencyName", "name")
                     ?.let { "طلب وكالة · " + it }
                     ?: valuePath(item, "applicant.displayName", "applicant.username")?.let { "طلب وكالة · " + it }
-                "rechargeApplications" -> valuePath(item, "user.displayName", "user.username")
+                "rechargeApplications" -> valuePath(item, "user.displayName", "user.username", "user.name")
                     ?.let { "طلب وكيل شحن · " + it }
-                    ?: value(item, "userId")?.let { "طلب وكيل شحن · " + it.take(8) }
+                    ?: value(item, "userName", "displayName", "username")?.let { "طلب وكيل شحن · " + it }
                 "vanityIds" -> value(item, "publicId")?.let { "آي دي مميز · " + it }
-                "gifts" -> value(item, "name", "giftName", "title") ?: id?.let { "هدية · " + it.take(8) }
+                "gifts" -> value(item, "name", "giftName", "title") ?: "هدية"
                 "cosmetics", "grantCosmetics" -> value(item, "name", "displayName", "title")
                     ?: value(item, "code")?.let { "ميزة · " + it }
-                else -> value(item, "displayName", "name", "title", "username", "email", "roomName", "publicId")
-                    ?: id?.let { "سجل · " + it.take(8) }
+                "vip" -> humanEntityName(item)?.let { "عضوية VIP · " + it } ?: "عضوية VIP"
+                "vipPlans" -> value(item, "name", "displayName", "title") ?: "خطة VIP"
+                else -> humanEntityName(item)
+                    ?: value(item, "displayName", "name", "title", "username", "email", "roomName", "publicId")
+                    ?: "عنصر الإدارة"
             } ?: return@forEach
             val status = value(item, "status", "state", "isActive", "type")
             val role = value(item, "staffRole", "role")
@@ -1469,7 +1472,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 "cosmetics", "grantCosmetics", "gifts" -> addLiveAssetPreview(card, item, type, primary)
                 "vanityIds" -> addVanityIdPreview(card, item, primary)
             }
-            if (!id.isNullOrBlank()) addText(card, "معرّف السجل: $id", 11f, false, MUTED)
+            // Internal database keys are intentionally hidden from the primary card identity.
             if (type == "users" && !publicId.isNullOrBlank() && publicId != id) {
                 val publicIdRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
                 addText(publicIdRow, "ID المستخدم: $publicId", 12f, true, ACCENT)
@@ -1478,18 +1481,101 @@ class AdminConsoleActivity : ThemedActivity() {
                 card.addView(publicIdRow)
             }
             if (!status.isNullOrBlank()) card.addView(statusChip(status))
-            val detailKeys = when (type) {
-                "users" -> listOf("username", "role", "coins", "balance", "diamonds", "level", "vipExpiresAt", "createdAt", "lastSeenAt")
-                "reports" -> listOf("reporterName", "reporterId", "targetName", "targetId", "targetType", "reason", "category", "createdAt")
-                "rooms" -> listOf("ownerName", "membersCount", "accessMode", "entryFeeCoins", "createdAt")
-                "streams" -> listOf("hostName", "viewerCount", "startedAt", "createdAt")
-                "agencies" -> listOf("ownerName", "membersCount", "status", "createdAt")
-                "agencyApplications", "rechargeApplications", "genderVerifications" -> listOf("applicantName", "userName", "userId", "reason", "createdAt")
-                "withdrawals", "recharges" -> listOf("userName", "userId", "amount", "coins", "status", "createdAt")
-                "logs" -> listOf("actorName", "actorId", "action", "targetType", "targetId", "createdAt")
-                else -> listOf("createdAt", "role", "level", "membersCount", "ownerName", "coinPrice", "diamondValue")
+            val detailSpecs: List<Pair<String, List<String>>> = when (type) {
+                "users" -> listOf(
+                    "اسم المستخدم" to listOf("displayName", "username", "name"),
+                    "ID المستخدم" to listOf("publicId", "userId"),
+                    "الدور" to listOf("role", "staffRole"),
+                    "العملات" to listOf("coins", "balance"),
+                    "الألماس" to listOf("diamonds"),
+                    "المستوى" to listOf("level"),
+                    "انتهاء VIP" to listOf("vipExpiresAt"),
+                    "تاريخ التسجيل" to listOf("createdAt"),
+                    "آخر ظهور" to listOf("lastSeenAt")
+                )
+                "vip" -> listOf(
+                    "اسم المستخدم" to listOf("user.displayName", "user.username", "user.name", "displayName", "username", "name"),
+                    "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
+                    "مستوى VIP" to listOf("level", "vipLevel"),
+                    "حالة العضوية" to listOf("status", "state", "isActive"),
+                    "تاريخ المنح" to listOf("createdAt", "grantedAt"),
+                    "تاريخ الانتهاء" to listOf("expiresAt", "vipExpiresAt")
+                )
+                "vipPlans" -> listOf(
+                    "اسم الخطة" to listOf("name", "displayName", "title"),
+                    "مستوى VIP" to listOf("level", "vipLevel"),
+                    "السعر الشهري" to listOf("coinPriceMonthly", "price"),
+                    "الحالة" to listOf("status", "isActive"),
+                    "تاريخ الإنشاء" to listOf("createdAt")
+                )
+                "reports" -> listOf(
+                    "اسم المبلّغ" to listOf("reporterName", "reporter.displayName", "reporter.username"),
+                    "اسم المبلّغ عنه" to listOf("targetName", "target.displayName", "target.username"),
+                    "نوع البلاغ" to listOf("targetType", "category"),
+                    "سبب البلاغ" to listOf("reason", "description"),
+                    "تاريخ البلاغ" to listOf("createdAt")
+                )
+                "rooms" -> listOf(
+                    "اسم الروم" to listOf("roomName", "name", "title"),
+                    "صاحب الروم" to listOf("ownerName", "owner.displayName", "owner.username"),
+                    "عدد الأعضاء" to listOf("membersCount", "memberCount"),
+                    "نوع الروم" to listOf("accessMode"),
+                    "رسوم الدخول" to listOf("entryFeeCoins"),
+                    "تاريخ الإنشاء" to listOf("createdAt")
+                )
+                "streams" -> listOf(
+                    "اسم المضيف" to listOf("hostName", "host.displayName", "host.username"),
+                    "اسم البث" to listOf("title", "name"),
+                    "عدد المشاهدين" to listOf("viewerCount"),
+                    "بدأ البث" to listOf("startedAt", "createdAt")
+                )
+                "agencies" -> listOf(
+                    "اسم الوكالة" to listOf("name", "displayName", "title"),
+                    "صاحب الوكالة" to listOf("ownerName", "owner.displayName", "owner.username"),
+                    "عدد الأعضاء" to listOf("membersCount", "memberCount"),
+                    "الحالة" to listOf("status", "isActive"),
+                    "تاريخ الإنشاء" to listOf("createdAt")
+                )
+                "agencyApplications" -> listOf(
+                    "اسم المتقدم" to listOf("applicant.displayName", "applicant.username", "applicantName", "userName"),
+                    "ID المتقدم" to listOf("applicant.publicId", "applicantId", "userId"),
+                    "اسم الوكالة المقترح" to listOf("proposedName", "agencyName"),
+                    "سبب الطلب" to listOf("reason"),
+                    "تاريخ الطلب" to listOf("createdAt")
+                )
+                "rechargeApplications", "genderVerifications" -> listOf(
+                    "اسم المستخدم" to listOf("user.displayName", "user.username", "user.name", "applicantName", "userName"),
+                    "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
+                    "السبب" to listOf("reason"),
+                    "تاريخ الطلب" to listOf("createdAt")
+                )
+                "withdrawals", "recharges" -> listOf(
+                    "اسم المستخدم" to listOf("user.displayName", "user.username", "user.name", "userName"),
+                    "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
+                    "المبلغ" to listOf("amount", "coins"),
+                    "الحالة" to listOf("status"),
+                    "تاريخ العملية" to listOf("createdAt")
+                )
+                "logs" -> listOf(
+                    "اسم المدير" to listOf("actorName", "actor.displayName", "actor.username"),
+                    "العملية" to listOf("action"),
+                    "النوع" to listOf("targetType"),
+                    "تاريخ العملية" to listOf("createdAt")
+                )
+                else -> listOf(
+                    "الاسم" to listOf("displayName", "name", "title", "username"),
+                    "الحالة" to listOf("status", "isActive"),
+                    "المستوى" to listOf("level"),
+                    "عدد الأعضاء" to listOf("membersCount"),
+                    "المالك" to listOf("ownerName", "owner.displayName", "owner.username"),
+                    "السعر" to listOf("coinPrice", "price"),
+                    "قيمة الألماس" to listOf("diamondValue"),
+                    "تاريخ الإنشاء" to listOf("createdAt")
+                )
             }
-            val detail = detailKeys.mapNotNull { k -> value(item, k)?.takeIf { it.isNotBlank() }?.let { "${prettyKey(k)}: $it" } }
+            val detail = detailSpecs.mapNotNull { (label, paths) ->
+                valuePath(item, *paths.toTypedArray())?.takeIf { it.isNotBlank() }?.let { "\$label: $it" }
+            }
             if (type == "agencyApplications") {
                 listOf(
                     "اسم المرسل" to valuePath(item, "applicant.displayName", "applicant.username"),
@@ -3144,6 +3230,19 @@ class AdminConsoleActivity : ThemedActivity() {
             if (!text.isNullOrEmpty() && text != "null") return text
         }
         return null
+    }
+
+    private fun humanEntityName(item: Any): String? {
+        val paths = arrayOf(
+            "user.displayName", "user.username", "user.name",
+            "applicant.displayName", "applicant.username", "applicant.name",
+            "owner.displayName", "owner.username", "owner.name",
+            "target.displayName", "target.username", "target.name",
+            "reporter.displayName", "reporter.username", "reporter.name",
+            "host.displayName", "host.username", "host.name",
+            "displayName", "username", "name", "title", "roomName"
+        )
+        return valuePath(item, *paths)?.takeIf { it.isNotBlank() }
     }
 
     private fun statusChip(rawStatus: String): View {
