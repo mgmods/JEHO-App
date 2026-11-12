@@ -472,8 +472,8 @@ export class CosmeticsService implements OnModuleInit {
     const personalMessage = String(dto.personalMessage || '').trim().slice(0, 500);
     const permanent = dto.permanent === true;
     const days = Number(dto.durationDays);
-    if (!recipientId || !name || name.length > 128 || !videoUrl) {
-      throw new BadRequestException('معرّف المستلم واسم الدخولية والفيديو مطلوبة');
+    if (!recipientId || !name || name.length > 128 || !videoUrl || !personalMessage) {
+      throw new BadRequestException('معرّف المستلم واسم الدخولية والفيديو ورسالة الإدارة مطلوبة');
     }
     if (!permanent && ![1, 7, 15, 30].includes(days)) {
       throw new BadRequestException('مدة الدخولية يجب أن تكون 1 أو 7 أو 15 أو 30 يوماً أو دائمة');
