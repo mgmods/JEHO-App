@@ -353,7 +353,7 @@ class AdminConsoleActivity : ThemedActivity() {
         body.addView(empty)
 
         val records = mutableListOf<Pair<View, Module>>()
-        available.chunked(3).forEach { pair ->
+        available.chunked(2).forEach { pair ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -361,7 +361,7 @@ class AdminConsoleActivity : ThemedActivity() {
             pair.forEach { module ->
                 val tile = card().apply {
                     setPadding(dp(13), dp(13), dp(13), dp(13))
-                    minimumHeight = dp(128)
+                    minimumHeight = dp(136)
                     isClickable = true
                     isFocusable = true
                     foreground = android.util.TypedValue().let {
@@ -635,7 +635,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         body.addView(empty)
         val records = mutableListOf<Pair<View, Module>>()
-        visible.chunked(3).forEach { group ->
+        visible.chunked(2).forEach { group ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -659,7 +659,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     elevation = dp(1).toFloat()
                     isClickable = true
                     isFocusable = true
-                    layoutParams = LinearLayout.LayoutParams(0, dp(126), 1f).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, dp(138), 1f).apply {
                         marginStart = dp(4)
                         marginEnd = dp(4)
                         bottomMargin = dp(10)
@@ -699,7 +699,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 }, LinearLayout.LayoutParams(-1, -2))
                 tile.addView(TextView(this).apply {
                     text = module.subtitle
-                    textSize = 9.5f
+                    textSize = 10.5f
                     setTextColor(MUTED)
                     gravity = Gravity.CENTER
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -713,8 +713,8 @@ class AdminConsoleActivity : ThemedActivity() {
                 row.addView(tile)
                 records.add(tile to module)
             }
-            if (group.size < 3) {
-                repeat(3 - group.size) {
+            if (group.size < 2) {
+                repeat(2 - group.size) {
                     row.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f).apply {
                         marginStart = dp(4)
                         marginEnd = dp(4)
