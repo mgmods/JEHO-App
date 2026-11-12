@@ -2041,13 +2041,13 @@ export class AdminController {
   @Delete('private-entries/:id')
   async deletePrivateEntry(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
+    @CurrentUser() actor: { sub: string; staffRole?: string; isSuperAdmin?: boolean },
   ) {
     const role = String(actor?.staffRole || '').toLowerCase();
     if (!actor?.isSuperAdmin && role !== 'super') {
       throw new ForbiddenException('Private entries are available to Super Admin only');
     }
-    return this.cosmeticsService.deletePrivateEntry(id);
+    return this.cosmeticsService.deletePrivateEntry(id, actor.sub);
   }
 
   // ─── Cosmetics admin ───────────────────────────────────────
