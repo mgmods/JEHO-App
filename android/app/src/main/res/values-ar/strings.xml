@@ -717,6 +717,9 @@
 <string name="agency_manage_menu_style">شكل إشعار الانضمام</string>
 <string name="agency_manage_menu_branding">الاسم والترحيب</string>
 <string name="agency_manage_menu_mall">مول الوكالة</string>
+<string name="agency_manage_menu_managers">مشرفو الوكالة</string>
+<string name="agency_manage_menu_hosts">مضيفو الوكالة</string>
+<string name="agency_manage_menu_members">أعضاء الوكالة</string>
 <string name="agency_manage_menu_live">بدء البث</string>
 <string name="agency_manage_menu_delete">حذف الوكالة</string>
     <string name="agency_manage_section_team">الفريق</string>
