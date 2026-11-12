@@ -1991,21 +1991,27 @@ export class AdminController {
       `تاريخ الانتهاء: ${expiryText}`,
       `رسالة من الإدارة: ${personal || 'نتمنى لك تجربة ممتعة!'}`,
     ].join('\n');
-    await this.notificationsService.create({
-      userId: granted.userId,
-      type: NotificationType.CHAT,
-      title: '🎁 دخولية خاصة من الإدارة',
-      body: message,
-      data: {
-        adminMessage: true,
-        source: 'admin',
-        privateEntry: true,
-        privateEntryId: granted.cosmetic.id,
-        action: 'open_private_entry_inventory',
-        inventorySection: 'entry_effect',
-      },
-      sendPush: true,
-    });
+    try {
+      await this.notificationsService.create({
+        userId: granted.userId,
+        type: NotificationType.CHAT,
+        title: '🎁 دخولية خاصة من الإدارة',
+        body: message,
+        data: {
+          adminMessage: true,
+          source: 'admin',
+          privateEntry: true,
+          privateEntryId: granted.cosmetic.id,
+          action: 'open_private_entry_inventory',
+          inventorySection: 'entry_effect',
+        },
+        sendPush: true,
+      });
+    } catch (error) {
+      // Do not leave a gifted item without its required Admin Messages record.
+      await this.cosmeticsService.deletePrivateEntry(granted.cosmetic.id).catch(() => undefined);
+      throw error;
+    }
     return { ...granted, adminMessageSent: true };
   }
 
