@@ -2771,7 +2771,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String agencyName = club.agencyName == null ? "" : club.agencyName.trim();
             boolean female = user != null && "female".equalsIgnoreCase(user.gender);
             if ("owner".equals(role)) {
-                return agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
+                return "قائد وكالة";
             }
             if (isAgencyRoom && room.agencyId != null && room.agencyId.equals(agencyId)) {
                 if ("host".equals(role)) return female ? "مضيفة" : "مضيف";
@@ -3220,6 +3220,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (inline == null || overflow == null) return;
         inline.removeAllViews();
         overflow.removeAllViews();
+        overflow.setOrientation(LinearLayout.VERTICAL);
+        overflow.setGravity(android.view.Gravity.RIGHT);
+        overflow.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        TextView chatName = row.findViewById(R.id.tvChatName);
+        float measuredName = chatName != null && chatName.getText() != null
+                ? chatName.getPaint().measureText(chatName.getText().toString()) : dp(72);
+        int firstLineLimit = Math.max(dp(42), dp(270) - Math.min(dp(116), (int) measuredName) - dp(18));
+        int overflowLineLimit = dp(270);
+        int[] inlineUsed = new int[] { 0 };
+        int[] overflowUsed = new int[] { 0 };
+        LinearLayout[] overflowLine = new LinearLayout[] { null };
 
         int total = 0;
         String agencyBadgeLabel = null;
@@ -3228,7 +3239,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String agencyName = decoration.agencyName == null ? "" : decoration.agencyName.trim();
         boolean female = "female".equalsIgnoreCase(decoration.gender);
         if ("owner".equals(agencyRole)) {
-            agencyBadgeLabel = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
+            agencyBadgeLabel = "قائد وكالة";
         } else {
             RoomDtos.RoomDto liveRoom = viewModel != null ? viewModel.getRoom().getValue() : null;
             String liveAgencyId = liveRoom != null && liveRoom.agencyId != null
@@ -3340,8 +3351,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void addRoomChatBadge(
             @NonNull LinearLayout inline, @NonNull LinearLayout overflow,
-            @NonNull View badge, int index) {
-        (index < 5 ? inline : overflow).addView(badge);
+            @NonNull View badge, int index, int firstLineLimit, int[] inlineUsed,
+            int overflowLineLimit, int[] overflowUsed, LinearLayout[] overflowLine) {
+        badge.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        int badgeWidth = badge.getMeasuredWidth();
+        ViewGroup.LayoutParams rawParams = badge.getLayoutParams();
+        if (rawParams instanceof LinearLayout.LayoutParams) {
+            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) rawParams;
+            badgeWidth += params.leftMargin + params.rightMargin;
+            if (android.os.Build.VERSION.SDK_INT >= 17) badgeWidth += params.getMarginStart() + params.getMarginEnd();
+        }
+        badgeWidth = Math.max(dp(18), badgeWidth);
+        if (inline.getChildCount() == 0 || inlineUsed[0] + badgeWidth <= firstLineLimit) {
+            inline.addView(badge);
+            inlineUsed[0] += badgeWidth;
+            return;
+        }
+        if (overflowLine[0] == null || (overflowUsed[0] + badgeWidth > overflowLineLimit
+                && overflowLine[0].getChildCount() > 0)) {
+            LinearLayout next = new LinearLayout(this);
+            next.setOrientation(LinearLayout.HORIZONTAL);
+            next.setGravity(android.view.Gravity.RIGHT | android.view.Gravity.CENTER_VERTICAL);
+            next.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            rowParams.topMargin = dp(2);
+            overflow.addView(next, rowParams);
+            overflowLine[0] = next;
+            overflowUsed[0] = 0;
+        }
+        overflowLine[0].addView(badge);
+        overflowUsed[0] += badgeWidth;
     }
 
     private LinearLayout.LayoutParams roomBadgeImageParams(int widthDp, int heightDp, int endMarginDp) {
@@ -8766,7 +8807,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
             // Agency leader is a permanent identity badge and remains visible in every room.
             if ("owner".equals(role)) {
-                labels.add(agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName);
+                labels.add("قائد وكالة");
             } else {
                 // Hosts/moderators are shown only inside the room belonging to that same agency.
                 RoomDtos.RoomDto liveRoom = viewModel != null ? viewModel.getRoom().getValue() : null;
