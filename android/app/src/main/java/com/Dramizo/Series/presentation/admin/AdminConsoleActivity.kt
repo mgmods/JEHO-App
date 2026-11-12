@@ -2407,11 +2407,7 @@ class AdminConsoleActivity : ThemedActivity() {
         if (!hasAction) {
             addText(actions, "لا توجد إجراءات مباشرة متاحة لهذا السجل من هذا القسم.", 12f, false, MUTED)
         }
-        body.addView(contentOrphanSpacer())
-        body.addView(content)
     }
-
-    private fun contentOrphanSpacer(): View = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(1)) }
 
     private fun showEditRoomDialog(id: String, title: String, accessMode: String, entryFee: String) {
         val form = formFields(listOf("اسم الروم", "وضع الدخول: free أو paid أو permanent", "رسوم الدخول بالعملات"))
