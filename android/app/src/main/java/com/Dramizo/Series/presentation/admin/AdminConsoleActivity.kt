@@ -870,8 +870,8 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "reports" -> load(api.reports(1, 40)) { renderItems(it, "reports") }
             "genderVerifications" -> load(api.genderVerifications("pending")) { renderItems(it, "genderVerifications") }
-            "withdrawals" -> load(api.withdrawals(1, 40)) { renderItems(it, "withdrawals") },
-            "recharges" -> load(api.recharges(1, 40)) { renderItems(it, "recharges") },
+            "withdrawals" -> load(api.withdrawals(1, 40)) { renderItems(it, "withdrawals") }
+            "recharges" -> load(api.recharges(1, 40)) { renderItems(it, "recharges") }
             "walletTransactions" -> load(api.walletTransactions(1, 50)) { renderItems(it, "walletTransactions") }
             "walletAdjust" -> {
                 body.addView(button("＋ تعديل رصيد مستخدم") { showAdjustWalletDialog() })
@@ -2429,18 +2429,18 @@ class AdminConsoleActivity : ThemedActivity() {
         }
 
         val specs: List<Pair<String, List<String>>> = when(type) {
-            "operators" -> listOf("اسم المدير" to listOf("user.displayName","user.username","displayName","username"), "ID المستخدم" to listOf("user.publicId","publicId","userId"), "الرتبة" to listOf("role","staffRole"), "الصلاحيات" to listOf("permissions","scopes"), "الحالة" to listOf("active","status"), "تاريخ الإضافة" to listOf("createdAt")),
-            "vipPlans" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "السعر" to listOf("price","priceCoins"), "المدة بالأيام" to listOf("durationDays","duration"), "المزايا" to listOf("description","benefits"), "الحالة" to listOf("isActive","status")),
-            "vip" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "تاريخ المنح" to listOf("createdAt","grantedAt"), "تاريخ الانتهاء" to listOf("expiresAt","vipExpiresAt")),
-            "agencyApplications" -> listOf("اسم المتقدم" to listOf("applicant.displayName","applicant.username","applicantName"), "اسم الوكالة المقترح" to listOf("proposedName","agencyName"), "الدولة" to listOf("country","region"), "التواصل" to listOf("contact","contactPhone","contactEmail"), "سبب الطلب" to listOf("reason","businessPlan"), "تاريخ الطلب" to listOf("createdAt")),
-            "rechargeApplications" -> listOf("اسم المستخدم" to listOf("user.displayName","user.username","userName"), "المنطقة" to listOf("region","country"), "التواصل" to listOf("contact"), "العملات المطلوبة" to listOf("requestedCoins"), "سبب الطلب" to listOf("reason"), "تاريخ الطلب" to listOf("createdAt")),
-            "rechargeAgents" -> listOf("ID المستخدم" to listOf("user.publicId","publicId","userId"), "المنطقة" to listOf("region","country"), "الرصيد المتاح" to listOf("floatCoins","balance"), "العمولة" to listOf("commission","commissionRate","commissionBps"), "الحد اليومي" to listOf("dailyLimitCoins"), "تاريخ الإضافة" to listOf("createdAt")),
-            "walletTransactions" -> listOf("نوع العملية" to listOf("type","transactionType"), "المبلغ" to listOf("amount","coins","diamonds"), "الرصيد قبل العملية" to listOf("balanceBefore"), "الرصيد بعد العملية" to listOf("balanceAfter"), "السبب" to listOf("reason","description"), "التاريخ" to listOf("createdAt","occurredAt")),
-            "withdrawals" -> listOf("المبلغ" to listOf("amount","coins"), "وسيلة السحب" to listOf("method","payoutMethod"), "الحساب المستلم" to listOf("account","accountNumber","destination"), "التاريخ" to listOf("createdAt")),
-            "recharges" -> listOf("العملات" to listOf("coins","amount"), "طريقة الشحن" to listOf("method","paymentMethod"), "رقم العملية" to listOf("reference","transactionId"), "التاريخ" to listOf("createdAt")),
-            "reports" -> listOf("المبلّغ" to listOf("reporter.displayName","reporter.username","reporterName"), "نوع البلاغ" to listOf("targetType","category"), "سبب البلاغ" to listOf("reason","description"), "التاريخ" to listOf("createdAt")),
-            "agencies" -> listOf("صاحب الوكالة" to listOf("owner.displayName","ownerName","owner.username"), "عدد الأعضاء" to listOf("membersCount","memberCount"), "تاريخ الإنشاء" to listOf("createdAt")),
-            "streams" -> listOf("المضيف" to listOf("host.displayName","hostName","host.username"), "عدد المشاهدين" to listOf("viewerCount"), "بداية البث" to listOf("startedAt","createdAt")),
+            "operators" -> listOf("اسم المدير" to listOf("user.displayName","user.username","displayName","username"), "ID المستخدم" to listOf("user.publicId","publicId","userId"), "الرتبة" to listOf("role","staffRole"), "الصلاحيات" to listOf("permissions","scopes"), "الحالة" to listOf("active","status"), "تاريخ الإضافة" to listOf("createdAt"))
+            "vipPlans" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "السعر" to listOf("price","priceCoins"), "المدة بالأيام" to listOf("durationDays","duration"), "المزايا" to listOf("description","benefits"), "الحالة" to listOf("isActive","status"))
+            "vip" -> listOf("مستوى VIP" to listOf("level","vipLevel"), "تاريخ المنح" to listOf("createdAt","grantedAt"), "تاريخ الانتهاء" to listOf("expiresAt","vipExpiresAt"))
+            "agencyApplications" -> listOf("اسم المتقدم" to listOf("applicant.displayName","applicant.username","applicantName"), "اسم الوكالة المقترح" to listOf("proposedName","agencyName"), "الدولة" to listOf("country","region"), "التواصل" to listOf("contact","contactPhone","contactEmail"), "سبب الطلب" to listOf("reason","businessPlan"), "تاريخ الطلب" to listOf("createdAt"))
+            "rechargeApplications" -> listOf("اسم المستخدم" to listOf("user.displayName","user.username","userName"), "المنطقة" to listOf("region","country"), "التواصل" to listOf("contact"), "العملات المطلوبة" to listOf("requestedCoins"), "سبب الطلب" to listOf("reason"), "تاريخ الطلب" to listOf("createdAt"))
+            "rechargeAgents" -> listOf("ID المستخدم" to listOf("user.publicId","publicId","userId"), "المنطقة" to listOf("region","country"), "الرصيد المتاح" to listOf("floatCoins","balance"), "العمولة" to listOf("commission","commissionRate","commissionBps"), "الحد اليومي" to listOf("dailyLimitCoins"), "تاريخ الإضافة" to listOf("createdAt"))
+            "walletTransactions" -> listOf("نوع العملية" to listOf("type","transactionType"), "المبلغ" to listOf("amount","coins","diamonds"), "الرصيد قبل العملية" to listOf("balanceBefore"), "الرصيد بعد العملية" to listOf("balanceAfter"), "السبب" to listOf("reason","description"), "التاريخ" to listOf("createdAt","occurredAt"))
+            "withdrawals" -> listOf("المبلغ" to listOf("amount","coins"), "وسيلة السحب" to listOf("method","payoutMethod"), "الحساب المستلم" to listOf("account","accountNumber","destination"), "التاريخ" to listOf("createdAt"))
+            "recharges" -> listOf("العملات" to listOf("coins","amount"), "طريقة الشحن" to listOf("method","paymentMethod"), "رقم العملية" to listOf("reference","transactionId"), "التاريخ" to listOf("createdAt"))
+            "reports" -> listOf("المبلّغ" to listOf("reporter.displayName","reporter.username","reporterName"), "نوع البلاغ" to listOf("targetType","category"), "سبب البلاغ" to listOf("reason","description"), "التاريخ" to listOf("createdAt"))
+            "agencies" -> listOf("صاحب الوكالة" to listOf("owner.displayName","ownerName","owner.username"), "عدد الأعضاء" to listOf("membersCount","memberCount"), "تاريخ الإنشاء" to listOf("createdAt"))
+            "streams" -> listOf("المضيف" to listOf("host.displayName","hostName","host.username"), "عدد المشاهدين" to listOf("viewerCount"), "بداية البث" to listOf("startedAt","createdAt"))
             "gifts" -> listOf("السعر بالعملات" to listOf("price","coinPrice","priceCoins"), "قيمة الألماس" to listOf("diamondValue","diamonds"), "النوع" to listOf("type"), "تاريخ الإنشاء" to listOf("createdAt"))
             "cosmetics","grantCosmetics" -> listOf("النوع" to listOf("type"), "السعر" to listOf("price","coinPrice","priceCoins"), "المدة" to listOf("duration","durationDays"), "تاريخ الإنشاء" to listOf("createdAt"))
             "vanityIds" -> listOf("الآي دي" to listOf("publicId","value","idValue"), "السعر" to listOf("priceCoins","price"), "المدة" to listOf("duration","durationDays"), "النمط" to listOf("styleMode"), "تاريخ الانتهاء" to listOf("expiresAt"))
