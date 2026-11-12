@@ -264,6 +264,7 @@ public class AgencyManageActivity extends ThemedActivity {
                     MiscDtos.AgencyDto ag = r.data;
                     binding.tvAgencyHeroName.setText(
                             ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
+                    if (binding.tvAgencyRoleBadge != null) binding.tvAgencyRoleBadge.setText("سوبر أدمن");
                     binding.tvAgencyHeroMeta.setText(getString(
                             R.string.agency_manage_meta_format,
                             Math.max(0, knownTotalMembers > 0
