@@ -18,6 +18,11 @@ public final class GiftDtos {
         @SerializedName("cpRelationshipType") public String cpRelationshipType;
         @SerializedName("cpPoints") public int cpPoints;
         @SerializedName("sortOrder") public int sortOrder;
+        @SerializedName("mediaType") public String mediaType;
+        @SerializedName("startsAt") public String startsAt;
+        @SerializedName("expiresAt") public String expiresAt;
+        @SerializedName("durationDays") public Integer durationDays;
+        @SerializedName("customGrantId") public String customGrantId;
     }
 
     /** Gift sheet tab from GET /gifts/categories. */
