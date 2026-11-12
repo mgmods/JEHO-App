@@ -52,6 +52,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private lateinit var progress: ProgressBar
     private lateinit var titleView: TextView
     private lateinit var backButton: TextView
+    private lateinit var bottomBackButton: TextView
     private var currentSection = "home"
     private var currentRole = StaffRoleHelper.NONE
     private val sectionHistory = java.util.ArrayDeque<String>()
@@ -308,10 +309,20 @@ class AdminConsoleActivity : ThemedActivity() {
             sectionHistory.clear()
             showHome(false)
         }
-        bottom.addView(backButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
+        bottomBackButton = navButton("‹  السابق") { handleAdminBack() }.apply {
+            visibility = View.GONE
+            contentDescription = "الرجوع إلى القسم السابق"
+        }
+        bottom.addView(bottomBackButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
         bottom.addView(homeButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginStart = dp(5) })
         root.addView(bottom, LinearLayout.LayoutParams(-1, -2))
         setContentView(root)
+    }
+
+    private fun setBackButtonsVisible(visible: Boolean) {
+        val visibility = if (visible) View.VISIBLE else View.GONE
+        if (::backButton.isInitialized) backButton.visibility = visibility
+        if (::bottomBackButton.isInitialized) bottomBackButton.visibility = visibility
     }
 
     private fun roleLabel(): String = when (currentRole) {
@@ -349,7 +360,7 @@ class AdminConsoleActivity : ThemedActivity() {
         if (remember) rememberCurrentSection("more")
         currentSection = "more"
         titleView.text = "المزيد من أدوات الإدارة"
-        backButton.visibility = View.VISIBLE
+        setBackButtonsVisible(true)
         body.removeAllViews()
         val roleName = when (currentRole) {
             StaffRoleHelper.SUPER -> "السوبر أدمن"
@@ -509,7 +520,7 @@ class AdminConsoleActivity : ThemedActivity() {
         if (remember) rememberCurrentSection("home")
         currentSection = "home"
         titleView.text = "نظام المدراء"
-        backButton.visibility = View.GONE
+        setBackButtonsVisible(false)
         body.removeAllViews()
         body.layoutDirection = View.LAYOUT_DIRECTION_RTL
 
