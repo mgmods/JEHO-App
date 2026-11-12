@@ -198,21 +198,20 @@ public final class UpdateActivity extends Activity {
                 new android.widget.FrameLayout.LayoutParams(dp(126), dp(126), Gravity.CENTER);
         logoHalo.addView(appIcon, appIconParams);
 
-        TextView badge = text(isArabic() ? "إصدار جديد" : "NEW VERSION", 13, ink, true);
+        TextView badge = text(forceUpdate ? (isArabic() ? "تحديث إلزامي" : "REQUIRED UPDATE") : (isArabic() ? "إصدار جديد" : "NEW VERSION"), 13, ink, true);
         badge.setGravity(Gravity.CENTER);
         badge.setPadding(dp(16), dp(8), dp(16), dp(8));
         badge.setBackground(rounded(paleMint, lineMint, dp(22)));
         body.addView(badge, params(-2, -2, 0, 0, 0, 18));
 
-        TextView heading = text(isArabic() ? "هذا الإصدار أصبح قديماً" : "This version is outdated", 27, ink, true);
+        TextView heading = text(title, 27, ink, true);
         heading.setGravity(Gravity.CENTER);
         heading.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
         body.addView(heading, params(-1, -2, 0, 0, 0, 12));
 
-        TextView copy = text(isArabic()
-                ? "يرجى تحديث التطبيق إلى الإصدار الجديد للتمكن من المتابعة."
-                : "Please update JEHO to the latest version to continue.",
-                16, muted, false);
+        TextView copy = text(message + (forceUpdate
+                ? (isArabic() ? "\\n\\nهذا التحديث مطلوب للمتابعة واستخدام جميع أقسام التطبيق." : "\\n\\nThis update is required to continue using JEHO.")
+                : ""), 16, muted, false);
         copy.setGravity(Gravity.CENTER);
         copy.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
         copy.setLineSpacing(dp(5), 1f);
