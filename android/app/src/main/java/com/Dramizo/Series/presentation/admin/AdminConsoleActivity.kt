@@ -1224,6 +1224,8 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             val name = nameInput.text.toString().trim()
             if (name.isBlank()) { toast("اكتب اسم الدخولية"); return@button }
+            val personalMessage = messageInput.text.toString().trim()
+            if (personalMessage.isBlank()) { toast("اكتب رسالة شخصية للمستخدم"); return@button }
             if (privateEntryUploadInProgress) { toast("انتظر انتهاء رفع الفيديو"); return@button }
             val videoUrl = privateEntryVideoUrl
             if (videoUrl.isNullOrBlank()) { toast("ارفع فيديو الدخولية أولاً"); return@button }
@@ -1234,7 +1236,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 "videoUrl" to videoUrl,
                 "durationDays" to days,
                 "permanent" to (days == 0),
-                "personalMessage" to messageInput.text.toString().trim()
+                "personalMessage" to personalMessage
             )
             confirm("تأكيد إهداء الدخولية إلى ID $target؟") {
                 load(api.grantPrivateEntry(payload)) {
