@@ -277,7 +277,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         }
         if (kind == CosmeticMedia.Kind.VIDEO || kind == CosmeticMedia.Kind.SVGA) {
             String png = base.replaceAll(
-                    "(?i)\\.(svga|mp4|webm|mov|html)(\\?.*)?$", ".png$2");
+                    "(?i)\\.(svga|mp4|webm|mov|3gp|3g2|html)(\\?.*)?$", ".png$2");
             if (!png.equals(base) && isStaticStill(png)) return png;
             if (preferPreview != null && isStaticStill(preferPreview)) return preferPreview;
             return null;
@@ -290,7 +290,8 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         if (url == null || url.isEmpty()) return false;
         String lower = url.toLowerCase(Locale.US);
         if (lower.contains(".svga") || lower.contains(".mp4") || lower.contains(".webm")
-                || lower.contains(".mov") || lower.contains(".html") || lower.endsWith(".json")) {
+                || lower.contains(".mov") || lower.contains(".3gp") || lower.contains(".3g2")
+                || lower.contains(".html") || lower.endsWith(".json")) {
             return false;
         }
         CosmeticMedia.Kind k = CosmeticMedia.kind(url);
