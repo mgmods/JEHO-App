@@ -1315,11 +1315,12 @@ class AdminConsoleActivity : ThemedActivity() {
         val labels = listOf("يوم واحد", "7 أيام", "15 يوماً", "30 يوماً", "دائمة")
         val days = listOf(1, 7, 15, 30, 0)
         spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
+        val configuredDays = value(item, "durationDays")?.toDoubleOrNull()?.toInt()
         val selected = when {
             value(item, "permanent") == "true" -> 4
-            value(item, "durationDays") == "1" -> 0
-            value(item, "durationDays") == "15" -> 2
-            value(item, "durationDays") == "30" -> 3
+            configuredDays == 1 -> 0
+            configuredDays == 15 -> 2
+            configuredDays == 30 -> 3
             else -> 1
         }
         spinner.setSelection(selected)
