@@ -48,6 +48,8 @@ public class CosmeticsViewModel extends ViewModel {
     private final Set<String> ownedIds = new HashSet<>();
     private final Set<String> equippedIds = new HashSet<>();
     private final Map<String, String> expiresAtById = new HashMap<>();
+    /** Private entry effects are returned only by the authenticated inventory endpoint, never the public catalog. */
+    private final List<CosmeticDtos.CosmeticDto> privateEntryInventory = new ArrayList<>();
     private final AtomicInteger loadSeq = new AtomicInteger();
     private volatile String filterType;
     private volatile boolean bagMode;
@@ -176,6 +178,7 @@ public class CosmeticsViewModel extends ViewModel {
                         ownedIds.clear();
                         equippedIds.clear();
                         expiresAtById.clear();
+                        privateEntryInventory.clear();
                         for (CosmeticDtos.UserCosmeticDto row : inv.data) {
                             if (row.cosmeticId == null) continue;
                             ownedIds.add(row.cosmeticId);
@@ -183,6 +186,10 @@ public class CosmeticsViewModel extends ViewModel {
                                 expiresAtById.put(row.cosmeticId, row.expiresAt);
                             }
                             if (row.equipped) equippedIds.add(row.cosmeticId);
+                            if (row.cosmetic != null && row.cosmetic.meta != null
+                                    && Boolean.TRUE.equals(row.cosmetic.meta.get("privateEntry"))) {
+                                privateEntryInventory.add(row.cosmetic);
+                            }
                         }
                     }
                     inventoryLoadedAtMs = System.currentTimeMillis();
@@ -200,6 +207,20 @@ public class CosmeticsViewModel extends ViewModel {
                         for (CosmeticDtos.CosmeticDto row : items) {
                             if (row != null && row.id != null && isOwned(row.id)) {
                                 ownedOnly.add(row);
+                            }
+                        }
+                    }
+                    if ("entry_effect".equals(loadType) || "join_toast".equals(loadType)) {
+                        synchronized (ownedIds) {
+                            for (CosmeticDtos.CosmeticDto privateEntry : privateEntryInventory) {
+                                if (privateEntry != null && privateEntry.id != null
+                                        && isOwned(privateEntry.id)) {
+                                    boolean alreadyAdded = false;
+                                    for (CosmeticDtos.CosmeticDto existing : ownedOnly) {
+                                        if (privateEntry.id.equals(existing.id)) { alreadyAdded = true; break; }
+                                    }
+                                    if (!alreadyAdded) ownedOnly.add(privateEntry);
+                                }
                             }
                         }
                     }
