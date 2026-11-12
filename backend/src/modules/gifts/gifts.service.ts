@@ -1855,7 +1855,7 @@ export class GiftsService implements OnModuleInit {
     const out: typeof gifts = [];
     const showDiamonds = !!ECONOMY.showDiamondValueInApp;
     for (const g of gifts) {
-      if (this.isLuckyBoxCatalogGift(g)) continue;
+      if (this.isLuckyBoxCatalogGift(g) || String(g.category || '').toLowerCase() === 'custom') continue;
       const effectiveCategory = String(g.category || 'normal').toLowerCase();
       const stem = this.giftArtStem(g.iconUrl) || this.giftNameKey(g.name);
       const key = effectiveCategory === 'cp'
@@ -2699,6 +2699,13 @@ export class GiftsService implements OnModuleInit {
     }
     const gift = await this.giftsRepo.findOne({ where: { id: dto.giftId, isActive: true } });
     if (!gift) throw new NotFoundException('Gift not found');
+    if (String(gift.category || '').toLowerCase() === 'custom') {
+      const owned = await this.dataSource.query(
+        `SELECT id FROM custom_gift_grants WHERE \"giftId\" = $1 AND \"userId\" = $2 AND \"revokedAt\" IS NULL AND (\"expiresAt\" IS NULL OR \"expiresAt\" > now()) LIMIT 1`,
+        [gift.id, senderId],
+      );
+      if (!owned?.length) throw new NotFoundException('هذه الهدية غير متاحة أو انتهت صلاحيتها');
+    }
     await this.assertGiftTarget(dto, selfGift);
 
     // CB/CP starter gifts are ordinary catalog gifts. The configured gift-to-type
@@ -3452,6 +3459,7 @@ export class GiftsService implements OnModuleInit {
       where: { id: dto.giftId, isActive: true },
     });
     if (!gift) throw new NotFoundException('Gift not found');
+    if (String(gift.category || '').toLowerCase() === 'custom') throw new BadRequestException('الهدايا المخصصة تُرسل لمستلم واحد فقط');
 
     const isLucky = gift.type === GiftType.LUCKY;
     const qtyCap = isLucky ? 177 : 99;
