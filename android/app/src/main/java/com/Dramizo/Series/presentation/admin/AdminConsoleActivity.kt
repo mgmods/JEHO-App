@@ -3821,7 +3821,7 @@ class AdminConsoleActivity : ThemedActivity() {
         isFocusable = true
     }
 
-    private fun addText    private fun addText(parent: LinearLayout, text: String, size: Float, bold: Boolean, color: Int) {
+    private fun addText(parent: LinearLayout, text: String, size: Float, bold: Boolean, color: Int) {
         val view = TextView(this).apply {
             this.text = text
             textSize = size
