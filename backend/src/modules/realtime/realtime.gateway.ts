@@ -337,6 +337,26 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     return null;
   }
 
+  /** Resolve the active room and its public title for privacy-approved presence display. */
+  async activeRoomDetailsForUser(userId: string): Promise<{ roomId: string; roomName: string } | null> {
+    if (!userId) return null;
+    const sockets = await this.server.in(`user:${userId}`).fetchSockets();
+    for (const socket of sockets) {
+      const profiles = (socket.data as any)?.roomProfiles || {};
+      for (const roomId of Object.keys(profiles)) {
+        if (!socket.rooms.has(`room:${roomId}`)) continue;
+        const room = await this.roomsRepo.findOne({
+          where: { id: roomId },
+          select: ['id', 'title', 'status'],
+        });
+        if (room && room.status !== RoomStatus.CLOSED) {
+          return { roomId: room.id, roomName: room.title || 'غرفة صوتية' };
+        }
+      }
+    }
+    return null;
+  }
+
   @SubscribeMessage('room:join')
   async onRoomJoin(
     @ConnectedSocket() client: AuthSocket,
