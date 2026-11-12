@@ -1977,7 +1977,7 @@ export class AdminController {
     });
     const durationText = granted.permanent ? 'دائمة' : `${granted.durationDays} يوماً`;
     const expiryText = granted.expiresAt
-      ? new Date(granted.expiresAt).toLocaleString('en-GB', {
+      ? granted.expiresAt.toLocaleString('en-GB', {
           day: '2-digit', month: '2-digit', year: 'numeric',
           hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC',
         })
