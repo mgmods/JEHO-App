@@ -227,13 +227,22 @@ class AdminConsoleActivity : ThemedActivity() {
             setBackgroundColor(Color.WHITE)
             elevation = dp(3).toFloat()
         }
+        // The back action lives in the persistent bottom navigation, never in the header.
         backButton = TextView(this).apply {
-            text = "➜"
-            textSize = 23f
-            setTextColor(TEXT)
+            text = "‹  رجوع"
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(ACCENT)
             gravity = Gravity.CENTER
-            setPadding(dp(8), dp(6), dp(8), dp(6))
             visibility = View.GONE
+            isClickable = true
+            isFocusable = true
+            contentDescription = "العودة إلى القسم السابق"
+            background = GradientDrawable().apply {
+                setColor(0xFFF1EDFF.toInt())
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), 0xFFE1D9FA.toInt())
+            }
             setOnClickListener { handleAdminBack() }
         }
         titleView = TextView(this).apply {
@@ -260,7 +269,6 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
             }
         }
-        header.addView(backButton, LinearLayout.LayoutParams(dp(44), dp(48)))
         header.addView(titleView, LinearLayout.LayoutParams(0, dp(48), 1f))
         header.addView(refreshButton, LinearLayout.LayoutParams(dp(44), dp(48)))
         root.addView(header)
@@ -287,8 +295,42 @@ class AdminConsoleActivity : ThemedActivity() {
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        // No fixed bottom navigation: each dashboard tile opens a full native section screen.
-        // Android's bottom system Back button is intercepted by OnBackPressedDispatcher.
+        // Persistent in-app navigation: section back and admin home are always available.
+        val bottomNavigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            setBackgroundColor(Color.WHITE)
+            elevation = dp(10).toFloat()
+        }
+        val homeButton = TextView(this).apply {
+            text = "⌂  الرئيسية"
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            contentDescription = "العودة إلى الصفحة الرئيسية للوحة الإدارة"
+            background = GradientDrawable(
+                GradientDrawable.Orientation.RIGHT_LEFT,
+                intArrayOf(0xFF7659D2.toInt(), 0xFF5B42B0.toInt())
+            ).apply { cornerRadius = dp(14).toFloat() }
+            setOnClickListener {
+                sectionHistory.clear()
+                showHome(false)
+            }
+        }
+        bottomNavigation.addView(backButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            marginEnd = dp(6)
+        })
+        bottomNavigation.addView(homeButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            marginStart = dp(6)
+        })
+        root.addView(bottomNavigation, LinearLayout.LayoutParams(-1, -2))
+
+        // Device Back follows the same in-panel history; it does not bypass section navigation.
         setContentView(root)
     }
 
@@ -353,7 +395,7 @@ class AdminConsoleActivity : ThemedActivity() {
         body.addView(empty)
 
         val records = mutableListOf<Pair<View, Module>>()
-        available.chunked(2).forEach { pair ->
+        available.chunked(3).forEach { pair ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -361,7 +403,7 @@ class AdminConsoleActivity : ThemedActivity() {
             pair.forEach { module ->
                 val tile = card().apply {
                     setPadding(dp(13), dp(13), dp(13), dp(13))
-                    minimumHeight = dp(136)
+                    minimumHeight = dp(150)
                     isClickable = true
                     isFocusable = true
                     foreground = android.util.TypedValue().let {
@@ -424,10 +466,12 @@ class AdminConsoleActivity : ThemedActivity() {
                 row.addView(tile)
                 records.add(tile to module)
             }
-            if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply {
-                marginStart = dp(4)
-                marginEnd = dp(4)
-            })
+            if (pair.size < 3) repeat(3 - pair.size) {
+                row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply {
+                    marginStart = dp(4)
+                    marginEnd = dp(4)
+                })
+            }
             body.addView(row)
         }
         if (available.isEmpty()) {
@@ -635,7 +679,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         body.addView(empty)
         val records = mutableListOf<Pair<View, Module>>()
-        visible.chunked(2).forEach { group ->
+        visible.chunked(3).forEach { group ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -659,7 +703,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     elevation = dp(1).toFloat()
                     isClickable = true
                     isFocusable = true
-                    layoutParams = LinearLayout.LayoutParams(0, dp(138), 1f).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, dp(150), 1f).apply {
                         marginStart = dp(4)
                         marginEnd = dp(4)
                         bottomMargin = dp(10)
@@ -676,7 +720,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 val icon = TextView(this).apply {
                     text = module.icon
-                    textSize = 26f
+                    textSize = 23f
                     gravity = Gravity.CENTER
                     setTextColor(iconTint)
                     background = roundRect(0xFFF5F4F9.toInt(), 15)
@@ -685,7 +729,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 tile.addView(icon)
                 tile.addView(TextView(this).apply {
                     text = module.title
-                    textSize = 12f
+                    textSize = 11f
                     setTextColor(TEXT)
                     typeface = Typeface.DEFAULT_BOLD
                     gravity = Gravity.CENTER
@@ -699,7 +743,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 }, LinearLayout.LayoutParams(-1, -2))
                 tile.addView(TextView(this).apply {
                     text = module.subtitle
-                    textSize = 10.5f
+                    textSize = 9.5f
                     setTextColor(MUTED)
                     gravity = Gravity.CENTER
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
@@ -713,8 +757,8 @@ class AdminConsoleActivity : ThemedActivity() {
                 row.addView(tile)
                 records.add(tile to module)
             }
-            if (group.size < 2) {
-                repeat(2 - group.size) {
+            if (group.size < 3) {
+                repeat(3 - group.size) {
                     row.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f).apply {
                         marginStart = dp(4)
                         marginEnd = dp(4)
