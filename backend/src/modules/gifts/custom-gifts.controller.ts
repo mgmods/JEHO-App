@@ -12,6 +12,8 @@ class GrantCustomGiftDto {
   @IsString() mediaUrl: string;
   @IsOptional() @IsString() mediaType?: string;
   @IsOptional() @IsInt() @Min(0) @Max(3650) durationDays?: number | null;
+  @IsInt() @Min(1) coinPrice: number;
+  @IsInt() @Min(0) diamondValue: number;
 }
 
 class LookupCustomGiftRecipientDto { @IsString() publicId: string; }
