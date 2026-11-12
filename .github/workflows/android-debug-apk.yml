@@ -1,5 +1,6 @@
 name: Android Universal APK
 # JEHO Stories build validation pipeline
+# Compile and release both validate the same current MG-JEHO Android source.
 
 on:
   push:
