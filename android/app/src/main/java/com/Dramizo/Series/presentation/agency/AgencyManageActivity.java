@@ -677,9 +677,7 @@ public class AgencyManageActivity extends ThemedActivity {
         showConfirmSheet(
                 getString(R.string.agency_delete_confirm_title),
                 getString(R.string.agency_delete_confirm_message)
-                        + (name.isEmpty() ? "" : "
-
-«" + name + "»"),
+                        + (name.isEmpty() ? "" : "\n\n«" + name + "»"),
                 getString(R.string.agency_delete),
                 () -> vm.deleteAgency(agencyId));
     }
