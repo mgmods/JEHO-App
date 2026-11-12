@@ -1264,8 +1264,11 @@ class AdminConsoleActivity : ThemedActivity() {
                 " · ID " + (value(item, "recipientPublicId") ?: "—"), 12f, false, MUTED)
             val permanent = value(item, "permanent") == "true"
             val expiry = value(item, "expiresAt")
+            val configuredDays = value(item, "durationDays")?.toDoubleOrNull()?.toInt()
             val state = value(item, "status") ?: "active"
-            addText(panel, if (permanent) "الصلاحية: دائمة" else "الانتهاء: " + (expiry ?: "منتهية"), 12f, false, MUTED)
+            addText(panel, "مدة الصلاحية: " + if (permanent) "دائمة" else (configuredDays?.toString() ?: "—") + " يوم", 12f, false, MUTED)
+            addText(panel, if (permanent) "تاريخ الانتهاء: دائمة – بدون تاريخ انتهاء" else "تاريخ الانتهاء: " + (expiry ?: "غير متاح"), 12f, false, MUTED)
+            value(item, "createdAt")?.let { addText(panel, "تاريخ الإهداء: $it", 11f, false, MUTED) }
             val stateLabel = when (state) {
                 "revoked" -> "ملغاة ومحذوفة من حقيبة المستخدم"
                 "expired" -> "منتهية الصلاحية"
