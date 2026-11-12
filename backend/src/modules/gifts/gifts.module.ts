@@ -31,7 +31,6 @@ import { CpModule } from '../cp/cp.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BadgesModule } from '../badges/badges.module';
 import { AuthModule } from '../auth/auth.module';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -66,7 +65,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
     AuthModule,
   ],
   controllers: [GiftsController, CustomGiftsController],
-  providers: [GiftsService, CustomGiftsService, JwtAuthGuard],
+  providers: [GiftsService, CustomGiftsService],
   exports: [GiftsService],
 })
 export class GiftsModule {}
