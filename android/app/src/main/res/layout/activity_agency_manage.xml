@@ -76,77 +76,33 @@
                 android:paddingHorizontal="16dp"
                 android:paddingTop="8dp">
 
-                <LinearLayout
+                                <LinearLayout
                     android:id="@+id/boxAgencyHero"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_agency_manage_hero"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="20dp">
-
-                    <FrameLayout
-                        android:layout_width="88dp"
-                        android:layout_height="88dp">
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:background="@drawable/bg_voice_seat_circle"
-                            android:backgroundTint="#1410B981" />
-
-                        <ImageView
-                            android:id="@+id/imgAgencyLogo"
-                            android:layout_width="72dp"
-                            android:layout_height="72dp"
-                            android:layout_gravity="center"
-                            android:background="@drawable/bg_voice_seat_circle"
-                            android:contentDescription="@null"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/icon_agency" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+                    <ImageView
+                        android:id="@+id/imgAgencyLogo"
+                        android:layout_width="76dp"
+                        android:layout_height="76dp"
+                        android:background="@drawable/bg_voice_seat_circle"
+                        android:contentDescription="@null"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/icon_agency" />
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:letterSpacing="0.06"
-                        android:id="@+id/tvAgencyRoleBadge"
-                        android:text="مالك"
-                        android:textAllCaps="true"
-                        android:textColor="@color/hiyoo_dark_green"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvAgencyHeroName"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:gravity="center"
-                        android:text="—"
-                        android:textColor="@color/text_primary"
-                        android:textSize="22sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvAgencyHeroMeta"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:gravity="center"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/tvCommission"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center"
-                        android:textColor="@color/text_hint"
-                        android:textSize="12sp"
-                        android:visibility="gone" />
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView android:id="@+id/tvAgencyHeroName" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textColor="@color/text_primary" android:textSize="19sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+                        <TextView android:id="@+id/tvAgencyHeroMeta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:textColor="@color/text_secondary" android:textSize="13sp" />
+                        <TextView android:id="@+id/tvAgencyRoleBadge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:background="@drawable/bg_agency_menu_row_gold" android:paddingHorizontal="12dp" android:paddingVertical="5dp" android:text="مالك" android:textColor="#946B16" android:textSize="12sp" android:textStyle="bold" />
+                        <TextView android:id="@+id/tvCommission" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:textColor="@color/text_hint" android:textSize="11sp" android:visibility="gone" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <ProgressBar
