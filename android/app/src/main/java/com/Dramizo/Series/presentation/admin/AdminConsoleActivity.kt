@@ -332,7 +332,6 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     /**
-     * Persistent native navigation    /**
      * Persistent native navigation for the administration workspace.
      * Every destination opens an existing API-backed module and is filtered
      * through the same role gate used by the module router.
@@ -1387,7 +1386,7 @@ class AdminConsoleActivity : ThemedActivity() {
         body.addView(panel)
     }
 
-    private fun loadUsers    private fun loadUsers(search: String) {
+    private fun loadUsers(search: String) {
         // Preserve the search controls and section introduction while replacing results.
         // Search row + section intro + role/access card stay in place while results refresh.
         // Keep both persistent controls: the search row and the section introduction.
