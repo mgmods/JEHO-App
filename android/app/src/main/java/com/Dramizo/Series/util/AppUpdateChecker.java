@@ -102,9 +102,24 @@ public final class AppUpdateChecker {
                 + (arabic ? "عندك: " : "Yours: ")
                 + BuildConfig.VERSION_NAME;
 
-        String positive = arabic ? "تحديث الآن" : "Update now";
-        String negative = force ? null : (arabic ? "لاحقاً" : "Later");
+        if (force) {
+            // A mandatory release is a full-screen gate, never a dismissible dialog.
+            Intent gate = new Intent(activity, com.Dramizo.Series.presentation.splash.UpdateActivity.class);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_FORCE, true);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_VERSION_CODE, latest);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_VERSION_NAME, versionLabel);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_URL, dto.storeUrl);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_LINK_TYPE, dto.linkType);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_TITLE, title);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_MESSAGE, body);
+            gate.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            activity.startActivity(gate);
+            activity.finish();
+            return;
+        }
 
+        String positive = arabic ? "تحديث الآن" : "Update now";
+        String negative = arabic ? "لاحقاً" : "Later";
         AuraDialogHelper.confirm(
                 activity,
                 title,
@@ -113,21 +128,12 @@ public final class AppUpdateChecker {
                 () -> openStore(activity, dto.storeUrl),
                 negative,
                 () -> {
-                    if (!force) {
-                        prefs.edit().putInt(KEY_SKIPPED_CODE, latest).apply();
-                    }
+                    prefs.edit().putInt(KEY_SKIPPED_CODE, latest).apply();
                     if (onContinue != null) onContinue.onContinue();
                 },
-                !force);
+                true);
 
-        // Soft update: also continue in background so splash isn't blocked forever
-        // if user leaves sheet open — only when not forced.
-        if (!force && onContinue != null) {
-            // Wait for user action; do not auto-continue.
-        }
-        if (force && onContinue == null) {
-            // blocking splash path — user must tap update
-        }
+        // Optional updates remain dismissible; mandatory updates never reach this dialog.
     }
 
     /** Soft reminder after main screen is up (non-blocking). */
