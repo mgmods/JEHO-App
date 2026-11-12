@@ -807,7 +807,15 @@ class AdminConsoleActivity : ThemedActivity() {
         // Keep this allow-list in sync with backend AdminGuard's native-app policy.
         // A new module is hidden by default until the server explicitly allows it.
         return when (currentRole) {
-            StaffRoleHelper.SUPER -> key in modules.map { it.key }.toSet()
+            // Super Admin native-app allow-list: expose only the requested operational tools.
+            // Keep unrelated dashboard modules hidden without deleting their code or APIs.
+            StaffRoleHelper.SUPER -> key in setOf(
+                "users", "rooms", "streams",
+                "agencies", "agencyApplications",
+                "rechargeApplications", "rechargeAgents",
+                "notifications", "vanityIds", "grantCosmetics", "vip",
+                "operators"
+            )
             StaffRoleHelper.ADMIN -> key in setOf(
                 "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
                 "cosmetics", "grantCosmetics", "gifts", "vip", "vanityIds"
