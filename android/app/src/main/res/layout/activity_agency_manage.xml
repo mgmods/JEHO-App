@@ -49,9 +49,14 @@
                 android:textSize="17sp"
                 android:textStyle="bold" />
 
-            <View
+            <ImageView
+                android:id="@+id/btnRefresh"
                 android:layout_width="48dp"
-                android:layout_height="48dp" />
+                android:layout_height="48dp"
+                android:contentDescription="تحديث بيانات الوكالة"
+                android:padding="12dp"
+                android:src="@android:drawable/ic_popup_sync"
+                app:tint="#B58A32" />
         </LinearLayout>
 
         <androidx.core.widget.NestedScrollView
@@ -106,7 +111,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
                         android:letterSpacing="0.06"
-                        android:id="@+id/tvAgencyRoleBadge"\n                        android:text="مالك"
+                        android:id="@+id/tvAgencyRoleBadge"
+                        android:text="مالك"
                         android:textAllCaps="true"
                         android:textColor="@color/hiyoo_dark_green"
                         android:textSize="11sp"
