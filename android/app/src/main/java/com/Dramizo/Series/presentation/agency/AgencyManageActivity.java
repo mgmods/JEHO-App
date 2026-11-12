@@ -104,6 +104,12 @@ public class AgencyManageActivity extends ThemedActivity {
         setupMenuRow(binding.menuStyle, R.string.agency_manage_menu_style, v -> dialogNoticeStyle());
         setupMenuRow(binding.menuBranding, R.string.agency_manage_menu_branding, v -> dialogBranding());
         setupMenuRow(binding.menuMall, R.string.agency_manage_menu_mall, v -> openMall("host_badge"));
+        setupMenuRow(binding.menuManagers, R.string.agency_manage_menu_managers,
+                v -> loadMemberDirectory("manager", "مشرفو الوكالة"));
+        setupMenuRow(binding.menuHosts, R.string.agency_manage_menu_hosts,
+                v -> loadMemberDirectory("host", "مضيفو الوكالة"));
+        setupMenuRow(binding.menuMembers, R.string.agency_manage_menu_members,
+                v -> loadMemberDirectory(null, "أعضاء الوكالة"));
 
         binding.menuLive.setOnClickListener(v -> {
             if (myAgency != null && myAgency.isEligibleHost()) {
@@ -319,6 +325,42 @@ public class AgencyManageActivity extends ThemedActivity {
         sheet.setContentView(content);
         sheet.show();
         return sheet;
+    }
+
+    private void loadMemberDirectory(@Nullable String roleFilter, @NonNull String title) {
+        binding.progressMembers.setVisibility(View.VISIBLE);
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<MiscDtos.ListResult<MiscDtos.AgencyMemberDto>> result =
+                    ApiCall.execute(c.getAgencyApi().listMembers(agencyId, "", 1, 100, "active"));
+            runOnUiThread(() -> {
+                if (isFinishing() || binding == null) return;
+                binding.progressMembers.setVisibility(View.GONE);
+                ArrayList<String> labels = new ArrayList<>();
+                ArrayList<Runnable> actions = new ArrayList<>();
+                if (result.success && result.data != null && result.data.items != null) {
+                    for (MiscDtos.AgencyMemberDto member : result.data.items) {
+                        if (member == null || member.userId == null) continue;
+                        String role = member.role != null ? member.role.toLowerCase(Locale.US) : "";
+                        if (roleFilter != null && !roleFilter.equals(role)) continue;
+                        String name = member.user != null
+                                ? (member.user.displayName != null ? member.user.displayName : member.user.username)
+                                : member.userId;
+                        String publicId = member.user != null ? member.user.displayPublicId() : "";
+                        labels.add((name != null ? name : "—")
+                                + (publicId.isEmpty() ? "" : " · ID " + publicId)
+                                + " · " + roleAr(role));
+                        actions.add(() -> showMemberActions(member, name, publicId,
+                                member.isActive == null || !member.isActive));
+                    }
+                }
+                if (labels.isEmpty()) {
+                    Toast.makeText(this, "لا توجد بيانات ضمن هذا القسم", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showCustomList(title, labels, actions);
+            });
+        });
     }
 
     private void dialogSearchHosts() {
