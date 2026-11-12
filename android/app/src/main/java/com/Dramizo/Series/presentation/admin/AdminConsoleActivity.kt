@@ -1246,9 +1246,6 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
             }
         })
-        body.addView(button("سجل الدخوليات المُهداة") {
-            load(api.privateEntries()) { renderPrivateEntryList(it) }
-        })
         load(api.privateEntries()) { renderPrivateEntryList(it) }
     }
 
