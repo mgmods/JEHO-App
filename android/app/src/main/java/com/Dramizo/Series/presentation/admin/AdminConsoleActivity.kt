@@ -296,7 +296,7 @@ class AdminConsoleActivity : ThemedActivity() {
             StaffRoleHelper.ADMIN -> "الأدمن"
             else -> "المانجر"
         }
-        val available = modules.filter { roleCanAccessModule(it.key) && it.key !in primaryNavigationModules() }
+        val available = modules.filter { roleCanAccessModule(it.key) }
 
         val intro = card().apply {
             setPadding(dp(16), dp(16), dp(16), dp(16))
