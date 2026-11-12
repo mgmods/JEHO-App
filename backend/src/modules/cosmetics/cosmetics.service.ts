@@ -293,6 +293,9 @@ export class CosmeticsService implements OnModuleInit {
     if (!code || !name || !dto.previewUrl) {
       throw new BadRequestException('type, code, name, previewUrl مطلوبة');
     }
+    if ((dto.meta as any)?.privateEntry === true) {
+      throw new BadRequestException('الدخوليات الخاصة تُنشأ من قسم الدخوليات الخاصة فقط');
+    }
     if ((dto.meta as any)?.cpStore === true) {
       if (!Number.isSafeInteger(Number(dto.coinPrice)) || Number(dto.coinPrice) <= 0) {
         throw new BadRequestException('سعر عنصر متجر CP يجب أن يكون أكبر من صفر كوين.');
@@ -331,6 +334,9 @@ export class CosmeticsService implements OnModuleInit {
   async adminUpdate(id: string, dto: Partial<Cosmetic>) {
     const row = await this.cosmeticsRepo.findOne({ where: { id } });
     if (!row) throw new NotFoundException('العنصر غير موجود');
+    if (this.isPrivateEntryCosmetic(row)) {
+      throw new BadRequestException('عدّل الدخولية الخاصة من قسم الدخوليات الخاصة فقط');
+    }
     if (dto.type != null) {
       this.assertSupportedType(dto.type);
       row.type = dto.type;
@@ -374,9 +380,12 @@ export class CosmeticsService implements OnModuleInit {
     return this.cosmeticsRepo.save(row);
   }
 
-  async adminDelete(id: string) {
+  async adminDelete(id: string, opts: { allowPrivateEntry?: boolean } = {}) {
     const row = await this.cosmeticsRepo.findOne({ where: { id } });
     if (!row) throw new NotFoundException('العنصر غير موجود');
+    if (this.isPrivateEntryCosmetic(row) && opts.allowPrivateEntry !== true) {
+      throw new BadRequestException('احذف الدخولية الخاصة من قسم الدخوليات الخاصة فقط');
+    }
 
     const urls = [...new Set([row.previewUrl, row.animationUrl].filter(Boolean))] as string[];
 
@@ -622,7 +631,7 @@ export class CosmeticsService implements OnModuleInit {
       relations: ['cosmetic'],
     });
     if (ownership?.equipped) await this.clearExpiredCosmeticWear(ownership);
-    return this.adminDelete(id);
+    return this.adminDelete(id, { allowPrivateEntry: true });
   }
 
   async expirePrivateEntryCosmetics() {
