@@ -3278,7 +3278,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             agencyBadge.setPadding(dp(5), dp(2), dp(5), dp(2));
             agencyBadge.setBackgroundResource(R.drawable.bg_agency_affiliation_badge);
             agencyBadge.setLayoutParams(roomBadgeTextParams(2));
-            addRoomChatBadge(inline, overflow, agencyBadge, total++);
+            addRoomChatBadge(inline, overflow, agencyBadge, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
         if (fallbackVip > 0) {
             ImageView vip = new ImageView(this);
@@ -3291,7 +3291,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } else {
                 vip.setImageResource(com.Dramizo.Series.util.AssetCatalog.vipMedal(fallbackVip));
             }
-            addRoomChatBadge(inline, overflow, vip, total++);
+            addRoomChatBadge(inline, overflow, vip, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
         if (decoration.cpActive) {
             TextView cp = new TextView(this);
@@ -3303,7 +3303,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             cp.setPadding(dp(5), dp(2), dp(5), dp(2));
             cp.setBackgroundResource(R.drawable.bg_cp_cv_badge);
             cp.setLayoutParams(roomBadgeTextParams(2));
-            addRoomChatBadge(inline, overflow, cp, total++);
+            addRoomChatBadge(inline, overflow, cp, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
         boolean styledId = decoration.publicId != null && !decoration.publicId.trim().isEmpty()
                 && decoration.publicIdStyleMode != null
@@ -3331,7 +3331,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 id.setBackgroundResource(R.drawable.bg_vanity_chip);
             }
             id.setLayoutParams(roomBadgeTextParams(2));
-            addRoomChatBadge(inline, overflow, id, total++);
+            addRoomChatBadge(inline, overflow, id, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
         for (String medalUrl : decoration.medalUrls) {
             if (medalUrl == null || medalUrl.trim().isEmpty()) continue;
@@ -3343,7 +3343,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     .placeholder(R.drawable.ic_medal_default)
                     .error(R.drawable.ic_medal_default)
                     .fitCenter().into(medal);
-            addRoomChatBadge(inline, overflow, medal, total++);
+            addRoomChatBadge(inline, overflow, medal, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
         inline.setVisibility(total > 0 ? View.VISIBLE : View.GONE);
         overflow.setVisibility(overflow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
