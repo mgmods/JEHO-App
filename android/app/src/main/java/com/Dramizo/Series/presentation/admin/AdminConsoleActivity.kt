@@ -1562,11 +1562,96 @@ class AdminConsoleActivity : ThemedActivity() {
                     "النوع" to listOf("targetType"),
                     "تاريخ العملية" to listOf("createdAt")
                 )
+                "rechargeAgents" -> listOf(
+                    "اسم الوكيل" to listOf("user.displayName", "user.username", "user.name", "displayName", "username", "name"),
+                    "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
+                    "الدولة / المنطقة" to listOf("region", "country"),
+                    "الحالة" to listOf("status", "isActive"),
+                    "العمولة" to listOf("commission", "commissionRate"),
+                    "تاريخ الإنشاء" to listOf("createdAt")
+                )
+                "walletTransactions" -> listOf(
+                    "اسم المستخدم" to listOf("user.displayName", "user.username", "user.name", "userName"),
+                    "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
+                    "نوع العملية" to listOf("type", "transactionType"),
+                    "المبلغ" to listOf("amount", "coins", "diamonds"),
+                    "الرصيد قبل العملية" to listOf("balanceBefore"),
+                    "الرصيد بعد العملية" to listOf("balanceAfter"),
+                    "السبب" to listOf("reason", "description"),
+                    "تاريخ العملية" to listOf("createdAt", "occurredAt")
+                )
+                "withdrawals" -> listOf(
+                    "اسم المستخدم" to listOf("user.displayName", "user.username", "user.name", "userName"),
+                    "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
+                    "المبلغ" to listOf("amount", "coins"),
+                    "وسيلة السحب" to listOf("method", "payoutMethod"),
+                    "الحساب المستلم" to listOf("account", "accountNumber", "destination"),
+                    "الحالة" to listOf("status", "state"),
+                    "تاريخ الطلب" to listOf("createdAt")
+                )
+                "recharges" -> listOf(
+                    "اسم المستخدم" to listOf("user.displayName", "user.username", "user.name", "userName"),
+                    "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
+                    "العملات" to listOf("coins", "amount"),
+                    "طريقة الشحن" to listOf("method", "paymentMethod"),
+                    "رقم العملية" to listOf("reference", "transactionId"),
+                    "الحالة" to listOf("status", "state"),
+                    "تاريخ العملية" to listOf("createdAt")
+                )
+                "notifications" -> listOf(
+                    "العنوان" to listOf("title", "subject"),
+                    "المحتوى" to listOf("message", "body", "content"),
+                    "المستلم" to listOf("recipient.displayName", "recipient.username", "userName", "recipientId"),
+                    "نوع الرسالة" to listOf("type", "channel"),
+                    "الحالة" to listOf("status", "state"),
+                    "تاريخ الإرسال" to listOf("createdAt", "sentAt")
+                )
+                "cosmetics", "grantCosmetics" -> listOf(
+                    "اسم الميزة" to listOf("name", "displayName", "title"),
+                    "النوع" to listOf("type"),
+                    "السعر" to listOf("price", "coinPrice", "priceCoins"),
+                    "المدة" to listOf("duration", "durationDays"),
+                    "الحالة" to listOf("status", "isActive"),
+                    "تاريخ الإنشاء" to listOf("createdAt")
+                )
+                "gifts" -> listOf(
+                    "اسم الهدية" to listOf("name", "giftName", "title"),
+                    "السعر بالعملات" to listOf("price", "coinPrice", "priceCoins"),
+                    "قيمة الألماس" to listOf("diamondValue", "diamonds"),
+                    "النوع" to listOf("type"),
+                    "الحالة" to listOf("status", "isActive"),
+                    "تاريخ الإنشاء" to listOf("createdAt")
+                )
+                "vanityIds" -> listOf(
+                    "الآي دي" to listOf("publicId", "value", "idValue"),
+                    "السعر" to listOf("priceCoins", "price"),
+                    "مدة الصلاحية" to listOf("duration", "durationDays"),
+                    "النمط" to listOf("styleMode"),
+                    "مستوى VIP المطلوب" to listOf("styleVipLevel", "vipLevel"),
+                    "الحالة" to listOf("status", "isActive"),
+                    "تاريخ الانتهاء" to listOf("expiresAt")
+                )
+                "genderVerifications" -> listOf(
+                    "اسم المستخدم" to listOf("user.displayName", "user.username", "user.name", "applicantName"),
+                    "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
+                    "الحالة" to listOf("status", "state"),
+                    "ملاحظة المراجعة" to listOf("adminNote", "reviewNote", "note"),
+                    "تاريخ الطلب" to listOf("createdAt", "submittedAt")
+                )
+                "logs" -> listOf(
+                    "اسم المدير" to listOf("actorName", "actor.displayName", "actor.username"),
+                    "العملية" to listOf("action"),
+                    "النوع" to listOf("targetType"),
+                    "العنصر المستهدف" to listOf("targetName", "target.displayName", "target.username", "targetId"),
+                    "ملاحظة" to listOf("note", "reason"),
+                    "تاريخ العملية" to listOf("createdAt")
+                )
                 else -> listOf(
                     "الاسم" to listOf("displayName", "name", "title", "username"),
+                    "ID المستخدم" to listOf("publicId", "userId"),
                     "الحالة" to listOf("status", "isActive"),
                     "المستوى" to listOf("level"),
-                    "عدد الأعضاء" to listOf("membersCount"),
+                    "عدد الأعضاء" to listOf("membersCount", "memberCount"),
                     "المالك" to listOf("ownerName", "owner.displayName", "owner.username"),
                     "السعر" to listOf("coinPrice", "price"),
                     "قيمة الألماس" to listOf("diamondValue"),
@@ -1613,13 +1698,14 @@ class AdminConsoleActivity : ThemedActivity() {
                     }
                     layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(8) }
                 }
-                detail.take(if (type == "reports" || type == "logs") 6 else 4).forEach { line ->
+                detail.take(if (type == "reports" || type == "logs") 10 else 8).forEach { line ->
                     val lineView = TextView(this).apply {
                         text = line
                         textSize = 12f
-                        setTextColor(MUTED)
-                        setPadding(0, dp(3), 0, dp(3))
-                        maxLines = 2
+                        setTextColor(TEXT)
+                        setPadding(dp(2), dp(5), dp(2), dp(5))
+                        maxLines = 3
+                        setLineSpacing(dp(2).toFloat(), 1f)
                     }
                     detailPanel.addView(lineView)
                 }
@@ -3421,8 +3507,9 @@ class AdminConsoleActivity : ThemedActivity() {
         backgroundTintList = null
         elevation = dp(1).toFloat()
         stateListAnimator = null
-        setPadding(dp(8), dp(3), dp(8), dp(3))
+        setPadding(dp(10), dp(4), dp(10), dp(4))
         contentDescription = label
+        // Native touch target with a compact visual footprint, matching modern Android controls.
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
             topMargin = dp(5)
             bottomMargin = dp(5)
