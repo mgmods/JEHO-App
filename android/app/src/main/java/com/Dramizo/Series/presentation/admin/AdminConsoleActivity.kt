@@ -211,7 +211,7 @@ class AdminConsoleActivity : ThemedActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
-            setBackgroundColor(BG)
+            setBackgroundColor(Color.WHITE)
         }
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
