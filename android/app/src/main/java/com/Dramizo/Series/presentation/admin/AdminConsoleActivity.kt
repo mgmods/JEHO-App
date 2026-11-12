@@ -1267,23 +1267,31 @@ class AdminConsoleActivity : ThemedActivity() {
                 " · ID " + (value(item, "recipientPublicId") ?: "—"), 12f, false, MUTED)
             val permanent = value(item, "permanent") == "true"
             val expiry = value(item, "expiresAt")
+            val state = value(item, "status") ?: "active"
             addText(panel, if (permanent) "الصلاحية: دائمة" else "الانتهاء: " + (expiry ?: "منتهية"), 12f, false, MUTED)
-            addText(panel, "الحالة: " + if (value(item, "equipped") == "true") "مركبة" else "غير مركبة", 12f, false, MUTED)
-            val actions = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutDirection = View.LAYOUT_DIRECTION_RTL
-                gravity = Gravity.CENTER_VERTICAL
+            val stateLabel = when (state) {
+                "revoked" -> "ملغاة ومحذوفة من حقيبة المستخدم"
+                "expired" -> "منتهية الصلاحية"
+                else -> if (value(item, "equipped") == "true") "فعالة · مركبة" else "فعالة · غير مركبة"
             }
-            actions.addView(button("تعديل") { showPrivateEntryEditDialog(item) }, LinearLayout.LayoutParams(0, dp(44), 1f))
-            actions.addView(button("حذف من حساب المستخدم") {
-                confirm("حذف الدخولية من حقيبة المستخدم وإلغاء استخدامها نهائياً؟") {
-                    load(api.deletePrivateEntry(id)) {
-                        toast("تم حذف الدخولية من حساب المستخدم")
-                        openModule("privateEntries")
-                    }
+            addText(panel, "الحالة: " + stateLabel, 12f, false, MUTED)
+            if (state != "revoked") {
+                val actions = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    gravity = Gravity.CENTER_VERTICAL
                 }
-            }, LinearLayout.LayoutParams(0, dp(44), 1f))
-            panel.addView(actions)
+                actions.addView(button("تعديل") { showPrivateEntryEditDialog(item) }, LinearLayout.LayoutParams(0, dp(44), 1f))
+                actions.addView(button("حذف من حساب المستخدم") {
+                    confirm("إلغاء ملكية الدخولية وحذفها من حقيبة المستخدم؟ سيبقى سجل الإهداء لدى السوبر أدمن.") {
+                        load(api.deletePrivateEntry(id)) {
+                            toast("تم حذف الدخولية من حساب المستخدم وحفظ سجلها")
+                            openModule("privateEntries")
+                        }
+                    }
+                }, LinearLayout.LayoutParams(0, dp(44), 1f))
+                panel.addView(actions)
+            }
             body.addView(panel)
         }
     }
