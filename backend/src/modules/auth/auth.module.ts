@@ -11,6 +11,7 @@ import { OtpCode } from '../../database/entities/otp-code.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { AdminUser } from '../../database/entities/admin-user.entity';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { AdminUser } from '../../database/entities/admin-user.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, JwtAuthGuard],
+  exports: [AuthService, JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}
