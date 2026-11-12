@@ -400,6 +400,7 @@ export class GiftsService implements OnModuleInit {
 
       for (const g of gifts) {
         if (!g.isActive) continue;
+        if (String(g.category || '').toLowerCase() === 'custom') continue;
         const price = Math.max(0, Math.floor(Number(g.coinPrice) || 0));
         if (price <= 0) {
           g.isActive = false;
@@ -421,7 +422,7 @@ export class GiftsService implements OnModuleInit {
 
       // --- deactivate lucky-box catalog junk ---
       for (const g of gifts) {
-        if (!g.isActive) continue;
+        if (!g.isActive || String(g.category || '').toLowerCase() === 'custom') continue;
         if (this.isLuckyBoxCatalogGift(g) || /عملة الحظ|صندوق حظ/i.test(String(g.name || ''))) {
           if (!/^حظ\s/.test(String(g.name || '').trim())) {
             g.isActive = false;
@@ -558,7 +559,7 @@ export class GiftsService implements OnModuleInit {
       for (const g of active) {
         // CP gifts are individually configured rewards; never hide one because
         // another CP gift happens to share its name or artwork.
-        if (String(g.category || '').toLowerCase() === 'cp') continue;
+        if (['cp', 'custom'].includes(String(g.category || '').toLowerCase())) continue;
         const key = keyFn(g);
         if (!key) continue;
         const arr = groups.get(key) || [];
@@ -664,7 +665,7 @@ export class GiftsService implements OnModuleInit {
       // Hide lucky-box from the gifts catalog (room float stays separate).
       const allActive = await this.giftsRepo.find({ where: { isActive: true } });
       for (const g of allActive) {
-        if (!this.isLuckyBoxCatalogGift(g)) continue;
+        if (String(g.category || '').toLowerCase() === 'custom' || !this.isLuckyBoxCatalogGift(g)) continue;
         g.isActive = false;
         await this.giftsRepo.save(g);
         this.log.log(`Deactivated lucky-box gift from catalog: ${g.name}`);
