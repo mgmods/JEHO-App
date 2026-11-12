@@ -2729,11 +2729,9 @@ export class GiftsService implements OnModuleInit {
     // Host diamonds are minted from the dashboard ratio only. The platform's
     // internal margin is accounted for separately and must never reduce host or agency earnings.
     // Ignore stale per-gift diamondValue so a 100-coin regular gift at 100% pays 100 diamonds.
-    const cappedPerUnit = mintDiamondsPerUnit(
-      coinPrice,
-      0,
-      ratioCap,
-    );
+    const cappedPerUnit = String(gift.category || '').toLowerCase() === 'custom'
+      ? Math.max(0, Math.floor(Number(gift.diamondValue) || 0))
+      : mintDiamondsPerUnit(coinPrice, 0, ratioCap);
     // Receiver diamonds are the final distributable pool. Lucky jackpot returns coins to sender.
     const diamondsAwarded = cappedPerUnit * qty;
     let luckyMultiplier: number | null = null;
