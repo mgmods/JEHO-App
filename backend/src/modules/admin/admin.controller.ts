@@ -61,6 +61,8 @@ import { AbuseSeverity } from '../../database/entities/abuse-log.entity';
 import { EconomySettingsService } from '../economy/economy-settings.service';
 import { GameOddsSettingsService } from '../games/game-odds-settings.service';
 import { GiftsService } from '../gifts/gifts.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 
 class ResolveReportDto {
   @IsEnum(ReportStatus)
@@ -123,6 +125,7 @@ export class AdminController {
     private readonly economySettings: EconomySettingsService,
     private readonly gameOddsSettings: GameOddsSettingsService,
     private readonly giftsService: GiftsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -1931,6 +1934,114 @@ export class AdminController {
   async setTasksEnabled(@Body() body: { enabled?: boolean }) {
     const enabled = await this.tasksService.setEnabled(body?.enabled !== false);
     return { enabled };
+  }
+
+  // ─── Super-admin private entries (existing entry_effect inventory/equip pipeline) ───
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('private-entries')
+  async listPrivateEntries(@CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean }) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    if (!actor?.isSuperAdmin && role !== 'super') {
+      throw new ForbiddenException('Private entries are available to Super Admin only');
+    }
+    return this.cosmeticsService.listPrivateEntries();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('private-entries/grant')
+  async grantPrivateEntry(
+    @Body() body: {
+      recipientPublicId?: string;
+      name?: string;
+      videoUrl?: string;
+      durationDays?: number;
+      permanent?: boolean;
+      personalMessage?: string;
+    },
+    @CurrentUser() actor: { sub: string; staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    if (!actor?.isSuperAdmin && role !== 'super') {
+      throw new ForbiddenException('Private entries are available to Super Admin only');
+    }
+    const granted = await this.cosmeticsService.grantPrivateEntry({
+      recipientPublicId: String(body?.recipientPublicId || ''),
+      name: String(body?.name || ''),
+      videoUrl: String(body?.videoUrl || ''),
+      durationDays: Number(body?.durationDays),
+      permanent: body?.permanent === true,
+      personalMessage: String(body?.personalMessage || ''),
+      giftedByUserId: actor.sub,
+    });
+    const durationText = granted.permanent ? 'دائمة' : `${granted.durationDays} يوماً`;
+    const expiryText = granted.expiresAt
+      ? new Date(granted.expiresAt).toLocaleString('en-GB', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC',
+        })
+      : 'دائمة – بدون تاريخ انتهاء';
+    const personal = String(body?.personalMessage || '').trim();
+    const message = [
+      '🎁 مبروك! لقد وصلتك دخولية خاصة كهدية من الإدارة.',
+      '',
+      `اسم الدخولية: ${granted.cosmetic.name}`,
+      `مدة الصلاحية: ${durationText}`,
+      `تاريخ الانتهاء: ${expiryText}`,
+      `رسالة من الإدارة: ${personal || 'نتمنى لك تجربة ممتعة!'}`,
+    ].join('\n');
+    await this.notificationsService.create({
+      userId: granted.userId,
+      type: NotificationType.CHAT,
+      title: '🎁 دخولية خاصة من الإدارة',
+      body: message,
+      data: {
+        adminMessage: true,
+        source: 'admin',
+        privateEntry: true,
+        privateEntryId: granted.cosmetic.id,
+        action: 'open_private_entry_inventory',
+        inventorySection: 'entry_effect',
+      },
+      sendPush: true,
+    });
+    return { ...granted, adminMessageSent: true };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('private-entries/:id')
+  async updatePrivateEntry(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: {
+      recipientPublicId?: string;
+      name?: string;
+      durationDays?: number;
+      permanent?: boolean;
+      personalMessage?: string;
+    },
+    @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    if (!actor?.isSuperAdmin && role !== 'super') {
+      throw new ForbiddenException('Private entries are available to Super Admin only');
+    }
+    return this.cosmeticsService.updatePrivateEntry(id, body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Delete('private-entries/:id')
+  async deletePrivateEntry(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    if (!actor?.isSuperAdmin && role !== 'super') {
+      throw new ForbiddenException('Private entries are available to Super Admin only');
+    }
+    return this.cosmeticsService.deletePrivateEntry(id);
   }
 
   // ─── Cosmetics admin ───────────────────────────────────────
