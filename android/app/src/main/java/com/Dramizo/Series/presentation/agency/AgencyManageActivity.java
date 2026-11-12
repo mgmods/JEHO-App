@@ -82,7 +82,8 @@ public class AgencyManageActivity extends ThemedActivity {
             return;
         }
 
-        binding.btnBack.setOnClickListener(v -> navigateUp());\n        if (binding.btnRefresh != null) binding.btnRefresh.setOnClickListener(v -> reload());
+        binding.btnBack.setOnClickListener(v -> navigateUp());
+        if (binding.btnRefresh != null) binding.btnRefresh.setOnClickListener(v -> reload());
         if (binding.boxAgencyHero != null) {
             android.graphics.drawable.GradientDrawable heroBackground =
                     new android.graphics.drawable.GradientDrawable(
@@ -149,7 +150,12 @@ public class AgencyManageActivity extends ThemedActivity {
             else if (labelRes == R.string.agency_manage_menu_branding) icon = android.R.drawable.ic_menu_gallery;
             else if (labelRes == R.string.agency_manage_menu_mall) icon = android.R.drawable.ic_menu_view;
             row.imgMenuIcon.setImageResource(icon);
-            int tint = 0xFF8156D8;\n            if (labelRes == R.string.agency_manage_menu_pending) tint = 0xFF2678D8;\n            else if (labelRes == R.string.agency_manage_menu_style) tint = 0xFFE34F91;\n            else if (labelRes == R.string.agency_manage_menu_code) tint = 0xFF20B96B;\n            else if (labelRes == R.string.agency_manage_menu_mall) tint = 0xFFE0A126;\n            row.imgMenuIcon.setColorFilter(tint);
+            int tint = 0xFF8156D8;
+            if (labelRes == R.string.agency_manage_menu_pending) tint = 0xFF2678D8;
+            else if (labelRes == R.string.agency_manage_menu_style) tint = 0xFFE34F91;
+            else if (labelRes == R.string.agency_manage_menu_code) tint = 0xFF20B96B;
+            else if (labelRes == R.string.agency_manage_menu_mall) tint = 0xFFE0A126;
+            row.imgMenuIcon.setColorFilter(tint);
         }
         row.getRoot().setOnClickListener(click);
     }
@@ -627,7 +633,9 @@ public class AgencyManageActivity extends ThemedActivity {
         showConfirmSheet(
                 getString(R.string.agency_delete_confirm_title),
                 getString(R.string.agency_delete_confirm_message)
-                        + (name.isEmpty() ? "" : "\n\n«" + name + "»"),
+                        + (name.isEmpty() ? "" : "
+
+«" + name + "»"),
                 getString(R.string.agency_delete),
                 () -> vm.deleteAgency(agencyId));
     }
