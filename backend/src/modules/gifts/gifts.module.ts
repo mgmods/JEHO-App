@@ -30,6 +30,8 @@ import { HostTargetModule } from '../host-target/host-target.module';
 import { CpModule } from '../cp/cp.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BadgesModule } from '../badges/badges.module';
+import { AuthModule } from '../auth/auth.module';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -61,9 +63,10 @@ import { BadgesModule } from '../badges/badges.module';
     CpModule,
     NotificationsModule,
     BadgesModule,
+    AuthModule,
   ],
   controllers: [GiftsController, CustomGiftsController],
-  providers: [GiftsService, CustomGiftsService],
+  providers: [GiftsService, CustomGiftsService, JwtAuthGuard],
   exports: [GiftsService],
 })
 export class GiftsModule {}
