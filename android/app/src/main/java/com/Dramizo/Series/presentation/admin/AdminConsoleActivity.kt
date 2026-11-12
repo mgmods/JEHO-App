@@ -65,6 +65,10 @@ class AdminConsoleActivity : ThemedActivity() {
     private var pendingIdentityFieldKey: String? = null
     private var staffIdentityUploadInProgress = false
     private val notificationImageRequestCode = 7042
+    private val customGiftUploadRequestCode = 7044
+    private var customGiftMediaUrl: String? = null
+    private var customGiftMediaType: String? = null
+    private var customGiftUploadInProgress = false
 
     private data class Module(val key: String, val title: String, val subtitle: String, val icon: String)
 
@@ -93,6 +97,7 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة محددة", "🔢"),
         Module("cosmetics", "كتالوج المميزات", "مراجعة المميزات المتاحة في المتجر", "🖼️"),
         Module("gifts", "كتالوج الهدايا", "مراجعة الهدايا المتاحة في النظام", "🎁"),
+        Module("customGifts", "إدارة الهدايا المخصصة", "رفع هدية خاصة وإهداؤها لمستخدم بمدة محددة", "🎁"),
         Module("grantCosmetics", "الإطارات والدخوليات", "إهداء المميزات لمدة 7 أو 15 أو 30 يومًا أو دائمًا", "✨"),
         Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
         Module("logs", "سجل العمليات", "مراجعة سجل التغييرات الإدارية", "🧾"),
@@ -814,11 +819,11 @@ class AdminConsoleActivity : ThemedActivity() {
                 "agencies", "agencyApplications",
                 "rechargeApplications", "rechargeAgents",
                 "notifications", "vanityIds", "grantCosmetics", "vip",
-                "operators"
+                "operators", "customGifts"
             )
             StaffRoleHelper.ADMIN -> key in setOf(
                 "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
-                "cosmetics", "grantCosmetics", "gifts", "vip", "vanityIds"
+                "cosmetics", "grantCosmetics", "gifts", "customGifts", "vip", "vanityIds"
             )
             StaffRoleHelper.MANAGER -> key in setOf(
                 "rooms", "streams", "reports", "cosmetics", "grantCosmetics", "gifts"
@@ -907,6 +912,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 load(api.vanityIds()) { renderItems(it, "vanityIds") }
             }
             "gifts" -> load(api.gifts()) { renderItems(it, "gifts") }
+            "customGifts" -> showCustomGifts()
             "vip" -> {
                 addText(body, "كل بطاقة هنا تمثل عضوية مستخدم واحدة. ستجد اسم صاحبها وID المستخدم ومستوى VIP والحالة وتاريخ المنح والانتهاء ومصدر المنح، ثم إجراءات واضحة للسحب أو فتح ملف المستخدم.", 12f, false, MUTED)
                 body.addView(button("＋ منح عضوية VIP") { showAssignVipDialog() })
@@ -931,6 +937,191 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "logs" -> load(api.logs(1, 50)) { renderItems(it, "logs") }
             "staffIdentity" -> showStaffIdentityEditor()
+        }
+    }
+
+    private fun showCustomGifts() {
+        customGiftMediaUrl = null
+        customGiftMediaType = null
+        body.removeAllViews()
+        val panel = card()
+        addText(panel, "إهداء ملف مخصص إلى مستخدم محدد", 17f, true, TEXT)
+        addText(panel, "الملف يُرفع من جهازك ويُحفظ في التخزين الدائم الحالي. لن يظهر في كتالوج الهدايا العام.", 12f, false, MUTED)
+        val idInput = featureField(panel, "ID المستخدم المستلم", "", "أدخل رقم ID الظاهر في الحساب")
+        val nameInput = featureField(panel, "اسم الهدية", "", "مثال: VIP Gift")
+        val durationLabel = TextView(this).apply {
+            text = "مدة الصلاحية"
+            textSize = 13f
+            setTextColor(TEXT)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, dp(5), 0, dp(6))
+        }
+        panel.addView(durationLabel)
+        val durationSpinner = Spinner(this)
+        val durationLabels = listOf("يوم واحد", "3 أيام", "7 أيام", "15 يوماً", "30 يوماً", "مدة مفتوحة")
+        val durationDays = listOf(1, 3, 7, 15, 30, 0)
+        durationSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, durationLabels)
+        panel.addView(durationSpinner, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+        val recipientStatus = TextView(this).apply {
+            text = "لم يتم التحقق من المستخدم بعد"
+            textSize = 12f
+            setTextColor(MUTED)
+            setPadding(0, dp(6), 0, dp(8))
+        }
+        panel.addView(recipientStatus)
+        val mediaStatus = TextView(this).apply {
+            tag = "custom_gift_media_status"
+            text = "لم يتم اختيار ملف"
+            textSize = 12f
+            setTextColor(MUTED)
+            setPadding(0, dp(8), 0, dp(8))
+        }
+        panel.addView(mediaStatus)
+        panel.addView(button("＋ رفع صورة أو فيديو أو GIF من الجهاز") {
+            val pick = Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "*/*"
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/mp4", "video/webm", "video/quicktime"))
+                addCategory(Intent.CATEGORY_OPENABLE)
+            }
+            startActivityForResult(Intent.createChooser(pick, "اختيار ملف الهدية"), customGiftUploadRequestCode)
+        })
+        body.addView(panel)
+        var verifiedPublicId: String? = null
+        idInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                verifiedPublicId = null
+                recipientStatus.text = "تغيّر ID؛ أعد التحقق من الحساب"
+                recipientStatus.setTextColor(MUTED)
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        body.addView(button("التحقق من حساب المستلم") {
+            val publicId = idInput.text.toString().trim()
+            if (publicId.isBlank()) { toast("أدخل ID المستخدم أولاً"); return@button }
+            load(api.customGiftLookup(mapOf("publicId" to publicId))) { raw ->
+                val user = raw as? Map<*, *>
+                if (user == null || user["id"] == null) {
+                    verifiedPublicId = null
+                    recipientStatus.text = "تعذر التحقق من الحساب"
+                    recipientStatus.setTextColor(0xFFC0392B.toInt())
+                } else {
+                    verifiedPublicId = publicId
+                    val display = user["displayName"]?.toString()?.takeIf { it.isNotBlank() }
+                        ?: user["username"]?.toString() ?: "مستخدم"
+                    recipientStatus.text = "✓ تم التحقق: " + display + " · ID " + (user["publicId"] ?: publicId)
+                    recipientStatus.setTextColor(0xFF23834B.toInt())
+                }
+            }
+        })
+        body.addView(button("تأكيد إرسال الهدية المخصصة") {
+            if (verifiedPublicId.isNullOrBlank() || verifiedPublicId != idInput.text.toString().trim()) {
+                toast("تحقق من ID المستخدم أولاً"); return@button
+            }
+            if (nameInput.text.toString().trim().isBlank()) { toast("اكتب اسم الهدية"); return@button }
+            if (customGiftUploadInProgress) { toast("انتظر حتى ينتهي رفع الملف"); return@button }
+            val mediaUrl = customGiftMediaUrl
+            val mediaType = customGiftMediaType
+            if (mediaUrl.isNullOrBlank() || mediaType.isNullOrBlank()) { toast("ارفع ملف الهدية أولاً"); return@button }
+            val days = durationDays.getOrElse(durationSpinner.selectedItemPosition) { 0 }
+            val payload = mapOf(
+                "recipientPublicId" to verifiedPublicId!!,
+                "name" to nameInput.text.toString().trim(),
+                "mediaUrl" to mediaUrl,
+                "mediaType" to mediaType,
+                "durationDays" to days
+            )
+            confirm("إرسال الهدية إلى ID " + verifiedPublicId + "؟ ستبدأ الصلاحية لحظة الإرسال.") {
+                load(api.customGiftSend(payload)) { raw ->
+                    val grant = (raw as? Map<*, *>)?.get("grant") as? Map<*, *>
+                    val starts = grant?.get("startsAt")?.toString() ?: "تم تسجيل وقت الإرسال"
+                    val ends = grant?.get("expiresAt")?.toString() ?: if (days == 0) "مدة مفتوحة" else "يحسبها الخادم"
+                    toast("تم إهداء الهدية بنجاح")
+                    addText(body, "بداية الصلاحية: " + starts, 12f, false, MUTED)
+                    addText(body, "نهاية الصلاحية: " + ends, 12f, false, MUTED)
+                    customGiftMediaUrl = null
+                    customGiftMediaType = null
+                    mediaStatus.text = "تم الإرسال — اختر ملفاً جديداً عند الحاجة"
+                }
+            }
+        })
+        body.addView(button("سجل الهدايا المخصصة") {
+            load(api.customGiftGrants()) { renderItems(it, "customGifts") }
+        })
+    }
+
+    private fun uploadCustomGiftMedia(uri: Uri) {
+        customGiftUploadInProgress = true
+        customGiftMediaUrl = null
+        customGiftMediaType = null
+        try {
+            val mime = (contentResolver.getType(uri) ?: "").lowercase()
+            val mediaType = when {
+                mime == "image/gif" -> "gif"
+                mime.startsWith("video/") -> "video"
+                mime.startsWith("image/") -> "image"
+                else -> throw IllegalArgumentException("اختر صورة أو فيديو أو GIF فقط")
+            }
+            val ext = when (mime) {
+                "image/png" -> ".png"
+                "image/webp" -> ".webp"
+                "image/gif" -> ".gif"
+                "image/jpeg", "image/jpg" -> ".jpg"
+                "video/webm" -> ".webm"
+                "video/quicktime" -> ".mov"
+                "video/3gpp" -> ".3gp"
+                else -> if (mediaType == "video") ".mp4" else ".jpg"
+            }
+            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: throw IllegalStateException("تعذر قراءة الملف")
+            if (bytes.isEmpty() || bytes.size > 50 * 1024 * 1024) {
+                throw IllegalArgumentException("حجم الملف يجب ألا يتجاوز 50 ميغابايت")
+            }
+            val part = MultipartBody.Part.createFormData(
+                "file", "custom-gift-" + System.currentTimeMillis() + ext,
+                bytes.toRequestBody(mime.toMediaType())
+            )
+            mediaStatusUpdate("جارٍ رفع الملف...")
+            ContainerProvider.from(this).getUploadApi().upload(part).enqueue(object : Callback<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> {
+                override fun onResponse(
+                    call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>,
+                    response: Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>
+                ) {
+                    customGiftUploadInProgress = false
+                    val result = response.body()?.getData()
+                    if (response.isSuccessful && response.body()?.success == true && !result?.url.isNullOrBlank()) {
+                        customGiftMediaUrl = result!!.url
+                        customGiftMediaType = mediaType
+                        val label = if (mediaType == "video") "الفيديو" else if (mediaType == "gif") "GIF" else "الصورة"
+                        mediaStatusUpdate("✓ تم رفع " + label + " بنجاح")
+                    } else {
+                        mediaStatusUpdate("فشل رفع الملف (HTTP " + response.code() + ")")
+                        toast("تعذر رفع ملف الهدية")
+                    }
+                }
+                override fun onFailure(
+                    call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>,
+                    error: Throwable
+                ) {
+                    customGiftUploadInProgress = false
+                    mediaStatusUpdate("فشل رفع الملف؛ تحقق من الاتصال")
+                    toast(error.message ?: "تعذر رفع الملف")
+                }
+            })
+        } catch (error: Exception) {
+            customGiftUploadInProgress = false
+            mediaStatusUpdate(error.message ?: "تعذر تجهيز الملف")
+            toast(error.message ?: "تعذر تجهيز الملف")
+        }
+    }
+
+    private fun mediaStatusUpdate(message: String) {
+        runOnUiThread {
+            if (!isFinishing && !isDestroyed) {
+                val status = body.findViewWithTag<TextView>("custom_gift_media_status")
+                status?.text = message
+                status?.setTextColor(if (message.startsWith("✓")) 0xFF23834B.toInt() else MUTED)
+            }
         }
     }
 
@@ -3406,6 +3597,7 @@ class AdminConsoleActivity : ThemedActivity() {
         val uri = data?.data ?: return
         if (requestCode == notificationImageRequestCode) uploadNotificationImage(uri)
         else if (requestCode == staffIdentityUploadRequestCode) uploadStaffIdentityAsset(uri)
+        else if (requestCode == customGiftUploadRequestCode) uploadCustomGiftMedia(uri)
     }
 
     private fun uploadNotificationImage(uri: Uri) {
