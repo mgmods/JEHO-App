@@ -29,7 +29,6 @@ import {
   ChangePasswordDto,
 } from './dto/auth.dto';
 import { normalizeStaffRole } from '../../common/staff-role';
-import { fullPermissions, normalizePermissions } from '../../common/dashboard-permissions';
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
@@ -489,19 +488,12 @@ export class AuthService implements OnModuleInit {
       await this.usersRepo.update(user.id, { publicId: user.publicId });
     }
     const staffRole = normalizeStaffRole(user);
-    // Expose the persisted module ACL to the native in-app console.
-    // Super Admin is full access; all other staff receive only explicitly assigned modules.
-    const dashboardPermissions =
-      staffRole === 'super'
-        ? fullPermissions()
-        : normalizePermissions(user.dashboardPermissions);
     const payload = {
       sub: user.id,
       username: user.username,
       publicId: user.publicId,
       isAdmin: staffRole === 'super',
       staffRole,
-      permissions: dashboardPermissions,
       role: staffRole === 'super' ? 'admin' : 'user',
       isGuest: user.isGuest,
     };
@@ -570,7 +562,6 @@ export class AuthService implements OnModuleInit {
         isGuest: user.isGuest,
         isAdmin: user.isAdmin || staffRole === 'super',
         staffRole,
-        dashboardPermissions,
       },
     };
   }
