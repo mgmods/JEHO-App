@@ -140,6 +140,7 @@ export class JwtAuthGuard implements CanActivate {
         isSuperAdmin: superAdmin,
         staffRole,
         permissions,
+        dashboardPermissions: normalizePermissions(user.dashboardPermissions),
         role: dashboardAccess ? 'admin' : 'user',
         isGuest: user.isGuest,
         authSource: 'app',
