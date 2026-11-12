@@ -122,11 +122,10 @@ public class GiftViewModel extends ViewModel {
                     }
                 }
                 // Merge only this account's active custom gifts into the current gift sheet.
-                Result<GiftDtos.GiftList> custom = com.Dramizo.Series.util.ApiCall.execute(c.giftApi.customMine());
+                Result<GiftDtos.GiftList> custom = com.Dramizo.Series.util.ApiCall.execute(c.getGiftApi().customMine());
                 if (custom.success && custom.data != null && !custom.data.isEmpty()) {
                     List<GiftDtos.GiftDto> merged = new ArrayList<>();
                     if (r.success && r.data != null) merged.addAll(r.data);
-                    for (GiftDtos.GiftDtos.GiftDto unused : java.util.Collections.<GiftDtos.GiftDto>emptyList()) { }
                     for (GiftDtos.GiftDto customGift : custom.data) {
                         if (customGift != null && customGift.id != null) merged.add(customGift);
                     }
