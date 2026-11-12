@@ -140,6 +140,37 @@ const entityList = Object.values(entities).filter(
           console.error('[LuckyBoxVideoBootstrap] Could not initialize video URL column.', error instanceof Error ? error.message : String(error));
         }
 
+        // Additive private custom-gift grants table. Keep this explicit because production
+        // databases run with TypeORM synchronize disabled; the migration is also kept
+        // in database/migrations for operators and fresh environments.
+        try {
+          await appDataSource.query(`
+            CREATE TABLE IF NOT EXISTS "jeho_own"."custom_gift_grants" (
+              "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              "userId" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE CASCADE,
+              "giftId" uuid NOT NULL UNIQUE REFERENCES "jeho_own"."gifts"("id") ON DELETE CASCADE,
+              "grantedBy" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE RESTRICT,
+              "mediaType" varchar(16) NOT NULL CHECK ("mediaType" IN ('image','video','gif')),
+              "mediaUrl" varchar(512) NOT NULL,
+              "durationDays" integer NULL CHECK ("durationDays" IS NULL OR "durationDays" >= 1),
+              "startsAt" timestamptz NOT NULL DEFAULT now(),
+              "expiresAt" timestamptz NULL,
+              "revokedAt" timestamptz NULL,
+              "createdAt" timestamptz NOT NULL DEFAULT now()
+            )
+          `);
+          await appDataSource.query(
+            'CREATE INDEX IF NOT EXISTS "idx_custom_gift_grants_owner_expiry" ON "jeho_own"."custom_gift_grants" ("userId", "expiresAt")',
+          );
+          await appDataSource.query(
+            'CREATE INDEX IF NOT EXISTS "idx_custom_gift_grants_gift_id" ON "jeho_own"."custom_gift_grants" ("giftId")',
+          );
+          console.log('[CustomGiftsBootstrap] Private custom-gift grants table is ready.');
+        } catch (error) {
+          console.error('[CustomGiftsBootstrap] Could not initialize custom gift grants table.', error instanceof Error ? error.message : String(error));
+          throw error;
+        }
+
         // Additive support-chest gift expiry column for existing JEHO databases.
         // Permanent gift history remains unchanged because expiresAt stays NULL.
         try {
