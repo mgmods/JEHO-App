@@ -15,6 +15,9 @@ public interface GiftApi {
     @GET("gifts/categories")
     Call<ApiResponse<GiftDtos.GiftCategoryList>> categories();
 
+    @GET("gifts/custom/mine")
+    Call<ApiResponse<GiftDtos.GiftList>> customMine();
+
     @GET("gifts/policy")
     Call<ApiResponse<java.util.Map<String, Object>>> selfGiftPolicy();
 
