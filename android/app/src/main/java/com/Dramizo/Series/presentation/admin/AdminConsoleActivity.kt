@@ -1385,7 +1385,7 @@ class AdminConsoleActivity : ThemedActivity() {
         body.addView(panel)
     }
 
-    private fun loadUsers    private fun loadUsers(search: String) {
+    private fun loadUsers(search: String) {
         // Preserve the search controls and section introduction while replacing results.
         // Search row + section intro + role/access card stay in place while results refresh.
         // Keep both persistent controls: the search row and the section introduction.
@@ -3836,10 +3836,6 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     /**
-     * Shared JEHO-native action button. One visual language across admin
-     * sections, with RTL layout, rounded surface and visible press feedback.
-     */
-    /**
      * Two-column action layout for record cards. Keeps related actions together,
      * reduces long vertical stacks, and preserves the same accessible 44dp touch target.
      */
@@ -3915,7 +3911,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
     }
 
-    private fun roundRect    private fun roundRect(color: Int, radius: Int): GradientDrawable =
+    private fun roundRect(color: Int, radius: Int): GradientDrawable =
         GradientDrawable().apply {
             setColor(color)
             cornerRadius = dp(radius).toFloat()
