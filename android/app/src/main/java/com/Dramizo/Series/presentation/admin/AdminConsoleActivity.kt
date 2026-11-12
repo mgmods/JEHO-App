@@ -1649,7 +1649,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     "السبب" to listOf("reason", "description"),
                     "تاريخ العملية" to listOf("createdAt", "occurredAt")
                 )
-                "withdrawals" -> listOf(,
+                "withdrawals" -> listOf(
                     "اسم المستخدم" to listOf("user.displayName", "user.username", "user.name", "userName"),
                     "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
                     "المبلغ" to listOf("amount", "coins"),
@@ -1658,7 +1658,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     "الحالة" to listOf("status", "state"),
                     "تاريخ الطلب" to listOf("createdAt")
                 )
-                "recharges" -> listOf(,
+                "recharges" -> listOf(
                     "اسم المستخدم" to listOf("user.displayName", "user.username", "user.name", "userName"),
                     "ID المستخدم" to listOf("user.publicId", "publicId", "userId"),
                     "العملات" to listOf("coins", "amount"),
@@ -1951,7 +1951,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         showReportDecisionDialog(id, false)
                     }
                 }
-                "withdrawals" -> if (!id.isNullOrBlank()) {,
+                "withdrawals" -> if (!id.isNullOrBlank()) {
                     addRecordAction(card, "اعتماد السحب") {
                         confirm("اعتماد طلب السحب؟ تحقق من الدفع فعلياً قبل الاعتماد.") {
                             load(api.approveWithdrawal(id)) { toast("استجاب الخادم لطلب اعتماد السحب"); openModule("withdrawals") }
@@ -1965,7 +1965,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     }
                 }
-                "recharges" -> if (!id.isNullOrBlank()) {,
+                "recharges" -> if (!id.isNullOrBlank()) {
                     addRecordAction(card, "إتمام طلب الشحن") {
                         confirm("لا تعتمد إلا بعد التحقق من الدفع. متابعة؟") {
                             load(api.completeRecharge(id, mapOf("note" to "تم التحقق يدوياً من تطبيق JEHO"))) {
@@ -2438,9 +2438,9 @@ class AdminConsoleActivity : ThemedActivity() {
             "walletTransactions" -> listOf("نوع العملية" to listOf("type","transactionType"), "المبلغ" to listOf("amount","coins","diamonds"), "الرصيد قبل العملية" to listOf("balanceBefore"), "الرصيد بعد العملية" to listOf("balanceAfter"), "السبب" to listOf("reason","description"), "التاريخ" to listOf("createdAt","occurredAt")),
             "withdrawals" -> listOf("المبلغ" to listOf("amount","coins"), "وسيلة السحب" to listOf("method","payoutMethod"), "الحساب المستلم" to listOf("account","accountNumber","destination"), "التاريخ" to listOf("createdAt")),
             "recharges" -> listOf("العملات" to listOf("coins","amount"), "طريقة الشحن" to listOf("method","paymentMethod"), "رقم العملية" to listOf("reference","transactionId"), "التاريخ" to listOf("createdAt")),
-            "reports" -> listOf("المبلّغ" to listOf("reporter.displayName","reporter.username","reporterName"), "نوع البلاغ" to listOf("targetType","category"), "سبب البلاغ" to listOf("reason","description"), "التاريخ" to listOf("createdAt"))
-            "agencies" -> listOf("صاحب الوكالة" to listOf("owner.displayName","ownerName","owner.username"), "عدد الأعضاء" to listOf("membersCount","memberCount"), "تاريخ الإنشاء" to listOf("createdAt"))
-            "streams" -> listOf("المضيف" to listOf("host.displayName","hostName","host.username"), "عدد المشاهدين" to listOf("viewerCount"), "بداية البث" to listOf("startedAt","createdAt"))
+            "reports" -> listOf("المبلّغ" to listOf("reporter.displayName","reporter.username","reporterName"), "نوع البلاغ" to listOf("targetType","category"), "سبب البلاغ" to listOf("reason","description"), "التاريخ" to listOf("createdAt")),
+            "agencies" -> listOf("صاحب الوكالة" to listOf("owner.displayName","ownerName","owner.username"), "عدد الأعضاء" to listOf("membersCount","memberCount"), "تاريخ الإنشاء" to listOf("createdAt")),
+            "streams" -> listOf("المضيف" to listOf("host.displayName","hostName","host.username"), "عدد المشاهدين" to listOf("viewerCount"), "بداية البث" to listOf("startedAt","createdAt")),
             "gifts" -> listOf("السعر بالعملات" to listOf("price","coinPrice","priceCoins"), "قيمة الألماس" to listOf("diamondValue","diamonds"), "النوع" to listOf("type"), "تاريخ الإنشاء" to listOf("createdAt"))
             "cosmetics","grantCosmetics" -> listOf("النوع" to listOf("type"), "السعر" to listOf("price","coinPrice","priceCoins"), "المدة" to listOf("duration","durationDays"), "تاريخ الإنشاء" to listOf("createdAt"))
             "vanityIds" -> listOf("الآي دي" to listOf("publicId","value","idValue"), "السعر" to listOf("priceCoins","price"), "المدة" to listOf("duration","durationDays"), "النمط" to listOf("styleMode"), "تاريخ الانتهاء" to listOf("expiresAt"))
@@ -2518,7 +2518,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     }
                 })
             }
-            "withdrawals" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {,
+            "withdrawals" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
                 hasAction = true
                 actions.addView(button("اعتماد السحب") {
                     confirm("لا تعتمد إلا بعد التحقق من الدفع فعلياً. متابعة؟") {
@@ -2531,7 +2531,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     }
                 })
             }
-            "recharges" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {,
+            "recharges" -> if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
                 hasAction = true
                 actions.addView(button("إتمام طلب الشحن") {
                     confirm("لا تعتمد إلا بعد التحقق من الدفع. متابعة؟") {
