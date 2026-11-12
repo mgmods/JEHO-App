@@ -219,48 +219,49 @@ class AdminConsoleActivity : ThemedActivity() {
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             setBackgroundColor(BG)
         }
+
+        // One persistent native Android workspace shared by every admin section.
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(9), dp(14), dp(9))
-            setBackgroundColor(Color.WHITE)
-            elevation = dp(3).toFloat()
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = android.graphics.drawable.ColorDrawable(Color.WHITE)
+            elevation = dp(4).toFloat()
         }
-        // The back action lives in the persistent bottom navigation, never in the header.
+
         backButton = TextView(this).apply {
-            text = "‹  رجوع"
-            textSize = 14f
+            text = "‹"
+            textSize = 30f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(ACCENT)
+            setTextColor(TEXT)
             gravity = Gravity.CENTER
             visibility = View.GONE
             isClickable = true
             isFocusable = true
             contentDescription = "العودة إلى القسم السابق"
-            background = GradientDrawable().apply {
-                setColor(0xFFF1EDFF.toInt())
-                cornerRadius = dp(14).toFloat()
-                setStroke(dp(1), 0xFFE1D9FA.toInt())
-            }
+            background = roundRect(0xFFF2F0F8.toInt(), 14)
             setOnClickListener { handleAdminBack() }
         }
+
         titleView = TextView(this).apply {
             text = "نظام المدراء"
-            textSize = 19f
+            textSize = 18f
             setTextColor(TEXT)
-            gravity = Gravity.CENTER
+            gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
             setTypeface(typeface, Typeface.BOLD)
+            includeFontPadding = false
         }
+
         val refreshButton = TextView(this).apply {
             text = "⟳"
-            textSize = 29f
-            setTextColor(0xFF252525.toInt())
+            textSize = 24f
+            setTextColor(TEXT)
             gravity = Gravity.CENTER
-            setPadding(dp(8), dp(4), dp(8), dp(4))
             contentDescription = "تحديث لوحة الإدارة"
             isClickable = true
             isFocusable = true
+            background = roundRect(0xFFF2F0F8.toInt(), 14)
             setOnClickListener {
                 when (currentSection) {
                     "home" -> showHome(false)
@@ -269,24 +270,24 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
             }
         }
-        header.addView(titleView, LinearLayout.LayoutParams(0, dp(48), 1f))
-        header.addView(refreshButton, LinearLayout.LayoutParams(dp(44), dp(48)))
+
+        header.addView(backButton, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(8) })
+        header.addView(titleView, LinearLayout.LayoutParams(0, dp(44), 1f))
+        header.addView(refreshButton, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginStart = dp(8) })
         root.addView(header)
 
-        // Initialize the loading indicator before attaching it to the view tree.
-        // The previous order accessed this lateinit property before assignment,
-        // crashing AdminConsoleActivity on every launch.
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = true
             visibility = View.GONE
             indeterminateTintList = android.content.res.ColorStateList.valueOf(ACCENT)
-            minimumHeight = dp(3)
+            minimumHeight = dp(2)
         }
-        // No website-style loading bar. The native page remains visible while data refreshes.
+
         val scroll = ScrollView(this).apply {
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             clipToPadding = false
-            setPadding(dp(16), dp(16), dp(16), dp(28))
+            setPadding(dp(14), dp(14), dp(14), dp(24))
+            isFillViewport = true
         }
         body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -295,18 +296,19 @@ class AdminConsoleActivity : ThemedActivity() {
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        // Persistent in-app navigation: section back and admin home are always available.
+        // Fixed Android-style bottom navigation. Back never exits the admin workspace.
         val bottomNavigation = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(9), dp(12), dp(9))
-            setBackgroundColor(Color.WHITE)
-            elevation = dp(10).toFloat()
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = android.graphics.drawable.ColorDrawable(Color.WHITE)
+            elevation = dp(12).toFloat()
         }
+
         val homeButton = TextView(this).apply {
             text = "⌂  الرئيسية"
-            textSize = 14f
+            textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -322,19 +324,15 @@ class AdminConsoleActivity : ThemedActivity() {
                 showHome(false)
             }
         }
-        bottomNavigation.addView(backButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-            marginEnd = dp(6)
-        })
-        bottomNavigation.addView(homeButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-            marginStart = dp(6)
-        })
-        root.addView(bottomNavigation, LinearLayout.LayoutParams(-1, -2))
 
-        // Device Back follows the same in-panel history; it does not bypass section navigation.
+        bottomNavigation.addView(backButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
+        bottomNavigation.addView(homeButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginStart = dp(5) })
+        root.addView(bottomNavigation, LinearLayout.LayoutParams(-1, -2))
         setContentView(root)
     }
 
     /**
+     * Persistent native navigation    /**
      * Persistent native navigation for the administration workspace.
      * Every destination opens an existing API-backed module and is filtered
      * through the same role gate used by the module router.
@@ -1338,45 +1336,58 @@ class AdminConsoleActivity : ThemedActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
-            setPadding(dp(15), dp(13), dp(15), dp(13))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFFF0ECFB.toInt(), 0xFFFFFFFF.toInt())
-            ).apply {
-                cornerRadius = dp(18).toFloat()
-                setStroke(dp(1), 0xFFE5DFF7.toInt())
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), 0xFFE4E4EC.toInt())
             }
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(10)
-                bottomMargin = dp(12)
-            }
+            elevation = dp(1).toFloat()
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) }
         }
+
         val icon = TextView(this).apply {
             text = module.icon
-            textSize = 25f
+            textSize = 22f
             gravity = Gravity.CENTER
-            background = roundRect(Color.WHITE, 13)
-            layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { marginStart = dp(12) }
+            background = roundRect(0xFFF1EEFA.toInt(), 13)
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(11) }
         }
         panel.addView(icon)
-        val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
-        addText(copy, module.title, 15f, true, TEXT)
-        val description = TextView(this).apply {
-            text = module.subtitle
-            textSize = 12f
-            setTextColor(MUTED)
-            maxLines = 3
-            setLineSpacing(dp(2).toFloat(), 1f)
-            setPadding(0, dp(2), 0, 0)
+
+        val copy = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
         }
-        copy.addView(description)
+        addText(copy, module.title, 15f, true, TEXT)
+        copy.addView(TextView(this).apply {
+            text = module.subtitle
+            textSize = 11.5f
+            setTextColor(MUTED)
+            maxLines = 2
+            includeFontPadding = false
+            setPadding(0, dp(3), 0, 0)
+        })
         panel.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+
+        val access = TextView(this).apply {
+            text = when (currentRole) {
+                StaffRoleHelper.SUPER -> "سوبر"
+                StaffRoleHelper.ADMIN -> "أدمن"
+                else -> "مانجر"
+            }
+            textSize = 10f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(ACCENT)
+            background = roundRect(0xFFF0ECFB.toInt(), 30)
+            setPadding(dp(9), dp(5), dp(9), dp(5))
+        }
+        panel.addView(access, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
         body.addView(panel)
-
-
     }
 
-    private fun loadUsers(search: String) {
+    private fun loadUsers    private fun loadUsers(search: String) {
         // Preserve the search controls and section introduction while replacing results.
         // Search row + section intro + role/access card stay in place while results refresh.
         // Keep both persistent controls: the search row and the section introduction.
@@ -1420,32 +1431,31 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun addNativeLoadingPlaceholders(): List<View> {
         val views = mutableListOf<View>()
-        repeat(2) {
+        repeat(3) {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
-                setPadding(dp(14), dp(14), dp(14), dp(14))
+                setPadding(dp(14), dp(13), dp(14), dp(13))
                 background = GradientDrawable().apply {
                     setColor(Color.WHITE)
-                    cornerRadius = dp(18).toFloat()
-                    setStroke(dp(1), 0xFFE8E5F0.toInt())
+                    cornerRadius = dp(16).toFloat()
+                    setStroke(dp(1), 0xFFE6E5EC.toInt())
                 }
-                alpha = 0.96f
-                layoutParams = LinearLayout.LayoutParams(-1, dp(92)).apply {
-                    bottomMargin = dp(10)
-                }
+                layoutParams = LinearLayout.LayoutParams(-1, dp(86)).apply { bottomMargin = dp(9) }
             }
-            val title = View(this).apply { background = roundRect(0xFFEDEAF4.toInt(), 8) }
-            val line = View(this).apply { background = roundRect(0xFFF3F1F7.toInt(), 7) }
-            card.addView(title, LinearLayout.LayoutParams(dp(180), dp(15)).apply { bottomMargin = dp(12) })
-            card.addView(line, LinearLayout.LayoutParams(dp(280), dp(11)))
+            val title = View(this).apply { background = roundRect(0xFFECEAF2.toInt(), 8) }
+            val line1 = View(this).apply { background = roundRect(0xFFF3F1F7.toInt(), 7) }
+            val line2 = View(this).apply { background = roundRect(0xFFF3F1F7.toInt(), 7) }
+            card.addView(title, LinearLayout.LayoutParams(dp(145), dp(13)).apply { bottomMargin = dp(10) })
+            card.addView(line1, LinearLayout.LayoutParams(dp(260), dp(9)).apply { bottomMargin = dp(7) })
+            card.addView(line2, LinearLayout.LayoutParams(dp(190), dp(9)))
             body.addView(card)
             views.add(card)
         }
         return views
     }
 
-    private fun renderItems(data: Any?, type: String) {
+    private fun renderItems    private fun renderItems(data: Any?, type: String) {
         val extractedItems = extractItems(data)
         val grantableTypes = setOf("entry_effect", "profile_card", "nameplate")
         val items = if (type == "grantCosmetics" && currentRole != StaffRoleHelper.SUPER) {
@@ -3801,14 +3811,14 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         layoutDirection = View.LAYOUT_DIRECTION_RTL
-        setPadding(dp(17), dp(16), dp(17), dp(16))
+        setPadding(dp(15), dp(14), dp(15), dp(14))
         background = GradientDrawable().apply {
             setColor(Color.WHITE)
-            cornerRadius = dp(20).toFloat()
-            setStroke(dp(1), 0xFFE5E7F0.toInt())
+            cornerRadius = dp(16).toFloat()
+            setStroke(dp(1), 0xFFE4E4EC.toInt())
         }
-        elevation = dp(2).toFloat()
-        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(11) }
+        elevation = dp(1).toFloat()
+        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
     }
 
     private fun addText(parent: LinearLayout, text: String, size: Float, bold: Boolean, color: Int) {
@@ -3820,12 +3830,14 @@ class AdminConsoleActivity : ThemedActivity() {
             gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
             setTextColor(color)
             if (bold) setTypeface(typeface, Typeface.BOLD)
+            includeFontPadding = false
             setPadding(0, dp(2), 0, dp(3))
         }
         parent.addView(view)
     }
 
     /**
+     * Shared JEHO-native action button    /**
      * Shared JEHO-native action button. One visual language across admin
      * sections, with RTL layout, rounded surface and visible press feedback.
      */
@@ -3873,49 +3885,43 @@ class AdminConsoleActivity : ThemedActivity() {
         textSize = 13f
         isAllCaps = false
         isSingleLine = false
-        maxLines = 3
-        // Never truncate an action label: its purpose must remain visible to staff.
+        maxLines = 2
         ellipsize = null
         gravity = Gravity.CENTER
         textAlignment = View.TEXT_ALIGNMENT_CENTER
-        minHeight = dp(44)
-        minimumHeight = dp(44)
-        minWidth = dp(0)
+        minHeight = dp(46)
+        minimumHeight = dp(46)
+        minWidth = 0
         setTextColor(Color.WHITE)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         textDirection = View.TEXT_DIRECTION_RTL
         layoutDirection = View.LAYOUT_DIRECTION_RTL
         includeFontPadding = false
-        val shape = GradientDrawable(
-            GradientDrawable.Orientation.RIGHT_LEFT,
-            intArrayOf(0xFF7659D2.toInt(), 0xFF5B42B0.toInt())
-        ).apply {
-            cornerRadius = dp(14).toFloat()
-            setStroke(dp(1), 0xFF8069D0.toInt())
-        }
-        val pressed = GradientDrawable().apply {
-            setColor(0xFF49358F.toInt())
-            cornerRadius = dp(11).toFloat()
-        }
         background = android.graphics.drawable.RippleDrawable(
             android.content.res.ColorStateList.valueOf(0x33FFFFFF),
-            shape,
-            pressed
+            GradientDrawable(
+                GradientDrawable.Orientation.RIGHT_LEFT,
+                intArrayOf(0xFF7659D2.toInt(), 0xFF5B42B0.toInt())
+            ).apply { cornerRadius = dp(13).toFloat() },
+            roundRect(0xFF49358F.toInt(), 13)
         )
-        backgroundTintList = null
         elevation = dp(1).toFloat()
         stateListAnimator = null
         setPadding(dp(10), dp(4), dp(10), dp(4))
         contentDescription = label
-        // Native touch target with a compact visual footprint, matching modern Android controls.
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(5)
-            bottomMargin = dp(5)
+            topMargin = dp(4)
+            bottomMargin = dp(4)
         }
-        setOnClickListener { isEnabled = false; action(); post { isEnabled = true } }
+        setOnClickListener {
+            if (!isEnabled) return@setOnClickListener
+            isEnabled = false
+            action()
+            postDelayed({ if (!isFinishing && !isDestroyed) isEnabled = true }, 350)
+        }
     }
 
-    private fun roundRect(color: Int, radius: Int): GradientDrawable =
+    private fun roundRect    private fun roundRect(color: Int, radius: Int): GradientDrawable =
         GradientDrawable().apply {
             setColor(color)
             cornerRadius = dp(radius).toFloat()
