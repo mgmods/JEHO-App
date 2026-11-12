@@ -64,6 +64,11 @@ export class AdminGuard implements CanActivate {
       const path = url.split('?')[0].toLowerCase().replace(/^\/api\/v\d+/, '');
       const verb = method.toUpperCase();
       const readOnly = ['GET', 'HEAD', 'OPTIONS'].includes(verb);
+      const isCustomGiftRoute = path.startsWith('/admin/custom-gifts');
+      if (isCustomGiftRoute) {
+        if (canAccessModule({ staffRole: role, permissions: user.permissions }, 'customGifts', readOnly ? 'read' : 'write')) return true;
+        throw new ForbiddenException('No custom gifts permission');
+      }
       const isTemporaryBan = /^\/admin\/users\/[^/]+\/temporary-(ban|unban)$/.test(path);
       const isCosmeticGrant = verb === 'POST' && path === '/admin/cosmetics/grant';
       const isVanityAssign = verb === 'POST' && path === '/vanity-ids/admin/assign';
