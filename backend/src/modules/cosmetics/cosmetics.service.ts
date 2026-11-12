@@ -86,6 +86,59 @@ function readIsoBmffDurationMs(buffer: Buffer): number | null {
   return scan(0, buffer.length, 0);
 }
 
+
+/** Read the WebM EBML Info/Duration element without trusting client metadata. */
+function readWebmDurationMs(buffer: Buffer): number | null {
+  const readVint = (offset: number, identifier: boolean) => {
+    if (offset >= buffer.length) return null;
+    const first = buffer[offset];
+    let marker = 0x80;
+    let length = 1;
+    while (length <= 8 && (first & marker) === 0) {
+      marker >>= 1;
+      length++;
+    }
+    if (length > 8 || offset + length > buffer.length) return null;
+    let value = BigInt(identifier ? first : (first & (marker - 1)));
+    for (let i = 1; i < length; i++) value = (value << 8n) | BigInt(buffer[offset + i]);
+    return { length, value };
+  };
+  const masters = new Set(['1a45dfa3', '18538067', '1549a966', '114d9b74', '1654ae6b']);
+  let durationTicks: number | null = null;
+  let timecodeScaleNs = 1_000_000;
+  const scan = (start: number, end: number, depth: number) => {
+    if (depth > 8) return;
+    let offset = start;
+    while (offset < end) {
+      const id = readVint(offset, true);
+      if (!id) return;
+      const size = readVint(offset + id.length, false);
+      if (!size) return;
+      const payload = offset + id.length + size.length;
+      const unknownSize = size.value === (1n << BigInt(7 * size.length)) - 1n;
+      const sizeNumber = unknownSize ? end - payload : Number(size.value);
+      if (!Number.isSafeInteger(sizeNumber) || sizeNumber < 0 || payload + sizeNumber > end) return;
+      const payloadEnd = payload + sizeNumber;
+      const idHex = id.value.toString(16).padStart(id.length * 2, '0');
+      if (idHex === '2ad7b1' && sizeNumber > 0 && sizeNumber <= 8) {
+        let scale = 0n;
+        for (let i = payload; i < payloadEnd; i++) scale = (scale << 8n) | BigInt(buffer[i]);
+        if (scale > 0n && scale <= BigInt(Number.MAX_SAFE_INTEGER)) timecodeScaleNs = Number(scale);
+      } else if (idHex === '4489' && (sizeNumber === 4 || sizeNumber === 8)) {
+        const value = sizeNumber === 4 ? buffer.readFloatBE(payload) : buffer.readDoubleBE(payload);
+        if (Number.isFinite(value) && value >= 0) durationTicks = value;
+      } else if (masters.has(idHex)) {
+        scan(payload, payloadEnd, depth + 1);
+      }
+      if (payloadEnd <= offset) return;
+      offset = payloadEnd;
+    }
+  };
+  scan(0, buffer.length, 0);
+  if (durationTicks == null) return null;
+  return Math.round((durationTicks * timecodeScaleNs) / 1_000_000);
+}
+
 type MikooCatalogItem = {
   type: CosmeticType | string;
   code: string;
@@ -487,9 +540,9 @@ export class CosmeticsService implements OnModuleInit {
     if (!uploadMatch) throw new BadRequestException('يجب رفع فيديو الدخولية إلى تخزين JEHO أولاً');
     const stored = await this.uploadsService.getStoredFile(uploadMatch[1]);
     if (!stored) throw new BadRequestException('تعذر قراءة فيديو الدخولية من التخزين');
-    const durationMs = readIsoBmffDurationMs(stored.buffer);
+    const durationMs = readIsoBmffDurationMs(stored.buffer) ?? readWebmDurationMs(stored.buffer);
     if (durationMs == null) {
-      throw new BadRequestException('تعذر التحقق من مدة الفيديو. استخدم MP4 أو MOV أو 3GP صالحاً.');
+      throw new BadRequestException('تعذر التحقق من مدة الفيديو. استخدم MP4 أو MOV أو 3GP أو WebM صالحاً.');
     }
     if (durationMs < 1000 || durationMs > 10_000) {
       throw new BadRequestException('مدة فيديو الدخولية يجب أن تكون من ثانية واحدة إلى 10 ثوانٍ فقط');
