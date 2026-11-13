@@ -71,6 +71,7 @@ public final class RoomCardBinder {
         bindViewerCount(b, room);
         bindLiveEqualizer(b);
         bindCardFrame(b, room, compactStrip);
+        bindTopFrame(b, room);
     }
 
     private static String displayTitle(RoomDtos.RoomDto room) {
@@ -278,6 +279,17 @@ public final class RoomCardBinder {
                 || RoomKenarHelper.isRoomFrameUrl(url);
         // fillItem=false: keep ConstraintLayout constraints on list cards (see RoomKenarHelper).
         RoomKenarHelper.bind(b.imgCardFrame, b.itemCard, url, key, animated, false);
+    }
+
+    /** Independent TOP winner frame layered above the room's own equipped card frame. */
+    private static void bindTopFrame(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
+        if (b.imgTopFrame == null) return;
+        String url = room != null ? room.roomTopFrameUrl : null;
+        String lower = url != null ? url.toLowerCase(Locale.ROOT) : "";
+        boolean animated = lower.contains(".gif") || lower.contains(".webp")
+                || RoomKenarHelper.isRoomFrameUrl(url);
+        String key = room != null ? room.id + ":top:" + room.roomTopRank : null;
+        RoomKenarHelper.bind(b.imgTopFrame, b.itemCard, url, key, animated, false);
     }
 
     private static void bindAvatars(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {

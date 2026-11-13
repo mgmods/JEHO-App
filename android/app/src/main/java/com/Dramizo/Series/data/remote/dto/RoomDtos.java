@@ -42,6 +42,10 @@ public final class RoomDtos {
         @SerializedName("challengeBadge") public String challengeBadge;
         @SerializedName("viewerAvatars") public List<String> viewerAvatars;
         /** Room progression level from gift activity (Mikoo-style Lv badge). */
+        /** Current daily/weekly support rank for visual card frame (1..3). */
+        @SerializedName("roomTopRank") public Integer roomTopRank;
+        @SerializedName("roomTopFrameUrl") public String roomTopFrameUrl;
+        @SerializedName("roomTopPeriod") public String roomTopPeriod;
         @SerializedName("roomLevel") public int roomLevel = 1;
         /** 1-based rank in explore feed sorted by viewers. */
         @SerializedName("exploreRank") public int exploreRank;

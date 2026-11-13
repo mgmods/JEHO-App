@@ -68,6 +68,42 @@
       </div>
     </div>
 
+    <div class="glass p-3 mb-3">
+      <h5 class="mb-3">إطارات TOP لكروت الرومات</h5>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <div class="form-check form-switch">
+            <input id="roomCardTopOn" v-model="cardTop.enabled" class="form-check-input" type="checkbox" />
+            <label class="form-check-label" for="roomCardTopOn">تفعيل ترتيب وإطارات TOP</label>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">فترة احتساب الدعم</label>
+          <select v-model="cardTop.period" class="form-select">
+            <option value="daily">يومي</option>
+            <option value="weekly">أسبوعي</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">معيار الدعم</label>
+          <select v-model="cardTop.metric" class="form-select">
+            <option value="diamonds">الألماس المستلم</option>
+            <option value="coins">قيمة الهدايا بالعملات</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-aurora w-100" type="button" :disabled="saving" @click="saveCardTop">حفظ إعدادات إطارات TOP</button>
+        </div>
+      </div>
+      <div class="row g-3 mt-1">
+        <div v-for="rank in [1, 2, 3]" :key="rank" class="col-md-4">
+          <label class="form-label">رابط إطار TOP {{ rank }}</label>
+          <input v-model.trim="cardTop.frames[rank - 1]" class="form-control" :placeholder="`رابط ملف GIF أو WebP أو صورة شفافة للمركز ${rank}`" />
+          <div class="form-text">يظهر حول كرت الروم صاحب هذا المركز فقط.</div>
+        </div>
+      </div>
+    </div>
+
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="mb-0">الترتيب · {{ board.seasonKey || '—' }} · {{ periodLabel }}</h5>
       <button class="btn btn-sm btn-ghost" type="button" @click="loadBoard">تحديث</button>
@@ -141,6 +177,7 @@ const prizeCards = ref([
   { rank: 3, coins: 20000, diamonds: 0, vipLevel: 1, vipDays: 30 },
 ])
 const board = ref({ items: [], seasonKey: '' })
+const cardTop = reactive({ enabled: false, period: 'weekly', metric: 'diamonds', frames: ['', '', ''] })
 const loading = ref(false)
 const saving = ref(false)
 const ending = ref(false)
@@ -176,6 +213,10 @@ async function loadCfg() {
   cfg.enabled = String(map['room_cup.enabled'] ?? 'true') !== 'false'
   cfg.period = map['room_cup.period'] || 'weekly'
   cfg.officialRoomId = map['official_room_id'] || ''
+  cardTop.enabled = String(map['room_card_top.enabled'] ?? 'false') === 'true'
+  cardTop.period = map['room_card_top.period'] === 'daily' ? 'daily' : 'weekly'
+  cardTop.metric = map['room_card_top.metric'] === 'coins' ? 'coins' : 'diamonds'
+  cardTop.frames = [1, 2, 3].map((rank) => map[`room_card_top.frame_${rank}`] || '')
   if (map['room_cup.prizes']) {
     try {
       const parsed = JSON.parse(map['room_cup.prizes'])
@@ -204,6 +245,27 @@ async function saveCfg() {
   } else {
     ok.value = 'تم الحفظ'
     toast().success('تم حفظ إعدادات كأس الروم')
+  }
+}
+
+async function saveCardTop() {
+  saving.value = true
+  error.value = ''
+  ok.value = ''
+  const patch = {
+    'room_card_top.enabled': String(!!cardTop.enabled),
+    'room_card_top.period': cardTop.period === 'daily' ? 'daily' : 'weekly',
+    'room_card_top.metric': cardTop.metric === 'coins' ? 'coins' : 'diamonds',
+  }
+  cardTop.frames.forEach((url, index) => { patch[`room_card_top.frame_${index + 1}`] = url || '' })
+  const { error: err } = await settingsApi.update(patch)
+  saving.value = false
+  if (err) {
+    error.value = err.message || 'تعذر حفظ إعدادات إطارات TOP'
+    toast().danger(error.value)
+  } else {
+    ok.value = 'تم حفظ إعدادات إطارات TOP'
+    toast().success(ok.value)
   }
 }
 

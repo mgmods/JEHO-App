@@ -1885,7 +1885,54 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return q;
   }
 
+  /** Current daily/weekly room supporters used only for visual TOP frames on room cards. */
+  private async roomCardTopRanks() {
+    const keys = [
+      'room_card_top.enabled',
+      'room_card_top.period',
+      'room_card_top.metric',
+      'room_card_top.frame_1',
+      'room_card_top.frame_2',
+      'room_card_top.frame_3',
+    ];
+    const rows = await this.settingsRepo.find({ where: { key: In(keys) } });
+    const values = new Map(rows.map((row) => [row.key, row.value]));
+    const enabled = values.get('room_card_top.enabled') === 'true';
+    const period = values.get('room_card_top.period') === 'daily' ? 'daily' : 'weekly';
+    const metric = values.get('room_card_top.metric') === 'coins' ? 'coins' : 'diamonds';
+    const frames = [1, 2, 3].map((rank) => (values.get(`room_card_top.frame_${rank}`) || '').trim() || null);
+    const ranks = new Map<string, number>();
+    if (!enabled) return { enabled, period, metric, frames, ranks };
+
+    const now = new Date();
+    let start: Date;
+    if (period === 'daily') {
+      start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    } else {
+      const day = now.getUTCDay() || 7;
+      start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day + 1));
+    }
+    const scoreColumn = metric === 'coins' ? 'g."totalCoins"' : 'g."diamondsAwarded"';
+    const leaders = await this.dataSource.query(
+      `SELECT g."roomId" AS "roomId", COALESCE(SUM(${scoreColumn}), 0) AS score
+         FROM gift_sends g
+         INNER JOIN rooms r ON r.id = g."roomId"
+        WHERE g."roomId" IS NOT NULL
+          AND r."roomKind" <> $2
+          AND g."createdAt" >= $1
+        GROUP BY g."roomId"
+        ORDER BY score DESC, g."roomId" ASC
+        LIMIT 3`,
+      [start, RoomKind.SUPPORT],
+    );
+    (leaders || []).forEach((row: any, index: number) => {
+      if (row.roomId) ranks.set(String(row.roomId), index + 1);
+    });
+    return { enabled, period, metric, frames, ranks };
+  }
+
   async list(query: PaginationDto) {
+    const cardTop = await this.roomCardTopRanks();
     const countQb = this.roomsRepo.createQueryBuilder('room');
     this.applyPublicRoomListFilters(countQb, query);
     const total = await countQb.getCount();
@@ -1922,8 +1969,23 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         `CASE WHEN room."roomKind" = :supportPinKind THEN 1 ELSE 0 END`,
         'support_pin',
       )
-      .setParameter('supportPinKind', RoomKind.SUPPORT)
+      .addSelect(
+        `CASE
+          WHEN room.id = :topRoom1 THEN 1
+          WHEN room.id = :topRoom2 THEN 2
+          WHEN room.id = :topRoom3 THEN 3
+          ELSE NULL
+        END`,
+        'room_top_rank',
+      )
+      .setParameters({
+        supportPinKind: RoomKind.SUPPORT,
+        topRoom1: [...cardTop.ranks.entries()].find(([, rank]) => rank === 1)?.[0] || null,
+        topRoom2: [...cardTop.ranks.entries()].find(([, rank]) => rank === 2)?.[0] || null,
+        topRoom3: [...cardTop.ranks.entries()].find(([, rank]) => rank === 3)?.[0] || null,
+      })
       .orderBy('support_pin', 'DESC')
+      .addOrderBy('room_top_rank', 'ASC', 'NULLS LAST')
       .addOrderBy('explore_heat', 'DESC')
       .addOrderBy('room.viewerCount', 'DESC')
       .addOrderBy('room.updatedAt', 'DESC')
@@ -1943,6 +2005,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         ),
         exploreRank: (query.skip || 0) + index + 1,
         challengeBadge: room.viewerCount >= 10 ? 'Hot 🔥' : null,
+        roomTopRank: cardTop.ranks.get(room.id) || null,
+        roomTopFrameUrl: cardTop.ranks.get(room.id) ? cardTop.frames[cardTop.ranks.get(room.id) - 1] : null,
+        roomTopPeriod: cardTop.period,
       })),
     );
     return paginate(enriched, total, query.page || 1, query.limit || 20);
