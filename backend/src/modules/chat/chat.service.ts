@@ -430,6 +430,25 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       where: { directKey: key },
       relations: ['participants', 'participants.user', 'participants.user.profile'],
     });
+    if (!conv) {
+      // Recover conversations whose directKey was detached by the previous
+      // one-sided-delete implementation. Reuse only a thread still visible
+      // to at least one participant; if both deleted it, start a clean thread.
+      conv = await this.convRepo.createQueryBuilder('c')
+        .leftJoinAndSelect('c.participants', 'parts')
+        .leftJoinAndSelect('parts.user', 'participantUser')
+        .leftJoinAndSelect('participantUser.profile', 'participantProfile')
+        .where('c.type = :type', { type: ConversationType.DIRECT })
+        .andWhere('c.directKey IS NULL')
+        .andWhere('EXISTS (SELECT 1 FROM chat_participants p1 WHERE p1."conversationId" = c.id AND p1."userId" = :userId)', { userId })
+        .andWhere('EXISTS (SELECT 1 FROM chat_participants p2 WHERE p2."conversationId" = c.id AND p2."userId" = :peerId)', { peerId: dto.peerId })
+        .andWhere('EXISTS (SELECT 1 FROM chat_participants p3 WHERE p3."conversationId" = c.id AND COALESCE(p3."isDeleted", false) = false)')
+        .orderBy('c.updatedAt', 'DESC')
+        .getOne();
+      if (conv) {
+        await this.convRepo.update({ id: conv.id, directKey: null }, { directKey: key });
+      }
+    }
     if (conv) {
       const myParticipant = (conv.participants || []).find((p) => p.userId === userId);
       if (myParticipant?.isDeleted) {
