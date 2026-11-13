@@ -60,6 +60,7 @@ import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.DeviceTimeFormat;
 import com.Dramizo.Series.util.GenderVerifiedBadge;
+import com.Dramizo.Series.util.VipNameStyle;
 import com.Dramizo.Series.util.PermissionHelper;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.bumptech.glide.Glide;
