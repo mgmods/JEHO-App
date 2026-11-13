@@ -113,7 +113,10 @@ public class AuraMessagingService extends FirebaseMessagingService {
             intent.putExtra(ChatConversationActivity.EXTRA_TITLE, peerName);
         }
         String avatar = firstNonEmpty(data,
-                "avatarUrl", "senderAvatarUrl", "imageUrl", "senderAvatar", "avatar");
+                "avatarUrl", "senderAvatarUrl", "actorAvatarUrl", "fromAvatarUrl",
+                "fromUserAvatarUrl", "userAvatarUrl", "profileAvatarUrl", "avatar_url",
+                "sender_avatar_url", "actor_avatar_url", "imageUrl", "senderAvatar",
+                "profileImageUrl", "avatar");
         if (avatar != null) {
             intent.putExtra(ChatConversationActivity.EXTRA_AVATAR, avatar);
         }
