@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { secureGameRandom } from './secure-game-rng';
 import { DataSource, Repository } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
@@ -137,15 +138,15 @@ export class DiceService {
 
       // Optional published admin win rate applies uniformly to all users; otherwise use natural dice.
       const configuredWinRate = getGameWinRate('dice');
-      const forceWin = configuredWinRate === undefined ? null : Math.random() * 100 < configuredWinRate;
+      const forceWin = configuredWinRate === undefined ? null : secureGameRandom() * 100 < configuredWinRate;
       const [d1, d2] = forceWin === null
-        ? [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]
+        ? [1 + Math.floor(secureGameRandom() * 6), 1 + Math.floor(secureGameRandom() * 6)]
         : forceWin ? this.comboFor(pick) : this.comboNot(pick);
       const total = d1 + d2;
       const multiplier = DICE_ODDS[pick] || 2;
       const won = total === pick;
       // Preserve legacy safety adjustment only when no admin percentage is configured.
-      const softVoid = configuredWinRate === undefined && won && multiplier >= 14 && Math.random() < 0.08;
+      const softVoid = configuredWinRate === undefined && won && multiplier >= 14 && secureGameRandom() < 0.08;
       const rawPayout = won && !softVoid ? amount * multiplier : 0;
       const { win: payout } = clampGamePayout({ bet: amount, win: rawPayout });
 
@@ -210,7 +211,7 @@ export class DiceService {
 
   private shouldWin(cfg: { winWeight: number; loseWeight: number }) {
     const total = cfg.winWeight + cfg.loseWeight;
-    return Math.random() * total < cfg.winWeight;
+    return secureGameRandom() * total < cfg.winWeight;
   }
 
   private comboFor(sum: number): [number, number] {
@@ -220,7 +221,7 @@ export class DiceService {
         if (i + j === sum) combos.push([i, j]);
       }
     }
-    return combos[Math.floor(Math.random() * combos.length)] || [1, 1];
+    return combos[Math.floor(secureGameRandom() * combos.length)] || [1, 1];
   }
 
   private comboNot(sum: number): [number, number] {
@@ -228,8 +229,8 @@ export class DiceService {
     let d2 = 1;
     let guard = 0;
     do {
-      d1 = 1 + Math.floor(Math.random() * 6);
-      d2 = 1 + Math.floor(Math.random() * 6);
+      d1 = 1 + Math.floor(secureGameRandom() * 6);
+      d2 = 1 + Math.floor(secureGameRandom() * 6);
       guard++;
     } while (d1 + d2 === sum && guard < 40);
     return [d1, d2];
