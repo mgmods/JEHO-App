@@ -433,21 +433,23 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     if (conv) {
       const myParticipant = (conv.participants || []).find((p) => p.userId === userId);
       if (myParticipant?.isDeleted) {
-        // A deleted DM is a closed thread for this user. Detach its unique key
-        // so a later message/start creates a brand-new conversation with no
-        // access to the old thread's message history.
-        await this.convRepo.update(
-          { id: conv.id, directKey: key },
-          { directKey: null },
+        // Reopen the same direct conversation for this participant only.
+        // joinedAt is advanced at deletion and acts as this user's history
+        // visibility boundary; the other participant keeps the complete thread.
+        await this.partRepo.update(
+          { conversationId: conv.id, userId },
+          { isDeleted: false, unreadCount: 0, isArchived: false, isPinned: false },
         );
-        conv = null;
-      } else {
-        const [vipByUser, nameStyles] = await Promise.all([
-          this.vipMapForUsers([userId, dto.peerId]),
-          this.vipNameStyleMapForUsers([userId, dto.peerId]),
-        ]);
-        return this.decorateConversation(conv, userId, vipByUser, undefined, nameStyles);
+        myParticipant.isDeleted = false;
+        myParticipant.unreadCount = 0;
+        myParticipant.isArchived = false;
+        myParticipant.isPinned = false;
       }
+      const [vipByUser, nameStyles] = await Promise.all([
+        this.vipMapForUsers([userId, dto.peerId]),
+        this.vipNameStyleMapForUsers([userId, dto.peerId]),
+      ]);
+      return this.decorateConversation(conv, userId, vipByUser, undefined, nameStyles);
     }
 
     conv = await this.convRepo.save(
@@ -912,13 +914,21 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const limit = Math.min(Math.max(query.limit || 50, 1), 100);
     const page = query.page || 1;
     const skip = (page - 1) * limit;
-    const [newestFirst, total] = await this.msgRepo.findAndCount({
-      where: { conversationId, isUnsent: false },
-      relations: ['sender', 'sender.profile', 'replyTo'],
-      skip,
-      take: limit,
-      order: { createdAt: 'DESC' },
-    });
+    const participant = await this.partRepo.findOne({ where: { conversationId, userId } });
+    const messageQuery = this.msgRepo.createQueryBuilder('message')
+      .where('message.conversationId = :conversationId', { conversationId })
+      .andWhere('message.isUnsent = false');
+    if (participant?.joinedAt) {
+      messageQuery.andWhere('message.createdAt >= :visibleAfter', { visibleAfter: participant.joinedAt });
+    }
+    const [newestFirst, total] = await messageQuery
+      .leftJoinAndSelect('message.sender', 'sender')
+      .leftJoinAndSelect('sender.profile', 'senderProfile')
+      .leftJoinAndSelect('message.replyTo', 'replyTo')
+      .orderBy('message.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
     const items = newestFirst.slice().reverse();
     const senderIds = items.map((m) => m.senderId);
     const [vipByUser, displayRanks, clubsByUser, agencyRolesByUser, nameStylesByUser] = await Promise.all([
@@ -1352,15 +1362,16 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       await manager.update(
         ChatParticipant,
         { conversationId, userId },
-        { isDeleted: true, unreadCount: 0, isArchived: false, isPinned: false },
+        {
+          isDeleted: true,
+          unreadCount: 0,
+          isArchived: false,
+          isPinned: false,
+          // Preserve the peer's original thread and mark where this user's
+          // fresh, empty view begins when they contact the peer again.
+          joinedAt: new Date(),
+        },
       );
-      if (conversation.type === ConversationType.DIRECT) {
-        await manager.update(
-          ChatConversation,
-          { id: conversationId },
-          { directKey: null },
-        );
-      }
     });
     this.realtime?.emitToUser(userId, 'chat:conversation:deleted', {
       conversationId,
