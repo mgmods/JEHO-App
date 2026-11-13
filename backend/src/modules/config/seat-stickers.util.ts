@@ -163,6 +163,7 @@ export function seatStickersClientPayload(
   return {
     version: cfg.version,
     updatedAt: cfg.updatedAt || null,
+    enabled: cfg.enabled !== false,
     items,
     formats: ['gif', 'webp', 'png', 'jpg'],
   };
