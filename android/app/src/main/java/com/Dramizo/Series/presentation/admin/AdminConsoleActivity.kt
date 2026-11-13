@@ -1918,7 +1918,23 @@ class AdminConsoleActivity : ThemedActivity() {
                 if (response.isSuccessful && envelope != null && envelope.success) {
                     onSuccess(envelope.data)
                 } else {
+                    // Preserve the server's actual validation message (including HTTP 400 details)
+                    // so malformed IDs, already-reviewed requests, and permission failures are
+                    // distinguishable instead of being collapsed into a generic status message.
+                    val serverDetail = try {
+                        response.errorBody()?.string()
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { raw ->
+                                try {
+                                    val json = org.json.JSONObject(raw)
+                                    json.optString("message").takeIf { it.isNotBlank() }
+                                        ?: json.optString("error").takeIf { it.isNotBlank() }
+                                        ?: raw
+                                } catch (_: Exception) { raw }
+                            }
+                    } catch (_: Exception) { null }
                     val message = envelope?.message?.takeIf { it.isNotBlank() }
+                        ?: serverDetail
                         ?: "تعذر تنفيذ الطلب (HTTP ${response.code()})"
                     showError(message)
                 }
