@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { randomUUID } from 'crypto';
+import { secureGameRandom } from '../secure-game-rng';
 import type { Server as HttpServer, IncomingMessage } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { packFrame, unpackFrame } from './mikoo-frame.util';
@@ -238,7 +239,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     const a: number[] = [];
     for (let i = from; i <= to; i++) a.push(i);
     for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(secureGameRandom() * (i + 1));
       const t = a[i]!;
       a[i] = a[j]!;
       a[j] = t;
@@ -516,8 +517,8 @@ export class MikooGatewayService implements OnModuleDestroy {
       .filter((x) => x.type === lucky77Icon + 1);
     const lucky77WinPos =
       lucky77Positions.length > 0
-        ? lucky77Positions[Math.floor(Math.random() * lucky77Positions.length)]!.pos
-        : 1 + Math.floor(Math.random() * 9);
+        ? lucky77Positions[Math.floor(secureGameRandom() * lucky77Positions.length)]!.pos
+        : 1 + Math.floor(secureGameRandom() * 9);
     const lucky77WinIcon = lucky77Icon;
     const winArea =
       gameId === 'greedy-box'
@@ -533,8 +534,8 @@ export class MikooGatewayService implements OnModuleDestroy {
               : // 7updown: weighted by dashboard RTP (not fair dice).
                 pickWeightedAreaId(sevenMults as number[], targetRtp);
     // Synthesize dice faces that match the chosen 7updown area for the UI.
-    let d1 = 1 + Math.floor(Math.random() * 6);
-    let d2 = 1 + Math.floor(Math.random() * 6);
+    let d1 = 1 + Math.floor(secureGameRandom() * 6);
+    let d2 = 1 + Math.floor(secureGameRandom() * 6);
     if (gameId === '7updown') {
       const combos =
         winArea === 2
@@ -542,7 +543,7 @@ export class MikooGatewayService implements OnModuleDestroy {
           : winArea === 1
             ? [[1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [2, 1], [2, 2], [2, 3], [2, 4], [3, 1], [3, 2], [3, 3], [4, 1], [4, 2], [5, 1]]
             : [[6, 6], [6, 5], [6, 4], [6, 3], [6, 2], [5, 6], [5, 5], [5, 4], [5, 3], [4, 6], [4, 5], [4, 4], [3, 6], [3, 5], [2, 6]];
-      const pick = combos[Math.floor(Math.random() * combos.length)] || [3, 4];
+      const pick = combos[Math.floor(secureGameRandom() * combos.length)] || [3, 4];
       d1 = pick[0]!;
       d2 = pick[1]!;
     }
