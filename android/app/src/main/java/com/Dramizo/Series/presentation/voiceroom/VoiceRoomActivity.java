@@ -8508,8 +8508,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         RecyclerView stickersRv = sheet.findViewById(R.id.recyclerStickers);
         // Seat stickers are displayed vertically and independently from chat emojis.
-        stickersRv.setLayoutManager(new LinearLayoutManager(
-                this, LinearLayoutManager.VERTICAL, false));
+        // Four stickers per row; additional rows continue vertically inside each category.
+        stickersRv.setLayoutManager(new GridLayoutManager(this, 4));
         stickersRv.setVisibility(seatOnly ? View.VISIBLE : View.GONE);
         View stickersLabel = sheet.findViewById(R.id.tvStickersLabel);
         if (stickersLabel != null) stickersLabel.setVisibility(seatOnly ? View.VISIBLE : View.GONE);
