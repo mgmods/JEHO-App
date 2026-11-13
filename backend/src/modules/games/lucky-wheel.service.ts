@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { secureGameRandom } from './secure-game-rng';
 import { DataSource, Repository } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
@@ -137,8 +138,8 @@ export class LuckyWheelService {
       const configuredWinRate = getGameWinRate('lucky-wheel');
       const outcome = configuredWinRate === undefined
         ? this.pickOutcome(cfg)
-        : Math.random() * 100 < configuredWinRate
-          ? (Math.random() < 0.1 ? 'x8' : 'x2')
+        : secureGameRandom() * 100 < configuredWinRate
+          ? (secureGameRandom() < 0.1 ? 'x8' : 'x2')
           : 'lose';
       const sectorIndex = this.pickSectorIndex(outcome);
       const sector = WHEEL_SECTORS[sectorIndex];
@@ -214,7 +215,7 @@ export class LuckyWheelService {
     x8Weight: number;
   }): 'lose' | 'x2' | 'x8' {
     const total = cfg.loseWeight + cfg.x2Weight + cfg.x8Weight;
-    let r = Math.random() * total;
+    let r = secureGameRandom() * total;
     if (r < cfg.loseWeight) return 'lose';
     r -= cfg.loseWeight;
     if (r < cfg.x2Weight) return 'x2';
@@ -227,7 +228,7 @@ export class LuckyWheelService {
       if (outcome === 'x8') return s.id === 'seven';
       return s.multiplier === 2;
     });
-    return idxs[Math.floor(Math.random() * idxs.length)]?.i ?? 2;
+    return idxs[Math.floor(secureGameRandom() * idxs.length)]?.i ?? 2;
   }
 
   private todayKey() {
