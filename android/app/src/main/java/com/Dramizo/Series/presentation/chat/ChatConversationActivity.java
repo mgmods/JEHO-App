@@ -2400,6 +2400,21 @@ public class ChatConversationActivity extends ThemedActivity {
         });
     }
 
+    private void refreshWornChatBubbleProfiles() {
+        final AppContainer container = ContainerProvider.from(this);
+        final String myId = container.getSessionManager().getUserId();
+        if (myId == null || myId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            Result<AuthDtos.UserDto> result = ApiCall.execute(container.getUserApi().getUser(myId));
+            if (!result.success || result.data == null) return;
+            container.getSessionManager().updateCachedUser(result.data);
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()) return;
+                if (adapter != null) adapter.setMyProfile(result.data);
+            });
+        });
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -2407,6 +2422,8 @@ public class ChatConversationActivity extends ThemedActivity {
         applyChatBackground();
         com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
         refreshPeerBlockStatus();
+        refreshWornChatBubbleProfiles();
+        loadPeerHeader();
         roomTrackingHandler.removeCallbacks(roomTrackingRefresh);
         refreshPeerRoomPresence();
         roomTrackingHandler.postDelayed(roomTrackingRefresh, 15_000L);
