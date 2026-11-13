@@ -1148,7 +1148,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         if (!sticker) return { error: 'Invalid reaction' };
         if (sticker.accessType === 'vip' || Number(sticker.requiredVipLevel) > 1) {
           const vip = await this.userVipRepo.findOne({ where: { userId: client.userId } });
-          const vipLevel = effectiveVipLevel(vip);
+          const vipLevel = effectiveVipLevel(Number(vip?.level || 0));
           if (vipLevel < Math.max(1, Number(sticker.requiredVipLevel) || 1)) {
             return { error: 'VIP level required' };
           }
