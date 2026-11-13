@@ -114,6 +114,8 @@ import { getGameBetSettings, getGameOdds, getGameRtp, isGameBettingEnabled, isGa
 type GameKind = 'crash' | 'multi' | 'spin';
 
 type RoomBet = {
+  /** Stable identity for this aggregated round/area wager and its payout. */
+  id: string;
   userId: string;
   playerId: number;
   sessionId: string;
@@ -2148,7 +2150,8 @@ export class MikooGatewayService implements OnModuleDestroy {
         existing.avatarUrl = player.avatarUrl || existing.avatarUrl;
       } else {
         room.bets.set(key, {
-          userId: player.userId,
+          id: randomUUID(),
+          userId: player.userId, 
           playerId: player.publicId,
           sessionId: player.sessionId,
           amount,
@@ -2400,7 +2403,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       );
     }
     bet.payout = win;
-    const bal = await this.credit(player.userId, win, gameSlug, ratio, bet.amount);
+    const bal = await this.credit(player.userId, win, gameSlug, ratio, bet.amount, `${bet.id}:cashout`);
     player.balance = bal;
     room.balances.set(ws, bal);
     // CashoutRsp.ratio is centi (client shows ratio/100).
@@ -2461,6 +2464,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     gameId: string,
     ratio: number,
     bet: number,
+    referenceId = randomUUID(),
   ) {
     const clamped = clampGamePayout({ bet, win: amount });
     if (clamped.capped) {
@@ -2479,6 +2483,14 @@ export class MikooGatewayService implements OnModuleDestroy {
         lock: { mode: 'pessimistic_write' },
       });
       if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      // A stable payout reference makes retries safe. The wallet row lock serializes
+      // concurrent attempts before checking the unique wallet transaction reference.
+      const existing = referenceId
+        ? await manager.findOne(WalletTransaction, {
+            where: { userId, referenceType: 'mikoo_game_win', referenceId },
+          })
+        : null;
+      if (existing) return Number(wallet.coins || 0);
       wallet.coins = Number(wallet.coins || 0) + amount;
       await manager.save(wallet);
       await manager.save(
@@ -2489,7 +2501,7 @@ export class MikooGatewayService implements OnModuleDestroy {
           amount,
           balanceAfter: Number(wallet.coins),
           referenceType: 'mikoo_game_win',
-          referenceId: randomUUID(),
+          referenceId,
           description: `Mikoo ${gameId} win`,
           metadata: {
             gameId,
