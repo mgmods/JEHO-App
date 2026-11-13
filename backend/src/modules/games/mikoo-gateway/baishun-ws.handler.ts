@@ -2200,7 +2200,7 @@ export class BaishunWsHandler {
     });
   }
 
-  private async debit(userId: string, amount: number, gameId: string, referenceId = randomUUID()) {
+  private async debit(userId: string, amount: number, gameId: string, referenceId: string = randomUUID()) {
     amount = clampBetAmount(amount, gamePayoutLimits().maxBet);
     if (amount < 1) throw new Error('INVALID_BET');
     return this.dataSource.transaction(async (manager) => {
@@ -2234,7 +2234,7 @@ export class BaishunWsHandler {
     });
   }
 
-  private async credit(userId: string, amount: number, gameId: string, bet = 0, referenceId = randomUUID()) {
+  private async credit(userId: string, amount: number, gameId: string, bet = 0, referenceId: string = randomUUID()) {
     const clamped = clampGamePayout({ bet, win: amount });
     if (clamped.capped) {
       this.logger.warn(
