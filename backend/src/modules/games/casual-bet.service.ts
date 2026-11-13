@@ -142,6 +142,20 @@ export class CasualBetService {
       }
       wallet.coins = Number(wallet.coins || 0) - amount;
       await manager.save(wallet);
+      await manager.save(manager.create(WalletTransaction, {
+        userId,
+        type: TransactionType.EXCHANGE,
+        currency: CurrencyType.COINS,
+        amount: -amount,
+        balanceAfter: Number(wallet.coins),
+        referenceType: betReferenceType,
+        referenceId: `${playId}:bet`,
+        description: `${gameId} bet (coins)`,
+        metadata: {
+          gameId, amount, roomId: body?.roomId || null, currency: 'coins',
+          multiplier: outcome.multiplier, detail: outcome.detail,
+        },
+      }));
 
       const rawPayout = Math.floor(amount * outcome.multiplier);
       const { win: payout } = clampGamePayout({ bet: amount, win: rawPayout });
@@ -182,6 +196,7 @@ export class CasualBetService {
         net: payout - amount,
         multiplier: outcome.multiplier,
         detail: outcome.detail,
+        replayed: false,
       };
     });
 
