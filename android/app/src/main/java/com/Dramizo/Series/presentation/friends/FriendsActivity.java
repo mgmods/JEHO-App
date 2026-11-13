@@ -88,6 +88,17 @@ public class FriendsActivity extends ThemedActivity {
     }
 
     @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        int requested = intent.getIntExtra(EXTRA_TAB, TAB_FRIENDS);
+        int target = Math.min(Math.max(requested, 0), TAB_COUNT - 1);
+        if (binding != null && binding.pager != null) {
+            binding.pager.setCurrentItem(target, false);
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         RealtimeClient.getInstance().removeUserListener(userListener);
         super.onDestroy();
