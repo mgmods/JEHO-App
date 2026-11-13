@@ -571,7 +571,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
   async getConversation(id: string, userId: string) {
     const part = await this.partRepo.findOne({ where: { conversationId: id, userId } });
-    if (!part) throw new ForbiddenException('Not a participant');
+    if (!part || part.isDeleted) throw new ForbiddenException('Conversation is no longer available');
     const conv = await this.convRepo.findOne({
       where: { id },
       relations: ['participants', 'participants.user', 'participants.user.profile'],
@@ -593,14 +593,16 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const [membership, dmConversation] = await Promise.all([
       this.partRepo.findOne({
         where: { conversationId, userId: senderId },
-        select: ['id'],
+        select: ['id', 'isDeleted'],
       }),
       this.convRepo.findOne({
         where: { id: conversationId },
         select: ['id', 'type'],
       }),
     ]);
-    if (!membership) throw new ForbiddenException('Not a participant');
+    if (!membership || membership.isDeleted) {
+      throw new ForbiddenException('Conversation is no longer available; start a new chat');
+    }
     if (!dmConversation) throw new NotFoundException('Conversation not found');
     if (dmConversation.type === ConversationType.DIRECT) {
       const participants = await this.partRepo.find({
@@ -782,12 +784,9 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     // Deliver to both participants concurrently instead of waiting for each socket
     // presence check and unread update in sequence.
     await Promise.all(peers.map(async (p) => {
-      // A fresh message restores the thread in each participant's inbox without
-      // restoring it for the other participant at the moment of deletion.
-      if (p.isDeleted) {
-        await this.partRepo.update({ id: p.id }, { isDeleted: false });
-        p.isDeleted = false;
-      }
+      // A participant who deleted this thread must never be re-added to it by
+      // an incoming message. Their next intentional contact creates a new DM.
+      if (p.isDeleted) return;
       const viewing = p.userId !== senderId && this.realtime
         ? await this.realtime.isUserInConversation(p.userId, conversationId)
         : false;
