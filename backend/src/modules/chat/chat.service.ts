@@ -232,6 +232,31 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     return map;
   }
 
+  /** Active VIP name treatment, sourced from the highest active VIP plan exactly as myVip(). */
+  private async vipNameStyleMapForUsers(userIds: string[]) {
+    const ids = [...new Set((userIds || []).filter(Boolean))];
+    const result = new Map<string, any>();
+    if (!ids.length) return result;
+    const rows = await this.userVipsRepo
+      .createQueryBuilder('v')
+      .leftJoinAndSelect('v.vipPlan', 'plan')
+      .where('v.userId IN (:...ids)', { ids })
+      .andWhere('v.isActive = true')
+      .andWhere('(v.expiresAt IS NULL OR v.expiresAt > NOW())')
+      .orderBy('v.userId', 'ASC')
+      .addOrderBy('v.level', 'DESC')
+      .getMany();
+    for (const row of rows) {
+      if (result.has(row.userId)) continue;
+      const benefits: any = row.vipPlan?.benefits || {};
+      const style = benefits?.visuals?.nameStyle;
+      if (style && (style.enabled === true || String(style.enabled).toLowerCase() === 'true')) {
+        result.set(row.userId, style);
+      }
+    }
+    return result;
+  }
+
   /** Display levels for wealth / popularity chips (same as profile API). */
   private economyStats(profile?: UserProfile | null) {
     const received = Math.max(0, Number(profile?.totalReceivedDiamonds ?? 0));
@@ -339,7 +364,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
-  private mapMessage(message: ChatMessage, vipLevel = 0, displayRank?: any, agencyClub?: any, agency?: any) {
+  private mapMessage(message: ChatMessage, vipLevel = 0, displayRank?: any, agencyClub?: any, agency?: any, nameStyle?: any) {
     const sender: any = message.sender;
     const profile = sender?.profile;
     const reply = (message as any).replyTo as ChatMessage | undefined;
@@ -368,6 +393,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
             username: sender.username,
             displayName: sender.displayName,
             avatarUrl: sender.avatarUrl,
+            nameStyle: nameStyle || null,
             customDisplayRankName: displayRank?.customDisplayRankName ?? null,
             customDisplayRankImageUrl: displayRank?.customDisplayRankImageUrl ?? null,
             customDisplayRankAnimated: displayRank?.customDisplayRankAnimated === true,
@@ -412,8 +438,11 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         );
         conv = null;
       } else {
-        const vipByUser = await this.vipMapForUsers([userId, dto.peerId]);
-        return this.decorateConversation(conv, userId, vipByUser);
+        const [vipByUser, nameStyles] = await Promise.all([
+          this.vipMapForUsers([userId, dto.peerId]),
+          this.vipNameStyleMapForUsers([userId, dto.peerId]),
+        ]);
+        return this.decorateConversation(conv, userId, vipByUser, undefined, nameStyles);
       }
     }
 
@@ -435,6 +464,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     userId: string,
     vipByUser?: Map<string, number>,
     displayRanks?: Map<string, any>,
+    nameStyles?: Map<string, any>,
   ) {
     const my = (conv.participants || []).find((p) => p.userId === userId);
     const peerPart = (conv.participants || []).find((p) => p.userId !== userId);
@@ -451,7 +481,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
           this.agencyRoleMapForUsers([msg.senderId]),
         ]);
         lastMessage = this.mapMessage(msg, senderVip, displayRanks?.get(msg.senderId),
-          clubs.get(msg.senderId), agencyRoles.get(msg.senderId));
+          clubs.get(msg.senderId), agencyRoles.get(msg.senderId), nameStyles?.get(msg.senderId));
       }
     }
     const peerVip = peerPart?.userId ? vipByUser?.get(peerPart.userId) ?? 0 : 0;
@@ -478,6 +508,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
             username: peerPart.user.username,
             displayName: peerPart.user.displayName,
             avatarUrl: peerPart.user.avatarUrl,
+            nameStyle: nameStyles?.get(peerPart.user.id) || null,
             customDisplayRankName: displayRanks?.get(peerPart.user.id)?.customDisplayRankName ?? null,
             customDisplayRankImageUrl: displayRanks?.get(peerPart.user.id)?.customDisplayRankImageUrl ?? null,
             customDisplayRankAnimated: displayRanks?.get(peerPart.user.id)?.customDisplayRankAnimated === true,
@@ -529,11 +560,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         if (peer.userId) peerIds.push(peer.userId);
       }
     }
-    const [vipByUser, displayRanks] = await Promise.all([
+    const [vipByUser, displayRanks, nameStyles] = await Promise.all([
       this.vipMapForUsers(peerIds), this.displayRankMapForUsers(peerIds),
+      this.vipNameStyleMapForUsers(peerIds),
     ]);
     const items = await Promise.all(
-      parts.map((p) => this.decorateConversation(p.conversation, userId, vipByUser, displayRanks)),
+      parts.map((p) => this.decorateConversation(p.conversation, userId, vipByUser, displayRanks, nameStyles)),
     );
     return paginate(items, total, query.page || 1, Math.min(Math.max(query.limit || 20, 1), 50));
   }
@@ -560,11 +592,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         if (part.conversation?.lastMessageId && peer.userId) peerIds.push(peer.userId);
       }
     }
-    const [vipByUser, displayRanks] = await Promise.all([
+    const [vipByUser, displayRanks, nameStyles] = await Promise.all([
       this.vipMapForUsers(peerIds), this.displayRankMapForUsers(peerIds),
+      this.vipNameStyleMapForUsers(peerIds),
     ]);
     const items = await Promise.all(
-      parts.map((p) => this.decorateConversation(p.conversation, userId, vipByUser, displayRanks)),
+      parts.map((p) => this.decorateConversation(p.conversation, userId, vipByUser, displayRanks, nameStyles)),
     );
     return paginate(items, total, query.page || 1, query.limit || 20);
   }
@@ -580,10 +613,11 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const peerIds = (conv.participants || [])
       .map((p) => p.userId)
       .filter((id): id is string => !!id);
-    const [vipByUser, displayRanks] = await Promise.all([
+    const [vipByUser, displayRanks, nameStyles] = await Promise.all([
       this.vipMapForUsers(peerIds), this.displayRankMapForUsers(peerIds),
+      this.vipNameStyleMapForUsers(peerIds),
     ]);
-    return this.decorateConversation(conv, userId, vipByUser, displayRanks);
+    return this.decorateConversation(conv, userId, vipByUser, displayRanks, nameStyles);
   }
 
   async send(conversationId: string, senderId: string, dto: SendMessageDto) {
@@ -768,12 +802,14 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         where: { userId: senderId, referenceType: 'paid_message', referenceId: message.id },
       }),
     ]);
-    const [senderVipMap, senderRanks, senderClubs, senderAgencyRoles] = await Promise.all([
+    const [senderVipMap, senderRanks, senderClubs, senderAgencyRoles, senderNameStyles] = await Promise.all([
       this.vipMapForUsers([senderId]), this.displayRankMapForUsers([senderId]),
       this.agencyClubMapForUsers([senderId]), this.agencyRoleMapForUsers([senderId]),
+      this.vipNameStyleMapForUsers([senderId]),
     ]);
     const mapped: any = this.mapMessage(full || message, senderVipMap.get(senderId) ?? 0,
-      senderRanks.get(senderId), senderClubs.get(senderId), senderAgencyRoles.get(senderId));
+      senderRanks.get(senderId), senderClubs.get(senderId), senderAgencyRoles.get(senderId),
+      senderNameStyles.get(senderId));
     if (paidTransaction) {
       const paidMetadata = (paidTransaction.metadata || {}) as Record<string, unknown>;
       mapped.paidCoins = Math.abs(Number(paidTransaction.amount) || 0);
@@ -881,9 +917,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     });
     const items = newestFirst.slice().reverse();
     const senderIds = items.map((m) => m.senderId);
-    const [vipByUser, displayRanks, clubsByUser, agencyRolesByUser] = await Promise.all([
+    const [vipByUser, displayRanks, clubsByUser, agencyRolesByUser, nameStylesByUser] = await Promise.all([
       this.vipMapForUsers(senderIds), this.displayRankMapForUsers(senderIds),
       this.agencyClubMapForUsers(senderIds), this.agencyRoleMapForUsers(senderIds),
+      this.vipNameStyleMapForUsers(senderIds),
     ]);
     const readAt = new Date();
     await this.partRepo.update(
@@ -895,7 +932,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const peerPart = peers.find((p) => p.userId !== userId);
     const mappedItems: any[] = items.map((m) => this.mapMessage(
       m, vipByUser.get(m.senderId) ?? 0, displayRanks.get(m.senderId), clubsByUser.get(m.senderId),
-      agencyRolesByUser.get(m.senderId),
+      agencyRolesByUser.get(m.senderId), nameStylesByUser.get(m.senderId),
     ));
     const paidIds = items.map((m) => m.id);
     if (paidIds.length) {
@@ -973,13 +1010,14 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     msg.isEdited = true;
     msg.editedAt = new Date();
     const saved = await this.msgRepo.save(msg);
-    const [senderVipMap, senderRanks, senderClubs, senderAgencyRoles] = await Promise.all([
+    const [senderVipMap, senderRanks, senderClubs, senderAgencyRoles, senderNameStyles] = await Promise.all([
       this.vipMapForUsers([userId]), this.displayRankMapForUsers([userId]),
       this.agencyClubMapForUsers([userId]), this.agencyRoleMapForUsers([userId]),
+      this.vipNameStyleMapForUsers([userId]),
     ]);
     const mapped = this.mapMessage({ ...saved, sender: msg.sender },
       senderVipMap.get(userId) ?? 0, senderRanks.get(userId), senderClubs.get(userId),
-      senderAgencyRoles.get(userId));
+      senderAgencyRoles.get(userId), senderNameStyles.get(userId));
     const conversation = await this.convRepo.findOne({ where: { id: msg.conversationId } });
     const touchesPreview = conversation?.lastMessageId === msg.id;
     const payload = {
@@ -1226,13 +1264,14 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       if (current) {
         const vip =
           (await this.vipMapForUsers([current.senderId])).get(current.senderId) ?? 0;
-        const [ranks, clubs, agencyRoles] = await Promise.all([
+        const [ranks, clubs, agencyRoles, nameStyles] = await Promise.all([
           this.displayRankMapForUsers([current.senderId]),
           this.agencyClubMapForUsers([current.senderId]),
           this.agencyRoleMapForUsers([current.senderId]),
+          this.vipNameStyleMapForUsers([current.senderId]),
         ]);
         lastMessage = this.mapMessage(current, vip, ranks.get(current.senderId),
-          clubs.get(current.senderId), agencyRoles.get(current.senderId));
+          clubs.get(current.senderId), agencyRoles.get(current.senderId), nameStyles.get(current.senderId));
       }
     }
 
