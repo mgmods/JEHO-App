@@ -99,9 +99,10 @@ const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').
 
 const rows = ref([])
 const categories = ref([
-  { id: 'cp', name: 'ملصقات CP', sortOrder: 1, isActive: true, accessType: 'cp', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: true },
-  { id: 'male', name: 'ملصقات شباب', sortOrder: 2, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'male', requiredVipLevel: 1, requiresCp: false },
-  { id: 'female', name: 'ملصقات بنات', sortOrder: 3, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'female', requiredVipLevel: 1, requiresCp: false },
+  { id: 'classic', name: 'الملصقات القديمة', sortOrder: 1, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false },
+  { id: 'male', name: 'ملصقات شباب', sortOrder: 2, isActive: false, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'male', requiredVipLevel: 1, requiresCp: false },
+  { id: 'cp', name: 'ملصقات CP', sortOrder: 3, isActive: false, accessType: 'cp', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: true },
+  { id: 'female', name: 'ملصقات بنات', sortOrder: 4, isActive: false, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'female', requiredVipLevel: 1, requiresCp: false },
 ])
 const enabled = ref(true)
 const loading = ref(false)
@@ -121,7 +122,7 @@ function blankRow() {
     name: '',
     sortOrder: (rows.value?.length || 0) + 1,
     isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false,
-    categoryId: categories.value.find((x) => x.id === 'male')?.id || 'male',
+    categoryId: categories.value.find((x) => x.id === 'classic')?.id || 'classic',
   }
 }
 
@@ -136,7 +137,7 @@ function defaultSeed() {
       url: `${ORIGIN}/assets/seat-stickers/${key}.${ext}`,
       name: key.toUpperCase(),
       sortOrder: n,
-      isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false, categoryId: 'male',
+      isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false, categoryId: 'classic',
     })
   }
   return out
