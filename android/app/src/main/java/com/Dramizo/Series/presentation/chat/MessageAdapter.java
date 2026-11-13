@@ -61,6 +61,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.WeakHashMap;
 
 public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private static final int TYPE_PEER = 0;
@@ -92,6 +93,8 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private int peerLevel = 1;
     private long peerLastReadAtMs;
     private final Set<String> playedAudioIds = new HashSet<>();
+    /** Tracks pending custom bubble loads so recycled rows cannot restore removed artwork. */
+    private final Map<View, CustomTarget<Drawable>> customBubbleTargets = new WeakHashMap<>();
     private MediaPlayer playing;
     private String playingUrl;
     private String playingMessageId;
@@ -1411,15 +1414,32 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     }
 
     private void applyCustomBubbleArtwork(@NonNull View bubble, @Nullable String url) {
-        if (url == null || url.trim().isEmpty()) return;
+        // A RecyclerView row may be rebound from a user who wears a CP bubble to
+        // one who has removed it. Cancel the previous request before handling the
+        // new value; otherwise a late Glide callback can put the deleted bubble
+        // back on screen after the default background was already restored.
+        CustomTarget<Drawable> previous = customBubbleTargets.remove(bubble);
+        if (previous != null) {
+            try { Glide.with(bubble).clear(previous); } catch (Exception ignored) { }
+        }
+
+        String requested = url != null ? url.trim() : "";
+        if (requested.isEmpty()) return; // caller has already applied the normal mine/peer background
+
         try {
-            Glide.with(bubble).load(AssetCatalog.absoluteUrl(url)).into(new CustomTarget<Drawable>() {
+            CustomTarget<Drawable> target = new CustomTarget<Drawable>() {
                 @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
-                    if (bubble.getContext() != null) bubble.setBackground(resource);
+                    if (bubble.getContext() != null && customBubbleTargets.get(bubble) == this) {
+                        bubble.setBackground(resource);
+                    }
                 }
                 @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
-            });
-        } catch (Exception ignored) { }
+            };
+            customBubbleTargets.put(bubble, target);
+            Glide.with(bubble).load(AssetCatalog.absoluteUrl(requested)).into(target);
+        } catch (Exception ignored) {
+            customBubbleTargets.remove(bubble);
+        }
     }
 
     private void applyBrandMineBubble(@NonNull View bubble) {
