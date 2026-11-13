@@ -95,7 +95,7 @@ function blankRow() {
     url: '',
     name: '',
     sortOrder: (rows.value?.length || 0) + 1,
-    isActive: true,
+    isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false,
   }
 }
 
@@ -204,6 +204,9 @@ async function save() {
       name: r.name || r.key,
       sortOrder: Number(r.sortOrder) || i + 1,
       isActive: r.isActive !== false,
+      accessType: r.accessType || 'free', priceCoins: Number(r.priceCoins) || 0,
+      audience: r.audience || 'all', requiredVipLevel: Number(r.requiredVipLevel) || 1,
+      requiresCp: r.requiresCp === true,
     }))
   const payload = {
     seat_stickers: JSON.stringify({ version: 2, enabled: enabled.value, items }),
