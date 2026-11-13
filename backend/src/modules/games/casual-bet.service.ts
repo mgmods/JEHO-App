@@ -124,10 +124,21 @@ export class CasualBetService {
         where: { userId, referenceType: betReferenceType, referenceId: `${playId}:bet` },
       }) : null;
       if (existingBet) {
+        const meta = (existingBet.metadata || {}) as Record<string, any>;
+        // An idempotency key identifies one immutable play, not merely a wallet debit.
+        // Reject accidental key reuse with a different payload instead of returning a
+        // previous result for a new bet/choice.
+        const sameRequest =
+          Number(meta.amount) === amount &&
+          String(meta.gameId || '') === gameId &&
+          String(meta.roomId || '') === String(body?.roomId || '') &&
+          JSON.stringify(meta.choice ?? null) === JSON.stringify(body?.choice ?? null);
+        if (!sameRequest) {
+          throw new BadRequestException('Idempotency key was already used for a different game request');
+        }
         const existingWin = await manager.findOne(WalletTransaction, {
           where: { userId, referenceType: winReferenceType, referenceId: `${playId}:win` },
         });
-        const meta = (existingBet.metadata || {}) as Record<string, any>;
         return {
           balance: Number(wallet.coins || 0), currency: 'coins', gameId,
           bet: amount, payout: Number(existingWin?.amount || 0),
@@ -152,7 +163,7 @@ export class CasualBetService {
         referenceId: `${playId}:bet`,
         description: `${gameId} bet (coins)`,
         metadata: {
-          gameId, amount, roomId: body?.roomId || null, currency: 'coins',
+          gameId, amount, roomId: body?.roomId || null, choice: body?.choice ?? null, currency: 'coins',
           multiplier: outcome.multiplier, detail: outcome.detail,
         },
       }));
