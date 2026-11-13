@@ -79,20 +79,19 @@ export function multiAreaMultipliers(): Record<number, number> {
   return { 1: 1.9, 2: 4.5, 3: 1.9 };
 }
 
-export function pickWeightedAreaIndex(
+/**
+ * Probability vector for an equal-stake spread across every area.
+ * The configured RTP is a benchmark for this reference mix, not a guarantee
+ * for arbitrary player-selected stake concentrations.
+ */
+export function calculateAreaOutcomeWeights(
   multipliers: readonly number[],
   targetRtp?: number,
-): number {
+): number[] {
   const m = multipliers.map((x) => Math.max(1.01, Number(x) || 1));
-  if (!m.length) return 0;
-  if (m.every((value) => value === m[0])) {
-    return Math.floor(secureGameRandom() * m.length);
-  }
+  if (!m.length) return [];
+  if (m.every((value) => value === m[0])) return m.map(() => 1 / m.length);
 
-  // RTP is calibrated for an equal-stake spread across all displayed areas:
-  // E[return] = sum(P(area_i) * multiplier_i) / areaCount.
-  // Solve P(area_i) ∝ multiplier_i^(-exponent); unlike tau/multiplier,
-  // the exponent does not cancel during normalization.
   const requestedRtp = Number(targetRtp) || getGameOdds().playerRtp;
   const targetTotalReturn = Math.min(
     Math.max(requestedRtp * m.length, Math.min(...m)),
@@ -108,7 +107,6 @@ export function pickWeightedAreaIndex(
   let high = 24;
   for (let i = 0; i < 64; i++) {
     const mid = (low + high) / 2;
-    // Expected return decreases monotonically as exponent increases.
     if (expectedTotal(mid) > targetTotalReturn) low = mid;
     else high = mid;
   }
@@ -116,14 +114,22 @@ export function pickWeightedAreaIndex(
   const exponent = (low + high) / 2;
   const weights = m.map((mult) => Math.pow(mult, -exponent));
   const sum = weights.reduce((a, b) => a + b, 0);
-  let roll = secureGameRandom() * sum;
+  return weights.map((weight) => weight / sum);
+}
+
+export function pickWeightedAreaIndex(
+  multipliers: readonly number[],
+  targetRtp?: number,
+): number {
+  const weights = calculateAreaOutcomeWeights(multipliers, targetRtp);
+  if (!weights.length) return 0;
+  let roll = secureGameRandom();
   for (let i = 0; i < weights.length; i++) {
     roll -= weights[i]!;
     if (roll <= 0) return i;
   }
-  return m.length - 1;
+  return weights.length - 1;
 }
-
 export function pickWeightedAreaId(
   multipliers: readonly number[],
   targetRtp?: number,
