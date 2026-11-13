@@ -2407,7 +2407,7 @@ public class ChatConversationActivity extends ThemedActivity {
         container.getIoExecutor().execute(() -> {
             Result<AuthDtos.UserDto> result = ApiCall.execute(container.getUserApi().getUser(myId));
             if (!result.success || result.data == null) return;
-            container.getSessionManager().updateCachedUser(result.data);
+            container.getSessionManager().updateCachedUserAuthoritative(result.data);
             runOnUiThread(() -> {
                 if (binding == null || isFinishing() || isDestroyed()) return;
                 if (adapter != null) adapter.setMyProfile(result.data);
