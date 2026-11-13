@@ -890,7 +890,7 @@ export class UsersService {
       NotificationType.FOLLOW,
       'متابع جديد',
       `${name} بدأ بمتابعتك`,
-      { type: 'follow', userId: followerId },
+      { type: 'follow', userId: followerId, actorUserId: followerId, actorAvatarUrl: follower?.avatarUrl || null },
     );
     return { following: true };
   }
@@ -1360,7 +1360,14 @@ export class UsersService {
       NotificationType.FOLLOW,
       label,
       `${name} أرسل لك ${label}`,
-      { type: 'social', requestId: saved.id, requestType: type },
+      {
+        type: 'social',
+        requestId: saved.id,
+        requestType: type,
+        userId: fromUserId,
+        actorUserId: fromUserId,
+        actorAvatarUrl: from?.avatarUrl || null,
+      },
     );
     return saved;
   }
