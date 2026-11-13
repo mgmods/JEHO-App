@@ -182,9 +182,9 @@ public final class AuraNotificationHelper {
             expanded.setTextViewText(R.id.btnNotifRead, "مقروء");
             expanded.setOnClickPendingIntent(R.id.btnNotifRead, pi);
 
-            // Reply must use Android's native RemoteInput action below. A custom
-            // RemoteViews button launches an Activity and cannot open inline input.
-            // Hide it so the visible "رد" action is always the true quick-reply action.
+            // Native Android RemoteInput below provides the inline reply control.
+            // RemoteViews buttons cannot summon the inline keyboard; retain the
+            // read button here and expose reply as a real system notification action.
             expanded.setViewVisibility(R.id.btnNotifReply, android.view.View.GONE);
         } else {
             expanded.setViewVisibility(R.id.rowNotifChatActions, android.view.View.GONE);
@@ -211,11 +211,10 @@ public final class AuraNotificationHelper {
                 .setContentIntent(pi);
 
         if (isChat) {
+            // Let Android render the expanded MessagingStyle and native action row.
+            // A custom RemoteViews big view suppresses/obscures RemoteInput on some ROMs.
             builder.setCustomContentView(compact)
-                    .setCustomBigContentView(expanded)
-                    // Use the same compact, bounded card for the heads-up surface.
-                    // Android owns its placement below the status bar.
-                    .setCustomHeadsUpContentView(expanded)
+                    .setCustomHeadsUpContentView(compact)
                     .setStyle(buildChatMessagingStyle(context, notificationId, title, avatar));
             androidx.core.app.RemoteInput remoteInput = new androidx.core.app.RemoteInput.Builder(
                     NotificationQuickReplyReceiver.EXTRA_REPLY)
@@ -237,6 +236,8 @@ public final class AuraNotificationHelper {
                     .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
                     .build();
             builder.addAction(replyAction);
+            builder.addAction(new NotificationCompat.Action.Builder(
+                    R.drawable.ic_stat_jeho, "مقروء", pi).build());
         } else {
             builder.setCustomContentView(compact)
                     .setCustomBigContentView(expanded)
