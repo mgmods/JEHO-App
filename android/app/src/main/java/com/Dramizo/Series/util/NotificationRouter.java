@@ -35,6 +35,35 @@ public final class NotificationRouter {
         String conversationId = first(data, "conversation_id", "conversationId");
         String roomId = first(data, "room_id", "roomId");
         String userId = first(data, "user_id", "userId", "senderId", "fromUserId", "actorUserId");
+        String action = first(data, "action", "kind", "requestType", "notificationKind", "eventType");
+        String normalizedAction = action == null ? "" : action.toLowerCase(java.util.Locale.ROOT);
+        String normalizedType = t.toLowerCase(java.util.Locale.ROOT);
+        String normalizedNested = nested == null ? "" : nested.toLowerCase(java.util.Locale.ROOT);
+        boolean friendRequest = isOneOf(normalizedType, "friend_request", "friend_request_received",
+                "new_friend_request", "friendship_request", "friendship_request_received")
+                || isOneOf(normalizedNested, "friend_request", "friend_request_received",
+                "new_friend_request", "friendship_request", "friendship_request_received")
+                || isOneOf(normalizedAction, "friend_request", "friend_request_received",
+                "new_friend_request", "friendship_request", "request_friend");
+        if (friendRequest) {
+            Intent i = new Intent(context, com.Dramizo.Series.presentation.friends.FriendsActivity.class);
+            i.putExtra(com.Dramizo.Series.presentation.friends.FriendsActivity.EXTRA_TAB,
+                    com.Dramizo.Series.presentation.friends.FriendsActivity.TAB_REQ_FRIEND);
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            return i;
+        }
+        boolean newFollower = isOneOf(normalizedType, "follow", "new_follower", "followed_you",
+                "user_followed", "new_follow")
+                || isOneOf(normalizedNested, "follow", "new_follower", "followed_you",
+                "user_followed", "new_follow")
+                || isOneOf(normalizedAction, "follow", "new_follower", "followed_you", "user_followed");
+        if (newFollower) {
+            Intent i = new Intent(context, com.Dramizo.Series.presentation.friends.FriendsActivity.class);
+            i.putExtra(com.Dramizo.Series.presentation.friends.FriendsActivity.EXTRA_TAB,
+                    com.Dramizo.Series.presentation.friends.FriendsActivity.TAB_FANS);
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            return i;
+        }
 
         if ("cp_relationship_request".equalsIgnoreCase(nested)
                 || "cp_relationship_request".equalsIgnoreCase(notificationKind)) {
@@ -114,6 +143,13 @@ public final class NotificationRouter {
             return new Intent(context, OfficialNewsActivity.class);
         }
         return new Intent(context, MainActivity.class);
+    }
+
+    private static boolean isOneOf(String value, String... candidates) {
+        for (String candidate : candidates) {
+            if (candidate.equalsIgnoreCase(value)) return true;
+        }
+        return false;
     }
 
     private static boolean isChatType(String type) {
