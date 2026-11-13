@@ -430,6 +430,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       where: { directKey: key },
       relations: ['participants', 'participants.user', 'participants.user.profile'],
     });
+    let recoveredLegacyThread = false;
     if (!conv) {
       // Recover conversations whose directKey was detached by the previous
       // one-sided-delete implementation. Reuse only a thread still visible
@@ -447,6 +448,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         .getOne();
       if (conv) {
         await this.convRepo.update({ id: conv.id, directKey: null }, { directKey: key });
+        recoveredLegacyThread = true;
       }
     }
     if (conv) {
@@ -455,14 +457,24 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         // Reopen the same direct conversation for this participant only.
         // joinedAt is advanced at deletion and acts as this user's history
         // visibility boundary; the other participant keeps the complete thread.
+        const reopenPatch: any = {
+          isDeleted: false,
+          unreadCount: 0,
+          isArchived: false,
+          isPinned: false,
+        };
+        // Legacy deleted rows did not record a history cutoff. Establish one
+        // now when recovering them so old messages remain hidden to this user.
+        if (recoveredLegacyThread) reopenPatch.joinedAt = new Date();
         await this.partRepo.update(
           { conversationId: conv.id, userId },
-          { isDeleted: false, unreadCount: 0, isArchived: false, isPinned: false },
+          reopenPatch,
         );
         myParticipant.isDeleted = false;
         myParticipant.unreadCount = 0;
         myParticipant.isArchived = false;
         myParticipant.isPinned = false;
+        if (recoveredLegacyThread) myParticipant.joinedAt = reopenPatch.joinedAt;
       }
       const [vipByUser, nameStyles] = await Promise.all([
         this.vipMapForUsers([userId, dto.peerId]),
