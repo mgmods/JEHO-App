@@ -84,7 +84,7 @@ function defaultItems(
       name: key.toUpperCase(),
       sortOrder: n,
       isActive: true,
-      accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false,
+      accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false, categoryId: 'male',
     });
   }
   return items;
