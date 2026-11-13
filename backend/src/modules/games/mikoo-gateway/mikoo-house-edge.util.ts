@@ -93,10 +93,20 @@ export function calculateAreaOutcomeWeights(
   if (m.every((value) => value === m[0])) return m.map(() => 1 / m.length);
 
   const requestedRtp = Number(targetRtp) || getGameOdds().playerRtp;
+  const minMultiplier = Math.min(...m);
+  const maxMultiplier = Math.max(...m);
   const targetTotalReturn = Math.min(
-    Math.max(requestedRtp * m.length, Math.min(...m)),
-    Math.max(...m),
+    Math.max(requestedRtp * m.length, minMultiplier),
+    maxMultiplier,
   );
+  if (targetTotalReturn <= minMultiplier + 1e-12) {
+    const minCount = m.filter((value) => value === minMultiplier).length;
+    return m.map((value) => value === minMultiplier ? 1 / minCount : 0);
+  }
+  if (targetTotalReturn >= maxMultiplier - 1e-12) {
+    const maxCount = m.filter((value) => value === maxMultiplier).length;
+    return m.map((value) => value === maxMultiplier ? 1 / maxCount : 0);
+  }
   const expectedTotal = (exponent: number) => {
     const weights = m.map((mult) => Math.pow(mult, -exponent));
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
