@@ -423,6 +423,7 @@ public final class MiscDtos {
     public static class SeatStickersDto {
         @SerializedName("version") public int version;
         @SerializedName("updatedAt") public String updatedAt;
+        @SerializedName("enabled") public boolean enabled = true;
         @SerializedName("items") public java.util.List<SeatStickerItemDto> items;
     }
 
