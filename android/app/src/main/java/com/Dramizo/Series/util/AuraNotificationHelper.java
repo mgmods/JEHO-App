@@ -180,32 +180,12 @@ public final class AuraNotificationHelper {
             // "مقروء" opens this exact thread; loading its messages clears unreadCount
             // and emits the normal read receipt on the backend.
             expanded.setTextViewText(R.id.btnNotifRead, "مقروء");
-            expanded.setTextViewText(R.id.btnNotifReply, "رد");
             expanded.setOnClickPendingIntent(R.id.btnNotifRead, pi);
 
-            // The visible heads-up "رد" button opens the exact conversation with
-            // the composer focused. Native RemoteInput below still supports true
-            // inline quick reply from the expanded system notification actions.
-            Intent replyActivity = new Intent(launch);
-            replyActivity.putExtra(ChatConversationActivity.EXTRA_FOCUS_COMPOSER, true);
-            replyActivity.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            PendingIntent replyActivityPi;
-            if (isVoiceRoomAlive(context)) {
-                replyActivity.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                replyActivityPi = PendingIntent.getActivity(
-                        context, notificationId + 30_000, replyActivity,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            } else {
-                Intent replyHome = new Intent(home);
-                replyHome.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
-                replyActivityPi = TaskStackBuilder.create(context)
-                        .addNextIntent(replyHome)
-                        .addNextIntent(replyActivity)
-                        .getPendingIntent(notificationId + 30_000,
-                                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            }
-            expanded.setOnClickPendingIntent(R.id.btnNotifReply, replyActivityPi);
+            // Reply must use Android's native RemoteInput action below. A custom
+            // RemoteViews button launches an Activity and cannot open inline input.
+            // Hide it so the visible "رد" action is always the true quick-reply action.
+            expanded.setViewVisibility(R.id.btnNotifReply, android.view.View.GONE);
         } else {
             expanded.setViewVisibility(R.id.rowNotifChatActions, android.view.View.GONE);
             expanded.setViewVisibility(R.id.tvNotificationAction, android.view.View.VISIBLE);
