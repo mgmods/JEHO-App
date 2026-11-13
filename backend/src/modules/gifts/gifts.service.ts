@@ -4050,4 +4050,36 @@ export class GiftsService implements OnModuleInit {
     }));
     return paginate(normalized, total, query.page || 1, query.limit || 20);
   }
+  /** Public profile gift cabinet: aggregate received gifts only, without sender identities. */
+  async receivedHistorySummary(userId: string) {
+    if (!userId || !String(userId).trim()) {
+      throw new BadRequestException('معرّف المستخدم مطلوب');
+    }
+    const rows = await this.sendsRepo.createQueryBuilder('giftSend')
+      .leftJoin('giftSend.gift', 'gift')
+      .select('giftSend.giftId', 'giftId')
+      .addSelect("COALESCE(giftSend.giftName, gift.name, 'هدية')", 'giftName')
+      .addSelect('COALESCE(giftSend.giftIconUrl, gift.iconUrl)', 'giftIconUrl')
+      .addSelect('SUM(giftSend.quantity)', 'quantity')
+      .addSelect('SUM(giftSend.totalCoins)', 'totalCoins')
+      .addSelect('SUM(giftSend.diamondsAwarded)', 'diamondsAwarded')
+      .where('giftSend.receiverId = :userId', { userId })
+      .andWhere('giftSend.senderId <> giftSend.receiverId')
+      .andWhere('(giftSend.expiresAt IS NULL OR giftSend.expiresAt > :now)', { now: new Date() })
+      .groupBy('giftSend.giftId')
+      .addGroupBy("COALESCE(giftSend.giftName, gift.name, 'هدية')")
+      .addGroupBy('COALESCE(giftSend.giftIconUrl, gift.iconUrl)')
+      .orderBy('SUM(giftSend.diamondsAwarded)', 'DESC')
+      .addOrderBy('SUM(giftSend.quantity)', 'DESC')
+      .getRawMany();
+    return rows.map((row) => ({
+      giftId: row.giftId || null,
+      giftName: String(row.giftName || 'هدية'),
+      giftIconUrl: row.giftIconUrl || null,
+      quantity: Math.max(0, Number(row.quantity) || 0),
+      totalCoins: Math.max(0, Number(row.totalCoins) || 0),
+      diamondsAwarded: Math.max(0, Number(row.diamondsAwarded) || 0),
+    }));
+  }
+
 }
