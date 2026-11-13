@@ -1937,16 +1937,6 @@ export class AdminController {
   }
 
   // ─── Super-admin private entries (existing entry_effect inventory/equip pipeline) ───
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Get('private-entries')
-  async listPrivateEntries(@CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean }) {
-    const role = String(actor?.staffRole || '').toLowerCase();
-    if (!actor?.isSuperAdmin && role !== 'super') {
-      throw new ForbiddenException('Private entries are available to Super Admin only');
-    }
-    return this.cosmeticsService.listPrivateEntries();
-  }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
