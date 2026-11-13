@@ -15,14 +15,28 @@ export type SeatStickerItem = {
   audience: 'all' | 'male' | 'female';
   requiredVipLevel: number;
   requiresCp: boolean;
+  categoryId: string;
+};
+
+export type SeatStickerCategory = {
+  id: string; name: string; iconUrl?: string; sortOrder: number; isActive: boolean;
+  accessType: 'free' | 'paid' | 'vip' | 'cp'; priceCoins: number; durationDays: number;
+  audience: 'all' | 'male' | 'female'; requiredVipLevel: number; requiresCp: boolean;
 };
 
 export type SeatStickersConfig = {
+  categories: SeatStickerCategory[];
   version: number;
   updatedAt?: string;
   enabled: boolean;
   items: SeatStickerItem[];
 };
+
+const DEFAULT_CATEGORIES: SeatStickerCategory[] = [
+  { id: 'cp', name: 'ملصقات CP', sortOrder: 1, isActive: true, accessType: 'cp', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: true },
+  { id: 'male', name: 'ملصقات شباب', sortOrder: 2, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'male', requiredVipLevel: 1, requiresCp: false },
+  { id: 'female', name: 'ملصقات بنات', sortOrder: 3, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'female', requiredVipLevel: 1, requiresCp: false },
+];
 
 const KEY_RE = /^[a-z0-9_-]{1,32}$/i;
 const MEDIA_RE = /\.(gif|webp|png|jpe?g)(\?|$)/i;
@@ -80,9 +94,10 @@ export function defaultSeatStickersConfig(
   origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
 ): SeatStickersConfig {
   return {
-    version: 2,
+    version: 3,
     enabled: true,
-    items: defaultItems(origin),
+    categories: DEFAULT_CATEGORIES.map((x) => ({ ...x })),
+    items: defaultItems(origin).map((item) => ({ ...item, categoryId: 'male' })),
   };
 }
 
@@ -125,13 +140,35 @@ export function sanitizeSeatStickersConfig(
       audience: ['all', 'male', 'female'].includes(String(row.audience)) ? row.audience : 'all',
       requiredVipLevel: Math.max(1, Math.min(7, Math.floor(Number(row.requiredVipLevel) || 1))),
       requiresCp: row.requiresCp === true,
+      categoryId: cleanKey(row.categoryId, 'male'),
     });
   });
 
+  const rawCategories = Array.isArray(obj.categories) ? obj.categories : DEFAULT_CATEGORIES;
+  const categorySeen = new Set<string>();
+  const categories: SeatStickerCategory[] = rawCategories.flatMap((row: any, idx: number) => {
+    if (!row || typeof row !== 'object') return [];
+    const id = cleanKey(row.id ?? row.key, 'category' + (idx + 1));
+    if (categorySeen.has(id)) return [];
+    categorySeen.add(id);
+    const accessType = ['free', 'paid', 'vip', 'cp'].includes(String(row.accessType)) ? row.accessType : 'free';
+    return [{
+      id, name: String(row.name || id).slice(0, 80),
+      iconUrl: cleanUrl(row.iconUrl || row.imageUrl) || undefined,
+      sortOrder: Number.isFinite(Number(row.sortOrder)) ? Math.floor(Number(row.sortOrder)) : idx + 1,
+      isActive: row.isActive !== false, accessType,
+      priceCoins: Math.max(0, Math.floor(Number(row.priceCoins) || 0)),
+      durationDays: Math.max(0, Math.min(3650, Math.floor(Number(row.durationDays) || 0))),
+      audience: ['all', 'male', 'female'].includes(String(row.audience)) ? row.audience : 'all',
+      requiredVipLevel: Math.max(1, Math.min(7, Math.floor(Number(row.requiredVipLevel) || 1))),
+      requiresCp: row.requiresCp === true,
+    }];
+  });
   // Empty admin clear is allowed — clients get no stickers until re-seeded.
   items.sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
   return {
-    version: Math.max(2, Math.floor(Number(obj.version) || 2)),
+    version: Math.max(3, Math.floor(Number(obj.version) || 3)),
+    categories: categories.sort((a, b) => a.sortOrder - b.sortOrder),
     updatedAt: obj.updatedAt ? String(obj.updatedAt) : undefined,
     enabled: obj.enabled !== false,
     items,
@@ -158,12 +195,13 @@ export function seatStickersClientPayload(
       sortOrder: i.sortOrder,
       accessType: i.accessType || 'free', priceCoins: i.priceCoins || 0,
       audience: i.audience || 'all', requiredVipLevel: i.requiredVipLevel || 1,
-      requiresCp: i.requiresCp === true,
+      requiresCp: i.requiresCp === true, categoryId: i.categoryId || 'male',
     }));
   return {
     version: cfg.version,
     updatedAt: cfg.updatedAt || null,
     enabled: cfg.enabled !== false,
+    categories: (cfg.categories || DEFAULT_CATEGORIES).filter((x) => x.isActive !== false),
     items,
     formats: ['gif', 'webp', 'png', 'jpg'],
   };
