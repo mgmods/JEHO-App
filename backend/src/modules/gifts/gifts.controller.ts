@@ -56,6 +56,13 @@ export class GiftsController {
     return this.giftsService.getSupportChestState(roomId);
   }
 
+  @Public()
+  @Get('history/received')
+  @ApiOperation({ summary: 'Public profile received-gift totals without sender identities' })
+  receivedHistory(@Query('userId') userId: string) {
+    return this.giftsService.receivedHistorySummary(userId);
+  }
+
   @Get('history')
   history(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
     return this.giftsService.history(userId, query);
