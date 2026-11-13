@@ -121,7 +121,7 @@ function blankRow() {
     name: '',
     sortOrder: (rows.value?.length || 0) + 1,
     isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false,
-    categoryId: categories.value[0]?.id || 'male',
+    categoryId: categories.value.find((x) => x.id === 'male')?.id || 'male',
   }
 }
 
@@ -136,7 +136,7 @@ function defaultSeed() {
       url: `${ORIGIN}/assets/seat-stickers/${key}.${ext}`,
       name: key.toUpperCase(),
       sortOrder: n,
-      isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false,
+      isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false, categoryId: 'male',
     })
   }
   return out
@@ -176,7 +176,7 @@ async function load() {
       accessType: r.accessType || 'free', priceCoins: Number(r.priceCoins) || 0,
       audience: r.audience || 'all', requiredVipLevel: Number(r.requiredVipLevel) || 1,
       requiresCp: r.requiresCp === true,
-      categoryId: r.categoryId || categories.value[0]?.id || 'male',
+      categoryId: r.categoryId || 'male',
     }))
   } else {
     rows.value = defaultSeed()
