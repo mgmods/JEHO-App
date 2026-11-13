@@ -20,7 +20,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="56dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="12dp">
@@ -47,11 +47,22 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/gift_history"
+                android:text="سجل الهدايا"
                 android:textColor="@color/text_primary"
-                android:textSize="20sp"
+                android:textSize="19sp"
                 android:textStyle="bold" />
         </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="12dp"
+            android:text="الهدايا التي تلقّاها هذا الحساب · مرتبة حسب إجمالي الدعم"
+            android:textColor="@color/text_hint"
+            android:textSize="12sp" />
 
         <FrameLayout
             android:layout_width="match_parent"
@@ -63,8 +74,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:paddingHorizontal="12dp"
-                android:paddingBottom="16dp" />
+                android:paddingHorizontal="8dp"
+                android:paddingBottom="18dp" />
 
             <TextView
                 android:id="@+id/tvEmpty"
@@ -73,7 +84,7 @@
                 android:layout_gravity="center"
                 android:gravity="center"
                 android:padding="32dp"
-                android:text="لا سجل هدايا بعد"
+                android:text="لا توجد هدايا مستلمة بعد"
                 android:textColor="@color/text_hint"
                 android:textSize="14sp"
                 android:visibility="gone" />
