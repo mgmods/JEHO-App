@@ -424,7 +424,22 @@ public final class MiscDtos {
         @SerializedName("version") public int version;
         @SerializedName("updatedAt") public String updatedAt;
         @SerializedName("enabled") public boolean enabled = true;
+        @SerializedName("categories") public java.util.List<SeatStickerCategoryDto> categories;
         @SerializedName("items") public java.util.List<SeatStickerItemDto> items;
+    }
+
+    public static class SeatStickerCategoryDto {
+        @SerializedName("id") public String id;
+        @SerializedName("name") public String name;
+        @SerializedName("iconUrl") public String iconUrl;
+        @SerializedName("sortOrder") public int sortOrder;
+        @SerializedName("isActive") public boolean isActive = true;
+        @SerializedName("accessType") public String accessType;
+        @SerializedName("priceCoins") public long priceCoins;
+        @SerializedName("durationDays") public int durationDays;
+        @SerializedName("audience") public String audience;
+        @SerializedName("requiredVipLevel") public int requiredVipLevel;
+        @SerializedName("requiresCp") public boolean requiresCp;
     }
 
     public static class SeatStickerItemDto {
@@ -438,6 +453,7 @@ public final class MiscDtos {
         @SerializedName("audience") public String audience;
         @SerializedName("requiredVipLevel") public int requiredVipLevel;
         @SerializedName("requiresCp") public boolean requiresCp;
+        @SerializedName("categoryId") public String categoryId;
     }
 
     public static class ThemeDto {
