@@ -2464,7 +2464,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     gameId: string,
     ratio: number,
     bet: number,
-    referenceId = randomUUID(),
+    referenceId: string = randomUUID(),
   ) {
     const clamped = clampGamePayout({ bet, win: amount });
     if (clamped.capped) {
