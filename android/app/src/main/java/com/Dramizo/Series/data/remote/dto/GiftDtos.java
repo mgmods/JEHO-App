@@ -138,6 +138,16 @@ public final class GiftDtos {
         }
     }
 
+    /** Aggregated received gifts for a public profile; deliberately contains no sender fields. */
+    public static class GiftReceivedSummaryDto {
+        @SerializedName("giftId") public String giftId;
+        @SerializedName("giftName") public String giftName;
+        @SerializedName("giftIconUrl") public String giftIconUrl;
+        @SerializedName("quantity") public long quantity;
+        @SerializedName("totalCoins") public long totalCoins;
+        @SerializedName("diamondsAwarded") public long diamondsAwarded;
+    }
+
     /** Backend returns data as a raw JSON array of gifts. */
     public static class GiftList extends java.util.ArrayList<GiftDto> {}
 }
