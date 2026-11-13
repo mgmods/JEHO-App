@@ -149,6 +149,37 @@ public class FriendsListFragment extends Fragment {
         });
     }
 
+    private void confirmSocialAction(String title, String message, Runnable action) {
+        com.Dramizo.Series.util.AuraDialogHelper.confirm(
+                requireContext(), title, message, title, action,
+                getString(android.R.string.cancel), null);
+    }
+
+    private void runSocialAction(String userId, boolean follow, boolean isFollowAction) {
+        if (userId == null || userId.isEmpty()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            Result<Object> r = ApiCall.execute(
+                    follow ? c.getUserApi().follow(userId) :
+                            (isFollowAction ? c.getUserApi().unfollow(userId)
+                                    : c.getUserApi().unfriend(userId)));
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (r.success) {
+                    Toast.makeText(requireContext(),
+                            follow ? "تم رد المتابعة" :
+                                    (isFollowAction ? "تم إلغاء المتابعة" : "تم إلغاء الصداقة"),
+                            Toast.LENGTH_SHORT).show();
+                    load(true);
+                } else {
+                    Toast.makeText(requireContext(),
+                            r.error != null ? r.error : "تعذر تنفيذ الإجراء",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
+
     @Override
     public void onDestroyView() {
         binding = null;
@@ -202,6 +233,26 @@ public class FriendsListFragment extends Fragment {
                     wealth);
 
             AvatarCosmetics.bindWear(h.b.imgAvatar, h.b.imgFrame, u);
+
+            if (h.b.btnAction != null) {
+                h.b.btnAction.setVisibility(View.VISIBLE);
+                if (mode == 0) {
+                    h.b.btnAction.setText("إلغاء الصداقة");
+                    h.b.btnAction.setOnClickListener(v -> confirmSocialAction(
+                            "إلغاء الصداقة",
+                            "هل تريد إلغاء الصداقة مع " + displayName + "؟",
+                            () -> runSocialAction(u.id, false, false)));
+                } else if (mode == 1) {
+                    h.b.btnAction.setText("إلغاء المتابعة");
+                    h.b.btnAction.setOnClickListener(v -> confirmSocialAction(
+                            "إلغاء المتابعة",
+                            "هل تريد إلغاء متابعة " + displayName + "؟",
+                            () -> runSocialAction(u.id, false, true)));
+                } else {
+                    h.b.btnAction.setText("رد المتابعة");
+                    h.b.btnAction.setOnClickListener(v -> runSocialAction(u.id, true, true));
+                }
+            }
             h.itemView.setOnClickListener(v -> listener.onClick(u));
         }
         @Override public int getItemCount() { return items.size(); }
