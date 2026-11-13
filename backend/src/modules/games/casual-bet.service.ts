@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { secureGameRandom } from './secure-game-rng';
 import { DataSource, Repository } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
@@ -203,7 +204,7 @@ export class CasualBetService {
     // Draw the target result once, then sample the game's real outcome distribution
     // conditional on that result. This keeps the configured rate global and identical
     // for every player, while ensuring 0% and 100% are never missed by a retry limit.
-    const wantWin = Math.random() * 100 < configured;
+    const wantWin = secureGameRandom() * 100 < configured;
     for (let attempt = 0; attempt < 500; attempt++) {
       const outcome = this.resolveOutcome(gameId, choice);
       if ((outcome.multiplier > 1) === wantWin) return outcome;
@@ -299,15 +300,15 @@ export class CasualBetService {
   ): { multiplier: number; detail: Record<string, unknown> } {
     if (gameId === 'slots') {
       const sym = ['7️⃣', '💎', '🍒', '⭐', '🍋', '🔔'];
-      const a = sym[Math.floor(Math.random() * sym.length)];
-      const b = sym[Math.floor(Math.random() * sym.length)];
-      const c = sym[Math.floor(Math.random() * sym.length)];
+      const a = sym[Math.floor(secureGameRandom() * sym.length)];
+      const b = sym[Math.floor(secureGameRandom() * sym.length)];
+      const c = sym[Math.floor(secureGameRandom() * sym.length)];
       let multiplier = 0;
       if (a === b && b === c) multiplier = a === '7️⃣' ? 12 : 6;
       else if (a === b || b === c || a === c) multiplier = 1.5;
       // House-side losing reels must visually match the zero payout: no hidden pairs/triples.
-      if (Math.random() < 0.72) {
-        const first = Math.floor(Math.random() * sym.length);
+      if (secureGameRandom() < 0.72) {
+        const first = Math.floor(secureGameRandom() * sym.length);
         return {
           multiplier: 0,
           detail: { reels: [sym[first], sym[(first + 1) % sym.length], sym[(first + 2) % sym.length]] },
@@ -316,7 +317,7 @@ export class CasualBetService {
       return { multiplier, detail: { reels: [a, b, c] } };
     }
     if (gameId === 'roulette') {
-      const n = Math.floor(Math.random() * 37);
+      const n = Math.floor(secureGameRandom() * 37);
       const red = new Set([
         1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36,
       ]);
@@ -327,7 +328,7 @@ export class CasualBetService {
       let multiplier = 0;
       if (hit) {
         if (color === 'green') multiplier = 12;
-        else if (Math.random() < 0.88) multiplier = 1.85;
+        else if (secureGameRandom() < 0.88) multiplier = 1.85;
       }
       return { multiplier, detail: { number: n, color, pick } };
     }
@@ -336,7 +337,7 @@ export class CasualBetService {
       const bins = [0.2, 0.5, 0.8, 1.5, 0.8, 0.5, 0.2];
       const weights = [8, 14, 20, 16, 20, 14, 8];
       const total = weights.reduce((a, b) => a + b, 0);
-      let r = Math.random() * total;
+      let r = secureGameRandom() * total;
       let idx = 0;
       for (let i = 0; i < weights.length; i++) {
         r -= weights[i];
@@ -349,7 +350,7 @@ export class CasualBetService {
     }
     if (gameId === 'crash') {
       // Stronger early bust than 0.92 param.
-      const crashAt = Math.max(1.0, Math.floor((1 / (1 - Math.random() * 0.78)) * 100) / 100);
+      const crashAt = Math.max(1.0, Math.floor((1 / (1 - secureGameRandom() * 0.78)) * 100) / 100);
       const cashout = Math.max(1.1, Number(choice) || 1.5);
       const won = cashout < crashAt;
       return {
@@ -360,7 +361,7 @@ export class CasualBetService {
     if (gameId === 'rps') {
       const opts = ['rock', 'paper', 'scissors'] as const;
       const you = String(choice || 'rock').toLowerCase();
-      const bot = opts[Math.floor(Math.random() * 3)];
+      const bot = opts[Math.floor(secureGameRandom() * 3)];
       let multiplier = 0;
       if (you === bot) multiplier = 1; // push
       else if (
@@ -373,8 +374,8 @@ export class CasualBetService {
       return { multiplier, detail: { you, bot } };
     }
     if (gameId === 'hilo') {
-      const card = 2 + Math.floor(Math.random() * 13);
-      const next = 2 + Math.floor(Math.random() * 13);
+      const card = 2 + Math.floor(secureGameRandom() * 13);
+      const next = 2 + Math.floor(secureGameRandom() * 13);
       const pick = String(choice || 'high').toLowerCase();
       const won =
         (pick === 'high' && next > card) ||
@@ -395,12 +396,12 @@ export class CasualBetService {
         'قوة خفية تعمل',
         'ابتسم للقدر',
       ];
-      const prophecy = prophecies[Math.floor(Math.random() * prophecies.length)];
-      const multiplier = Math.random() < 0.28 ? (Math.random() < 0.15 ? 5 : 2) : 0;
+      const prophecy = prophecies[Math.floor(secureGameRandom() * prophecies.length)];
+      const multiplier = secureGameRandom() < 0.28 ? (secureGameRandom() < 0.15 ? 5 : 2) : 0;
       return { multiplier, detail: { prophecy } };
     }
     if (gameId === 'blackjack') {
-      const draw = () => 2 + Math.floor(Math.random() * 10);
+      const draw = () => 2 + Math.floor(secureGameRandom() * 10);
       let you = draw() + draw();
       let dealer = draw() + draw();
       while (you < 17) you += draw();
@@ -413,7 +414,7 @@ export class CasualBetService {
       return { multiplier, detail: { you, dealer } };
     }
     if (gameId === 'poker') {
-      const dice = Array.from({ length: 5 }, () => 1 + Math.floor(Math.random() * 6));
+      const dice = Array.from({ length: 5 }, () => 1 + Math.floor(secureGameRandom() * 6));
       const counts = new Map<number, number>();
       dice.forEach((d) => counts.set(d, (counts.get(d) || 0) + 1));
       const vals = [...counts.values()].sort((a, b) => b - a);
@@ -425,32 +426,32 @@ export class CasualBetService {
       else if (vals[0] === 2 && vals[1] === 2) multiplier = 2;
       else if (vals[0] === 2) multiplier = 1.2;
       // If the house voids a high hand, show a genuinely losing hand too.
-      if (Math.random() < 0.55 && multiplier > 1.2) {
+      if (secureGameRandom() < 0.55 && multiplier > 1.2) {
         return { multiplier: 0, detail: { dice: [1, 2, 3, 4, 5], hand: 1 } };
       }
       return { multiplier, detail: { dice, hand: vals[0] } };
     }
     if (gameId === 'tarot') {
       const cards = ['🌟', '🌙', '🔥', '💧', '⚔️', '👑', '🌹', '💀'];
-      const card = cards[Math.floor(Math.random() * cards.length)];
-      const multiplier = Math.random() < 0.3 ? (card === '👑' ? 6 : 2) : 0;
+      const card = cards[Math.floor(secureGameRandom() * cards.length)];
+      const multiplier = secureGameRandom() < 0.3 ? (card === '👑' ? 6 : 2) : 0;
       return { multiplier, detail: { card } };
     }
     if (gameId === 'penalty') {
       const dirs = ['L', 'C', 'R'];
       const shot = String(choice || 'C').toUpperCase();
       // Keeper saves more often than pure 1/3 (house).
-      const keeperBias = Math.random();
+      const keeperBias = secureGameRandom();
       const keeper =
         keeperBias < 0.42
           ? shot
-          : dirs[Math.floor(Math.random() * 3)];
+          : dirs[Math.floor(secureGameRandom() * 3)];
       const won = shot !== keeper;
       return { multiplier: won ? 1.55 : 0, detail: { shot, keeper } };
     }
     if (gameId === 'reaction') {
       // Client ms is untrusted — fixed low-edge server roll (no free ×4).
-      const roll = Math.random();
+      const roll = secureGameRandom();
       let multiplier = 0;
       if (roll < 0.12) multiplier = 1.5;
       else if (roll < 0.28) multiplier = 1.1;
