@@ -10,11 +10,17 @@ export type SeatStickerItem = {
   name?: string;
   sortOrder: number;
   isActive: boolean;
+  accessType: 'free' | 'paid' | 'vip' | 'cp';
+  priceCoins: number;
+  audience: 'all' | 'male' | 'female';
+  requiredVipLevel: number;
+  requiresCp: boolean;
 };
 
 export type SeatStickersConfig = {
   version: number;
   updatedAt?: string;
+  enabled: boolean;
   items: SeatStickerItem[];
 };
 
@@ -64,6 +70,7 @@ function defaultItems(
       name: key.toUpperCase(),
       sortOrder: n,
       isActive: true,
+      accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false,
     });
   }
   return items;
@@ -73,7 +80,8 @@ export function defaultSeatStickersConfig(
   origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
 ): SeatStickersConfig {
   return {
-    version: 1,
+    version: 2,
+    enabled: true,
     items: defaultItems(origin),
   };
 }
@@ -112,14 +120,20 @@ export function sanitizeSeatStickersConfig(
         ? Math.floor(Number(row.sortOrder))
         : idx + 1,
       isActive: row.isActive !== false && row.active !== false,
+      accessType: ['free', 'paid', 'vip', 'cp'].includes(String(row.accessType)) ? row.accessType : 'free',
+      priceCoins: Math.max(0, Math.floor(Number(row.priceCoins) || 0)),
+      audience: ['all', 'male', 'female'].includes(String(row.audience)) ? row.audience : 'all',
+      requiredVipLevel: Math.max(1, Math.min(7, Math.floor(Number(row.requiredVipLevel) || 1))),
+      requiresCp: row.requiresCp === true,
     });
   });
 
   // Empty admin clear is allowed — clients get no stickers until re-seeded.
   items.sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
   return {
-    version: Math.max(1, Math.floor(Number(obj.version) || 1)),
+    version: Math.max(2, Math.floor(Number(obj.version) || 2)),
     updatedAt: obj.updatedAt ? String(obj.updatedAt) : undefined,
+    enabled: obj.enabled !== false,
     items,
   };
 }
@@ -135,13 +149,16 @@ export function seatStickersClientPayload(
     return `${o}${u.startsWith('/') ? '' : '/'}${u}`;
   };
   const items = (cfg.items || [])
-    .filter((i) => i && i.isActive !== false && i.key && i.url)
+    .filter((i) => cfg.enabled !== false && i && i.isActive !== false && i.key && i.url)
     .map((i) => ({
       id: i.id || i.key,
       key: i.key,
       url: abs(i.url),
       name: i.name || i.key,
       sortOrder: i.sortOrder,
+      accessType: i.accessType || 'free', priceCoins: i.priceCoins || 0,
+      audience: i.audience || 'all', requiredVipLevel: i.requiredVipLevel || 1,
+      requiresCp: i.requiresCp === true,
     }));
   return {
     version: cfg.version,
@@ -176,6 +193,7 @@ export function resolveActiveStickerUrl(
 ): string | null {
   if (!key) return null;
   const k = key.trim().toLowerCase();
+  if (cfg?.enabled === false) return null;
   const items = cfg?.items || [];
   const hit = items.find((i) => i && i.isActive !== false && i.key === k && i.url);
   if (!hit) return null;
