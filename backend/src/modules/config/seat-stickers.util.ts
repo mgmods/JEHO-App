@@ -141,7 +141,7 @@ export function sanitizeSeatStickersConfig(
       audience: ['all', 'male', 'female'].includes(String(row.audience)) ? row.audience : 'all',
       requiredVipLevel: Math.max(1, Math.min(7, Math.floor(Number(row.requiredVipLevel) || 1))),
       requiresCp: row.requiresCp === true,
-      categoryId: cleanKey(row.categoryId, 'male'),
+      categoryId: /^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(key) ? 'classic' : cleanKey(row.categoryId, 'classic'),
     });
   });
 
@@ -165,6 +165,8 @@ export function sanitizeSeatStickersConfig(
       requiresCp: row.requiresCp === true,
     }];
   });
+  if (!categorySeen.has('classic')) categories.push({ ...DEFAULT_CATEGORIES[0] });
+  // Preserve the original e01-e74 catalog in its own classic section.
   // Empty admin clear is allowed — clients get no stickers until re-seeded.
   items.sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
   return {
