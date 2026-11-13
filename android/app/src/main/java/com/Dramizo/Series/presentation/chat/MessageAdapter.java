@@ -82,7 +82,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private final List<ChatDtos.MessageDto> items = new ArrayList<>();
     private final Map<String, String> translations = new HashMap<>();
     private final String myUserId;
-    private final AuthDtos.UserDto me;
+    private AuthDtos.UserDto me;
     private final Listener listener;
     private String peerAvatarUrl;
     private String peerChatBubbleUrl;
@@ -140,6 +140,12 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         this.peerHostBadgeMeta = hostBadgeMeta;
         this.peerVipLevel = Math.max(0, vipLevel);
         this.peerLevel = Math.max(1, level);
+        notifyDataSetChanged();
+    }
+
+    /** Refresh the signed-in sender profile after changing worn cosmetics. */
+    public void setMyProfile(@Nullable AuthDtos.UserDto user) {
+        this.me = user;
         notifyDataSetChanged();
     }
 
