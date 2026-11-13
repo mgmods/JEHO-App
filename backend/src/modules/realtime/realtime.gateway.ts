@@ -1146,27 +1146,33 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         const sticker = (cfg.items || []).find((item) =>
           item && item.isActive !== false && item.key === emojiKey && item.url);
         if (!sticker) return { error: 'Invalid reaction' };
-        if (sticker.audience === 'male' || sticker.audience === 'female') {
+        const category = (cfg.categories || []).find((item) => item.id === sticker.categoryId && item.isActive !== false);
+        if (!category) return { error: 'Sticker category is unavailable' };
+        const requiredAudience = category.audience !== 'all' ? category.audience : sticker.audience;
+        if (requiredAudience === 'male' || requiredAudience === 'female') {
           const user = await this.usersRepo.findOne({
             where: { id: client.userId },
             select: ['id', 'gender', 'genderVerified'],
           });
-          if (!user || user.gender !== sticker.audience ||
-              (sticker.audience === 'female' && user.genderVerified !== true)) {
+          if (!user || user.gender !== requiredAudience ||
+              (requiredAudience === 'female' && user.genderVerified !== true)) {
             return { error: 'This sticker is not available for this account' };
           }
         }
-        if (sticker.accessType === 'vip' || Number(sticker.requiredVipLevel) > 1) {
+        const requiredVipLevel = Math.max(Number(sticker.requiredVipLevel) || 1,
+          category.accessType === 'vip' ? Number(category.requiredVipLevel) || 1 : 1);
+        if (sticker.accessType === 'vip' || category.accessType === 'vip' || requiredVipLevel > 1) {
           const vip = await this.userVipRepo.findOne({
             where: { userId: client.userId, isActive: true },
           });
           const vipLevel = effectiveVipLevel(Number(vip?.level || 0));
           if (!vip || (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) ||
-              vipLevel < Math.max(1, Number(sticker.requiredVipLevel) || 1)) {
+              vipLevel < Math.max(1, requiredVipLevel)) {
             return { error: 'VIP level required' };
           }
         }
-        if (sticker.accessType === 'cp' || sticker.requiresCp) {
+        if (sticker.accessType === 'cp' || category.accessType === 'cp' ||
+            sticker.requiresCp || category.requiresCp) {
           const activeCp = await this.profilesRepo.manager.query(
             `SELECT id FROM cp_relationships
               WHERE status = 'active'
@@ -1180,7 +1186,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
             return { error: 'CP is disabled' };
           }
         }
-        if (sticker.accessType === 'paid') {
+        if (sticker.accessType === 'paid' || category.accessType === 'paid') {
           return { error: 'Purchase is required for this sticker' };
         }
         stickerUrl = resolveActiveStickerUrl(cfg, emojiKey) || '';
