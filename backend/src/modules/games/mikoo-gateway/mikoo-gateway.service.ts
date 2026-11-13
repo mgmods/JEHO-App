@@ -122,6 +122,8 @@ type RoomBet = {
   amount: number;
   areaId: number;
   cashedOut: boolean;
+  /** In-process guard against two overlapping cashout requests. */
+  cashoutProcessing?: boolean;
   payout: number;
   ws?: WebSocket;
   displayName?: string;
@@ -1889,9 +1891,10 @@ export class MikooGatewayService implements OnModuleDestroy {
       return player;
     }
     try {
-      let bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
+      const operationId = randomUUID();
+      let bal = await this.debit(player.userId, amount, gameSlug, player.publicId, operationId);
       const { win, mult } = spinPayout(amount, { gameId: gameSlug });
-      if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount);
+      if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount, `${operationId}:win`);
       player.balance = bal;
       if (style === 'fortune') {
         this.send(ws, '.game.DoFortuneGemsRes', encodeFortuneGemsRes({
@@ -1965,9 +1968,10 @@ export class MikooGatewayService implements OnModuleDestroy {
       return player;
     }
     try {
-      let bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
+      const operationId = randomUUID();
+      let bal = await this.debit(player.userId, amount, gameSlug, player.publicId, operationId);
       const { win, mult } = spinPayout(amount, { gameId: gameSlug });
-      if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount);
+      if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount, `${operationId}:win`);
       player.balance = bal;
       if (style === 'sugar') {
         this.send(ws, '.game.s_c_bet', encodeSugarBetRes({
@@ -2137,7 +2141,8 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
 
     try {
-      const bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
+      const operationId = randomUUID();
+      const bal = await this.debit(player.userId, amount, gameSlug, player.publicId, operationId);
       player.balance = bal;
       room.balances.set(ws, bal);
       const key = `${player.publicId}:${req.areaId || 0}`;
@@ -2150,7 +2155,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         existing.avatarUrl = player.avatarUrl || existing.avatarUrl;
       } else {
         room.bets.set(key, {
-          id: randomUUID(),
+          id: operationId,
           userId: player.userId, 
           playerId: player.publicId,
           sessionId: player.sessionId,
@@ -2379,7 +2384,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     room: RoomState,
     player: MikooPlayerContext,
   ) {
-    const bet = [...room.bets.values()].find((b) => b.playerId === player.publicId && !b.cashedOut);
+    const bet = [...room.bets.values()].find((b) => b.playerId === player.publicId && !b.cashedOut && !b.cashoutProcessing);
     if (!bet || room.phase !== 'flying') {
       this.send(ws, '.game.CashoutRsp', encodeCashoutRsp({
         code: 1,
@@ -2390,7 +2395,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       }));
       return player;
     }
-    bet.cashedOut = true;
+    bet.cashoutProcessing = true;
     // Bust dist already houses; rake + hard ratio/abs caps (live from dashboard).
     const ratio = Math.min(room.ratio, gamePayoutLimits().maxCrashRatio);
     const { win, capped } = clampGamePayout({
@@ -2403,7 +2408,17 @@ export class MikooGatewayService implements OnModuleDestroy {
       );
     }
     bet.payout = win;
-    const bal = await this.credit(player.userId, win, gameSlug, ratio, bet.amount, `${bet.id}:cashout`);
+    let bal: number;
+    try {
+      bal = await this.credit(player.userId, win, gameSlug, ratio, bet.amount, `${bet.id}:cashout`);
+      bet.cashedOut = true;
+      bet.cashoutProcessing = false;
+    } catch (error) {
+      bet.cashoutProcessing = false;
+      this.logger.error(`Mikoo cashout settlement failed game=${gameSlug} user=${player.userId} bet=${bet.id}: ${(error as Error).message}`);
+      this.send(ws, '.game.CashoutRsp', encodeCashoutRsp({ code: 1, desc: 'Settlement failed; retry cashout', ratio: room.ratio * 100, winMoney: 0, selfMoney: player.balance }));
+      return player;
+    }
     player.balance = bal;
     room.balances.set(ws, bal);
     // CashoutRsp.ratio is centi (client shows ratio/100).
@@ -2430,7 +2445,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     return player;
   }
 
-  private async debit(userId: string, amount: number, gameId: string, playerId: number) {
+  private async debit(userId: string, amount: number, gameId: string, playerId: number, referenceId = randomUUID()) {
     return this.dataSource.transaction(async (manager) => {
       let wallet = await manager.findOne(Wallet, {
         where: { userId },
@@ -2449,7 +2464,7 @@ export class MikooGatewayService implements OnModuleDestroy {
           amount: -amount,
           balanceAfter: Number(wallet.coins),
           referenceType: 'mikoo_game_bet',
-          referenceId: randomUUID(),
+          referenceId,
           description: `Mikoo ${gameId} bet`,
           metadata: { gameId, playerId, amount },
         }),
