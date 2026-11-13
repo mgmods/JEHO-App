@@ -236,8 +236,19 @@ public final class AuraNotificationHelper {
                     .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
                     .build();
             builder.addAction(replyAction);
+            // Mark as read in the background; do not open the app or the conversation.
+            Intent readIntent = new Intent(context, NotificationQuickReplyReceiver.class);
+            readIntent.setAction(NotificationQuickReplyReceiver.ACTION_MARK_READ);
+            readIntent.putExtra(NotificationQuickReplyReceiver.EXTRA_CONVERSATION_ID,
+                    launch.getStringExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID));
+            readIntent.putExtra(NotificationQuickReplyReceiver.EXTRA_NOTIFICATION_ID, notificationId);
+            PendingIntent readPendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    notificationId ^ 0x51A8,
+                    readIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             builder.addAction(new NotificationCompat.Action.Builder(
-                    R.drawable.ic_stat_jeho, "مقروء", pi).build());
+                    R.drawable.ic_stat_jeho, "مقروء", readPendingIntent).build());
         } else {
             builder.setCustomContentView(compact)
                     .setCustomBigContentView(expanded)
