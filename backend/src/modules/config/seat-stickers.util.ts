@@ -33,9 +33,10 @@ export type SeatStickersConfig = {
 };
 
 const DEFAULT_CATEGORIES: SeatStickerCategory[] = [
-  { id: 'cp', name: 'ملصقات CP', sortOrder: 1, isActive: true, accessType: 'cp', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: true },
-  { id: 'male', name: 'ملصقات شباب', sortOrder: 2, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'male', requiredVipLevel: 1, requiresCp: false },
-  { id: 'female', name: 'ملصقات بنات', sortOrder: 3, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'female', requiredVipLevel: 1, requiresCp: false },
+  { id: 'classic', name: 'الملصقات القديمة', sortOrder: 1, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false },
+  { id: 'male', name: 'ملصقات شباب', sortOrder: 2, isActive: false, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'male', requiredVipLevel: 1, requiresCp: false },
+  { id: 'cp', name: 'ملصقات CP', sortOrder: 3, isActive: false, accessType: 'cp', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: true },
+  { id: 'female', name: 'ملصقات بنات', sortOrder: 4, isActive: false, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'female', requiredVipLevel: 1, requiresCp: false },
 ];
 
 const KEY_RE = /^[a-z0-9_-]{1,32}$/i;
@@ -97,7 +98,7 @@ export function defaultSeatStickersConfig(
     version: 3,
     enabled: true,
     categories: DEFAULT_CATEGORIES.map((x) => ({ ...x })),
-    items: defaultItems(origin).map((item) => ({ ...item, categoryId: 'male' })),
+    items: defaultItems(origin).map((item) => ({ ...item, categoryId: 'classic' })),
   };
 }
 
