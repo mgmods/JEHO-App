@@ -8,7 +8,7 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
@@ -24,11 +24,14 @@ import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.bumptech.glide.Glide;
 
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 public class GiftHistoryActivity extends ThemedActivity {
+    public static final String EXTRA_USER_ID = "gift_history_user_id";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -37,40 +40,53 @@ public class GiftHistoryActivity extends ThemedActivity {
         binding.btnBack.setOnClickListener(v -> navigateUp());
 
         AppContainer c = ContainerProvider.from(this);
-        List<GiftDtos.GiftHistoryDto> items = new ArrayList<>();
+        String profileId = getIntent().getStringExtra(EXTRA_USER_ID);
+        if (profileId == null || profileId.trim().isEmpty()) {
+            profileId = c.getSessionManager().getUserId();
+        }
+        final String targetId = profileId == null ? "" : profileId.trim();
+
+        List<GiftDtos.GiftReceivedSummaryDto> items = new ArrayList<>();
         RecyclerView.Adapter<VH> adapter = new RecyclerView.Adapter<>() {
             @NonNull @Override
             public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-                return new VH(ItemGiftHistoryBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
+                return new VH(ItemGiftHistoryBinding.inflate(
+                        LayoutInflater.from(parent.getContext()), parent, false));
             }
+
             @Override
             public void onBindViewHolder(@NonNull VH holder, int position) {
-                GiftDtos.GiftHistoryDto h = items.get(position);
-                String giftName = h.gift != null ? h.gift.name : "هدية";
-                String from = h.sender != null ? h.sender.displayName : "?";
-                String to = h.receiver != null ? h.receiver.displayName : "?";
-                holder.b.tvGiftName.setText(giftName + " ×" + Math.max(1, h.quantity));
-                holder.b.tvGiftMeta.setText("من " + from + " → " + to
-                        + (h.displayCoins() > 0 ? " · " + h.displayCoins() + " عملة" : ""));
-                long diamonds = h.diamondsAwarded > 0 ? h.diamondsAwarded : h.displayCoins();
-                holder.b.tvCoins.setText(String.format(Locale.US, "%,d 💎", diamonds));
-                String icon = h.gift != null ? h.gift.iconUrl : null;
+                GiftDtos.GiftReceivedSummaryDto item = items.get(position);
+                holder.b.tvGiftName.setText(item.giftName == null || item.giftName.trim().isEmpty()
+                        ? "هدية" : item.giftName);
+                holder.b.tvGiftMeta.setText("× " + NumberFormat.getNumberInstance(Locale.US)
+                        .format(Math.max(0L, item.quantity)) + " مرة");
+                long support = Math.max(0L, item.diamondsAwarded);
+                holder.b.tvCoins.setText(NumberFormat.getNumberInstance(Locale.US).format(support) + " 💎");
                 Glide.with(holder.b.imgGift)
-                        .load(AssetCatalog.absoluteUrl(icon))
+                        .load(AssetCatalog.absoluteUrl(item.giftIconUrl))
                         .placeholder(ImagePlaceholder.gift())
                         .error(ImagePlaceholder.gift())
                         .into(holder.b.imgGift);
             }
+
             @Override public int getItemCount() { return items.size(); }
         };
-        binding.recycler.setLayoutManager(new LinearLayoutManager(this));
+
+        GridLayoutManager grid = new GridLayoutManager(this, 4);
+        binding.recycler.setLayoutManager(grid);
         binding.recycler.setAdapter(adapter);
 
+        if (targetId.isEmpty()) {
+            binding.tvEmpty.setVisibility(View.VISIBLE);
+            return;
+        }
         c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<GiftDtos.GiftHistoryDto>> r = ApiCall.execute(c.getGiftApi().history(1));
+            Result<java.util.List<GiftDtos.GiftReceivedSummaryDto>> r =
+                    ApiCall.execute(c.getGiftApi().receivedHistory(targetId));
             runOnUiThread(() -> {
                 items.clear();
-                if (r.success && r.data != null && r.data.items != null) items.addAll(r.data.items);
+                if (r.success && r.data != null) items.addAll(r.data);
                 adapter.notifyDataSetChanged();
                 binding.tvEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
                 if (r.error != null) Toast.makeText(this, r.error, Toast.LENGTH_SHORT).show();
