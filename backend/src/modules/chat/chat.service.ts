@@ -246,8 +246,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       .orderBy('v.userId', 'ASC')
       .addOrderBy('v.level', 'DESC')
       .getMany();
+    const resolved = new Set<string>();
     for (const row of rows) {
-      if (result.has(row.userId)) continue;
+      if (resolved.has(row.userId)) continue;
+      // The highest active VIP plan is authoritative. A disabled/missing style
+      // on that plan must not inherit a lower plan's name treatment.
+      resolved.add(row.userId);
       const benefits: any = row.vipPlan?.benefits || {};
       const style = benefits?.visuals?.nameStyle;
       if (style && (style.enabled === true || String(style.enabled).toLowerCase() === 'true')) {
