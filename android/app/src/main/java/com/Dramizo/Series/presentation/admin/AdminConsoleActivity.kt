@@ -284,9 +284,6 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
             }
         }
-        // Navigation is handled exclusively by Android's physical/system Back action.
-        // Keep the legacy view initialized but do not place a back control in the toolbar.
-        backButton.visibility = View.GONE
         topBar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f))
         topBar.addView(refreshButton, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginStart = dp(8) })
         root.addView(topBar)
@@ -320,13 +317,18 @@ class AdminConsoleActivity : ThemedActivity() {
             sectionHistory.clear()
             showHome(false)
         }
-        bottomBackButton = navButton("‹  السابق") { handleAdminBack() }.apply {
+        bottomBackButton = navButton("‹  رجوع") { handleAdminBack() }.apply {
             visibility = View.GONE
             contentDescription = "الرجوع إلى القسم السابق"
         }
-        // Keep only the home shortcut here; previous-section navigation uses device Back.
-        bottomBackButton.visibility = View.GONE
-        bottom.addView(homeButton, LinearLayout.LayoutParams(-1, dp(48)))
+        // Keep Home and Back together in the persistent bottom navigation.
+        // Back is shown only while a module/detail screen is open.
+        bottom.addView(homeButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            marginStart = dp(5)
+        })
+        bottom.addView(bottomBackButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            marginEnd = dp(5)
+        })
         root.addView(bottom, LinearLayout.LayoutParams(-1, -2))
         setContentView(root)
     }
@@ -854,7 +856,7 @@ class AdminConsoleActivity : ThemedActivity() {
         currentSection = key
         val module = modules.firstOrNull { it.key == key }
         titleView.text = module?.title ?: "مركز إدارة JEHO"
-        backButton.visibility = View.VISIBLE
+        setBackButtonsVisible(true)
         body.removeAllViews()
         if (key != "users") module?.let { addSectionIntro(it) }
         when (key) {
