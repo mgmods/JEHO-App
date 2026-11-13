@@ -18,7 +18,7 @@
     "seed:catalog": "node scripts/upsert_catalog_pack.js",
     "lint": "tsc -p tsconfig.json --noEmit",
     "migrate:cp-system": "node scripts/migrate-cp-system.js",
-    "test:games": "node --test -r ts-node/register src/modules/games/mikoo-gateway/mikoo-house-edge.util.spec.ts"
+    "test:games": "node --test -r ts-node/register src/modules/games/mikoo-gateway/mikoo-house-edge.util.spec.ts src/modules/games/casual-bet-idempotency.util.spec.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
