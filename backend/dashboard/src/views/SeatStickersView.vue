@@ -18,6 +18,24 @@
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
     <p class="text-secondary small mb-3">{{ t('seatStickers.hint') }}</p>
+    <section class="glass p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <strong>أقسام وحزم الملصقات</strong>
+        <button class="btn btn-outline-light btn-sm" type="button" @click="addCategory">إضافة قسم</button>
+      </div>
+      <div v-for="(category, index) in categories" :key="category.id" class="row g-2 align-items-end mb-3">
+        <div class="col-md-3"><label class="form-label small">اسم القسم</label><input v-model="category.name" class="form-control form-control-sm" /></div>
+        <div class="col-md-2"><label class="form-label small">المعرّف</label><input v-model="category.id" class="form-control form-control-sm" /></div>
+        <div class="col-md-2"><label class="form-label small">نوع الوصول</label><select v-model="category.accessType" class="form-select form-select-sm"><option value="free">مجاني</option><option value="paid">شراء القسم بالكوينز</option><option value="vip">VIP</option><option value="cp">CP</option></select></div>
+        <div class="col-md-2"><label class="form-label small">السعر</label><input v-model.number="category.priceCoins" type="number" min="0" class="form-control form-control-sm" /></div>
+        <div class="col-md-1"><label class="form-label small">المدة بالأيام (0 دائم)</label><input v-model.number="category.durationDays" type="number" min="0" class="form-control form-control-sm" /></div>
+        <div class="col-md-1"><label class="form-label small">VIP</label><input v-model.number="category.requiredVipLevel" type="number" min="1" max="7" class="form-control form-control-sm" /></div>
+        <div class="col-md-1"><div class="form-check"><input v-model="category.isActive" class="form-check-input" type="checkbox" /><label class="form-check-label small">نشط</label></div><button class="btn btn-link btn-sm text-danger px-0" @click="categories.splice(index,1)">حذف</button></div>
+        <div class="col-md-3"><label class="form-label small">الفئة</label><select v-model="category.audience" class="form-select form-select-sm"><option value="all">الجميع</option><option value="male">الشباب</option><option value="female">البنات</option></select></div>
+        <div class="col-md-3"><label class="form-label small">رابط أيقونة القسم</label><input v-model="category.iconUrl" class="form-control form-control-sm" placeholder="/uploads/..." /></div>
+        <div class="col-md-3"><div class="form-check"><input v-model="category.requiresCp" class="form-check-input" type="checkbox" /><label class="form-check-label small">يشترط CP فعال</label></div></div>
+      </div>
+    </section>
 
     <LoadingSpinner v-if="loading" />
     <template v-else>
@@ -35,6 +53,8 @@
             <img v-if="row.url" :src="absUrl(row.url)" alt="" />
             <span v-else class="text-muted small">—</span>
           </div>
+          <label class="form-label small mb-1">القسم</label>
+          <select v-model="row.categoryId" class="form-select form-select-sm mb-2"><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select>
           <label class="form-label small mb-1">{{ t('seatStickers.key') }}</label>
           <input v-model="row.key" class="form-control form-control-sm mb-2" maxlength="32" placeholder="e01" />
           <label class="form-label small mb-1">{{ t('seatStickers.name') }}</label>
@@ -78,6 +98,11 @@ const { t } = useI18n()
 const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '')
 
 const rows = ref([])
+const categories = ref([
+  { id: 'cp', name: 'ملصقات CP', sortOrder: 1, isActive: true, accessType: 'cp', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: true },
+  { id: 'male', name: 'ملصقات شباب', sortOrder: 2, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'male', requiredVipLevel: 1, requiresCp: false },
+  { id: 'female', name: 'ملصقات بنات', sortOrder: 3, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'female', requiredVipLevel: 1, requiresCp: false },
+])
 const enabled = ref(true)
 const loading = ref(false)
 const saving = ref(false)
@@ -138,6 +163,7 @@ async function load() {
   }
   const cfg = parseSetting(data, 'seat_stickers')
   enabled.value = cfg?.enabled !== false
+  categories.value = Array.isArray(cfg?.categories) && cfg.categories.length ? cfg.categories.map((x, i) => ({ ...x, sortOrder: Number(x.sortOrder) || i + 1 })) : categories.value
   if (cfg && Array.isArray(cfg.items) && cfg.items.length) {
     rows.value = cfg.items.map((r, i) => ({
       id: r.id || r.key || `s${i + 1}`,
@@ -149,10 +175,16 @@ async function load() {
       accessType: r.accessType || 'free', priceCoins: Number(r.priceCoins) || 0,
       audience: r.audience || 'all', requiredVipLevel: Number(r.requiredVipLevel) || 1,
       requiresCp: r.requiresCp === true,
+      categoryId: r.categoryId || categories.value[0]?.id || 'male',
     }))
   } else {
     rows.value = defaultSeed()
   }
+}
+
+function addCategory() {
+  const id = 'category' + Date.now().toString(36)
+  categories.value.push({ id, name: 'قسم جديد', sortOrder: categories.value.length + 1, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false, iconUrl: '' })
 }
 
 function addBlank() {
@@ -207,9 +239,10 @@ async function save() {
       accessType: r.accessType || 'free', priceCoins: Number(r.priceCoins) || 0,
       audience: r.audience || 'all', requiredVipLevel: Number(r.requiredVipLevel) || 1,
       requiresCp: r.requiresCp === true,
+      categoryId: r.categoryId || categories.value[0]?.id || 'male',
     }))
   const payload = {
-    seat_stickers: JSON.stringify({ version: 2, enabled: enabled.value, items }),
+    seat_stickers: JSON.stringify({ version: 3, enabled: enabled.value, categories: categories.value.map((x, i) => ({ ...x, id: String(x.id || ('category' + (i + 1))).trim().toLowerCase(), sortOrder: i + 1 })), items }),
   }
   const { error: err } = await settingsApi.update(payload)
   saving.value = false
