@@ -151,7 +151,7 @@ public class FriendsListFragment extends Fragment {
 
     private void confirmSocialAction(String title, String message, Runnable action) {
         com.Dramizo.Series.util.AuraDialogHelper.confirm(
-                requireContext(), title, message, title, action,
+                requireContext(), title, message, title, () -> action.run(),
                 getString(android.R.string.cancel), null);
     }
 
@@ -186,7 +186,7 @@ public class FriendsListFragment extends Fragment {
         super.onDestroyView();
     }
 
-    private static class FriendAdapter extends RecyclerView.Adapter<FriendAdapter.VH> {
+    private class FriendAdapter extends RecyclerView.Adapter<FriendAdapter.VH> {
         interface Listener { void onClick(AuthDtos.UserDto u); }
         private final List<AuthDtos.UserDto> items = new ArrayList<>();
         private final Listener listener;
