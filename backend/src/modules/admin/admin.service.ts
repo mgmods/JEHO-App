@@ -3807,7 +3807,12 @@ export class AdminService {
   async assignVip(body: { userId: string; planId: string; days?: number; permanent?: boolean }) {
     const plan = await this.vipRepo.findOne({ where: { id: body.planId } });
     if (!plan) throw new NotFoundException('VIP plan not found');
-    const user = await this.usersRepo.findOne({ where: { id: body.userId } });
+    // Native admin accepts the public User ID shown in the app as well as the internal UUID.
+    const lookup = String(body.userId || '').trim();
+    if (!lookup) throw new BadRequestException('User ID is required');
+    const user = await this.usersRepo.findOne({
+      where: [{ id: lookup }, { publicId: lookup }],
+    });
     if (!user) throw new NotFoundException('User not found');
     const permanent = body.permanent === true;
     const days = Number(body.days ?? 30);
@@ -3815,15 +3820,15 @@ export class AdminService {
     if (!permanent && ![1, 3, 7, 15, 30].includes(days)) {
       throw new BadRequestException('VIP duration must be 1, 3, 7, 15 or 30 days, or permanent=true');
     }
-    await this.userVipRepo.update({ userId: body.userId, isActive: true }, { isActive: false });
+    await this.userVipRepo.update({ userId: user.id, isActive: true }, { isActive: false });
     const startsAt = new Date();
     // UserVip.expiresAt is non-null in the existing schema; year 9999 represents permanent VIP without a migration.
     const expiresAt = permanent
       ? new Date('9999-12-31T23:59:59.999Z')
       : new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
-    return this.userVipRepo.save(
+    const grant = await this.userVipRepo.save(
       this.userVipRepo.create({
-        userId: body.userId,
+        userId: user.id,
         vipPlanId: plan.id,
         level: plan.level,
         startsAt,
@@ -3831,6 +3836,28 @@ export class AdminService {
         isActive: true,
       }),
     );
+    try {
+      const durationText = permanent ? 'دائمة – بدون تاريخ انتهاء' : days + ' يوم';
+      await this.notificationsService.create({
+        userId: user.id,
+        type: NotificationType.SYSTEM,
+        title: 'تم إرسال VIP لك من الإدارة',
+        body: 'تم إرسال VIP مستوى ' + plan.level + ' لك من الإدارة. مدة الصلاحية: ' + durationText + '.',
+        data: {
+          officialNews: true,
+          adminVipGrant: true,
+          vipId: grant.id,
+          vipPlanId: plan.id,
+          vipLevel: plan.level,
+          expiresAt: grant.expiresAt,
+          durationDays: permanent ? null : days,
+        },
+        sendPush: true,
+      });
+    } catch {
+      // Notification failure must not roll back the already committed VIP grant.
+    }
+    return grant;
   }
 
   async revokeVip(id: string) {
