@@ -2,6 +2,7 @@
  * House-favored payout RNG for Mikoo games.
  * Live knobs come from dashboard → game.house_odds (see game-odds-runtime).
  */
+import { secureGameRandom } from '../secure-game-rng';
 import { clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
 import { getGameOdds, getGameWinRate } from '../game-odds-runtime';
 import { MIKOO_WIN_MULTS } from './mikoo-game-economy';
@@ -27,10 +28,10 @@ export function spinPayout(
   );
   const configuredRate = opts?.gameId ? getGameWinRate(opts.gameId) : undefined;
   const effectiveHitRate = configuredRate === undefined ? hitRate : configuredRate / 100;
-  if (Math.random() >= effectiveHitRate) {
+  if (secureGameRandom() >= effectiveHitRate) {
     return { win: 0, mult: 0 };
   }
-  const roll = Math.random();
+  const roll = secureGameRandom();
   let mult: number;
   if (roll < 0.42) mult = 2;
   else if (roll < 0.68) mult = 3;
@@ -56,19 +57,19 @@ export function biasedCrashAt(): number {
   // Dashboard win rate for Crash means the chance a round reaches at least x1.50.
   // It is resolved here on the server, so changing the setting affects real outcomes.
   if (configuredWinRate !== undefined) {
-    if (Math.random() * 100 >= configuredWinRate) return 1.0;
-    const u = Math.random();
-    if (u < 0.65) return Math.round((1.5 + Math.random() * 1.5) * 100) / 100;
-    const tail = 3.0 + Math.pow(Math.random(), 1.6) * Math.max(0.5, maxR - 3);
+    if (secureGameRandom() * 100 >= configuredWinRate) return 1.0;
+    const u = secureGameRandom();
+    if (u < 0.65) return Math.round((1.5 + secureGameRandom() * 1.5) * 100) / 100;
+    const tail = 3.0 + Math.pow(secureGameRandom(), 1.6) * Math.max(0.5, maxR - 3);
     return Math.min(maxR, Math.round(tail * 100) / 100);
   }
 
   // Backward-compatible distribution until an administrator explicitly sets a Crash rate.
-  const u = Math.random();
+  const u = secureGameRandom();
   if (u < 0.12) return 1.0;
-  if (u < 0.55) return Math.round((1.01 + Math.random() * 0.44) * 100) / 100;
-  if (u < 0.82) return Math.round((1.5 + Math.random() * 1.5) * 100) / 100;
-  const tail = 3.0 + Math.pow(Math.random(), 1.6) * Math.max(0.5, maxR - 3);
+  if (u < 0.55) return Math.round((1.01 + secureGameRandom() * 0.44) * 100) / 100;
+  if (u < 0.82) return Math.round((1.5 + secureGameRandom() * 1.5) * 100) / 100;
+  const tail = 3.0 + Math.pow(secureGameRandom(), 1.6) * Math.max(0.5, maxR - 3);
   return Math.min(maxR, Math.round(tail * 100) / 100);
 }
 
@@ -88,7 +89,7 @@ export function pickWeightedAreaIndex(
   );
   const weights = m.map((mult) => tau / mult);
   const sum = weights.reduce((a, b) => a + b, 0);
-  let r = Math.random() * sum;
+  let r = secureGameRandom() * sum;
   for (let i = 0; i < weights.length; i++) {
     r -= weights[i]!;
     if (r <= 0) return i;
