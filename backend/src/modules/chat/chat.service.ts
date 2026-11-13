@@ -447,7 +447,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         .orderBy('c.updatedAt', 'DESC')
         .getOne();
       if (conv) {
-        await this.convRepo.update({ id: conv.id, directKey: null }, { directKey: key });
+        await this.convRepo.update({ id: conv.id }, { directKey: key });
         recoveredLegacyThread = true;
       }
     }
