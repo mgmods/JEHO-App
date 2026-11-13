@@ -85,6 +85,7 @@ public class SignInDialog extends DialogFragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         binding = DialogSignInBinding.inflate(inflater, container, false);
+        binding.getRoot().setVisibility(View.INVISIBLE);
         buildDayCells();
         binding.bltvCheckIn.setOnClickListener(v -> claimToday());
         loadRewards();
@@ -144,6 +145,7 @@ public class SignInDialog extends DialogFragment {
             requireActivity().runOnUiThread(() -> {
                 if (binding == null) return;
                 if (!r.success || r.data == null) {
+                    binding.getRoot().setVisibility(View.VISIBLE);
                     binding.tvSignHint.setText("تعذر تحميل المكافآت. تحقق من اتصالك وحاول مجددًا.");
                     binding.bltvCheckIn.setEnabled(true);
                     return;
@@ -155,6 +157,7 @@ public class SignInDialog extends DialogFragment {
                     dismissAllowingStateLoss();
                     return;
                 }
+                binding.getRoot().setVisibility(View.VISIBLE);
                 applyTheme(status.theme);
                 List<MiscDtos.DailyLoginRewardDto> days = status.days;
                 for (int i = 0; i < 7; i++) {
