@@ -1097,6 +1097,11 @@ public class ChatConversationActivity extends ThemedActivity {
                 ? displayName
                 : (username != null && !username.isEmpty() ? username : getString(R.string.chat));
         binding.tvPeerName.setText(name);
+        VipNameStyle.bind(binding.tvPeerName, peer);
+        if (binding.tvStripName != null) {
+            binding.tvStripName.setText(name);
+            VipNameStyle.bind(binding.tvStripName, peer);
+        }
         String publicId = peer != null ? peer.displayPublicId() : "";
         if (publicId.isEmpty() && username != null && !username.isEmpty()) {
             publicId = username;
