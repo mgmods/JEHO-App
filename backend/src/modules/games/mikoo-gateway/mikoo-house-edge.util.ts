@@ -13,8 +13,10 @@ export function MULTI_AREA_TARGET_RTP(): number {
 }
 
 /**
- * Weighted multipliers so EV when hit ≈ 5.9;
- * hitRate from dashboard → RTP ≈ hitRate * 5.9.
+ * Nominal multiplier distribution before the shared payout guard:
+ * 42% x2, 26% x3, 15% x4, 9% x10, 4% x15, 2.5% x20, 1.5% x25.
+ * The nominal conditional mean is 4.595x; the realized return is lower
+ * when maxWinMult / maxWinAbsolute caps truncate larger outcomes.
  */
 export function spinPayout(
   betAmount: number,
