@@ -8459,6 +8459,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         Dialog dialog = new Dialog(this, R.style.MikooBottomPanelDialog);
         View sheet = getLayoutInflater().inflate(R.layout.dialog_emoji_picker, null);
         dialog.setContentView(sheet);
+        TextView pickerTitle = sheet.findViewById(R.id.tvEmojiPickerTitle);
+        if (pickerTitle != null) pickerTitle.setText(seatOnly ? "ملصقات المقاعد" : "إيموجي الشات");
         dialog.setCanceledOnTouchOutside(true);
         Window window = dialog.getWindow();
         if (window != null) {
@@ -8524,6 +8526,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 final SeatReactionEmojis.Item item = stickerItems.get(position);
                 final String key = item.key;
                 final String uri = item.url;
+                TextView accessBadge = holder.itemView.findViewById(R.id.tvStickerAccess);
+                if (accessBadge != null) {
+                    String type = item.accessType != null ? item.accessType : "free";
+                    String badge = "free".equals(type) ? "" : "paid".equals(type) ? "🔒" :
+                            "vip".equals(type) ? "VIP" : "CP";
+                    accessBadge.setText(badge);
+                    accessBadge.setVisibility(badge.isEmpty() ? View.GONE : View.VISIBLE);
+                }
                 final int resId = SeatReactionEmojis.FALLBACK_DRAWABLE;
                 if (uri != null && SeatReactionEmojis.isWebpUrl(uri)) {
                     com.bumptech.glide.Glide.with(img)
@@ -8552,6 +8562,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     if (!isOnSeat(currentSeats)) {
                         Toast.makeText(VoiceRoomActivity.this,
                                 "اجلس على المايك أولاً لإرسال رد الفعل", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if ("paid".equals(item.accessType)) {
+                        Toast.makeText(VoiceRoomActivity.this, "هذا الملصق مدفوع، يلزم شراؤه أولاً", Toast.LENGTH_SHORT).show();
                         return;
                     }
                     sendSeatReaction(key, resId);
