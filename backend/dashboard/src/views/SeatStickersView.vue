@@ -121,6 +121,7 @@ function blankRow() {
     name: '',
     sortOrder: (rows.value?.length || 0) + 1,
     isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false,
+    categoryId: categories.value[0]?.id || 'male',
   }
 }
 
