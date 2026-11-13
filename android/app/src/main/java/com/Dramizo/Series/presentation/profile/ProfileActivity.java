@@ -359,8 +359,14 @@ public class ProfileActivity extends ThemedActivity {
             });
         });
 
-        binding.rowGiftHistory.setOnClickListener(v ->
-                startActivity(new Intent(this, GiftHistoryActivity.class)));
+        binding.rowGiftHistory.setOnClickListener(v -> {
+            String profileId = targetUserIdHold[0];
+            if (profileId == null || profileId.trim().isEmpty()) profileId = loadedProfileId;
+            if (profileId == null || profileId.trim().isEmpty()) profileId = myId;
+            Intent gifts = new Intent(this, GiftHistoryActivity.class);
+            gifts.putExtra(GiftHistoryActivity.EXTRA_USER_ID, profileId);
+            startActivity(gifts);
+        });
 
         if (userId != null && myId != null && !userId.equals(myId)) {
             container.getIoExecutor().execute(() -> {
