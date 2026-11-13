@@ -480,7 +480,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         where: { id: conv.lastMessageId },
         relations: ['sender', 'sender.profile'],
       });
-      if (msg && !msg.isUnsent) {
+      if (msg && !msg.isUnsent && (!my?.joinedAt || new Date(msg.createdAt).getTime() >= new Date(my.joinedAt).getTime())) {
         const senderVip = vipByUser?.get(msg.senderId) ?? 0;
         const [clubs, agencyRoles] = await Promise.all([
           this.agencyClubMapForUsers([msg.senderId]),
@@ -549,6 +549,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       .leftJoin('c.messages', 'matchedMessage', 'matchedMessage.isUnsent = false')
       .where('p.userId = :userId', { userId })
       .andWhere('COALESCE(p.isDeleted, false) = false')
+      .andWhere('(matchedMessage.id IS NULL OR matchedMessage."createdAt" >= p."joinedAt")')
       .andWhere(
         "(LOWER(COALESCE(c.title, '')) LIKE :needle OR LOWER(COALESCE(peer.username, '')) LIKE :needle OR LOWER(COALESCE(peer.displayName, '')) LIKE :needle OR LOWER(CAST(peer.id AS text)) LIKE :needle OR LOWER(COALESCE(matchedMessage.content, '')) LIKE :needle)",
         { needle },
