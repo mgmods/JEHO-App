@@ -13,7 +13,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.GiftDtos;
-import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ActivityGiftHistoryBinding;
 import com.Dramizo.Series.databinding.ItemGiftHistoryBinding;
 import com.Dramizo.Series.di.AppContainer;
@@ -61,8 +60,6 @@ public class GiftHistoryActivity extends ThemedActivity {
                         ? "هدية" : item.giftName);
                 holder.b.tvGiftMeta.setText("× " + NumberFormat.getNumberInstance(Locale.US)
                         .format(Math.max(0L, item.quantity)) + " مرة");
-                long support = Math.max(0L, item.diamondsAwarded);
-                holder.b.tvCoins.setText(NumberFormat.getNumberInstance(Locale.US).format(support) + " 💎");
                 Glide.with(holder.b.imgGift)
                         .load(AssetCatalog.absoluteUrl(item.giftIconUrl))
                         .placeholder(ImagePlaceholder.gift())
