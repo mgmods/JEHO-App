@@ -58,6 +58,16 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="56dp"
+            android:layout_marginTop="-2dp"
+            android:layout_marginEnd="16dp"
+            android:text="أصدقاؤك، متابعوك وطلبات التواصل في مكان واحد"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
+
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabs"
             android:layout_width="match_parent"
