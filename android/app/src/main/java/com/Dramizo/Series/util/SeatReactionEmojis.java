@@ -24,11 +24,22 @@ public final class SeatReactionEmojis {
         public final String key;
         public final String url;
         public final String name;
+        public final String accessType;
+        public final long priceCoins;
+        public final String audience;
+        public final int requiredVipLevel;
+        public final boolean requiresCp;
 
-        public Item(String key, String url, String name) {
+        public Item(String key, String url, String name, String accessType, long priceCoins,
+                    String audience, int requiredVipLevel, boolean requiresCp) {
             this.key = key;
             this.url = url;
             this.name = name;
+            this.accessType = accessType != null ? accessType : "free";
+            this.priceCoins = Math.max(0L, priceCoins);
+            this.audience = audience != null ? audience : "all";
+            this.requiredVipLevel = Math.max(1, requiredVipLevel);
+            this.requiresCp = requiresCp;
         }
     }
 
@@ -52,7 +63,8 @@ public final class SeatReactionEmojis {
             String key = row.key != null ? row.key.trim().toLowerCase(Locale.US) : "";
             String url = row.url != null ? row.url.trim() : "";
             if (key.isEmpty() || url.isEmpty()) continue;
-            next.add(new Item(key, url, row.name != null ? row.name : key));
+            next.add(new Item(key, url, row.name != null ? row.name : key,
+                    row.accessType, row.priceCoins, row.audience, row.requiredVipLevel, row.requiresCp));
         }
         setCatalog(next);
     }
