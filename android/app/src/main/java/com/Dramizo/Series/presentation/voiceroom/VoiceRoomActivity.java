@@ -1080,7 +1080,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.btnEmoji.setOnClickListener(v -> showEmojiPicker());
         if (binding.btnSeatSticker != null) {
             binding.btnSeatSticker.setVisibility(View.VISIBLE);
-            binding.btnSeatSticker.setOnClickListener(v -> showEmojiPicker());
+            binding.btnSeatSticker.setOnClickListener(v -> showSeatStickerPicker());
         }
         binding.btnGames.setOnClickListener(v -> showRoomGames());
 
@@ -8451,7 +8451,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }).start();
     }
 
-    private void showEmojiPicker() {
+    private void showEmojiPicker() { showEmojiPicker(false); }
+
+    private void showSeatStickerPicker() { showEmojiPicker(true); }
+
+    private void showEmojiPicker(boolean seatOnly) {
         Dialog dialog = new Dialog(this, R.style.MikooBottomPanelDialog);
         View sheet = getLayoutInflater().inflate(R.layout.dialog_emoji_picker, null);
         dialog.setContentView(sheet);
@@ -8501,9 +8505,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         };
 
         RecyclerView stickersRv = sheet.findViewById(R.id.recyclerStickers);
-        // Horizontal scroll — stickers from dashboard catalog (remote GIF/WebP).
+        // Seat stickers are displayed vertically and independently from chat emojis.
         stickersRv.setLayoutManager(new LinearLayoutManager(
-                this, LinearLayoutManager.HORIZONTAL, false));
+                this, LinearLayoutManager.VERTICAL, false));
+        stickersRv.setVisibility(seatOnly ? View.VISIBLE : View.GONE);
+        View stickersLabel = sheet.findViewById(R.id.tvStickersLabel);
+        if (stickersLabel != null) stickersLabel.setVisibility(seatOnly ? View.VISIBLE : View.GONE);
         stickersRv.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -8556,6 +8563,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         stickersRv.setNestedScrollingEnabled(false);
 
         RecyclerView emojiRv = sheet.findViewById(R.id.recyclerEmojis);
+        emojiRv.setVisibility(seatOnly ? View.GONE : View.VISIBLE);
         emojiRv.setLayoutManager(new GridLayoutManager(this, 8));
         emojiRv.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull @Override
