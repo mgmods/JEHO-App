@@ -1140,16 +1140,27 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           }
           rememberSeatStickersCache(cfg);
         }
+        if (!cfg || cfg.enabled === false) {
+          return { error: 'Seat stickers are disabled' };
+        }
+        const sticker = (cfg.items || []).find((item) =>
+          item && item.isActive !== false && item.key === emojiKey && item.url);
+        if (!sticker) return { error: 'Invalid reaction' };
+        if (sticker.accessType === 'vip' || Number(sticker.requiredVipLevel) > 1) {
+          const vip = await this.userVipRepo.findOne({ where: { userId: client.userId } });
+          const vipLevel = effectiveVipLevel(vip);
+          if (vipLevel < Math.max(1, Number(sticker.requiredVipLevel) || 1)) {
+            return { error: 'VIP level required' };
+          }
+        }
+        if (sticker.accessType === 'paid' || sticker.accessType === 'cp' || sticker.requiresCp) {
+          return { error: 'This sticker requires an active entitlement' };
+        }
         stickerUrl = resolveActiveStickerUrl(cfg, emojiKey) || '';
       } catch {
-        stickerUrl = '';
+        return { error: 'Unable to validate seat sticker' };
       }
-      if (!stickerUrl) {
-        // Legacy fallback while catalog migrates.
-        if (!/^e(0[1-9]|[1-6]\d|7[0-4])$/.test(emojiKey)) {
-          return { error: 'Invalid reaction' };
-        }
-      }
+      if (!stickerUrl) return { error: 'Invalid reaction' };
       payload = {
         userId: client.userId,
         emojiKey,
