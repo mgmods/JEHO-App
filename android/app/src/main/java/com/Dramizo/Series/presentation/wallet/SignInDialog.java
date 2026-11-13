@@ -149,10 +149,10 @@ public class SignInDialog extends DialogFragment {
                     return;
                 }
                 status = r.data;
-                if (!status.enabled) {
-                    binding.tvSignHint.setText("مكافآت تسجيل الدخول متوقفة حاليًا");
-                    binding.bltvCheckIn.setEnabled(false);
-                    binding.bltvCheckIn.setText("غير متاح");
+                // A claimed reward is complete for this calendar day. Never leave
+                // the daily popup parked on a disabled "تم الاستلام" button.
+                if (!status.enabled || status.alreadyClaimed || !status.shouldShow) {
+                    dismissAllowingStateLoss();
                     return;
                 }
                 applyTheme(status.theme);
@@ -401,19 +401,58 @@ public class SignInDialog extends DialogFragment {
             requireActivity().runOnUiThread(() -> {
                 claiming = false;
                 if (r.success) {
-                    if (binding != null) {
-                        binding.bltvCheckIn.setText("تم الاستلام");
-                        binding.bltvCheckIn.setEnabled(false);
-                        binding.bltvCheckIn.setTextColor(GREEN);
-                    }
-                    Toast.makeText(requireContext(), "تم الاستلام بنجاح", Toast.LENGTH_SHORT).show();
-                    loadRewards();
+                    showClaimSuccess(r.data);
                 } else {
                     Toast.makeText(requireContext(), r.error != null ? r.error : getString(R.string.error_generic), Toast.LENGTH_LONG).show();
                     if (binding != null) binding.bltvCheckIn.setEnabled(true);
                 }
             });
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void showClaimSuccess(@Nullable Map<String, Object> response) {
+        if (binding == null || response == null) return;
+        Object rawReward = response.get("reward");
+        Map<String, Object> reward = rawReward instanceof Map
+                ? (Map<String, Object>) rawReward : java.util.Collections.emptyMap();
+        String type = String.valueOf(reward.get("type") == null ? "coins" : reward.get("type"));
+        String name = String.valueOf(reward.get("name") == null
+                ? (status != null && status.reward != null ? status.reward.label : "مكافأتك اليومية")
+                : reward.get("name"));
+        String preview = firstNonEmpty(
+                reward.get("previewUrl"), reward.get("imageUrl"), reward.get("iconUrl"),
+                status != null && status.reward != null ? status.reward.previewUrl : null);
+        String animation = firstNonEmpty(
+                reward.get("animationUrl"),
+                status != null && status.reward != null ? status.reward.animationUrl : null);
+
+        binding.clSignIn.setVisibility(View.GONE);
+        binding.successPanel.setVisibility(View.VISIBLE);
+        binding.tvClaimRewardName.setText(name);
+        binding.tvClaimSuccess.setText("تم الاستلام بنجاح");
+        binding.tvClaimEnvelope.setText("✉");
+        if ("cosmetic".equalsIgnoreCase(type) && nonEmpty(preview)) {
+            loadDashboardArtwork(binding.imgClaimReward, preview, animation,
+                    R.drawable.ic_gold_coin, ImageView.ScaleType.FIT_CENTER);
+        } else {
+            binding.imgClaimReward.setImageResource(R.drawable.ic_gold_coin);
+        }
+        binding.btnClaimOk.setOnClickListener(v -> dismissAllowingStateLoss());
+        binding.getRoot().requestLayout();
+        Dialog dialog = getDialog();
+        if (dialog != null && dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    private String firstNonEmpty(Object... values) {
+        for (Object value : values) {
+            String candidate = value == null ? "" : String.valueOf(value).trim();
+            if (!candidate.isEmpty() && !"null".equalsIgnoreCase(candidate)) return candidate;
+        }
+        return "";
     }
 
     private boolean nonEmpty(String value) { return value != null && !value.trim().isEmpty(); }
