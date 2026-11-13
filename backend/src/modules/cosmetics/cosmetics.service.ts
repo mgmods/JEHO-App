@@ -600,41 +600,6 @@ export class CosmeticsService implements OnModuleInit {
     };
   }
 
-  async listPrivateEntries() {
-    const rows = await this.cosmeticsRepo.find({
-      where: { type: CosmeticType.ENTRY_EFFECT },
-      order: { createdAt: 'DESC' },
-    });
-    const privateRows = rows.filter(row => this.isPrivateEntryCosmetic(row));
-    const result: Array<Record<string, unknown>> = [];
-    for (const cosmetic of privateRows) {
-      const ownership = await this.userCosmeticsRepo.findOne({ where: { cosmeticId: cosmetic.id } });
-      const meta: any = cosmetic.meta || {};
-      const ownerId = ownership?.userId || meta.privateOwnerUserId || null;
-      const owner = ownerId ? await this.usersRepo.findOne({ where: { id: ownerId } }) : null;
-      const revoked = !ownership || !!meta.privateRevokedAt;
-      result.push({
-        id: cosmetic.id,
-        name: cosmetic.name,
-        videoUrl: cosmetic.animationUrl || cosmetic.previewUrl,
-        recipientUserId: owner?.id || ownerId,
-        recipientPublicId: owner?.publicId || null,
-        recipientName: owner?.displayName || owner?.username || null,
-        durationDays: meta.privateDurationDays ?? null,
-        remainingDays: ownership?.expiresAt
-          ? Math.max(0, Math.ceil((ownership.expiresAt.getTime() - Date.now()) / 86_400_000))
-          : null,
-        expiresAt: ownership?.expiresAt || null,
-        permanent: ownership ? ownership.expiresAt == null : !!meta.privatePermanent,
-        equipped: ownership?.equipped || false,
-        status: revoked ? 'revoked' : (ownership?.expiresAt && ownership.expiresAt.getTime() <= Date.now() ? 'expired' : 'active'),
-        revokedAt: meta.privateRevokedAt || null,
-        personalMessage: meta.privatePersonalMessage || '',
-        createdAt: cosmetic.createdAt,
-      });
-    }
-    return result;
-  }
 
   async updatePrivateEntry(id: string, dto: {
     recipientPublicId?: string;
