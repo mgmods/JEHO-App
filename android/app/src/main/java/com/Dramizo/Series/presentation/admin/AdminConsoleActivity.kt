@@ -832,7 +832,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 "agencies", "agencyApplications",
                 "rechargeApplications", "rechargeAgents",
                 "notifications", "vanityIds", "vip",
-                "operators", "privateEntries"
+                "operators", "privateEntries", "customGifts"
             )
             StaffRoleHelper.ADMIN -> key in setOf(
                 "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
@@ -1243,11 +1243,10 @@ class AdminConsoleActivity : ThemedActivity() {
                 load(api.grantPrivateEntry(payload)) {
                     toast("تم إهداء الدخولية وإرسال رسالة الإدارة")
                     privateEntryVideoUrl = null
-                    openModule("privateEntries")
+                    showPrivateEntries()
                 }
             }
         })
-        load(api.privateEntries()) { renderPrivateEntryList(it) }
     }
 
     private fun renderPrivateEntryList(raw: Any?) {
