@@ -432,6 +432,11 @@ public final class MiscDtos {
         @SerializedName("url") public String url;
         @SerializedName("name") public String name;
         @SerializedName("sortOrder") public int sortOrder;
+        @SerializedName("accessType") public String accessType;
+        @SerializedName("priceCoins") public long priceCoins;
+        @SerializedName("audience") public String audience;
+        @SerializedName("requiredVipLevel") public int requiredVipLevel;
+        @SerializedName("requiresCp") public boolean requiresCp;
     }
 
     public static class ThemeDto {
