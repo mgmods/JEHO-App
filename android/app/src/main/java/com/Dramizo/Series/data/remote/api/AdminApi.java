@@ -173,7 +173,7 @@ public interface AdminApi {
     @DELETE("admin/operators/{id}")
     Call<ApiResponse<Object>> deleteOperator(@Path("id") String id);
     @GET("admin/agencies/applications")
-    Call<ApiResponse<Object>> agencyApplications(@Query("page") int page, @Query("limit") int limit);
+    Call<ApiResponse<Object>> agencyApplications(@Query("page") int page, @Query("limit") int limit, @Query("status") String status);
     @POST("admin/agencies/applications/{id}/approve")
     Call<ApiResponse<Object>> approveAgencyApplication(@Path("id") String id, @Body Map<String, Object> body);
     @POST("admin/agencies/applications/{id}/reject")
