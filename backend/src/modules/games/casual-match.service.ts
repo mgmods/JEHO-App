@@ -34,6 +34,7 @@ import { CasualActionDto } from './dto/casual.dto';
 import { TasksService } from '../tasks/tasks.service';
 import { RoomGameAccessService } from './room-game-access.service';
 import { isGameEnabled } from './game-odds-runtime';
+import { secureGameRandom } from './secure-game-rng';
 
 
 
@@ -325,7 +326,7 @@ export class CasualMatchService {
 
       const damage =
         settings.minDamage +
-        Math.floor(Math.random() * (settings.maxDamage - settings.minDamage + 1));
+        Math.floor(secureGameRandom() * (settings.maxDamage - settings.minDamage + 1));
       state.attackers[userId] = used + 1;
       state.hp = Math.max(0, state.hp - damage);
       state.lastHitBy = userId;
