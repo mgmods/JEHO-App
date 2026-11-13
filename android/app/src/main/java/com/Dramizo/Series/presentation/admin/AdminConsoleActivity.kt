@@ -344,15 +344,15 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun navButton(label: String, action: () -> Unit): TextView =
         TextView(this).apply {
             text = label
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
+            textSize = 13.5f
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             contentDescription = label
             background = GradientDrawable(
                 GradientDrawable.Orientation.RIGHT_LEFT,
                 intArrayOf(0xFF7659D2.toInt(), 0xFF5B42B0.toInt())
-            ).apply { cornerRadius = dp(14).toFloat() }
+            ).apply { cornerRadius = dp(15).toFloat() }
             setOnClickListener { action() }
         }
 
@@ -828,8 +828,8 @@ class AdminConsoleActivity : ThemedActivity() {
                 "users", "rooms", "streams",
                 "agencies", "agencyApplications",
                 "rechargeApplications", "rechargeAgents",
-                "notifications", "vanityIds", "grantCosmetics", "vip",
-                "operators", "customGifts", "privateEntries"
+                "notifications", "vanityIds", "vip",
+                "operators", "privateEntries"
             )
             StaffRoleHelper.ADMIN -> key in setOf(
                 "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
@@ -894,7 +894,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 body.addView(button("↻ تحديث قائمة الوكالات") { openModule("agencies") })
                 load(api.agencies(1, 40)) { renderItems(it, "agencies") }
             }
-            "agencyApplications" -> load(api.agencyApplications(1, 40)) { renderItems(it, "agencyApplications") }
+            "agencyApplications" -> load(api.agencyApplications(1, 40, "pending")) { renderItems(it, "agencyApplications") }
             "rechargeApplications" -> load(api.rechargeAgentApplications()) { renderItems(it, "rechargeApplications") }
             "rechargeAgents" -> {
                 body.addView(button("＋ إضافة وكيل شحن") { showAssignRechargeAgentDialog() })
@@ -925,16 +925,10 @@ class AdminConsoleActivity : ThemedActivity() {
             "customGifts" -> showCustomGifts()
             "privateEntries" -> showPrivateEntries()
             "vip" -> {
-                addText(body, "كل بطاقة هنا تمثل عضوية مستخدم واحدة. ستجد اسم صاحبها وID المستخدم ومستوى VIP والحالة وتاريخ المنح والانتهاء ومصدر المنح، ثم إجراءات واضحة للسحب أو فتح ملف المستخدم.", 12f, false, MUTED)
-                body.addView(button("＋ منح عضوية VIP") { showAssignVipDialog() })
-                if (currentRole == StaffRoleHelper.SUPER) {
-                    body.addView(button("＋ إنشاء خطة VIP") { showCreateVipPlanDialog() })
-                }
-                load(api.vipMembers(1, 40)) { renderItems(it, "vip") }
-                val plansButton = button("إدارة خطط VIP") {
-                    load(api.vipPlans()) { renderItems(it, "vipPlans") }
-                }
-                if (currentRole == StaffRoleHelper.SUPER) body.addView(plansButton)
+                addText(body, "VIPات المعروفة والمضافة من لوحة التحكم فقط. لا يوجد هنا سجل عضويات قديم ولا إنشاء أو رفع VIP من داخل التطبيق.", 12f, false, MUTED)
+                body.addView(button("＋ إرسال VIP لمستخدم") { showAssignVipDialog() })
+                addText(body, "الخطط المعتمدة من لوحة التحكم", 14f, true, TEXT)
+                load(api.vipPlans()) { renderItems(it, "vipPlans") }
             }
             "toastManager" -> showToastManager()
             "mysteriousMan" -> showMysteriousManSettings()
@@ -942,9 +936,13 @@ class AdminConsoleActivity : ThemedActivity() {
             "supportChest" -> showSupportChestSettings()
             "roomPkSettings" -> showRoomPkSettings()
             "notifications" -> {
-                body.addView(button("＋ رسالة عامة أو خاصة + إشعار") { showNotificationDialog() })
-                body.addView(button("✉ رسالة دردشة مباشرة إلى ID محدد") { showDirectMessageDialog() })
-                load(api.notifications(1, 40)) { renderItems(it, "notifications") }
+                addText(body, "لا يتم عرض أي سجل رسائل أو إشعارات قديم داخل تطبيق الإدارة. الإرسال يبدأ من هنا فقط.", 12f, false, MUTED)
+                body.addView(button("＋ إرسال رسالة إدارة + إشعار") { showNotificationDialog() })
+                body.addView(button("✉ إرسال رسالة دردشة مباشرة إلى ID محدد") { showDirectMessageDialog() })
+                val empty = card()
+                addText(empty, "سجل الرسائل فارغ", 15f, true, TEXT)
+                addText(empty, "لا توجد رسائل قديمة معروضة للسوبر أدمن.", 12f, false, MUTED)
+                body.addView(empty)
             }
             "logs" -> load(api.logs(1, 50)) { renderItems(it, "logs") }
             "staffIdentity" -> showStaffIdentityEditor()
@@ -2426,17 +2424,8 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     }
                 }
-                "vipPlans" -> if (!id.isNullOrBlank()) {
-                    addRecordAction(card, "تعديل الخطة") { showEditVipPlanDialog(id, primary, vipLevel, vipPrice) }
-                    val active = status?.equals("true", true) == true
-                    addRecordAction(card, if (active) "تعطيل الخطة" else "تفعيل الخطة") {
-                        confirm("تغيير حالة خطة VIP؟") {
-                            load(api.updateVipPlan(id, mapOf("isActive" to !active))) {
-                                toast("تم تحديث خطة VIP")
-                                load(api.vipPlans()) { renderItems(it, "vipPlans") }
-                            }
-                        }
-                    }
+                "vipPlans" -> {
+                    addText(card, "هذه الخطة معتمدة من لوحة التحكم. تعديلها أو إنشاؤها أو رفع أصولها يتم من الداشبورد فقط.", 11f, false, MUTED)
                 }
                 "vip" -> if (!id.isNullOrBlank()) {
                     if (!vipUserId.isNullOrBlank()) {
@@ -2811,7 +2800,10 @@ class AdminConsoleActivity : ThemedActivity() {
                     previous == "more" -> showMoreModules(false)
                     previous != null -> openModule(previous, false)
                     currentSection != "home" -> showHome(false)
-                    else -> Unit
+                    else -> {
+                        // Keep the Android system Back key inside the admin workspace.
+                        showHome(false)
+                    }
                 }
             }
         }
@@ -3655,7 +3647,7 @@ class AdminConsoleActivity : ThemedActivity() {
         val allowedDays = if (currentRole == StaffRoleHelper.ADMIN) listOf(1, 3, 7, 15) else listOf(7, 15, 30)
         val allowPermanent = currentRole == StaffRoleHelper.SUPER
         val durationHint = if (allowPermanent) "المدة: 7 أو 15 أو 30 أو permanent" else "المدة بالأيام: " + allowedDays.joinToString(" أو ")
-        val form = formFields(listOf("معرّف المستخدم", "معرّف خطة VIP", durationHint))
+        val form = formFields(listOf("User ID / Public ID للمستخدم", "معرّف خطة VIP المعروفة", durationHint))
         AlertDialog.Builder(this)
             .setTitle("منح عضوية VIP")
             .setView(form.first)
@@ -3679,7 +3671,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         confirm("تأكيد منح VIP للمستخدم المحدد " + durationLabel + "؟") {
                             load(api.assignVip(mapOf("userId" to userId, "planId" to planId, "days" to (days ?: 30), "permanent" to permanent))) {
                                 dialog.dismiss()
-                                toast("استجاب الخادم لطلب منح VIP")
+                                toast("تم إرسال VIP للمستخدم بنجاح")
                                 openModule("vip")
                             }
                         }
