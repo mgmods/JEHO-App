@@ -702,10 +702,69 @@ class MainActivity : ThemedActivity() {
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     if (result.success) {
-                        claimButton.text = "تم الاستلام ✓"
-                        claimButton.isEnabled = false
+                        // The server has committed the claim. Persist the local display guard
+                        // immediately, then replace the reward grid with a real success state.
                         prefs.edit().putString("seen_date", status.today).apply()
-                        Toast.makeText(this, "تم الاستلام بنجاح!", Toast.LENGTH_LONG).show()
+                        val payload = result.data
+                        val reward = payload?.get("reward") as? Map<*, *>
+                        val rewardType = reward?.get("type")?.toString().orEmpty()
+                        val rewardName = reward?.get("name")?.toString()?.takeIf { it.isNotBlank() }
+                            ?: if (rewardType.equals("cosmetic", true)) "المكافأة التجميلية" else {
+                                val amount = reward?.get("amount")?.toString()
+                                if (!amount.isNullOrBlank()) "+$amount كوينز" else "مكافأتك اليومية"
+                            }
+                        val previewUrl = listOf("previewUrl", "imageUrl", "iconUrl")
+                            .firstNotNullOfOrNull { key -> reward?.get(key)?.toString()?.takeIf { it.isNotBlank() } }
+                        root.removeAllViews()
+                        root.gravity = Gravity.CENTER
+                        root.setPadding(pad, pad * 2, pad, pad * 2)
+                        root.addView(TextView(this).apply {
+                            text = "✉"
+                            textSize = 42f
+                            gravity = Gravity.CENTER
+                            setTextColor(dailyLoginThemeColor(status, "titleColor", Color.rgb(143, 99, 13)))
+                        }, LinearLayout.LayoutParams(-1, -2))
+                        if (rewardType.equals("cosmetic", true) && !previewUrl.isNullOrBlank()) {
+                            val rewardImage = ImageView(this).apply {
+                                layoutParams = LinearLayout.LayoutParams(
+                                    (116 * resources.displayMetrics.density).toInt(),
+                                    (116 * resources.displayMetrics.density).toInt()
+                                ).apply { gravity = Gravity.CENTER; topMargin = pad / 2 }
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                            }
+                            root.addView(rewardImage)
+                            Glide.with(this).load(resolveDailyLoginImageUrl(previewUrl))
+                                .placeholder(android.R.drawable.ic_menu_gallery)
+                                .error(android.R.drawable.ic_menu_gallery).into(rewardImage)
+                        }
+                        root.addView(TextView(this).apply {
+                            text = "تم الاستلام"
+                            textSize = 22f
+                            typeface = Typeface.DEFAULT_BOLD
+                            gravity = Gravity.CENTER
+                            setTextColor(dailyLoginThemeColor(status, "titleColor", Color.rgb(61, 49, 88)))
+                            setPadding(0, pad, 0, pad / 3)
+                        }, LinearLayout.LayoutParams(-1, -2))
+                        root.addView(TextView(this).apply {
+                            text = rewardName
+                            textSize = 15f
+                            gravity = Gravity.CENTER
+                            setTextColor(dailyLoginThemeColor(status, "subtitleColor", Color.rgb(118, 107, 128)))
+                        }, LinearLayout.LayoutParams(-1, -2))
+                        root.addView(Button(this).apply {
+                            text = "حسناً"
+                            isAllCaps = false
+                            textSize = 16f
+                            setTextColor(Color.WHITE)
+                            background = roundedBackground(
+                                dailyLoginThemeColor(status, "buttonColor", Color.rgb(118, 82, 165)),
+                                28, Color.rgb(93, 62, 135)
+                            )
+                            setOnClickListener { dialog.dismiss() }
+                        }, LinearLayout.LayoutParams(-1, (52 * resources.displayMetrics.density).toInt()).apply {
+                            topMargin = pad
+                        })
+                        root.requestLayout()
                     } else {
                         claimButton.text = "استلام"
                         claimButton.isEnabled = true
