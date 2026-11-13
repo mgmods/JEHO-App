@@ -84,7 +84,12 @@ public class ChatRepositoryImpl implements ChatRepository {
         }
     }
 
-    @Override public void clearCachedConversation(String conversationId) {\n        if (conversationId == null || conversationId.isEmpty()) return;\n        try { dao.clearConversation(conversationId); } catch (Exception ignored) {}\n    }\n\n    @Override public Result<ChatDtos.MessageDto> sendMessage(String conversationId, String content, String replyToId) {
+    @Override public void clearCachedConversation(String conversationId) {
+        if (conversationId == null || conversationId.isEmpty()) return;
+        try { dao.clearConversation(conversationId); } catch (Exception ignored) {}
+    }
+
+    @Override public Result<ChatDtos.MessageDto> sendMessage(String conversationId, String content, String replyToId) {
         Result<ChatDtos.MessageDto> result = ApiCall.execute(api.send(conversationId, new ChatDtos.SendMessageRequest(content, "text", replyToId)));
         if (result.success) cacheConfirmedMessage(result.data);
         return result;
