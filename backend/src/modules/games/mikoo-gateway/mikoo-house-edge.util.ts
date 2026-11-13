@@ -13,8 +13,10 @@ export function MULTI_AREA_TARGET_RTP(): number {
 }
 
 /**
- * Weighted multipliers so EV when hit ≈ 5.9;
- * hitRate from dashboard → RTP ≈ hitRate * 5.9.
+ * Nominal multiplier distribution before the shared payout guard:
+ * 42% x2, 26% x3, 15% x4, 9% x10, 4% x15, 2.5% x20, 1.5% x25.
+ * The nominal conditional mean is 4.595x; the realized return is lower
+ * when maxWinMult / maxWinAbsolute caps truncate larger outcomes.
  */
 export function spinPayout(
   betAmount: number,
@@ -77,26 +79,67 @@ export function multiAreaMultipliers(): Record<number, number> {
   return { 1: 1.9, 2: 4.5, 3: 1.9 };
 }
 
+/**
+ * Probability vector for an equal-stake spread across every area.
+ * The configured RTP is a benchmark for this reference mix, not a guarantee
+ * for arbitrary player-selected stake concentrations.
+ */
+export function calculateAreaOutcomeWeights(
+  multipliers: readonly number[],
+  targetRtp?: number,
+): number[] {
+  const m = multipliers.map((x) => Math.max(1.01, Number(x) || 1));
+  if (!m.length) return [];
+  if (m.every((value) => value === m[0])) return m.map(() => 1 / m.length);
+
+  const requestedRtp = Number(targetRtp) || getGameOdds().playerRtp;
+  const minMultiplier = Math.min(...m);
+  const maxMultiplier = Math.max(...m);
+  const targetTotalReturn = Math.min(
+    Math.max(requestedRtp * m.length, minMultiplier),
+    maxMultiplier,
+  );
+  if (targetTotalReturn <= minMultiplier + 1e-12) {
+    const minCount = m.filter((value) => value === minMultiplier).length;
+    return m.map((value) => value === minMultiplier ? 1 / minCount : 0);
+  }
+  if (targetTotalReturn >= maxMultiplier - 1e-12) {
+    const maxCount = m.filter((value) => value === maxMultiplier).length;
+    return m.map((value) => value === maxMultiplier ? 1 / maxCount : 0);
+  }
+  const expectedTotal = (exponent: number) => {
+    const weights = m.map((mult) => Math.pow(mult, -exponent));
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    return weights.reduce((sum, weight, index) => sum + (weight / totalWeight) * m[index]!, 0);
+  };
+
+  let low = -24;
+  let high = 24;
+  for (let i = 0; i < 64; i++) {
+    const mid = (low + high) / 2;
+    if (expectedTotal(mid) > targetTotalReturn) low = mid;
+    else high = mid;
+  }
+
+  const exponent = (low + high) / 2;
+  const weights = m.map((mult) => Math.pow(mult, -exponent));
+  const sum = weights.reduce((a, b) => a + b, 0);
+  return weights.map((weight) => weight / sum);
+}
+
 export function pickWeightedAreaIndex(
   multipliers: readonly number[],
   targetRtp?: number,
 ): number {
-  const m = multipliers.map((x) => Math.max(1.01, Number(x) || 1));
-  if (!m.length) return 0;
-  const tau = Math.min(
-    0.9,
-    Math.max(0.5, Number(targetRtp) || getGameOdds().playerRtp),
-  );
-  const weights = m.map((mult) => tau / mult);
-  const sum = weights.reduce((a, b) => a + b, 0);
-  let r = secureGameRandom() * sum;
+  const weights = calculateAreaOutcomeWeights(multipliers, targetRtp);
+  if (!weights.length) return 0;
+  let roll = secureGameRandom();
   for (let i = 0; i < weights.length; i++) {
-    r -= weights[i]!;
-    if (r <= 0) return i;
+    roll -= weights[i]!;
+    if (roll <= 0) return i;
   }
-  return m.length - 1;
+  return weights.length - 1;
 }
-
 export function pickWeightedAreaId(
   multipliers: readonly number[],
   targetRtp?: number,

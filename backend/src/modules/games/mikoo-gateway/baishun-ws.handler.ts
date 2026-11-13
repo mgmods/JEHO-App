@@ -387,10 +387,14 @@ export class BaishunWsHandler {
               this.logger.log(
                 `GAME_PROBE BAISHUN_SPIN game=${gameSlug} msgId=${msgId} bet=${betAmount} user=${player.userId} bal=${player.balance}`,
               );
-              const afterBet = await this.debit(player.userId, betAmount, gameSlug);
+              const suppliedOperationId = data.operationId ?? data.requestId ?? data.idempotencyKey ?? clientTs;
+              const operationId = suppliedOperationId != null && String(suppliedOperationId).trim()
+                ? `baishun:${gameSlug}:${player.sessionId}:${String(suppliedOperationId).slice(0, 120)}`
+                : randomUUID();
               const { win, mult } = spinPayout(betAmount, { gameId: gameSlug });
-              let balance = afterBet;
-              if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
+              const { balance } = await this.settleInstantBet(
+                player.userId, betAmount, win, gameSlug, mult, operationId,
+              );
               player.balance = balance;
               const rewardMultipleIndex = Math.max(0, Math.min(10, mult > 0 ? Math.min(10, mult) : 0));
               const rewardLevel = win >= betAmount * 3 ? 2 : win > 0 ? 1 : 0;
@@ -934,6 +938,8 @@ export class BaishunWsHandler {
     let hiloRounds = 0;
     let royalRoundId = `r${Date.now()}`;
     let royalMyBet = 0;
+    let royalSettlementTimer: ReturnType<typeof setTimeout> | null = null;
+    let royalRoundLocked = false;
     let greedyRoundId = `g${Date.now()}`;
     let greedyMyBet = 0;
     /** areaId -> stake total this round */
@@ -1329,6 +1335,10 @@ export class BaishunWsHandler {
                 this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeRoyalBetRes(p.balance || 0, royalMyBet)));
                 return;
               }
+              if (royalRoundLocked) {
+                this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeRoyalBetRes(p.balance || 0, royalMyBet)));
+                return;
+              }
               try {
                 const bal = await this.debit(p.userId, chip, gameSlug);
                 p.balance = bal;
@@ -1348,8 +1358,11 @@ export class BaishunWsHandler {
                   winCoins: 0,
                   balanceAfter: bal,
                 });
-                // Auto settle after short delay so UI progresses.
-                setTimeout(() => {
+                // One settlement timer per round. Further chip placements aggregate into
+                // the same stake instead of scheduling duplicate payouts.
+                if (!royalSettlementTimer) royalSettlementTimer = setTimeout(() => {
+                  royalSettlementTimer = null;
+                  royalRoundLocked = true;
                   if (ws.readyState !== WebSocket.OPEN) return;
                   const winner = 1 + Math.floor(secureGameRandom() * 2);
                   const blue = [1, 5, 9];
@@ -1379,7 +1392,7 @@ export class BaishunWsHandler {
                       stake * odds * (secureGameRandom() < payGate ? 1 : 0),
                     );
                     let nb = await this.sessions.refreshBalance(p);
-                    if (win > 0) nb = await this.credit(p.userId, win, gameSlug, stake);
+                    if (win > 0) nb = await this.credit(p.userId, win, gameSlug, stake, `${royalRoundId}:${p.userId}:settle`);
                     p.balance = nb;
                     const uid = String(p.publicId || p.userId);
                     setTimeout(() => {
@@ -1415,6 +1428,7 @@ export class BaishunWsHandler {
                       );
                       royalMyBet = 0;
                       royalRoundId = `r${Date.now()}`;
+                      royalRoundLocked = false;
                       setTimeout(() => {
                         if (ws.readyState !== WebSocket.OPEN) return;
                         this.sendBin(
@@ -1908,7 +1922,8 @@ export class BaishunWsHandler {
       const angle = Number(data.angle ?? 90);
       try {
         const charged = cost;
-        const bal = await this.debit(player.userId, charged, gameSlug);
+        const fishOperationId = `baishun:${gameSlug}:${player.sessionId}:fire:${String(fireToken).slice(0, 120)}`;
+        const bal = await this.debit(player.userId, charged, gameSlug, fishOperationId);
         player.balance = bal;
         let stakeMap = this.fishFireStakes.get(ws);
         if (!stakeMap) {
@@ -1984,7 +1999,8 @@ export class BaishunWsHandler {
       const { win } = spinPayout(stake, { hitRate: getGameOdds().fishingHitRate, gameId: gameSlug });
       let bal = await this.sessions.refreshBalance(player);
       if (win > 0) {
-        bal = await this.credit(player.userId, win, gameSlug, stake);
+        const fishOperationId = `baishun:${gameSlug}:${player.sessionId}:fire:${tokenKey.slice(0, 120)}`;
+        bal = await this.credit(player.userId, win, gameSlug, stake, `${fishOperationId}:win`);
         player.balance = bal;
         this.replyFish(ws, 1003, {
           ids: [fishId],
@@ -2136,7 +2152,65 @@ export class BaishunWsHandler {
     ws.send(buf);
   }
 
-  private async debit(userId: string, amount: number, gameId: string) {
+  private async settleInstantBet(
+    userId: string,
+    betAmount: number,
+    rawWin: number,
+    gameId: string,
+    multiplier: number,
+    operationId: string,
+  ): Promise<{ balance: number; win: number }> {
+    const { win } = clampGamePayout({ bet: betAmount, win: rawWin });
+    return this.dataSource.transaction(async (manager) => {
+      let wallet = await manager.findOne(Wallet, {
+        where: { userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      const existingBet = await manager.findOne(WalletTransaction, {
+        where: { userId, referenceType: 'mikoo_baishun_bet', referenceId: operationId },
+      });
+      if (existingBet) {
+        const existingWin = await manager.findOne(WalletTransaction, {
+          where: { userId, referenceType: 'mikoo_baishun_win', referenceId: `${operationId}:win` },
+        });
+        return { balance: Number(wallet.coins || 0), win: Number(existingWin?.amount || 0) };
+      }
+      const balance = Number(wallet.coins || 0);
+      if (balance < betAmount) throw new Error('INSUFFICIENT');
+      const afterDebit = balance - betAmount;
+      const afterSettlement = afterDebit + win;
+      wallet.coins = afterSettlement;
+      await manager.save(wallet);
+      await manager.save(manager.create(WalletTransaction, {
+        userId,
+        type: TransactionType.EXCHANGE,
+        currency: CurrencyType.COINS,
+        amount: -betAmount,
+        balanceAfter: afterDebit,
+        referenceType: 'mikoo_baishun_bet',
+        referenceId: operationId,
+        description: `BaiShun ${gameId} spin`,
+        metadata: { gameId, betAmount, operationId, atomicSettlement: true },
+      }));
+      if (win > 0) {
+        await manager.save(manager.create(WalletTransaction, {
+          userId,
+          type: TransactionType.LUCKY_REWARD,
+          currency: CurrencyType.COINS,
+          amount: win,
+          balanceAfter: afterSettlement,
+          referenceType: 'mikoo_baishun_win',
+          referenceId: `${operationId}:win`,
+          description: `BaiShun ${gameId} win`,
+          metadata: { gameId, amount: win, bet: betAmount, multiplier, operationId, atomicSettlement: true },
+        }));
+      }
+      return { balance: afterSettlement, win };
+    });
+  }
+
+  private async debit(userId: string, amount: number, gameId: string, referenceId: string = randomUUID()) {
     amount = clampBetAmount(amount, gamePayoutLimits().maxBet);
     if (amount < 1) throw new Error('INVALID_BET');
     return this.dataSource.transaction(async (manager) => {
@@ -2145,6 +2219,10 @@ export class BaishunWsHandler {
         lock: { mode: 'pessimistic_write' },
       });
       if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId, referenceType: 'mikoo_baishun_bet', referenceId },
+      });
+      if (existing) return Number(wallet.coins || 0);
       const balance = Number(wallet.coins || 0);
       if (balance < amount) throw new Error('INSUFFICIENT');
       wallet.coins = balance - amount;
@@ -2157,7 +2235,7 @@ export class BaishunWsHandler {
           amount: -amount,
           balanceAfter: Number(wallet.coins),
           referenceType: 'mikoo_baishun_bet',
-          referenceId: randomUUID(),
+          referenceId,
           description: `BaiShun ${gameId} spin`,
           metadata: { gameId, amount },
         }),
@@ -2166,7 +2244,7 @@ export class BaishunWsHandler {
     });
   }
 
-  private async credit(userId: string, amount: number, gameId: string, bet = 0) {
+  private async credit(userId: string, amount: number, gameId: string, bet = 0, referenceId: string = randomUUID()) {
     const clamped = clampGamePayout({ bet, win: amount });
     if (clamped.capped) {
       this.logger.warn(
@@ -2184,6 +2262,10 @@ export class BaishunWsHandler {
         lock: { mode: 'pessimistic_write' },
       });
       if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId, referenceType: 'mikoo_baishun_win', referenceId },
+      });
+      if (existing) return Number(wallet.coins || 0);
       wallet.coins = Number(wallet.coins || 0) + amount;
       await manager.save(wallet);
       await manager.save(
@@ -2194,7 +2276,7 @@ export class BaishunWsHandler {
           amount,
           balanceAfter: Number(wallet.coins),
           referenceType: 'mikoo_baishun_win',
-          referenceId: randomUUID(),
+          referenceId,
           description: `BaiShun ${gameId} win`,
           metadata: {
             gameId,

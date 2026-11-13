@@ -114,12 +114,16 @@ import { getGameBetSettings, getGameOdds, getGameRtp, isGameBettingEnabled, isGa
 type GameKind = 'crash' | 'multi' | 'spin';
 
 type RoomBet = {
+  /** Stable identity for this aggregated round/area wager and its payout. */
+  id: string;
   userId: string;
   playerId: number;
   sessionId: string;
   amount: number;
   areaId: number;
   cashedOut: boolean;
+  /** In-process guard against two overlapping cashout requests. */
+  cashoutProcessing?: boolean;
   payout: number;
   ws?: WebSocket;
   displayName?: string;
@@ -648,7 +652,7 @@ export class MikooGatewayService implements OnModuleDestroy {
 
       let bal = 0;
       try {
-        if (settledWin > 0) bal = await this.credit(bet.userId, settledWin, gameId, mult, bet.amount);
+        if (settledWin > 0) bal = await this.credit(bet.userId, settledWin, gameId, mult, bet.amount, `${gameId}:${room.round}:${bet.id}:settle`);
         else {
           const w = await this.wallets.findOne({ where: { userId: bet.userId } });
           bal = Number(w?.coins || 0);
@@ -734,7 +738,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         try {
           if (row.win > 0) {
             const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
-            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal, `${gameId}:${room.round}:${row.userId}:settle`);
           } else {
             const w = await this.wallets.findOne({ where: { userId: row.userId } });
             bal = Number(w?.coins || 0);
@@ -827,7 +831,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         try {
           if (row.win > 0) {
             const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
-            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal, `${gameId}:${room.round}:${row.userId}:settle`);
           } else {
             const w = await this.wallets.findOne({ where: { userId: row.userId } });
             bal = Number(w?.coins || 0);
@@ -941,7 +945,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         try {
           if (row.win > 0) {
             const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
-            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal, `${gameId}:${room.round}:${row.userId}:settle`);
           } else {
             const w = await this.wallets.findOne({ where: { userId: row.userId } });
             bal = Number(w?.coins || 0);
@@ -1032,7 +1036,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         try {
           if (row.win > 0) {
             const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
-            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal, `${gameId}:${room.round}:${row.userId}:settle`);
           } else {
             const w = await this.wallets.findOne({ where: { userId: row.userId } });
             bal = Number(w?.coins || 0);
@@ -1887,9 +1891,11 @@ export class MikooGatewayService implements OnModuleDestroy {
       return player;
     }
     try {
-      let bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
+      const operationId = randomUUID();
       const { win, mult } = spinPayout(amount, { gameId: gameSlug });
-      if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount);
+      const { balance: bal } = await this.settleInstantBet(
+        player.userId, amount, win, gameSlug, mult, operationId,
+      );
       player.balance = bal;
       if (style === 'fortune') {
         this.send(ws, '.game.DoFortuneGemsRes', encodeFortuneGemsRes({
@@ -1963,9 +1969,11 @@ export class MikooGatewayService implements OnModuleDestroy {
       return player;
     }
     try {
-      let bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
+      const operationId = randomUUID();
       const { win, mult } = spinPayout(amount, { gameId: gameSlug });
-      if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount);
+      const { balance: bal } = await this.settleInstantBet(
+        player.userId, amount, win, gameSlug, mult, operationId,
+      );
       player.balance = bal;
       if (style === 'sugar') {
         this.send(ws, '.game.s_c_bet', encodeSugarBetRes({
@@ -2135,7 +2143,8 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
 
     try {
-      const bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
+      const operationId = randomUUID();
+      const bal = await this.debit(player.userId, amount, gameSlug, player.publicId, operationId);
       player.balance = bal;
       room.balances.set(ws, bal);
       const key = `${player.publicId}:${req.areaId || 0}`;
@@ -2148,7 +2157,8 @@ export class MikooGatewayService implements OnModuleDestroy {
         existing.avatarUrl = player.avatarUrl || existing.avatarUrl;
       } else {
         room.bets.set(key, {
-          userId: player.userId,
+          id: operationId,
+          userId: player.userId, 
           playerId: player.publicId,
           sessionId: player.sessionId,
           amount,
@@ -2376,7 +2386,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     room: RoomState,
     player: MikooPlayerContext,
   ) {
-    const bet = [...room.bets.values()].find((b) => b.playerId === player.publicId && !b.cashedOut);
+    const bet = [...room.bets.values()].find((b) => b.playerId === player.publicId && !b.cashedOut && !b.cashoutProcessing);
     if (!bet || room.phase !== 'flying') {
       this.send(ws, '.game.CashoutRsp', encodeCashoutRsp({
         code: 1,
@@ -2387,7 +2397,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       }));
       return player;
     }
-    bet.cashedOut = true;
+    bet.cashoutProcessing = true;
     // Bust dist already houses; rake + hard ratio/abs caps (live from dashboard).
     const ratio = Math.min(room.ratio, gamePayoutLimits().maxCrashRatio);
     const { win, capped } = clampGamePayout({
@@ -2400,7 +2410,17 @@ export class MikooGatewayService implements OnModuleDestroy {
       );
     }
     bet.payout = win;
-    const bal = await this.credit(player.userId, win, gameSlug, ratio, bet.amount);
+    let bal: number;
+    try {
+      bal = await this.credit(player.userId, win, gameSlug, ratio, bet.amount, `${bet.id}:cashout`);
+      bet.cashedOut = true;
+      bet.cashoutProcessing = false;
+    } catch (error) {
+      bet.cashoutProcessing = false;
+      this.logger.error(`Mikoo cashout settlement failed game=${gameSlug} user=${player.userId} bet=${bet.id}: ${(error as Error).message}`);
+      this.send(ws, '.game.CashoutRsp', encodeCashoutRsp({ code: 1, desc: 'Settlement failed; retry cashout', ratio: room.ratio * 100, winMoney: 0, selfMoney: player.balance }));
+      return player;
+    }
     player.balance = bal;
     room.balances.set(ws, bal);
     // CashoutRsp.ratio is centi (client shows ratio/100).
@@ -2427,7 +2447,71 @@ export class MikooGatewayService implements OnModuleDestroy {
     return player;
   }
 
-  private async debit(userId: string, amount: number, gameId: string, playerId: number) {
+  /**
+   * Atomic debit + payout for one-shot Mikoo spins. The operation reference is
+   * unique per spin; if a caller retries with the same reference, the wallet
+   * ledger prevents a second debit or credit.
+   */
+  private async settleInstantBet(
+    userId: string,
+    betAmount: number,
+    rawWin: number,
+    gameId: string,
+    multiplier: number,
+    operationId: string,
+  ): Promise<{ balance: number; win: number }> {
+    const { win } = clampGamePayout({ bet: betAmount, win: rawWin });
+    return this.dataSource.transaction(async (manager) => {
+      let wallet = await manager.findOne(Wallet, {
+        where: { userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      const existingBet = await manager.findOne(WalletTransaction, {
+        where: { userId, referenceType: 'mikoo_game_bet', referenceId: operationId },
+      });
+      if (existingBet) {
+        const existingWin = await manager.findOne(WalletTransaction, {
+          where: { userId, referenceType: 'mikoo_game_win', referenceId: `${operationId}:win` },
+        });
+        return { balance: Number(wallet.coins || 0), win: Number(existingWin?.amount || 0) };
+      }
+
+      const currentBalance = Number(wallet.coins || 0);
+      if (currentBalance < betAmount) throw new Error('INSUFFICIENT');
+      const afterDebit = currentBalance - betAmount;
+      const afterSettlement = afterDebit + win;
+      wallet.coins = afterSettlement;
+      await manager.save(wallet);
+      await manager.save(manager.create(WalletTransaction, {
+        userId,
+        type: TransactionType.EXCHANGE,
+        currency: CurrencyType.COINS,
+        amount: -betAmount,
+        balanceAfter: afterDebit,
+        referenceType: 'mikoo_game_bet',
+        referenceId: operationId,
+        description: `Mikoo ${gameId} bet`,
+        metadata: { gameId, amount: betAmount, operationId, atomicSettlement: true },
+      }));
+      if (win > 0) {
+        await manager.save(manager.create(WalletTransaction, {
+          userId,
+          type: TransactionType.LUCKY_REWARD,
+          currency: CurrencyType.COINS,
+          amount: win,
+          balanceAfter: afterSettlement,
+          referenceType: 'mikoo_game_win',
+          referenceId: `${operationId}:win`,
+          description: `Mikoo ${gameId} win`,
+          metadata: { gameId, ratio: multiplier, bet: betAmount, amount: win, operationId, atomicSettlement: true },
+        }));
+      }
+      return { balance: afterSettlement, win };
+    });
+  }
+
+  private async debit(userId: string, amount: number, gameId: string, playerId: number, referenceId = randomUUID()) {
     return this.dataSource.transaction(async (manager) => {
       let wallet = await manager.findOne(Wallet, {
         where: { userId },
@@ -2446,7 +2530,7 @@ export class MikooGatewayService implements OnModuleDestroy {
           amount: -amount,
           balanceAfter: Number(wallet.coins),
           referenceType: 'mikoo_game_bet',
-          referenceId: randomUUID(),
+          referenceId,
           description: `Mikoo ${gameId} bet`,
           metadata: { gameId, playerId, amount },
         }),
@@ -2461,6 +2545,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     gameId: string,
     ratio: number,
     bet: number,
+    referenceId: string = randomUUID(),
   ) {
     const clamped = clampGamePayout({ bet, win: amount });
     if (clamped.capped) {
@@ -2479,6 +2564,14 @@ export class MikooGatewayService implements OnModuleDestroy {
         lock: { mode: 'pessimistic_write' },
       });
       if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      // A stable payout reference makes retries safe. The wallet row lock serializes
+      // concurrent attempts before checking the unique wallet transaction reference.
+      const existing = referenceId
+        ? await manager.findOne(WalletTransaction, {
+            where: { userId, referenceType: 'mikoo_game_win', referenceId },
+          })
+        : null;
+      if (existing) return Number(wallet.coins || 0);
       wallet.coins = Number(wallet.coins || 0) + amount;
       await manager.save(wallet);
       await manager.save(
@@ -2489,7 +2582,7 @@ export class MikooGatewayService implements OnModuleDestroy {
           amount,
           balanceAfter: Number(wallet.coins),
           referenceType: 'mikoo_game_win',
-          referenceId: randomUUID(),
+          referenceId,
           description: `Mikoo ${gameId} win`,
           metadata: {
             gameId,

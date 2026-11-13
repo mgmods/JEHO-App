@@ -64,9 +64,12 @@ export class LuckyWheelService {
     const adminBet = getGameBetSettings('lucky-wheel');
     return {
       enabled: (map.get('games.lucky_wheel.enabled') ?? 'true') !== 'false' && isGameBettingEnabled('lucky-wheel'),
-      maxBet: Math.min(adminBet.maxBet, Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), gamePayoutLimits().maxBet),
-      minBet: Math.max(adminBet.minBet, Math.min(Math.max(1, num('games.lucky_wheel.min_bet', 100)), Math.min(adminBet.maxBet, Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), gamePayoutLimits().maxBet))),
-      chips: adminBet.chips,
+      // The unified dashboard is the source of truth for per-game stake limits.
+      // Keep the legacy enabled flag only as an additional emergency kill switch;
+      // legacy min/max values must not silently override the administrator's values.
+      maxBet: Math.min(adminBet.maxBet, gamePayoutLimits().maxBet),
+      minBet: adminBet.minBet,
+      chips: adminBet.chips.filter((chip) => chip >= adminBet.minBet && chip <= Math.min(adminBet.maxBet, gamePayoutLimits().maxBet)),
       /** Very low win rate by default. */
       loseWeight: Math.max(1, num('games.lucky_wheel.lose_weight', 72)),
       x2Weight: Math.max(0, num('games.lucky_wheel.x2_weight', 24)),

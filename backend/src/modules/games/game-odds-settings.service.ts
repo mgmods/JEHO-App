@@ -122,10 +122,27 @@ export class GameOddsSettingsService implements OnModuleInit, OnModuleDestroy {
       row.value = JSON.stringify(next);
     }
     await this.settingsRepo.save(row);
-    setGameOdds(next);
+
+    // Verify the persisted representation, not only the in-memory value just written.
+    const persisted = await this.settingsRepo.findOne({
+      where: { key: GAME_ODDS_SETTING_KEY },
+    });
+    if (!persisted?.value) {
+      throw new Error('Game odds settings were not readable after save');
+    }
+    let persistedConfig: GameOddsConfig;
+    try {
+      persistedConfig = sanitizeGameOdds(JSON.parse(persisted.value));
+    } catch {
+      persistedConfig = sanitizeGameOdds(persisted.value);
+    }
+    if (persistedConfig.version !== next.version) {
+      throw new Error('Game odds settings read-back version does not match the saved version');
+    }
+    setGameOdds(persistedConfig);
     this.log.log(
-      `game odds updated rtp=${next.playerRtp} spinHit=${next.spinHitRate} crashRake=${next.crashCashoutRake}`,
+      `game odds updated rtp=${persistedConfig.playerRtp} spinHit=${persistedConfig.spinHitRate} crashRake=${persistedConfig.crashCashoutRake}`,
     );
-    return gameOddsClientPayload(next);
+    return gameOddsClientPayload(persistedConfig);
   }
 }

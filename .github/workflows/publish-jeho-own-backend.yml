@@ -3,7 +3,7 @@ name: Publish JEHO backend image
 on:
   push:
     branches:
-      - jeho-own
+      - MG-JEHO
     paths:
       - "backend/**"
       - ".github/workflows/publish-jeho-own-backend.yml"
@@ -19,10 +19,10 @@ concurrency:
 
 jobs:
   build-and-publish:
-    if: ${{ github.ref_name == 'jeho-own' }}
+    if: ${{ github.ref_name == 'MG-JEHO' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out selected JEHO branch
+      - name: Check out authoritative JEHO branch
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
@@ -35,15 +35,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish stable JEHO-OWN image
-        if: ${{ github.ref_name == 'jeho-own' }}
+      - name: Build and publish JEHO-OWN backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ghcr.io/mgmods/jeho-own-backend:jeho-own
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho
             ghcr.io/mgmods/jeho-own-backend:sha-${{ github.sha }}
-
-
+            ghcr.io/mgmods/jeho-own-backend:${{ github.sha }}

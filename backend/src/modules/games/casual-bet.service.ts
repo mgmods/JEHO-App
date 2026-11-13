@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { secureGameRandom } from './secure-game-rng';
+import { isSameCasualPlayRequest } from './casual-bet-idempotency.util';
 import { DataSource, Repository } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
@@ -91,6 +92,7 @@ export class CasualBetService {
       amount: number;
       roomId?: string;
       choice?: string | number;
+      idempotencyKey?: string;
     },
   ) {
     const gameId = String(body?.gameId || '').toLowerCase() as CasualGameId;
@@ -115,25 +117,55 @@ export class CasualBetService {
         lock: { mode: 'pessimistic_write' },
       });
       if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      const suppliedKey = String(body?.idempotencyKey || '').trim();
+      const playId = suppliedKey ? `${gameId}:${suppliedKey}` : randomUUID();
+      const betReferenceType = `casual_${gameId}_bet`;
+      const winReferenceType = `casual_${gameId}_win`;
+      const existingBet = suppliedKey ? await manager.findOne(WalletTransaction, {
+        where: { userId, referenceType: betReferenceType, referenceId: `${playId}:bet` },
+      }) : null;
+      if (existingBet) {
+        const meta = (existingBet.metadata || {}) as Record<string, any>;
+        // An idempotency key identifies one immutable play, not merely a wallet debit.
+        // Reject accidental key reuse with a different payload instead of returning a
+        // previous result for a new bet/choice.
+        const sameRequest = isSameCasualPlayRequest(meta, {
+          gameId, amount, roomId: body?.roomId, choice: body?.choice,
+        });
+        if (!sameRequest) {
+          throw new BadRequestException('Idempotency key was already used for a different game request');
+        }
+        const existingWin = await manager.findOne(WalletTransaction, {
+          where: { userId, referenceType: winReferenceType, referenceId: `${playId}:win` },
+        });
+        return {
+          balance: Number(wallet.coins || 0), currency: 'coins', gameId,
+          bet: amount, payout: Number(existingWin?.amount || 0),
+          won: Number(existingWin?.amount || 0) > amount,
+          net: Number(existingWin?.amount || 0) - amount,
+          multiplier: Number(meta.multiplier || 0),
+          detail: meta.detail || {}, replayed: true,
+        };
+      }
       if (Number(wallet.coins || 0) < amount) {
         throw new BadRequestException('Insufficient coins');
       }
       wallet.coins = Number(wallet.coins || 0) - amount;
       await manager.save(wallet);
-      const playId = randomUUID();
-      await manager.save(
-        manager.create(WalletTransaction, {
-          userId,
-          type: TransactionType.EXCHANGE,
-          currency: CurrencyType.COINS,
-          amount: -amount,
-          balanceAfter: Number(wallet.coins),
-          referenceType: `casual_${gameId}_bet`,
-          referenceId: `${playId}:bet`,
-          description: `${gameId} bet (coins)`,
-          metadata: { gameId, amount, roomId: body?.roomId || null, currency: 'coins' },
-        }),
-      );
+      await manager.save(manager.create(WalletTransaction, {
+        userId,
+        type: TransactionType.EXCHANGE,
+        currency: CurrencyType.COINS,
+        amount: -amount,
+        balanceAfter: Number(wallet.coins),
+        referenceType: betReferenceType,
+        referenceId: `${playId}:bet`,
+        description: `${gameId} bet (coins)`,
+        metadata: {
+          gameId, amount, roomId: body?.roomId || null, choice: body?.choice ?? null, currency: 'coins',
+          multiplier: outcome.multiplier, detail: outcome.detail,
+        },
+      }));
 
       const rawPayout = Math.floor(amount * outcome.multiplier);
       const { win: payout } = clampGamePayout({ bet: amount, win: rawPayout });
@@ -147,7 +179,7 @@ export class CasualBetService {
             currency: CurrencyType.COINS,
             amount: payout,
             balanceAfter: Number(wallet.coins),
-            referenceType: `casual_${gameId}_win`,
+            referenceType: winReferenceType,
             referenceId: `${playId}:win`,
             description: `${gameId} win x${outcome.multiplier} (coins)`,
             metadata: {
@@ -174,11 +206,12 @@ export class CasualBetService {
         net: payout - amount,
         multiplier: outcome.multiplier,
         detail: outcome.detail,
+        replayed: false,
       };
     });
 
     const name = await this.displayName(userId);
-    if (body?.roomId) {
+    if (body?.roomId && !result.replayed) {
       this.realtime?.emitToRoom(body.roomId, 'casual-game:play', {
         roomId: body.roomId,
         userId,

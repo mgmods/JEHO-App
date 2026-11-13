@@ -64,9 +64,12 @@ export class DiceService {
     const adminBet = getGameBetSettings('dice');
     return {
       enabled: (map.get('games.dice.enabled') ?? 'true') !== 'false' && isGameBettingEnabled('dice'),
-      maxBet: Math.min(adminBet.maxBet, Math.max(100, num('games.dice.max_bet', 10_000)), gamePayoutLimits().maxBet),
-      minBet: Math.max(adminBet.minBet, Math.min(Math.max(1, num('games.dice.min_bet', 100)), Math.min(adminBet.maxBet, Math.max(100, num('games.dice.max_bet', 10_000)), gamePayoutLimits().maxBet))),
-      chips: adminBet.chips,
+      // The unified dashboard is the source of truth for per-game stake limits.
+      // Keep the legacy enabled flag only as an additional emergency kill switch;
+      // legacy min/max values must not silently override the administrator's values.
+      maxBet: Math.min(adminBet.maxBet, gamePayoutLimits().maxBet),
+      minBet: adminBet.minBet,
+      chips: adminBet.chips.filter((chip) => chip >= adminBet.minBet && chip <= Math.min(adminBet.maxBet, gamePayoutLimits().maxBet)),
       /** Very low hit rate (~8%). */
       winWeight: Math.max(0, num('games.dice.win_weight', 8)),
       loseWeight: Math.max(1, num('games.dice.lose_weight', 92)),
