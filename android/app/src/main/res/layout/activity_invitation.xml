@@ -52,8 +52,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="24dp"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="20dp"
             android:background="@drawable/bg_wallet_section"
+            android:elevation="3dp"
             android:gravity="center_horizontal"
             android:orientation="vertical"
             android:padding="24dp">
@@ -62,8 +63,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="رمز الدعوة الخاص بك"
-                android:textColor="#333333"
-                android:textSize="16sp" />
+                android:textColor="#222222"
+                android:textSize="17sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvInviteCode"
