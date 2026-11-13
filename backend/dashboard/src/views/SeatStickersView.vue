@@ -177,7 +177,7 @@ async function load() {
       accessType: r.accessType || 'free', priceCoins: Number(r.priceCoins) || 0,
       audience: r.audience || 'all', requiredVipLevel: Number(r.requiredVipLevel) || 1,
       requiresCp: r.requiresCp === true,
-      categoryId: r.categoryId || 'male',
+      categoryId: /^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(String(r.key || '')) ? 'classic' : (r.categoryId || 'classic'),
     }))
   } else {
     rows.value = defaultSeed()
