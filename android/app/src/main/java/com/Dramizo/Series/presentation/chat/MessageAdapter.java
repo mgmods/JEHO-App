@@ -646,9 +646,14 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.imgFrame.setVisibility(View.GONE);
         }
 
-        holder.b.tvSender.setVisibility(View.GONE);
+        AuthDtos.UserDto styledNameUser = mine ? me : msg.sender;
+        boolean hasActiveNameStyle = styledNameUser != null
+                && styledNameUser.nameStyle != null
+                && (Boolean.TRUE.equals(styledNameUser.nameStyle.get("enabled"))
+                    || "true".equalsIgnoreCase(String.valueOf(styledNameUser.nameStyle.get("enabled"))));
         holder.b.tvSender.setText(name);
-        VipNameStyle.bind(holder.b.tvSender, mine ? me : msg.sender);
+        holder.b.tvSender.setVisibility(hasActiveNameStyle ? View.VISIBLE : View.GONE);
+        VipNameStyle.bind(holder.b.tvSender, styledNameUser);
         bindAgencyClubBadge(holder, msg, mine);
 
         if (showAvatar && listener != null) {
