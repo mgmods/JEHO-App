@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.LayoutInflater;
 import android.view.Gravity;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -27,12 +28,15 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.data.remote.dto.BadgeDto;
 import com.Dramizo.Series.databinding.ActivityProfileBinding;
+import com.Dramizo.Series.databinding.ItemGiftHistoryBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import android.widget.ImageView;
@@ -228,13 +232,7 @@ public class ProfileActivity extends ThemedActivity {
                 UserSocialNav.openVisitors(this, id, myId);
             });
         }
-        if (binding.propProfileSupporters != null) {
-            binding.propProfileSupporters.setOnClickListener(v -> {
-                String id = targetUserIdHold[0];
-                if (id == null || id.isEmpty()) return;
-                UserSocialNav.openFollowers(this, id, myId);
-            });
-        }
+        // Supporters are gift senders, not followers; their cards are rendered inline below.
         if (binding.propProfileFriends != null) {
             binding.propProfileFriends.setOnClickListener(v -> {
                 String id = targetUserIdHold[0];
@@ -359,15 +357,7 @@ public class ProfileActivity extends ThemedActivity {
             });
         });
 
-        binding.rowGiftHistory.setOnClickListener(v -> {
-            String profileId = targetUserIdHold[0];
-            if (profileId == null || profileId.trim().isEmpty()) profileId = loadedProfileId;
-            if (profileId == null || profileId.trim().isEmpty()) profileId = myId;
-            Intent gifts = new Intent(this, GiftHistoryActivity.class);
-            gifts.putExtra(GiftHistoryActivity.EXTRA_USER_ID, profileId);
-            startActivity(gifts);
-        });
-
+        // Received gifts are shown directly in the profile as a horizontal swipeable strip.
         if (userId != null && myId != null && !userId.equals(myId)) {
             container.getIoExecutor().execute(() -> {
                 try { container.getUserApi().visit(userId).execute(); } catch (Exception ignored) {}
@@ -457,6 +447,8 @@ public class ProfileActivity extends ThemedActivity {
                 loadedProfileId = user.id;
                 loadProfileMedals(user.id);
                 loadProfileAchievementBadges(user.id);
+                loadProfileSupporters(user.id);
+                loadProfileGiftStrip(user.id);
             }
             if (binding.tvStatFriends != null) binding.tvStatFriends.setText(formatScore(followers));
             if (binding.tvStatFollowing != null) binding.tvStatFollowing.setText(formatScore(following));
@@ -601,6 +593,105 @@ public class ProfileActivity extends ThemedActivity {
         if (userId != null) vm.loadUser(userId); else vm.loadMe();
     }
 
+
+
+    /** Top accounts that actually sent gifts to this profile — never followers. */
+    private void loadProfileSupporters(String profileId) {
+        if (binding == null || profileId == null || profileId.trim().isEmpty()) return;
+        RecyclerView recycler = binding.recyclerProfileSupporters;
+        recycler.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        recycler.setNestedScrollingEnabled(false);
+        container.getIoExecutor().execute(() -> {
+            Result<List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(container.getGiftApi().supporters(profileId));
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()) return;
+                List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto> supporters =
+                        result.success && result.data != null ? result.data : new java.util.ArrayList<>();
+                recycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+                    @NonNull @Override
+                    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                        View item = LayoutInflater.from(parent.getContext())
+                                .inflate(R.layout.item_profile_supporter, parent, false);
+                        return new RecyclerView.ViewHolder(item) {};
+                    }
+                    @Override public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+                        com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto supporter = supporters.get(position);
+                        ImageView avatar = holder.itemView.findViewById(R.id.imgSupporterAvatar);
+                        ImageView frame = holder.itemView.findViewById(R.id.imgSupporterFrame);
+                        TextView name = holder.itemView.findViewById(R.id.tvSupporterName);
+                        TextView amount = holder.itemView.findViewById(R.id.tvSupporterAmount);
+                        name.setText(supporter.displayName == null || supporter.displayName.trim().isEmpty()
+                                ? supporter.username : supporter.displayName);
+                        amount.setText("💎 " + NumberFormat.getNumberInstance(Locale.US)
+                                .format(Math.max(0L, supporter.totalSupport)));
+                        AvatarCosmetics.bindStacked(avatar, frame, supporter.avatarUrl, supporter.frameUrl);
+                        holder.itemView.setOnClickListener(v -> {
+                            if (supporter.id == null || supporter.id.isEmpty()) return;
+                            Intent profile = new Intent(ProfileActivity.this, ProfileActivity.class);
+                            profile.putExtra(EXTRA_USER_ID, supporter.id);
+                            startActivity(profile);
+                        });
+                    }
+                    @Override public int getItemCount() { return supporters.size(); }
+                });
+                binding.tvProfileSupportersEmpty.setVisibility(supporters.isEmpty() ? View.VISIBLE : View.GONE);
+                if (binding.tvPropProfileSupporters != null) {
+                    binding.tvPropProfileSupporters.setText(formatScore(supporters.size()));
+                }
+            });
+        });
+    }
+
+    /** Compact gift cabinet embedded in the profile; horizontal swipe, no navigation tap. */
+    private void loadProfileGiftStrip(String profileId) {
+        if (binding == null || profileId == null || profileId.trim().isEmpty()) return;
+        RecyclerView recycler = binding.recyclerProfileGiftHistory;
+        recycler.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        recycler.setNestedScrollingEnabled(false);
+        List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto> gifts = new java.util.ArrayList<>();
+        RecyclerView.Adapter<GiftStripHolder> adapter = new RecyclerView.Adapter<GiftStripHolder>() {
+            @NonNull @Override
+            public GiftStripHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                ItemGiftHistoryBinding item = ItemGiftHistoryBinding.inflate(
+                        LayoutInflater.from(parent.getContext()), parent, false);
+                item.getRoot().setLayoutParams(new RecyclerView.LayoutParams(
+                        (int) (104 * getResources().getDisplayMetrics().density),
+                        (int) (116 * getResources().getDisplayMetrics().density)));
+                return new GiftStripHolder(item);
+            }
+            @Override public void onBindViewHolder(@NonNull GiftStripHolder holder, int position) {
+                com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto gift = gifts.get(position);
+                holder.binding.tvGiftName.setText(gift.giftName == null ? "هدية" : gift.giftName);
+                holder.binding.tvGiftMeta.setText("× " + NumberFormat.getNumberInstance(Locale.US)
+                        .format(Math.max(0L, gift.quantity)));
+                Glide.with(holder.binding.imgGift).load(AssetCatalog.absoluteUrl(gift.giftIconUrl))
+                        .placeholder(ImagePlaceholder.gift()).error(ImagePlaceholder.gift())
+                        .into(holder.binding.imgGift);
+            }
+            @Override public int getItemCount() { return gifts.size(); }
+        };
+        recycler.setAdapter(adapter);
+        container.getIoExecutor().execute(() -> {
+            Result<List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(container.getGiftApi().receivedHistory(profileId));
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()) return;
+                gifts.clear();
+                if (result.success && result.data != null) gifts.addAll(result.data);
+                adapter.notifyDataSetChanged();
+                binding.tvProfileGiftsEmpty.setVisibility(gifts.isEmpty() ? View.VISIBLE : View.GONE);
+            });
+        });
+    }
+
+    private static final class GiftStripHolder extends RecyclerView.ViewHolder {
+        final ItemGiftHistoryBinding binding;
+        GiftStripHolder(ItemGiftHistoryBinding binding) {
+            super(binding.getRoot());
+            this.binding = binding;
+        }
+    }
 
     private void refreshRoomPresence(String targetId) {
         if (targetId == null || targetId.trim().isEmpty() || container == null) return;
