@@ -8513,7 +8513,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         stickersRv.setVisibility(seatOnly ? View.VISIBLE : View.GONE);
         View stickersLabel = sheet.findViewById(R.id.tvStickersLabel);
         if (stickersLabel != null) stickersLabel.setVisibility(seatOnly ? View.VISIBLE : View.GONE);
-        stickersRv.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        final java.util.List<SeatReactionEmojis.Item> visibleStickerItems =
+                new java.util.ArrayList<>(stickerItems);
+        final RecyclerView.Adapter<RecyclerView.ViewHolder> stickerAdapter =
+                new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
                 View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_emoji_sticker, parent, false);
@@ -8523,7 +8526,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
                 ImageView img = holder.itemView.findViewById(R.id.imgSticker);
                 img.setBackgroundColor(android.graphics.Color.TRANSPARENT);
-                final SeatReactionEmojis.Item item = stickerItems.get(position);
+                final SeatReactionEmojis.Item item = visibleStickerItems.get(position);
                 final String key = item.key;
                 final String uri = item.url;
                 TextView accessBadge = holder.itemView.findViewById(R.id.tvStickerAccess);
@@ -8572,8 +8575,47 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     dialog.dismiss();
                 });
             }
-            @Override public int getItemCount() { return stickerItems.size(); }
-        });
+            @Override public int getItemCount() { return visibleStickerItems.size(); }
+        };
+        stickersRv.setAdapter(stickerAdapter);
+        android.widget.LinearLayout categoryTabs = sheet.findViewById(R.id.layoutStickerCategories);
+        android.view.View categoryScroll = sheet.findViewById(R.id.scrollStickerCategories);
+        if (categoryTabs != null && seatOnly) {
+            categoryTabs.removeAllViews();
+            java.util.List<com.Dramizo.Series.data.remote.dto.MiscDtos.SeatStickerCategoryDto> packCategories =
+                    SeatReactionEmojis.categories();
+            if (packCategories != null && !packCategories.isEmpty()) {
+                categoryScroll.setVisibility(View.VISIBLE);
+                for (com.Dramizo.Series.data.remote.dto.MiscDtos.SeatStickerCategoryDto category : packCategories) {
+                    if (category == null || !category.isActive) continue;
+                    TextView tab = new TextView(this);
+                    tab.setText(category.name != null ? category.name : category.id);
+                    tab.setTextColor(Color.WHITE);
+                    tab.setTextSize(12f);
+                    tab.setPadding(14, 9, 14, 9);
+                    android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+                    bg.setColor(0xFF26343B);
+                    bg.setCornerRadius(24f);
+                    tab.setBackground(bg);
+                    android.widget.LinearLayout.LayoutParams tabLp = new android.widget.LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    tabLp.setMargins(4, 2, 4, 2);
+                    categoryTabs.addView(tab, tabLp);
+                    tab.setOnClickListener(v -> {
+                        visibleStickerItems.clear();
+                        for (SeatReactionEmojis.Item sticker : stickerItems) {
+                            if (category.id != null && category.id.equals(sticker.categoryId)) visibleStickerItems.add(sticker);
+                        }
+                        stickerAdapter.notifyDataSetChanged();
+                    });
+                }
+                if (categoryTabs.getChildCount() > 0) categoryTabs.getChildAt(0).performClick();
+            } else if (categoryScroll != null) {
+                categoryScroll.setVisibility(View.GONE);
+            }
+        } else if (categoryScroll != null) {
+            categoryScroll.setVisibility(View.GONE);
+        }
         stickersRv.setNestedScrollingEnabled(false);
 
         RecyclerView emojiRv = sheet.findViewById(R.id.recyclerEmojis);
