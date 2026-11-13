@@ -148,6 +148,17 @@ public final class GiftDtos {
         @SerializedName("diamondsAwarded") public long diamondsAwarded;
     }
 
+    /** One account that has supported this profile through gifts. */
+    public static class GiftSupporterDto {
+        @SerializedName("id") public String id;
+        @SerializedName("username") public String username;
+        @SerializedName("displayName") public String displayName;
+        @SerializedName("avatarUrl") public String avatarUrl;
+        @SerializedName("frameUrl") public String frameUrl;
+        @SerializedName("totalSupport") public long totalSupport;
+        @SerializedName("giftCount") public long giftCount;
+    }
+
     /** Backend returns data as a raw JSON array of gifts. */
     public static class GiftList extends java.util.ArrayList<GiftDto> {}
 }
