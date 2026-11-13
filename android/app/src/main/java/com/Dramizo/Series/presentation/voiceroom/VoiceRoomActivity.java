@@ -8564,6 +8564,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         RecyclerView emojiRv = sheet.findViewById(R.id.recyclerEmojis);
         emojiRv.setVisibility(seatOnly ? View.GONE : View.VISIBLE);
+        View chatEmojiLabel = sheet.findViewById(R.id.tvChatEmojisLabel);
+        if (chatEmojiLabel != null) chatEmojiLabel.setVisibility(seatOnly ? View.GONE : View.VISIBLE);
         emojiRv.setLayoutManager(new GridLayoutManager(this, 8));
         emojiRv.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull @Override
