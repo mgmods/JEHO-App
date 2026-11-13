@@ -68,6 +68,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.UUID;
+import java.util.Locale;
 import java.text.NumberFormat;
 
 public class ProfileActivity extends ThemedActivity {
@@ -453,9 +454,6 @@ public class ProfileActivity extends ThemedActivity {
             if (binding.tvStatFriends != null) binding.tvStatFriends.setText(formatScore(followers));
             if (binding.tvStatFollowing != null) binding.tvStatFollowing.setText(formatScore(following));
             if (binding.tvStatFans != null) binding.tvStatFans.setText(formatScore(visitors));
-            if (binding.tvPropProfileSupporters != null) {
-                binding.tvPropProfileSupporters.setText(formatScore(followers));
-            }
             if (binding.tvPropProfileFriends != null) {
                 binding.tvPropProfileFriends.setText(formatScore(friends));
             }
