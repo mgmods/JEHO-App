@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WebSocket } from 'ws';
 import { randomUUID } from 'crypto';
+import { secureGameRandom } from '../secure-game-rng';
 import { DataSource } from 'typeorm';
 import { MikooSessionService, MikooPlayerContext } from './mikoo-session.service';
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
@@ -992,8 +993,8 @@ export class BaishunWsHandler {
     };
 
     const randCard = () => ({
-      id: 1 + Math.floor(Math.random() * 13),
-      flower: Math.floor(Math.random() * 4),
+      id: 1 + Math.floor(secureGameRandom() * 13),
+      flower: Math.floor(secureGameRandom() * 4),
     });
 
     const clearGreedyTimers = () => {
@@ -1350,7 +1351,7 @@ export class BaishunWsHandler {
                 // Auto settle after short delay so UI progresses.
                 setTimeout(() => {
                   if (ws.readyState !== WebSocket.OPEN) return;
-                  const winner = 1 + Math.floor(Math.random() * 2);
+                  const winner = 1 + Math.floor(secureGameRandom() * 2);
                   const blue = [1, 5, 9];
                   const red = [2, 6, 10];
                   const rewardAreaIds = [winner];
@@ -1375,7 +1376,7 @@ export class BaishunWsHandler {
                     const configuredRoyalRate = getGameWinRate('royal-battle');
                     const payGate = configuredRoyalRate === undefined ? getGameOdds().royalBattlePayGate : configuredRoyalRate / 100;
                     const win = Math.floor(
-                      stake * odds * (Math.random() < payGate ? 1 : 0),
+                      stake * odds * (secureGameRandom() < payGate ? 1 : 0),
                     );
                     let nb = await this.sessions.refreshBalance(p);
                     if (win > 0) nb = await this.credit(p.userId, win, gameSlug, stake);
@@ -1508,7 +1509,7 @@ export class BaishunWsHandler {
             const selectType = Number(fields[1] ?? 0); // 1 lower, 2 higher
             const prev = hiloCard.id;
             const configuredHiloRate = getGameWinRate('hilo');
-            const wantHiloWin = configuredHiloRate === undefined ? null : Math.random() * 100 < configuredHiloRate;
+            const wantHiloWin = configuredHiloRate === undefined ? null : secureGameRandom() * 100 < configuredHiloRate;
             const didHiloWin = (card: { id: number }) => selectType === 2 ? card.id > prev : selectType === 1 ? card.id < prev : card.id !== prev;
             let next = randCard();
             if (wantHiloWin !== null) {
@@ -1725,12 +1726,12 @@ export class BaishunWsHandler {
 
   private swimsuitBoard(forceWinLine = false): number[][] {
     const cols: number[][] = [];
-    const winSym = 1 + Math.floor(Math.random() * 8);
+    const winSym = 1 + Math.floor(secureGameRandom() * 8);
     for (let c = 0; c < 5; c++) {
       const col: number[] = [];
       for (let r = 0; r < 4; r++) {
         if (forceWinLine && r === 1) col.push(winSym);
-        else col.push(1 + Math.floor(Math.random() * 8));
+        else col.push(1 + Math.floor(secureGameRandom() * 8));
       }
       cols.push(col);
     }
@@ -1870,9 +1871,9 @@ export class BaishunWsHandler {
           clearInterval(spawnTimer);
           return;
         }
-        const n = 1 + Math.floor(Math.random() * 3);
+        const n = 1 + Math.floor(secureGameRandom() * 3);
         const fishs = Array.from({ length: n }, (_, i) => {
-          const fid = 2000 + Math.floor(Math.random() * 900000) + i;
+          const fid = 2000 + Math.floor(secureGameRandom() * 900000) + i;
           return makeFish(fid, fid % 7);
         });
         this.replyFish(ws, 1004, { fishs });
@@ -2073,7 +2074,7 @@ export class BaishunWsHandler {
   }
 
   private fakeSymbols() {
-    return Array.from({ length: 15 }, () => 1 + Math.floor(Math.random() * 8));
+    return Array.from({ length: 15 }, () => 1 + Math.floor(secureGameRandom() * 8));
   }
 
   /** Cleopatra: NormalResult[col][row] — heights [6,7,7,7,6] = 33 cells. */
@@ -2082,7 +2083,7 @@ export class BaishunWsHandler {
     const cols: number[][] = [];
     for (let c = 0; c < heights.length; c++) {
       const col: number[] = [];
-      for (let r = 0; r < heights[c]; r++) col.push(1 + Math.floor(Math.random() * 8));
+      for (let r = 0; r < heights[c]; r++) col.push(1 + Math.floor(secureGameRandom() * 8));
       cols.push(col);
     }
     return cols;
@@ -2104,7 +2105,7 @@ export class BaishunWsHandler {
     // A losing spin must not accidentally display a winning three-of-a-kind.
     const symbols = [1, 2, 3, 4, 5, 6, 7, 8];
     for (let i = symbols.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(secureGameRandom() * (i + 1));
       [symbols[i], symbols[j]] = [symbols[j]!, symbols[i]!];
     }
     return symbols.slice(0, 3);
