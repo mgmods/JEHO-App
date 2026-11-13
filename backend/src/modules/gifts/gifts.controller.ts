@@ -63,6 +63,13 @@ export class GiftsController {
     return this.giftsService.receivedHistorySummary(userId);
   }
 
+  @Public()
+  @Get('supporters')
+  @ApiOperation({ summary: 'Public profile top gift supporters with support totals' })
+  supporters(@Query('userId') userId: string) {
+    return this.giftsService.receivedSupporters(userId);
+  }
+
   @Get('history')
   history(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
     return this.giftsService.history(userId, query);
