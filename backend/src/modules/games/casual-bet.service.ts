@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { secureGameRandom } from './secure-game-rng';
+import { isSameCasualPlayRequest } from './casual-bet-idempotency.util';
 import { DataSource, Repository } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
@@ -128,11 +129,9 @@ export class CasualBetService {
         // An idempotency key identifies one immutable play, not merely a wallet debit.
         // Reject accidental key reuse with a different payload instead of returning a
         // previous result for a new bet/choice.
-        const sameRequest =
-          Number(meta.amount) === amount &&
-          String(meta.gameId || '') === gameId &&
-          String(meta.roomId || '') === String(body?.roomId || '') &&
-          JSON.stringify(meta.choice ?? null) === JSON.stringify(body?.choice ?? null);
+        const sameRequest = isSameCasualPlayRequest(meta, {
+          gameId, amount, roomId: body?.roomId, choice: body?.choice,
+        });
         if (!sameRequest) {
           throw new BadRequestException('Idempotency key was already used for a different game request');
         }
