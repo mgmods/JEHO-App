@@ -125,14 +125,14 @@ public final class NotificationRouter {
             put(i, ContestsActivity.EXTRA_AGENCY_ID, first(data, "agency_id", "agencyId"));
             return i;
         }
-        String action = first(data, "action");
-        if ("agency".equals(t) && ("agency_club_approved".equalsIgnoreCase(action != null ? action : "")
-                || "agency_club_rejected".equalsIgnoreCase(action != null ? action : ""))) {
+        String agencyAction = first(data, "action");
+        if ("agency".equals(t) && ("agency_club_approved".equalsIgnoreCase(agencyAction != null ? agencyAction : "")
+                || "agency_club_rejected".equalsIgnoreCase(agencyAction != null ? agencyAction : ""))) {
             Intent i = new Intent(context, AgencyActivity.class);
             put(i, "open_agency_club_details_id", first(data, "agency_id", "agencyId"));
             return i;
         }
-        if ("agency".equals(t) && "join_request".equalsIgnoreCase(action != null ? action : "")) {
+        if ("agency".equals(t) && "join_request".equalsIgnoreCase(agencyAction != null ? agencyAction : "")) {
             Intent i = new Intent(context, AgencyManageActivity.class);
             put(i, AgencyManageActivity.EXTRA_AGENCY_ID, first(data, "agency_id", "agencyId"));
             i.putExtra(AgencyManageActivity.EXTRA_OPEN_PENDING_REQUESTS, true);
