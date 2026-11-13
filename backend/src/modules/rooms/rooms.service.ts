@@ -1997,18 +1997,21 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const items = this.dedupeRoomsById(rawItems);
     const giftCoins = await this.roomGiftCoinTotals(items.map((room) => room.id));
     const enriched = await Promise.all(
-      items.map(async (room, index) => ({
-        ...(await this.decorateRoom(room)),
-        roomLevel: this.computeRoomLevel(
-          giftCoins.get(room.id) || 0,
-          room.viewerCount || 0,
-        ),
-        exploreRank: (query.skip || 0) + index + 1,
-        challengeBadge: room.viewerCount >= 10 ? 'Hot 🔥' : null,
-        roomTopRank: cardTop.ranks.get(room.id) || null,
-        roomTopFrameUrl: cardTop.ranks.get(room.id) ? cardTop.frames[cardTop.ranks.get(room.id) - 1] : null,
-        roomTopPeriod: cardTop.period,
-      })),
+      items.map(async (room, index) => {
+        const roomTopRank = cardTop.ranks.get(room.id) || null;
+        return {
+          ...(await this.decorateRoom(room)),
+          roomLevel: this.computeRoomLevel(
+            giftCoins.get(room.id) || 0,
+            room.viewerCount || 0,
+          ),
+          exploreRank: (query.skip || 0) + index + 1,
+          challengeBadge: room.viewerCount >= 10 ? 'Hot 🔥' : null,
+          roomTopRank,
+          roomTopFrameUrl: roomTopRank ? (cardTop.frames[roomTopRank - 1] || null) : null,
+          roomTopPeriod: cardTop.period,
+        };
+      }),
     );
     return paginate(enriched, total, query.page || 1, query.limit || 20);
   }
