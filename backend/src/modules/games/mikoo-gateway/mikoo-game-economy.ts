@@ -1,3 +1,5 @@
+import { secureGameRandom } from '../secure-game-rng';
+
 /**
  * Shared Mikoo economy presets — chips, area ratios, spin multipliers.
  * High display mults are OK because settlement lands via inverse-weight RTP (≈75%).
@@ -57,5 +59,5 @@ export function lucky77ChipsList(): number[] {
 
 /** Pick a random win mult from the table (for decorating symbols). */
 export function randomWinMult(): number {
-  return MIKOO_WIN_MULTS[Math.floor(Math.random() * MIKOO_WIN_MULTS.length)]!;
+  return MIKOO_WIN_MULTS[Math.floor(secureGameRandom() * MIKOO_WIN_MULTS.length)]!;
 }
