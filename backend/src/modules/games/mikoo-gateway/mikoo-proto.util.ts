@@ -1,3 +1,4 @@
+import { secureGameRandom } from '../secure-game-rng';
 /** Minimal protobuf encode/decode for Mikoo hash-game messages. */
 
 import {
@@ -1043,13 +1044,13 @@ export function encodeCleopatraBetRes(data: {
 }): Buffer {
   const win = Math.max(0, Math.floor(data.winMoney || 0));
   const rowCounts = [6, 7, 7, 7, 6];
-  const winSym = 1 + Math.floor(Math.random() * 8);
+  const winSym = 1 + Math.floor(secureGameRandom() * 8);
   const cells: Buffer[] = [];
   for (let col = 0; col < rowCounts.length; col++) {
     const rows = rowCounts[col];
     for (let row = 0; row < rows; row++) {
       const number =
-        win > 0 && row === 2 ? winSym : 1 + Math.floor(Math.random() * 9);
+        win > 0 && row === 2 ? winSym : 1 + Math.floor(secureGameRandom() * 9);
       const pos = encodeMessage([
         pbInt32(1, row),
         pbInt32(2, col),
@@ -1109,7 +1110,7 @@ export function encodeOlympiansBetRes(data: {
   const cols = 6;
   const rows = 5;
   const win = Math.max(0, Math.floor(data.winMoney || 0));
-  const winSymbol = 1 + Math.floor(Math.random() * 8);
+  const winSymbol = 1 + Math.floor(secureGameRandom() * 8);
   const paidMult =
     data.mult && data.mult > 0
       ? data.mult
@@ -1123,11 +1124,11 @@ export function encodeOlympiansBetRes(data: {
     for (let row = 0; row < rows; row++) {
       // Scatter decorative mults so players see x2 / x10 / x50 values on symbols.
       const decor =
-        Math.random() < 0.18 ? randomWinMult() : 1;
+        secureGameRandom() < 0.18 ? randomWinMult() : 1;
       board.push({
         row,
         col,
-        number: 1 + Math.floor(Math.random() * 9),
+        number: 1 + Math.floor(secureGameRandom() * 9),
         mul: decor,
       });
     }
@@ -1190,14 +1191,14 @@ export function encodeSugarBetRes(data: {
       const mul =
         win > 0 && row === 2 && col < 5
           ? Math.max(1, paidMult)
-          : Math.random() < 0.15
+          : secureGameRandom() < 0.15
             ? randomWinMult()
             : 1;
       matrix.push(
         encodeMessage([
           pbInt32(1, row),
           pbInt32(2, col),
-          pbInt32(3, 1 + Math.floor(Math.random() * 8)),
+          pbInt32(3, 1 + Math.floor(secureGameRandom() * 8)),
           pbInt32(4, mul),
         ]),
       );
@@ -1231,7 +1232,7 @@ export function encodeMegawaysBetRes(data: {
   const win = Math.max(0, Math.floor(data.winMoney ?? 0));
   const reelCount = 6;
   const heights = [5, 6, 5, 7, 6, 5];
-  const winSym = 1 + Math.floor(Math.random() * 8);
+  const winSym = 1 + Math.floor(secureGameRandom() * 8);
   const reels: Buffer[] = [];
   for (let col = 0; col < reelCount; col++) {
     const h = heights[col] ?? 5;
@@ -1240,7 +1241,7 @@ export function encodeMegawaysBetRes(data: {
       nums.push(
         win > 0 && row === Math.floor(h / 2)
           ? winSym
-          : 1 + Math.floor(Math.random() * 10),
+          : 1 + Math.floor(secureGameRandom() * 10),
       );
     }
     // numList: repeated int32 list@1
@@ -1270,10 +1271,10 @@ export function encodePirateBetRes(data: {
   tipType?: number;
 }): Buffer {
   const win = Math.max(0, Math.floor(data.winMoney));
-  const winIcon = 1 + Math.floor(Math.random() * 8);
+  const winIcon = 1 + Math.floor(secureGameRandom() * 8);
   const icons: number[] = [];
   for (let i = 0; i < 15; i++) {
-    icons.push(1 + Math.floor(Math.random() * 8));
+    icons.push(1 + Math.floor(secureGameRandom() * 8));
   }
   // Paint a simple middle-row match when winning so bingoLine matches board.
   if (win > 0) {
@@ -1312,12 +1313,12 @@ export function encodeDoSlotsRsp(data: {
 }): Buffer {
   const icons: number[] = [];
   for (let i = 0; i < 15; i++) {
-    icons.push(1 + Math.floor(Math.random() * 9));
+    icons.push(1 + Math.floor(secureGameRandom() * 9));
   }
   const win = Math.max(0, Math.floor(data.winMoney));
   const isBingo = win > 0 ? 1 : 0;
   // Paint middle row (indices 5..9) as a 5-of-a-kind when winning.
-  const winIcon = 1 + Math.floor(Math.random() * 8);
+  const winIcon = 1 + Math.floor(secureGameRandom() * 8);
   if (isBingo) {
     for (let col = 0; col < 5; col++) icons[5 + col] = winIcon;
   }
@@ -1357,7 +1358,7 @@ export function encodeFortuneGemsRes(data: {
   const icons: Buffer[] = [];
   // 5x3 grid typical for fortune gems
   for (let i = 0; i < 15; i++) {
-    icons.push(pbUInt32(6, 1 + Math.floor(Math.random() * 8)));
+    icons.push(pbUInt32(6, 1 + Math.floor(secureGameRandom() * 8)));
   }
   const isWin = data.winMoney > 0 ? 1 : 0;
   const winMult = Math.max(0, Math.floor(data.mult ?? (isWin ? randomWinMult() : 0)));
