@@ -938,6 +938,8 @@ export class BaishunWsHandler {
     let hiloRounds = 0;
     let royalRoundId = `r${Date.now()}`;
     let royalMyBet = 0;
+    let royalSettlementTimer: ReturnType<typeof setTimeout> | null = null;
+    let royalRoundLocked = false;
     let greedyRoundId = `g${Date.now()}`;
     let greedyMyBet = 0;
     /** areaId -> stake total this round */
@@ -1333,6 +1335,10 @@ export class BaishunWsHandler {
                 this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeRoyalBetRes(p.balance || 0, royalMyBet)));
                 return;
               }
+              if (royalRoundLocked) {
+                this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeRoyalBetRes(p.balance || 0, royalMyBet)));
+                return;
+              }
               try {
                 const bal = await this.debit(p.userId, chip, gameSlug);
                 p.balance = bal;
@@ -1352,8 +1358,11 @@ export class BaishunWsHandler {
                   winCoins: 0,
                   balanceAfter: bal,
                 });
-                // Auto settle after short delay so UI progresses.
-                setTimeout(() => {
+                // One settlement timer per round. Further chip placements aggregate into
+                // the same stake instead of scheduling duplicate payouts.
+                if (!royalSettlementTimer) royalSettlementTimer = setTimeout(() => {
+                  royalSettlementTimer = null;
+                  royalRoundLocked = true;
                   if (ws.readyState !== WebSocket.OPEN) return;
                   const winner = 1 + Math.floor(secureGameRandom() * 2);
                   const blue = [1, 5, 9];
@@ -1383,7 +1392,7 @@ export class BaishunWsHandler {
                       stake * odds * (secureGameRandom() < payGate ? 1 : 0),
                     );
                     let nb = await this.sessions.refreshBalance(p);
-                    if (win > 0) nb = await this.credit(p.userId, win, gameSlug, stake);
+                    if (win > 0) nb = await this.credit(p.userId, win, gameSlug, stake, `${royalRoundId}:${p.userId}:settle`);
                     p.balance = nb;
                     const uid = String(p.publicId || p.userId);
                     setTimeout(() => {
@@ -1419,6 +1428,7 @@ export class BaishunWsHandler {
                       );
                       royalMyBet = 0;
                       royalRoundId = `r${Date.now()}`;
+                      royalRoundLocked = false;
                       setTimeout(() => {
                         if (ws.readyState !== WebSocket.OPEN) return;
                         this.sendBin(
