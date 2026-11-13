@@ -85,16 +85,41 @@ export function pickWeightedAreaIndex(
 ): number {
   const m = multipliers.map((x) => Math.max(1.01, Number(x) || 1));
   if (!m.length) return 0;
-  const tau = Math.min(
-    0.9,
-    Math.max(0.5, Number(targetRtp) || getGameOdds().playerRtp),
+  if (m.every((value) => value === m[0])) {
+    return Math.floor(secureGameRandom() * m.length);
+  }
+
+  // RTP is calibrated for an equal-stake spread across all displayed areas:
+  // E[return] = sum(P(area_i) * multiplier_i) / areaCount.
+  // Solve P(area_i) ∝ multiplier_i^(-exponent); unlike tau/multiplier,
+  // the exponent does not cancel during normalization.
+  const requestedRtp = Number(targetRtp) || getGameOdds().playerRtp;
+  const targetTotalReturn = Math.min(
+    Math.max(requestedRtp * m.length, Math.min(...m)),
+    Math.max(...m),
   );
-  const weights = m.map((mult) => tau / mult);
+  const expectedTotal = (exponent: number) => {
+    const weights = m.map((mult) => Math.pow(mult, -exponent));
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    return weights.reduce((sum, weight, index) => sum + (weight / totalWeight) * m[index]!, 0);
+  };
+
+  let low = -24;
+  let high = 24;
+  for (let i = 0; i < 64; i++) {
+    const mid = (low + high) / 2;
+    // Expected return decreases monotonically as exponent increases.
+    if (expectedTotal(mid) > targetTotalReturn) low = mid;
+    else high = mid;
+  }
+
+  const exponent = (low + high) / 2;
+  const weights = m.map((mult) => Math.pow(mult, -exponent));
   const sum = weights.reduce((a, b) => a + b, 0);
-  let r = secureGameRandom() * sum;
+  let roll = secureGameRandom() * sum;
   for (let i = 0; i < weights.length; i++) {
-    r -= weights[i]!;
-    if (r <= 0) return i;
+    roll -= weights[i]!;
+    if (roll <= 0) return i;
   }
   return m.length - 1;
 }
