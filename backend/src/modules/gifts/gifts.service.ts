@@ -4082,4 +4082,43 @@ export class GiftsService implements OnModuleInit {
     }));
   }
 
+  /** Public profile supporters: rank distinct gift senders by delivered support diamonds. */
+  async receivedSupporters(userId: string) {
+    if (!userId || !String(userId).trim()) {
+      throw new BadRequestException('معرّف المستخدم مطلوب');
+    }
+    const rows = await this.sendsRepo.createQueryBuilder('giftSend')
+      .innerJoin('giftSend.sender', 'sender')
+      .leftJoin('sender.profile', 'senderProfile')
+      .select('sender.id', 'id')
+      .addSelect('sender.username', 'username')
+      .addSelect('sender.displayName', 'displayName')
+      .addSelect('sender.avatarUrl', 'avatarUrl')
+      .addSelect('senderProfile.hostBadgeUrl', 'frameUrl')
+      .addSelect('SUM(giftSend.diamondsAwarded)', 'totalSupport')
+      .addSelect('SUM(giftSend.quantity)', 'giftCount')
+      .where('giftSend.receiverId = :userId', { userId })
+      .andWhere('giftSend.senderId <> giftSend.receiverId')
+      .andWhere('(giftSend.expiresAt IS NULL OR giftSend.expiresAt > :now)', { now: new Date() })
+      .groupBy('sender.id')
+      .addGroupBy('sender.username')
+      .addGroupBy('sender.displayName')
+      .addGroupBy('sender.avatarUrl')
+      .addGroupBy('senderProfile.hostBadgeUrl')
+      .orderBy('SUM(giftSend.diamondsAwarded)', 'DESC')
+      .addOrderBy('SUM(giftSend.totalCoins)', 'DESC')
+      .limit(100)
+      .getRawMany();
+    return rows.map((row) => ({
+      id: String(row.id),
+      username: String(row.username || ''),
+      displayName: String(row.displayName || row.username || ''),
+      avatarUrl: row.avatarUrl || null,
+      frameUrl: row.frameUrl || null,
+      totalSupport: Math.max(0, Number(row.totalSupport) || 0),
+      giftCount: Math.max(0, Number(row.giftCount) || 0),
+    }));
+  }
+
+
 }
