@@ -30,6 +30,9 @@ public interface GiftApi {
     @GET("gifts/support-chest")
     Call<ApiResponse<java.util.Map<String, Object>>> supportChest(@retrofit2.http.Query("roomId") String roomId);
 
+    @GET("gifts/history/received")
+    Call<ApiResponse<java.util.List<GiftDtos.GiftReceivedSummaryDto>>> receivedHistory(@retrofit2.http.Query("userId") String userId);
+
     @GET("gifts/history")
     Call<ApiResponse<MiscDtos.ListResult<GiftDtos.GiftHistoryDto>>> history(@retrofit2.http.Query("page") int page);
 }
