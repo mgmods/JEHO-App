@@ -88,6 +88,20 @@ public class SessionManager {
         }
     }
 
+    /**
+     * Replace the cached profile with a complete server profile. Unlike
+     * updateCachedUser(), this intentionally preserves explicit nulls such as
+     * chatBubbleUrl=null after the user removes a worn CP chat bubble.
+     */
+    public void updateCachedUserAuthoritative(AuthDtos.UserDto user) {
+        if (user == null) return;
+        prefs.edit()
+                .putString("user_json", gson.toJson(user))
+                .putString("user_id", user.id != null ? user.id : prefs.getString("user_id", null))
+                .commit();
+        saveAccountSnapshot();
+    }
+
     public void updateCachedUser(AuthDtos.UserDto user) {
         if (user == null) return;
         String identifier = user.username != null ? user.username
