@@ -22,6 +22,7 @@
     <LoadingSpinner v-if="loading" />
     <template v-else>
       <div v-if="!rows.length" class="glass p-4 empty-state mb-3">{{ t('seatStickers.empty') }}</div>
+      <div class="glass p-3 mb-3"><div class="form-check form-switch"><input id="seat-stickers-enabled" v-model="enabled" class="form-check-input" type="checkbox" /><label class="form-check-label" for="seat-stickers-enabled">تفعيل ملصقات المقاعد والإيموجيات المتحركة</label></div><small class="text-secondary">عند الإيقاف تختفي جميع الملصقات من التطبيق.</small></div>
       <div class="sticker-grid">
         <article v-for="(row, idx) in rows" :key="row.id || row.key || idx" class="glass p-3 sticker-card">
           <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
@@ -40,6 +41,12 @@
           <input v-model="row.name" class="form-control form-control-sm mb-2" maxlength="80" />
           <label class="form-label small mb-1">{{ t('seatStickers.sort') }}</label>
           <input v-model.number="row.sortOrder" type="number" class="form-control form-control-sm mb-2" min="1" />
+          <label class="form-label small mb-1">نوع الإتاحة</label>
+          <select v-model="row.accessType" class="form-select form-select-sm mb-2"><option value="free">مجاني</option><option value="paid">مدفوع بالكوينز</option><option value="vip">حصري VIP</option><option value="cp">حصري CP</option></select>
+          <label class="form-label small mb-1">السعر بالكوينز</label><input v-model.number="row.priceCoins" type="number" min="0" class="form-control form-control-sm mb-2" />
+          <label class="form-label small mb-1">الفئة</label><select v-model="row.audience" class="form-select form-select-sm mb-2"><option value="all">الجميع</option><option value="male">الشباب</option><option value="female">البنات</option></select>
+          <label class="form-label small mb-1">مستوى VIP المطلوب</label><input v-model.number="row.requiredVipLevel" type="number" min="1" max="7" class="form-control form-control-sm mb-2" />
+          <div class="form-check mb-2"><input v-model="row.requiresCp" class="form-check-input" type="checkbox" /><label class="form-check-label small">يشترط علاقة CP فعالة</label></div>
           <label class="form-label small mb-1">{{ t('seatStickers.file') }}</label>
           <input
             type="file"
@@ -71,6 +78,7 @@ const { t } = useI18n()
 const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '')
 
 const rows = ref([])
+const enabled = ref(true)
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -102,7 +110,7 @@ function defaultSeed() {
       url: `${ORIGIN}/assets/seat-stickers/${key}.${ext}`,
       name: key.toUpperCase(),
       sortOrder: n,
-      isActive: true,
+      isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false,
     })
   }
   return out
@@ -129,6 +137,7 @@ async function load() {
     return
   }
   const cfg = parseSetting(data, 'seat_stickers')
+  enabled.value = cfg?.enabled !== false
   if (cfg && Array.isArray(cfg.items) && cfg.items.length) {
     rows.value = cfg.items.map((r, i) => ({
       id: r.id || r.key || `s${i + 1}`,
@@ -137,6 +146,9 @@ async function load() {
       name: r.name || '',
       sortOrder: Number(r.sortOrder) || i + 1,
       isActive: r.isActive !== false,
+      accessType: r.accessType || 'free', priceCoins: Number(r.priceCoins) || 0,
+      audience: r.audience || 'all', requiredVipLevel: Number(r.requiredVipLevel) || 1,
+      requiresCp: r.requiresCp === true,
     }))
   } else {
     rows.value = defaultSeed()
@@ -194,7 +206,7 @@ async function save() {
       isActive: r.isActive !== false,
     }))
   const payload = {
-    seat_stickers: JSON.stringify({ version: 1, items }),
+    seat_stickers: JSON.stringify({ version: 2, enabled: enabled.value, items }),
   }
   const { error: err } = await settingsApi.update(payload)
   saving.value = false
