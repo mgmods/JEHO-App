@@ -401,13 +401,20 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       relations: ['participants', 'participants.user', 'participants.user.profile'],
     });
     if (conv) {
-      // Re-opening a deleted chat restores it for this user
-      await this.partRepo.update(
-        { conversationId: conv.id, userId },
-        { isDeleted: false, isArchived: false },
-      );
-      const vipByUser = await this.vipMapForUsers([userId, dto.peerId]);
-      return this.decorateConversation(conv, userId, vipByUser);
+      const myParticipant = (conv.participants || []).find((p) => p.userId === userId);
+      if (myParticipant?.isDeleted) {
+        // A deleted DM is a closed thread for this user. Detach its unique key
+        // so a later message/start creates a brand-new conversation with no
+        // access to the old thread's message history.
+        await this.convRepo.update(
+          { id: conv.id, directKey: key },
+          { directKey: null },
+        );
+        conv = null;
+      } else {
+        const vipByUser = await this.vipMapForUsers([userId, dto.peerId]);
+        return this.decorateConversation(conv, userId, vipByUser);
+      }
     }
 
     conv = await this.convRepo.save(
@@ -1291,12 +1298,28 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
   async deleteForMe(conversationId: string, userId: string) {
     await this.getConversation(conversationId, userId);
-    // Hide this conversation only for the requesting participant. The other
-    // participant keeps the full thread and receives no deletion event.
-    await this.partRepo.update(
-      { conversationId, userId },
-      { isDeleted: true, unreadCount: 0, isArchived: false, isPinned: false },
-    );
+    // Hide this conversation only for the requesting participant. Also release
+    // the unique direct-message key: the next contact with this peer must create
+    // a new conversation ID instead of reusing this thread and its old messages.
+    await this.dataSource.transaction(async (manager) => {
+      const conversation = await manager.findOne(ChatConversation, {
+        where: { id: conversationId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!conversation) throw new NotFoundException('Conversation not found');
+      await manager.update(
+        ChatParticipant,
+        { conversationId, userId },
+        { isDeleted: true, unreadCount: 0, isArchived: false, isPinned: false },
+      );
+      if (conversation.type === ConversationType.DIRECT) {
+        await manager.update(
+          ChatConversation,
+          { id: conversationId },
+          { directKey: null },
+        );
+      }
+    });
     this.realtime?.emitToUser(userId, 'chat:conversation:deleted', {
       conversationId,
       byUserId: userId,
