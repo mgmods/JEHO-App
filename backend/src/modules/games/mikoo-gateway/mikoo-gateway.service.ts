@@ -1892,9 +1892,10 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
     try {
       const operationId = randomUUID();
-      let bal = await this.debit(player.userId, amount, gameSlug, player.publicId, operationId);
       const { win, mult } = spinPayout(amount, { gameId: gameSlug });
-      if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount, `${operationId}:win`);
+      const { balance: bal } = await this.settleInstantBet(
+        player.userId, amount, win, gameSlug, mult, operationId,
+      );
       player.balance = bal;
       if (style === 'fortune') {
         this.send(ws, '.game.DoFortuneGemsRes', encodeFortuneGemsRes({
@@ -1969,9 +1970,10 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
     try {
       const operationId = randomUUID();
-      let bal = await this.debit(player.userId, amount, gameSlug, player.publicId, operationId);
       const { win, mult } = spinPayout(amount, { gameId: gameSlug });
-      if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount, `${operationId}:win`);
+      const { balance: bal } = await this.settleInstantBet(
+        player.userId, amount, win, gameSlug, mult, operationId,
+      );
       player.balance = bal;
       if (style === 'sugar') {
         this.send(ws, '.game.s_c_bet', encodeSugarBetRes({
@@ -2443,6 +2445,70 @@ export class MikooGatewayService implements OnModuleDestroy {
       balanceAfter: bal,
     });
     return player;
+  }
+
+  /**
+   * Atomic debit + payout for one-shot Mikoo spins. The operation reference is
+   * unique per spin; if a caller retries with the same reference, the wallet
+   * ledger prevents a second debit or credit.
+   */
+  private async settleInstantBet(
+    userId: string,
+    betAmount: number,
+    rawWin: number,
+    gameId: string,
+    multiplier: number,
+    operationId: string,
+  ): Promise<{ balance: number; win: number }> {
+    const { win } = clampGamePayout({ bet: betAmount, win: rawWin });
+    return this.dataSource.transaction(async (manager) => {
+      let wallet = await manager.findOne(Wallet, {
+        where: { userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      const existingBet = await manager.findOne(WalletTransaction, {
+        where: { userId, referenceType: 'mikoo_game_bet', referenceId: operationId },
+      });
+      if (existingBet) {
+        const existingWin = await manager.findOne(WalletTransaction, {
+          where: { userId, referenceType: 'mikoo_game_win', referenceId: `${operationId}:win` },
+        });
+        return { balance: Number(wallet.coins || 0), win: Number(existingWin?.amount || 0) };
+      }
+
+      const currentBalance = Number(wallet.coins || 0);
+      if (currentBalance < betAmount) throw new Error('INSUFFICIENT');
+      const afterDebit = currentBalance - betAmount;
+      const afterSettlement = afterDebit + win;
+      wallet.coins = afterSettlement;
+      await manager.save(wallet);
+      await manager.save(manager.create(WalletTransaction, {
+        userId,
+        type: TransactionType.EXCHANGE,
+        currency: CurrencyType.COINS,
+        amount: -betAmount,
+        balanceAfter: afterDebit,
+        referenceType: 'mikoo_game_bet',
+        referenceId: operationId,
+        description: `Mikoo ${gameId} bet`,
+        metadata: { gameId, amount: betAmount, operationId, atomicSettlement: true },
+      }));
+      if (win > 0) {
+        await manager.save(manager.create(WalletTransaction, {
+          userId,
+          type: TransactionType.LUCKY_REWARD,
+          currency: CurrencyType.COINS,
+          amount: win,
+          balanceAfter: afterSettlement,
+          referenceType: 'mikoo_game_win',
+          referenceId: `${operationId}:win`,
+          description: `Mikoo ${gameId} win`,
+          metadata: { gameId, ratio: multiplier, bet: betAmount, amount: win, operationId, atomicSettlement: true },
+        }));
+      }
+      return { balance: afterSettlement, win };
+    });
   }
 
   private async debit(userId: string, amount: number, gameId: string, playerId: number, referenceId = randomUUID()) {
