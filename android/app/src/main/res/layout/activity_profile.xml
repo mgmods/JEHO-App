@@ -795,6 +795,42 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/sectionProfileSupporters"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="14dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_profile_section_light"
+                    android:orientation="vertical"
+                    android:padding="10dp">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="الداعمون"
+                        android:textColor="#FF283047"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recyclerProfileSupporters"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:clipToPadding="false"
+                        android:nestedScrollingEnabled="false"
+                        android:overScrollMode="never"
+                        android:paddingBottom="2dp" />
+                    <TextView
+                        android:id="@+id/tvProfileSupportersEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="10dp"
+                        android:text="لا يوجد داعمون حتى الآن"
+                        android:textColor="#FF73798D"
+                        android:textSize="11sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
                 <!-- Profile medal/rank strip is disabled platform-wide. -->
                 <!-- Agency strip (same as user card) -->
                 <androidx.constraintlayout.widget.ConstraintLayout
@@ -1432,34 +1468,35 @@
                 <LinearLayout
                     android:id="@+id/rowGiftHistory"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:contentDescription="@null"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/ic_asset_gift" />
-
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="10dp">
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:layout_weight="1"
-                        android:text="@string/gift_history"
+                        android:text="الهدايا"
                         android:textColor="#FF283047"
-                        android:textSize="14sp"
+                        android:textSize="15sp"
                         android:textStyle="bold" />
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:contentDescription="@null"
-                        android:src="@drawable/ic_arrow_right_me"
-                        app:tint="#FF7B8196" />
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recyclerProfileGiftHistory"
+                        android:layout_width="match_parent"
+                        android:layout_height="124dp"
+                        android:layout_marginTop="8dp"
+                        android:clipToPadding="false"
+                        android:nestedScrollingEnabled="false"
+                        android:overScrollMode="never" />
+                    <TextView
+                        android:id="@+id/tvProfileGiftsEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="10dp"
+                        android:text="لا توجد هدايا مستلمة بعد"
+                        android:textColor="#FF73798D"
+                        android:textSize="11sp"
+                        android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
