@@ -650,7 +650,7 @@ export class MikooGatewayService implements OnModuleDestroy {
 
       let bal = 0;
       try {
-        if (settledWin > 0) bal = await this.credit(bet.userId, settledWin, gameId, mult, bet.amount);
+        if (settledWin > 0) bal = await this.credit(bet.userId, settledWin, gameId, mult, bet.amount, `${gameId}:${room.round}:${bet.id}:settle`);
         else {
           const w = await this.wallets.findOne({ where: { userId: bet.userId } });
           bal = Number(w?.coins || 0);
@@ -736,7 +736,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         try {
           if (row.win > 0) {
             const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
-            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal, `${gameId}:${room.round}:${row.userId}:settle`);
           } else {
             const w = await this.wallets.findOne({ where: { userId: row.userId } });
             bal = Number(w?.coins || 0);
@@ -829,7 +829,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         try {
           if (row.win > 0) {
             const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
-            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal, `${gameId}:${room.round}:${row.userId}:settle`);
           } else {
             const w = await this.wallets.findOne({ where: { userId: row.userId } });
             bal = Number(w?.coins || 0);
@@ -943,7 +943,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         try {
           if (row.win > 0) {
             const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
-            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal, `${gameId}:${room.round}:${row.userId}:settle`);
           } else {
             const w = await this.wallets.findOne({ where: { userId: row.userId } });
             bal = Number(w?.coins || 0);
@@ -1034,7 +1034,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         try {
           if (row.win > 0) {
             const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
-            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal, `${gameId}:${room.round}:${row.userId}:settle`);
           } else {
             const w = await this.wallets.findOne({ where: { userId: row.userId } });
             bal = Number(w?.coins || 0);
