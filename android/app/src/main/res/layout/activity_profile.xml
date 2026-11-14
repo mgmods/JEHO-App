@@ -360,6 +360,7 @@
                         android:id="@+id/imgAgencyRoleBadge"
                         android:layout_width="wrap_content"
                         android:layout_height="28dp"
+                        android:maxWidth="112dp"
                         android:minWidth="64dp"
                         android:adjustViewBounds="true"
                         android:scaleType="fitCenter"
