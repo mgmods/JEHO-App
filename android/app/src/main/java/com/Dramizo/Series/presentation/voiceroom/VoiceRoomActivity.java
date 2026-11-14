@@ -168,6 +168,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean pendingSeatInviteDialog;
 
     private ActivityVoiceRoomBinding binding;
+    private boolean seatStickerRefreshInFlight;
     @Nullable private TextView roomPkScoreBanner;
     @Nullable private android.widget.LinearLayout roomPkSplitContainer;
     @Nullable private TextView roomPkTeamAName;
@@ -602,8 +603,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 .get(VoiceRoomViewModel.class);
         // Fail closed on stale sticker data, then load the latest dashboard catalog for this room.
         SeatReactionEmojis.setFromDto(null);
-        AppContainer stickerContainer = ContainerProvider.from(this);
-        stickerContainer.ioExecutor.execute(() -> RemoteSeatStickers.refreshBlocking(stickerContainer));
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
         // The tapped room card already knows this ID, so show it on first paint instead of
         // waiting for the network join response to carry the same value back.
@@ -8472,6 +8471,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void showEmojiPicker(boolean seatOnly) {
+        if (seatOnly) {
+            if (seatStickerRefreshInFlight) {
+                Toast.makeText(this, "جارٍ تحديث الملصقات، انتظر لحظة", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            seatStickerRefreshInFlight = true;
+            // Never show a stale catalog after an admin disables or replaces stickers.
+            SeatReactionEmojis.setFromDto(null);
+            AppContainer stickerContainer = ContainerProvider.from(this);
+            stickerContainer.ioExecutor.execute(() -> {
+                RemoteSeatStickers.refreshBlocking(stickerContainer);
+                runOnUiThread(() -> {
+                    seatStickerRefreshInFlight = false;
+                    if (!isFinishing() && !isDestroyed()) showEmojiPickerContent(true);
+                });
+            });
+            Toast.makeText(this, "جارٍ تحديث الملصقات", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        showEmojiPickerContent(false);
+    }
+
+    private void showEmojiPickerContent(boolean seatOnly) {
         Dialog dialog = new Dialog(this, R.style.MikooBottomPanelDialog);
         View sheet = getLayoutInflater().inflate(R.layout.dialog_emoji_picker, null);
         dialog.setContentView(sheet);
