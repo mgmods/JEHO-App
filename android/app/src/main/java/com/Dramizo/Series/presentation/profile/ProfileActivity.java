@@ -346,6 +346,18 @@ public class ProfileActivity extends ThemedActivity {
                 return true;
             });
         }
+        if (binding.btnMore != null) {
+            binding.btnMore.setOnClickListener(v -> showProfileMoreMenu(targetUserIdHold[0]));
+        }
+        if (binding.btnRoom != null) {
+            binding.btnRoom.setOnClickListener(v -> {
+                if (roomTrackingRoomId == null || roomTrackingRoomId.trim().isEmpty()) {
+                    Toast.makeText(this, "هذا المستخدم ليس في غرفة حالياً", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                openTrackedRoom();
+            });
+        }
         binding.btnBack.setOnClickListener(v -> navigateUp());
         if (binding.btnRoomTracking != null) {
             binding.btnRoomTracking.setOnClickListener(v -> openTrackedRoom());
@@ -1954,4 +1966,32 @@ public class ProfileActivity extends ThemedActivity {
         }
         super.onDestroy();
     }
+    private void showProfileMoreMenu(String targetId) {
+        if (targetId == null || targetId.trim().isEmpty()) return;
+        String[] items = {"حظر المستخدم", "إلغاء"};
+        new AlertDialog.Builder(this)
+                .setItems(items, (dialog, which) -> {
+                    if (which != 0) return;
+                    new AlertDialog.Builder(this)
+                            .setTitle("حظر المستخدم")
+                            .setMessage("هل تريد حظر هذا المستخدم؟")
+                            .setNegativeButton("إلغاء", null)
+                            .setPositiveButton("حظر", (d, w) -> {
+                                container.getIoExecutor().execute(() -> {
+                                    Map<String, String> body = new HashMap<>();
+                                    body.put("reason", "profile");
+                                    Result<Object> result = com.Dramizo.Series.util.ApiCall.execute(
+                                            container.getUserApi().block(targetId, body));
+                                    runOnUiThread(() -> Toast.makeText(this,
+                                            result.success ? "تم حظر المستخدم" : 
+                                            (result.error != null ? result.error : "تعذر تنفيذ الحظر"),
+                                            Toast.LENGTH_SHORT).show());
+                                });
+                            })
+                            .show();
+                })
+                .show();
+    }
+
+
 }
