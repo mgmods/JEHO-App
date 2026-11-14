@@ -146,10 +146,15 @@ async function load() {
   }
   const cfg = parseSetting(data, 'seat_stickers')
   enabled.value = cfg?.enabled !== false
-  const legacyCatalog = Number(cfg?.version || 0) < 4
-  categories.value = legacyCatalog ? [] : (Array.isArray(cfg?.categories) ? cfg.categories.filter((x) => x && x.id !== 'classic').map((x, i) => ({ ...x, sortOrder: Number(x.sortOrder) || i + 1 })) : [])
-  if (!legacyCatalog && cfg && Array.isArray(cfg.items) && cfg.items.length) {
-    rows.value = cfg.items.filter((r) => r && r.categoryId !== 'classic').map((r, i) => ({
+  // Do not use the version number alone to discard data. Older server
+  // builds could write version 1/2/3 after sanitizing a valid dashboard save.
+  // Preserve every explicit dashboard category and URL-backed item; only the
+  // retired "classic" bundled category is excluded.
+  categories.value = Array.isArray(cfg?.categories)
+    ? cfg.categories.filter((x) => x && x.id !== 'classic').map((x, i) => ({ ...x, sortOrder: Number(x.sortOrder) || i + 1 }))
+    : []
+  rows.value = Array.isArray(cfg?.items)
+    ? cfg.items.filter((r) => r && r.categoryId !== 'classic' && String(r.url || '').trim()).map((r, i) => ({
       id: r.id || r.key || `s${i + 1}`,
       key: r.key || '',
       url: r.url || '',
@@ -161,9 +166,7 @@ async function load() {
       requiresCp: r.requiresCp === true,
       categoryId: r.categoryId === 'classic' ? '' : (r.categoryId || ''),
     }))
-  } else {
-    rows.value = []
-  }
+    : []
 }
 
 async function onCategoryIcon(e, category) {
