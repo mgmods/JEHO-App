@@ -38,12 +38,12 @@
                 android:layout_height="wrap_content"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                android:minHeight="300dp">
+                android:minHeight="226dp">
 
                 <ImageView
                     android:id="@+id/imgCover"
                     android:layout_width="match_parent"
-                    android:layout_height="300dp"
+                    android:layout_height="226dp"
                     android:contentDescription="@null"
                     android:scaleType="centerCrop"
                     android:src="@color/bg_light" />
@@ -135,18 +135,18 @@
                 android:id="@+id/userCardBg"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="-86dp"
+                android:layout_marginTop="-66dp"
                 android:background="@drawable/bg_profile_panel_from_avatar_mid"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:orientation="vertical"
-                android:paddingBottom="20dp">
+                android:paddingBottom="12dp">
 
                 <!-- Profile avatar and the linked partner portrait share one compact row. -->
                 <LinearLayout
                     android:id="@+id/profileIdentityAndCp"
                     android:layout_width="match_parent"
-                    android:layout_height="132dp"
+                    android:layout_height="108dp"
                     android:background="@android:color/transparent"
                     android:gravity="start|center_vertical"
                     android:orientation="horizontal"
@@ -156,8 +156,8 @@
 
                     <FrameLayout
                         android:id="@+id/profileAvatarWrap"
-                        android:layout_width="124dp"
-                        android:layout_height="132dp"
+                        android:layout_width="104dp"
+                        android:layout_height="108dp"
                         android:layout_gravity="top"
                         android:layout_marginStart="12dp"
                         android:layout_marginTop="0dp"
@@ -166,8 +166,8 @@
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/imgAvatar"
-                            android:layout_width="100dp"
-                            android:layout_height="100dp"
+                            android:layout_width="82dp"
+                            android:layout_height="82dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/nav_profile"
                             android:elevation="4dp"
@@ -179,8 +179,8 @@
 
                         <ImageView
                             android:id="@+id/imgFrame"
-                            android:layout_width="108dp"
-                            android:layout_height="108dp"
+                            android:layout_width="90dp"
+                            android:layout_height="90dp"
                             android:layout_gravity="center"
                             android:layout_gravity="center"
                             android:contentDescription="@null"
@@ -189,8 +189,8 @@
 
                         <com.Dramizo.Series.util.HostSignalView
                             android:id="@+id/webProfileHostSignal"
-                            android:layout_width="108dp"
-                            android:layout_height="108dp"
+                            android:layout_width="90dp"
+                            android:layout_height="90dp"
                             android:layout_gravity="center"
                             android:visibility="gone" />
                     </FrameLayout>
@@ -198,7 +198,7 @@
                     <LinearLayout
                         android:id="@+id/rowProfileCp"
                         android:layout_width="wrap_content"
-                        android:layout_height="124dp"
+                        android:layout_height="100dp"
                         android:layout_gravity="top"
                         android:layout_marginStart="8dp"
                         android:layout_marginEnd="12dp"
@@ -209,8 +209,8 @@
                         android:visibility="gone">
 
                         <FrameLayout
-                            android:layout_width="96dp"
-                            android:layout_height="96dp"
+                            android:layout_width="76dp"
+                            android:layout_height="76dp"
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpPartner"
@@ -234,8 +234,8 @@
 
                         <TextView
                             android:id="@+id/tvProfileCpHeart"
-                            android:layout_width="36dp"
-                            android:layout_height="42dp"
+                            android:layout_width="28dp"
+                            android:layout_height="34dp"
                             android:layout_marginStart="6dp"
                             android:layout_marginEnd="6dp"
                             android:gravity="center"
@@ -246,7 +246,7 @@
                             android:shadowRadius="7"
                             android:text="♥"
                             android:textColor="#FFFF5277"
-                            android:textSize="27sp"
+                            android:textSize="22sp"
                             android:textStyle="bold" />
 
                         <!-- Larger primary portrait for the profile owner. -->
@@ -520,8 +520,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
                             android:background="@drawable/bg_chip_charm"
-                            android:paddingHorizontal="8dp"
-                            android:paddingVertical="3dp"
+                            android:paddingHorizontal="5dp"
+                            android:paddingVertical="2dp"
                             android:text="0"
                             android:textColor="#FFFFFFFF"
                             android:textSize="13sp"
@@ -542,8 +542,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
                             android:background="@drawable/bg_chip_wealth"
-                            android:paddingHorizontal="11dp"
-                            android:paddingVertical="6dp"
+                            android:paddingHorizontal="7dp"
+                            android:paddingVertical="3dp"
                             android:text="0"
                             android:textColor="#FFFFFFFF"
                             android:textSize="13sp"
@@ -575,8 +575,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
                             android:background="@drawable/bg_profile_id_light"
-                            android:paddingHorizontal="11dp"
-                            android:paddingVertical="6dp"
+                            android:paddingHorizontal="7dp"
+                            android:paddingVertical="3dp"
                             android:text="1"
                             android:textColor="#FFFF6FB7"
                             android:textSize="13sp"
@@ -812,22 +812,22 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="14dp"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="4dp"
                     android:background="@drawable/bg_profile_panel"
                     android:orientation="vertical"
-                    android:padding="5dp">
+                    android:padding="2dp">
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="الداعمون"
                         android:textColor="#FFFFFFFF"
-                        android:textSize="12sp"
+                        android:textSize="10sp"
                         android:textStyle="bold" />
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/recyclerProfileSupporters"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
+                        android:layout_marginTop="1dp"
                         android:clipToPadding="false"
                         android:nestedScrollingEnabled="false"
                         android:overScrollMode="never"
@@ -836,7 +836,7 @@
                         android:id="@+id/tvProfileSupportersEmpty"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:padding="4dp"
+                        android:padding="2dp"
                         android:text="لا يوجد داعمون حتى الآن"
                         android:textColor="#FFB9A7B8"
                         android:textSize="11sp"
