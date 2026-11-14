@@ -232,45 +232,133 @@ async function save() {
   saving.value = true
   error.value = ''
   success.value = ''
-  const invalidUrl = rows.value.find((r) => r.url && !/^https?:\/\//i.test(String(r.url).trim()) && !String(r.url).trim().startsWith('/'))
+
+  const rowsWithUrl = rows.value
+    .map((row, index) => ({ row, index, url: String(row.url || '').trim() }))
+    .filter((entry) => entry.url)
+
+  const invalidUrl = rowsWithUrl.find(({ url }) =>
+    !/^https?:\/\//i.test(url) && !url.startsWith('/')
+  )
   if (invalidUrl) {
     saving.value = false
     error.value = 'رابط الملصق يجب أن يبدأ بـ https:// أو http:// أو يكون مسار رفع محلي يبدأ بـ /.'
     toast().danger(error.value)
     return
   }
-  const items = rows.value
-    .filter((r) => r.url && String(r.key || '').trim() && String(r.categoryId || '').trim())
-    .map((r, i) => ({
-      id: r.id || r.key,
-      key: String(r.key).trim().toLowerCase(),
-      url: absUrl(r.url),
-      name: r.name || r.key,
-      sortOrder: Number(r.sortOrder) || i + 1,
-      isActive: r.isActive !== false,
-      accessType: r.accessType || 'free', priceCoins: Number(r.priceCoins) || 0,
-      audience: r.audience || 'all', requiredVipLevel: Number(r.requiredVipLevel) || 1,
-      requiresCp: r.requiresCp === true,
-      categoryId: r.categoryId || categories.value[0]?.id || 'male',
-    }))
+
+  // A sticker must never be silently discarded just because the admin has
+  // not created a category yet. Create a general category and attach it.
+  if (rowsWithUrl.length && !categories.value.some((x) => x && String(x.name || '').trim())) {
+    categories.value.push({
+      id: 'general',
+      name: 'عام',
+      sortOrder: 1,
+      isActive: true,
+      accessType: 'free',
+      priceCoins: 0,
+      durationDays: 0,
+      audience: 'all',
+      requiredVipLevel: 1,
+      requiresCp: false,
+      iconUrl: '',
+    })
+  }
+
   const normalizedCategories = categories.value
     .filter((x) => x && x.id !== 'classic' && String(x.name || '').trim())
-    .map((x, i) => ({ ...x, id: String(x.id || ('category' + (i + 1))).trim().toLowerCase(), name: String(x.name).trim(), sortOrder: i + 1 }))
+    .map((x, i) => ({
+      ...x,
+      id: String(x.id || ('category' + (i + 1))).trim().toLowerCase(),
+      name: String(x.name).trim(),
+      sortOrder: Number(x.sortOrder) || i + 1,
+    }))
   const validIds = new Set(normalizedCategories.map((x) => x.id))
-  const safeItems = items.filter((item) => validIds.has(item.categoryId))
-  const payload = {
-    seat_stickers: JSON.stringify({ version: 4, enabled: enabled.value, categories: normalizedCategories, items: safeItems }),
+  const fallbackCategoryId = normalizedCategories[0]?.id || ''
+
+  const usedKeys = new Set()
+  const items = rowsWithUrl.map(({ row, index, url }, i) => {
+    let key = String(row.key || row.id || ('sticker_' + (index + 1)))
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '')
+      .slice(0, 32)
+    if (!key) key = 'sticker_' + (index + 1)
+    const baseKey = key
+    let suffix = 2
+    while (usedKeys.has(key)) {
+      const tail = '_' + suffix++
+      key = baseKey.slice(0, 32 - tail.length) + tail
+    }
+    usedKeys.add(key)
+
+    const requestedCategory = String(row.categoryId || '').trim().toLowerCase()
+    const categoryId = validIds.has(requestedCategory) ? requestedCategory : fallbackCategoryId
+    return {
+      id: String(row.id || key),
+      key,
+      url: absUrl(url),
+      name: String(row.name || key).trim() || key,
+      sortOrder: Number(row.sortOrder) || i + 1,
+      isActive: row.isActive !== false,
+      accessType: row.accessType || 'free',
+      priceCoins: Number(row.priceCoins) || 0,
+      audience: row.audience || 'all',
+      requiredVipLevel: Number(row.requiredVipLevel) || 1,
+      requiresCp: row.requiresCp === true,
+      categoryId,
+    }
+  }).filter((item) => item.categoryId && item.url)
+
+  if (rowsWithUrl.length && items.length !== rowsWithUrl.length) {
+    saving.value = false
+    error.value = 'لم يتم تجهيز كل الملصقات للحفظ. تأكد من وجود قسم صالح لكل ملصق.'
+    toast().danger(error.value)
+    return
   }
+
+  const payload = {
+    seat_stickers: JSON.stringify({
+      version: 4,
+      enabled: enabled.value,
+      categories: normalizedCategories,
+      items,
+    }),
+  }
+
   const { error: err } = await settingsApi.update(payload)
-  saving.value = false
   if (err) {
+    saving.value = false
     error.value = err.message
     toast().danger(err.message)
-  } else {
-    success.value = t('seatStickers.saved')
-    toast().success(t('seatStickers.saved'))
-    await load()
+    return
   }
+
+  // Read the value back from the database before reporting success. This
+  // catches server-side sanitization or persistence failures immediately.
+  const { data: verifyData, error: verifyError } = await settingsApi.get()
+  if (verifyError) {
+    saving.value = false
+    error.value = 'تم إرسال الحفظ، لكن تعذّر التأكد من بقاء الملصقات. أعد المحاولة.'
+    toast().danger(error.value)
+    return
+  }
+  const persisted = parseSetting(verifyData, 'seat_stickers')
+  const persistedItems = Array.isArray(persisted?.items) ? persisted.items : []
+  const persistedKeys = new Set(persistedItems.map((item) => String(item?.key || '').toLowerCase()))
+  const missing = items.filter((item) => !persistedKeys.has(item.key))
+  if (missing.length) {
+    saving.value = false
+    error.value = 'الخادم لم يحتفظ بكل الملصقات؛ لم نعرض رسالة نجاح كاذبة. تحقق من الإعدادات ثم أعد الحفظ.'
+    toast().danger(error.value)
+    await load()
+    return
+  }
+
+  await load()
+  saving.value = false
+  success.value = t('seatStickers.saved')
+  toast().success(t('seatStickers.saved'))
 }
 
 onMounted(load)
