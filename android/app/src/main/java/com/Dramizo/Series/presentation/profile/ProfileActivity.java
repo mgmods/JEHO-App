@@ -246,7 +246,16 @@ public class ProfileActivity extends ThemedActivity {
                 UserSocialNav.openVisitors(this, id, myId);
             });
         }
-        // Supporters are gift senders, not followers; their cards are rendered inline below.
+        // The supporters count opens the actual gift-supporters list.
+        if (binding.propProfileSupporters != null) {
+            binding.propProfileSupporters.setOnClickListener(v -> {
+                String id = targetUserIdHold[0];
+                if (id == null || id.trim().isEmpty()) return;
+                Intent supporters = new Intent(this, SupportersActivity.class);
+                supporters.putExtra(EXTRA_USER_ID, id);
+                startActivity(supporters);
+            });
+        }
         if (binding.propProfileFriends != null) {
             binding.propProfileFriends.setOnClickListener(v -> {
                 String id = targetUserIdHold[0];
@@ -625,13 +634,14 @@ public class ProfileActivity extends ThemedActivity {
                         com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto supporter = supporters.get(position);
                         ImageView avatar = holder.itemView.findViewById(R.id.imgSupporterAvatar);
                         ImageView frame = holder.itemView.findViewById(R.id.imgSupporterFrame);
+                        com.Dramizo.Series.util.HostSignalView liveFrame = holder.itemView.findViewById(R.id.supporterHostSignal);
                         TextView name = holder.itemView.findViewById(R.id.tvSupporterName);
                         TextView amount = holder.itemView.findViewById(R.id.tvSupporterAmount);
                         name.setText(supporter.displayName == null || supporter.displayName.trim().isEmpty()
                                 ? supporter.username : supporter.displayName);
                         amount.setText("💎 " + NumberFormat.getNumberInstance(Locale.US)
                                 .format(Math.max(0L, supporter.totalSupport)));
-                        AvatarCosmetics.bindStacked(avatar, frame, supporter.avatarUrl, supporter.frameUrl);
+                        AvatarCosmetics.bindStacked(avatar, frame, liveFrame, supporter.avatarUrl, supporter.frameUrl, null);
                         holder.itemView.setOnClickListener(v -> {
                             if (supporter.id == null || supporter.id.isEmpty()) return;
                             Intent profile = new Intent(ProfileActivity.this, ProfileActivity.class);
@@ -653,7 +663,7 @@ public class ProfileActivity extends ThemedActivity {
     private void loadProfileGiftStrip(String profileId) {
         if (binding == null || profileId == null || profileId.trim().isEmpty()) return;
         RecyclerView recycler = binding.recyclerProfileGiftHistory;
-        recycler.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        recycler.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(this, 5));
         recycler.setNestedScrollingEnabled(false);
         List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto> gifts = new java.util.ArrayList<>();
         RecyclerView.Adapter<GiftStripHolder> adapter = new RecyclerView.Adapter<GiftStripHolder>() {
@@ -662,8 +672,8 @@ public class ProfileActivity extends ThemedActivity {
                 ItemGiftHistoryBinding item = ItemGiftHistoryBinding.inflate(
                         LayoutInflater.from(parent.getContext()), parent, false);
                 item.getRoot().setLayoutParams(new RecyclerView.LayoutParams(
-                        (int) (104 * getResources().getDisplayMetrics().density),
-                        (int) (116 * getResources().getDisplayMetrics().density)));
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        (int) (112 * getResources().getDisplayMetrics().density)));
                 return new GiftStripHolder(item);
             }
             @Override public void onBindViewHolder(@NonNull GiftStripHolder holder, int position) {
