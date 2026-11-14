@@ -1387,7 +1387,11 @@ public class HomeFragment extends Fragment {
             }
             @Override
             public void onRoomEvent(String roomId, String event, JsonObject payload, String fromUserId, String fromUsername) {
-                if ("room:updated".equals(event) || "room:closed".equals(event)) {
+                if ("room:updated".equals(event)
+                        || "room:closed".equals(event)
+                        || "room:top_cards_changed".equals(event)) {
+                    // TOP 1/2/3 can change after any room gift; reload the feed
+                    // so ranks, ordering and replacement frames move together.
                     viewModel.refreshRoomsQuietly();
                 }
             }
