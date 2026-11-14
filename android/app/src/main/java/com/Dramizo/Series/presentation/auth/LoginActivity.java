@@ -229,6 +229,7 @@ public class LoginActivity extends ThemedActivity {
     private void setRegisterMode(boolean register) {
         registerMode = register;
         binding.emailLayout.setVisibility(register ? View.VISIBLE : View.GONE);
+        binding.confirmPasswordLayout.setVisibility(register ? View.VISIBLE : View.GONE);
         binding.usernameLayout.setVisibility(View.GONE);
         binding.identifierLayout.setVisibility(register ? View.GONE : View.VISIBLE);
         binding.btnAuthSubmit.setText(register ? R.string.register : R.string.login);
