@@ -143,8 +143,8 @@ public class HomeFeedPageFragment extends Fragment {
     }
 
     private boolean idsPrefixMatch(List<RoomDtos.RoomDto> filtered, int prefix) {
-        if (roomAdapter == null || roomAdapter.getRoomCount() < prefix) return false;
-        return roomAdapter.getRoomCount() == prefix;
+        return roomAdapter != null && roomAdapter.getRoomCount() >= prefix
+                && roomAdapter.matchesPrefix(filtered, prefix);
     }
 
     private String countryFilter() {
