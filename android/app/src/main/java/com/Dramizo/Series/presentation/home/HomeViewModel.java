@@ -146,6 +146,9 @@ public class HomeViewModel extends ViewModel {
                         || (old != null && (old.viewerCount != neu.viewerCount
                         || old.roomLevel != neu.roomLevel
                         || old.exploreRank != neu.exploreRank
+                        || !Objects.equals(old.roomTopRank, neu.roomTopRank)
+                        || !eq(old.roomTopFrameUrl, neu.roomTopFrameUrl)
+                        || !eq(old.roomTopPeriod, neu.roomTopPeriod)
                         || !eq(old.coverUrl, neu.coverUrl)
                         || !eq(old.title, neu.title)))) {
                     changed = true;
@@ -215,6 +218,11 @@ public class HomeViewModel extends ViewModel {
         c.roomLevel = neu.roomLevel;
         // Keep live Hot rank from server (1/2/3 badges); fall back only if missing.
         c.exploreRank = neu.exploreRank > 0 ? neu.exploreRank : old.exploreRank;
+        // TOP rank/frame are authoritative server fields; copy null too when a room
+        // leaves TOP 1/2/3 so the original room card is restored immediately.
+        c.roomTopRank = neu.roomTopRank;
+        c.roomTopFrameUrl = neu.roomTopFrameUrl;
+        c.roomTopPeriod = neu.roomTopPeriod;
         c.giftSoundsEnabled = old.giftSoundsEnabled;
         c.chatZoneEnabled = old.chatZoneEnabled;
         c.charmEnabled = old.charmEnabled;
