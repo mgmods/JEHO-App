@@ -223,8 +223,9 @@ export function resolveActiveStickerUrl(
   if (!key) return null;
   const k = key.trim().toLowerCase();
   if (cfg?.enabled === false) return null;
+  const activeCategoryIds = new Set((cfg?.categories || []).filter((c) => c && c.isActive !== false).map((c) => c.id));
   const items = cfg?.items || [];
-  const hit = items.find((i) => i && i.isActive !== false && i.key === k && i.url);
+  const hit = items.find((i) => i && i.isActive !== false && i.key === k && i.url && activeCategoryIds.has(i.categoryId));
   if (!hit) return null;
   const u = hit.url;
   if (/^https?:\/\//i.test(u)) return u;
