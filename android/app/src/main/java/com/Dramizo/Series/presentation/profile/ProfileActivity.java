@@ -598,6 +598,9 @@ public class ProfileActivity extends ThemedActivity {
                         TextView name = holder.itemView.findViewById(R.id.tvSupporterName);
                         name.setText(supporter.displayName == null || supporter.displayName.trim().isEmpty()
                                 ? supporter.username : supporter.displayName);
+                        TextView diamonds = holder.itemView.findViewById(R.id.tvSupporterDiamonds);
+                        if (diamonds != null) diamonds.setText("♦ " + NumberFormat.getNumberInstance(Locale.US)
+                                .format(Math.max(0L, supporter.totalSupport)));
                         AvatarCosmetics.bindStacked(avatar, frame, liveFrame, supporter.avatarUrl, supporter.frameUrl, null);
                         holder.itemView.setOnClickListener(v -> {
                             if (supporter.id == null || supporter.id.isEmpty()) return;

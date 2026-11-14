@@ -4087,6 +4087,8 @@ export class GiftsService implements OnModuleInit {
       .addSelect('SUM(giftSend.totalCoins)', 'totalCoins')
       .addSelect('SUM(giftSend.diamondsAwarded)', 'diamondsAwarded')
       .where('giftSend.receiverId = :userId', { userId })
+      // Weekly leaderboard resets automatically at Monday 00:00 (database week boundary).
+      .andWhere('giftSend.createdAt >= date_trunc(\'week\', CURRENT_TIMESTAMP)')
       .andWhere('giftSend.senderId <> giftSend.receiverId')
       .andWhere('(giftSend.expiresAt IS NULL OR giftSend.expiresAt > :now)', { now: new Date() })
       .groupBy('giftSend.giftId')
@@ -4139,6 +4141,7 @@ export class GiftsService implements OnModuleInit {
       avatarUrl: row.avatarUrl || null,
       frameUrl: row.frameUrl || null,
       totalSupport: Math.max(0, Number(row.totalSupport) || 0),
+      totalDiamonds: Math.max(0, Number(row.totalSupport) || 0),
       giftCount: Math.max(0, Number(row.giftCount) || 0),
     }));
   }

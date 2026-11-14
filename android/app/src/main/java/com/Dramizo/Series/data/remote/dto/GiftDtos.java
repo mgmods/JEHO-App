@@ -156,6 +156,7 @@ public final class GiftDtos {
         @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("frameUrl") public String frameUrl;
         @SerializedName("totalSupport") public long totalSupport;
+        @SerializedName("totalDiamonds") public long totalDiamonds;
         @SerializedName("giftCount") public long giftCount;
     }
 
