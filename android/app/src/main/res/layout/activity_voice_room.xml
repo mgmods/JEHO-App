@@ -381,6 +381,7 @@
                             android:id="@+id/tvRoomTitle"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:translationY="-2dp"
                             android:layout_weight="1"
                             android:ellipsize="marquee"
                             android:fadingEdge="horizontal"
@@ -390,7 +391,7 @@
                             android:singleLine="true"
                             android:text="@string/voice_room"
                             android:textColor="@color/white"
-                            android:textSize="12.5sp"
+                            android:textSize="12sp"
                             android:textStyle="bold" />
 
                         <ImageView
