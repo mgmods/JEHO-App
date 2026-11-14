@@ -3,6 +3,6 @@
     <!-- Keep the upper half of the avatar area transparent so the cover visually continues
          behind the portrait; the dark identity panel begins at the avatar midpoint. -->
     <item
-        android:top="80dp"
+        android:top="42dp"
         android:drawable="@drawable/bg_profile_panel" />
 </layer-list>
