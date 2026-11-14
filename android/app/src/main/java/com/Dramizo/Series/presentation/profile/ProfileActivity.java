@@ -253,7 +253,7 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
         // The supporters count opens the actual gift-supporters list.
-        if (binding.propProfileSupporters != null) binding.propProfileSupporters.setOnClickListener(v -> openProfileMoments());
+        if (binding.propProfileSupporters != null) binding.propProfileSupporters.setOnClickListener(v -> openProfileDetails());
         if (binding.propProfileFriends != null) {
             binding.propProfileFriends.setOnClickListener(v -> {
                 String id = targetUserIdHold[0];
@@ -1937,12 +1937,20 @@ public class ProfileActivity extends ThemedActivity {
     }
 
 
-    private void openProfileMoments() {
+    private void openProfileMomentsLegacy() {
         String id = loadedProfileId;
         if (id == null || id.trim().isEmpty()) return;
         Intent moments = new Intent(this, ProfileDetailsActivity.class);
         moments.putExtra(ProfileDetailsActivity.EXTRA_USER_ID, id);
         startActivity(moments);
+    }
+
+    private void openProfileDetails() {
+        String id = loadedProfileId;
+        if (id == null || id.trim().isEmpty()) return;
+        Intent details = new Intent(this, ProfileDetailsActivity.class);
+        details.putExtra(ProfileDetailsActivity.EXTRA_USER_ID, id);
+        startActivity(details);
     }
 
     private void showProfileProperty() {
