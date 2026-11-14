@@ -363,7 +363,7 @@ public final class UserProfileCardSheet {
                     });
                 } else if (u.agencyClub != null && u.agencyClub.label != null && !u.agencyClub.label.trim().isEmpty()) {
                     if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
-                    if (tvAgencyName != null) tvAgencyName.setText(u.agencyClub.label);
+                    if (tvAgencyName != null) tvAgencyName.setText(StaffRoleHelper.genderizeLabel(u.agencyClub.label, u.gender));
                     if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
                     if (imgAgencyLogo != null) {
                         String clubLogo = u.agencyClub.agencyLogoUrl;
