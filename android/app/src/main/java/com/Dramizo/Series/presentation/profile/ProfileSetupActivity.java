@@ -157,7 +157,6 @@ public class ProfileSetupActivity extends ThemedActivity {
             AvatarImageLoader.load(binding.imgAvatar, user.avatarUrl);
         }
         binding.etDisplayName.setText(user.displayName != null ? user.displayName : "");
-        binding.etBio.setText(user.bio != null ? user.bio : "");
         String birthday = normalizeBirthday(user.birthday);
         binding.etBirthday.setText(birthday.isEmpty() ? "2000-01-01" : birthday);
         if ("male".equalsIgnoreCase(user.gender)) binding.spinnerGender.setSelection(1);
@@ -232,13 +231,6 @@ public class ProfileSetupActivity extends ThemedActivity {
         String displayName = text(binding.etDisplayName);
         String birthday = normalizeBirthday(text(binding.etBirthday));
         int genderIndex = binding.spinnerGender.getSelectedItemPosition();
-        String bio = text(binding.etBio);
-        if (com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(bio)) {
-            Toast.makeText(this,
-                    com.Dramizo.Series.util.ChatContentFilter.AGENCY_WORD_REASON,
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
         // Profile photos are optional. A failed upload must never block account setup.
         if (displayName.isEmpty()) {
             binding.etDisplayName.setError("اكتب اسمك");
@@ -269,16 +261,10 @@ public class ProfileSetupActivity extends ThemedActivity {
             Toast.makeText(this, "اختر الجنس", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (bio.isEmpty()) {
-            Toast.makeText(this, "اكتب نبذة قصيرة عنك", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
         MiscDtos.UpdateProfileRequest request = new MiscDtos.UpdateProfileRequest();
         // Leave avatarUrl unset when no photo was uploaded; backend keeps the default avatar.
         if (nonEmpty(avatarUrl)) request.avatarUrl = avatarUrl;
         request.displayName = displayName;
-        request.bio = bio;
         request.gender = GENDER_VALUES[genderIndex];
         request.birthday = birthday;
         request.country = selectedCountryCode();
