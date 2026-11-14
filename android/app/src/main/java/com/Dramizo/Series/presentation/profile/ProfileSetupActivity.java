@@ -156,6 +156,7 @@ public class ProfileSetupActivity extends ThemedActivity {
         if (nonEmpty(user.avatarUrl)) {
             AvatarImageLoader.load(binding.imgAvatar, user.avatarUrl);
         }
+        binding.etDisplayName.setText(user.displayName != null ? user.displayName : "");
         binding.etBio.setText(user.bio != null ? user.bio : "");
         String birthday = normalizeBirthday(user.birthday);
         binding.etBirthday.setText(birthday.isEmpty() ? "2000-01-01" : birthday);
@@ -228,6 +229,7 @@ public class ProfileSetupActivity extends ThemedActivity {
     }
 
     private void saveProfile() {
+        String displayName = text(binding.etDisplayName);
         String birthday = normalizeBirthday(text(binding.etBirthday));
         int genderIndex = binding.spinnerGender.getSelectedItemPosition();
         String bio = text(binding.etBio);
@@ -238,6 +240,11 @@ public class ProfileSetupActivity extends ThemedActivity {
             return;
         }
         // Profile photos are optional. A failed upload must never block account setup.
+        if (displayName.isEmpty()) {
+            binding.etDisplayName.setError("اكتب اسمك");
+            binding.etDisplayName.requestFocus();
+            return;
+        }
         if (birthday.isEmpty()) {
             Toast.makeText(this, "اختر تاريخ الميلاد", Toast.LENGTH_SHORT).show();
             return;
@@ -270,6 +277,7 @@ public class ProfileSetupActivity extends ThemedActivity {
         MiscDtos.UpdateProfileRequest request = new MiscDtos.UpdateProfileRequest();
         // Leave avatarUrl unset when no photo was uploaded; backend keeps the default avatar.
         if (nonEmpty(avatarUrl)) request.avatarUrl = avatarUrl;
+        request.displayName = displayName;
         request.bio = bio;
         request.gender = GENDER_VALUES[genderIndex];
         request.birthday = birthday;
