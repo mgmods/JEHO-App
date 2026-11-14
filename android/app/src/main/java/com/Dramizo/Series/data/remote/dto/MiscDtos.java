@@ -84,6 +84,7 @@ public final class MiscDtos {
         @SerializedName("name") public String name;
         @SerializedName("logoUrl") public String logoUrl;
         @SerializedName("coverUrl") public String coverUrl;
+        @SerializedName("profileCoverUrls") public java.util.List<String> profileCoverUrls;
         /** Decorative frame / room card overlay when live. */
         @SerializedName("frameUrl") public String frameUrl;
         @SerializedName("description") public String description;
