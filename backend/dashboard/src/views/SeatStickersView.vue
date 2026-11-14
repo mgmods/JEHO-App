@@ -65,12 +65,13 @@
           <label class="form-label small mb-1">الفئة</label><select v-model="row.audience" class="form-select form-select-sm mb-2"><option value="all">الجميع</option><option value="male">الشباب</option><option value="female">البنات</option></select>
           <label class="form-label small mb-1">مستوى VIP المطلوب</label><input v-model.number="row.requiredVipLevel" type="number" min="1" max="7" class="form-control form-control-sm mb-2" />
           <div class="form-check mb-2"><input v-model="row.requiresCp" class="form-check-input" type="checkbox" /><label class="form-check-label small">يشترط علاقة CP فعالة</label></div>
-          <label class="form-label small mb-1">رابط الملصق (اختياري بدل الرفع)</label>
-          <input v-model.trim="row.url" class="form-control form-control-sm mb-2" placeholder="https://... أو /uploads/..." />
+          <label class="form-label small mb-1">رابط مباشر للملصق (اختياري بدل الرفع)</label>
+          <input v-model.trim="row.url" class="form-control form-control-sm mb-1" type="url" inputmode="url" placeholder="https://example.com/sticker.gif" />
+          <small class="text-secondary d-block mb-2">يدعم رابط GIF أو WebP المتحرك، وPNG أو JPG الثابت. استخدم رابط الصورة المباشر الذي يمكن فتحه دون تسجيل دخول.</small>
           <label class="form-label small mb-1">{{ t('seatStickers.file') }}</label>
           <input
             type="file"
-            accept="image/gif,image/webp,image/png,image/jpeg,.gif,.webp,.png,.jpg,.jpeg"
+            accept="image/gif,image/webp,image/png,image/jpeg,image/apng,.gif,.webp,.png,.jpg,.jpeg,.apng"
             class="form-control form-control-sm mb-2"
             @change="(e) => onFile(e, row)"
           />
@@ -231,6 +232,13 @@ async function save() {
   saving.value = true
   error.value = ''
   success.value = ''
+  const invalidUrl = rows.value.find((r) => r.url && !/^https?:\/\//i.test(String(r.url).trim()) && !String(r.url).trim().startsWith('/'))
+  if (invalidUrl) {
+    saving.value = false
+    error.value = 'رابط الملصق يجب أن يبدأ بـ https:// أو http:// أو يكون مسار رفع محلي يبدأ بـ /.'
+    toast().danger(error.value)
+    return
+  }
   const items = rows.value
     .filter((r) => r.url && String(r.key || '').trim() && String(r.categoryId || '').trim())
     .map((r, i) => ({
