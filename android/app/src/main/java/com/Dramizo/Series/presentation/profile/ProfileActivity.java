@@ -244,6 +244,9 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
         if (binding.sectionProfileSupporters != null) {
+            binding.sectionProfileSupporters.setVisibility(View.GONE);
+        }
+        if (binding.sectionProfileSupporters != null) {
             binding.sectionProfileSupporters.setOnClickListener(v -> {
                 String id = targetUserIdHold[0];
                 if (id == null || id.trim().isEmpty()) return;
