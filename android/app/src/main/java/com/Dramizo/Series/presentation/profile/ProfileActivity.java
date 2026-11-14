@@ -887,6 +887,7 @@ public class ProfileActivity extends ThemedActivity {
                 : (rechargeAgent ? "وكيل شحن" : "وكالة");
         StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(role);
         if (StaffRoleHelper.isStaff(user) && !identity.label.isEmpty()) label = identity.label;
+        label = StaffRoleHelper.genderizeLabel(label, user.gender);
         binding.tvStaffBadge.setVisibility(View.VISIBLE);
         binding.tvStaffBadge.setTag(StaffRoleHelper.isStaff(user) ? role : null);
         binding.tvStaffBadge.setText(label);
@@ -970,20 +971,20 @@ public class ProfileActivity extends ThemedActivity {
         final int textColor;
         final int strokeColor;
         if ("owner".equals(agencyRole)) {
-            label = "♛  قائد وكالة";
+            label = StaffRoleHelper.genderizeLabel("♛  قائد وكالة", user.gender);
             start = 0xFFFFF0CC;
             end = 0xFFFFD778;
             textColor = 0xFF765000;
             strokeColor = 0xFFE8BD57;
         } else if ("manager".equals(agencyRole) || "admin".equals(agencyRole)
                 || "agency_admin".equals(agencyRole)) {
-            label = "◆  أدمن وكالة";
+            label = StaffRoleHelper.genderizeLabel("◆  أدمن وكالة", user.gender);
             start = 0xFFEDE7FF;
             end = 0xFFD8CCFF;
             textColor = 0xFF5636A5;
             strokeColor = 0xFFB6A0F0;
         } else {
-            label = "●  مضيف وكالة";
+            label = StaffRoleHelper.genderizeLabel("●  مضيف وكالة", user.gender);
             start = 0xFFDDF8F2;
             end = 0xFFBCEDE2;
             textColor = 0xFF126B5B;
