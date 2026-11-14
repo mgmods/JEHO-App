@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="64dp"
+    android:layout_width="56dp"
     android:layout_height="wrap_content"
     android:layout_marginEnd="5dp"
     android:background="@drawable/bg_profile_section_light"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="6dp">
+    android:padding="4dp">
 
     <FrameLayout
-        android:layout_width="48dp"
-        android:layout_height="48dp">
+        android:layout_width="40dp"
+        android:layout_height="40dp">
         <ImageView
             android:id="@+id/imgSupporterAvatar"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:layout_gravity="center"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_default_avatar" />
@@ -34,12 +34,12 @@
         android:id="@+id/tvSupporterName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
+        android:layout_marginTop="3dp"
         android:ellipsize="end"
         android:gravity="center"
         android:maxLines="1"
         android:textColor="#FF283047"
-        android:textSize="10sp"
+        android:textSize="9sp"
         android:textStyle="bold" />
 
     <TextView
