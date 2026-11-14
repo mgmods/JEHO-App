@@ -42,12 +42,4 @@
         android:textSize="8sp"
         android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/tvSupporterAmount"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:maxLines="1"
-        android:textColor="#FFB17A21"
-        android:textSize="9sp" />
 </LinearLayout>
