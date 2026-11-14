@@ -89,7 +89,7 @@
                     android:maxLines="1"
                     android:maxWidth="116dp"
                     android:textColor="#FFE8EEF8"
-                    android:textSize="13sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
                     tools:text="AuraStar" />
 
