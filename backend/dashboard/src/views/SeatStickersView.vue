@@ -54,7 +54,7 @@
           <label class="form-label small mb-1">القسم</label>
           <select v-model="row.categoryId" class="form-select form-select-sm mb-2"><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select>
           <label class="form-label small mb-1">{{ t('seatStickers.key') }}</label>
-          <input v-model="row.key" class="form-control form-control-sm mb-2" maxlength="32" placeholder="e01" />
+          <input v-model="row.key" class="form-control form-control-sm mb-2" maxlength="32" placeholder="sticker_01" />
           <label class="form-label small mb-1">{{ t('seatStickers.name') }}</label>
           <input v-model="row.name" class="form-control form-control-sm mb-2" maxlength="80" />
           <label class="form-label small mb-1">{{ t('seatStickers.sort') }}</label>
@@ -147,7 +147,8 @@ async function load() {
   enabled.value = cfg?.enabled !== false
   categories.value = Array.isArray(cfg?.categories) ? cfg.categories.filter((x) => x && x.id !== 'classic').map((x, i) => ({ ...x, sortOrder: Number(x.sortOrder) || i + 1 })) : []
   if (cfg && Array.isArray(cfg.items) && cfg.items.length) {
-    rows.value = cfg.items.filter((r) => r && r.categoryId !== 'classic' && !/^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(String(r.key || ''))).map((r, i) => ({
+    const legacyCatalog = Number(cfg.version || 0) < 4
+    rows.value = cfg.items.filter((r) => r && r.categoryId !== 'classic' && !(legacyCatalog && /^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(String(r.key || '')))).map((r, i) => ({
       id: r.id || r.key || `s${i + 1}`,
       key: r.key || '',
       url: r.url || '',
