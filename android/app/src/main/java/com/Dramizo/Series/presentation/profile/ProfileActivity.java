@@ -253,7 +253,13 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
         // The supporters count opens the actual gift-supporters list.
-        if (binding.propProfileSupporters != null) binding.propProfileSupporters.setOnClickListener(v -> openProfileDetails());
+        if (binding.propProfileSupporters != null) binding.propProfileSupporters.setOnClickListener(v -> {
+            String id = targetUserIdHold[0];
+            if (id == null || id.trim().isEmpty()) return;
+            Intent supporters = new Intent(this, SupportersActivity.class);
+            supporters.putExtra(EXTRA_USER_ID, id);
+            startActivity(supporters);
+        });
         if (binding.propProfileFriends != null) {
             binding.propProfileFriends.setOnClickListener(v -> {
                 String id = targetUserIdHold[0];
