@@ -8460,7 +8460,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         View sheet = getLayoutInflater().inflate(R.layout.dialog_emoji_picker, null);
         dialog.setContentView(sheet);
         TextView pickerTitle = sheet.findViewById(R.id.tvEmojiPickerTitle);
-        if (pickerTitle != null) pickerTitle.setText(seatOnly ? "ملصقات المقاعد" : "إيموجي الشات");
+        if (pickerTitle != null) pickerTitle.setText(seatOnly ? "ملصقات" : "إيموجي الشات");
         dialog.setCanceledOnTouchOutside(true);
         Window window = dialog.getWindow();
         if (window != null) {
