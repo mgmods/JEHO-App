@@ -127,7 +127,8 @@
         <activity android:name=".presentation.profile.MedalActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.BadgeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.SecureProfileImageActivity" android:exported="false" android:screenOrientation="portrait" />
-        <activity android:name=".presentation.profile.ProfileActivity" android:exported="false"
+                <activity android:name=".presentation.profile.ProfileDetailsActivity" android:exported="false" android:screenOrientation="portrait" />
+<activity android:name=".presentation.profile.ProfileActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
         <!-- Required by uCrop: without this explicit activity registration Android throws
