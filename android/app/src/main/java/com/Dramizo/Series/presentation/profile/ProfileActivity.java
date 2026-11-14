@@ -559,7 +559,13 @@ public class ProfileActivity extends ThemedActivity {
             if (binding.tvProfileAgencyName != null) binding.tvProfileAgencyName.setText("ملكية");
             if (binding.propProfileSupporters != null) {
                 binding.propProfileSupporters.setVisibility(View.VISIBLE);
-                binding.propProfileSupporters.setOnClickListener(v -> openProfileMoments());
+                binding.propProfileSupporters.setOnClickListener(v -> {
+            String id = targetUserIdHold[0];
+            if (id == null || id.trim().isEmpty()) return;
+            Intent supporters = new Intent(this, SupportersActivity.class);
+            supporters.putExtra(EXTRA_USER_ID, id);
+            startActivity(supporters);
+        });
             }
             if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("لحظاتي");
             if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(View.GONE);
