@@ -14,8 +14,12 @@ import java.io.File;
 import com.yalantis.ucrop.UCrop;
 import android.os.Bundle;
 import android.view.MotionEvent;
+import android.view.ViewGroup;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.ArrayAdapter;
 import android.widget.Toast;
 
