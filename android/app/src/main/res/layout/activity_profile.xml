@@ -208,15 +208,15 @@
                         android:visibility="gone">
 
                         <FrameLayout
-                            android:layout_width="96dp"
-                            android:layout_height="96dp"
+                            android:layout_width="76dp"
+                            android:layout_height="76dp"
                             android:elevation="4dp"
                             android:clipChildren="false"
                             android:clipToPadding="false">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpPartner"
-                                android:layout_width="96dp"
-                                android:layout_height="96dp"
+                                android:layout_width="76dp"
+                                android:layout_height="76dp"
                                 android:contentDescription="@null"
                                 android:elevation="4dp"
                                 android:scaleType="centerCrop"
@@ -226,8 +226,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpPartnerFrame"
-                                android:layout_width="96dp"
-                                android:layout_height="96dp"
+                                android:layout_width="76dp"
+                                android:layout_height="76dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitCenter"
                                 android:visibility="gone" />
@@ -235,9 +235,9 @@
 
                         <TextView
                             android:id="@+id/tvProfileCpHeart"
-                            android:layout_width="28dp"
-                            android:layout_height="34dp"
-                            android:layout_marginStart="6dp"
+                            android:layout_width="24dp"
+                            android:layout_height="30dp"
+                            android:layout_marginStart="5dp"
                             android:layout_marginEnd="6dp"
                             android:gravity="center"
                             android:includeFontPadding="false"
@@ -484,9 +484,9 @@
 
                         <ImageView
                             android:id="@+id/imgVipMedal"
-                            android:layout_width="28dp"
-                            android:layout_height="18dp"
-                            android:layout_marginStart="6dp"
+                            android:layout_width="25dp"
+                            android:layout_height="16dp"
+                            android:layout_marginStart="5dp"
                             android:adjustViewBounds="true"
                             android:contentDescription="VIP"
                             android:scaleType="fitCenter"
@@ -498,8 +498,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="5dp"
                             android:background="@drawable/bg_chip_vip"
-                            android:paddingHorizontal="12dp"
-                            android:paddingVertical="6dp"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="5dp"
                             android:text="VIP 0"
                             android:textColor="#FFFFFFFF"
                             android:textSize="11sp"
@@ -508,9 +508,9 @@
 
                         <ImageView
                             android:id="@+id/imgRankIcon"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:layout_marginStart="5dp"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="4dp"
                             android:contentDescription="الترتيب"
                             android:scaleType="fitCenter"
                             android:src="@drawable/ic_me_rank" />
@@ -525,14 +525,14 @@
                             android:paddingVertical="2dp"
                             android:text="0"
                             android:textColor="#FFFFFFFF"
-                            android:textSize="13sp"
+                            android:textSize="12sp"
                             android:textStyle="bold" />
 
                         <ImageView
                             android:id="@+id/imgWealthIcon"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:layout_marginStart="5dp"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="4dp"
                             android:contentDescription="الثروة"
                             android:scaleType="fitCenter"
                             android:src="@drawable/ic_asset_diamond" />
@@ -543,11 +543,11 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
                             android:background="@drawable/bg_chip_wealth"
-                            android:paddingHorizontal="7dp"
-                            android:paddingVertical="3dp"
+                            android:paddingHorizontal="6dp"
+                            android:paddingVertical="2dp"
                             android:text="0"
                             android:textColor="#FFFFFFFF"
-                            android:textSize="13sp"
+                            android:textSize="12sp"
                             android:textStyle="bold" />
 
                         <ImageView
@@ -908,6 +908,17 @@
                         android:layout_weight="0"
                         android:visibility="gone" />
                 </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/profileDetailsInlinePanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="14dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_profile_panel"
+                    android:orientation="vertical"
+                    android:padding="8dp"
+                    android:visibility="gone" />
 
                 <!-- Agency strip (same as user card) -->
                 <androidx.constraintlayout.widget.ConstraintLayout
