@@ -12,12 +12,13 @@ export class RegisterDto {
   @MaxLength(72)
   password: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: "Internal login username; generated automatically when omitted" })
+  @IsOptional()
   @IsString()
   @MinLength(3)
   @MaxLength(48)
   @Matches(/^[a-zA-Z0-9_]+$/)
-  username: string;
+  username?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
