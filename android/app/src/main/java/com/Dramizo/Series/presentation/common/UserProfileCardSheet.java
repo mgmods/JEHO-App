@@ -421,13 +421,15 @@ public final class UserProfileCardSheet {
                     String staffRole = StaffRoleHelper.normalize(u);
                     if (!staffBadge.isEmpty()) {
                         StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(staffRole);
-                        String roleLabel = identity.label.isEmpty() ? staffBadge : identity.label;
+                        String roleLabel = StaffRoleHelper.genderizeLabel(
+                                identity.label.isEmpty() ? staffBadge : identity.label, u.gender);
                         tvName.setTag("staff:" + staffRole);
                         tvName.setText(displayName + "\n" + roleLabel);
                         StaffIdentityConfigCache.load(activity, () -> {
                             if (!dialog.isShowing() || !("staff:" + staffRole).equals(tvName.getTag())) return;
                             StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(staffRole);
-                            tvName.setText(displayName + "\n" + (latest.label.isEmpty() ? staffBadge : latest.label));
+                            tvName.setText(displayName + "\n" + StaffRoleHelper.genderizeLabel(
+                                    latest.label.isEmpty() ? staffBadge : latest.label, u.gender));
                             // Staff role frames are assigned by role, not by mall ownership.
                             // Keep normal user wear when no dedicated staff frame is configured.
                             if (!latest.frameUrl.isEmpty() && frame != null) {
