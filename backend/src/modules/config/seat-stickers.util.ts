@@ -32,12 +32,7 @@ export type SeatStickersConfig = {
   items: SeatStickerItem[];
 };
 
-const DEFAULT_CATEGORIES: SeatStickerCategory[] = [
-  { id: 'classic', name: 'الملصقات القديمة', sortOrder: 1, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false },
-  { id: 'male', name: 'ملصقات شباب', sortOrder: 2, isActive: false, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'male', requiredVipLevel: 1, requiresCp: false },
-  { id: 'cp', name: 'ملصقات CP', sortOrder: 3, isActive: false, accessType: 'cp', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: true },
-  { id: 'female', name: 'ملصقات بنات', sortOrder: 4, isActive: false, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'female', requiredVipLevel: 1, requiresCp: false },
-];
+const DEFAULT_CATEGORIES: SeatStickerCategory[] = [];
 
 const KEY_RE = /^[a-z0-9_-]{1,32}$/i;
 const MEDIA_RE = /\.(gif|webp|png|jpe?g)(\?|$)/i;
@@ -79,7 +74,7 @@ export function defaultSeatStickersConfig(
   origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
 ): SeatStickersConfig {
   return {
-    version: 3,
+    version: 4,
     enabled: true,
     categories: DEFAULT_CATEGORIES.map((x) => ({ ...x })),
     items: defaultItems(),
