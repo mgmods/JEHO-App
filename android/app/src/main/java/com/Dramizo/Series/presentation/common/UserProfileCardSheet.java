@@ -342,9 +342,8 @@ public final class UserProfileCardSheet {
                     if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
                     if (tvAgencyName != null) {
                         String agencyName = u.agency.name == null ? "" : u.agency.name.trim();
-                        tvAgencyName.setText(agencyName.isEmpty()
-                                ? "♛  قائد وكالة"
-                                : "♛  قائد وكالة · " + agencyName);
+                        tvAgencyName.setText(StaffRoleHelper.genderizeLabel(
+                                agencyName.isEmpty() ? "♛  قائد وكالة" : "♛  قائد وكالة · " + agencyName, u.gender));
                     }
                     if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
                     if (imgAgencyLogo != null) {
