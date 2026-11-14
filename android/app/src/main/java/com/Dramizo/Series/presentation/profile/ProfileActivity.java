@@ -298,42 +298,6 @@ public class ProfileActivity extends ThemedActivity {
         // Keep the legacy view hidden for old layouts; never expose a profile request action.
         binding.btnCpRequest.setVisibility(View.GONE);
         binding.btnCpRequest.setOnClickListener(null);
-        binding.btnFriend.setOnClickListener(v -> {
-            if (userId == null) return;
-            if (myId != null && userId.equals(myId)) {
-                Toast.makeText(this, "هذا حسابك", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            sendSocialRequest(userId, "friend", "صداقة");
-        });
-        if (binding.btnFriend != null) {
-            binding.btnFriend.setOnLongClickListener(v -> {
-                if (userId == null || myId == null || userId.equals(myId)) return false;
-                AuraDialogHelper.confirm(this,
-                        "إلغاء الصداقة",
-                        "هل تريد إزالة هذا المستخدم من قائمة الأصدقاء؟",
-                        "إلغاء الصداقة",
-                        () -> {
-                            container.getIoExecutor().execute(() -> {
-                                Result<Object> r = com.Dramizo.Series.util.ApiCall.execute(
-                                        container.getUserApi().unfriend(userId));
-                                runOnUiThread(() -> {
-                                    if (r.success) {
-                                        Toast.makeText(this, "تم إلغاء الصداقة", Toast.LENGTH_SHORT).show();
-                                        vm.loadUser(userId);
-                                    } else {
-                                        Toast.makeText(this,
-                                                r.error != null ? r.error : getString(R.string.error_generic),
-                                                Toast.LENGTH_LONG).show();
-                                    }
-                                });
-                            });
-                        },
-                        getString(android.R.string.cancel),
-                        null);
-                return true;
-            });
-        }
         if (binding.btnMore != null) {
             binding.btnMore.setOnClickListener(v -> showProfileMoreMenu(targetUserIdHold[0]));
         }
@@ -486,9 +450,6 @@ public class ProfileActivity extends ThemedActivity {
             if (binding.tvStatFriends != null) binding.tvStatFriends.setText(formatScore(followers));
             if (binding.tvStatFollowing != null) binding.tvStatFollowing.setText(formatScore(following));
             if (binding.tvStatFans != null) binding.tvStatFans.setText(formatScore(visitors));
-            if (binding.tvPropProfileFriends != null) {
-                binding.tvPropProfileFriends.setText(formatScore(friends));
-            }
             if (binding.tvStats != null) {
                 binding.tvStats.setText(getString(R.string.user_card_stat_following) + " " + followers
                         + " · " + getString(R.string.user_card_stat_fans) + " " + following
@@ -583,10 +544,8 @@ public class ProfileActivity extends ThemedActivity {
             bindProfileCoverGallery(user.profileCoverUrls, user.coverUrl);
             if (myId != null && myId.equals(user.id)) {
                 binding.btnFollow.setVisibility(View.GONE);
-                if (binding.btnFriend != null) binding.btnFriend.setVisibility(View.GONE);
             } else {
                 binding.btnFollow.setVisibility(View.VISIBLE);
-                if (binding.btnFriend != null) binding.btnFriend.setVisibility(View.VISIBLE);
                 isFollowingTarget = Boolean.TRUE.equals(user.isFollowing);
                 binding.btnFollow.setText(
                         isFollowingTarget ? R.string.unfollow : R.string.follow);
@@ -1979,7 +1938,7 @@ public class ProfileActivity extends ThemedActivity {
 
 
     private void openProfileMoments() {
-        String id = targetUserIdHold[0];
+        String id = loadedProfileId;
         if (id == null || id.trim().isEmpty()) return;
         Intent moments = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
         moments.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, id);
