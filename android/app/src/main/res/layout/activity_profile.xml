@@ -208,9 +208,11 @@
                         android:visibility="gone">
 
                         <FrameLayout
-                            android:layout_width="76dp"
-                            android:layout_height="76dp"
-                            android:elevation="4dp">
+                            android:layout_width="96dp"
+                            android:layout_height="96dp"
+                            android:elevation="4dp"
+                            android:clipChildren="false"
+                            android:clipToPadding="false">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpPartner"
                                 android:layout_width="96dp"
@@ -227,7 +229,7 @@
                                 android:layout_width="96dp"
                                 android:layout_height="96dp"
                                 android:contentDescription="@null"
-                                android:scaleType="fitXY"
+                                android:scaleType="fitCenter"
                                 android:visibility="gone" />
                         </FrameLayout>
 
@@ -843,6 +845,70 @@
                 </LinearLayout>
 
                 <!-- Profile medal/rank strip is disabled platform-wide. -->
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    android:text="@string/user_card_property_title" />
+
+                <!-- Reference tabs: الملكية / لحظاتي -->
+                <LinearLayout
+                    android:id="@+id/rowProfileProperty"
+                    android:layout_width="match_parent"
+                    android:layout_height="58dp"
+                    android:layout_marginHorizontal="14dp"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:background="@android:color/transparent">
+
+                    <LinearLayout
+                        android:id="@+id/propProfileFamily"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+                        <TextView
+                            android:id="@+id/tvProfileAgencyName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ملكية"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="17sp"
+                            android:textStyle="bold" />
+                        <View
+                            android:layout_width="30dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="7dp"
+                            android:background="#FFFF6FB7" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/propProfileSupporters"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+                        <TextView
+                            android:id="@+id/tvPropProfileSupporters"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="تفاصيل"
+                            android:textColor="#FFB58AAE"
+                            android:textSize="17sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/propProfileFriends"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="0"
+                        android:visibility="gone" />
+                </LinearLayout>
+
                 <!-- Agency strip (same as user card) -->
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:id="@+id/rowProfileAgency"
@@ -940,70 +1006,6 @@
                             tools:text="GID:1895" />
                     </LinearLayout>
                 </androidx.constraintlayout.widget.ConstraintLayout>
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone"
-                    android:text="@string/user_card_property_title" />
-
-                <!-- Reference tabs: الملكية / لحظاتي -->
-                <LinearLayout
-                    android:id="@+id/rowProfileProperty"
-                    android:layout_width="match_parent"
-                    android:layout_height="58dp"
-                    android:layout_marginHorizontal="14dp"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center"
-                    android:orientation="horizontal"
-                    android:background="@android:color/transparent">
-
-                    <LinearLayout
-                        android:id="@+id/propProfileFamily"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-                        <TextView
-                            android:id="@+id/tvProfileAgencyName"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="ملكية"
-                            android:textColor="#FFFFFFFF"
-                            android:textSize="17sp"
-                            android:textStyle="bold" />
-                        <View
-                            android:layout_width="30dp"
-                            android:layout_height="3dp"
-                            android:layout_marginTop="7dp"
-                            android:background="#FFFF6FB7" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/propProfileSupporters"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-                        <TextView
-                            android:id="@+id/tvPropProfileSupporters"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="اللحظات"
-                            android:textColor="#FFB58AAE"
-                            android:textSize="17sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/propProfileFriends"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:layout_weight="0"
-                        android:visibility="gone" />
-                </LinearLayout>
 
                 <!-- Mysterious Man toggle: visible only on the account owner's profile. -->
                 <LinearLayout
@@ -1251,7 +1253,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="18dp"
                 android:layout_marginTop="18dp"
-                android:text="سجل الهدايا"
+                android:text="الهدايا"
                 android:textColor="#FFFFFFFF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
