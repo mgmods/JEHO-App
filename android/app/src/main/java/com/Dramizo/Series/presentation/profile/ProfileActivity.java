@@ -225,6 +225,7 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
         if (binding.sectionProfileSupporters != null) {
+            binding.sectionProfileSupporters.setVisibility(View.VISIBLE);
             binding.sectionProfileSupporters.setOnClickListener(v -> {
                 String id = targetUserIdHold[0];
                 if (id == null || id.trim().isEmpty()) return;
@@ -566,7 +567,9 @@ public class ProfileActivity extends ThemedActivity {
     /** Top accounts that actually sent gifts to this profile — never followers. */
     private void loadProfileSupporters(String profileId) {
         if (binding == null || profileId == null || profileId.trim().isEmpty()) return;
+        if (binding.sectionProfileSupporters != null) binding.sectionProfileSupporters.setVisibility(View.VISIBLE);
         RecyclerView recycler = binding.recyclerProfileSupporters;
+        recycler.setVisibility(View.VISIBLE);
         recycler.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         recycler.setNestedScrollingEnabled(false);
         container.getIoExecutor().execute(() -> {
@@ -576,6 +579,7 @@ public class ProfileActivity extends ThemedActivity {
                 if (binding == null || isFinishing() || isDestroyed()) return;
                 List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto> supporters =
                         result.success && result.data != null ? result.data : new java.util.ArrayList<>();
+                recycler.setVisibility(View.VISIBLE);
                 recycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                     @NonNull @Override
                     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -1923,133 +1927,66 @@ public class ProfileActivity extends ThemedActivity {
         startActivity(moments);
     }
 
+    private boolean profileDetailsExpanded = false;
+    private boolean profileDetailsViewsAttached = false;
+
+    /** Expand the existing profile sections in place; never navigate away or open a modal. */
     private void openProfileDetails() {
-        if (binding == null) return;
-        final String id = loadedProfileId == null ? "" : loadedProfileId;
-        final String viewerId = container == null ? null : container.getSessionManager().getUserId();
-        final com.google.android.material.bottomsheet.BottomSheetDialog sheet =
-                new com.google.android.material.bottomsheet.BottomSheetDialog(this);
-        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setClipToPadding(false);
-        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
-        root.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = Math.round(18 * getResources().getDisplayMetrics().density);
-        root.setPadding(pad, pad, pad, pad);
-        android.graphics.drawable.GradientDrawable panel = new android.graphics.drawable.GradientDrawable();
-        panel.setColor(0xFF211A25);
-        panel.setCornerRadii(new float[]{pad,pad,pad,pad,pad,pad,pad,pad});
-        root.setBackground(panel);
-
-        TextView heading = new TextView(this);
-        heading.setText("تفاصيل الحساب");
-        heading.setTextColor(0xFFFFFFFF);
-        heading.setTextSize(18);
-        heading.setTypeface(null, android.graphics.Typeface.BOLD);
-        heading.setGravity(Gravity.CENTER);
-        root.addView(heading, new android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        android.widget.LinearLayout identity = new android.widget.LinearLayout(this);
-        identity.setGravity(Gravity.CENTER_VERTICAL);
-        identity.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        identity.setPadding(0, pad, 0, pad);
-        ImageView avatar = new ImageView(this);
-        int avatarSize = Math.round(58 * getResources().getDisplayMetrics().density);
-        avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        Drawable photo = binding.imgProfileCpSelf != null
-                && binding.imgProfileCpSelf.getVisibility() == View.VISIBLE
-                ? binding.imgProfileCpSelf.getDrawable() : binding.imgAvatar.getDrawable();
-        avatar.setImageDrawable(photo);
-        android.widget.LinearLayout.LayoutParams avatarLp =
-                new android.widget.LinearLayout.LayoutParams(avatarSize, avatarSize);
-        avatarLp.setMarginEnd(pad);
-        identity.addView(avatar, avatarLp);
-        android.widget.LinearLayout identityText = new android.widget.LinearLayout(this);
-        identityText.setOrientation(android.widget.LinearLayout.VERTICAL);
-        TextView name = new TextView(this);
-        name.setText(binding.tvDisplayName.getText());
-        name.setTextColor(0xFFFFFFFF);
-        name.setTextSize(16);
-        name.setTypeface(null, android.graphics.Typeface.BOLD);
-        identityText.addView(name);
-        TextView publicId = new TextView(this);
-        publicId.setText(binding.tvUsername.getText());
-        publicId.setTextColor(0xFFBDB3C4);
-        publicId.setTextSize(12);
-        identityText.addView(publicId);
-        identity.addView(identityText, new android.widget.LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        root.addView(identity);
-
-        android.widget.LinearLayout badgeRow = new android.widget.LinearLayout(this);
-        badgeRow.setGravity(Gravity.CENTER_VERTICAL);
-        badgeRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        if (binding.rowProfileMedals != null && binding.rowProfileMedals.getChildCount() > 0) {
-            View badgeContainer = binding.rowProfileMedals.getChildAt(0);
-            if (badgeContainer instanceof ViewGroup) {
-                ViewGroup group = (ViewGroup) badgeContainer;
-                for (int i = 0; i < group.getChildCount(); i++) {
-                    View child = group.getChildAt(i);
-                    if (child instanceof ImageView && child.getVisibility() == View.VISIBLE) {
-                        Drawable drawable = ((ImageView) child).getDrawable();
-                        if (drawable == null) continue;
-                        ImageView badge = new ImageView(this);
-                        badge.setImageDrawable(drawable.getConstantState() == null
-                                ? drawable : drawable.getConstantState().newDrawable().mutate());
-                        badge.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                        int size = Math.round(28 * getResources().getDisplayMetrics().density);
-                        android.widget.LinearLayout.LayoutParams badgeLp =
-                                new android.widget.LinearLayout.LayoutParams(size, size);
-                        badgeLp.setMarginEnd(Math.round(6 * getResources().getDisplayMetrics().density));
-                        badgeRow.addView(badge, badgeLp);
-                    }
-                }
-            }
+        if (binding == null || binding.profileDetailsInlinePanel == null) return;
+        ViewGroup panel = binding.profileDetailsInlinePanel;
+        profileDetailsExpanded = !profileDetailsExpanded;
+        if (!profileDetailsExpanded) {
+            panel.setVisibility(View.GONE);
+            if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("تفاصيل");
+            return;
         }
-        if (badgeRow.getChildCount() > 0) root.addView(badgeRow);
 
-        android.widget.LinearLayout stats = new android.widget.LinearLayout(this);
-        stats.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        stats.setGravity(Gravity.CENTER);
-        stats.setPadding(0, pad, 0, pad);
-        addProfileDetailStat(stats, "المتابعون", binding.tvStatFriends.getText().toString(),
-                () -> { if (!id.isEmpty()) UserSocialNav.openFollowers(this, id, viewerId); });
-        addProfileDetailStat(stats, "المعجبون", binding.tvStatFollowing.getText().toString(),
-                () -> { if (!id.isEmpty()) UserSocialNav.openFollowing(this, id, viewerId); });
-        addProfileDetailStat(stats, "الزوار", binding.tvStatFans.getText().toString(),
-                () -> { if (!id.isEmpty()) UserSocialNav.openVisitors(this, id, viewerId); });
-        root.addView(stats);
-
-        android.widget.LinearLayout supporters = new android.widget.LinearLayout(this);
-        supporters.setOrientation(android.widget.LinearLayout.VERTICAL);
-        supporters.setPadding(pad, pad, pad, pad);
-        supporters.setBackgroundColor(0xFF302536);
-        TextView supportersTitle = new TextView(this);
-        supportersTitle.setText("الداعمون");
-        supportersTitle.setTextColor(0xFFFFFFFF);
-        supportersTitle.setTextSize(15);
-        supportersTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        supporters.addView(supportersTitle);
-        TextView supportersHint = new TextView(this);
-        supportersHint.setText("اضغط لعرض الداعمين وصورهم");
-        supportersHint.setTextColor(0xFFBDB3C4);
-        supportersHint.setTextSize(12);
-        supporters.addView(supportersHint);
-        supporters.setOnClickListener(v -> {
-            sheet.dismiss();
-            if (!id.trim().isEmpty()) {
-                Intent intent = new Intent(this, SupportersActivity.class);
-                intent.putExtra(EXTRA_USER_ID, id);
-                startActivity(intent);
+        if (!profileDetailsViewsAttached) {
+            // Reuse the existing gift-history cabinet and earned-medals strip, preserving
+            // their original adapters, visuals and click behavior.
+            View giftHistory = binding.recyclerProfileGiftHistory == null
+                    ? null : (View) binding.recyclerProfileGiftHistory.getParent();
+            if (giftHistory != null && giftHistory.getParent() instanceof ViewGroup) {
+                ((ViewGroup) giftHistory.getParent()).removeView(giftHistory);
+                panel.addView(giftHistory, new android.widget.LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             }
-        });
-        root.addView(supporters, new android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        scroll.addView(root);
-        sheet.setContentView(scroll);
-        sheet.getBehavior().setDraggable(true);
-        sheet.show();
+            if (binding.rowProfileAchievementBadges != null) {
+                View badges = binding.rowProfileAchievementBadges;
+                if (badges.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) badges.getParent()).removeView(badges);
+                }
+                badges.setVisibility(View.VISIBLE);
+                panel.addView(badges, new android.widget.LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
+
+            TextView moments = new TextView(this);
+            moments.setText("اللحظات  ›");
+            moments.setTextColor(0xFFFFFFFF);
+            moments.setTextSize(14);
+            moments.setTypeface(null, android.graphics.Typeface.BOLD);
+            moments.setGravity(Gravity.CENTER);
+            moments.setPadding(0, Math.round(14 * getResources().getDisplayMetrics().density),
+                    0, Math.round(14 * getResources().getDisplayMetrics().density));
+            android.graphics.drawable.GradientDrawable momentsBg =
+                    new android.graphics.drawable.GradientDrawable();
+            momentsBg.setColor(0xFF302536);
+            momentsBg.setCornerRadius(Math.round(12 * getResources().getDisplayMetrics().density));
+            moments.setBackground(momentsBg);
+            moments.setOnClickListener(v -> openProfileMomentsLegacy());
+            panel.addView(moments, new android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            profileDetailsViewsAttached = true;
+        }
+
+        if (binding.recyclerProfileGiftHistory != null
+                && binding.recyclerProfileGiftHistory.getParent() instanceof ViewGroup) {
+            View row = (View) binding.recyclerProfileGiftHistory.getParent();
+            row.setVisibility(View.VISIBLE);
+        }
+        if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("إخفاء");
+        panel.setVisibility(View.VISIBLE);
     }
 
     private void addProfileDetailStat(android.widget.LinearLayout parent, String label,
