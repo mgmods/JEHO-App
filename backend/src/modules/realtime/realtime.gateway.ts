@@ -1159,8 +1159,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
             return { error: 'This sticker is not available for this account' };
           }
         }
-        const requiredVipLevel = Math.max(Number(sticker.requiredVipLevel) || 1,
-          category.accessType === 'vip' ? Number(category.requiredVipLevel) || 1 : 1);
+        const requiredVipLevel = Math.max(
+          Number(sticker.requiredVipLevel) || 1,
+          Number(category.requiredVipLevel) || 1,
+        );
         if (sticker.accessType === 'vip' || category.accessType === 'vip' || requiredVipLevel > 1) {
           const vip = await this.userVipRepo.findOne({
             where: { userId: client.userId, isActive: true },
