@@ -3223,6 +3223,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (inline == null || overflow == null) return;
         inline.removeAllViews();
         overflow.removeAllViews();
+        inline.setVisibility(View.GONE);
         overflow.setOrientation(LinearLayout.VERTICAL);
         overflow.setGravity(android.view.Gravity.RIGHT);
         overflow.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -3362,15 +3363,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         ViewGroup.LayoutParams rawParams = badge.getLayoutParams();
         if (rawParams instanceof LinearLayout.LayoutParams) {
             LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) rawParams;
-            badgeWidth += params.leftMargin + params.rightMargin;
-            if (android.os.Build.VERSION.SDK_INT >= 17) badgeWidth += params.getMarginStart() + params.getMarginEnd();
+            // left/right and start/end refer to the same margins; count them once.
+            badgeWidth += android.os.Build.VERSION.SDK_INT >= 17
+                    ? params.getMarginStart() + params.getMarginEnd()
+                    : params.leftMargin + params.rightMargin;
         }
         badgeWidth = Math.max(dp(18), badgeWidth);
-        if (inlineUsed[0] + badgeWidth <= firstLineLimit) {
-            inline.addView(badge);
-            inlineUsed[0] += badgeWidth;
-            return;
-        }
+        // Keep every badge in a compact horizontal flow below the sender name.
+        // Do not place a few badges beside the name and strand the rest on separate lines.
         if (overflowLine[0] == null || (overflowUsed[0] + badgeWidth > overflowLineLimit
                 && overflowLine[0].getChildCount() > 0)) {
             LinearLayout next = new LinearLayout(this);
