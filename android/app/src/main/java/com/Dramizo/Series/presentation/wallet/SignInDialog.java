@@ -419,23 +419,37 @@ public class SignInDialog extends DialogFragment {
         Object rawReward = response.get("reward");
         Map<String, Object> reward = rawReward instanceof Map
                 ? (Map<String, Object>) rawReward : java.util.Collections.emptyMap();
-        String type = String.valueOf(reward.get("type") == null ? "coins" : reward.get("type"));
-        String name = String.valueOf(reward.get("name") == null
-                ? (status != null && status.reward != null ? status.reward.label : "مكافأتك اليومية")
-                : reward.get("name"));
+        String type = firstNonEmpty(reward.get("type"), "coins");
+        MiscDtos.DailyLoginRewardDto configuredReward = status != null ? status.reward : null;
+        String cosmeticName = firstNonEmpty(
+                reward.get("name"),
+                configuredReward == null ? null : configuredReward.name,
+                configuredReward == null ? null : configuredReward.label,
+                "مكافأتك اليومية");
         String preview = firstNonEmpty(
                 reward.get("previewUrl"), reward.get("imageUrl"), reward.get("iconUrl"),
-                status != null && status.reward != null ? status.reward.previewUrl : null);
+                configuredReward == null ? null : configuredReward.previewUrl,
+                configuredReward == null ? null : configuredReward.imageUrl,
+                configuredReward == null ? null : configuredReward.iconUrl);
         String animation = firstNonEmpty(
                 reward.get("animationUrl"),
-                status != null && status.reward != null ? status.reward.animationUrl : null);
+                configuredReward == null ? null : configuredReward.animationUrl);
+        long amount = numberValue(reward.get("amount"),
+                configuredReward == null ? 0L : configuredReward.amount);
+        boolean hasArtwork = nonEmpty(preview);
 
         binding.clSignIn.setVisibility(View.GONE);
         binding.successPanel.setVisibility(View.VISIBLE);
-        binding.tvClaimRewardName.setText(name);
-        binding.tvClaimSuccess.setText("تم الاستلام بنجاح");
+        String displayName = "coins".equalsIgnoreCase(type)
+                ? String.format(Locale.getDefault(), "%,d كوينز", amount)
+                : cosmeticName;
+        binding.tvClaimRewardName.setText(displayName);
+        binding.tvClaimSuccess.setText("تم استلام مكافأتك بنجاح");
         binding.tvClaimEnvelope.setText("✉");
-        if ("cosmetic".equalsIgnoreCase(type) && nonEmpty(preview)) {
+        // Use the actual catalogue artwork for every cosmetic reward (frames,
+        // entry cards, names, backgrounds, etc.), not only items whose type is
+        // literally "cosmetic". Coin rewards use the app's real coin artwork.
+        if (hasArtwork) {
             loadDashboardArtwork(binding.imgClaimReward, preview, animation,
                     R.drawable.ic_gold_coin, ImageView.ScaleType.FIT_CENTER);
         } else {
@@ -448,6 +462,12 @@ public class SignInDialog extends DialogFragment {
             dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT);
         }
+    }
+
+    private long numberValue(Object value, long fallback) {
+        if (value instanceof Number) return ((Number) value).longValue();
+        try { return value == null ? fallback : Long.parseLong(String.valueOf(value)); }
+        catch (Exception ignored) { return fallback; }
     }
 
     private String firstNonEmpty(Object... values) {
