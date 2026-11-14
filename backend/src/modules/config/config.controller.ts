@@ -421,6 +421,29 @@ export class ConfigController {
   }
 
   @Public()
+  @Get('agency-role-badges')
+  @ApiOperation({ summary: 'Public agency leader and host badge images managed from dashboard' })
+  async agencyRoleBadges() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'agency_role_badges' } });
+    let config: any = {};
+    if (row?.value) {
+      try {
+        config = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+      } catch {
+        config = {};
+      }
+    }
+    const safeUrl = (value: unknown) => {
+      const url = String(value || '').trim();
+      return url && url.length <= 2048 ? url : '';
+    };
+    return {
+      leaderBadgeUrl: safeUrl(config?.leaderBadgeUrl),
+      hostBadgeUrl: safeUrl(config?.hostBadgeUrl),
+    };
+  }
+
+  @Public()
   @Get('seat-stickers')
   @ApiOperation({
     summary: 'Seat mic reaction stickers (GIF/WebP) managed from dashboard',
