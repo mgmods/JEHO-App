@@ -34,8 +34,8 @@ public final class ProfileDetailsActivity extends Activity {
         View gifts = findViewById(R.id.cardGiftHistory);
         if (gifts != null) {
             gifts.setOnClickListener(v -> {
-                Intent intent = new Intent(this, ProfileActivity.class);
-                intent.putExtra(ProfileActivity.EXTRA_USER_ID, userId);
+                Intent intent = new Intent(this, GiftHistoryActivity.class);
+                intent.putExtra(GiftHistoryActivity.EXTRA_USER_ID, userId);
                 startActivity(intent);
             });
         }
