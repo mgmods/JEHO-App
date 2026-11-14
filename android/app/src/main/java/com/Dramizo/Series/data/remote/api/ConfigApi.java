@@ -32,6 +32,10 @@ public interface ConfigApi {
     Call<ApiResponse<MiscDtos.NavIconsDto>> navIcons(@Query("_") long cacheBust);
 
     @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
+    @GET("config/agency-role-badges")
+    Call<ApiResponse<MiscDtos.AgencyRoleBadgesDto>> agencyRoleBadges(@Query("_") long cacheBust);
+
+    @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
     @GET("config/seat-stickers")
     Call<ApiResponse<MiscDtos.SeatStickersDto>> seatStickers(@Query("_") long cacheBust);
 
