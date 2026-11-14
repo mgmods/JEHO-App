@@ -965,7 +965,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.rowProfileAgency.setVisibility(View.GONE);
                 return;
             }
-            binding.rowProfileAgency.setVisibility(View.VISIBLE);
+            binding.rowProfileAgency.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
             if (binding.tvAgencyName != null) {
                 binding.tvAgencyName.setText(club.agencyName == null || club.agencyName.trim().isEmpty()
                         ? club.label.trim() : club.agencyName.trim());
@@ -1443,7 +1443,7 @@ public class ProfileActivity extends ThemedActivity {
                     durationText = relationshipDays + " يوم";
                 }
                 binding.tvProfileCpCvDays.setText("♥ معاً منذ " + durationText);
-                binding.rowProfileCpCv.setVisibility(View.VISIBLE);
+                binding.rowProfileCpCv.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
 
                 // Show exactly two portraits in the upper profile area: reuse the larger
                 // profile portrait slot for the linked pair instead of leaving a third copy.
@@ -1761,7 +1761,7 @@ public class ProfileActivity extends ThemedActivity {
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges) {
                         if (badge == null || !badge.earned || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
                         ImageView image = new ImageView(this);
-                        int size = Math.round(40 * getResources().getDisplayMetrics().density);
+                        int size = Math.round(48 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
                         lp.setMargins(0, 0, Math.round(8 * getResources().getDisplayMetrics().density), 0);
                         image.setLayoutParams(lp);
@@ -1930,6 +1930,8 @@ public class ProfileActivity extends ThemedActivity {
 
     private boolean profileDetailsExpanded = false;
     private boolean profileDetailsViewsAttached = false;
+    private boolean profileAgencyVisibleBeforeDetails = false;
+    private boolean profileCpVisibleBeforeDetails = false;
 
     /** Expand the existing profile sections in place; never navigate away or open a modal. */
     private void openProfileDetails() {
@@ -1938,9 +1940,19 @@ public class ProfileActivity extends ThemedActivity {
         profileDetailsExpanded = !profileDetailsExpanded;
         if (!profileDetailsExpanded) {
             panel.setVisibility(View.GONE);
+            if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(
+                    profileAgencyVisibleBeforeDetails ? View.VISIBLE : View.GONE);
+            if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(
+                    profileCpVisibleBeforeDetails ? View.VISIBLE : View.GONE);
             if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("تفاصيل");
             return;
         }
+        profileAgencyVisibleBeforeDetails = binding.rowProfileAgency != null
+                && binding.rowProfileAgency.getVisibility() == View.VISIBLE;
+        profileCpVisibleBeforeDetails = binding.rowProfileCpCv != null
+                && binding.rowProfileCpCv.getVisibility() == View.VISIBLE;
+        if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(View.GONE);
+        if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(View.GONE);
 
         if (!profileDetailsViewsAttached) {
             // Details order: moments first, then the existing gift-history section.
@@ -1969,7 +1981,6 @@ public class ProfileActivity extends ThemedActivity {
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             }
             profileDetailsViewsAttached = true;
-        }
         }
 
         if (binding.recyclerProfileGiftHistory != null
@@ -2028,9 +2039,11 @@ public class ProfileActivity extends ThemedActivity {
 
     private void showProfileProperty() {
         if (binding == null) return;
-        if (binding.rowProfileCpCv != null) {
-            binding.rowProfileCpCv.setVisibility(binding.rowProfileCpCv.getVisibility() == View.VISIBLE
-                    ? View.VISIBLE : View.VISIBLE);
+        if (binding.rowProfileAgency != null && profileDetailsExpanded) {
+            binding.rowProfileAgency.setVisibility(View.GONE);
+        }
+        if (binding.rowProfileCpCv != null && profileDetailsExpanded) {
+            binding.rowProfileCpCv.setVisibility(View.GONE);
         }
         if (binding.rowGiftHistory != null) binding.rowGiftHistory.setVisibility(View.VISIBLE);
         if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.VISIBLE);
