@@ -2831,7 +2831,11 @@ export class AdminService {
             prevVer = 0;
           }
         }
-        clean.version = prevVer + 1;
+        // Version 4 is the first dashboard-managed catalog format.
+        // Keep that schema version even when the setting row is new or legacy;
+        // otherwise the dashboard mistakes a fresh save for retired bundled data
+        // and clears every uploaded sticker on the next load.
+        clean.version = Math.max(4, prevVer + 1);
         clean.updatedAt = new Date().toISOString();
         nextValue = JSON.stringify(clean);
       } catch {
