@@ -39,5 +39,15 @@ public final class ProfileDetailsActivity extends Activity {
                 startActivity(intent);
             });
         }
+
+        View medals = findViewById(R.id.cardMedalsBadges);
+        if (medals != null) {
+            medals.setOnClickListener(v -> {
+                if (userId == null || userId.trim().isEmpty()) return;
+                Intent intent = new Intent(this, MedalActivity.class);
+                intent.putExtra(ProfileActivity.EXTRA_USER_ID, userId);
+                startActivity(intent);
+            });
+        }
     }
 }
