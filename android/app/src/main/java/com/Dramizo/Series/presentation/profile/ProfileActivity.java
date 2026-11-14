@@ -431,6 +431,9 @@ public class ProfileActivity extends ThemedActivity {
             if (user.id != null && !user.id.isEmpty()) {
                 targetUserIdHold[0] = user.id;
                 loadedProfileId = user.id;
+                if (binding.sectionProfileSupporters != null) {
+                    binding.sectionProfileSupporters.setVisibility(View.VISIBLE);
+                }
                 loadProfileMedals(user.id);
                 loadProfileAchievementBadges(user.id);
                 loadProfileSupporters(user.id);
@@ -780,7 +783,7 @@ public class ProfileActivity extends ThemedActivity {
                     item.setContentDescription(badge.name == null ? "شارة" : badge.name);
                     ImageView icon = new ImageView(this);
                     icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(dpProfile(54), dpProfile(54));
+                    LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(dpProfile(50), dpProfile(50));
                     item.addView(icon, imageLp);
                     Glide.with(ProfileActivity.this)
                             .load(AssetCatalog.absoluteUrl(badge.imageUrl))
@@ -797,11 +800,11 @@ public class ProfileActivity extends ThemedActivity {
                     TextView name = new TextView(this);
                     name.setText(badge.name == null ? "شارة" : badge.name);
                     name.setTextColor(0xFF4B4568);
-                    name.setTextSize(10f);
+                    name.setTextSize(9.5f);
                     name.setMaxLines(1);
                     name.setGravity(Gravity.CENTER);
                     name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(dpProfile(66), ViewGroup.LayoutParams.WRAP_CONTENT);
+                    LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(dpProfile(62), ViewGroup.LayoutParams.WRAP_CONTENT);
                     nameLp.topMargin = dpProfile(2);
                     item.addView(name, nameLp);
                     item.setOnClickListener(v -> openBadgeCabinet(profileId));
