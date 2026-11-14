@@ -38,12 +38,12 @@
                 android:layout_height="wrap_content"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                android:minHeight="380dp">
+                android:minHeight="300dp">
 
                 <ImageView
                     android:id="@+id/imgCover"
                     android:layout_width="match_parent"
-                    android:layout_height="380dp"
+                    android:layout_height="300dp"
                     android:contentDescription="@null"
                     android:scaleType="centerCrop"
                     android:src="@color/bg_light" />
@@ -135,7 +135,7 @@
                 android:id="@+id/userCardBg"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="-105dp"
+                android:layout_marginTop="-86dp"
                 android:background="@drawable/bg_profile_panel_from_avatar_mid"
                 android:clipChildren="false"
                 android:clipToPadding="false"
@@ -146,7 +146,7 @@
                 <LinearLayout
                     android:id="@+id/profileIdentityAndCp"
                     android:layout_width="match_parent"
-                    android:layout_height="160dp"
+                    android:layout_height="132dp"
                     android:background="@android:color/transparent"
                     android:gravity="start|center_vertical"
                     android:orientation="horizontal"
@@ -156,8 +156,8 @@
 
                     <FrameLayout
                         android:id="@+id/profileAvatarWrap"
-                        android:layout_width="148dp"
-                        android:layout_height="160dp"
+                        android:layout_width="124dp"
+                        android:layout_height="132dp"
                         android:layout_gravity="top"
                         android:layout_marginStart="12dp"
                         android:layout_marginTop="0dp"
@@ -166,8 +166,8 @@
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/imgAvatar"
-                            android:layout_width="122dp"
-                            android:layout_height="122dp"
+                            android:layout_width="100dp"
+                            android:layout_height="100dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/nav_profile"
                             android:elevation="4dp"
@@ -197,7 +197,7 @@
                     <LinearLayout
                         android:id="@+id/rowProfileCp"
                         android:layout_width="wrap_content"
-                        android:layout_height="150dp"
+                        android:layout_height="124dp"
                         android:layout_gravity="top"
                         android:layout_marginStart="8dp"
                         android:layout_marginEnd="12dp"
@@ -208,13 +208,13 @@
                         android:visibility="gone">
 
                         <FrameLayout
-                            android:layout_width="124dp"
-                            android:layout_height="124dp"
+                            android:layout_width="96dp"
+                            android:layout_height="96dp"
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpPartner"
-                                android:layout_width="124dp"
-                                android:layout_height="124dp"
+                                android:layout_width="96dp"
+                                android:layout_height="96dp"
                                 android:contentDescription="@null"
                                 android:elevation="4dp"
                                 android:scaleType="centerCrop"
@@ -224,8 +224,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpPartnerFrame"
-                                android:layout_width="124dp"
-                                android:layout_height="124dp"
+                                android:layout_width="96dp"
+                                android:layout_height="96dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
@@ -233,8 +233,8 @@
 
                         <TextView
                             android:id="@+id/tvProfileCpHeart"
-                            android:layout_width="48dp"
-                            android:layout_height="54dp"
+                            android:layout_width="36dp"
+                            android:layout_height="42dp"
                             android:layout_marginStart="6dp"
                             android:layout_marginEnd="6dp"
                             android:gravity="center"
@@ -245,18 +245,18 @@
                             android:shadowRadius="7"
                             android:text="♥"
                             android:textColor="#FFFF5277"
-                            android:textSize="34sp"
+                            android:textSize="27sp"
                             android:textStyle="bold" />
 
                         <!-- Larger primary portrait for the profile owner. -->
                         <FrameLayout
-                            android:layout_width="128dp"
-                            android:layout_height="128dp"
+                            android:layout_width="96dp"
+                            android:layout_height="96dp"
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpSelf"
-                                android:layout_width="128dp"
-                                android:layout_height="128dp"
+                                android:layout_width="96dp"
+                                android:layout_height="96dp"
                                 android:contentDescription="@null"
                                 android:elevation="4dp"
                                 android:scaleType="centerCrop"
@@ -266,8 +266,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpSelfFrame"
-                                android:layout_width="128dp"
-                                android:layout_height="128dp"
+                                android:layout_width="96dp"
+                                android:layout_height="96dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
@@ -460,8 +460,8 @@
                     android:visibility="visible"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:paddingStart="14dp"
+                    android:layout_marginTop="2dp"
+                    android:paddingStart="10dp"
                     android:paddingEnd="14dp"
                     android:scrollbars="none">
 
@@ -482,8 +482,8 @@
 
                         <ImageView
                             android:id="@+id/imgVipMedal"
-                            android:layout_width="36dp"
-                            android:layout_height="24dp"
+                            android:layout_width="28dp"
+                            android:layout_height="18dp"
                             android:layout_marginStart="6dp"
                             android:adjustViewBounds="true"
                             android:contentDescription="VIP"
@@ -500,14 +500,14 @@
                             android:paddingVertical="6dp"
                             android:text="VIP 0"
                             android:textColor="#FFFFFFFF"
-                            android:textSize="13sp"
+                            android:textSize="11sp"
                             android:textStyle="bold"
                             android:visibility="gone" />
 
                         <ImageView
                             android:id="@+id/imgRankIcon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
                             android:layout_marginStart="5dp"
                             android:contentDescription="الترتيب"
                             android:scaleType="fitCenter"
@@ -519,8 +519,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
                             android:background="@drawable/bg_chip_charm"
-                            android:paddingHorizontal="11dp"
-                            android:paddingVertical="6dp"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="3dp"
                             android:text="0"
                             android:textColor="#FFFFFFFF"
                             android:textSize="13sp"
@@ -528,8 +528,8 @@
 
                         <ImageView
                             android:id="@+id/imgWealthIcon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
                             android:layout_marginStart="5dp"
                             android:contentDescription="الثروة"
                             android:scaleType="fitCenter"
@@ -561,8 +561,8 @@
 
                         <ImageView
                             android:id="@+id/imgLevelIcon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
                             android:layout_marginStart="5dp"
                             android:contentDescription="المستوى"
                             android:scaleType="fitCenter"
@@ -811,22 +811,22 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="14dp"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="6dp"
                     android:background="@drawable/bg_profile_panel"
                     android:orientation="vertical"
-                    android:padding="10dp">
+                    android:padding="5dp">
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="الداعمون"
                         android:textColor="#FFFFFFFF"
-                        android:textSize="14sp"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/recyclerProfileSupporters"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="3dp"
                         android:clipToPadding="false"
                         android:nestedScrollingEnabled="false"
                         android:overScrollMode="never"
@@ -835,7 +835,7 @@
                         android:id="@+id/tvProfileSupportersEmpty"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:padding="10dp"
+                        android:padding="4dp"
                         android:text="لا يوجد داعمون حتى الآن"
                         android:textColor="#FFB9A7B8"
                         android:textSize="11sp"
