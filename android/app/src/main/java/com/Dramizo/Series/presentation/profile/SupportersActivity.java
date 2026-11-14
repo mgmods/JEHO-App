@@ -56,8 +56,6 @@ public class SupportersActivity extends ThemedActivity {
                 GiftDtos.GiftSupporterDto item = items.get(position);
                 holder.binding.tvSupporterName.setText(item.displayName == null || item.displayName.trim().isEmpty()
                         ? (item.username == null ? "مستخدم" : item.username) : item.displayName);
-                holder.binding.tvSupporterAmount.setText("💎 " + NumberFormat.getNumberInstance(Locale.US)
-                        .format(Math.max(0L, item.totalSupport)));
                 AvatarCosmetics.bindStacked(holder.binding.imgSupporterAvatar,
                         holder.binding.imgSupporterFrame, holder.binding.supporterHostSignal,
                         item.avatarUrl, item.frameUrl, null);
