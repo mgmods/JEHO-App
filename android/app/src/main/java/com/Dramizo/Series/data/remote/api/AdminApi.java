@@ -259,6 +259,9 @@ public interface AdminApi {
     @GET("admin/staff-identity/public")
     Call<ApiResponse<Object>> publicStaffIdentity();
 
+    @GET("admin/agency-role-badges/public")
+    Call<ApiResponse<Object>> publicAgencyRoleBadges();
+
     @GET("admin/staff-identity")
     Call<ApiResponse<Object>> staffIdentity();
 
