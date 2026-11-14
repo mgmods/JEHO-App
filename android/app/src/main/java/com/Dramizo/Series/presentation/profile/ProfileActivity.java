@@ -672,7 +672,9 @@ public class ProfileActivity extends ThemedActivity {
     private void loadProfileGiftStrip(String profileId) {
         if (binding == null || profileId == null || profileId.trim().isEmpty()) return;
         RecyclerView recycler = binding.recyclerProfileGiftHistory;
-        recycler.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(this, 5));
+        int profileWidthDp = getResources().getConfiguration().screenWidthDp;
+        int giftColumns = profileWidthDp >= 420 ? 4 : 3;
+        recycler.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(this, giftColumns));
         recycler.setNestedScrollingEnabled(false);
         List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto> gifts = new java.util.ArrayList<>();
         RecyclerView.Adapter<GiftStripHolder> adapter = new RecyclerView.Adapter<GiftStripHolder>() {
@@ -682,7 +684,7 @@ public class ProfileActivity extends ThemedActivity {
                         LayoutInflater.from(parent.getContext()), parent, false);
                 item.getRoot().setLayoutParams(new RecyclerView.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        (int) (112 * getResources().getDisplayMetrics().density)));
+                        (int) (132 * getResources().getDisplayMetrics().density)));
                 return new GiftStripHolder(item);
             }
             @Override public void onBindViewHolder(@NonNull GiftStripHolder holder, int position) {
