@@ -243,8 +243,10 @@ public class LoginActivity extends ThemedActivity {
     }
 
     private void submitPasswordAuth() {
+        // Passwords are compared and submitted exactly as entered; never trim
+        // either field because even a trailing character must remain significant.
         String password = binding.etAuthPassword.getText() == null
-                ? "" : binding.etAuthPassword.getText().toString().trim();
+                ? "" : binding.etAuthPassword.getText().toString();
         if (password.length() < 6) {
             binding.etAuthPassword.setError(getString(R.string.password_min_length));
             binding.etAuthPassword.requestFocus();
@@ -253,11 +255,12 @@ public class LoginActivity extends ThemedActivity {
         if (registerMode) {
             String confirmPassword = binding.etAuthConfirmPassword.getText() == null
                     ? "" : binding.etAuthConfirmPassword.getText().toString();
-            if (!password.equals(confirmPassword)) {
+            if (confirmPassword.isEmpty() || !password.equals(confirmPassword)) {
                 binding.etAuthConfirmPassword.setError("كلمتا المرور غير متطابقتين");
                 binding.etAuthConfirmPassword.requestFocus();
                 return;
             }
+            binding.etAuthPassword.setError(null);
             binding.etAuthConfirmPassword.setError(null);
         }
         if (!registerMode) {
