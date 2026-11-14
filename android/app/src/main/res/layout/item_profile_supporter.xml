@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="56dp"
+    android:layout_width="48dp"
     android:layout_height="wrap_content"
     android:layout_marginEnd="5dp"
     android:background="@drawable/bg_profile_section_light"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="4dp">
+    android:padding="2dp">
 
     <FrameLayout
-        android:layout_width="40dp"
-        android:layout_height="40dp">
+        android:layout_width="34dp"
+        android:layout_height="34dp">
         <ImageView
             android:id="@+id/imgSupporterAvatar"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:layout_gravity="center"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_default_avatar" />
@@ -34,12 +34,12 @@
         android:id="@+id/tvSupporterName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
+        android:layout_marginTop="1dp"
         android:ellipsize="end"
         android:gravity="center"
         android:maxLines="1"
         android:textColor="#FF283047"
-        android:textSize="9sp"
+        android:textSize="8sp"
         android:textStyle="bold" />
 
     <TextView
@@ -49,5 +49,5 @@
         android:gravity="center"
         android:maxLines="1"
         android:textColor="#FFB17A21"
-        android:textSize="10sp" />
+        android:textSize="9sp" />
 </LinearLayout>
