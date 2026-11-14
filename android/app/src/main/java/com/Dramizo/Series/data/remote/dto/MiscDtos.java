@@ -420,6 +420,12 @@ public final class MiscDtos {
         @SerializedName("icon") public String icon;
     }
 
+    /** Agency role badge artwork from GET /config/agency-role-badges. */
+    public static class AgencyRoleBadgesDto {
+        @SerializedName("leaderBadgeUrl") public String leaderBadgeUrl;
+        @SerializedName("hostBadgeUrl") public String hostBadgeUrl;
+    }
+
     /** Seat mic stickers from GET /config/seat-stickers. */
     public static class SeatStickersDto {
         @SerializedName("version") public int version;
