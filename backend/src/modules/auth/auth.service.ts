@@ -63,8 +63,19 @@ export class AuthService implements OnModuleInit {
   }
 
   async register(dto: RegisterDto) {
+    const baseUsername = (dto.username || dto.email.split('@')[0] || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 24) || 'user';
+    let generatedUsername = baseUsername;
+    let suffix = 0;
+    while (await this.usersRepo.findOne({ where: { username: generatedUsername } })) {
+      suffix += 1;
+      generatedUsername = `${baseUsername.slice(0, 20)}${suffix}`.slice(0, 24);
+    }
+
     const existing = await this.usersRepo.findOne({
-      where: [{ email: dto.email }, { username: dto.username }],
+      where: [{ email: dto.email }],
     });
     if (existing) {
       throw new ConflictException('Email or username already registered');
@@ -73,10 +84,10 @@ export class AuthService implements OnModuleInit {
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = this.usersRepo.create({
       email: dto.email.toLowerCase(),
-      username: dto.username.toLowerCase(),
+      username: generatedUsername,
       publicId: await this.allocatePublicId(),
       passwordHash,
-      displayName: dto.displayName || dto.username,
+      displayName: dto.displayName || "",
       emailVerified: false,
     });
     await this.usersRepo.save(user);
