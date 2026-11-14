@@ -959,7 +959,7 @@ public class ProfileActivity extends ThemedActivity {
                     GradientDrawable.Orientation.LEFT_RIGHT, new int[]{start, end});
             chip.setCornerRadius(100f * getResources().getDisplayMetrics().density);
             chip.setStroke((int) (1 * getResources().getDisplayMetrics().density), strokeColor);
-            binding.tvAgencyRoleBadge.setText(club.label.trim());
+            binding.tvAgencyRoleBadge.setText(StaffRoleHelper.genderizeLabel(club.label.trim(), user.gender));
             binding.tvAgencyRoleBadge.setTextColor(textColor);
             binding.tvAgencyRoleBadge.setBackground(chip);
             binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
