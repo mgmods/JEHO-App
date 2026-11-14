@@ -2,6 +2,7 @@ package com.Dramizo.Series.presentation.profile;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.app.DatePickerDialog;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Color;
@@ -440,6 +441,73 @@ public class EditProfileActivity extends ThemedActivity {
         }
     }
 
+    private void refreshCoverGalleryThumbnails() {
+        if (binding == null || binding.coverGalleryItems == null) return;
+        binding.coverGalleryItems.removeAllViews();
+        final float density = getResources().getDisplayMetrics().density;
+        for (int i = 0; i < profileCoverUrls.size(); i++) {
+            final int index = i;
+            String url = profileCoverUrls.get(i);
+            android.widget.FrameLayout tile = new android.widget.FrameLayout(this);
+            LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams((int)(76*density), (int)(54*density));
+            tileLp.setMargins(0, 0, (int)(8*density), 0);
+            ImageView thumb = new ImageView(this);
+            thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            tile.addView(thumb, new android.widget.FrameLayout.LayoutParams(-1, -1));
+            Glide.with(this).load(url).centerCrop().into(thumb);
+            TextView remove = new TextView(this);
+            remove.setText("×"); remove.setTextColor(Color.WHITE); remove.setTextSize(17f);
+            remove.setTypeface(remove.getTypeface(), android.graphics.Typeface.BOLD);
+            remove.setGravity(android.view.Gravity.CENTER);
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setShape(android.graphics.drawable.GradientDrawable.OVAL); bg.setColor(0xDDC62828);
+            remove.setBackground(bg);
+            android.widget.FrameLayout.LayoutParams removeLp = new android.widget.FrameLayout.LayoutParams(
+                    (int)(23*density), (int)(23*density), android.view.Gravity.TOP|android.view.Gravity.END);
+            removeLp.setMargins(0,(int)(2*density),(int)(2*density),0);
+            tile.addView(remove, removeLp);
+            remove.setOnClickListener(v -> confirmRemoveCover(index));
+            thumb.setOnClickListener(v -> confirmRemoveCover(index));
+            binding.coverGalleryItems.addView(tile, tileLp);
+        }
+    }
+
+    private void confirmRemoveCover(int index) {
+        if (index < 0 || index >= profileCoverUrls.size()) return;
+        new AlertDialog.Builder(this).setTitle("حذف صورة الغلاف")
+                .setMessage("هل تريد حذف هذه الصورة من صور الغلاف؟")
+                .setNegativeButton("إلغاء", null)
+                .setPositiveButton("حذف", (dialog, which) -> removeCoverAt(index)).show();
+    }
+
+    private void removeCoverAt(int index) {
+        if (index < 0 || index >= profileCoverUrls.size() || binding == null) return;
+        ArrayList<String> updated = new ArrayList<>(profileCoverUrls); updated.remove(index);
+        MiscDtos.UpdateProfileRequest patch = new MiscDtos.UpdateProfileRequest();
+        patch.profileCoverUrls = updated; patch.coverUrl = updated.isEmpty() ? "" : updated.get(0);
+        binding.progress.setVisibility(View.VISIBLE);
+        c.getIoExecutor().execute(() -> {
+            try {
+                Response<ApiResponse<AuthDtos.UserDto>> response = c.getUserApi().updateProfile(patch).execute();
+                if (!response.isSuccessful() || response.body() == null || !response.body().success)
+                    throw new IllegalStateException(UploadApi.errorMessage(response, "تعذر حذف صورة الغلاف"));
+                if (response.body().data != null) c.getSessionManager().updateCachedUser(response.body().data);
+                runOnUiThread(() -> {
+                    if (binding == null || isFinishing()) return;
+                    profileCoverUrls.clear(); profileCoverUrls.addAll(updated);
+                    binding.etCover.setText(updated.isEmpty() ? "" : updated.get(0));
+                    updateCoverGalleryCount(); refreshCoverGalleryThumbnails();
+                    AvatarImageLoader.loadMedia(binding.imgCoverPreview, updated.isEmpty() ? null : updated.get(0), ImagePlaceholder.cover());
+                    binding.progress.setVisibility(View.GONE);
+                    Toast.makeText(this, "تم حذف صورة الغلاف", Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> { if (binding != null) { binding.progress.setVisibility(View.GONE);
+                    Toast.makeText(this, error.getMessage() == null ? "تعذر حذف الصورة" : error.getMessage(), Toast.LENGTH_LONG).show(); } });
+            }
+        });
+    }
+
     private void onCoverImagesPicked(List<Uri> selected) {
         if (selected == null || selected.isEmpty()) return;
         int remaining = 5 - profileCoverUrls.size();
@@ -452,9 +520,7 @@ public class EditProfileActivity extends ThemedActivity {
             ArrayList<String> uploaded = new ArrayList<>(profileCoverUrls);
             try {
                 for (Uri uri : selected) {
-                    if (isAnimatedImage(uri)) {
-                        throw new IllegalArgumentException("صور الغلاف المتعددة يجب أن تكون صوراً ثابتة وليست GIF أو WebP متحركاً");
-                    }
+                    // Preserve original animated GIF/WebP bytes in the gallery upload.
                     MultipartBody.Part part = AvatarImageLoader.multipartFromUri(getContentResolver(), uri, "cover");
                     Response<ApiResponse<UploadApi.UploadResult>> response = c.getUploadApi().upload(part).execute();
                     if (!response.isSuccessful() || response.body() == null || !response.body().success
@@ -476,6 +542,7 @@ public class EditProfileActivity extends ThemedActivity {
                     profileCoverUrls.clear();
                     profileCoverUrls.addAll(uploaded);
                     updateCoverGalleryCount();
+                    refreshCoverGalleryThumbnails();
                     if (!uploaded.isEmpty()) {
                         binding.etCover.setText(uploaded.get(0));
                         AvatarImageLoader.loadMedia(binding.imgCoverPreview, uploaded.get(0), ImagePlaceholder.cover());
@@ -593,8 +660,13 @@ public class EditProfileActivity extends ThemedActivity {
                     // before telling the user it is applied. Send only the changed image field
                     // so unsaved name/bio edits in this form are not overwritten.
                     MiscDtos.UpdateProfileRequest imagePatch = new MiscDtos.UpdateProfileRequest();
-                    if (cover) imagePatch.coverUrl = url;
-                    else imagePatch.avatarUrl = url;
+                    if (cover) {
+                        imagePatch.coverUrl = url;
+                        ArrayList<String> updatedCovers = new ArrayList<>(profileCoverUrls);
+                        updatedCovers.remove(url); updatedCovers.add(0, url);
+                        while (updatedCovers.size() > 5) updatedCovers.remove(updatedCovers.size() - 1);
+                        imagePatch.profileCoverUrls = updatedCovers;
+                    } else imagePatch.avatarUrl = url;
                     Response<ApiResponse<AuthDtos.UserDto>> saved =
                             c.getUserApi().updateProfile(imagePatch).execute();
                     if (!saved.isSuccessful() || saved.body() == null || !saved.body().success) {
@@ -611,8 +683,12 @@ public class EditProfileActivity extends ThemedActivity {
                         binding.progress.setVisibility(View.GONE);
                         if (cover) {
                             binding.etCover.setText(url);
-                            AvatarImageLoader.loadMedia(binding.imgCoverPreview, url,
-                                    ImagePlaceholder.cover());
+                            profileCoverUrls.clear();
+                            if (saved.body().data != null && saved.body().data.profileCoverUrls != null)
+                                profileCoverUrls.addAll(saved.body().data.profileCoverUrls);
+                            else profileCoverUrls.add(url);
+                            updateCoverGalleryCount(); refreshCoverGalleryThumbnails();
+                            AvatarImageLoader.loadMedia(binding.imgCoverPreview, url, ImagePlaceholder.cover());
                         } else {
                             binding.etAvatar.setText(url);
                             AvatarImageLoader.load(binding.imgAvatarPreview, url);
