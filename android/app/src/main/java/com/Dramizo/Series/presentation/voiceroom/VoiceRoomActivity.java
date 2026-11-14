@@ -3231,7 +3231,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         float measuredName = chatName != null && chatName.getText() != null
                 ? chatName.getPaint().measureText(chatName.getText().toString()) : dp(72);
         int firstLineLimit = Math.max(dp(42), dp(270) - Math.min(dp(116), (int) measuredName) - dp(18));
-        int overflowLineLimit = dp(270);
+        int overflowLineLimit = dp(282);
         int[] inlineUsed = new int[] { 0 };
         int[] overflowUsed = new int[] { 0 };
         LinearLayout[] overflowLine = new LinearLayout[] { null };
@@ -3378,7 +3378,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             next.setGravity(android.view.Gravity.RIGHT | android.view.Gravity.CENTER_VERTICAL);
             next.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    overflowLineLimit, LinearLayout.LayoutParams.WRAP_CONTENT);
             rowParams.topMargin = dp(2);
             overflow.addView(next, rowParams);
             overflowLine[0] = next;
@@ -16617,13 +16617,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     mul = rawMultiplier <= 0d ? 0 : Math.max(1, (int) Math.round(rawMultiplier));
                 }
             }
-            String luckyToastEventKey = firstNonEmpty(
-                    memberStr(payload, "eventId"),
-                    memberStr(payload, "sendId"),
-                    memberStr(payload, "requestId"),
-                    memberStr(payload, "at"));
-            if (luckyToastEventKey == null) luckyToastEventKey = String.valueOf(System.currentTimeMillis());
-            showLuckyHitBanner(senderId, who, memberStr(payload, "senderAvatarUrl"), won, rawMultiplier, luckyToastEventKey);
+            // The "حظ سعيد" winner toast/banner is intentionally disabled.
             if (won > 0) {
                 GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
                 // Only float/rain on the winner's seat when a payout actually occurred.
@@ -18185,6 +18179,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     hostMeta,
                     isAgencyRoom,
                     1);
+        }
+        // In the room header card only, show the owner's profile photo naturally
+        // without their decorative profile frame. Other app surfaces keep the frame.
+        if (binding.imgRoomHostFrame != null) {
+            binding.imgRoomHostFrame.setVisibility(View.GONE);
+            binding.imgRoomHostFrame.setImageDrawable(null);
         }
         if (binding.headerHostSignal != null
                 && binding.headerHostSignal.getVisibility() == View.VISIBLE) {
