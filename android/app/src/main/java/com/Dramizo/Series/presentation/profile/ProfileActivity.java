@@ -589,11 +589,8 @@ public class ProfileActivity extends ThemedActivity {
                         ImageView frame = holder.itemView.findViewById(R.id.imgSupporterFrame);
                         com.Dramizo.Series.util.HostSignalView liveFrame = holder.itemView.findViewById(R.id.supporterHostSignal);
                         TextView name = holder.itemView.findViewById(R.id.tvSupporterName);
-                        TextView amount = holder.itemView.findViewById(R.id.tvSupporterAmount);
                         name.setText(supporter.displayName == null || supporter.displayName.trim().isEmpty()
                                 ? supporter.username : supporter.displayName);
-                        amount.setText("💎 " + NumberFormat.getNumberInstance(Locale.US)
-                                .format(Math.max(0L, supporter.totalSupport)));
                         AvatarCosmetics.bindStacked(avatar, frame, liveFrame, supporter.avatarUrl, supporter.frameUrl, null);
                         holder.itemView.setOnClickListener(v -> {
                             if (supporter.id == null || supporter.id.isEmpty()) return;
