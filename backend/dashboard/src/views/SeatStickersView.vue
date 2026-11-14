@@ -1,10 +1,7 @@
 <template>
   <div>
-    <PageHeader :title="t('seatStickers.title')" :subtitle="t('seatStickers.subtitle')">
+    <PageHeader title="ملصقات" subtitle="أنشئ أقسام الملصقات وارفع الملصقات المتحركة أو الصور، وحدد شروط ظهورها للمستخدمين داخل التطبيق.">
       <template #actions>
-        <button class="btn btn-outline-light btn-sm me-2" type="button" :disabled="saving" @click="seedDefaults">
-          {{ t('seatStickers.seed') }}
-        </button>
         <button class="btn btn-outline-light btn-sm me-2" type="button" @click="addBlank">
           <i class="bi bi-plus-lg me-1"></i>{{ t('seatStickers.add') }}
         </button>
@@ -95,14 +92,10 @@ import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const { t } = useI18n()
-const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '')
 
 const rows = ref([])
 const categories = ref([
-  { id: 'classic', name: 'الملصقات القديمة', sortOrder: 1, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false },
-  { id: 'male', name: 'ملصقات شباب', sortOrder: 2, isActive: false, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'male', requiredVipLevel: 1, requiresCp: false },
-  { id: 'cp', name: 'ملصقات CP', sortOrder: 3, isActive: false, accessType: 'cp', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: true },
-  { id: 'female', name: 'ملصقات بنات', sortOrder: 4, isActive: false, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'female', requiredVipLevel: 1, requiresCp: false },
+  
 ])
 const enabled = ref(true)
 const loading = ref(false)
@@ -122,26 +115,10 @@ function blankRow() {
     name: '',
     sortOrder: (rows.value?.length || 0) + 1,
     isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false,
-    categoryId: categories.value.find((x) => x.id === 'classic')?.id || 'classic',
+    categoryId: categories.value[0]?.id || '',
   }
 }
 
-function defaultSeed() {
-  const out = []
-  for (let n = 1; n <= 74; n++) {
-    const key = `e${String(n).padStart(2, '0')}`
-    const ext = n <= 26 ? 'gif' : 'webp'
-    out.push({
-      id: key,
-      key,
-      url: `${ORIGIN}/assets/seat-stickers/${key}.${ext}`,
-      name: key.toUpperCase(),
-      sortOrder: n,
-      isActive: true, accessType: 'free', priceCoins: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false, categoryId: 'classic',
-    })
-  }
-  return out
-}
 
 function parseSetting(list, key) {
   const found = (Array.isArray(list) ? list : list?.items || []).find((s) => s.key === key)
@@ -165,7 +142,7 @@ async function load() {
   }
   const cfg = parseSetting(data, 'seat_stickers')
   enabled.value = cfg?.enabled !== false
-  categories.value = Array.isArray(cfg?.categories) && cfg.categories.length ? cfg.categories.map((x, i) => ({ ...x, sortOrder: Number(x.sortOrder) || i + 1 })) : categories.value
+  categories.value = Array.isArray(cfg?.categories) ? cfg.categories.filter((x) => x && x.id !== 'classic').map((x, i) => ({ ...x, sortOrder: Number(x.sortOrder) || i + 1 })) : []
   if (cfg && Array.isArray(cfg.items) && cfg.items.length) {
     rows.value = cfg.items.map((r, i) => ({
       id: r.id || r.key || `s${i + 1}`,
@@ -177,16 +154,16 @@ async function load() {
       accessType: r.accessType || 'free', priceCoins: Number(r.priceCoins) || 0,
       audience: r.audience || 'all', requiredVipLevel: Number(r.requiredVipLevel) || 1,
       requiresCp: r.requiresCp === true,
-      categoryId: /^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(String(r.key || '')) ? 'classic' : (r.categoryId || 'classic'),
+      categoryId: r.categoryId === 'classic' ? '' : (r.categoryId || ''),
     }))
   } else {
-    rows.value = defaultSeed()
+    rows.value = []
   }
 }
 
 function addCategory() {
   const id = 'category' + Date.now().toString(36)
-  categories.value.push({ id, name: 'قسم جديد', sortOrder: categories.value.length + 1, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false, iconUrl: '' })
+  categories.value.push({ id, name: 'ملصقات جديدة', sortOrder: categories.value.length + 1, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false, iconUrl: '' })
 }
 
 function addBlank() {
@@ -195,11 +172,6 @@ function addBlank() {
 
 function removeAt(idx) {
   rows.value.splice(idx, 1)
-}
-
-function seedDefaults() {
-  rows.value = defaultSeed()
-  toast().info(t('seatStickers.seeded'))
 }
 
 async function onFile(e, row) {
@@ -213,6 +185,7 @@ async function onFile(e, row) {
   }
   const url = data?.url || data?.data?.url || ''
   row.url = absUrl(url)
+  if (!row.categoryId && categories.value.length) row.categoryId = categories.value[0].id
   if (!row.key) {
     const base = String(file.name || '')
       .replace(/\.[^.]+$/, '')
@@ -230,7 +203,7 @@ async function save() {
   error.value = ''
   success.value = ''
   const items = rows.value
-    .filter((r) => r.url && String(r.key || '').trim())
+    .filter((r) => r.url && String(r.key || '').trim() && String(r.categoryId || '').trim())
     .map((r, i) => ({
       id: r.id || r.key,
       key: String(r.key).trim().toLowerCase(),
@@ -244,7 +217,7 @@ async function save() {
       categoryId: r.categoryId || categories.value[0]?.id || 'male',
     }))
   const payload = {
-    seat_stickers: JSON.stringify({ version: 3, enabled: enabled.value, categories: categories.value.map((x, i) => ({ ...x, id: String(x.id || ('category' + (i + 1))).trim().toLowerCase(), sortOrder: i + 1 })), items }),
+    seat_stickers: JSON.stringify({ version: 4, enabled: enabled.value, categories: categories.value.filter((x) => x.id !== 'classic').map((x, i) => ({ ...x, id: String(x.id || ('category' + (i + 1))).trim().toLowerCase(), sortOrder: i + 1 })), items }),
   }
   const { error: err } = await settingsApi.update(payload)
   saving.value = false
