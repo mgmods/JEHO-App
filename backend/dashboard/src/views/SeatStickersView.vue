@@ -22,15 +22,15 @@
       </div>
       <div v-for="(category, index) in categories" :key="category.id" class="row g-2 align-items-end mb-3">
         <div class="col-md-3"><label class="form-label small">اسم القسم</label><input v-model="category.name" class="form-control form-control-sm" /></div>
-        <div class="col-md-2"><label class="form-label small">المعرّف</label><input v-model="category.id" class="form-control form-control-sm" /></div>
+        <div class="col-md-2"><label class="form-label small">المعرّف الداخلي</label><input :value="category.id" class="form-control form-control-sm" readonly /></div>
         <div class="col-md-2"><label class="form-label small">نوع الوصول</label><select v-model="category.accessType" class="form-select form-select-sm"><option value="free">مجاني</option><option value="paid">شراء القسم بالكوينز</option><option value="vip">VIP</option><option value="cp">CP</option></select></div>
         <div class="col-md-2"><label class="form-label small">السعر</label><input v-model.number="category.priceCoins" type="number" min="0" class="form-control form-control-sm" /></div>
         <div class="col-md-1"><label class="form-label small">المدة بالأيام (0 دائم)</label><input v-model.number="category.durationDays" type="number" min="0" class="form-control form-control-sm" /></div>
         <div class="col-md-1"><label class="form-label small">VIP</label><input v-model.number="category.requiredVipLevel" type="number" min="1" max="7" class="form-control form-control-sm" /></div>
         <div class="col-md-1"><div class="form-check"><input v-model="category.isActive" class="form-check-input" type="checkbox" /><label class="form-check-label small">نشط</label></div><button class="btn btn-link btn-sm text-danger px-0" @click="categories.splice(index,1)">حذف</button></div>
         <div class="col-md-3"><label class="form-label small">الفئة</label><select v-model="category.audience" class="form-select form-select-sm"><option value="all">الجميع</option><option value="male">الشباب</option><option value="female">البنات</option></select></div>
-        <div class="col-md-3"><label class="form-label small">رابط أيقونة القسم</label><input v-model="category.iconUrl" class="form-control form-control-sm" placeholder="https://... أو /uploads/..." />
-        <div class="col-md-3"><label class="form-label small">رفع أيقونة القسم</label><input type="file" accept="image/*" class="form-control form-control-sm" @change="(e) => onCategoryIcon(e, category)" /></div></div>
+        <div class="col-md-3"><label class="form-label small">رابط أيقونة القسم</label><input v-model="category.iconUrl" class="form-control form-control-sm" placeholder="https://... أو /uploads/..." /></div>
+        <div class="col-md-3"><label class="form-label small">رفع أيقونة القسم</label><input type="file" accept="image/*" class="form-control form-control-sm" @change="(e) => onCategoryIcon(e, category)" /></div>
         <div class="col-md-3"><div class="form-check"><input v-model="category.requiresCp" class="form-check-input" type="checkbox" /><label class="form-check-label small">يشترط CP فعال</label></div></div>
       </div>
     </section>
