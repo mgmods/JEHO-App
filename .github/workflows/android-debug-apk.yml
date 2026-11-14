@@ -23,7 +23,7 @@ on:
 
 concurrency:
   group: jeho-android-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
