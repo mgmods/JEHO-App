@@ -246,6 +246,16 @@ public class LoginActivity extends ThemedActivity {
             binding.etAuthPassword.requestFocus();
             return;
         }
+        if (registerMode) {
+            String confirmPassword = binding.etAuthConfirmPassword.getText() == null
+                    ? "" : binding.etAuthConfirmPassword.getText().toString();
+            if (!password.equals(confirmPassword)) {
+                binding.etAuthConfirmPassword.setError("كلمتا المرور غير متطابقتين");
+                binding.etAuthConfirmPassword.requestFocus();
+                return;
+            }
+            binding.etAuthConfirmPassword.setError(null);
+        }
         if (!registerMode) {
             String identifier = binding.etAuthIdentifier.getText() == null
                     ? "" : binding.etAuthIdentifier.getText().toString().trim();
