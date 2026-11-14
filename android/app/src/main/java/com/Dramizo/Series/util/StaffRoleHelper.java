@@ -66,6 +66,26 @@ public final class StaffRoleHelper {
         return "";
     }
 
+    /** Apply Arabic gender agreement to role labels returned by dashboard configuration. */
+    public static String genderizeLabel(@Nullable String label, @Nullable String gender) {
+        if (label == null || label.trim().isEmpty()) return label == null ? "" : label;
+        String value = label;
+        boolean female = gender != null && ("female".equalsIgnoreCase(gender.trim())
+                || "f".equalsIgnoreCase(gender.trim()) || "أنثى".equals(gender.trim()) || "انثى".equals(gender.trim()));
+        boolean male = gender != null && ("male".equalsIgnoreCase(gender.trim())
+                || "m".equalsIgnoreCase(gender.trim()) || "ذكر".equals(gender.trim()));
+        if (male) {
+            value = value.replace("مضيفة", "مضيف").replace("مضيفـة", "مضيف")
+                    .replace("قائدة", "قائد").replace("مديرة", "مدير").replace("مشرفة", "مشرف");
+        } else if (female) {
+            value = value.replace("مضيف وكالة", "مضيفة وكالة").replace("مضيف", "مضيفة")
+                    .replace("قائد وكالة", "قائدة وكالة").replace("قائد", "قائدة")
+                    .replace("مدير وكالة", "مديرة وكالة").replace("مدير", "مديرة")
+                    .replace("مشرف", "مشرفة");
+        }
+        return value;
+    }
+
     /** One-line powers summary for profile. */
     public static String powersAr(@Nullable AuthDtos.UserDto user) {
         String r = normalize(user);
