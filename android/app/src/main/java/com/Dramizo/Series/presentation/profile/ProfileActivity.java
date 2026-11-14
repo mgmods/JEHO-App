@@ -191,18 +191,9 @@ public class ProfileActivity extends ThemedActivity {
         // Medal cabinet is shown on the profile itself, beneath the identity and moments rows.
         // Public/custom IDs are resolved to the actual UUID by ProfileViewModel before loading.
         if (binding.rowBadges != null) {
-            // Keep the public profile's badges/medals cabinet entry available.
-            binding.rowBadges.setVisibility(View.VISIBLE);
-            binding.rowBadges.setOnClickListener(v -> {
-                String profileId = targetUserIdHold[0];
-                if (profileId == null || profileId.trim().isEmpty()) {
-                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الميداليات", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                Intent medals = new Intent(this, MedalActivity.class);
-                medals.putExtra(EXTRA_USER_ID, profileId);
-                startActivity(medals);
-            });
+            // The reference keeps medals in the compact strip under the ID.
+            binding.rowBadges.setVisibility(View.GONE);
+            binding.rowBadges.setOnClickListener(null);
         }
         if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
         if (binding.rowProfileAchievementBadges != null) {
@@ -261,9 +252,9 @@ public class ProfileActivity extends ThemedActivity {
             binding.propProfileSupporters.setOnClickListener(v -> {
                 String id = targetUserIdHold[0];
                 if (id == null || id.trim().isEmpty()) return;
-                Intent supporters = new Intent(this, SupportersActivity.class);
-                supporters.putExtra(EXTRA_USER_ID, id);
-                startActivity(supporters);
+                Intent moments = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
+                moments.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, id);
+                startActivity(moments);
             });
         }
         if (binding.propProfileFriends != null) {
