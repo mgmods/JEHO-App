@@ -145,12 +145,16 @@ export function sanitizeSeatStickersConfig(
       requiresCp: row.requiresCp === true,
     }];
   });
-  // Migrate pre-v4 bundled sticker catalogs away, but allow admins to create a new
-  // sticker whose own key happens to be e01/e02 after the dashboard migration.
+  // One-time migration: discard the entire pre-v4 catalog (including its old sections).
+  // After the dashboard saves v4, admins can create any fresh key/name/category.
   const legacyCatalog = Math.floor(Number(obj.version) || 0) < 4;
-  for (let i = items.length - 1; i >= 0; i--) {
-    const isBundledKey = /^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(items[i].key);
-    if ((legacyCatalog && isBundledKey) || !categorySeen.has(items[i].categoryId)) items.splice(i, 1);
+  if (legacyCatalog) {
+    categories.splice(0, categories.length);
+    items.splice(0, items.length);
+  } else {
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (!categorySeen.has(items[i].categoryId)) items.splice(i, 1);
+    }
   }
   items.sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
   return {
