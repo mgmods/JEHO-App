@@ -71,12 +71,36 @@
                     android:layout_marginTop="6dp"
                     android:text="اختيار صورة البروفايل" />
 
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.AuraLive.TextInput"
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="18dp"
-                    android:hint="الاسم">
+                    app:cardBackgroundColor="#FFFFFFFF"
+                    app:cardCornerRadius="18dp"
+                    app:cardElevation="2dp"
+                    app:strokeColor="#1A8B91A1"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="معلومات الحساب"
+                            android:textColor="@color/text_primary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.AuraLive.TextInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:hint="الاسم">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etDisplayName"
@@ -148,6 +172,8 @@
                     android:text="@string/month_change_country_limit"
                     android:textColor="@color/text_hint"
                     android:textSize="11sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnContinue"
