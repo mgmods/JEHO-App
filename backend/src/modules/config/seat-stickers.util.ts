@@ -39,7 +39,7 @@ const MEDIA_RE = /\.(gif|webp|png|jpe?g)(\?|$)/i;
 
 let cache: SeatStickersConfig | null = null;
 let cacheAt = 0;
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 5_000;
 
 function originBase(
   origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
