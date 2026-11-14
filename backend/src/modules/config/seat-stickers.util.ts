@@ -145,9 +145,12 @@ export function sanitizeSeatStickersConfig(
       requiresCp: row.requiresCp === true,
     }];
   });
-  // Remove the old bundled sticker set and its classic category completely.
+  // Migrate pre-v4 bundled sticker catalogs away, but allow admins to create a new
+  // sticker whose own key happens to be e01/e02 after the dashboard migration.
+  const legacyCatalog = Math.floor(Number(obj.version) || 0) < 4;
   for (let i = items.length - 1; i >= 0; i--) {
-    if (/^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(items[i].key) || !categorySeen.has(items[i].categoryId)) items.splice(i, 1);
+    const isBundledKey = /^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(items[i].key);
+    if ((legacyCatalog && isBundledKey) || !categorySeen.has(items[i].categoryId)) items.splice(i, 1);
   }
   items.sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
   return {
