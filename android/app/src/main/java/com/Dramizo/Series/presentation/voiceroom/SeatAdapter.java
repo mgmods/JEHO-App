@@ -1078,27 +1078,26 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             key = null;
         }
         String uri = key != null ? SeatReactionEmojis.urlForKey(key) : null;
-        holder.b.imgSeatReaction.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        // Circular overlay exactly matches the 76dp seat stage, covering the avatar/seat.
+        android.graphics.drawable.GradientDrawable circularMask = new android.graphics.drawable.GradientDrawable();
+        circularMask.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        circularMask.setColor(android.graphics.Color.TRANSPARENT);
+        holder.b.imgSeatReaction.setBackground(circularMask);
+        holder.b.imgSeatReaction.setClipToOutline(true);
+        holder.b.imgSeatReaction.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
         if (uri != null) {
-            if (SeatReactionEmojis.isWebpUrl(uri)) {
-                Glide.with(holder.b.imgSeatReaction)
-                        .load(uri)
-                        .fitCenter()
-                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
-                        .error(res)
-                        .into(holder.b.imgSeatReaction);
-            } else if (uri.toLowerCase(java.util.Locale.US).contains(".gif")) {
+            if (uri.toLowerCase(java.util.Locale.US).contains(".gif")) {
                 Glide.with(holder.b.imgSeatReaction)
                         .asGif()
                         .load(uri)
-                        .fitCenter()
+                        .centerCrop()
                         .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
                         .error(res)
                         .into(holder.b.imgSeatReaction);
             } else {
                 Glide.with(holder.b.imgSeatReaction)
                         .load(uri)
-                        .fitCenter()
+                        .centerCrop()
                         .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
                         .error(res)
                         .into(holder.b.imgSeatReaction);
