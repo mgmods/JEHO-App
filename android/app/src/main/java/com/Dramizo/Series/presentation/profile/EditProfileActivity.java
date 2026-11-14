@@ -41,6 +41,8 @@ import com.bumptech.glide.Glide;
 
 import java.util.Calendar;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 
 import okhttp3.MultipartBody;
 import retrofit2.Response;
@@ -50,6 +52,7 @@ public class EditProfileActivity extends ThemedActivity {
     private ProfileViewModel vm;
     private AppContainer c;
     private boolean pickingCover;
+    private final ArrayList<String> profileCoverUrls = new ArrayList<>();
     private String lastGender = "";
     private String originalCountryCode = "";
     private boolean countryLocked;
@@ -62,6 +65,8 @@ public class EditProfileActivity extends ThemedActivity {
 
     private final ActivityResultLauncher<String> pickImage = registerForActivityResult(
             new ActivityResultContracts.GetContent(), this::onImagePicked);
+    private final ActivityResultLauncher<String> pickCoverGallery = registerForActivityResult(
+            new ActivityResultContracts.GetMultipleContents(), this::onCoverImagesPicked);
 
     private final ActivityResultLauncher<Intent> cropImage = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -129,6 +134,10 @@ public class EditProfileActivity extends ThemedActivity {
             binding.etBio.setText(user.bio);
             binding.etAvatar.setText(user.avatarUrl != null ? user.avatarUrl : "");
             binding.etCover.setText(user.coverUrl != null ? user.coverUrl : "");
+            profileCoverUrls.clear();
+            if (user.profileCoverUrls != null) profileCoverUrls.addAll(user.profileCoverUrls);
+            else if (user.coverUrl != null && !user.coverUrl.trim().isEmpty()) profileCoverUrls.add(user.coverUrl);
+            updateCoverGalleryCount();
             binding.etBirthday.setText(normalizeBirthday(user.birthday));
             selectGender(user.gender);
             lastGender = user.gender != null ? user.gender : "";
@@ -159,6 +168,14 @@ public class EditProfileActivity extends ThemedActivity {
         if (binding.rowAvatar != null) {
             binding.rowAvatar.setOnClickListener(v -> binding.btnPickAvatar.performClick());
         }
+        binding.btnPickCoverGallery.setOnClickListener(v -> {
+            int remaining = 5 - profileCoverUrls.size();
+            if (remaining <= 0) {
+                Toast.makeText(this, "وصلت للحد الأقصى: 5 صور. احذف الصور القديمة أولاً.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            pickCoverGallery.launch("image/*");
+        });
         binding.btnPickCover.setOnClickListener(v -> {
             pickingCover = true;
             pickImage.launch("image/*");
@@ -331,6 +348,7 @@ public class EditProfileActivity extends ThemedActivity {
         req.bio = emptyToNull(text(binding.etBio));
         req.avatarUrl = emptyToNull(text(binding.etAvatar));
         req.coverUrl = emptyToNull(text(binding.etCover));
+        req.profileCoverUrls = new ArrayList<>(profileCoverUrls);
         if (binding.spinnerGender.isEnabled()) {
             req.gender = emptyToNull(selectedGenderValue());
         }
@@ -414,6 +432,65 @@ public class EditProfileActivity extends ThemedActivity {
 
     private String selectedCountryValue() {
         return CountryCatalog.codeAtSpinnerIndex(binding.spinnerCountry.getSelectedItemPosition());
+    }
+
+    private void updateCoverGalleryCount() {
+        if (binding != null && binding.tvCoverGalleryCount != null) {
+            binding.tvCoverGalleryCount.setText(profileCoverUrls.size() + " من 5 صور");
+        }
+    }
+
+    private void onCoverImagesPicked(List<Uri> selected) {
+        if (selected == null || selected.isEmpty()) return;
+        int remaining = 5 - profileCoverUrls.size();
+        if (selected.size() > remaining) {
+            Toast.makeText(this, "يمكنك إضافة " + remaining + " صورة فقط", Toast.LENGTH_LONG).show();
+            return;
+        }
+        binding.progress.setVisibility(View.VISIBLE);
+        c.getIoExecutor().execute(() -> {
+            ArrayList<String> uploaded = new ArrayList<>(profileCoverUrls);
+            try {
+                for (Uri uri : selected) {
+                    if (isAnimatedImage(uri)) {
+                        throw new IllegalArgumentException("صور الغلاف المتعددة يجب أن تكون صوراً ثابتة وليست GIF أو WebP متحركاً");
+                    }
+                    MultipartBody.Part part = AvatarImageLoader.multipartFromUri(getContentResolver(), uri, "cover");
+                    Response<ApiResponse<UploadApi.UploadResult>> response = c.getUploadApi().upload(part).execute();
+                    if (!response.isSuccessful() || response.body() == null || !response.body().success
+                            || response.body().data == null || response.body().data.url == null) {
+                        throw new IllegalStateException(UploadApi.errorMessage(response, "فشل رفع إحدى صور الغلاف"));
+                    }
+                    uploaded.add(AssetCatalog.absoluteUrl(response.body().data.url));
+                }
+                MiscDtos.UpdateProfileRequest patch = new MiscDtos.UpdateProfileRequest();
+                patch.profileCoverUrls = uploaded;
+                if (!uploaded.isEmpty()) patch.coverUrl = uploaded.get(0);
+                Response<ApiResponse<AuthDtos.UserDto>> saved = c.getUserApi().updateProfile(patch).execute();
+                if (!saved.isSuccessful() || saved.body() == null || !saved.body().success) {
+                    throw new IllegalStateException(UploadApi.errorMessage(saved, "تم الرفع لكن تعذر حفظ صور الغلاف"));
+                }
+                if (saved.body().data != null) c.getSessionManager().updateCachedUser(saved.body().data);
+                runOnUiThread(() -> {
+                    if (isFinishing() || binding == null) return;
+                    profileCoverUrls.clear();
+                    profileCoverUrls.addAll(uploaded);
+                    updateCoverGalleryCount();
+                    if (!uploaded.isEmpty()) {
+                        binding.etCover.setText(uploaded.get(0));
+                        AvatarImageLoader.loadMedia(binding.imgCoverPreview, uploaded.get(0), ImagePlaceholder.cover());
+                    }
+                    binding.progress.setVisibility(View.GONE);
+                    Toast.makeText(this, "تم رفع وحفظ صور الغلاف بنجاح", Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    if (binding == null) return;
+                    binding.progress.setVisibility(View.GONE);
+                    Toast.makeText(this, error.getMessage() == null ? "تعذر رفع صور الغلاف" : error.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        });
     }
 
     private void onImagePicked(Uri uri) {
