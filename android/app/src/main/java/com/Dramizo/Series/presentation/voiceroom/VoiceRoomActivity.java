@@ -8046,7 +8046,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     Toast.LENGTH_SHORT).show();
             return;
         }
-        showRoomReaction(myUserId, emojiKey, allowedRes, stickerUrl);
+        // The server broadcasts the reaction only after validating the sticker and its access rules.
     }
 
     private void showRoomReaction(String userId, String emojiKey, int emojiResId) {
@@ -16545,7 +16545,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String uid = memberStr(payload, "userId");
             if (uid == null) uid = fromUserId;
             if (uid == null || uid.isEmpty()) return;
-            if (myUserId != null && sameUser(myUserId, uid)) return; // already shown locally
             String key = memberStr(payload, "emojiKey");
             String remoteUrl = memberStr(payload, "url");
             int res = SeatReactionEmojis.drawableForKey(key);
