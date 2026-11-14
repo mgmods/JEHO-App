@@ -41,7 +41,7 @@ public final class RemoteSeatStickers {
     public static void refreshBlocking(AppContainer c) {
         if (c == null) return;
         try {
-            Result<MiscDtos.SeatStickersDto> r = ApiCall.execute(c.getConfigApi().seatStickers());
+            Result<MiscDtos.SeatStickersDto> r = ApiCall.execute(c.getConfigApi().seatStickers(System.currentTimeMillis()));
             if (!r.success || r.data == null) return;
             cached = r.data;
             SeatReactionEmojis.setFromDto(r.data);
