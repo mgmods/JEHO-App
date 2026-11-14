@@ -266,6 +266,22 @@ export class AdminService {
     private readonly dataSource: DataSource,
   ) {}
 
+  async getPublicAgencyRoleBadges() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'agency_role_badges' } });
+    const fallback = { leaderBadgeUrl: '', hostBadgeUrl: '' };
+    if (!row?.value) return fallback;
+    try {
+      const parsed = JSON.parse(row.value);
+      const clean = (value: unknown) => {
+        const url = typeof value === 'string' ? value.trim() : '';
+        return url.length <= 2048 && /^(https:\/\/[^\\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(url) ? url : '';
+      };
+      return { leaderBadgeUrl: clean(parsed?.leaderBadgeUrl), hostBadgeUrl: clean(parsed?.hostBadgeUrl) };
+    } catch {
+      return fallback;
+    }
+  }
+
   private staffIdentityDefaults() {
     const role = (label: string, accentColor: string) => ({
       label, accentColor, badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '',
