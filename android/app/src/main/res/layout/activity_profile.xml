@@ -1385,7 +1385,8 @@
                     android:layout_marginHorizontal="14dp"
                     android:layout_marginTop="16dp"
                     android:gravity="center"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:layoutDirection="ltr">
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnFollow"
@@ -1407,6 +1408,7 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnFriend"
+                        android:visibility="gone"
                         style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                         android:layout_width="56dp"
                         android:layout_height="56dp"
@@ -1422,6 +1424,8 @@
                         android:textStyle="normal"
                         app:backgroundTint="@null"
                         app:cornerRadius="28dp" />
+
+
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnRoom"
