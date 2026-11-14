@@ -36,7 +36,6 @@ public final class ProfileDetailsActivity extends Activity {
             gifts.setOnClickListener(v -> {
                 Intent intent = new Intent(this, ProfileActivity.class);
                 intent.putExtra(ProfileActivity.EXTRA_USER_ID, userId);
-                intent.putExtra(ProfileActivity.EXTRA_OPEN_GIFT_HISTORY, true);
                 startActivity(intent);
             });
         }
