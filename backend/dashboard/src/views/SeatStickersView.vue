@@ -144,7 +144,7 @@ async function load() {
   enabled.value = cfg?.enabled !== false
   categories.value = Array.isArray(cfg?.categories) ? cfg.categories.filter((x) => x && x.id !== 'classic').map((x, i) => ({ ...x, sortOrder: Number(x.sortOrder) || i + 1 })) : []
   if (cfg && Array.isArray(cfg.items) && cfg.items.length) {
-    rows.value = cfg.items.map((r, i) => ({
+    rows.value = cfg.items.filter((r) => r && r.categoryId !== 'classic' && !/^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(String(r.key || ''))).map((r, i) => ({
       id: r.id || r.key || `s${i + 1}`,
       key: r.key || '',
       url: r.url || '',
