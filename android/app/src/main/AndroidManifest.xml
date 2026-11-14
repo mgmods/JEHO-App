@@ -243,6 +243,7 @@
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.SocialListActivity" android:exported="false" 
             android:screenOrientation="portrait" />
+        <activity android:name=".presentation.profile.SupportersActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.GiftHistoryActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.MyEventsActivity" android:exported="false"
