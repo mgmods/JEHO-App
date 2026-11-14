@@ -336,20 +336,36 @@
                     tools:text="سوبر أدمن"
                     tools:visibility="visible" />
 
-                <TextView
-                    android:id="@+id/tvAgencyRoleBadge"
+                <FrameLayout
+                    android:id="@+id/agencyRoleBadgeContainer"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
                     android:layout_marginTop="6dp"
-                    android:includeFontPadding="false"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="5dp"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:visibility="gone"
-                    tools:text="♛ صاحب وكالة"
-                    tools:visibility="visible" />
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvAgencyRoleBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="5dp"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        tools:text="قائد الوكالة" />
+
+                    <ImageView
+                        android:id="@+id/imgAgencyRoleBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:minWidth="64dp"
+                        android:adjustViewBounds="true"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone"
+                        tools:src="@drawable/icon_agency" />
+                </FrameLayout>
 
                 <!-- ID / flag / level -->
                 <LinearLayout
