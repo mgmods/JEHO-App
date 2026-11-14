@@ -1382,14 +1382,7 @@ public class ProfileActivity extends ThemedActivity {
                         ownHostBadgeMeta);
                 // The partner's frame comes from that linked account's real equipped wear,
                 // with the same VIP fallback used on their own profile.
-                com.Dramizo.Series.util.AvatarCosmetics.bindWear(
-                        binding.imgProfileCpPartner,
-                        binding.imgProfileCpPartnerFrame,
-                        avatar,
-                        partnerFrameUrl,
-                        partnerHostBadgeUrl,
-                        null,
-                        partnerHostBadgeMeta);
+                bindCpPartnerAvatarAndFrame(avatar, partnerFrameUrl, partnerHostBadgeUrl);
 
                 // Mirror the same live relationship into the decorative CV card.
                 bindRealCpAvatar(binding.imgProfileCpCvSelf, ownAvatarUrl);
@@ -1934,11 +1927,177 @@ public class ProfileActivity extends ThemedActivity {
     }
 
     private void openProfileDetails() {
-        String id = loadedProfileId;
-        if (id == null || id.trim().isEmpty()) return;
-        Intent details = new Intent(this, ProfileDetailsActivity.class);
-        details.putExtra(ProfileDetailsActivity.EXTRA_USER_ID, id);
-        startActivity(details);
+        if (binding == null) return;
+        final String id = loadedProfileId == null ? "" : loadedProfileId;
+        final String viewerId = container == null ? null : container.getSessionManager().getUserId();
+        final com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = Math.round(18 * getResources().getDisplayMetrics().density);
+        root.setPadding(pad, pad, pad, pad);
+        android.graphics.drawable.GradientDrawable panel = new android.graphics.drawable.GradientDrawable();
+        panel.setColor(0xFF211A25);
+        panel.setCornerRadii(new float[]{pad,pad,pad,pad,pad,pad,pad,pad});
+        root.setBackground(panel);
+
+        TextView heading = new TextView(this);
+        heading.setText("تفاصيل الحساب");
+        heading.setTextColor(0xFFFFFFFF);
+        heading.setTextSize(18);
+        heading.setTypeface(null, android.graphics.Typeface.BOLD);
+        heading.setGravity(Gravity.CENTER);
+        root.addView(heading, new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        android.widget.LinearLayout identity = new android.widget.LinearLayout(this);
+        identity.setGravity(Gravity.CENTER_VERTICAL);
+        identity.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        identity.setPadding(0, pad, 0, pad);
+        ImageView avatar = new ImageView(this);
+        int avatarSize = Math.round(58 * getResources().getDisplayMetrics().density);
+        avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        Drawable photo = binding.imgProfileCpSelf != null
+                && binding.imgProfileCpSelf.getVisibility() == View.VISIBLE
+                ? binding.imgProfileCpSelf.getDrawable() : binding.imgAvatar.getDrawable();
+        avatar.setImageDrawable(photo);
+        android.widget.LinearLayout.LayoutParams avatarLp =
+                new android.widget.LinearLayout.LayoutParams(avatarSize, avatarSize);
+        avatarLp.setMarginEnd(pad);
+        identity.addView(avatar, avatarLp);
+        android.widget.LinearLayout identityText = new android.widget.LinearLayout(this);
+        identityText.setOrientation(android.widget.LinearLayout.VERTICAL);
+        TextView name = new TextView(this);
+        name.setText(binding.tvDisplayName.getText());
+        name.setTextColor(0xFFFFFFFF);
+        name.setTextSize(16);
+        name.setTypeface(null, android.graphics.Typeface.BOLD);
+        identityText.addView(name);
+        TextView publicId = new TextView(this);
+        publicId.setText(binding.tvUsername.getText());
+        publicId.setTextColor(0xFFBDB3C4);
+        publicId.setTextSize(12);
+        identityText.addView(publicId);
+        identity.addView(identityText, new android.widget.LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        root.addView(identity);
+
+        android.widget.LinearLayout badgeRow = new android.widget.LinearLayout(this);
+        badgeRow.setGravity(Gravity.CENTER_VERTICAL);
+        badgeRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        if (binding.rowProfileMedals != null && binding.rowProfileMedals.getChildCount() > 0) {
+            View badgeContainer = binding.rowProfileMedals.getChildAt(0);
+            if (badgeContainer instanceof ViewGroup) {
+                ViewGroup group = (ViewGroup) badgeContainer;
+                for (int i = 0; i < group.getChildCount(); i++) {
+                    View child = group.getChildAt(i);
+                    if (child instanceof ImageView && child.getVisibility() == View.VISIBLE) {
+                        Drawable drawable = ((ImageView) child).getDrawable();
+                        if (drawable == null) continue;
+                        ImageView badge = new ImageView(this);
+                        badge.setImageDrawable(drawable.getConstantState() == null
+                                ? drawable : drawable.getConstantState().newDrawable().mutate());
+                        badge.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        int size = Math.round(28 * getResources().getDisplayMetrics().density);
+                        android.widget.LinearLayout.LayoutParams badgeLp =
+                                new android.widget.LinearLayout.LayoutParams(size, size);
+                        badgeLp.setMarginEnd(Math.round(6 * getResources().getDisplayMetrics().density));
+                        badgeRow.addView(badge, badgeLp);
+                    }
+                }
+            }
+        }
+        if (badgeRow.getChildCount() > 0) root.addView(badgeRow);
+
+        android.widget.LinearLayout stats = new android.widget.LinearLayout(this);
+        stats.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        stats.setGravity(Gravity.CENTER);
+        stats.setPadding(0, pad, 0, pad);
+        addProfileDetailStat(stats, "المتابعون", binding.tvStatFriends.getText().toString(),
+                () -> { if (!id.isEmpty()) UserSocialNav.openFollowers(this, id, viewerId); });
+        addProfileDetailStat(stats, "المعجبون", binding.tvStatFans.getText().toString(),
+                () -> { if (!id.isEmpty()) UserSocialNav.openFollowing(this, id, viewerId); });
+        addProfileDetailStat(stats, "الزوار", binding.tvStatVisitors.getText().toString(),
+                () -> { if (!id.isEmpty()) UserSocialNav.openVisitors(this, id, viewerId); });
+        root.addView(stats);
+
+        android.widget.LinearLayout supporters = new android.widget.LinearLayout(this);
+        supporters.setOrientation(android.widget.LinearLayout.VERTICAL);
+        supporters.setPadding(pad, pad, pad, pad);
+        supporters.setBackgroundColor(0xFF302536);
+        TextView supportersTitle = new TextView(this);
+        supportersTitle.setText("الداعمون");
+        supportersTitle.setTextColor(0xFFFFFFFF);
+        supportersTitle.setTextSize(15);
+        supportersTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        supporters.addView(supportersTitle);
+        TextView supportersHint = new TextView(this);
+        supportersHint.setText("اضغط لعرض الداعمين وصورهم");
+        supportersHint.setTextColor(0xFFBDB3C4);
+        supportersHint.setTextSize(12);
+        supporters.addView(supportersHint);
+        supporters.setOnClickListener(v -> {
+            sheet.dismiss();
+            if (!id.trim().isEmpty()) {
+                Intent intent = new Intent(this, SupportersActivity.class);
+                intent.putExtra(EXTRA_USER_ID, id);
+                startActivity(intent);
+            }
+        });
+        root.addView(supporters, new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        scroll.addView(root);
+        sheet.setContentView(scroll);
+        sheet.setDraggable(true);
+        sheet.show();
+    }
+
+    private void addProfileDetailStat(android.widget.LinearLayout parent, String label,
+            String value, Runnable action) {
+        android.widget.LinearLayout item = new android.widget.LinearLayout(this);
+        item.setOrientation(android.widget.LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setPadding(6, 6, 6, 6);
+        item.setClickable(true);
+        item.setFocusable(true);
+        TextView count = new TextView(this);
+        count.setText(value);
+        count.setTextColor(0xFFFFFFFF);
+        count.setTextSize(16);
+        count.setTypeface(null, android.graphics.Typeface.BOLD);
+        item.addView(count);
+        TextView title = new TextView(this);
+        title.setText(label);
+        title.setTextColor(0xFFBDB3C4);
+        title.setTextSize(11);
+        item.addView(title);
+        item.setOnClickListener(v -> action.run());
+        parent.addView(item, new android.widget.LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+    }
+
+    private void bindCpPartnerAvatarAndFrame(String avatarUrl, String frameUrl, String hostBadgeUrl) {
+        if (binding == null) return;
+        bindRealCpAvatar(binding.imgProfileCpPartner, avatarUrl);
+        String selectedFrame = hostBadgeUrl != null && !hostBadgeUrl.trim().isEmpty()
+                ? hostBadgeUrl.trim() : (frameUrl == null ? "" : frameUrl.trim());
+        ImageView frame = binding.imgProfileCpPartnerFrame;
+        if (frame == null) return;
+        if (selectedFrame.isEmpty()) {
+            Glide.with(this).clear(frame);
+            frame.setImageDrawable(null);
+            frame.setVisibility(View.GONE);
+            return;
+        }
+        frame.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        frame.setVisibility(View.VISIBLE);
+        // Preserve the full transparent frame silhouette; do not circle-clip the artwork.
+        Glide.with(this).load(AssetCatalog.absoluteUrl(selectedFrame))
+                .fitCenter().into(frame);
+        frame.bringToFront();
     }
 
     private void showProfileProperty() {
