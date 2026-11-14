@@ -187,6 +187,22 @@
                         android:scaleType="centerCrop"
                         android:src="@drawable/lodim"
                         app:shapeAppearanceOverlay="@style/ShapeAppearance.Jeho.BannerImage" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPickCoverGallery"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="إضافة صور للغلاف (حتى 5 صور)" />
+
+                    <TextView
+                        android:id="@+id/tvCoverGalleryCount"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="0 من 5 صور"
+                        android:textColor="@color/text_hint"
+                        android:textSize="12sp" />
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
