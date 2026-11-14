@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
+import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.view.LayoutInflater;
 import android.view.Gravity;
@@ -88,6 +89,16 @@ public class ProfileActivity extends ThemedActivity {
     };
     private AnimatorSet cpHeartAnimator;
     private String loadedProfileId = "";
+    private final java.util.ArrayList<String> profileCoverGallery = new java.util.ArrayList<>();
+    private int profileCoverIndex = 0;
+    private float coverTouchStartX = 0f;
+    private final Runnable profileCoverAdvance = new Runnable() {
+        @Override public void run() {
+            if (binding == null || isFinishing() || isDestroyed() || profileCoverGallery.size() < 2) return;
+            showProfileCover((profileCoverIndex + 1) % profileCoverGallery.size());
+            profileHandler.postDelayed(this, 3000L);
+        }
+    };
     private com.Dramizo.Series.realtime.RealtimeClient.UserListener cpConfigListener;
     private String cpProfileTargetId = "";
     private String cpProfileOwnAvatarUrl = "";
@@ -549,12 +560,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.tvLastSeen.setVisibility(View.GONE);
             }
 
-            if (user.coverUrl != null && !user.coverUrl.isEmpty()) {
-                com.Dramizo.Series.util.AvatarImageLoader.loadMedia(binding.imgCover, user.coverUrl,
-                        ImagePlaceholder.cover());
-            } else {
-                binding.imgCover.setImageResource(ImagePlaceholder.cover());
-            }
+            bindProfileCoverGallery(user.profileCoverUrls, user.coverUrl);
             if (myId != null && myId.equals(user.id)) {
                 binding.btnFollow.setVisibility(View.GONE);
                 if (binding.btnFriend != null) binding.btnFriend.setVisibility(View.GONE);
@@ -1834,6 +1840,56 @@ public class ProfileActivity extends ThemedActivity {
         });
     }
 
+    private void bindProfileCoverGallery(List<String> urls, String fallbackCover) {
+        profileHandler.removeCallbacks(profileCoverAdvance);
+        profileCoverGallery.clear();
+        if (urls != null) {
+            for (String url : urls) {
+                if (url != null && !url.trim().isEmpty() && !profileCoverGallery.contains(url.trim())) {
+                    profileCoverGallery.add(url.trim());
+                }
+                if (profileCoverGallery.size() == 5) break;
+            }
+        }
+        if (profileCoverGallery.isEmpty() && fallbackCover != null && !fallbackCover.trim().isEmpty()) {
+            profileCoverGallery.add(fallbackCover.trim());
+        }
+        profileCoverIndex = 0;
+        showProfileCover(0);
+        binding.imgCover.setOnTouchListener((view, event) -> {
+            if (profileCoverGallery.size() < 2) return false;
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                coverTouchStartX = event.getX();
+                return true;
+            }
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                float delta = event.getX() - coverTouchStartX;
+                if (Math.abs(delta) > 35f) {
+                    int next = delta < 0
+                            ? (profileCoverIndex + 1) % profileCoverGallery.size()
+                            : (profileCoverIndex - 1 + profileCoverGallery.size()) % profileCoverGallery.size();
+                    showProfileCover(next);
+                    profileHandler.removeCallbacks(profileCoverAdvance);
+                    profileHandler.postDelayed(profileCoverAdvance, 3000L);
+                }
+                return true;
+            }
+            return true;
+        });
+        if (profileCoverGallery.size() > 1) profileHandler.postDelayed(profileCoverAdvance, 3000L);
+    }
+
+    private void showProfileCover(int index) {
+        if (binding == null) return;
+        if (profileCoverGallery.isEmpty()) {
+            binding.imgCover.setImageResource(ImagePlaceholder.cover());
+            return;
+        }
+        profileCoverIndex = Math.max(0, Math.min(index, profileCoverGallery.size() - 1));
+        com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
+                binding.imgCover, profileCoverGallery.get(profileCoverIndex), ImagePlaceholder.cover());
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -1859,12 +1915,14 @@ public class ProfileActivity extends ThemedActivity {
     protected void onPause() {
         profileHandler.removeCallbacks(mysteriousModeRefresh);
         profileHandler.removeCallbacks(roomPresenceRefresh);
+        profileHandler.removeCallbacks(profileCoverAdvance);
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
         profileHandler.removeCallbacks(mysteriousModeRefresh);
+        profileHandler.removeCallbacks(profileCoverAdvance);
         if (cpConfigListener != null) {
             com.Dramizo.Series.realtime.RealtimeClient.getInstance().removeUserListener(cpConfigListener);
             cpConfigListener = null;
