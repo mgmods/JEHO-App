@@ -38,12 +38,12 @@
                 android:layout_height="wrap_content"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                android:minHeight="340dp">
+                android:minHeight="380dp">
 
                 <ImageView
                     android:id="@+id/imgCover"
                     android:layout_width="match_parent"
-                    android:layout_height="340dp"
+                    android:layout_height="380dp"
                     android:contentDescription="@null"
                     android:scaleType="centerCrop"
                     android:src="@color/bg_light" />
@@ -135,7 +135,7 @@
                 android:id="@+id/userCardBg"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="-60dp"
+                android:layout_marginTop="-105dp"
                 android:background="@drawable/bg_profile_panel"
                 android:clipChildren="false"
                 android:clipToPadding="false"
@@ -146,7 +146,7 @@
                 <LinearLayout
                     android:id="@+id/profileIdentityAndCp"
                     android:layout_width="match_parent"
-                    android:layout_height="170dp"
+                    android:layout_height="160dp"
                     android:background="@drawable/bg_profile_panel"
                     android:gravity="start|center_vertical"
                     android:orientation="horizontal"
@@ -157,7 +157,7 @@
                     <FrameLayout
                         android:id="@+id/profileAvatarWrap"
                         android:layout_width="148dp"
-                        android:layout_height="170dp"
+                        android:layout_height="160dp"
                         android:layout_gravity="top"
                         android:layout_marginStart="12dp"
                         android:layout_marginTop="0dp"
@@ -166,8 +166,8 @@
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/imgAvatar"
-                            android:layout_width="128dp"
-                            android:layout_height="128dp"
+                            android:layout_width="122dp"
+                            android:layout_height="122dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/nav_profile"
                             android:elevation="4dp"
