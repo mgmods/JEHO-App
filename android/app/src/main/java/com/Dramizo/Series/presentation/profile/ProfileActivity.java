@@ -233,14 +233,10 @@ public class ProfileActivity extends ThemedActivity {
                 startActivity(supporters);
             });
         }
-        // The supporters count opens the actual gift-supporters list.
-        if (binding.propProfileSupporters != null) binding.propProfileSupporters.setOnClickListener(v -> {
-            String id = targetUserIdHold[0];
-            if (id == null || id.trim().isEmpty()) return;
-            Intent supporters = new Intent(this, SupportersActivity.class);
-            supporters.putExtra(EXTRA_USER_ID, id);
-            startActivity(supporters);
-        });
+        // Button 2 is the Details shortcut; the supporters panel remains independent.
+        if (binding.propProfileSupporters != null) {
+            binding.propProfileSupporters.setOnClickListener(v -> openProfileDetails());
+        }
         if (binding.propProfileFriends != null) {
             binding.propProfileFriends.setOnClickListener(v -> {
                 String id = targetUserIdHold[0];
@@ -1723,12 +1719,12 @@ public class ProfileActivity extends ThemedActivity {
                         LinearLayout item = new LinearLayout(this);
                         item.setOrientation(LinearLayout.VERTICAL);
                         item.setGravity(Gravity.CENTER);
-                        int width = Math.round(66 * getResources().getDisplayMetrics().density);
+                        int width = Math.round(46 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams itemLp = new LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
                         itemLp.setMargins(0, 0, Math.round(6 * getResources().getDisplayMetrics().density), 0);
                         item.setLayoutParams(itemLp);
                         ImageView image = new ImageView(this);
-                        int size = Math.round(52 * getResources().getDisplayMetrics().density);
+                        int size = Math.round(34 * getResources().getDisplayMetrics().density);
                         image.setLayoutParams(new LinearLayout.LayoutParams(size, size));
                         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
                         image.setContentDescription(label);
@@ -1736,7 +1732,7 @@ public class ProfileActivity extends ThemedActivity {
                         TextView caption = new TextView(this);
                         caption.setText(label);
                         caption.setTextColor(0xFF697187);
-                        caption.setTextSize(11);
+                        caption.setTextSize(9);
                         caption.setGravity(Gravity.CENTER);
                         caption.setMaxLines(1);
                         caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
