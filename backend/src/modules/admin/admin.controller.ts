@@ -130,6 +130,14 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Get('agency-role-badges/public')
+  @ApiOperation({ summary: 'Read dashboard-managed public agency role badge images' })
+  getPublicAgencyRoleBadges() {
+    return this.adminService.getPublicAgencyRoleBadges();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('staff-identity/public')
   @ApiOperation({ summary: 'Read public staff role identity assets for profile and room rendering' })
   getPublicStaffIdentityConfig() {
