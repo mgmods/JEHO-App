@@ -3362,35 +3362,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @NonNull LinearLayout inline, @NonNull LinearLayout overflow,
             @NonNull View badge, int index, int firstLineLimit, int[] inlineUsed,
             int overflowLineLimit, int[] overflowUsed, LinearLayout[] overflowLine) {
-        badge.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-        int badgeWidth = badge.getMeasuredWidth();
-        ViewGroup.LayoutParams rawParams = badge.getLayoutParams();
-        if (rawParams instanceof LinearLayout.LayoutParams) {
-            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) rawParams;
-            // left/right and start/end refer to the same margins; count them once.
-            badgeWidth += android.os.Build.VERSION.SDK_INT >= 17
-                    ? params.getMarginStart() + params.getMarginEnd()
-                    : params.leftMargin + params.rightMargin;
-        }
-        badgeWidth = Math.max(dp(18), badgeWidth);
-        // Keep every badge in a compact horizontal flow below the sender name.
-        // Do not place a few badges beside the name and strand the rest on separate lines.
-        if (overflowLine[0] == null || (overflowUsed[0] + badgeWidth > overflowLineLimit
-                && overflowLine[0].getChildCount() > 0)) {
-            LinearLayout next = new LinearLayout(this);
-            next.setOrientation(LinearLayout.HORIZONTAL);
-            next.setGravity(android.view.Gravity.RIGHT | android.view.Gravity.CENTER_VERTICAL);
-            next.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                    overflowLineLimit, LinearLayout.LayoutParams.WRAP_CONTENT);
-            rowParams.topMargin = dp(2);
-            overflow.addView(next, rowParams);
-            overflowLine[0] = next;
-            overflowUsed[0] = 0;
-        }
-        overflowLine[0].addView(badge);
-        overflowUsed[0] += badgeWidth;
+        // Keep sender decorations beside the sender name, not on a second line.
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMarginEnd(dp(2));
+        badge.setLayoutParams(params);
+        inline.addView(badge);
+        inline.setVisibility(View.VISIBLE);
+        overflow.removeAllViews();
+        overflow.setVisibility(View.GONE);
     }
 
     private LinearLayout.LayoutParams roomBadgeImageParams(int widthDp, int heightDp, int endMarginDp) {
