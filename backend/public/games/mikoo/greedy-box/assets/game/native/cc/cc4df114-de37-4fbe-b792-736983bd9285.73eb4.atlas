@@ -1,0 +1,118 @@
+
+bigRewardAni.png
+size: 1068,682
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1_00000
+  rotate: true
+  xy: 229, 22
+  size: 93, 229
+  orig: 95, 231
+  offset: 1, 1
+  index: -1
+1_00001
+  rotate: false
+  xy: 953, 123
+  size: 112, 255
+  orig: 114, 257
+  offset: 1, 1
+  index: -1
+1_00002
+  rotate: true
+  xy: 2, 121
+  size: 114, 269
+  orig: 116, 272
+  offset: 1, 1
+  index: -1
+1_00003
+  rotate: true
+  xy: 2, 3
+  size: 116, 225
+  orig: 119, 228
+  offset: 1, 1
+  index: -1
+1_00004
+  rotate: true
+  xy: 808, 2
+  size: 119, 232
+  orig: 121, 235
+  offset: 1, 1
+  index: -1
+1_00005
+  rotate: false
+  xy: 684, 18
+  size: 122, 228
+  orig: 126, 231
+  offset: 2, 1
+  index: -1
+1_00006
+  rotate: false
+  xy: 828, 128
+  size: 123, 250
+  orig: 127, 252
+  offset: 3, 1
+  index: -1
+1_06
+  rotate: false
+  xy: 382, 117
+  size: 300, 129
+  orig: 300, 129
+  offset: 0, 0
+  index: -1
+1_07
+  rotate: true
+  xy: 710, 380
+  size: 300, 130
+  orig: 300, 130
+  offset: 0, 0
+  index: -1
+1_10
+  rotate: true
+  xy: 576, 380
+  size: 300, 132
+  orig: 300, 132
+  offset: 0, 0
+  index: -1
+1_11
+  rotate: false
+  xy: 526, 248
+  size: 300, 130
+  orig: 300, 130
+  offset: 0, 0
+  index: -1
+1_14
+  rotate: true
+  xy: 842, 380
+  size: 300, 129
+  orig: 300, 129
+  offset: 0, 0
+  index: -1
+人
+  rotate: false
+  xy: 2, 237
+  size: 277, 445
+  orig: 278, 445
+  offset: 0, 0
+  index: -1
+大刀
+  rotate: true
+  xy: 264, 181
+  size: 500, 310
+  orig: 500, 310
+  offset: 0, 0
+  index: -1
+手
+  rotate: false
+  xy: 58, 656
+  size: 39, 25
+  orig: 40, 30
+  offset: 0, 0
+  index: -1
+马
+  rotate: false
+  xy: 119, 419
+  size: 300, 262
+  orig: 300, 262
+  offset: 0, 0
+  index: -1

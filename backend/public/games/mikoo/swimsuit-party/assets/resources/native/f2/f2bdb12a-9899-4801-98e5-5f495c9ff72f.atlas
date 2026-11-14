@@ -1,0 +1,13 @@
+
+yongquan.png
+size: 96,76
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+yongquan
+  rotate: false
+  xy: 0, 0
+  size: 93, 75
+  orig: 93, 75
+  offset: 0, 0
+  index: -1

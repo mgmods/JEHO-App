@@ -1,0 +1,1 @@
+JEHO MG-JEHO Android release rebuild trigger after prior run was cancelled before Gradle build completed. Verify Kotlin compilation, release APK, HTML assets, and signing certificate.

@@ -1,0 +1,104 @@
+
+big-win.png
+size: 504,989
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+BIG WIN
+  rotate: true
+  xy: 2, 3
+  size: 614, 435
+  orig: 615, 435
+  offset: 1, 0
+  index: -1
+光效
+  rotate: false
+  xy: 2, 617
+  size: 500, 370
+  orig: 500, 370
+  offset: 0, 0
+  index: -1
+图层 1
+  rotate: false
+  xy: 336, 446
+  size: 151, 168
+  orig: 151, 168
+  offset: 0, 0
+  index: -1
+图层 10
+  rotate: false
+  xy: 2, 447
+  size: 137, 77
+  orig: 224, 104
+  offset: 71, 27
+  index: -1
+图层 11
+  rotate: false
+  xy: 63, 23
+  size: 88, 69
+  orig: 106, 101
+  offset: 0, 32
+  index: -1
+图层 2
+  rotate: true
+  xy: 347, 9
+  size: 95, 138
+  orig: 96, 138
+  offset: 1, 0
+  index: -1
+图层 3
+  rotate: false
+  xy: 94, 521
+  size: 32, 33
+  orig: 32, 33
+  offset: 0, 0
+  index: -1
+图层 4
+  rotate: false
+  xy: 445, 34
+  size: 31, 31
+  orig: 31, 31
+  offset: 0, 0
+  index: -1
+图层 5
+  rotate: false
+  xy: 63, 20
+  size: 34, 29
+  orig: 34, 29
+  offset: 0, 0
+  index: -1
+图层 6
+  rotate: false
+  xy: 2, 525
+  size: 85, 90
+  orig: 85, 90
+  offset: 0, 0
+  index: -1
+图层 7
+  rotate: false
+  xy: 157, 567
+  size: 42, 48
+  orig: 42, 48
+  offset: 0, 0
+  index: -1
+图层 8
+  rotate: false
+  xy: 89, 556
+  size: 66, 59
+  orig: 66, 59
+  offset: 0, 0
+  index: -1
+图层 9
+  rotate: false
+  xy: 2, 28
+  size: 59, 56
+  orig: 59, 56
+  offset: 0, 0
+  index: -1
+闪闪光
+  rotate: false
+  xy: 2, 86
+  size: 76, 68
+  orig: 76, 68
+  offset: 0, 0
+  index: -1

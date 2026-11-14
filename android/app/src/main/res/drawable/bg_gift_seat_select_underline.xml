@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Teal bar under selected gift recipient (seat / strip). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FF43D3A2" />
+    <corners android:radius="2dp" />
+</shape>

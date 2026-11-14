@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Conversation row — white app theme -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="10dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginEnd="10dp"
+    android:layout_marginBottom="4dp"
+    android:background="@drawable/bg_chat_preview_card"
+    android:foreground="?attr/selectableItemBackground"
+    android:minHeight="84dp">
+
+    <LinearLayout
+        android:id="@+id/chatRowBody"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layoutDirection="locale"
+        android:minHeight="72dp"
+        android:orientation="horizontal"
+        android:paddingStart="13dp"
+        android:paddingTop="11dp"
+        android:paddingEnd="52dp"
+        android:paddingBottom="11dp">
+
+        <FrameLayout
+            android:layout_width="64dp"
+            android:layout_height="64dp">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/imgAvatar"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/chat"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_default_avatar"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+
+            <ImageView
+                android:id="@+id/imgFrame"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgHostBadge"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgCustomRankBadge"
+                android:layout_width="17dp"
+                android:layout_height="17dp"
+                android:layout_gravity="top|end"
+                android:contentDescription="@null"
+                android:elevation="8dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <View
+                android:id="@+id/onlineDot"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="1dp"
+                android:layout_marginBottom="1dp"
+                android:background="@drawable/bg_online_dot_ring"
+                android:visibility="gone"
+                tools:visibility="visible" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:includeFontPadding="false"
+                        android:maxWidth="180dp"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textDirection="locale"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        tools:text="سارة أحمد" />
+
+                    <ImageView
+                        android:id="@+id/imgOfficial"
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:layout_marginStart="4dp"
+                        android:contentDescription="@null"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_gender_verified"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/text_hint"
+                    android:textSize="12sp"
+                    tools:text="10:42" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvLast"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:textColor="@color/text_secondary"
+                    android:textDirection="locale"
+                    android:textSize="14sp"
+                    tools:text="مرحبا، كيف حالك؟" />
+
+                <TextView
+                    android:id="@+id/tvUnread"
+                    android:layout_width="wrap_content"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_chat_unread_pill"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:minWidth="18dp"
+                    android:paddingHorizontal="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="3"
+                    tools:visibility="visible" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvStaffChip"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+            <TextView
+                android:id="@+id/tvUsername"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+            <LinearLayout
+                android:id="@+id/rowBadges"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone">
+                <TextView android:id="@+id/tvVipChip" android:layout_width="0dp" android:layout_height="0dp" />
+                <TextView android:id="@+id/tvLevelChip" android:layout_width="0dp" android:layout_height="0dp" />
+                <TextView android:id="@+id/tvWealthChip" android:layout_width="0dp" android:layout_height="0dp" />
+                <TextView android:id="@+id/tvCharmChip" android:layout_width="0dp" android:layout_height="0dp" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/btnConversationMore"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="خيارات المحادثة"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_chat_menu_more"
+        android:tint="#737B8C" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:layout_gravity="bottom"
+        android:visibility="gone"
+        android:layout_marginStart="84dp"
+        android:background="@color/divider_color" />
+</FrameLayout>

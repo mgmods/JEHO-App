@@ -1,0 +1,139 @@
+
+jxk_01.png
+size: 784,388
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1334jiangxian_00000
+  rotate: false
+  xy: 522, 2
+  size: 131, 128
+  orig: 145, 151
+  offset: 4, 11
+  index: -1
+2_00000
+  rotate: false
+  xy: 667, 273
+  size: 116, 115
+  orig: 145, 151
+  offset: 11, 18
+  index: -1
+baisha
+  rotate: false
+  xy: 70, 62
+  size: 51, 51
+  orig: 51, 51
+  offset: 0, 0
+  index: -1
+hua
+  rotate: true
+  xy: 0, 43
+  size: 70, 68
+  orig: 70, 68
+  offset: 0, 0
+  index: -1
+lizi/lizi_001
+  rotate: true
+  xy: 540, 268
+  size: 120, 125
+  orig: 176, 178
+  offset: 32, 37
+  index: -1
+lizi/lizi_002
+  rotate: true
+  xy: 260, 4
+  size: 119, 127
+  orig: 176, 178
+  offset: 33, 36
+  index: -1
+lizi/lizi_003
+  rotate: true
+  xy: 0, 253
+  size: 135, 128
+  orig: 176, 178
+  offset: 17, 36
+  index: -1
+lizi/lizi_004
+  rotate: true
+  xy: 387, 131
+  size: 131, 129
+  orig: 176, 178
+  offset: 18, 35
+  index: -1
+lizi/lizi_005
+  rotate: false
+  xy: 389, 0
+  size: 131, 129
+  orig: 176, 178
+  offset: 19, 35
+  index: -1
+lizi/lizi_006
+  rotate: true
+  xy: 518, 132
+  size: 130, 129
+  orig: 176, 178
+  offset: 20, 35
+  index: -1
+lizi/lizi_007
+  rotate: false
+  xy: 128, 1
+  size: 130, 117
+  orig: 176, 178
+  offset: 21, 36
+  index: -1
+lizi/lizi_008
+  rotate: true
+  xy: 649, 135
+  size: 131, 127
+  orig: 176, 178
+  offset: 21, 26
+  index: -1
+lizi/lizi_009
+  rotate: false
+  xy: 128, 120
+  size: 130, 131
+  orig: 176, 178
+  offset: 22, 26
+  index: -1
+lizi/lizi_010
+  rotate: true
+  xy: 405, 264
+  size: 124, 133
+  orig: 176, 178
+  offset: 29, 26
+  index: -1
+lizi/lizi_011
+  rotate: true
+  xy: 268, 264
+  size: 124, 135
+  orig: 176, 178
+  offset: 28, 25
+  index: -1
+lizi/lizi_012
+  rotate: true
+  xy: 130, 263
+  size: 125, 136
+  orig: 176, 178
+  offset: 27, 24
+  index: -1
+lizi/lizi_013
+  rotate: false
+  xy: 260, 125
+  size: 125, 136
+  orig: 176, 178
+  offset: 27, 24
+  index: -1
+lizi/lizi_014
+  rotate: false
+  xy: 0, 115
+  size: 126, 136
+  orig: 176, 178
+  offset: 26, 25
+  index: -1
+lizi/lizi_015
+  rotate: false
+  xy: 655, 8
+  size: 125, 125
+  orig: 176, 178
+  offset: 27, 37
+  index: -1

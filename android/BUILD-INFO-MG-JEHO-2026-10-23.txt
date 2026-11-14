@@ -1,0 +1,4 @@
+JEHO MG-JEHO post-merge build marker
+Date: 2026-10-23
+Purpose: trigger Android Universal APK workflow on the merged MG-JEHO branch after staff-role lifecycle fixes #125 and #126.
+Expected production API: https://jeho-own-backend.mgs.blitz.cloud/api/v1

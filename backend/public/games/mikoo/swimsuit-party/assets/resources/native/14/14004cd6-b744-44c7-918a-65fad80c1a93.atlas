@@ -1,0 +1,398 @@
+
+scatter.png
+size: 424,520
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+Water_a_0009
+  rotate: true
+  xy: 363, 202
+  size: 47, 51
+  orig: 51, 51
+  offset: 3, 0
+  index: -1
+banzi
+  rotate: false
+  xy: 155, 263
+  size: 79, 29
+  orig: 79, 30
+  offset: 0, 0
+  index: -1
+banzi2
+  rotate: false
+  xy: 397, 251
+  size: 24, 16
+  orig: 31, 17
+  offset: 7, 0
+  index: -1
+dikuang
+  rotate: true
+  xy: 161, 400
+  size: 120, 137
+  orig: 120, 137
+  offset: 0, 0
+  index: -1
+kuang
+  rotate: true
+  xy: 300, 353
+  size: 119, 121
+  orig: 120, 121
+  offset: 1, 0
+  index: -1
+lang
+  rotate: true
+  xy: 161, 294
+  size: 104, 130
+  orig: 104, 130
+  offset: 0, 0
+  index: -1
+lt_10089_tex_09
+  rotate: false
+  xy: 0, 373
+  size: 159, 147
+  orig: 160, 147
+  offset: 1, 0
+  index: -1
+ren1
+  rotate: true
+  xy: 0, 287
+  size: 84, 96
+  orig: 85, 113
+  offset: 1, 17
+  index: -1
+scatter
+  rotate: false
+  xy: 300, 474
+  size: 122, 46
+  orig: 122, 46
+  offset: 0, 0
+  index: -1
+stga/dituguan/lanhua_00000
+  rotate: true
+  xy: 223, 147
+  size: 49, 63
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00002
+  rotate: true
+  xy: 0, 0
+  size: 49, 62
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00004
+  rotate: true
+  xy: 155, 119
+  size: 49, 63
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00006
+  rotate: true
+  xy: 91, 178
+  size: 50, 62
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00008
+  rotate: true
+  xy: 229, 198
+  size: 50, 62
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00010
+  rotate: true
+  xy: 91, 230
+  size: 51, 62
+  orig: 71, 86
+  offset: 14, 16
+  index: -1
+stga/dituguan/lanhua_00012
+  rotate: true
+  xy: 90, 126
+  size: 50, 63
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00014
+  rotate: true
+  xy: 293, 154
+  size: 50, 63
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00016
+  rotate: true
+  xy: 358, 150
+  size: 50, 63
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00018
+  rotate: true
+  xy: 353, 98
+  size: 50, 62
+  orig: 71, 86
+  offset: 15, 16
+  index: -1
+stga/dituguan/lanhua_00020
+  rotate: true
+  xy: 285, 51
+  size: 50, 62
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00022
+  rotate: true
+  xy: 0, 100
+  size: 49, 62
+  orig: 71, 86
+  offset: 14, 15
+  index: -1
+stga/dituguan/lanhua_00024
+  rotate: true
+  xy: 64, 0
+  size: 49, 62
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00026
+  rotate: true
+  xy: 288, 103
+  size: 49, 63
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/dituguan/lanhua_00028
+  rotate: true
+  xy: 220, 96
+  size: 49, 63
+  orig: 71, 86
+  offset: 15, 15
+  index: -1
+stga/pg/dituguan/disg_001
+  rotate: true
+  xy: 74, 163
+  size: 9, 14
+  orig: 54, 65
+  offset: 6, 39
+  index: -1
+stga/pg/dituguan/disg_002
+  rotate: true
+  xy: 64, 133
+  size: 16, 24
+  orig: 54, 65
+  offset: 5, 31
+  index: -1
+stga/pg/dituguan/disg_003
+  rotate: true
+  xy: 133, 96
+  size: 21, 32
+  orig: 54, 65
+  offset: 5, 24
+  index: -1
+stga/pg/dituguan/disg_004
+  rotate: false
+  xy: 397, 310
+  size: 25, 41
+  orig: 54, 65
+  offset: 5, 16
+  index: -1
+stga/pg/dituguan/disg_005
+  rotate: false
+  xy: 349, 52
+  size: 29, 44
+  orig: 54, 65
+  offset: 5, 13
+  index: -1
+stga/pg/dituguan/disg_006
+  rotate: false
+  xy: 306, 3
+  size: 33, 46
+  orig: 54, 65
+  offset: 5, 11
+  index: -1
+stga/pg/dituguan/disg_007
+  rotate: true
+  xy: 170, 38
+  size: 37, 47
+  orig: 54, 65
+  offset: 5, 10
+  index: -1
+stga/pg/dituguan/disg_008
+  rotate: false
+  xy: 128, 1
+  size: 40, 48
+  orig: 54, 65
+  offset: 6, 9
+  index: -1
+stga/pg/dituguan/disg_009
+  rotate: false
+  xy: 0, 51
+  size: 42, 47
+  orig: 54, 65
+  offset: 6, 9
+  index: -1
+stga/pg/dituguan/disg_010
+  rotate: false
+  xy: 44, 51
+  size: 40, 47
+  orig: 54, 65
+  offset: 9, 8
+  index: -1
+stga/pg/dituguan/disg_011
+  rotate: true
+  xy: 170, 0
+  size: 36, 46
+  orig: 54, 65
+  offset: 13, 8
+  index: -1
+stga/pg/dituguan/disg_012
+  rotate: false
+  xy: 341, 4
+  size: 32, 45
+  orig: 54, 65
+  offset: 17, 8
+  index: -1
+stga/pg/dituguan/disg_013
+  rotate: false
+  xy: 86, 51
+  size: 28, 43
+  orig: 54, 65
+  offset: 21, 8
+  index: -1
+stga/pg/dituguan/disg_014
+  rotate: false
+  xy: 397, 269
+  size: 24, 39
+  orig: 54, 65
+  offset: 25, 8
+  index: -1
+stga/pg/dituguan/disg_015
+  rotate: false
+  xy: 64, 101
+  size: 19, 30
+  orig: 54, 65
+  offset: 30, 9
+  index: -1
+stga/pg/dituguan/disg_016
+  rotate: false
+  xy: 74, 174
+  size: 14, 21
+  orig: 54, 65
+  offset: 35, 10
+  index: -1
+stga/scatter/stsg_001
+  rotate: true
+  xy: 380, 64
+  size: 32, 38
+  orig: 91, 51
+  offset: 5, 6
+  index: -1
+stga/scatter/stsg_002
+  rotate: false
+  xy: 116, 52
+  size: 38, 42
+  orig: 91, 51
+  offset: 4, 4
+  index: -1
+stga/scatter/stsg_003
+  rotate: true
+  xy: 260, 2
+  size: 46, 44
+  orig: 91, 51
+  offset: 3, 3
+  index: -1
+stga/scatter/stsg_004
+  rotate: false
+  xy: 98, 283
+  size: 55, 44
+  orig: 91, 51
+  offset: 3, 3
+  index: -1
+stga/scatter/stsg_005
+  rotate: false
+  xy: 220, 50
+  size: 62, 44
+  orig: 91, 51
+  offset: 3, 3
+  index: -1
+stga/scatter/stsg_006
+  rotate: false
+  xy: 155, 170
+  size: 66, 45
+  orig: 91, 51
+  offset: 4, 3
+  index: -1
+stga/scatter/stsg_007
+  rotate: false
+  xy: 155, 217
+  size: 72, 44
+  orig: 91, 51
+  offset: 6, 5
+  index: -1
+stga/scatter/stsg_008
+  rotate: false
+  xy: 0, 151
+  size: 72, 44
+  orig: 91, 51
+  offset: 11, 5
+  index: -1
+stga/scatter/stsg_009
+  rotate: false
+  xy: 293, 206
+  size: 68, 43
+  orig: 91, 51
+  offset: 18, 6
+  index: -1
+stga/scatter/stsg_010
+  rotate: false
+  xy: 98, 329
+  size: 61, 42
+  orig: 91, 51
+  offset: 26, 7
+  index: -1
+stga/scatter/stsg_011
+  rotate: false
+  xy: 236, 250
+  size: 55, 42
+  orig: 91, 51
+  offset: 33, 7
+  index: -1
+stga/scatter/stsg_012
+  rotate: false
+  xy: 170, 77
+  size: 48, 40
+  orig: 91, 51
+  offset: 40, 7
+  index: -1
+stga/scatter/stsg_013
+  rotate: false
+  xy: 218, 1
+  size: 40, 35
+  orig: 91, 51
+  offset: 47, 8
+  index: -1
+tikaong
+  rotate: false
+  xy: 293, 251
+  size: 102, 100
+  orig: 102, 100
+  offset: 0, 0
+  index: -1
+tui1
+  rotate: true
+  xy: 86, 96
+  size: 28, 45
+  orig: 28, 45
+  offset: 0, 0
+  index: -1
+xing_00018
+  rotate: false
+  xy: 0, 197
+  size: 89, 88
+  orig: 89, 88
+  offset: 0, 0
+  index: -1

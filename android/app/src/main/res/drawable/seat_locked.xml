@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+
+    <path
+        android:fillColor="#99000000"
+        android:pathData="M32,32m-28,0a28,28 0,1 1,56 0a28,28 0,1 1,-56 0" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M32,32m-28,0a28,28 0,1 1,56 0a28,28 0,1 1,-56 0"
+        android:strokeWidth="1.2"
+        android:strokeColor="#40FFFFFF" />
+
+    <!-- Lock body -->
+    <path
+        android:fillColor="#CCFFFFFF"
+        android:pathData="M26,30 h12 v12 h-12 z" />
+
+    <!-- Shackle -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M28,30 C28,24 36,24 36,30"
+        android:strokeWidth="2.2"
+        android:strokeColor="#CCFFFFFF"
+        android:strokeLineCap="round" />
+</vector>

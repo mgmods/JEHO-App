@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="30dp"
+    android:layout_height="30dp"
+    android:layout_marginEnd="8dp"
+    android:clipChildren="false">
+
+    <ImageView
+        android:id="@+id/imgJoinerAvatar"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_seat_avatar_ring"
+        android:contentDescription="@null"
+        android:padding="1dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_tab_me" />
+
+    <ImageView
+        android:id="@+id/imgJoinerFrame"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
+</FrameLayout>

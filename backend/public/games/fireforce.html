@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>قوة النار · AuraLive</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;background:radial-gradient(ellipse at center,#3a1208,#0a0508 70%);color:#fff;font-family:Tahoma,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:14px}
+h1{font-size:24px;color:#ffd27a;font-weight:900}
+.badge-row{display:flex;gap:8px;justify-content:center;min-height:36px}
+.aura-badge{display:none;align-items:center;justify-content:center;min-width:36px;height:36px;padding:0 10px;border-radius:999px;background:rgba(0,0,0,.35);border:1px solid rgba(255,214,120,.45);font-size:18px}
+.aura-badge.on{display:inline-flex}
+.boss{width:min(88vw,340px);aspect-ratio:1;border-radius:24px;border:2px solid #c9a227;background:linear-gradient(180deg,#5a1d0c,#1a0808);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;box-shadow:0 0 40px rgba(255,80,0,.25)}
+.boss span{font-size:96px;user-select:none;transition:transform .08s}
+.hpwrap{width:min(88vw,340px);height:16px;background:#222;border-radius:999px;overflow:hidden;border:1px solid #c9a227}
+.hp{height:100%;width:100%;background:linear-gradient(90deg,#ff4d4d,#ff9a3c);transition:width .15s}
+.stats{display:flex;gap:16px;font-size:14px}
+button{border:0;border-radius:16px;padding:14px 22px;font-weight:900;color:#fff;background:linear-gradient(90deg,#ff5a1f,#c41e6a);font-size:16px;cursor:pointer}
+#msg{color:#ffd7b0;min-height:22px}
+</style>
+</head>
+<body>
+<h1>قوة النار</h1>
+<div class="badge-row"><span class="aura-badge" id="stampBadge"></span><span class="aura-badge" id="emojiBadge"></span></div>
+<div class="stats"><div>الضرر: <b id="dmg">0</b></div><div>الجولة: <b id="round">1</b></div></div>
+<div class="hpwrap"><div class="hp" id="hp"></div></div>
+<div class="boss" id="boss"><span id="face">👾</span></div>
+<div id="msg">اضغط بسرعة لضرب الزعيم!</div>
+<button id="hit">اضرب الزعيم</button>
+<button id="new" style="background:linear-gradient(90deg,#00c6ff,#0072ff)">زعيم جديد</button>
+<script>
+let hp=100,max=100,dmg=0,round=1,alive=true;
+function sync(){
+  document.getElementById('hp').style.width=(hp/max*100)+'%';
+  document.getElementById('dmg').textContent=dmg;
+  document.getElementById('round').textContent=round;
+}
+function hit(){
+  if(!alive) return;
+  const strike=8+Math.floor(Math.random()*10);
+  hp=Math.max(0,hp-strike); dmg+=strike;
+  const face=document.getElementById('face');
+  face.style.transform='scale(.86) rotate(-6deg)';
+  setTimeout(()=>face.style.transform='',80);
+  if(hp<=0){
+    alive=false; round++;
+    document.getElementById('msg').textContent='تم القضاء على الزعيم! 🏆 جولة '+round;
+    face.textContent='💥';
+    setTimeout(()=>{
+      max=100+round*25; hp=max; alive=true; face.textContent='👾';
+      document.getElementById('msg').textContent='زعيم أقوى ظهر! استمر';
+      sync();
+    },900);
+  } else document.getElementById('msg').textContent='ضربت '+strike+'!';
+  sync();
+}
+document.getElementById('hit').onclick=hit;
+document.getElementById('boss').onclick=hit;
+document.getElementById('new').onclick=()=>{hp=100;max=100;dmg=0;round=1;alive=true;document.getElementById('face').textContent='👾';document.getElementById('msg').textContent='اضغط بسرعة لضرب الزعيم!';sync();};
+sync();
+const STAMPS={stamp_heart:'💖',stamp_crown:'👑',stamp_vip:'⭐'};
+const EMOJIS={emoji_laugh:'😂',emoji_fire:'🔥',emoji_crown:'👑'};
+function setBadge(el,text){ if(!el)return; if(text){el.textContent=text;el.classList.add('on');}else{el.textContent='';el.classList.remove('on');} }
+window.applyAuraCosmetics=function(c){
+  c=c||window.__AURA_COSMETICS__||{};
+  setBadge(document.getElementById('stampBadge'), STAMPS[c.stamp]||'');
+  setBadge(document.getElementById('emojiBadge'), EMOJIS[c.emoji]||'');
+  if(c.emoji==='emoji_fire') document.getElementById('face').textContent='🔥';
+};
+if(window.__AURA_COSMETICS__) window.applyAuraCosmetics(window.__AURA_COSMETICS__);
+</script>
+</body>
+</html>

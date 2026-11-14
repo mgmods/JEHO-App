@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>حذف الحساب | JEHO CHAT</title>
+    <link rel="icon" type="image/png" href="/assets/brand/jeho_logo.png">
+    
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet" id="bootstrap-rtl">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+        :root {
+            --primary: #2563EB;
+            --primary-glow: rgba(37, 99, 235, 0.15);
+            --secondary: #06B6D4;
+            --secondary-glow: rgba(6, 182, 212, 0.15);
+            --bg-light: #ffffff;
+            --bg-card: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            --transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        body {
+            font-family: 'Tajawal', 'Outfit', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        html[lang="en"] {
+            direction: ltr;
+        }
+        html[lang="en"] body {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Background Glowing Orbs */
+        .glowing-orb {
+            position: absolute;
+            width: 450px;
+            height: 450px;
+            border-radius: 50%;
+            filter: blur(160px);
+            opacity: 0.08;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .orb-1 { top: 5%; right: -50px; background: var(--primary); }
+        .orb-2 { bottom: 10%; left: -100px; background: var(--secondary); }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px;
+            transition: var(--transition);
+        }
+
+        /* Navbar */
+        .navbar {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 18px 0;
+        }
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.8rem;
+            color: var(--text-main) !important;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+        .nav-link {
+            font-weight: 500;
+            color: var(--text-muted) !important;
+            margin: 0 12px;
+            transition: var(--transition);
+        }
+        .nav-link:hover {
+            color: var(--primary) !important;
+        }
+
+        .lang-switch {
+            background: #f1f5f9;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px 14px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Header block */
+        .page-header {
+            padding: 160px 0 60px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        .page-header h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 15px;
+        }
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        /* Forms styling */
+        .form-control {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-main) !important;
+            border-radius: 12px;
+            padding: 14px;
+            transition: var(--transition);
+        }
+        .form-control:focus {
+            background: #ffffff;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.25rem var(--primary-glow);
+        }
+        .form-label {
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+            font-size: 0.98rem;
+        }
+
+        .btn-danger-custom {
+            background: #ff4757;
+            border: none;
+            color: white;
+            padding: 14px 35px;
+            border-radius: 30px;
+            font-weight: 700;
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.3);
+            transition: var(--transition);
+        }
+        .btn-danger-custom:hover {
+            background: #ff6b81;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 71, 87, 0.5);
+        }
+
+        .alert-panel {
+            background: rgba(255, 71, 87, 0.05);
+            border: 1px solid rgba(255, 71, 87, 0.15);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .step-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.01);
+        }
+        .step-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gradient);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+
+        /* Language Toggle Display Classes */
+        .show-en, [lang="en"] .show-ar { display: none !important; }
+        [lang="en"] .show-en { display: block !important; }
+        span[lang="en"].show-en { display: inline !important; }
+        .show-ar, [lang="ar"] .show-ar { display: block !important; }
+        span[lang="ar"].show-ar { display: inline !important; }
+
+        /* Footer */
+        footer {
+            background: #0f172a;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding: 60px 0 30px;
+            color: #94a3b8;
+            margin-top: 100px;
+            font-size: 0.95rem;
+            position: relative;
+            z-index: 2;
+        }
+        footer a {
+            color: #94a3b8;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        footer a:hover {
+            color: white;
+        }
+    
+        main, .hero, .features, .how-works, .cta-section, footer, .navbar, .container, .page-header, .legal-wrap {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Orbs -->
+    <div class="glowing-orb orb-1"></div>
+    <div class="glowing-orb orb-2"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <img src="/assets/brand/jeho_logo.png" alt="JEHO CHAT Logo" class="brand-logo">
+                <span>JEHO CHAT</span>
+            </a>
+            
+            <div class="d-flex align-items-center gap-2">
+                <button class="lang-switch" onclick="toggleLanguage()">
+                    <i class="fas fa-globe"></i>
+                    <span class="show-ar">EN</span>
+                    <span class="show-en">عربي</span>
+                </button>
+                <a href="/" class="btn btn-premium btn-sm">
+                    <span class="show-ar">الرئيسية</span>
+                    <span class="show-en">Home</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <header class="page-header">
+        <div class="container">
+            <h1 class="show-ar">حذف حساب المستخدم</h1>
+            <h1 class="show-en">Delete Your Account</h1>
+            <p class="show-ar">تطبيق JEHO CHAT (JEHO CHAT) &mdash; طلبات إزالة الحساب والبيانات المرتبطة</p>
+            <p class="show-en">JEHO CHAT Application &mdash; Account & Associated Data Removal Request</p>
+        </div>
+    </header>
+
+    <!-- Content Panel -->
+    <main class="container">
+        <div class="glass-panel">
+            
+            <div class="row g-5">
+                <!-- Left Side: Methods & Warning -->
+                <div class="col-lg-6">
+                    <h3 class="mb-4" style="font-weight: 700; color: #0f172a;">
+                        <span class="show-ar">خيارات وطرق حذف الحساب</span>
+                        <span class="show-en">Account Deletion Pathways</span>
+                    </h3>
+
+                    <!-- In-app Option -->
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <h5 class="font-weight-bold show-ar" style="color:#0f172a;">من داخل تطبيق JEHO CHAT (فوري)</h5>
+                        <h5 class="font-weight-bold show-en" style="color:#0f172a;">Directly In-App (Instant)</h5>
+                        <p class="show-ar text-muted mb-0">افتح التطبيق &larr; اذهب إلى الإعدادات (أيقونة الترس) &larr; الحساب &larr; حذف الحساب. سيتم مسح حسابك وكافة العملات والدردشة فورا.</p>
+                        <p class="show-en text-muted mb-0">Open JEHO CHAT app &rarr; go to Settings &rarr; Account &rarr; Delete Account. Your profile and coins will be cleared immediately.</p>
+                    </div>
+
+                    <!-- Email Option -->
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <h5 class="font-weight-bold show-ar" style="color:#0f172a;">عبر البريد الإلكتروني (خلال 48 ساعة)</h5>
+                        <h5 class="font-weight-bold show-en" style="color:#0f172a;">By Email Request (48 Hours)</h5>
+                        <p class="show-ar text-muted mb-0">أرسل رسالة من بريدك الإلكتروني المسجل لدينا إلى <a href="mailto:sf213777@gmail.com" style="color: var(--primary);">sf213777@gmail.com</a> بعنوان "طلب حذف حساب JEHO CHAT"، وسنقوم بمعالجة طلبك وحذفه.</p>
+                        <p class="show-en text-muted mb-0">Email us from your registered email address to <a href="mailto:sf213777@gmail.com" style="color: var(--primary);">sf213777@gmail.com</a> with subject "Account Deletion Request".</p>
+                    </div>
+
+                    <!-- Web Form Option -->
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <h5 class="font-weight-bold show-ar" style="color:#0f172a;">استخدام النموذج الإلكتروني (خلال 48 ساعة)</h5>
+                        <h5 class="font-weight-bold show-en" style="color:#0f172a;">Use the Online Form (48 Hours)</h5>
+                        <p class="show-ar text-muted mb-0">املأ نموذج طلب حذف الحساب الموجود بجانب هذه الصفحة، وسنقوم بالتحقق من الحساب وإزالته في غضون 48 ساعة.</p>
+                        <p class="show-en text-muted mb-0">Fill out the web form on this page with your details. We will process and delete the account within 48 hours.</p>
+                    </div>
+
+                    <!-- Danger Warning Box -->
+                    <div class="alert-panel">
+                        <h5 class="font-weight-bold text-danger show-ar"><i class="fas fa-triangle-exclamation me-2"></i>تحذير هام جداً:</h5>
+                        <h5 class="font-weight-bold text-danger show-en"><i class="fas fa-triangle-exclamation me-2"></i>Critical Deletion Warning:</h5>
+                        <p class="show-ar mb-0" style="font-size: 0.95rem; line-height: 1.6; color: #7f1d1d;">عملية حذف الحساب هي **نهائية ولا يمكن التراجع عنها**. سيؤدي الحذف إلى إزالة صورتك الشخصية، اسمك، بريدك الإلكتروني، سجل الدردشات، الهدايا المرسلة والمستقبلة، والعملات الافتراضية المتبقية في حسابك ولن تتمكن من استرجاعها أبداً.</p>
+                        <p class="show-en mb-0" style="font-size: 0.95rem; line-height: 1.6; color: #7f1d1d;">Account deletion is **permanent and irreversible**. All messages, gifts, VIP levels, decorative frames, and purchased coin balances will be completely cleared and cannot be recovered.</p>
+                    </div>
+                </div>
+
+                <!-- Right Side: Submit Form -->
+                <div class="col-lg-6">
+                    <div class="p-4" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.02);">
+                        <h3 class="mb-4" style="font-weight: 700; color: #0f172a;">
+                            <span class="show-ar">نموذج طلب حذف الحساب</span>
+                            <span class="show-en">Account Deletion Web Form</span>
+                        </h3>
+
+                        <!-- Feedback Alerts -->
+                        
+                            <div class="alert alert-success border-0 text-white" style="background: #2ecc71;">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <span class="show-ar"><strong>تم إرسال طلبك بنجاح!</strong> سنقوم بالتحقق وحذف الحساب بالكامل خلال 48 ساعة.</span>
+                                <span class="show-en"><strong>Request sent successfully!</strong> We will review and erase the profile within 48 hours.</span>
+                            </div>
+                        
+
+                        
+                            <div class="alert alert-danger border-0 text-white" style="background: #e74c3c;">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                
+                            </div>
+                        
+
+                        <form action="mailto:sf213777@gmail.com" method="post" enctype="text/plain" action="delete-account.php">
+                            <!-- Language helper hidden input -->
+                            <input type="hidden" name="current_lang" id="current_lang" value="ar">
+
+                            <div class="mb-3">
+                                <label for="email" class="form-label">
+                                    <span class="show-ar">البريد الإلكتروني المسجل بالتطبيق *</span>
+                                    <span class="show-en">Registered Email Address *</span>
+                                </label>
+                                <input type="email" class="form-control" id="email" name="email" placeholder="example@email.com">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="username" class="form-label">
+                                    <span class="show-ar">اسم المستخدم (في حال عدم تذكر الإيميل)</span>
+                                    <span class="show-en">Username (if you forgot registered email)</span>
+                                </label>
+                                <input type="text" class="form-control" id="username" name="username" placeholder="Username">
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="reason" class="form-label">
+                                    <span class="show-ar">سبب طلب الحذف (اختياري)</span>
+                                    <span class="show-en">Reason for deletion (optional)</span>
+                                </label>
+                                <textarea class="form-control" id="reason" name="reason" rows="4" placeholder="Reason..."></textarea>
+                            </div>
+
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-danger-custom w-100 py-3">
+                                    <span class="show-ar"><i class="fas fa-trash-can me-2"></i> تقديم طلب حذف الحساب</span>
+                                    <span class="show-en"><i class="fas fa-trash-can me-2"></i> Submit Account Deletion Request</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container text-center">
+            <p>&copy;  JEHO CHAT. All rights reserved by JEHO CHAT.</p>
+            <p style="margin: 10px 0 0;">
+                <a href="/privacy.html" class="mx-2"><span class="show-ar">سياسة الخصوصية</span><span class="show-en">Privacy Policy</span></a>
+                <a href="/terms.html" class="mx-2"><span class="show-ar">شروط الخدمة</span><span class="show-en">Terms of Service</span></a>
+                <a href="/data-collection.html" class="mx-2"><span class="show-ar">صفحة جمع البيانات</span><span class="show-en">Data Collection</span></a>
+                <a href="/delete-account.html" class="mx-2"><span class="show-ar">حذف الحساب</span><span class="show-en">Delete Account</span></a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleLanguage() {
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            const langInput = document.getElementById('current_lang');
+            
+            if (htmlTag.getAttribute('lang') === 'ar') {
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+                localStorage.setItem('hams_lang', 'en');
+                if(langInput) langInput.value = 'en';
+            } else {
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+                localStorage.setItem('hams_lang', 'ar');
+                if(langInput) langInput.value = 'ar';
+            }
+}
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('hams_lang');
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            const langInput = document.getElementById('current_lang');
+            
+            if (savedLang === 'en') {
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+                if(langInput) langInput.value = 'en';
+            } else {
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+                if(langInput) langInput.value = 'ar';
+            }
+        });
+    </script>
+</body>
+</html>

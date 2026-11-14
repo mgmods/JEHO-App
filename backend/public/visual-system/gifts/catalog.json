@@ -1,0 +1,511 @@
+{
+  "version": 2,
+  "count": 43,
+  "items": [
+    {
+      "id": "ball",
+      "name": "كرة أسطورية",
+      "sound": "cute",
+      "animation": "bounce",
+      "tier": "basic",
+      "file": "gift-ball.png",
+      "filter": "brightness(1)",
+      "order": 1
+    },
+    {
+      "id": "car",
+      "name": "سيارة خارقة",
+      "sound": "engine",
+      "animation": "drive",
+      "tier": "legendary",
+      "file": "gift-car.png",
+      "sprite": {
+        "file": "gift-car.png",
+        "frames": 9,
+        "duration": 0.7
+      },
+      "filter": "brightness(1)",
+      "order": 2
+    },
+    {
+      "id": "castle",
+      "name": "قلعة الجليد",
+      "sound": "royal",
+      "animation": "rise",
+      "tier": "mythic",
+      "file": "gift-castle.png",
+      "filter": "brightness(1)",
+      "order": 3
+    },
+    {
+      "id": "champagne",
+      "name": "احتفال فاخر",
+      "sound": "celebration",
+      "animation": "burst",
+      "tier": "premium",
+      "file": "gift-champagne.png",
+      "filter": "brightness(1)",
+      "order": 4
+    },
+    {
+      "id": "crown",
+      "name": "التاج الملكي",
+      "sound": "royal",
+      "animation": "crown",
+      "tier": "legendary",
+      "file": "gift-crown.png",
+      "filter": "brightness(1)",
+      "order": 5
+    },
+    {
+      "id": "diamond",
+      "name": "ألماسة",
+      "sound": "sparkle",
+      "animation": "crystal",
+      "tier": "premium",
+      "file": "gift-diamond.png",
+      "filter": "brightness(1)",
+      "order": 6
+    },
+    {
+      "id": "dragon",
+      "name": "التنين",
+      "sound": "fire",
+      "animation": "dragon",
+      "tier": "mythic",
+      "file": "gift-dragon.png",
+      "sprite": {
+        "file": "gift-dragon.png",
+        "frames": 9,
+        "duration": 0.88
+      },
+      "filter": "brightness(1)",
+      "order": 7
+    },
+    {
+      "id": "fireworks",
+      "name": "ألعاب نارية",
+      "sound": "celebration",
+      "animation": "burst",
+      "tier": "premium",
+      "file": "gift-fireworks.png",
+      "filter": "brightness(1)",
+      "order": 8
+    },
+    {
+      "id": "galaxy",
+      "name": "المجرة",
+      "sound": "cosmic",
+      "animation": "orbit",
+      "tier": "mythic",
+      "file": "gift-galaxy.png",
+      "filter": "brightness(1)",
+      "order": 9
+    },
+    {
+      "id": "guitar",
+      "name": "غيتار النجوم",
+      "sound": "celebration",
+      "animation": "swing",
+      "tier": "premium",
+      "file": "gift-guitar.png",
+      "filter": "brightness(1)",
+      "order": 10
+    },
+    {
+      "id": "heart",
+      "name": "قلب كريستالي",
+      "sound": "romance",
+      "animation": "heart",
+      "tier": "premium",
+      "file": "gift-heart.png",
+      "filter": "brightness(1)",
+      "order": 11
+    },
+    {
+      "id": "icecream",
+      "name": "آيس كريم",
+      "sound": "cute",
+      "animation": "bounce",
+      "tier": "basic",
+      "file": "gift-icecream.png",
+      "filter": "brightness(1)",
+      "order": 12
+    },
+    {
+      "id": "lion",
+      "name": "الأسد الملكي",
+      "sound": "roar",
+      "animation": "run",
+      "tier": "legendary",
+      "file": "gift-lion.png",
+      "sprite": {
+        "file": "gift-lion.png",
+        "frames": 9,
+        "duration": 0.95
+      },
+      "filter": "brightness(1)",
+      "order": 13
+    },
+    {
+      "id": "lucky-box",
+      "name": "صندوق الحظ",
+      "sound": "sparkle",
+      "animation": "box",
+      "tier": "premium",
+      "file": "gift-lucky-box.png",
+      "filter": "brightness(1)",
+      "order": 14
+    },
+    {
+      "id": "meteor",
+      "name": "النيزك",
+      "sound": "impact",
+      "animation": "meteor",
+      "tier": "legendary",
+      "file": "gift-meteor.png",
+      "filter": "brightness(1)",
+      "order": 15
+    },
+    {
+      "id": "plane",
+      "name": "طائرة خاصة",
+      "sound": "engine",
+      "animation": "fly",
+      "tier": "legendary",
+      "file": "gift-plane.png",
+      "sprite": {
+        "file": "gift-plane.png",
+        "frames": 9,
+        "duration": 0.74
+      },
+      "filter": "brightness(1)",
+      "order": 16
+    },
+    {
+      "id": "ring",
+      "name": "خاتم الحب",
+      "sound": "romance",
+      "animation": "crystal",
+      "tier": "premium",
+      "file": "gift-ring.png",
+      "filter": "brightness(1)",
+      "order": 17
+    },
+    {
+      "id": "rocket",
+      "name": "الصاروخ",
+      "sound": "cosmic",
+      "animation": "rocket",
+      "tier": "legendary",
+      "file": "gift-rocket.png",
+      "sprite": {
+        "file": "gift-rocket.png",
+        "frames": 9,
+        "duration": 0.7
+      },
+      "filter": "brightness(1)",
+      "order": 18
+    },
+    {
+      "id": "rose",
+      "name": "وردة الحب",
+      "sound": "romance",
+      "animation": "heart",
+      "tier": "basic",
+      "file": "gift-rose.png",
+      "filter": "brightness(1)",
+      "order": 19
+    },
+    {
+      "id": "teddy",
+      "name": "الدب اللطيف",
+      "sound": "cute",
+      "animation": "bounce",
+      "tier": "basic",
+      "file": "gift-teddy.png",
+      "filter": "brightness(1)",
+      "order": 20
+    },
+    {
+      "id": "unicorn",
+      "name": "اليونيكورن",
+      "sound": "sparkle",
+      "animation": "run",
+      "tier": "legendary",
+      "file": "gift-unicorn.png",
+      "sprite": {
+        "file": "gift-unicorn.png",
+        "frames": 9,
+        "duration": 0.84
+      },
+      "filter": "brightness(1)",
+      "order": 21
+    },
+    {
+      "id": "yacht",
+      "name": "اليخت الملكي",
+      "sound": "luxury",
+      "animation": "sail",
+      "tier": "mythic",
+      "file": "gift-yacht.png",
+      "filter": "brightness(1)",
+      "order": 22
+    },
+    {
+      "id": "microphone",
+      "name": "ميكروفون النجوم",
+      "sound": "celebration",
+      "animation": "swing",
+      "tier": "premium",
+      "file": "gift-microphone.png",
+      "filter": "brightness(1)",
+      "order": 23
+    },
+    {
+      "id": "phoenix",
+      "name": "العنقاء",
+      "sound": "fire",
+      "animation": "phoenix",
+      "tier": "mythic",
+      "file": "gift-phoenix.png",
+      "sprite": {
+        "file": "gift-phoenix.png",
+        "frames": 9,
+        "duration": 0.86
+      },
+      "filter": "brightness(1)",
+      "order": 24
+    },
+    {
+      "id": "royal-tiger",
+      "name": "النمر الملكي",
+      "sound": "roar",
+      "animation": "run",
+      "tier": "mythic",
+      "file": "gift-royal-tiger.png",
+      "sprite": {
+        "file": "gift-royal-tiger.png",
+        "frames": 9,
+        "duration": 0.9
+      },
+      "filter": "brightness(1)",
+      "order": 25
+    },
+    {
+      "id": "luxury-watch",
+      "name": "ساعة فاخرة",
+      "sound": "luxury",
+      "animation": "crystal",
+      "tier": "legendary",
+      "file": "gift-luxury-watch.png",
+      "filter": "brightness(1)",
+      "order": 26
+    },
+    {
+      "id": "treasure-chest",
+      "name": "كنز الجواهر",
+      "sound": "luxury",
+      "animation": "box",
+      "tier": "mythic",
+      "file": "gift-treasure-chest.png",
+      "filter": "brightness(1)",
+      "order": 27
+    },
+    {
+      "id": "golden-throne",
+      "name": "العرش الذهبي",
+      "sound": "royal",
+      "animation": "crown",
+      "tier": "mythic",
+      "file": "gift-golden-throne.png",
+      "filter": "brightness(1)",
+      "order": 28
+    },
+    {
+      "id": "dire-wolf",
+      "name": "الذئب الجليدي",
+      "sound": "howl",
+      "animation": "run",
+      "tier": "mythic",
+      "file": "gift-dire-wolf.png",
+      "sprite": {
+        "file": "gift-dire-wolf.png",
+        "frames": 9,
+        "duration": 0.82
+      },
+      "filter": "brightness(1)",
+      "order": 29
+    },
+    {
+      "id": "royal-train",
+      "name": "القطار الملكي",
+      "sound": "train",
+      "animation": "train",
+      "tier": "legendary",
+      "file": "gift-royal-train.png",
+      "sprite": {
+        "file": "gift-royal-train.png",
+        "frames": 9,
+        "duration": 0.72
+      },
+      "filter": "brightness(1)",
+      "order": 30
+    },
+    {
+      "id": "golden-tractor",
+      "name": "التراكتور الذهبي",
+      "sound": "tractor",
+      "animation": "tractor",
+      "tier": "legendary",
+      "file": "gift-golden-tractor.png",
+      "sprite": {
+        "file": "gift-golden-tractor.png",
+        "frames": 9,
+        "duration": 0.78
+      },
+      "filter": "brightness(1)",
+      "order": 31
+    },
+    {
+      "id": "crystal-piano",
+      "name": "البيانو الكريستالي",
+      "sound": "piano",
+      "animation": "music",
+      "tier": "mythic",
+      "file": "gift-crystal-piano.png",
+      "filter": "brightness(1)",
+      "order": 32
+    },
+    {
+      "id": "superbike",
+      "name": "الدراجة الخارقة",
+      "sound": "motorcycle",
+      "animation": "drive",
+      "tier": "legendary",
+      "file": "gift-superbike.png",
+      "sprite": {
+        "file": "gift-superbike.png",
+        "frames": 9,
+        "duration": 0.66
+      },
+      "filter": "brightness(1)",
+      "order": 33
+    },
+    {
+      "id": "royal-drums",
+      "name": "طبول الملوك",
+      "sound": "drums",
+      "animation": "music",
+      "tier": "legendary",
+      "file": "gift-royal-drums.png",
+      "filter": "brightness(1)",
+      "order": 34
+    },
+    {
+      "id": "planet-earth",
+      "name": "كوكب الأرض",
+      "sound": "cosmic",
+      "animation": "orbit",
+      "tier": "mythic",
+      "file": "gift-planet-earth.png",
+      "filter": "brightness(1)",
+      "order": 35
+    },
+    {
+      "id": "planet-saturn",
+      "name": "كوكب زحل",
+      "sound": "cosmic",
+      "animation": "orbit",
+      "tier": "mythic",
+      "file": "gift-planet-saturn.png",
+      "filter": "brightness(1)",
+      "order": 36
+    },
+    {
+      "id": "royal-eagle",
+      "name": "النسر الملكي",
+      "sound": "eagle",
+      "animation": "bird",
+      "tier": "mythic",
+      "file": "gift-royal-eagle.png",
+      "sprite": {
+        "file": "gift-royal-eagle.png",
+        "frames": 9,
+        "duration": 0.8
+      },
+      "filter": "brightness(1)",
+      "order": 37
+    },
+    {
+      "id": "royal-elephant",
+      "name": "الفيل الملكي",
+      "sound": "elephant",
+      "animation": "stomp",
+      "tier": "mythic",
+      "file": "gift-royal-elephant.png",
+      "sprite": {
+        "file": "gift-royal-elephant.png",
+        "frames": 9,
+        "duration": 0.92
+      },
+      "filter": "brightness(1)",
+      "order": 38
+    },
+    {
+      "id": "golden-falcon",
+      "name": "الصقر الذهبي",
+      "sound": "eagle",
+      "animation": "bird",
+      "tier": "legendary",
+      "file": "gift-golden-falcon.png",
+      "sprite": {
+        "file": "gift-golden-falcon.png",
+        "frames": 9,
+        "duration": 0.76
+      },
+      "filter": "brightness(1)",
+      "order": 39
+    },
+    {
+      "id": "magic-lamp",
+      "name": "المصباح السحري",
+      "sound": "magic",
+      "animation": "orbit",
+      "tier": "mythic",
+      "file": "gift-magic-lamp.png",
+      "filter": "brightness(1)",
+      "order": 40
+    },
+    {
+      "id": "lucky-coin-100",
+      "name": "حظ برونزي",
+      "sound": "luxury",
+      "animation": "burst",
+      "tier": "basic",
+      "file": "lucky-coin-100.png",
+      "filter": "brightness(1)",
+      "order": 41
+    },
+    {
+      "id": "lucky-coin-500",
+      "name": "حظ فضي",
+      "sound": "luxury",
+      "animation": "burst",
+      "tier": "premium",
+      "file": "lucky-coin-500.png",
+      "filter": "brightness(1)",
+      "order": 42
+    },
+    {
+      "id": "lucky-coin-1000",
+      "name": "حظ ذهبي",
+      "sound": "luxury",
+      "animation": "burst",
+      "tier": "legendary",
+      "file": "lucky-coin-1000.png",
+      "filter": "brightness(1)",
+      "order": 43
+    }
+  ]
+}

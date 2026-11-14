@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Timer + broom style icon for auto room-chat clean. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- circle plate (matches other room-opera icons feel) -->
+    <path
+        android:fillColor="#33FFFFFF"
+        android:pathData="M24,4c11.05,0 20,8.95 20,20s-8.95,20 -20,20S4,35.05 4,24 12.95,4 24,4z" />
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M24,8c8.84,0 16,7.16 16,16s-7.16,16 -16,16S8,32.84 8,24 15.16,8 24,8z" />
+    <!-- clock face -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.2"
+        android:pathData="M24,14c5.52,0 10,4.48 10,10s-4.48,10 -10,10 -10,-4.48 -10,-10 4.48,-10 10,-10z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M23,17h2v8.2l5.4,3.1 -1,1.73 -6.4,-3.7z" />
+    <!-- sparkles = wipe -->
+    <path
+        android:fillColor="#FF80CBC4"
+        android:pathData="M34,12l1.2,2.6 2.6,1.2 -2.6,1.2 -1.2,2.6 -1.2,-2.6 -2.6,-1.2 2.6,-1.2z" />
+    <path
+        android:fillColor="#FF80CBC4"
+        android:pathData="M12,30l0.9,1.9 1.9,0.9 -1.9,0.9 -0.9,1.9 -0.9,-1.9 -1.9,-0.9 1.9,-0.9z" />
+</vector>

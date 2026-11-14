@@ -1,0 +1,661 @@
+package com.Dramizo.Series.util;
+
+import android.app.Activity;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.widget.ImageView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
+
+import com.Dramizo.Series.R;
+import com.Dramizo.Series.data.remote.dto.MiscDtos;
+import com.bumptech.glide.Glide;
+import com.google.gson.Gson;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
+
+import java.util.concurrent.CopyOnWriteArrayList;
+
+/**
+ * Applies APK-bundled visuals only. Dashboard remote theme is not used.
+ */
+public final class RemoteTheme {
+    private static volatile MiscDtos.ThemeDto cached;
+    private static final CopyOnWriteArrayList<Runnable> refreshListeners = new CopyOnWriteArrayList<>();
+
+    private RemoteTheme() {}
+
+    private static final String PREFS = "remote_theme";
+    private static final String KEY_JSON = "theme_json";
+    private static final Gson GSON = new Gson();
+
+    public static MiscDtos.ThemeDto getCached(Context context) {
+        MiscDtos.ThemeDto mem = cached;
+        if (mem != null) return mem;
+        MiscDtos.ThemeDto disk = readDisk(context);
+        if (disk != null) {
+            cached = disk;
+            return disk;
+        }
+        MiscDtos.ThemeDto defaults = MiscDtos.ThemeDto.defaults();
+        cached = defaults;
+        return defaults;
+    }
+
+    /** Registers a lightweight callback for screens that display dashboard-controlled theme assets. */
+    public static void addRefreshListener(@Nullable Runnable listener) {
+        if (listener != null) refreshListeners.addIfAbsent(listener);
+    }
+
+    public static void removeRefreshListener(@Nullable Runnable listener) {
+        if (listener != null) refreshListeners.remove(listener);
+    }
+
+    private static void notifyRefreshListeners() {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            for (Runnable listener : refreshListeners) {
+                try {
+                    listener.run();
+                } catch (Throwable ignored) {
+                }
+            }
+        });
+    }
+
+    /** Downloads the dashboard-controlled theme once per app start; failures keep the last cache. */
+    public static void refreshFromApi(Context context, com.Dramizo.Series.data.remote.api.ConfigApi api) {
+        if (context == null || api == null) return;
+        try {
+            com.Dramizo.Series.domain.model.Result<MiscDtos.ThemeDto> result =
+                    ApiCall.execute(api.theme());
+            if (!result.success || result.data == null) return;
+            cached = result.data;
+            writeDisk(context, result.data);
+            notifyRefreshListeners();
+        } catch (Throwable ignored) {
+            // Remote configuration must never prevent the app from opening.
+        }
+    }
+
+    private static void writeDisk(Context context, MiscDtos.ThemeDto theme) {
+        try {
+            Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+            if (storage == null || theme == null) return;
+            storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_JSON, GSON.toJson(theme))
+                    .apply();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Nullable
+    private static MiscDtos.ThemeDto readDisk(Context context) {
+        try {
+            Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+            if (storage == null) return null;
+            String json = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getString(KEY_JSON, "");
+            if (json == null || json.trim().isEmpty()) return null;
+            return GSON.fromJson(json, MiscDtos.ThemeDto.class);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    public static int getCachedVersion(Context context) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        return theme != null ? Math.max(0, theme.version) : 1;
+    }
+
+    public static int parseColor(@Nullable String hex, int fallback) {
+        if (hex == null || hex.trim().isEmpty()) return fallback;
+        try {
+            String v = hex.trim();
+            if (!v.startsWith("#")) v = "#" + v;
+            return Color.parseColor(v);
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    @Nullable
+    public static String assetUrl(Context context, String key) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        if (theme == null || theme.assets == null || key == null) return null;
+        String value = theme.assets.get(key);
+        return notEmpty(value) ? value : null;
+    }
+
+    /** Returns active server splash items sorted by dashboard order. */
+    public static java.util.List<MiscDtos.SplashItemDto> activeSplashItems(Context context) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        java.util.ArrayList<MiscDtos.SplashItemDto> out = new java.util.ArrayList<>();
+        if (theme == null || theme.splash == null || !theme.splash.enabled || theme.splash.items == null) return out;
+        for (MiscDtos.SplashItemDto item : theme.splash.items) {
+            if (item == null || !item.active || !notEmpty(item.url)) continue;
+            out.add(item);
+        }
+        java.util.Collections.sort(out, (x, y) -> Integer.compare(x.sortOrder, y.sortOrder));
+        return out;
+    }
+
+    /** Selects the next configured splash once per launcher process start. */
+    public static MiscDtos.SplashItemDto nextSplash(Context context) {
+        java.util.List<MiscDtos.SplashItemDto> items = activeSplashItems(context);
+        if (!items.isEmpty()) {
+            try {
+                Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+                if (storage == null) return items.get(0);
+                android.content.SharedPreferences prefs = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                int index = prefs.getInt("splash_index", 0);
+                int selected = Math.floorMod(index, items.size());
+                prefs.edit().putInt("splash_index", selected + 1).apply();
+                return items.get(selected);
+            } catch (Throwable ignored) {
+                return items.get(0);
+            }
+        }
+
+        // Older dashboard builds save a single uploaded splash in brand.splashUrl
+        // or backgrounds.splash instead of splash.items. Keep those uploads visible
+        // to the Android launcher without requiring the admin to upload them again.
+        MiscDtos.ThemeDto theme = getCached(context);
+        if (theme == null || theme.splash == null || !theme.splash.enabled) return null;
+        String legacyUrl = brandSplashUrl(context);
+        if (!notEmpty(legacyUrl)) legacyUrl = backgroundUrl(context, "splash");
+        if (!notEmpty(legacyUrl) && theme.assets != null) legacyUrl = theme.assets.get("splash");
+        if (!notEmpty(legacyUrl)) return null;
+
+        MiscDtos.SplashItemDto fallback = new MiscDtos.SplashItemDto();
+        fallback.id = "dashboard-splash";
+        fallback.url = AssetCatalog.absoluteUrl(legacyUrl.trim());
+        fallback.active = true;
+        fallback.durationSeconds = 5;
+        fallback.sortOrder = 0;
+        fallback.targetType = "home";
+        return fallback;
+    }
+
+    public static long splashDurationMs(@Nullable MiscDtos.SplashItemDto item) {
+        if (item == null) return 5000L;
+        int seconds = Math.max(1, Math.min(5, item.durationSeconds));
+        return seconds * 1000L;
+    }
+
+    /** Returns the dashboard-configured brand logo, when present. */
+    @Nullable
+    public static String brandLogoUrl(Context context) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        return theme != null && theme.brand != null && notEmpty(theme.brand.logoUrl)
+                ? theme.brand.logoUrl : null;
+    }
+
+    /** Returns the dashboard-configured brand splash, when present. */
+    @Nullable
+    public static String brandSplashUrl(Context context) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        return theme != null && theme.brand != null && notEmpty(theme.brand.splashUrl)
+                ? theme.brand.splashUrl : null;
+    }
+
+    /** Returns a dashboard-configured wallpaper, with the bundled layout as fallback. */
+    @Nullable
+    public static String backgroundUrl(Context context, String screenKey) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        if (theme == null) return null;
+        return backgroundField(theme.backgrounds, screenKey);
+    }
+
+    @Nullable
+    private static String backgroundField(MiscDtos.ThemeBackgrounds bg, String screenKey) {
+        if (bg == null || screenKey == null) return null;
+        // The shared dashboard wallpaper is authoritative for all four main tabs.
+        // Keep per-section values as backward-compatible fallback only.
+        if (("home".equals(screenKey) || "profile".equals(screenKey)
+                || "chat".equals(screenKey) || "games".equals(screenKey))
+                && notEmpty(bg.allSections)) return bg.allSections;
+        if ("home".equals(screenKey) && notEmpty(bg.home)) return bg.home;
+        if ("profile".equals(screenKey) && notEmpty(bg.profile)) return bg.profile;
+        if ("chat".equals(screenKey) && notEmpty(bg.chat)) return bg.chat;
+        if ("games".equals(screenKey) && notEmpty(bg.games)) return bg.games;
+        switch (screenKey) {
+            case "app": return bg.app;
+            case "auth": return bg.auth;
+            case "splash": return bg.splash;
+            case "home": return bg.home;
+            case "profile": return bg.profile;
+            case "chat": return bg.chat;
+            case "games": return bg.games;
+            case "createRoom": return bg.createRoom;
+            case "liveRoom": return bg.liveRoom;
+            case "voiceRoom": return bg.voiceRoom;
+            case "appNight": return bg.appNight;
+            case "homeHeader": return bg.homeHeader;
+            case "roomDefault": return bg.roomDefault;
+            default: return null;
+        }
+    }
+
+    @Nullable
+    public static String roomDefaultBackgroundUrl(Context context) {
+        return backgroundUrl(context, "voiceRoom");
+    }
+
+    @Nullable
+    public static String homeBackgroundUrl(Context context) {
+        return backgroundUrl(context, "home");
+    }
+
+    public static void applyActivityBackground(@Nullable Activity activity, String screenKey) {
+        if (activity == null) return;
+        View root = activity.getWindow() != null ? activity.getWindow().getDecorView() : null;
+        int fallback = fallbackForScreen(screenKey);
+        String url = backgroundUrl(activity, screenKey);
+        applyBackgroundTo(activity, root, url, fallback);
+        applySystemBarsFromBackground(activity, url, fallback, screenKey);
+        applyMappedAssets(root);
+    }
+
+    public static void applyActivityBackground(@Nullable View root, String screenKey) {
+        if (root == null) return;
+        Context ctx = root.getContext();
+        String url = backgroundUrl(ctx, screenKey);
+        applyBackgroundTo(null, root, url, fallbackForScreen(screenKey));
+        applyMappedAssets(root);
+    }
+
+    /** One clean white background for the whole app. */
+    private static int fallbackForScreen(String screenKey) {
+        return R.color.white;
+    }
+
+    /**
+     * Light theme: white status/nav bars with dark system icons.
+     */
+    private static void applySystemBarsFromBackground(
+            @NonNull Activity activity,
+            @Nullable String url,
+            int fallbackRes,
+            @Nullable String screenKey
+    ) {
+        Window window = activity.getWindow();
+        if (window == null) return;
+        final int white = activity.getResources().getColor(R.color.white, activity.getTheme());
+        window.setStatusBarColor(Color.TRANSPARENT);
+        if (wantsSolidBottomChrome(screenKey)) {
+            applyBottomChromeColor(activity, white);
+        } else {
+            window.setNavigationBarColor(white);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.setNavigationBarContrastEnforced(true);
+            }
+        }
+        WindowInsetsControllerCompat c =
+                WindowCompat.getInsetsController(window, window.getDecorView());
+        c.setAppearanceLightStatusBars(true);
+        c.setAppearanceLightNavigationBars(true);
+        if ("voiceRoom".equals(screenKey)) {
+            window.setNavigationBarColor(Color.TRANSPARENT);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.setNavigationBarContrastEnforced(false);
+            }
+            c.setAppearanceLightStatusBars(false);
+            c.setAppearanceLightNavigationBars(false);
+        }
+    }
+
+    /** Paints Android nav + main tab bar the same wallpaper-matched solid color. */
+    private static void applyBottomChromeColor(@NonNull Activity activity, int color) {
+        Window window = activity.getWindow();
+        if (window == null) return;
+        // Fully opaque — never let wallpaper bleed under system nav / tabs.
+        int solid = Color.argb(255, Color.red(color), Color.green(color), Color.blue(color));
+        window.setNavigationBarColor(solid);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.setNavigationBarContrastEnforced(false);
+        }
+        View bar = activity.findViewById(R.id.customBottomBar);
+        if (bar != null) {
+            bar.setBackgroundColor(solid);
+        }
+        WindowInsetsControllerCompat c =
+                WindowCompat.getInsetsController(window, window.getDecorView());
+        c.setAppearanceLightNavigationBars(isLight(solid));
+    }
+
+    /** Main shell tabs share one solid chrome with the Android navigation bar. */
+    private static boolean wantsSolidBottomChrome(@Nullable String screenKey) {
+        if (screenKey == null) return false;
+        switch (screenKey) {
+            case "home":
+            case "drama":
+            case "games":
+            case "chat":
+            case "profile":
+            case "createRoom":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static int sampleStripColor(@NonNull Bitmap bitmap, boolean top) {
+        int avg = sampleStripColorRaw(bitmap, top);
+        // A subtle darkening keeps white system icons readable while preserving the image hue.
+        return Color.rgb(
+                (int) Math.min(255, Color.red(avg) * 0.82),
+                (int) Math.min(255, Color.green(avg) * 0.82),
+                (int) Math.min(255, Color.blue(avg) * 0.82)
+        );
+    }
+
+    /** Exact average of the top/bottom image strip — used to match bottom chrome to wallpaper. */
+    private static int sampleStripColorRaw(@NonNull Bitmap bitmap, boolean top) {
+        int width = Math.max(1, bitmap.getWidth());
+        int height = Math.max(1, bitmap.getHeight());
+        int strip = Math.max(1, height / 9);
+        int startY = top ? 0 : Math.max(0, height - strip);
+        int stepX = Math.max(1, width / 24);
+        int stepY = Math.max(1, strip / 8);
+        long red = 0;
+        long green = 0;
+        long blue = 0;
+        long count = 0;
+        for (int y = startY; y < Math.min(height, startY + strip); y += stepY) {
+            for (int x = 0; x < width; x += stepX) {
+                int pixel = bitmap.getPixel(x, y);
+                if (Color.alpha(pixel) < 128) continue;
+                red += Color.red(pixel);
+                green += Color.green(pixel);
+                blue += Color.blue(pixel);
+                count++;
+            }
+        }
+        if (count == 0) return 0xFF0B1220; // deep navy brand fallback (not purple)
+        return Color.rgb((int) (red / count), (int) (green / count), (int) (blue / count));
+    }
+
+    private static void applySystemBarIconContrast(
+            @NonNull Window window,
+            int statusColor,
+            int navigationColor
+    ) {
+        View decor = window.getDecorView();
+        int flags = decor.getSystemUiVisibility();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (isLight(statusColor)) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            else flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (isLight(navigationColor)) flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            else flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        }
+        decor.setSystemUiVisibility(flags);
+    }
+
+    private static boolean isLight(int color) {
+        double luminance = (
+                0.2126 * Color.red(color)
+                        + 0.7152 * Color.green(color)
+                        + 0.0722 * Color.blue(color)
+        ) / 255.0;
+        return luminance > 0.62;
+    }
+
+    private static void applyBackgroundTo(
+            @Nullable Activity activity,
+            @Nullable View root,
+            @Nullable String url,
+            int fallbackRes
+    ) {
+        if (root == null) return;
+        ImageView target = findBackgroundImageView(root);
+        if (target != null) {
+            // Dashboard wallpaper ImageViews are intentionally GONE in XML until
+            // a URL is configured. Reveal the target before loadInto(), which
+            // deliberately skips GONE views to avoid waking unrelated placeholders.
+            if (notEmpty(url)) {
+                target.setVisibility(View.VISIBLE);
+                target.setAlpha(1f);
+                loadInto(target, url, fallbackRes);
+            }
+            return;
+        }
+
+        View bgTarget = root;
+        if (activity != null) {
+            View content = activity.findViewById(android.R.id.content);
+            if (content instanceof ViewGroup) {
+                ViewGroup group = (ViewGroup) content;
+                if (group.getChildCount() > 0) {
+                    bgTarget = group.getChildAt(0);
+                    ImageView nested = findBackgroundImageView(bgTarget);
+                    if (nested != null) {
+                        if (notEmpty(url)) loadInto(nested, url, fallbackRes);
+                        return;
+                    }
+                }
+            }
+        }
+
+        String resolved = AssetCatalog.absoluteUrl(url);
+        if (resolved == null || resolved.isEmpty()) {
+            try {
+                bgTarget.setBackgroundResource(fallbackRes);
+            } catch (Exception ignored) {
+            }
+            return;
+        }
+
+        final View finalTarget = bgTarget;
+        try {
+            Glide.with(finalTarget.getContext())
+                    .load(resolved)
+                    .placeholder(fallbackRes)
+                    .error(fallbackRes)
+                    .into(new CustomTarget<Drawable>() {
+                        @Override
+                        public void onResourceReady(
+                                @NonNull Drawable resource,
+                                @Nullable Transition<? super Drawable> transition
+                        ) {
+                            finalTarget.setBackground(resource);
+                        }
+
+                        @Override
+                        public void onLoadCleared(@Nullable Drawable placeholder) {
+                        }
+                    });
+        } catch (Exception e) {
+            try {
+                finalTarget.setBackgroundResource(fallbackRes);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    @Nullable
+    private static ImageView findBackgroundImageView(View root) {
+        if (root == null) return null;
+        Context ctx = root.getContext();
+        String[] ids = {"imgThemeBg", "imgHomeBg", "imgRoomBg", "imgCoverFallback"};
+        for (String idName : ids) {
+            int id = ctx.getResources().getIdentifier(idName, "id", ctx.getPackageName());
+            if (id != 0) {
+                View found = root.findViewById(id);
+                if (found instanceof ImageView) return (ImageView) found;
+            }
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View child = group.getChildAt(i);
+                if (child instanceof ImageView
+                        && child.getLayoutParams() != null
+                        && child.getLayoutParams().width == ViewGroup.LayoutParams.MATCH_PARENT
+                        && child.getLayoutParams().height == ViewGroup.LayoutParams.MATCH_PARENT) {
+                    return (ImageView) child;
+                }
+                ImageView nested = findBackgroundImageView(child);
+                if (nested != null) return nested;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Apply only explicitly configured server assets. Existing XML drawables remain
+     * the safe fallback when a dashboard asset is absent or fails to load.
+     */
+    public static void applyMappedAssets(@Nullable View root) {
+        if (root == null) return;
+        String logo = brandLogoUrl(root.getContext());
+        if (notEmpty(logo)) {
+            loadMappedUrl(root, "imgLogo", logo);
+            loadMappedUrl(root, "imgAppLogo", logo);
+            loadMappedUrl(root, "imgBrandLogo", logo);
+        }
+    }
+
+    private static void loadMappedUrl(View root, String idName, @Nullable String url) {
+        if (!notEmpty(url)) return;
+        Context context = root.getContext();
+        int id = context.getResources().getIdentifier(idName, "id", context.getPackageName());
+        if (id == 0) return;
+        View found = root.findViewById(id);
+        if (found instanceof ImageView) {
+            loadMappedUrl((ImageView) found, url);
+        }
+    }
+
+    private static void loadMappedUrl(ImageView view, String url) {
+        String resolved = AssetCatalog.absoluteUrl(url);
+        if (!notEmpty(resolved)) return;
+        Drawable fallback = view.getDrawable();
+        try {
+            Glide.with(view)
+                    .load(resolved)
+                    .placeholder(fallback)
+                    .error(fallback)
+                    .into(view);
+        } catch (Exception ignored) {
+            if (fallback != null) view.setImageDrawable(fallback);
+        }
+    }
+
+    private static void loadMappedAsset(ImageView view, String key) {
+        String url = assetUrl(view.getContext(), key);
+        String resolved = AssetCatalog.absoluteUrl(url);
+        if (!notEmpty(resolved)) return;
+        Drawable fallback = view.getDrawable();
+        try {
+            Glide.with(view)
+                    .load(resolved)
+                    .placeholder(fallback)
+                    .error(fallback)
+                    .into(view);
+        } catch (Exception ignored) {
+            if (fallback != null) view.setImageDrawable(fallback);
+        }
+    }
+
+    public static void applyChrome(Activity activity) {
+        // Wallpaper + system bars come from applyActivityBackground.
+        // Do not paint flat theme colors over brand backgrounds.
+    }
+
+    public static int primaryColor(Context context) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        int fallback = 0xFFFE2C55;
+        try {
+            fallback = context.getColor(R.color.gift_accent);
+        } catch (Exception ignored) {
+            try {
+                fallback = context.getColor(R.color.aurora_teal);
+            } catch (Exception ignored2) {
+            }
+        }
+        if (theme == null || theme.colors == null) return fallback;
+        int parsed = parseColor(theme.colors.primary, fallback);
+        // Dashboard sometimes stores surface/white as "primary" for light themes.
+        if (isWeakBrandFill(parsed)) return fallback;
+        return parsed;
+    }
+
+    private static boolean isWeakBrandFill(int color) {
+        int a = (color >>> 24) & 0xFF;
+        if (a < 180) return true;
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        double lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0;
+        if (lum >= 0.78) return true;
+        int max = Math.max(r, Math.max(g, b));
+        int min = Math.min(r, Math.min(g, b));
+        return (max - min) < 18 && lum > 0.55;
+    }
+
+    public static void loadInto(ImageView view, @Nullable String pathOrUrl, int fallbackRes) {
+        if (view == null) return;
+        // Never un-hide stubs that layouts mark GONE.
+        if (view.getVisibility() == View.GONE) return;
+        String resolved = AssetCatalog.absoluteUrl(pathOrUrl);
+        if (notEmpty(resolved)) {
+            Drawable keep = view.getDrawable();
+            try {
+                Glide.with(view.getContext())
+                        .load(resolved)
+                        .placeholder(keep)
+                        .error(fallbackRes != 0 ? fallbackRes : keep)
+                        .into(view);
+            } catch (Exception ignored) {
+                if (fallbackRes != 0) view.setImageResource(fallbackRes);
+            }
+            return;
+        }
+        // No remote URL — keep android:src from XML. Never wipe artwork with white.
+        if (view.getDrawable() == null && fallbackRes != 0) {
+            view.setImageResource(fallbackRes);
+        }
+    }
+
+    /**
+     * Load a named dashboard theme asset when configured; otherwise keep the
+     * existing XML drawable untouched.
+     */
+    public static void loadAsset(ImageView view, String key, int fallbackRes) {
+        if (view == null) return;
+        view.setVisibility(View.VISIBLE);
+        String url = assetUrl(view.getContext(), key);
+        if (notEmpty(url)) {
+            loadInto(view, url, fallbackRes);
+        } else if (view.getDrawable() == null && fallbackRes != 0) {
+            view.setImageResource(fallbackRes);
+        }
+    }
+
+    /** Same as loadAsset, but preserves the existing view visibility. */
+    public static void loadAssetOrGone(ImageView view, String key) {
+        if (view == null) return;
+        String url = assetUrl(view.getContext(), key);
+        if (notEmpty(url)) {
+            loadInto(view, url, 0);
+        }
+    }
+
+    private static boolean notEmpty(@Nullable String s) {
+        return s != null && !s.trim().isEmpty();
+    }
+}

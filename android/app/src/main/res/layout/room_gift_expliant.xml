@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout android:layout_gravity="end" android:id="@+id/lucky_gift_tips" android:focusable="true" android:visibility="gone" android:clickable="true" android:layout_width="214.0dip" android:layout_height="@dimen/dp_52" android:layout_marginBottom="-10.0dip" android:layoutDirection="locale" android:elevation="12.0dip"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@+id/iv_lucky_gift_label" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="fill_parent" android:src="@drawable/icon_gift_dialog_lucky_gift" android:scaleType="fitXY" android:contentDescription="@null" />
+</androidx.constraintlayout.widget.ConstraintLayout>

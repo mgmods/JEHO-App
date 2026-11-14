@@ -1,0 +1,1 @@
+Fresh CI trigger after correcting AdminConsoleActivity to use explicit ApiResponse.getData() and isSuccess() accessors. Verify workflow checks out the MG-JEHO branch HEAD (expected source commit e3abaf7246ab1ccde6afed2bc522ffd19fe073d6), then compileReleaseKotlin and package the signed APK.

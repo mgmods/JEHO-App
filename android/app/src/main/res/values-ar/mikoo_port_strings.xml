@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="all">الكل</string>
+    <string name="detail">التفاصيل</string>
+    <string name="first_charge">شحن أول</string>
+    <string name="gift_cp_level">مستوى CP</string>
+    <string name="gift_gold_init">0</string>
+    <string name="gift_no_cp">لا يوجد CP</string>
+    <string name="gift_number_1">1</string>
+    <string name="gift_number_10">7</string>
+    <string name="gift_number_38">17</string>
+    <string name="gift_number_66">177</string>
+    <string name="gift_number_188">777</string>
+    <string name="level_less_than_sth" formatted="false">LV.%s التقدم: %s</string>
+    <string name="reward">مكافأة</string>
+    <string name="room_my_join">انضمام</string>
+    <string name="send">ارسال</string>
+    <string name="send_to_all">إرسال للكل</string>
+    <string name="welcome">ترحيب</string>
+</resources>

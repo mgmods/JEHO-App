@@ -1,0 +1,104 @@
+
+goldlizi.png
+size: 516,1079
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+0
+  rotate: false
+  xy: 2, 799
+  size: 270, 278
+  orig: 270, 278
+  offset: 0, 0
+  index: -1
+16
+  rotate: true
+  xy: 173, 215
+  size: 188, 164
+  orig: 188, 164
+  offset: 0, 0
+  index: -1
+lizi/lizi_000
+  rotate: false
+  xy: 2, 2
+  size: 170, 190
+  orig: 170, 203
+  offset: 0, 6
+  index: -1
+lizi/lizi_001
+  rotate: false
+  xy: 174, 18
+  size: 155, 195
+  orig: 170, 203
+  offset: 8, 4
+  index: -1
+lizi/lizi_002
+  rotate: false
+  xy: 339, 131
+  size: 153, 187
+  orig: 170, 203
+  offset: 8, 14
+  index: -1
+lizi/lizi_003
+  rotate: false
+  xy: 173, 405
+  size: 169, 187
+  orig: 170, 203
+  offset: 1, 13
+  index: -1
+lizi/lizi_004
+  rotate: false
+  xy: 2, 594
+  size: 170, 203
+  orig: 170, 203
+  offset: 0, 0
+  index: -1
+lizi/lizi_005
+  rotate: false
+  xy: 274, 874
+  size: 170, 203
+  orig: 170, 203
+  offset: 0, 0
+  index: -1
+lizi/lizi_006
+  rotate: false
+  xy: 174, 600
+  size: 168, 197
+  orig: 170, 203
+  offset: 0, 4
+  index: -1
+lizi/lizi_007
+  rotate: false
+  xy: 2, 394
+  size: 169, 198
+  orig: 170, 203
+  offset: 0, 3
+  index: -1
+lizi/lizi_008
+  rotate: false
+  xy: 2, 194
+  size: 169, 198
+  orig: 170, 203
+  offset: 0, 3
+  index: -1
+lizi/lizi_009
+  rotate: false
+  xy: 344, 676
+  size: 170, 196
+  orig: 170, 203
+  offset: 0, 2
+  index: -1
+lizi/lizi_010
+  rotate: false
+  xy: 344, 499
+  size: 170, 175
+  orig: 170, 203
+  offset: 0, 14
+  index: -1
+lizi/lizi_011
+  rotate: false
+  xy: 344, 320
+  size: 170, 177
+  orig: 170, 203
+  offset: 0, 13
+  index: -1

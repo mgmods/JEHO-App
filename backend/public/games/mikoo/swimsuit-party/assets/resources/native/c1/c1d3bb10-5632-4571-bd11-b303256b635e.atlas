@@ -1,0 +1,27 @@
+
+yezi_01.png
+size: 196,148
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+guan
+  rotate: true
+  xy: 0, 0
+  size: 146, 134
+  orig: 146, 134
+  offset: 0, 0
+  index: -1
+hua
+  rotate: true
+  xy: 136, 70
+  size: 76, 57
+  orig: 76, 57
+  offset: 0, 0
+  index: -1
+xiguan
+  rotate: false
+  xy: 136, 4
+  size: 60, 64
+  orig: 60, 64
+  offset: 0, 0
+  index: -1

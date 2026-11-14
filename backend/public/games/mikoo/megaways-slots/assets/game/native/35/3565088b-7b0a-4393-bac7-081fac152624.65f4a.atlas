@@ -1,0 +1,160 @@
+
+leishen.png
+size: 862,808
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+11_000
+  rotate: false
+  xy: 652, 41
+  size: 125, 44
+  orig: 137, 63
+  offset: 8, 11
+  index: -1
+11_001
+  rotate: false
+  xy: 434, 11
+  size: 122, 39
+  orig: 137, 63
+  offset: 10, 4
+  index: -1
+11_002
+  rotate: false
+  xy: 652, 87
+  size: 123, 52
+  orig: 137, 63
+  offset: 10, 2
+  index: -1
+11_003
+  rotate: false
+  xy: 304, 7
+  size: 128, 48
+  orig: 137, 63
+  offset: 7, 0
+  index: -1
+11_004
+  rotate: true
+  xy: 779, 10
+  size: 129, 41
+  orig: 137, 63
+  offset: 7, 0
+  index: -1
+1_001
+  rotate: false
+  xy: 2, 506
+  size: 200, 300
+  orig: 200, 300
+  offset: 0, 0
+  index: -1
+1_002
+  rotate: false
+  xy: 608, 447
+  size: 100, 150
+  orig: 100, 150
+  offset: 0, 0
+  index: -1
+1_003
+  rotate: false
+  xy: 2, 204
+  size: 200, 300
+  orig: 200, 300
+  offset: 0, 0
+  index: -1
+1_004
+  rotate: true
+  xy: 710, 497
+  size: 100, 150
+  orig: 100, 150
+  offset: 0, 0
+  index: -1
+1_005
+  rotate: false
+  xy: 204, 506
+  size: 200, 300
+  orig: 200, 300
+  offset: 0, 0
+  index: -1
+1_006
+  rotate: true
+  xy: 710, 395
+  size: 100, 150
+  orig: 100, 150
+  offset: 0, 0
+  index: -1
+1_007
+  rotate: false
+  xy: 608, 295
+  size: 100, 150
+  orig: 100, 150
+  offset: 0, 0
+  index: -1
+1_008
+  rotate: false
+  xy: 204, 204
+  size: 200, 300
+  orig: 200, 300
+  offset: 0, 0
+  index: -1
+1_009
+  rotate: true
+  xy: 710, 293
+  size: 100, 150
+  orig: 100, 150
+  offset: 0, 0
+  index: -1
+1_010
+  rotate: false
+  xy: 550, 52
+  size: 100, 150
+  orig: 100, 150
+  offset: 0, 0
+  index: -1
+1_011
+  rotate: false
+  xy: 652, 141
+  size: 100, 150
+  orig: 100, 150
+  offset: 0, 0
+  index: -1
+1_012
+  rotate: true
+  xy: 2, 2
+  size: 200, 300
+  orig: 200, 300
+  offset: 0, 0
+  index: -1
+1_013
+  rotate: false
+  xy: 406, 506
+  size: 200, 300
+  orig: 200, 300
+  offset: 0, 0
+  index: -1
+1_014
+  rotate: false
+  xy: 406, 204
+  size: 200, 300
+  orig: 200, 300
+  offset: 0, 0
+  index: -1
+1_015
+  rotate: false
+  xy: 754, 141
+  size: 100, 150
+  orig: 100, 150
+  offset: 0, 0
+  index: -1
+人物
+  rotate: false
+  xy: 608, 599
+  size: 250, 207
+  orig: 250, 210
+  offset: 0, 0
+  index: -1
+黄色闪电
+  rotate: false
+  xy: 304, 57
+  size: 244, 145
+  orig: 244, 145
+  offset: 0, 0
+  index: -1

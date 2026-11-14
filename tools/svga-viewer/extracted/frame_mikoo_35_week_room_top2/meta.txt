@@ -1,0 +1,4 @@
+file: frame_mikoo_35_week_room_top2.svga
+version: 2.1.0
+params: {'w': 300.0, 'h': 300.0, 'fps': 12, 'frames': 48}
+decompressed_bytes: 2223032

@@ -1,0 +1,90 @@
+
+chuxian2.png
+size: 626,136
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+kuang2
+  rotate: false
+  xy: 2, 84
+  size: 249, 50
+  orig: 258, 50
+  offset: 0, 0
+  index: -1
+win2
+  rotate: false
+  xy: 510, 86
+  size: 114, 48
+  orig: 114, 48
+  offset: 0, 0
+  index: -1
+光_000
+  rotate: true
+  xy: 2, 2
+  size: 13, 61
+  orig: 299, 85
+  offset: 13, 12
+  index: -1
+光_001
+  rotate: false
+  xy: 521, 19
+  size: 54, 65
+  orig: 299, 85
+  offset: 13, 10
+  index: -1
+光_002
+  rotate: false
+  xy: 413, 69
+  size: 95, 65
+  orig: 299, 85
+  offset: 13, 10
+  index: -1
+光_003
+  rotate: false
+  xy: 162, 2
+  size: 136, 65
+  orig: 299, 85
+  offset: 13, 10
+  index: -1
+光_004
+  rotate: false
+  xy: 2, 17
+  size: 158, 65
+  orig: 299, 85
+  offset: 32, 10
+  index: -1
+光_005
+  rotate: false
+  xy: 2, 17
+  size: 158, 65
+  orig: 299, 85
+  offset: 73, 10
+  index: -1
+光_006
+  rotate: false
+  xy: 253, 69
+  size: 158, 65
+  orig: 299, 85
+  offset: 114, 10
+  index: -1
+光_007
+  rotate: false
+  xy: 300, 2
+  size: 129, 65
+  orig: 299, 85
+  offset: 155, 10
+  index: -1
+光_008
+  rotate: false
+  xy: 431, 2
+  size: 88, 65
+  orig: 299, 85
+  offset: 196, 10
+  index: -1
+光_009
+  rotate: false
+  xy: 577, 19
+  size: 47, 65
+  orig: 299, 85
+  offset: 237, 10
+  index: -1

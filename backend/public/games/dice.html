@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>لعبة النرد - Dice Game</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(180deg, #0a0e27 0%, #1a1f4d 50%, #0d1235 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            color: white;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .chip.busy, .number-btn.busy { opacity: 0.5; pointer-events: none; }
+
+        .game-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        /* Room WebView embed: compact full UI — no clipping */
+        html.embed, html.embed body {
+            height: 100% !important;
+            max-height: 100% !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            display: flex !important;
+            align-items: stretch !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: linear-gradient(180deg, #0a0e27 0%, #1a1f4d 50%, #0d1235 100%) !important;
+        }
+        html.embed .game-container {
+            transform-origin: top center;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 4px 6px !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            box-sizing: border-box !important;
+        }
+        html.embed .top-bar { display: none !important; }
+        html.embed .header-banner { padding: 4px 6px !important; margin-bottom: 4px !important; }
+        html.embed .header-banner h1 { font-size: 15px !important; }
+        html.embed .today-win-box { padding: 4px !important; margin-bottom: 4px !important; }
+        html.embed .today-win-value { font-size: 16px !important; }
+        html.embed .dice-container { gap: 18px !important; margin: 6px 0 !important; }
+        html.embed .dice-wrapper, html.embed .dice-face { width: 64px !important; height: 64px !important; }
+        html.embed .face-front, html.embed .face-back,
+        html.embed .face-right, html.embed .face-left,
+        html.embed .face-top, html.embed .face-bottom { transform: none; }
+        html.embed .face-front  { transform: translateZ(32px); }
+        html.embed .face-back   { transform: rotateY(180deg) translateZ(32px); }
+        html.embed .face-right  { transform: rotateY(90deg) translateZ(32px); }
+        html.embed .face-left   { transform: rotateY(-90deg) translateZ(32px); }
+        html.embed .face-top    { transform: rotateX(90deg) translateZ(32px); }
+        html.embed .face-bottom { transform: rotateX(-90deg) translateZ(32px); }
+        html.embed .dice-face .dot { width: 10px !important; height: 10px !important; }
+        html.embed .dice-total { margin: 4px 0 !important; }
+        html.embed .dice-total-value { font-size: 22px !important; }
+        html.embed .number-selection { padding: 6px !important; margin-bottom: 6px !important; }
+        html.embed .chip { width: 44px !important; height: 44px !important; }
+        html.embed .spin-btn, html.embed .roll-btn { min-height: 36px !important; font-size: 13px !important; padding: 6px !important; }
+
+        .top-bar {
+            background: linear-gradient(90deg, #1a1f3a, #2a2f5a);
+            padding: 10px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 2px solid rgba(255,215,0,0.3);
+        }
+
+        .top-icons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            width: 38px;
+            height: 38px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            color: white;
+            transition: all 0.3s;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255,215,0,0.3);
+            border-color: #ffd700;
+        }
+
+        .balance-box {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #1a1f3a;
+            padding: 8px 18px;
+            border-radius: 25px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            box-shadow: 0 4px 15px rgba(255,215,0,0.4);
+        }
+
+        .header-banner {
+            background: linear-gradient(90deg, #2d8a4e, #1a4d2e);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            text-align: center;
+            border: 2px solid #4ade80;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .header-banner h1 {
+            color: #fff;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .today-win-box {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            padding: 12px;
+            margin-bottom: 15px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(255,215,0,0.3);
+        }
+
+        .today-win-label {
+            font-size: 16px;
+            color: #ffd700;
+            margin-bottom: 5px;
+        }
+
+        .today-win-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .balance-info {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+
+        .info-box {
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid rgba(255,215,0,0.4);
+            flex: 1;
+        }
+
+        .info-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        /* Dice Table */
+        .dice-table {
+            background: linear-gradient(135deg, #1a4d2e, #0d2818);
+            border-radius: 20px;
+            padding: 30px 20px;
+            margin-bottom: 20px;
+            border: 4px solid #ffd700;
+            box-shadow: 0 0 40px rgba(255,215,0,0.3), inset 0 0 30px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dice-table::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(255,255,255,0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255,255,255,0.05) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .dice-container {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            margin: 30px 0;
+            perspective: 1000px;
+            -webkit-perspective: 1000px;
+        }
+
+        .dice-wrapper {
+            width: 100px;
+            height: 100px;
+            position: relative;
+            transform-style: preserve-3d;
+            -webkit-transform-style: preserve-3d;
+            /* JS-only motion — CSS transition fights WebView (same lucky-wheel fix). */
+            transition: none;
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .dice-wrapper.rolling {
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.45));
+        }
+
+        .dice-face {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #ffffff, #f0f0f0);
+            border: 3px solid #333;
+            border-radius: 15px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            padding: 12px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.1);
+        }
+
+        .dice-face .dot {
+            width: 18px;
+            height: 18px;
+            background: radial-gradient(circle, #1a1a1a, #333);
+            border-radius: 50%;
+            justify-self: center;
+            align-self: center;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .face-front  { transform: translateZ(50px); }
+        .face-back   { transform: rotateY(180deg) translateZ(50px); }
+        .face-right  { transform: rotateY(90deg) translateZ(50px); }
+        .face-left   { transform: rotateY(-90deg) translateZ(50px); }
+        .face-top    { transform: rotateX(90deg) translateZ(50px); }
+        .face-bottom { transform: rotateX(-90deg) translateZ(50px); }
+
+        .dice-total {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .dice-total-label {
+            font-size: 16px;
+            color: #ffd700;
+            margin-bottom: 8px;
+        }
+
+        .dice-total-value {
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 20px #ffd700;
+        }
+
+        /* Number Selection */
+        .number-selection {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 0 20px rgba(255,215,0,0.3);
+        }
+
+        .selection-label {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .numbers-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+        }
+
+        .number-btn {
+            padding: 12px 5px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .number-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(255,215,0,0.5);
+        }
+
+        .number-btn.selected {
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            color: #1a1f3a;
+            box-shadow: 0 0 20px rgba(255,215,0,0.8);
+            transform: scale(1.1);
+        }
+
+        .number-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .number-odds {
+            font-size: 10px;
+            display: block;
+            margin-top: 3px;
+            opacity: 0.9;
+        }
+
+        /* Bet Chips */
+        .bet-section {
+            margin-bottom: 15px;
+        }
+
+        .bet-label {
+            text-align: center;
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .chips-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            border: 4px dashed rgba(255,255,255,0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .chip::before {
+            content: '';
+            position: absolute;
+            width: 75%;
+            height: 75%;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
+        }
+
+        .chip:hover:not(:disabled) {
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+        }
+
+        .chip.selected {
+            box-shadow: 0 0 0 4px #fff, 0 0 25px rgba(255,255,255,0.9);
+            transform: scale(1.15);
+        }
+
+        .chip:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .chip-100 { background: radial-gradient(circle, #f472b6, #db2777, #be185d); }
+        .chip-1k { background: radial-gradient(circle, #4ade80, #22c55e, #16a34a); }
+        .chip-10k { background: radial-gradient(circle, #60a5fa, #3b82f6, #2563eb); }
+        .chip-50k { background: radial-gradient(circle, #fb923c, #f97316, #ea580c); }
+        .chip-100k { background: radial-gradient(circle, #a78bfa, #8b5cf6, #7c3aed); }
+
+        .chip-value {
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            z-index: 1;
+        }
+
+        .roll-btn {
+            width: 100%;
+            padding: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            color: #1a1f3a;
+            box-shadow: 0 8px 25px rgba(255,215,0,0.5);
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .roll-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(255,215,0,0.7);
+        }
+
+        .roll-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .message {
+            text-align: center;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 12px;
+            background: rgba(0,0,0,0.5);
+            font-size: 18px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .win {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            animation: pulse 0.5s infinite;
+            border-color: #4ade80;
+        }
+
+        .lose {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            border-color: #f87171;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .history-section {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 2px solid rgba(255,215,0,0.4);
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 15px;
+        }
+
+        .history-label {
+            text-align: center;
+            font-size: 14px;
+            color: #ffd700;
+            margin-bottom: 8px;
+        }
+
+        .history-dice {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .history-item {
+            background: rgba(255,255,255,0.1);
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            border: 1px solid rgba(255,215,0,0.3);
+        }
+
+        .history-item.win {
+            background: rgba(34,197,94,0.3);
+            border-color: #22c55e;
+        }
+
+        .history-item.lose {
+            background: rgba(239,68,68,0.3);
+            border-color: #ef4444;
+        }
+
+        @media (max-width: 600px) {
+            .dice-container {
+                gap: 40px;
+            }
+            .dice-wrapper {
+                width: 80px;
+                height: 80px;
+            }
+            .dice-face {
+                width: 80px;
+                height: 80px;
+                padding: 10px;
+            }
+            .dice-face .dot {
+                width: 14px;
+                height: 14px;
+            }
+            .face-front  { transform: translateZ(40px); }
+            .face-back   { transform: rotateY(180deg) translateZ(40px); }
+            .face-right  { transform: rotateY(90deg) translateZ(40px); }
+            .face-left   { transform: rotateY(-90deg) translateZ(40px); }
+            .face-top    { transform: rotateX(90deg) translateZ(40px); }
+            .face-bottom { transform: rotateX(-90deg) translateZ(40px); }
+            .numbers-grid {
+                grid-template-columns: repeat(6, 1fr);
+                gap: 5px;
+            }
+            .number-btn {
+                padding: 10px 3px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="top-bar">
+            <div class="top-icons">
+                <div class="icon-btn" id="btnClose" onclick="closeGame()"><i class="fas fa-times"></i></div>
+                <div class="icon-btn" id="btnHelp" onclick="showHelp()"><i class="fas fa-question"></i></div>
+                <div class="icon-btn" id="btnSound" onclick="toggleSound()"><i class="fas fa-volume-up"></i></div>
+                <div class="icon-btn"><i class="fas fa-clock"></i></div>
+            </div>
+            <div class="balance-box">
+                <i class="fas fa-coins"></i>
+                <span id="topBalance">...</span>
+            </div>
+        </div>
+
+        <div class="header-banner">
+            <h1><i class="fas fa-dice"></i> لعبة النرد <i class="fas fa-dice"></i></h1>
+        </div>
+
+        <div class="today-win-box">
+            <div class="today-win-label">فوز اليوم</div>
+            <div class="today-win-value" id="todayWin">0</div>
+        </div>
+
+        <div class="balance-info">
+            <div class="info-box">
+                <div class="info-label">رصيد الفضية</div>
+                <div class="info-value" id="balanceDisplay">...</div>
+            </div>
+            <div class="info-box">
+                <div class="info-label">الرهان</div>
+                <div class="info-value" id="currentBet">0</div>
+            </div>
+            <div class="info-box">
+                <div class="info-label">الرقم المختار</div>
+                <div class="info-value" id="selectedNumber">-</div>
+            </div>
+        </div>
+
+        <div class="dice-table">
+            <div class="dice-container">
+                <div class="dice-wrapper" id="dice1">
+                    <div class="dice-face face-front" id="dice1-front"></div>
+                    <div class="dice-face face-back" id="dice1-back"></div>
+                    <div class="dice-face face-right" id="dice1-right"></div>
+                    <div class="dice-face face-left" id="dice1-left"></div>
+                    <div class="dice-face face-top" id="dice1-top"></div>
+                    <div class="dice-face face-bottom" id="dice1-bottom"></div>
+                </div>
+                <div class="dice-wrapper" id="dice2">
+                    <div class="dice-face face-front" id="dice2-front"></div>
+                    <div class="dice-face face-back" id="dice2-back"></div>
+                    <div class="dice-face face-right" id="dice2-right"></div>
+                    <div class="dice-face face-left" id="dice2-left"></div>
+                    <div class="dice-face face-top" id="dice2-top"></div>
+                    <div class="dice-face face-bottom" id="dice2-bottom"></div>
+                </div>
+            </div>
+            <div class="dice-total">
+                <div class="dice-total-label">مجموع النرد</div>
+                <div class="dice-total-value" id="diceTotal">-</div>
+            </div>
+        </div>
+
+        <div class="number-selection">
+            <div class="selection-label"><i class="fas fa-bullseye"></i> اختر رقمك (2-12)</div>
+            <div class="numbers-grid" id="numbersGrid"></div>
+        </div>
+
+        <div class="message" id="message">اختر رقمًا وقيمة الرهان ثم اضغط رمي النرد!</div>
+
+        <div class="bet-section">
+            <div class="bet-label">اختر قيمة الرهان:</div>
+            <div class="chips-row">
+                <button class="chip chip-100" onclick="selectBet(100)" id="chip100">
+                    <span class="chip-value">100</span>
+                </button>
+                <button class="chip chip-1k" onclick="selectBet(1000)" id="chip1k">
+                    <span class="chip-value">1K</span>
+                </button>
+                <button class="chip chip-10k" onclick="selectBet(10000)" id="chip10k">
+                    <span class="chip-value">10K</span>
+                </button>
+                <button class="chip chip-50k" onclick="selectBet(50000)" id="chip50k">
+                    <span class="chip-value">50K</span>
+                </button>
+                <button class="chip chip-100k" onclick="selectBet(100000)" id="chip100k">
+                    <span class="chip-value">100K</span>
+                </button>
+            </div>
+        </div>
+
+        <button class="roll-btn" id="rollBtn" onclick="rollDice()" disabled>
+            <i class="fas fa-dice"></i> رمي النرد <i class="fas fa-dice"></i>
+        </button>
+
+        <div class="history-section">
+            <div class="history-label"><i class="fas fa-history"></i> السجل الأخير</div>
+            <div class="history-dice" id="historyDice"></div>
+        </div>
+    </div>
+
+    <script>
+        var q = new URLSearchParams(location.search);
+        if (q.get('embed') === '1') document.documentElement.classList.add('embed');
+        var token = q.get('token') || localStorage.getItem('accessToken') || '';
+        if (!token && window.AuraBridge && typeof AuraBridge.getAccessToken === 'function') {
+            try { token = AuraBridge.getAccessToken() || ''; } catch (_) {}
+        }
+        var roomId = q.get('roomId') || '';
+        var apiBase = (q.get('apiBase') || '').replace(/\/$/, '');
+        if (!apiBase) {
+            if (location.protocol === 'http:' || location.protocol === 'https:') apiBase = location.origin;
+            else apiBase = 'https://api.adnova.bbs.tr';
+        }
+        var origin = apiBase.replace(/\/api\/v1\/?$/, '');
+        var apiRoot = origin + '/api/v1';
+        var ASSET = (location.protocol === 'file:')
+            ? 'dice/'
+            : (origin + '/games/dice/');
+
+        var balance = 0;
+        var balanceReady = false;
+        var currentBetAmount = 0;
+        var selectedNum = null;
+        var isRolling = false;
+        var todayWinTotal = 0;
+        var rollHistory = [];
+        var soundOn = true;
+        var audioOk = false;
+        var maxBet = 20000;
+        var oddsMap = { 2:8, 3:6, 4:5, 5:4, 6:3, 7:2, 8:3, 9:4, 10:5, 11:6, 12:8 };
+
+        var faceDots = {
+            1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9]
+        };
+        var diceLayout = { front: 1, back: 6, right: 3, left: 4, top: 2, bottom: 5 };
+        var showNumberRotation = {
+            1: { x: 0, y: 0 }, 2: { x: -90, y: 0 }, 3: { x: 0, y: -90 },
+            4: { x: 0, y: 90 }, 5: { x: 90, y: 0 }, 6: { x: 0, y: 180 }
+        };
+
+        var sfx = {};
+        function ensureSfx() {
+            if (sfx.click) return;
+            ['click', 'spin', 'win', 'lose'].forEach(function (n) {
+                try {
+                    var a = new Audio(ASSET + 'sfx-' + n + '.wav');
+                    a.preload = 'auto';
+                    a.volume = 0.6;
+                    sfx[n] = a;
+                } catch (e) {}
+            });
+        }
+        function unlockAudio() {
+            if (audioOk) return;
+            audioOk = true;
+            ensureSfx();
+            try {
+                if (sfx.click) {
+                    var p = sfx.click.play();
+                    if (p && p.then) p.then(function () { sfx.click.pause(); sfx.click.currentTime = 0; }).catch(function () {});
+                }
+            } catch (e) {}
+        }
+        function play(name) {
+            if (!soundOn) return;
+            ensureSfx();
+            try {
+                var a = sfx[name];
+                if (!a) return;
+                a.currentTime = 0;
+                a.play().catch(function () {});
+            } catch (e) {}
+        }
+
+        function api(path, options) {
+            options = options || {};
+            return fetch(apiRoot + path, {
+                method: options.method || 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                },
+                body: options.body || undefined
+            }).then(function (res) {
+                return res.json().catch(function () { return {}; }).then(function (body) {
+                    var data = (body && body.data !== undefined) ? body.data : body;
+                    if (!res.ok) {
+                        var msg = Array.isArray(body.message) ? body.message.join(', ') : (body.message || body.error || ('HTTP ' + res.status));
+                        throw new Error(msg);
+                    }
+                    return data;
+                });
+            });
+        }
+
+        function createDotFace(number) {
+            var face = document.createElement('div');
+            face.className = 'dice-face';
+            var dots = faceDots[number];
+            for (var i = 1; i <= 9; i++) {
+                var cell = document.createElement('div');
+                if (dots.indexOf(i) >= 0) cell.className = 'dot';
+                face.appendChild(cell);
+            }
+            return face;
+        }
+
+        function getOdds(num) {
+            return oddsMap[num] || 2;
+        }
+
+        function initDice() {
+            var faces = ['front', 'back', 'right', 'left', 'top', 'bottom'];
+            faces.forEach(function (face) {
+                var num = diceLayout[face];
+                var dice1Face = document.getElementById('dice1-' + face);
+                var dice2Face = document.getElementById('dice2-' + face);
+                dice1Face.innerHTML = '';
+                dice2Face.innerHTML = '';
+                var dots1 = createDotFace(num);
+                var dots2 = createDotFace(num);
+                while (dots1.firstChild) dice1Face.appendChild(dots1.firstChild);
+                while (dots2.firstChild) dice2Face.appendChild(dots2.firstChild);
+            });
+
+            var grid = document.getElementById('numbersGrid');
+            grid.innerHTML = '';
+            for (var i = 2; i <= 12; i++) {
+                var btn = document.createElement('button');
+                btn.className = 'number-btn';
+                btn.type = 'button';
+                var odds = getOdds(i);
+                btn.innerHTML = i + '<span class="number-odds">x' + odds + '</span>';
+                btn.onclick = (function (n) { return function () { selectNumber(n); }; })(i);
+                btn.id = 'num' + i;
+                grid.appendChild(btn);
+            }
+        }
+
+        function setBusy(busy) {
+            document.querySelectorAll('.chip, .number-btn').forEach(function (el) {
+                if (busy) el.classList.add('busy');
+                else {
+                    el.classList.remove('busy');
+                    el.removeAttribute('disabled');
+                }
+            });
+        }
+
+        function selectNumber(num) {
+            unlockAudio();
+            if (isRolling) return;
+            play('click');
+            selectedNum = num;
+            document.getElementById('selectedNumber').textContent = num;
+            document.querySelectorAll('.number-btn').forEach(function (btn) { btn.classList.remove('selected'); });
+            var el = document.getElementById('num' + num);
+            if (el) el.classList.add('selected');
+            checkReady();
+        }
+
+        function selectBet(amount) {
+            unlockAudio();
+            if (isRolling) return;
+            play('click');
+            if (!token) {
+                showMessage('<i class="fas fa-times-circle"></i> سجّل الدخول للعب', 'lose');
+                return;
+            }
+            if (!balanceReady) {
+                showMessage('<i class="fas fa-spinner fa-spin"></i> جاري تحميل الرصيد...');
+                loadBalance();
+                return;
+            }
+            if (amount > maxBet) amount = maxBet;
+            if (amount > balance) {
+                showMessage('<i class="fas fa-times-circle"></i> رصيد الفضية غير كافي! <button type="button" onclick="openWallet()" style="margin:0 6px;padding:4px 10px;border:0;border-radius:10px;background:#ffd700;color:#1a1f3a;font-weight:700;">شراء فضية</button>', 'lose');
+                return;
+            }
+            currentBetAmount = amount;
+            document.getElementById('currentBet').textContent = formatNumber(currentBetAmount);
+            document.querySelectorAll('.chip').forEach(function (chip) { chip.classList.remove('selected'); });
+            var chipId = 'chip100';
+            if (amount === 1000) chipId = 'chip1k';
+            else if (amount === 10000) chipId = 'chip10k';
+            else if (amount === 50000) chipId = 'chip50k';
+            else if (amount === 100000) chipId = 'chip100k';
+            var el = document.getElementById(chipId);
+            if (el) el.classList.add('selected');
+            checkReady();
+        }
+
+        function checkReady() {
+            document.getElementById('rollBtn').disabled = !(selectedNum && currentBetAmount > 0 && !isRolling);
+        }
+
+        function applyDiceRot(el, x, y, z) {
+            if (!el) return;
+            z = z || 0;
+            var v = 'rotateX(' + x + 'deg) rotateY(' + y + 'deg) rotateZ(' + z + 'deg)';
+            el.style.webkitTransform = v;
+            el.style.transform = v;
+        }
+
+        function easeOutCubic(t) {
+            return 1 - Math.pow(1 - t, 3);
+        }
+
+        function rollDice() {
+            unlockAudio();
+            if (isRolling || !selectedNum || currentBetAmount === 0) return;
+            if (!token) {
+                showMessage('<i class="fas fa-times-circle"></i> سجّل الدخول للعب', 'lose');
+                return;
+            }
+            if (!balanceReady || currentBetAmount > balance) {
+                showMessage('<i class="fas fa-times-circle"></i> رصيد الفضية غير كافي!', 'lose');
+                return;
+            }
+
+            isRolling = true;
+            document.getElementById('rollBtn').disabled = true;
+            setBusy(true);
+            play('spin');
+            showMessage('<i class="fas fa-spinner fa-spin"></i> جاري رمي النرد...');
+
+            var body = { amount: currentBetAmount, number: selectedNum };
+            if (roomId) body.roomId = roomId;
+
+            var dice1 = document.getElementById('dice1');
+            var dice2 = document.getElementById('dice2');
+
+            // Same pattern as lucky-wheel: wait for server result, then animate with rAF only.
+            api('/games/dice/roll', { method: 'POST', body: JSON.stringify(body) })
+                .then(function (payload) {
+                    var d1 = Number(payload.d1 || 1);
+                    var d2 = Number(payload.d2 || 1);
+                    var total = Number(payload.total || (d1 + d2));
+                    var final1 = showNumberRotation[d1] || showNumberRotation[1];
+                    var final2 = showNumberRotation[d2] || showNumberRotation[1];
+
+                    var spins = 5 + Math.floor(Math.random() * 3);
+                    var start1x = 0, start1y = 0;
+                    var start2x = 15, start2y = -20;
+                    var end1x = final1.x + spins * 360;
+                    var end1y = final1.y + (spins - 1) * 360;
+                    var end2x = final2.x + (spins + 1) * 360;
+                    var end2y = final2.y + spins * 360;
+
+                    dice1.classList.add('rolling');
+                    dice2.classList.add('rolling');
+                    applyDiceRot(dice1, start1x, start1y, 0);
+                    applyDiceRot(dice2, start2x, start2y, 0);
+                    if (dice1) void dice1.offsetWidth;
+                    if (dice2) void dice2.offsetWidth;
+
+                    var duration = 3200;
+                    var t0 = Date.now();
+                    function tick() {
+                        var p = Math.min(1, (Date.now() - t0) / duration);
+                        var e = easeOutCubic(p);
+                        applyDiceRot(dice1, start1x + (end1x - start1x) * e, start1y + (end1y - start1y) * e, 0);
+                        applyDiceRot(dice2, start2x + (end2x - start2x) * e, start2y + (end2y - start2y) * e, 0);
+                        if (p < 1) requestAnimationFrame(tick);
+                    }
+                    requestAnimationFrame(tick);
+
+                    setTimeout(function () {
+                        try {
+                            applyDiceRot(dice1, final1.x, final1.y, 0);
+                            applyDiceRot(dice2, final2.x, final2.y, 0);
+                            dice1.classList.remove('rolling');
+                            dice2.classList.remove('rolling');
+                            document.getElementById('diceTotal').textContent = total;
+
+                            balance = Number(payload.balance || 0);
+                            balanceReady = true;
+                            todayWinTotal = Number(payload.todayWins || todayWinTotal);
+                            updateBalance();
+                            document.getElementById('todayWin').textContent = formatNumber(todayWinTotal);
+                            addToHistory(d1, d2, total, !!payload.won);
+
+                            if (payload.won && payload.payout > 0) {
+                                play('win');
+                                showMessage('<i class="fas fa-trophy"></i> مبروك! ربحت ' + formatNumber(payload.payout) + '! (x' + (payload.multiplier || getOdds(selectedNum)) + ')', 'win');
+                            } else {
+                                play('lose');
+                                showMessage('<i class="fas fa-sad-tear"></i> ظهر ' + total + ' - حظ أوفر!', 'lose');
+                            }
+                        } catch (err) {
+                            showMessage('<i class="fas fa-times-circle"></i> ' + ((err && err.message) || 'خطأ'), 'lose');
+                        } finally {
+                            finishRound();
+                            setTimeout(function () {
+                                if (!isRolling && currentBetAmount === 0) {
+                                    showMessage('اختر رقمًا وقيمة الرهان ثم اضغط رمي النرد!');
+                                }
+                            }, 2200);
+                        }
+                    }, duration + 80);
+                })
+                .catch(function (e) {
+                    if (dice1) dice1.classList.remove('rolling');
+                    if (dice2) dice2.classList.remove('rolling');
+                    finishRound();
+                    showMessage('<i class="fas fa-times-circle"></i> ' + ((e && e.message) || 'خطأ'), 'lose');
+                    // Don't call loadBalance here — it overwrote the error with the default prompt.
+                });
+        }
+
+        function finishRound() {
+            isRolling = false;
+            currentBetAmount = 0;
+            document.getElementById('currentBet').textContent = '0';
+            setBusy(false);
+            document.querySelectorAll('.chip').forEach(function (chip) { chip.classList.remove('selected'); });
+            document.getElementById('rollBtn').disabled = true;
+        }
+
+        function addToHistory(d1, d2, total, isWin) {
+            rollHistory.unshift({ d1: d1, d2: d2, total: total, isWin: isWin });
+            if (rollHistory.length > 10) rollHistory.pop();
+            var container = document.getElementById('historyDice');
+            container.innerHTML = '';
+            rollHistory.forEach(function (h) {
+                var item = document.createElement('div');
+                item.className = 'history-item ' + (h.isWin ? 'win' : 'lose');
+                item.innerHTML = '<i class="fas fa-dice"></i> ' + h.d1 + '+' + h.d2 + '=' + h.total;
+                container.appendChild(item);
+            });
+        }
+
+        function showMessage(text, type) {
+            var msgEl = document.getElementById('message');
+            msgEl.innerHTML = text;
+            msgEl.className = 'message';
+            if (type === 'win') msgEl.classList.add('win');
+            else if (type === 'lose') msgEl.classList.add('lose');
+        }
+
+        function updateBalance() {
+            document.getElementById('balanceDisplay').textContent = formatNumber(balance);
+            document.getElementById('topBalance').textContent = formatNumber(balance);
+        }
+
+        function formatNumber(num) {
+            return Math.floor(Number(num) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        function loadBalance() {
+            if (!token) {
+                document.getElementById('balanceDisplay').textContent = '0';
+                document.getElementById('topBalance').textContent = '0';
+                showMessage('<i class="fas fa-times-circle"></i> سجّل الدخول للعب', 'lose');
+                return;
+            }
+            showMessage('<i class="fas fa-spinner fa-spin"></i> جاري تحميل الرصيد...');
+            api('/games/dice').then(function (data) {
+                balance = Number(data.balance || 0);
+                balanceReady = true;
+                todayWinTotal = Number(data.todayWins || 0);
+                if (data.config) {
+                    if (data.config.maxBet) maxBet = Number(data.config.maxBet);
+                    if (data.config.odds) oddsMap = data.config.odds;
+                }
+                updateBalance();
+                document.getElementById('todayWin').textContent = formatNumber(todayWinTotal);
+                var chip100k = document.getElementById('chip100k');
+                if (chip100k && maxBet < 100000) chip100k.style.display = 'none';
+                var chip50k = document.getElementById('chip50k');
+                if (chip50k && maxBet < 50000) chip50k.style.display = 'none';
+                // refresh odds labels
+                for (var i = 2; i <= 12; i++) {
+                    var b = document.getElementById('num' + i);
+                    if (b) b.innerHTML = i + '<span class="number-odds">x' + getOdds(i) + '</span>';
+                }
+                if (!isRolling) {
+                    showMessage('اختر رقمًا وقيمة الرهان ثم اضغط رمي النرد!');
+                }
+            }).catch(function (e) {
+                balanceReady = false;
+                if (!isRolling) {
+                    showMessage('<i class="fas fa-times-circle"></i> ' + ((e && e.message) || 'تعذر تحميل الرصيد'), 'lose');
+                }
+            });
+        }
+
+        function closeGame() {
+            try { if (window.AuraBridge && AuraBridge.closeGame) AuraBridge.closeGame(); } catch (e) {}
+        }
+        function showHelp() {
+            alert('اختر رقمًا من 2 إلى 12 ثم شريحة رهان واضغط رمي. النتيجة من السيرفر ونسبة الفوز منخفضة.');
+        }
+        function toggleSound() {
+            soundOn = !soundOn;
+            unlockAudio();
+            var b = document.getElementById('btnSound');
+            if (b) b.innerHTML = soundOn ? '<i class="fas fa-volume-up"></i>' : '<i class="fas fa-volume-mute"></i>';
+        }
+        function openWallet() {
+            try { if (window.AuraBridge && AuraBridge.openWallet) AuraBridge.openWallet(); } catch (e) {}
+        }
+
+        document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+        document.addEventListener('click', unlockAudio, { once: true });
+
+        window.selectBet = selectBet;
+        window.selectNumber = selectNumber;
+        window.rollDice = rollDice;
+        window.closeGame = closeGame;
+        window.showHelp = showHelp;
+        window.toggleSound = toggleSound;
+        window.openWallet = openWallet;
+
+        window.onload = function () {
+            initDice();
+            loadBalance();
+        };
+    </script>
+</body>
+</html>

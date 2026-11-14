@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stubs for media3-ui drawable aliases that can go missing with a corrupt Gradle transform cache. -->
+<resources>
+    <drawable name="exo_icon_fastforward">@android:drawable/ic_media_ff</drawable>
+    <drawable name="exo_icon_rewind">@android:drawable/ic_media_rew</drawable>
+    <drawable name="exo_icon_play">@android:drawable/ic_media_play</drawable>
+    <drawable name="exo_icon_pause">@android:drawable/ic_media_pause</drawable>
+    <drawable name="exo_icon_next">@android:drawable/ic_media_next</drawable>
+    <drawable name="exo_icon_previous">@android:drawable/ic_media_previous</drawable>
+    <drawable name="exo_icon_fullscreen_enter">@android:drawable/ic_menu_crop</drawable>
+    <drawable name="exo_icon_fullscreen_exit">@android:drawable/ic_menu_close_clear_cancel</drawable>
+    <drawable name="exo_icon_repeat_all">@android:drawable/ic_menu_rotate</drawable>
+    <drawable name="exo_icon_repeat_off">@android:drawable/ic_menu_rotate</drawable>
+    <drawable name="exo_icon_repeat_one">@android:drawable/ic_menu_rotate</drawable>
+    <drawable name="exo_icon_shuffle_off">@android:drawable/ic_menu_sort_by_size</drawable>
+    <drawable name="exo_icon_shuffle_on">@android:drawable/ic_menu_sort_by_size</drawable>
+    <drawable name="exo_icon_vr">@android:drawable/ic_menu_view</drawable>
+</resources>

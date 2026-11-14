@@ -1,0 +1,520 @@
+package com.Dramizo.Series.util;
+
+import com.Dramizo.Series.util.ImagePlaceholder;
+
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
+import android.os.Build;
+import android.service.notification.StatusBarNotification;
+import android.widget.RemoteViews;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.TaskStackBuilder;
+import androidx.core.content.ContextCompat;
+
+import com.Dramizo.Series.R;
+import com.Dramizo.Series.presentation.chat.ChatConversationActivity;
+import com.Dramizo.Series.presentation.main.MainActivity;
+import com.Dramizo.Series.presentation.notifications.OfficialNewsActivity;
+import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
+import com.Dramizo.Series.service.VoiceRoomForegroundService;
+import com.bumptech.glide.Glide;
+
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public final class AuraNotificationHelper {
+    public static final String CHANNEL_MESSAGES = "jeho_messages_v4";
+    private static final String GROUP_MESSAGES = "jeho_direct_messages";
+    private static final int GROUP_SUMMARY_ID = 0x4A45484F;
+    private static final ExecutorService IO = Executors.newSingleThreadExecutor();
+
+    private AuraNotificationHelper() {}
+
+    public static void show(
+            @NonNull Context context,
+            @NonNull String channelId,
+            @NonNull String title,
+            @NonNull String body,
+            @NonNull String type,
+            @NonNull Intent tapIntent,
+            int notificationId
+    ) {
+        show(context, channelId, title, body, type, tapIntent, notificationId, null);
+    }
+
+    public static void show(
+            @NonNull Context context,
+            @NonNull String channelId,
+            @NonNull String title,
+            @NonNull String body,
+            @NonNull String type,
+            @NonNull Intent tapIntent,
+            int notificationId,
+            @Nullable String avatarUrl
+    ) {
+        Context app = context.getApplicationContext();
+        String safeTitle = title != null && !title.isEmpty() ? title : app.getString(R.string.app_name);
+        String safeBody = body != null ? body : "";
+        String safeType = type != null ? type : "system";
+        String url = AssetCatalog.absoluteUrl(avatarUrl);
+        boolean directChat = ("chat".equalsIgnoreCase(safeType) || "message".equalsIgnoreCase(safeType))
+                && isChatIntent(tapIntent);
+        if (directChat) rememberChatMessage(app, notificationId, safeTitle, safeBody);
+
+        // Show immediately with placeholder, then refresh when avatar loads (Redmi-safe).
+        post(app, channelId, safeTitle, safeBody, safeType, tapIntent, notificationId, null);
+
+        if (url == null || url.isEmpty()) return;
+        IO.execute(() -> {
+            Bitmap avatar = loadCircleAvatar(app, url);
+            if (avatar != null) {
+                post(app, channelId, safeTitle, safeBody, safeType, tapIntent, notificationId, avatar);
+            }
+        });
+    }
+
+    private static void post(
+            @NonNull Context context,
+            @NonNull String channelId,
+            @NonNull String title,
+            @NonNull String body,
+            @NonNull String type,
+            @NonNull Intent tapIntent,
+            int notificationId,
+            @Nullable Bitmap avatar
+    ) {
+        Intent launch = new Intent(tapIntent);
+        // Keep CLEAR_TOP/SINGLE_TOP on the destination; root is Main via TaskStackBuilder.
+        launch.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
+        Intent home = new Intent(context, MainActivity.class);
+        home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        if (isChatIntent(launch)) {
+            home.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
+        } else if (isOfficialNewsIntent(launch)) {
+            home.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
+        } else {
+            home.putExtra(MainActivity.EXTRA_OPEN_HOME, true);
+        }
+
+        PendingIntent pi;
+        if (launch.getComponent() != null
+                && MainActivity.class.getName().equals(launch.getComponent().getClassName())) {
+            pi = PendingIntent.getActivity(
+                    context,
+                    notificationId,
+                    launch,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        } else if (isChatIntent(launch) && isVoiceRoomAlive(context)) {
+            // Do NOT CLEAR_TOP Main — that would destroy VoiceRoom and kick the user out.
+            Intent chat = new Intent(launch);
+            chat.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            pi = PendingIntent.getActivity(
+                    context,
+                    notificationId,
+                    chat,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        } else {
+            // Main → target so Back returns to the app instead of exiting.
+            pi = TaskStackBuilder.create(context)
+                    .addNextIntent(home)
+                    .addNextIntent(launch)
+                    .getPendingIntent(
+                            notificationId,
+                            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        }
+
+        int fallbackIcon = iconForType(type);
+        int underlay = ContextCompat.getColor(context, R.color.notification_avatar_fill);
+        // Always circular — peer avatar when loaded, else circular brand/fallback.
+        Bitmap contentBitmap = avatar != null
+                ? avatar
+                : bitmapFromDrawable(context, fallbackIcon, underlay);
+        if (contentBitmap == null && "chat".equalsIgnoreCase(type)) {
+            contentBitmap = circularLauncherIcon(context);
+        }
+
+        boolean isChat = ("chat".equalsIgnoreCase(type) || "message".equalsIgnoreCase(type))
+                && isChatIntent(launch);
+        // One style for all alerts: compact horizontal, circular avatar on the LEFT.
+        int compactLayout = R.layout.notification_auralive_compact;
+        int expandedLayout = isChat
+                ? R.layout.notification_chat_expanded
+                : R.layout.notification_auralive_expanded;
+
+        RemoteViews compact = new RemoteViews(context.getPackageName(), compactLayout);
+        compact.setTextViewText(R.id.tvNotificationTitle, title);
+        compact.setTextViewText(R.id.tvNotificationBody, body);
+        if (contentBitmap != null) {
+            compact.setImageViewBitmap(R.id.imgNotificationContent, contentBitmap);
+        } else {
+            compact.setImageViewResource(R.id.imgNotificationContent, fallbackIcon);
+        }
+
+        RemoteViews expanded = new RemoteViews(context.getPackageName(), expandedLayout);
+        expanded.setTextViewText(R.id.tvNotificationTitle, title);
+        expanded.setTextViewText(R.id.tvNotificationBody, body);
+        if (contentBitmap != null) {
+            expanded.setImageViewBitmap(R.id.imgNotificationContent, contentBitmap);
+        } else {
+            expanded.setImageViewResource(R.id.imgNotificationContent, fallbackIcon);
+        }
+        if (isChat) {
+            expanded.setViewVisibility(R.id.rowNotifChatActions, android.view.View.VISIBLE);
+            expanded.setViewVisibility(R.id.tvNotificationAction, android.view.View.GONE);
+            // "مقروء" opens this exact thread; loading its messages clears unreadCount
+            // and emits the normal read receipt on the backend.
+            expanded.setTextViewText(R.id.btnNotifRead, "مقروء");
+            expanded.setOnClickPendingIntent(R.id.btnNotifRead, pi);
+
+            // Native Android RemoteInput below provides the inline reply control.
+            // RemoteViews buttons cannot summon the inline keyboard; retain the
+            // read button here and expose reply as a real system notification action.
+            expanded.setViewVisibility(R.id.btnNotifReply, android.view.View.GONE);
+        } else {
+            expanded.setViewVisibility(R.id.rowNotifChatActions, android.view.View.GONE);
+            expanded.setViewVisibility(R.id.tvNotificationAction, android.view.View.VISIBLE);
+            expanded.setTextViewText(R.id.tvNotificationAction, actionLabelForType(type));
+        }
+
+        // Custom RemoteViews only: one avatar inside the layout.
+        // No setLargeIcon / no DecoratedCustomViewStyle — those duplicate the photo / app icon.
+        // Chat heads-up includes the two requested actions; other alerts use the compact card.
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(R.drawable.ic_stat_jeho)
+                .setColor(ContextCompat.getColor(context, R.color.aurora_teal))
+                .setContentTitle(title)
+                .setContentText(body)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(isChat
+                        ? NotificationCompat.CATEGORY_MESSAGE
+                        : NotificationCompat.CATEGORY_STATUS)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(!isChat)
+                .setContentIntent(pi);
+
+        if (isChat) {
+            // Let Android render the expanded MessagingStyle and native action row.
+            // A custom RemoteViews big view suppresses/obscures RemoteInput on some ROMs.
+            builder.setCustomContentView(compact)
+                    .setCustomHeadsUpContentView(compact)
+                    .setStyle(buildChatMessagingStyle(context, notificationId, title, avatar));
+            androidx.core.app.RemoteInput remoteInput = new androidx.core.app.RemoteInput.Builder(
+                    NotificationQuickReplyReceiver.EXTRA_REPLY)
+                    .setLabel("اكتب ردك…")
+                    .build();
+            Intent replyIntent = new Intent(context, NotificationQuickReplyReceiver.class);
+            replyIntent.putExtra(NotificationQuickReplyReceiver.EXTRA_CONVERSATION_ID,
+                    launch.getStringExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID));
+            replyIntent.putExtra(NotificationQuickReplyReceiver.EXTRA_NOTIFICATION_ID, notificationId);
+            PendingIntent replyPendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    notificationId ^ 0x51A7,
+                    replyIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+            NotificationCompat.Action replyAction = new NotificationCompat.Action.Builder(
+                    R.drawable.ic_stat_jeho, "رد", replyPendingIntent)
+                    .addRemoteInput(remoteInput)
+                    .setAllowGeneratedReplies(true)
+                    .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+                    .build();
+            builder.addAction(replyAction);
+            // Mark as read in the background; do not open the app or the conversation.
+            Intent readIntent = new Intent(context, NotificationQuickReplyReceiver.class);
+            readIntent.setAction(NotificationQuickReplyReceiver.ACTION_MARK_READ);
+            readIntent.putExtra(NotificationQuickReplyReceiver.EXTRA_CONVERSATION_ID,
+                    launch.getStringExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID));
+            readIntent.putExtra(NotificationQuickReplyReceiver.EXTRA_NOTIFICATION_ID, notificationId);
+            PendingIntent readPendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    notificationId ^ 0x51A8,
+                    readIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.addAction(new NotificationCompat.Action.Builder(
+                    R.drawable.ic_stat_jeho, "مقروء", readPendingIntent).build());
+        } else {
+            builder.setCustomContentView(compact)
+                    .setCustomBigContentView(expanded)
+                    .setCustomHeadsUpContentView(compact);
+        }
+
+        if (isChat) {
+            // Keep one updatable notification per conversation and let Android group
+            // separate conversations together, like mainstream messaging apps.
+            builder.setGroup(GROUP_MESSAGES)
+                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN);
+            Intent dismissed = new Intent(context, NotificationDismissReceiver.class);
+            dismissed.setAction(NotificationDismissReceiver.ACTION_DISMISS);
+            dismissed.putExtra(NotificationDismissReceiver.EXTRA_NOTIFICATION_ID, notificationId);
+            PendingIntent deletePi = PendingIntent.getBroadcast(
+                    context, notificationId + 20_000, dismissed,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.setDeleteIntent(deletePi);
+        }
+
+        try {
+            if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return;
+            NotificationManagerCompat manager = NotificationManagerCompat.from(context);
+            manager.notify(notificationId, builder.build());
+            if (isChat) refreshMessageGroupSummary(context);
+        } catch (SecurityException ignored) {
+            // POST_NOTIFICATIONS denied on Android 13+.
+        }
+    }
+
+    /** Keep a quiet summary for multiple active DM conversations; each conversation
+     * retains its own notification and can be opened independently. */
+    public static void refreshMessageGroupSummary(@NonNull Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        NotificationManagerCompat manager = NotificationManagerCompat.from(context);
+        try {
+            java.util.List<StatusBarNotification> active = manager.getActiveNotifications();
+            java.util.ArrayList<CharSequence> lines = new java.util.ArrayList<>();
+            for (StatusBarNotification status : active) {
+                android.app.Notification notification = status.getNotification();
+                if (!GROUP_MESSAGES.equals(notification.getGroup())
+                        || (notification.flags & android.app.Notification.FLAG_GROUP_SUMMARY) != 0) continue;
+                android.os.Bundle extras = notification.extras;
+                CharSequence title = extras != null ? extras.getCharSequence(android.app.Notification.EXTRA_TITLE) : null;
+                CharSequence body = extras != null ? extras.getCharSequence(android.app.Notification.EXTRA_TEXT) : null;
+                if (title != null || body != null) {
+                    lines.add((title == null ? "رسالة جديدة" : title) + ": " + (body == null ? "" : body));
+                }
+            }
+            if (lines.size() < 2) {
+                manager.cancel(GROUP_SUMMARY_ID);
+                return;
+            }
+            Intent openMessages = new Intent(context, MainActivity.class);
+            openMessages.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            openMessages.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
+            PendingIntent content = PendingIntent.getActivity(
+                    context, GROUP_SUMMARY_ID, openMessages,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle()
+                    .setBigContentTitle("رسائل JEHO")
+                    .setSummaryText("محادثات لديها رسائل جديدة");
+            int start = Math.max(0, lines.size() - 5);
+            for (int i = start; i < lines.size(); i++) inbox.addLine(lines.get(i));
+            NotificationCompat.Builder summary = new NotificationCompat.Builder(context, CHANNEL_MESSAGES)
+                    .setSmallIcon(R.drawable.ic_stat_jeho)
+                    .setColor(ContextCompat.getColor(context, R.color.aurora_teal))
+                    .setContentTitle("رسائل JEHO")
+                    .setContentText("رسائل جديدة من " + lines.size() + " محادثات")
+                    .setNumber(lines.size())
+                    .setStyle(inbox)
+                    .setGroup(GROUP_MESSAGES)
+                    .setGroupSummary(true)
+                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
+                    .setSilent(true)
+                    .setOnlyAlertOnce(true)
+                    .setAutoCancel(true)
+                    .setContentIntent(content);
+            manager.notify(GROUP_SUMMARY_ID, summary.build());
+        } catch (SecurityException ignored) {
+            // Notification permission may be revoked while the app is running.
+        }
+    }
+
+    public static void clearChatMessageHistory(Context context, int notificationId) {
+        context.getSharedPreferences("jeho_dm_notification_history", Context.MODE_PRIVATE)
+                .edit().remove("conversation_" + notificationId).apply();
+    }
+
+    private static void rememberChatMessage(Context context, int notificationId,
+                                             String sender, String body) {
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences(
+                    "jeho_dm_notification_history", Context.MODE_PRIVATE);
+            String key = "conversation_" + notificationId;
+            org.json.JSONArray messages = new org.json.JSONArray(prefs.getString(key, "[]"));
+            org.json.JSONObject item = new org.json.JSONObject();
+            item.put("sender", sender);
+            item.put("body", body);
+            item.put("time", System.currentTimeMillis());
+            messages.put(item);
+            org.json.JSONArray trimmed = new org.json.JSONArray();
+            int start = Math.max(0, messages.length() - 10);
+            for (int i = start; i < messages.length(); i++) trimmed.put(messages.getJSONObject(i));
+            prefs.edit().putString(key, trimmed.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static NotificationCompat.MessagingStyle buildChatMessagingStyle(
+            Context context, int notificationId, String senderName, @Nullable Bitmap avatar) {
+        androidx.core.app.Person.Builder personBuilder = new androidx.core.app.Person.Builder()
+                .setName(senderName);
+        if (avatar != null) {
+            personBuilder.setIcon(androidx.core.graphics.drawable.IconCompat.createWithBitmap(avatar));
+        }
+        androidx.core.app.Person sender = personBuilder.build();
+        NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(
+                new androidx.core.app.Person.Builder().setName("أنت").build())
+                .setConversationTitle(senderName)
+                .setGroupConversation(false);
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences(
+                    "jeho_dm_notification_history", Context.MODE_PRIVATE);
+            org.json.JSONArray messages = new org.json.JSONArray(
+                    prefs.getString("conversation_" + notificationId, "[]"));
+            for (int i = 0; i < messages.length(); i++) {
+                org.json.JSONObject item = messages.getJSONObject(i);
+                style.addMessage(item.optString("body"), item.optLong("time"), sender);
+            }
+        } catch (Exception ignored) {
+        }
+        return style;
+    }
+
+    @Nullable
+    private static Bitmap loadCircleAvatar(@NonNull Context context, @NonNull String url) {
+        try {
+            Bitmap raw = Glide.with(context)
+                    .asBitmap()
+                    .load(url)
+                    .submit(128, 128)
+                    .get();
+            int underlay = ContextCompat.getColor(context, R.color.notification_avatar_fill);
+            return toCircle(raw, underlay);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    /** Circular app logo for RemoteViews (engagement / room fallback). */
+    @Nullable
+    public static Bitmap circularLauncherIcon(@NonNull Context context) {
+        int underlay = ContextCompat.getColor(context, R.color.notification_avatar_fill);
+        return bitmapFromDrawable(context, R.mipmap.ic_launcher, underlay);
+    }
+
+    @Nullable
+    private static Bitmap bitmapFromDrawable(@NonNull Context context, int resId, int underlayColor) {
+        try {
+            android.graphics.drawable.Drawable d = ContextCompat.getDrawable(context, resId);
+            if (d == null) return null;
+            int w = Math.max(1, d.getIntrinsicWidth());
+            int h = Math.max(1, d.getIntrinsicHeight());
+            Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bmp);
+            d.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+            d.draw(canvas);
+            return toCircle(bmp, underlayColor);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Circular avatar without transparent pixels.
+     * RemoteViews / MIUI often paint transparent corners as solid black.
+     */
+    @Nullable
+    private static Bitmap toCircle(@Nullable Bitmap src, int underlayColor) {
+        if (src == null) return null;
+        int size = Math.min(src.getWidth(), src.getHeight());
+        Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setFilterBitmap(true);
+        paint.setColor(underlayColor != 0 ? underlayColor : Color.WHITE);
+        canvas.drawRect(0, 0, size, size, paint);
+
+        Bitmap masked = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas maskCanvas = new Canvas(masked);
+        Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        maskPaint.setFilterBitmap(true);
+        maskCanvas.drawCircle(size / 2f, size / 2f, size / 2f, maskPaint);
+        maskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        Rect srcRect = new Rect(
+                (src.getWidth() - size) / 2,
+                (src.getHeight() - size) / 2,
+                (src.getWidth() + size) / 2,
+                (src.getHeight() + size) / 2
+        );
+        Rect dst = new Rect(0, 0, size, size);
+        maskCanvas.drawBitmap(src, srcRect, dst, maskPaint);
+
+        canvas.drawBitmap(masked, 0, 0, null);
+        masked.recycle();
+        return output;
+    }
+
+    private static boolean isChatIntent(Intent launch) {
+        return launch.getComponent() != null
+                && ChatConversationActivity.class.getName().equals(launch.getComponent().getClassName());
+    }
+
+    private static boolean isVoiceRoomAlive(Context context) {
+        if (VoiceRoomActivity.isRoomUiVisible()) return true;
+        String active = VoiceRoomForegroundService.activeRoomId(context);
+        return active != null && !active.isEmpty();
+    }
+
+    private static boolean isOfficialNewsIntent(Intent launch) {
+        return launch.getComponent() != null
+                && OfficialNewsActivity.class.getName().equals(launch.getComponent().getClassName());
+    }
+
+    private static int iconForType(String type) {
+        if (type == null) return ImagePlaceholder.brandLogo();
+        switch (type.toLowerCase(Locale.US)) {
+            case "gift":
+                return ImagePlaceholder.gift();
+            case "chat":
+            case "message":
+            case "follow":
+            case "friend":
+            case "relation":
+                // Prefer peer avatar when URL exists; brand mark as fallback (not a chat bubble).
+                return ImagePlaceholder.brandLogo();
+            case "system":
+            case "agency":
+            case "wallet":
+            case "vip":
+            case "withdraw":
+                return ImagePlaceholder.brandLogo();
+            default:
+                return ImagePlaceholder.brandLogo();
+        }
+    }
+
+    private static String actionLabelForType(String type) {
+        if (type == null) return "فتح";
+        switch (type.toLowerCase(Locale.US)) {
+            case "gift":
+                return "عرض الهدية";
+            case "chat":
+            case "message":
+                return "فتح المحادثة";
+            case "live":
+            case "stream":
+                return "دخول البث";
+            case "follow":
+            case "friend":
+            case "relation":
+                return "عرض الملف";
+            default:
+                return "فتح";
+        }
+    }
+}

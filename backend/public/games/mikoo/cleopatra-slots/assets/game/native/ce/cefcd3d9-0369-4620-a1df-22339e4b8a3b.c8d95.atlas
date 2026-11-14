@@ -1,0 +1,76 @@
+
+wild.png
+size: 253,533
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+111/111_000
+  rotate: false
+  xy: 131, 218
+  size: 113, 92
+  orig: 130, 150
+  offset: 11, 20
+  index: -1
+111/111_001
+  rotate: false
+  xy: 121, 124
+  size: 113, 92
+  orig: 130, 150
+  offset: 11, 21
+  index: -1
+111/111_002
+  rotate: true
+  xy: 103, 2
+  size: 113, 94
+  orig: 130, 150
+  offset: 11, 21
+  index: -1
+111/111_003
+  rotate: true
+  xy: 2, 2
+  size: 113, 99
+  orig: 130, 150
+  offset: 11, 21
+  index: -1
+111/111_004
+  rotate: false
+  xy: 132, 312
+  size: 115, 106
+  orig: 130, 150
+  offset: 9, 21
+  index: -1
+111/111_005
+  rotate: false
+  xy: 2, 117
+  size: 117, 110
+  orig: 130, 150
+  offset: 7, 21
+  index: -1
+155C6D30-0C0A-42E6-A1F5-E3CC3835C187
+  rotate: false
+  xy: 2, 229
+  size: 127, 149
+  orig: 129, 151
+  offset: 1, 1
+  index: -1
+2
+  rotate: false
+  xy: 2, 380
+  size: 128, 151
+  orig: 129, 151
+  offset: 0, 0
+  index: -1
+wild22.jpg
+  rotate: false
+  xy: 132, 420
+  size: 119, 111
+  orig: 130, 155
+  offset: 6, 23
+  index: -1
+wlid
+  rotate: true
+  xy: 199, 31
+  size: 91, 45
+  orig: 93, 47
+  offset: 1, 1
+  index: -1

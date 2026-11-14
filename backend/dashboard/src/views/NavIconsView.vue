@@ -1,0 +1,431 @@
+<template>
+  <div>
+    <PageHeader :title="t('navIcons.title')" :subtitle="t('navIcons.subtitle')">
+      <template #actions>
+        <button class="btn btn-outline-light btn-sm me-2" type="button" :disabled="saving" @click="clearAll">
+          {{ t('navIcons.clear') }}
+        </button>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="save">
+          {{ saving ? t('app.saving') : t('navIcons.save') }}
+        </button>
+      </template>
+    </PageHeader>
+
+    <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
+    <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
+
+    <p class="text-secondary small mb-3">{{ t('navIcons.hint') }}</p>
+
+    <LoadingSpinner v-if="loading" />
+    <div v-else class="nav-icons-grid">
+      <article v-for="tab in tabs" :key="tab.key" class="glass p-3 nav-icon-card">
+        <h3 class="h6 mb-2">{{ tab.label }}</h3>
+        <div class="d-flex gap-3 flex-wrap">
+          <div class="icon-slot">
+            <div class="icon-preview">
+              <img v-if="form[tab.key].normal" :src="absUrl(form[tab.key].normal)" alt="" />
+              <span v-else class="text-muted small">—</span>
+            </div>
+            <label class="form-label small mb-1">{{ t('navIcons.normal') }}</label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+              class="form-control form-control-sm"
+              @change="(e) => onFile(e, tab.key, 'normal')"
+            />
+            <button
+              v-if="form[tab.key].normal"
+              class="btn btn-link btn-sm text-danger px-0"
+              type="button"
+              @click="form[tab.key].normal = ''"
+            >
+              {{ t('navIcons.remove') }}
+            </button>
+          </div>
+          <div class="icon-slot">
+            <div class="icon-preview">
+              <img v-if="form[tab.key].selected" :src="absUrl(form[tab.key].selected)" alt="" />
+              <span v-else class="text-muted small">—</span>
+            </div>
+            <label class="form-label small mb-1">{{ t('navIcons.selected') }}</label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+              class="form-control form-control-sm"
+              @change="(e) => onFile(e, tab.key, 'selected')"
+            />
+            <button
+              v-if="form[tab.key].selected"
+              class="btn btn-link btn-sm text-danger px-0"
+              type="button"
+              @click="form[tab.key].selected = ''"
+            >
+              {{ t('navIcons.remove') }}
+            </button>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <PageHeader title="أيقونات قنوات الدردشات" subtitle="غيّر شعارات الأخبار الرسمية ورسائل الإدارة وأيقونة الإشعارات، وتُطبّق الإعدادات على جميع المستخدمين." />
+    <div class="nav-icons-grid mb-4">
+      <article v-for="channel in channelList" :key="channel.key" class="glass p-3 nav-icon-card">
+        <h3 class="h6 mb-2">{{ channel.label }}</h3>
+        <div class="icon-slot">
+          <div class="icon-preview">
+            <img v-if="channelIcons[channel.key]" :src="absUrl(channelIcons[channel.key])" alt="" />
+            <span v-else class="text-muted small">الأيقونة الافتراضية</span>
+          </div>
+          <label class="form-label small mb-1">أيقونة القناة</label>
+          <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+            class="form-control form-control-sm" @change="(e) => onChannelFile(e, channel.key)" />
+          <button v-if="channelIcons[channel.key]" class="btn btn-link btn-sm text-danger px-0" type="button"
+            @click="channelIcons[channel.key] = ''">إزالة الأيقونة المخصصة</button>
+          <label v-if="channel.key !== 'notifications'" class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" v-model="verification[channel.key]" />
+            <span class="form-check-label">إظهار علامة التوثيق البنفسجية عند الجميع</span>
+          </label>
+          <div v-if="channel.key !== 'notifications'" class="small text-secondary mt-1">
+            {{ verification[channel.key] ? 'القناة موثّقة' : 'القناة غير موثّقة' }} — يتحدّث ظهور العلامة لجميع المستخدمين بعد الحفظ.
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <PageHeader title="أيقونات قسم أنا" subtitle="ارفع أيقونات مربعات الملف الشخصي واختصارات الشاشة الرئيسية لتظهر عند جميع المستخدمين." />
+    <div class="small text-secondary fw-semibold mb-2">أيقونات مربعات قسم أنا</div>
+    <div class="nav-icons-grid mb-3">
+      <article v-for="action in profileActionsList" :key="action.key" class="glass p-3 nav-icon-card">
+        <h3 class="h6 mb-2">{{ action.label }}</h3>
+        <div class="icon-slot">
+          <div class="icon-preview">
+            <img v-if="profileIcons[action.key]" :src="absUrl(profileIcons[action.key])" alt="" />
+            <span v-else class="text-muted small">الأيقونة الافتراضية</span>
+          </div>
+          <label class="form-label small mb-1">أيقونة الزر</label>
+          <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+            class="form-control form-control-sm" @change="(e) => onProfileFile(e, action.key)" />
+          <button v-if="profileIcons[action.key]" class="btn btn-link btn-sm text-danger px-0" type="button"
+            @click="profileIcons[action.key] = ''">إزالة الأيقونة المخصصة</button>
+        </div>
+      </article>
+    </div>
+    <div class="small text-secondary fw-semibold mb-2">اختصارات الشاشة الرئيسية</div>
+    <div class="nav-icons-grid">
+      <article v-for="shortcut in homeShortcutList" :key="shortcut.key" class="glass p-3 nav-icon-card">
+        <h3 class="h6 mb-2">{{ shortcut.label }}</h3>
+        <div class="icon-slot">
+          <div class="icon-preview">
+            <img v-if="homeShortcuts[shortcut.key]" :src="absUrl(homeShortcuts[shortcut.key])" alt="" />
+            <span v-else class="text-muted small">أيقونة التطبيق الافتراضية</span>
+          </div>
+          <label class="form-label small mb-1">أيقونة الزر</label>
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+            class="form-control form-control-sm" @change="(e) => onHomeShortcutFile(e, shortcut.key)" />
+          <button v-if="homeShortcuts[shortcut.key]" class="btn btn-link btn-sm text-danger px-0" type="button"
+            @click="homeShortcuts[shortcut.key] = ''">استعادة الأيقونة الافتراضية</button>
+        </div>
+      </article>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { settingsApi, uploadsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
+import { toast } from '@/composables/useToast'
+import PageHeader from '@/components/PageHeader.vue'
+import AlertMessage from '@/components/AlertMessage.vue'
+import LoadingSpinner from '@/components/LoadingSpinner.vue'
+
+const { t } = useI18n()
+const ORIGIN = (import.meta.env.VITE_API_ORIGIN || window.location.origin).replace(/\/$/, '')
+
+const KEYS = ['party', 'stories', 'games', 'chat', 'me']
+
+const tabs = computed(() => [
+  { key: 'party', label: t('navIcons.tabs.party') },
+  { key: 'stories', label: t('navIcons.tabs.stories') },
+  { key: 'games', label: t('navIcons.tabs.games') },
+  { key: 'chat', label: t('navIcons.tabs.chat') },
+  { key: 'me', label: t('navIcons.tabs.me') },
+])
+
+function emptyForm() {
+  const o = {}
+  for (const k of KEYS) o[k] = { normal: '', selected: '' }
+  return o
+}
+
+const form = reactive(emptyForm())
+const profileIcons = reactive({ vip: '', level: '', store: '', room: '', agencyCenter: '', events: '', agency: '', recharge: '', tasks: '', tools: '', settings: '', support: '' })
+const channelIcons = reactive({ officialNews: '', adminMessages: '', notifications: '' })
+const homeShortcuts = reactive({ search: '', room: '' })
+const homeShortcutList = [{ key: 'search', label: 'زر البحث أعلى الشاشة الرئيسية' }, { key: 'room', label: 'زر الغرفة أعلى الشاشة الرئيسية' }]
+const verification = reactive({ officialNews: true, adminMessages: true })
+const channelList = [
+  { key: 'officialNews', label: 'الأخبار الرسمية' },
+  { key: 'adminMessages', label: 'رسائل الإدارة' },
+  { key: 'notifications', label: 'الإشعارات' },
+]
+const profileActionsList = [
+  { key: 'vip', label: 'VIP' },
+  { key: 'level', label: 'المستوى' },
+  { key: 'store', label: 'المتجر' },
+  { key: 'room', label: 'الغرفة' },
+  { key: 'agencyCenter', label: 'الوكالة' },
+  { key: 'events', label: 'فعالياتي' },
+  { key: 'agency', label: 'فتح وكالة' },
+  { key: 'tasks', label: 'مركز المهام' },
+  { key: 'recharge', label: 'وكيل الشحن' },
+  { key: 'tools', label: 'الأدوات' },
+  { key: 'settings', label: 'الإعدادات' },
+  { key: 'support', label: 'الدعم' },
+]
+const version = ref(1)
+const profileActions = ref({})
+const loading = ref(false)
+const saving = ref(false)
+const error = ref('')
+const success = ref('')
+
+function absUrl(u) {
+  return resolveAsset(u)
+}
+
+// Persist upload paths, not the dashboard's preview origin. This lets the
+// mobile app resolve /uploads/... against its configured JEHO-OWN API host.
+function storedUrl(u) {
+  if (!u) return ''
+  if (/^https?:\/\//i.test(u)) {
+    try {
+      const parsed = new URL(u)
+      if (parsed.pathname.startsWith('/uploads/')) return parsed.pathname + parsed.search
+    } catch {}
+  }
+  return u
+}
+
+function parseSetting(list, key) {
+  const found = (Array.isArray(list) ? list : list?.items || []).find((s) => s.key === key)
+  if (!found?.value) return null
+  try {
+    return typeof found.value === 'string' ? JSON.parse(found.value) : found.value
+  } catch {
+    return null
+  }
+}
+
+function applyConfig(cfg) {
+  const next = emptyForm()
+  if (cfg && typeof cfg === 'object') {
+    version.value = Math.max(1, Number(cfg.version) || 1)
+    profileActions.value = cfg.profileActions && typeof cfg.profileActions === 'object' ? { ...cfg.profileActions } : {}
+    for (const k of KEYS) {
+      const p = cfg[k] || cfg.tabs?.[k] || (k === 'stories' ? (cfg.drama || cfg.tabs?.drama || {}) : {})
+      next[k].normal = p.normal || p.icon || ''
+      next[k].selected = p.selected || ''
+    }
+  }
+  for (const k of KEYS) {
+    form[k].normal = next[k].normal
+    form[k].selected = next[k].selected
+  }
+  for (const action of profileActionsList) {
+    profileIcons[action.key] = (cfg && cfg.profileActions && cfg.profileActions[action.key]) || ''
+  }
+  for (const key of Object.keys(channelIcons)) {
+    channelIcons[key] = (cfg && cfg.channelIcons && cfg.channelIcons[key]) || ''
+  }
+  for (const key of Object.keys(homeShortcuts)) homeShortcuts[key] = cfg?.homeShortcuts?.[key] || ''
+  verification.officialNews = cfg?.officialNewsVerified !== false
+  verification.adminMessages = cfg?.adminMessagesVerified !== false
+}
+
+async function load() {
+  loading.value = true
+  const { data, error: err } = await settingsApi.get()
+  loading.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  applyConfig(parseSetting(data, 'app_nav_icons'))
+}
+
+async function onFile(e, tabKey, field) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  const name = (file.name || '').toLowerCase()
+  const ok =
+    file.type === 'image/png' ||
+    file.type === 'image/jpeg' ||
+    file.type === 'image/webp' ||
+    file.type === 'image/svg+xml' ||
+    /\.(png|jpe?g|webp|svg)$/i.test(name)
+  if (!ok) {
+    error.value = t('navIcons.badFormat')
+    toast().danger(t('navIcons.badFormat'))
+    return
+  }
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  const url = storedUrl(data?.path || data?.url || data?.data?.path || data?.data?.url || '')
+  if (!url) {
+    toast().danger(t('app.error'))
+    return
+  }
+  form[tabKey][field] = url
+  toast().success(t('app.success'))
+}
+
+async function onChannelFile(e, channelKey) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  const name = (file.name || '').toLowerCase()
+  const ok = file.type === 'image/png' || file.type === 'image/jpeg' ||
+    file.type === 'image/webp' || file.type === 'image/svg+xml' ||
+    /\.(png|jpe?g|webp|svg)$/i.test(name)
+  if (!ok) {
+    error.value = t('navIcons.badFormat')
+    toast().danger(t('navIcons.badFormat'))
+    return
+  }
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  const url = storedUrl(data?.path || data?.url || data?.data?.path || data?.data?.url || '')
+  if (!url) {
+    toast().danger(t('app.error'))
+    return
+  }
+  channelIcons[channelKey] = url
+  toast().success(t('app.success'))
+}
+
+async function onProfileFile(e, actionKey) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  const name = (file.name || '').toLowerCase()
+  const ok = file.type === 'image/png' || file.type === 'image/jpeg' ||
+    file.type === 'image/webp' || file.type === 'image/svg+xml' ||
+    /\.(png|jpe?g|webp|svg)$/i.test(name)
+  if (!ok) {
+    error.value = t('navIcons.badFormat')
+    toast().danger(t('navIcons.badFormat'))
+    return
+  }
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  const url = storedUrl(data?.path || data?.url || data?.data?.path || data?.data?.url || '')
+  if (!url) {
+    toast().danger(t('app.error'))
+    return
+  }
+  profileIcons[actionKey] = url
+  toast().success(t('app.success'))
+}
+
+async function onHomeShortcutFile(e, shortcutKey) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  const name = (file.name || '').toLowerCase()
+  const ok = file.type === 'image/png' || file.type === 'image/jpeg' || file.type === 'image/webp' || file.type === 'image/svg+xml' || /\.(png|jpe?g|webp|svg)$/i.test(name)
+  if (!ok) { error.value = t('navIcons.badFormat'); toast().danger(t('navIcons.badFormat')); return }
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const url = storedUrl(data?.path || data?.url || data?.data?.path || data?.data?.url || '')
+  if (!url) { toast().danger(t('app.error')); return }
+  homeShortcuts[shortcutKey] = url
+  toast().success(t('app.success'))
+}
+
+function clearAll() {
+  applyConfig(null)
+  version.value = 1
+}
+
+async function save() {
+  saving.value = true
+  error.value = ''
+  success.value = ''
+  const body = {
+    version: Math.max(1, Number(version.value) || 1) + 1,
+    updatedAt: new Date().toISOString(),
+    party: { ...form.party },
+    stories: { ...form.stories },
+    games: { ...form.games },
+    chat: { ...form.chat },
+    me: { ...form.me },
+    profileActions: { ...profileIcons },
+    channelIcons: { ...channelIcons },
+    homeShortcuts: { ...homeShortcuts },
+    officialNewsVerified: verification.officialNews,
+    adminMessagesVerified: verification.adminMessages,
+  }
+  const { error: err } = await settingsApi.update({
+    app_nav_icons: JSON.stringify(body),
+  })
+  saving.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+  } else {
+    success.value = t('navIcons.saved')
+    toast().success(t('navIcons.saved'))
+    await load()
+  }
+}
+
+onMounted(load)
+</script>
+
+<style scoped>
+.nav-icons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.nav-icon-card {
+  border-radius: 14px;
+}
+.icon-slot {
+  flex: 1;
+  min-width: 120px;
+}
+.icon-preview {
+  width: 112px;
+  height: 112px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.icon-preview img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+</style>

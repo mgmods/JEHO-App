@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64px" height="64px" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>icon/tab/massage-h</title>
+    <defs>
+        <linearGradient x1="50%" y1="22.0404966%" x2="50%" y2="100%" id="linearGradient-1">
+            <stop stop-color="#FFFFFF" offset="0%"></stop>
+            <stop stop-color="#86BA9D" offset="100%"></stop>
+        </linearGradient>
+        <path d="M37.5,10 C48.2695526,10 57,18.7304474 57,29.5 C57,40.2695526 48.2695526,49 37.5,49 L36.388,49 L32.3581023,53.3227917 L27.723,49 L26.5,49 C15.7304474,49 7,40.2695526 7,29.5 C7,18.7304474 15.7304474,10 26.5,10 L37.5,10 Z M20,26 C18.3431458,26 17,27.3431458 17,29 C17,30.6568542 18.3431458,32 20,32 C21.6568542,32 23,30.6568542 23,29 C23,27.3431458 21.6568542,26 20,26 Z M32,26 C30.3431458,26 29,27.3431458 29,29 C29,30.6568542 30.3431458,32 32,32 C33.6568542,32 35,30.6568542 35,29 C35,27.3431458 33.6568542,26 32,26 Z M44,26 C42.3431458,26 41,27.3431458 41,29 C41,30.6568542 42.3431458,32 44,32 C45.6568542,32 47,30.6568542 47,29 C47,27.3431458 45.6568542,26 44,26 Z" id="path-2"></path>
+    </defs>
+    <g id="探索-黑" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="切图" transform="translate(-1804, -325)">
+            <g id="形状结合" transform="translate(1804, 325)">
+                <use fill="#5D756A" xlink:href="#path-2"></use>
+                <use fill="url(#linearGradient-1)" xlink:href="#path-2"></use>
+            </g>
+        </g>
+    </g>
+</svg>

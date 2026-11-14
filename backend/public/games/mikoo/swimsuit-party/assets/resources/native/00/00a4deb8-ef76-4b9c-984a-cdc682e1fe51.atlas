@@ -1,0 +1,27 @@
+
+fg_anniu_bg.png
+size: 1140,384
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/deng
+  rotate: false
+  xy: 902, 44
+  size: 51, 51
+  orig: 51, 51
+  offset: 0, 0
+  index: -1
+images/di
+  rotate: false
+  xy: 0, 0
+  size: 900, 384
+  orig: 900, 384
+  offset: 0, 0
+  index: -1
+images/xiahua
+  rotate: true
+  xy: 902, 97
+  size: 287, 235
+  orig: 287, 235
+  offset: 0, 0
+  index: -1

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Ludo · AuraLive</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;background:radial-gradient(ellipse at top,#0f3d3a,#071210 60%);color:#fff;font-family:Tahoma,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;padding:12px;gap:10px}
+h1{font-size:22px;color:#7dffd4;font-weight:900}
+.meta{font-size:13px;opacity:.9}
+.board-wrap{width:min(92vw,420px);aspect-ratio:1;background:#0b221f;border:3px solid #c9a227;border-radius:16px;padding:8px;box-shadow:0 12px 30px rgba(0,0,0,.45)}
+canvas{width:100%;height:100%;display:block;border-radius:10px;background:#123}
+.panel{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+.die{width:56px;height:56px;border-radius:14px;background:linear-gradient(180deg,#fff,#ddd);color:#111;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;border:2px solid #c9a227}
+.aura-badge{display:none;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border-radius:999px;background:rgba(0,0,0,.35);border:1px solid rgba(255,214,120,.45);font-size:16px}
+.aura-badge.on{display:inline-flex}
+button{border:0;border-radius:16px;padding:12px 18px;font-weight:800;color:#fff;background:linear-gradient(90deg,#00c9a7,#007a66);cursor:pointer}
+#msg{min-height:22px;text-align:center;color:#b8ffe8}
+.legend{display:flex;gap:12px;font-size:12px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-left:4px}
+</style>
+</head>
+<body>
+<h1>Ludo</h1>
+<div class="meta" id="turn">دورك · ارمِ النرد</div>
+<div class="legend">
+  <span><i class="dot" style="background:#e74c3c"></i>أنت</span>
+  <span><i class="dot" style="background:#3498db"></i>أزرق</span>
+  <span><i class="dot" style="background:#2ecc71"></i>أخضر</span>
+  <span><i class="dot" style="background:#f1c40f"></i>أصفر</span>
+</div>
+<div class="board-wrap"><canvas id="c" width="420" height="420"></canvas></div>
+<div id="msg">أول من يوصل قطعة إلى النهاية يفوز</div>
+<div class="panel">
+  <span class="aura-badge" id="stampBadge"></span>
+  <span class="aura-badge" id="emojiBadge"></span>
+  <div class="die" id="die">-</div>
+  <button id="roll">ارمِ النرد</button>
+  <button id="new" style="background:linear-gradient(90deg,#ff9a3c,#ff4d6d)">جولة جديدة</button>
+</div>
+<script>
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const N=15, CELL=420/N;
+const COLORS=['#e74c3c','#3498db','#2ecc71','#f1c40f'];
+const NAMES=['أنت','أزرق','أخضر','أصفر'];
+// Simplified track: each player has 4 tokens with path progress 0..56 (0=home, 1..51 track, 52..56 home stretch)
+let tokens=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+let turn=0, dice=0, canRoll=true, winner=null;
+const PATH_LEN=52, HOME_LEN=5, FINISH=PATH_LEN+HOME_LEN;
+
+function trackXY(player, progress){
+  // Map progress to grid positions around a classic-looking board ring
+  if(progress<=0){
+    const bases=[[2,2],[12,2],[12,12],[2,12]];
+    const o=bases[player];
+    return {x:o[0]+0.5,y:o[1]+0.5};
+  }
+  if(progress>PATH_LEN){
+    const home=[[7,1],[13,7],[7,13],[1,7]];
+    const d=progress-PATH_LEN;
+    const h=home[player];
+    if(player===0) return {x:h[0], y:h[1]+d};
+    if(player===1) return {x:h[0]-d, y:h[1]};
+    if(player===2) return {x:h[0], y:h[1]-d};
+    return {x:h[0]+d, y:h[1]};
+  }
+  // shared ring clockwise starting from red entry
+  const ring=[];
+  for(let x=6;x<=8;x++) ring.push([x,0]);
+  for(let y=1;y<=5;y++) ring.push([8,y]);
+  for(let x=9;x<=14;x++) ring.push([x,6]);
+  for(let y=6;y<=8;y++) ring.push([14,y]);
+  for(let x=13;x>=9;x--) ring.push([x,8]);
+  for(let y=9;y<=14;y++) ring.push([8,y]);
+  for(let x=8;x>=6;x--) ring.push([x,14]);
+  for(let y=13;y>=9;y--) ring.push([6,y]);
+  for(let x=5;x>=0;x--) ring.push([x,8]);
+  for(let y=8;y>=6;y--) ring.push([0,y]);
+  for(let x=1;x<=5;x++) ring.push([x,6]);
+  for(let y=5;y>=1;y--) ring.push([6,y]);
+  // pad/truncate to 52
+  while(ring.length<52) ring.push(ring[ring.length-1]);
+  const startOffset=[0,13,26,39][player];
+  const idx=(startOffset+progress-1)%52;
+  const p=ring[idx];
+  return {x:p[0]+0.5,y:p[1]+0.5};
+}
+
+function drawBoard(){
+  ctx.clearRect(0,0,420,420);
+  // yards
+  const yards=[[0,0,'#c0392b'],[9,0,'#2980b9'],[9,9,'#27ae60'],[0,9,'#f39c12']];
+  yards.forEach(([x,y,col])=>{
+    ctx.fillStyle=col; ctx.globalAlpha=.35;
+    ctx.fillRect(x*CELL,y*CELL,6*CELL,6*CELL);
+    ctx.globalAlpha=1;
+    ctx.strokeStyle=col; ctx.lineWidth=2; ctx.strokeRect(x*CELL+2,y*CELL+2,6*CELL-4,6*CELL-4);
+  });
+  // grid soft
+  ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1;
+  for(let i=0;i<=N;i++){ ctx.beginPath(); ctx.moveTo(i*CELL,0); ctx.lineTo(i*CELL,420); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*CELL); ctx.lineTo(420,i*CELL); ctx.stroke(); }
+  // center
+  ctx.fillStyle='#c9a227'; ctx.beginPath();
+  ctx.moveTo(6*CELL,6*CELL); ctx.lineTo(9*CELL,6*CELL); ctx.lineTo(7.5*CELL,7.5*CELL); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#3498db'; ctx.beginPath();
+  ctx.moveTo(9*CELL,6*CELL); ctx.lineTo(9*CELL,9*CELL); ctx.lineTo(7.5*CELL,7.5*CELL); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#2ecc71'; ctx.beginPath();
+  ctx.moveTo(9*CELL,9*CELL); ctx.lineTo(6*CELL,9*CELL); ctx.lineTo(7.5*CELL,7.5*CELL); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#e74c3c'; ctx.beginPath();
+  ctx.moveTo(6*CELL,9*CELL); ctx.lineTo(6*CELL,6*CELL); ctx.lineTo(7.5*CELL,7.5*CELL); ctx.closePath(); ctx.fill();
+
+  // tokens
+  for(let p=0;p<4;p++){
+    tokens[p].forEach((prog,i)=>{
+      const pos=trackXY(p, prog);
+      const jitter=i*0.12;
+      const x=(pos.x+jitter)*CELL, y=(pos.y+jitter)*CELL;
+      ctx.beginPath(); ctx.fillStyle=COLORS[p];
+      ctx.arc(x,y,CELL*0.32,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    });
+  }
+}
+
+function movable(p, roll){
+  const moves=[];
+  tokens[p].forEach((prog,i)=>{
+    if(prog===0){ if(roll===6) moves.push(i); }
+    else if(prog+roll<=FINISH) moves.push(i);
+  });
+  return moves;
+}
+
+function applyMove(p, idx, roll){
+  let prog=tokens[p][idx];
+  if(prog===0) prog=1; else prog+=roll;
+  tokens[p][idx]=prog;
+  // capture opponents on shared track
+  if(prog>0 && prog<=PATH_LEN){
+    for(let o=0;o<4;o++){
+      if(o===p) continue;
+      tokens[o]=tokens[o].map(op=>{
+        if(op>0 && op<=PATH_LEN){
+          const a=trackXY(p,prog), b=trackXY(o,op);
+          if(Math.abs(a.x-b.x)<.2 && Math.abs(a.y-b.y)<.2) return 0;
+        }
+        return op;
+      });
+    }
+  }
+  if(tokens[p].every(t=>t>=FINISH)){ winner=p; document.getElementById('msg').textContent=NAMES[p]+' فاز! 🏆'; }
+}
+
+async function botTurn(){
+  if(pvp) return;
+  while(turn!==0 && winner===null){
+    await sleep(450);
+    dice=1+Math.floor(Math.random()*6);
+    document.getElementById('die').textContent=dice;
+    document.getElementById('turn').textContent='دور '+NAMES[turn];
+    let moves=movable(turn,dice);
+    if(moves.length){
+      applyMove(turn, moves[Math.floor(Math.random()*moves.length)], dice);
+      drawBoard();
+      if(dice===6 && winner===null) continue;
+    }
+    turn=(turn+1)%4;
+  }
+  if(winner===null){
+    canRoll=true;
+    document.getElementById('turn').textContent='دورك · ارمِ النرد';
+    document.getElementById('msg').textContent='ارمِ النرد ثم اختر قطعة';
+  }
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+let pvp=false, role=1, applying=false;
+function isPvp(){ return !!(window.__AURA_PVP__&&window.__AURA_PVP__.active)||(window.AuraBridge&&AuraBridge.isPvP&&AuraBridge.isPvP()); }
+function myRole(){ if(window.__AURA_PVP__&&window.__AURA_PVP__.role) return window.__AURA_PVP__.role; try{return AuraBridge.myRole()}catch(e){return 1} }
+function myColor(){ return myRole()===1 ? 0 : 1; }
+function pushLudo(msg){
+  if(!pvp||applying) return;
+  try{ AuraBridge.postState(JSON.stringify({tokens,turn,dice,canRoll,winner,msg:msg||'',kind:'ludo'})); }catch(e){}
+}
+function afterMyMove(){
+  if(winner!==null){ pushLudo('win'); return; }
+  if(dice===6){ canRoll=true; document.getElementById('msg').textContent='6! ارمِ مرة أخرى'; pushLudo('extra'); return; }
+  turn = myColor()===0 ? 1 : 0;
+  canRoll=false;
+  document.getElementById('turn').textContent='دور الخصم';
+  pushLudo('move');
+}
+
+document.getElementById('roll').onclick=async ()=>{
+  const me=pvp?myColor():0;
+  if(!canRoll || turn!==me || winner!==null) return;
+  canRoll=false;
+  dice=1+Math.floor(Math.random()*6);
+  document.getElementById('die').textContent=dice;
+  const moves=movable(me,dice);
+  if(!moves.length){
+    document.getElementById('msg').textContent='لا حركة — مرّ الدور';
+    if(pvp){ turn = me===0?1:0; pushLudo('pass'); return; }
+    turn=1; await botTurn(); return;
+  }
+  document.getElementById('msg').textContent='اضغط على قطعتك للتحريك';
+  if(moves.length===1){
+    applyMove(me,moves[0],dice); drawBoard();
+    if(pvp){ afterMyMove(); return; }
+    if(dice===6 && winner===null){ canRoll=true; document.getElementById('msg').textContent='6! ارمِ مرة أخرى'; return; }
+    turn=1; await botTurn(); return;
+  }
+  window._pendingMoves=moves;
+};
+
+canvas.onclick=(e)=>{
+  const me=pvp?myColor():0;
+  if(turn!==me || !window._pendingMoves) return;
+  const rect=canvas.getBoundingClientRect();
+  const x=((e.clientX-rect.left)/rect.width)*420;
+  const y=((e.clientY-rect.top)/rect.height)*420;
+  let best=null, bestD=1e9;
+  window._pendingMoves.forEach(i=>{
+    const pos=trackXY(me,tokens[me][i]);
+    const d=Math.hypot(pos.x*CELL-x,pos.y*CELL-y);
+    if(d<bestD){bestD=d; best=i;}
+  });
+  if(best===null) return;
+  applyMove(me,best,dice); drawBoard();
+  window._pendingMoves=null;
+  if(pvp){ afterMyMove(); return; }
+  if(winner!==null) return;
+  if(dice===6){ canRoll=true; document.getElementById('msg').textContent='6! ارمِ مرة أخرى'; return; }
+  turn=1; botTurn();
+};
+
+function reset(){
+  tokens=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+  turn=0; dice=0; canRoll=true; winner=null; window._pendingMoves=null;
+  document.getElementById('die').textContent='-';
+  document.getElementById('turn').textContent='دورك · ارمِ النرد';
+  document.getElementById('msg').textContent=pvp?'مباراة 1 ضد 1 مع خصم حقيقي':'أول من يوصل قطعة إلى النهاية يفوز';
+  drawBoard();
+  if(pvp && role===1) pushLudo('reset');
+}
+document.getElementById('new').onclick=()=>{ if(pvp&&role!==1){document.getElementById('msg').textContent='فقط المضيف';return;} reset(); };
+window.applyAuraState=function(raw){
+  try{
+    applying=true; const s=typeof raw==='string'?JSON.parse(raw):raw; if(!s||!s.tokens) return;
+    pvp=true; role=myRole(); tokens=s.tokens; turn=s.turn; dice=s.dice; canRoll=!!s.canRoll; winner=s.winner;
+    const me=myColor();
+    if(turn===me && winner===null){ canRoll=true; document.getElementById('turn').textContent='دورك · ارمِ النرد'; }
+    else document.getElementById('turn').textContent='دور الخصم';
+    if(s.msg) document.getElementById('msg').textContent=s.msg;
+    document.getElementById('die').textContent=dice||'-';
+    drawBoard();
+  }catch(e){} finally{ applying=false; }
+};
+window.onAuraPvPReady=function(){
+  pvp=true; role=myRole(); NAMES[0]='لاعب 1'; NAMES[1]='لاعب 2';
+  document.querySelector('.legend').innerHTML='<span><i class="dot" style="background:#e74c3c"></i>أحمر</span><span><i class="dot" style="background:#3498db"></i>أزرق · خصم حقيقي</span>';
+  reset();
+  if(role!==1){ canRoll=false; document.getElementById('msg').textContent='انتظار الخصم…'; }
+};
+const DIE_SKINS={
+  dice_gold:{bg:'linear-gradient(180deg,#ffe9a8,#f0c14b)',color:'#5a3d00',border:'#c9a227'},
+  dice_fire:{bg:'linear-gradient(180deg,#ffb347,#ff4d4d)',color:'#3a0000',border:'#ff6b35'},
+  dice_diamond:{bg:'linear-gradient(180deg,#e8fbff,#7ad7ff)',color:'#053a55',border:'#4fc3f7'}
+};
+const TILE_SKINS={
+  tile_classic:{ring:'#c9a227'},
+  tile_rose:{ring:'#e91e8c'},
+  tile_royal:{ring:'#9b59b6'}
+};
+const STAMPS={stamp_heart:'💖',stamp_crown:'👑',stamp_vip:'⭐'};
+const EMOJIS={emoji_laugh:'😂',emoji_fire:'🔥',emoji_crown:'👑'};
+function setBadge(el,text){
+  if(!el) return;
+  if(text){ el.textContent=text; el.classList.add('on'); }
+  else { el.textContent=''; el.classList.remove('on'); }
+}
+window.applyAuraCosmetics=function(c){
+  c=c||window.__AURA_COSMETICS__||{};
+  const die=document.getElementById('die');
+  const skin=c.dice&&DIE_SKINS[c.dice];
+  if(die&&skin){ die.style.background=skin.bg; die.style.color=skin.color; die.style.borderColor=skin.border; }
+  const wrap=document.querySelector('.board-wrap');
+  const tile=c.tiles&&TILE_SKINS[c.tiles];
+  if(wrap&&tile) wrap.style.borderColor=tile.ring;
+  setBadge(document.getElementById('stampBadge'), STAMPS[c.stamp]||'');
+  setBadge(document.getElementById('emojiBadge'), EMOJIS[c.emoji]||'');
+};
+if(window.__AURA_COSMETICS__) window.applyAuraCosmetics(window.__AURA_COSMETICS__);
+(function boot(){ pvp=isPvp(); if(pvp){ role=myRole(); window.onAuraPvPReady(); } else reset(); })();
+</script>
+</body>
+</html>

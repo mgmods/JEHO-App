@@ -1,0 +1,34 @@
+
+StartSelection.png
+size: 750,444
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+上文案
+  rotate: false
+  xy: 285, 163
+  size: 208, 52
+  orig: 208, 53
+  offset: 0, 1
+  index: -1
+下文案
+  rotate: false
+  xy: 285, 217
+  size: 345, 53
+  orig: 345, 53
+  offset: 0, 0
+  index: -1
+红色背景
+  rotate: false
+  xy: 2, 272
+  size: 746, 170
+  orig: 746, 170
+  offset: 0, 0
+  index: -1
+足球
+  rotate: false
+  xy: 2, 2
+  size: 281, 268
+  orig: 282, 268
+  offset: 1, 0
+  index: -1

@@ -1,0 +1,41 @@
+
+niao.png
+size: 81,75
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+头
+  rotate: true
+  xy: 43, 32
+  size: 41, 36
+  orig: 41, 36
+  offset: 0, 0
+  index: -1
+爪子
+  rotate: true
+  xy: 40, 2
+  size: 25, 8
+  orig: 27, 10
+  offset: 1, 1
+  index: -1
+眨眼
+  rotate: false
+  xy: 50, 10
+  size: 17, 20
+  orig: 17, 20
+  offset: 0, 0
+  index: -1
+翅膀
+  rotate: true
+  xy: 2, 2
+  size: 25, 36
+  orig: 25, 36
+  offset: 0, 0
+  index: -1
+身体
+  rotate: false
+  xy: 2, 29
+  size: 39, 44
+  orig: 39, 44
+  offset: 0, 0
+  index: -1

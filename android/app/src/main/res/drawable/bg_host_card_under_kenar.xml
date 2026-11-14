@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flat fill under kenar — no pill radius (avoids black corner gaps). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#E61A1008" />
+    <corners android:radius="10dp" />
+</shape>

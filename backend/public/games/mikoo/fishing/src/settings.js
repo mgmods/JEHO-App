@@ -1,0 +1,1 @@
+window._CCSettings={platform:"web-mobile",groupList:["default","bullet","fish"],collisionMatrix:[[false,false],[false,false,true],[false,true,false]],hasResourcesBundle:true,hasStartSceneBundle:false,remoteBundles:[],subpackages:[],launchScene:"db://assets/Scene/Main.fire",orientation:"landscape",jsList:[]};

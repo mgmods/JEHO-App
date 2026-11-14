@@ -1,0 +1,76 @@
+
+selectAni-bigRewardAni.png
+size: 692,274
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+000
+  rotate: false
+  xy: 280, 138
+  size: 136, 134
+  orig: 150, 150
+  offset: 6, 9
+  index: -1
+111
+  rotate: false
+  xy: 418, 138
+  size: 136, 134
+  orig: 150, 150
+  offset: 6, 9
+  index: -1
+222
+  rotate: false
+  xy: 278, 3
+  size: 136, 133
+  orig: 150, 150
+  offset: 6, 9
+  index: -1
+333
+  rotate: false
+  xy: 554, 2
+  size: 135, 133
+  orig: 150, 150
+  offset: 6, 10
+  index: -1
+444
+  rotate: false
+  xy: 416, 3
+  size: 136, 133
+  orig: 150, 150
+  offset: 6, 10
+  index: -1
+555
+  rotate: false
+  xy: 2, 2
+  size: 136, 133
+  orig: 150, 150
+  offset: 6, 9
+  index: -1
+666
+  rotate: false
+  xy: 2, 137
+  size: 137, 135
+  orig: 150, 150
+  offset: 6, 8
+  index: -1
+777
+  rotate: true
+  xy: 556, 137
+  size: 135, 134
+  orig: 150, 150
+  offset: 7, 9
+  index: -1
+888
+  rotate: false
+  xy: 141, 2
+  size: 135, 134
+  orig: 150, 150
+  offset: 7, 9
+  index: -1
+999
+  rotate: false
+  xy: 141, 138
+  size: 137, 134
+  orig: 150, 150
+  offset: 6, 9
+  index: -1

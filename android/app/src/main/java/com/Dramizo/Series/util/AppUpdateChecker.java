@@ -1,0 +1,170 @@
+package com.Dramizo.Series.util;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.Uri;
+import android.text.TextUtils;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.Dramizo.Series.BuildConfig;
+import com.Dramizo.Series.data.remote.dto.MiscDtos;
+import com.Dramizo.Series.di.AppContainer;
+import com.Dramizo.Series.domain.model.Result;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
+
+import java.util.Locale;
+
+/**
+ * Checks store version from {@code GET /config/app-update} and shows a professional
+ * update sheet when the installed build is behind.
+ */
+public final class AppUpdateChecker {
+    private static final String PREFS = "app_update_gate";
+    private static final String KEY_SKIPPED_CODE = "skipped_version_code";
+    private static boolean shownThisProcess;
+
+    private AppUpdateChecker() {}
+
+    public interface ContinueCallback {
+        void onContinue();
+    }
+
+    /**
+     * Soft check: may skip once per version; force update blocks until Play Store opens.
+     * Calls {@code onContinue} when user can proceed (no update / dismissed soft update).
+     */
+    public static void check(@NonNull Activity activity, @Nullable ContinueCallback onContinue) {
+        if (activity.isFinishing()) {
+            if (onContinue != null) onContinue.onContinue();
+            return;
+        }
+        AppContainer c = ContainerProvider.from(activity);
+        c.getIoExecutor().execute(() -> {
+            Result<MiscDtos.AppUpdateDto> r = ApiCall.execute(c.getConfigApi().appUpdate());
+            activity.runOnUiThread(() -> {
+                if (activity.isFinishing()) return;
+                if (!r.success || r.data == null || r.data.latestVersionCode <= 0) {
+                    if (onContinue != null) onContinue.onContinue();
+                    return;
+                }
+                maybeShow(activity, r.data, onContinue);
+            });
+        });
+    }
+
+    private static void maybeShow(
+            @NonNull Activity activity,
+            @NonNull MiscDtos.AppUpdateDto dto,
+            @Nullable ContinueCallback onContinue) {
+        int installed = BuildConfig.VERSION_CODE;
+        int latest = Math.max(0, dto.latestVersionCode);
+        int minCode = Math.max(0, dto.minVersionCode);
+        if (latest <= installed) {
+            if (onContinue != null) onContinue.onContinue();
+            return;
+        }
+        boolean force = dto.forceUpdate || (minCode > 0 && installed < minCode);
+        SharedPreferences prefs = activity.getSharedPreferences(PREFS, Activity.MODE_PRIVATE);
+        if (!force) {
+            if (shownThisProcess) {
+                if (onContinue != null) onContinue.onContinue();
+                return;
+            }
+            int skipped = prefs.getInt(KEY_SKIPPED_CODE, 0);
+            if (skipped >= latest) {
+                if (onContinue != null) onContinue.onContinue();
+                return;
+            }
+        }
+
+        shownThisProcess = true;
+        boolean arabic = isArabic(activity);
+        String title = firstNonEmpty(
+                arabic ? dto.titleAr : dto.titleEn,
+                arabic ? dto.titleEn : dto.titleAr,
+                arabic ? "تحديث جديد متوفر" : "Update available");
+        String versionLabel = !TextUtils.isEmpty(dto.latestVersionName)
+                ? dto.latestVersionName
+                : ("v" + latest);
+        String body = firstNonEmpty(
+                arabic ? dto.messageAr : dto.messageEn,
+                arabic ? dto.messageEn : dto.messageAr,
+                arabic
+                        ? "يتوفر إصدار أحدث من JEHO CHAT على المتجر. حدّث الآن لأفضل تجربة."
+                        : "A newer JEHO CHAT build is on the store. Update now for the best experience.");
+        String message = body + "\n\n"
+                + (arabic ? "الإصدار الجديد: " : "New version: ")
+                + versionLabel
+                + "  ·  "
+                + (arabic ? "عندك: " : "Yours: ")
+                + BuildConfig.VERSION_NAME;
+
+        if (force) {
+            // A mandatory release is a full-screen gate, never a dismissible dialog.
+            Intent gate = new Intent(activity, com.Dramizo.Series.presentation.splash.UpdateActivity.class);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_FORCE, true);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_VERSION_CODE, latest);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_VERSION_NAME, versionLabel);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_URL, dto.storeUrl);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_LINK_TYPE, dto.linkType);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_TITLE, title);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_MESSAGE, body);
+            gate.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            activity.startActivity(gate);
+            activity.finish();
+            return;
+        }
+
+        String positive = arabic ? "تحديث الآن" : "Update now";
+        String negative = arabic ? "لاحقاً" : "Later";
+        AuraDialogHelper.confirm(
+                activity,
+                title,
+                message,
+                positive,
+                () -> openStore(activity, dto.storeUrl),
+                negative,
+                () -> {
+                    prefs.edit().putInt(KEY_SKIPPED_CODE, latest).apply();
+                    if (onContinue != null) onContinue.onContinue();
+                },
+                true);
+
+        // Optional updates remain dismissible; mandatory updates never reach this dialog.
+    }
+
+    /** Soft reminder after main screen is up (non-blocking). */
+    public static void checkSoft(@NonNull Activity activity) {
+        check(activity, null);
+    }
+
+    private static void openStore(@NonNull Activity activity, @Nullable String storeUrl) {
+        String url = storeUrl == null ? "" : storeUrl.trim();
+        if (url.isEmpty()) return;
+        try {
+            Uri uri = Uri.parse(url);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!"https".equalsIgnoreCase(scheme) && !"http".equalsIgnoreCase(scheme))) return;
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, uri));
+        } catch (Exception ignored) {
+            // Never substitute Google Play: the dashboard URL is the source of truth.
+        }
+    }
+
+    private static boolean isArabic(@NonNull Activity activity) {
+        Locale loc = activity.getResources().getConfiguration().getLocales().get(0);
+        return loc != null && "ar".equalsIgnoreCase(loc.getLanguage());
+    }
+
+    @NonNull
+    private static String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String v : values) {
+            if (v != null && !v.trim().isEmpty()) return v.trim();
+        }
+        return "";
+    }
+}

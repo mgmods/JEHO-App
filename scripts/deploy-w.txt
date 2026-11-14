@@ -1,0 +1,220 @@
+﻿
+> auralive-dashboard@1.0.0 build
+> vite build
+
+vite v6.4.3 building for production...
+transforming...
+Γ£ô 220 modules transformed.
+python : node_modules/svga/dist/index.esm.min.js (2:42990): Use of eval in "node_modules/svga/dist/index.esm.min.js" 
+is strongly discouraged as it poses security risks and may cause issues with minification.
+At C:\Users\momf\AppData\Local\Temp\ps-script-8ced8af5-0a80-4c02-a63b-7694155a8a0d.ps1:104 char:1
++ python scripts/deploy_incremental.py backend/src/modules/recharge-age ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (node_modules/sv...h minification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+rendering chunks...
+computing gzip size...
+dist/index.html                                        2.81 kB Γöé gzip:     1.33 kB
+dist/assets/svga_room_loading-C0J1HJWM.svga           60.70 kB
+dist/assets/bootstrap-icons-mSm7cUeB.woff2           134.04 kB
+dist/assets/jeho_logo-Buog0U3W.png                   140.80 kB
+dist/assets/bootstrap-icons-BeopsB42.woff            180.29 kB
+dist/assets/logo-CzFvK20s.png                        213.65 kB
+dist/assets/Amiri-Regular-DuMToiWY.ttf               431.12 kB
+dist/assets/GiftsView-CNpLFCNU.css                     0.10 kB Γöé gzip:     0.11 kB
+dist/assets/OffersView-CGPbGqq8.css                    0.10 kB Γöé gzip:     0.11 kB
+dist/assets/LuckyBoxesView-CaYflBQ3.css                0.10 kB Γöé gzip:     0.11 kB
+dist/assets/ContestsView-Ki881Shq.css                  0.18 kB Γöé gzip:     0.16 kB
+dist/assets/NotificationsView-B350ixBd.css             0.19 kB Γöé gzip:     0.13 kB
+dist/assets/BannersView-CEf7pwAA.css                   0.26 kB Γöé gzip:     0.18 kB
+dist/assets/CountryFlag-4U2CFQs4.css                   0.26 kB Γöé gzip:     0.19 kB
+dist/assets/LoadingSpinner-ukLGMBQb.css                0.30 kB Γöé gzip:     0.21 kB
+dist/assets/BulkActionBar-DuInOlWx.css                 0.30 kB Γöé gzip:     0.22 kB
+dist/assets/VanityIdsView-JqkZqUNv.css                 0.31 kB Γöé gzip:     0.23 kB
+dist/assets/BulkCheck-DkzRpd8B.css                     0.37 kB Γöé gzip:     0.24 kB
+dist/assets/PromosView-D2Cd9C7_.css                    0.44 kB Γöé gzip:     0.26 kB
+dist/assets/NavIconsView-BMQc3v97.css                  0.52 kB Γöé gzip:     0.30 kB
+dist/assets/UserDetailView-CmNxCFHU.css                0.72 kB Γöé gzip:     0.37 kB
+dist/assets/CoinPackagesView-Ycoa22CX.css              0.82 kB Γöé gzip:     0.45 kB
+dist/assets/DramaView-1huU6hH7.css                     1.01 kB Γöé gzip:     0.49 kB
+dist/assets/WalletView-D7xnPc5A.css                    1.07 kB Γöé gzip:     0.48 kB
+dist/assets/ChartCard-CLp3TLiC.css                     1.14 kB Γöé gzip:     0.53 kB
+dist/assets/SettingsView-DBRH3dK-.css                  1.22 kB Γöé gzip:     0.44 kB
+dist/assets/AdminLayout-C351ExY3.css                   1.55 kB Γöé gzip:     0.59 kB
+dist/assets/VipView-DTYK2BPG.css                       1.67 kB Γöé gzip:     0.67 kB
+dist/assets/StatCard-BKjlCBZ7.css                      1.90 kB Γöé gzip:     0.73 kB
+dist/assets/CosmeticsView-CHsBGYpD.css                 2.84 kB Γöé gzip:     0.97 kB
+dist/assets/RoomsView-BLf-BVU7.css                     3.25 kB Γöé gzip:     1.00 kB
+dist/assets/GamesView-C97huI7u.css                     3.56 kB Γöé gzip:     1.18 kB
+dist/assets/PolicyBrochureView-B5LkNZcP.css            3.92 kB Γöé gzip:     1.26 kB
+dist/assets/UsersView-C4ROyBLQ.css                     3.94 kB Γöé gzip:     1.18 kB
+dist/assets/LoginView-7wN00DMK.css                     7.52 kB Γöé gzip:     2.01 kB
+dist/assets/DashboardView-D_k5RtSl.css                 8.81 kB Γöé gzip:     2.10 kB
+dist/assets/index-BLmJki7K.css                       361.20 kB Γöé gzip:    55.44 kB
+dist/assets/logo-D48iQTy7.js                           0.06 kB Γöé gzip:     0.08 kB
+dist/assets/_plugin-vue_export-helper-DlAUqK2U.js      0.09 kB Γöé gzip:     0.10 kB
+dist/assets/BulkCheck-CEYe3U4m.js                      0.51 kB Γöé gzip:     0.37 kB
+dist/assets/useBulk-C91y03xS.js                        0.63 kB Γöé gzip:     0.40 kB
+dist/assets/PageHeader-D9BVE3b2.js                     0.63 kB Γöé gzip:     0.40 kB
+dist/assets/StatusBadge-c9srZ02J.js                    0.96 kB Γöé gzip:     0.44 kB
+dist/assets/useUtils-YbTLCVWn.js                       1.19 kB Γöé gzip:     0.50 kB
+dist/assets/AlertMessage-C1P91VLt.js                   1.24 kB Γöé gzip:     0.62 kB
+dist/assets/CountryFlag-BqncqKS2.js                    1.47 kB Γöé gzip:     0.79 kB
+dist/assets/ConfirmDialog-ChFszktp.js                  1.53 kB Γöé gzip:     0.76 kB
+dist/assets/BulkActionBar-CVWaCs2j.js                  2.80 kB Γöé gzip:     1.33 kB
+dist/assets/StatCard-D0ggm4r0.js                       3.20 kB Γöé gzip:     1.24 kB
+dist/assets/PromosView-CFPmtpUI.js                     4.69 kB Γöé gzip:     1.84 kB
+dist/assets/LoginView-BuEsAIJL.js                      4.84 kB Γöé gzip:     1.84 kB
+dist/assets/RankingView-DdrxXMu0.js                    4.86 kB Γöé gzip:     2.03 kB
+dist/assets/LogsView-fSAWlEyr.js                       5.14 kB Γöé gzip:     2.13 kB
+dist/assets/NavIconsView-BiqcngFO.js                   5.16 kB Γöé gzip:     2.09 kB
+dist/assets/GameAdsView-6KmR_bt4.js                    6.28 kB Γöé gzip:     1.83 kB
+dist/assets/ReportsView-DXA1-DQC.js                    6.72 kB Γöé gzip:     2.57 kB
+dist/assets/CoinPackagesView-CUQmvDy4.js               6.99 kB Γöé gzip:     2.72 kB
+dist/assets/TasksView-BqBx279U.js                      7.54 kB Γöé gzip:     2.40 kB
+dist/assets/BannersView-YZQFDNE5.js                    7.98 kB Γöé gzip:     3.28 kB
+dist/assets/OffersView-BVlt6CSQ.js                     8.01 kB Γöé gzip:     3.22 kB
+dist/assets/RoomCupView-BP6cBS9K.js                    8.28 kB Γöé gzip:     3.16 kB
+dist/assets/GenderVerificationsView-C2kR9gtY.js        8.55 kB Γöé gzip:     3.40 kB
+dist/assets/LuckyBoxesView-DZ_ciGt-.js                 9.12 kB Γöé gzip:     3.28 kB
+dist/assets/AdminLayout-C_TH0fSv.js                    9.25 kB Γöé gzip:     3.56 kB
+dist/assets/VanityIdsView-D50HIZAp.js                  9.35 kB Γöé gzip:     3.55 kB
+dist/assets/NotificationsView-DwuNlz-Q.js             10.75 kB Γöé gzip:     3.85 kB
+dist/assets/HostTargetView-DKTMM_Sg.js                11.12 kB Γöé gzip:     3.65 kB
+dist/assets/DramaView-CMdrDLPU.js                     12.00 kB Γöé gzip:     3.68 kB
+dist/assets/VipView-BDadKJp8.js                       12.26 kB Γöé gzip:     4.35 kB
+dist/assets/RoomsView-C2bfO3NF.js                     13.29 kB Γöé gzip:     5.03 kB
+dist/assets/UsersView-D9zWN3o1.js                     13.54 kB Γöé gzip:     4.81 kB
+dist/assets/RechargeAgentsView-CnCv576-.js            13.83 kB Γöé gzip:     4.92 kB
+dist/assets/GamesView-DSQ83eoh.js                     15.07 kB Γöé gzip:     5.28 kB
+dist/assets/UserDetailView-B62ak4sK.js                15.28 kB Γöé gzip:     4.50 kB
+dist/assets/ContestsView-DKfMfxkh.js                  17.28 kB Γöé gzip:     5.30 kB
+dist/assets/DashboardView-CZYghD6t.js                 19.72 kB Γöé gzip:     6.39 kB
+dist/assets/GiftsView-BpXUHvMl.js                     19.84 kB Γöé gzip:     6.04 kB
+dist/assets/CosmeticsView-BtuWxTcW.js                 20.92 kB Γöé gzip:     6.94 kB
+dist/assets/WalletView-3qFztT6z.js                    27.38 kB Γöé gzip:     7.47 kB
+dist/assets/AgenciesView-DzGzLKrq.js                  30.42 kB Γöé gzip:     8.22 kB
+dist/assets/LoadingSpinner-DPf-XB5x.js                58.94 kB Γöé gzip:    18.77 kB
+dist/assets/SettingsView-BuAUdON6.js                  88.38 kB Γöé gzip:    20.12 kB
+dist/assets/ChartCard-ByhnSX9z.js                    188.41 kB Γöé gzip:    65.94 kB
+dist/assets/index-B2AtTpBq.js                        435.85 kB Γöé gzip:   148.31 kB
+dist/assets/PolicyBrochureView-B7Udgftx.js         2,249.12 kB Γöé gzip: 1,055.65 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: 
+https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+Γ£ô built in 17.18s
+$ cd /www/wwwroot/api.adnova.bbs.tr && node -e 'require("dotenv").config(); const names=["JWT_SECRET","JWT_REFRESH_SECRET","ADMIN_PASSWORD","DB_PASSWORD"]; const missing=names.filter(n=>!process.env[n]||process.env[n].length<16); if(missing.length){console.error("Missing/short production secrets: "+missing.join(","));process.exit(1)}; if(process.env.JWT_SECRET===process.env.JWT_REFRESH_SECRET){console.error("JWT secrets must differ");process.exit(1)}; console.log("production secret preflight passed")'
+production secret preflight passed
+uploaded backend\src\modules\recharge-agents\recharge-agents.service.ts
+uploaded backend\src\modules\host-target\host-target.service.ts
+uploaded backend\dashboard\dist\assets\AdminLayout-C_TH0fSv.js
+uploaded backend\dashboard\dist\assets\AgenciesView-DzGzLKrq.js
+uploaded backend\dashboard\dist\assets\AlertMessage-C1P91VLt.js
+uploaded backend\dashboard\dist\assets\BannersView-YZQFDNE5.js
+uploaded backend\dashboard\dist\assets\BulkActionBar-CVWaCs2j.js
+uploaded backend\dashboard\dist\assets\BulkCheck-CEYe3U4m.js
+uploaded backend\dashboard\dist\assets\ChartCard-ByhnSX9z.js
+uploaded backend\dashboard\dist\assets\CoinPackagesView-CUQmvDy4.js
+uploaded backend\dashboard\dist\assets\ConfirmDialog-ChFszktp.js
+uploaded backend\dashboard\dist\assets\ContestsView-DKfMfxkh.js
+uploaded backend\dashboard\dist\assets\CosmeticsView-BtuWxTcW.js
+uploaded backend\dashboard\dist\assets\CountryFlag-BqncqKS2.js
+uploaded backend\dashboard\dist\assets\DashboardView-CZYghD6t.js
+uploaded backend\dashboard\dist\assets\DramaView-CMdrDLPU.js
+uploaded backend\dashboard\dist\assets\GameAdsView-6KmR_bt4.js
+uploaded backend\dashboard\dist\assets\GamesView-DSQ83eoh.js
+uploaded backend\dashboard\dist\assets\GenderVerificationsView-C2kR9gtY.js
+uploaded backend\dashboard\dist\assets\GiftsView-BpXUHvMl.js
+uploaded backend\dashboard\dist\assets\HostTargetView-DKTMM_Sg.js
+uploaded backend\dashboard\dist\assets\LoadingSpinner-DPf-XB5x.js
+uploaded backend\dashboard\dist\assets\LoginView-BuEsAIJL.js
+uploaded backend\dashboard\dist\assets\LogsView-fSAWlEyr.js
+uploaded backend\dashboard\dist\assets\LuckyBoxesView-DZ_ciGt-.js
+uploaded backend\dashboard\dist\assets\NavIconsView-BiqcngFO.js
+uploaded backend\dashboard\dist\assets\NotificationsView-DwuNlz-Q.js
+uploaded backend\dashboard\dist\assets\OffersView-BVlt6CSQ.js
+uploaded backend\dashboard\dist\assets\PageHeader-D9BVE3b2.js
+uploaded backend\dashboard\dist\assets\PolicyBrochureView-B7Udgftx.js
+uploaded backend\dashboard\dist\assets\PromosView-CFPmtpUI.js
+uploaded backend\dashboard\dist\assets\RankingView-DdrxXMu0.js
+uploaded backend\dashboard\dist\assets\RechargeAgentsView-CnCv576-.js
+uploaded backend\dashboard\dist\assets\ReportsView-DXA1-DQC.js
+uploaded backend\dashboard\dist\assets\RoomCupView-BP6cBS9K.js
+uploaded backend\dashboard\dist\assets\RoomsView-C2bfO3NF.js
+uploaded backend\dashboard\dist\assets\SettingsView-BuAUdON6.js
+uploaded backend\dashboard\dist\assets\StatCard-D0ggm4r0.js
+uploaded backend\dashboard\dist\assets\StatusBadge-c9srZ02J.js
+uploaded backend\dashboard\dist\assets\TasksView-BqBx279U.js
+uploaded backend\dashboard\dist\assets\UserDetailView-B62ak4sK.js
+uploaded backend\dashboard\dist\assets\UsersView-D9zWN3o1.js
+uploaded backend\dashboard\dist\assets\VanityIdsView-D50HIZAp.js
+uploaded backend\dashboard\dist\assets\VipView-BDadKJp8.js
+uploaded backend\dashboard\dist\assets\WalletView-3qFztT6z.js
+uploaded backend\dashboard\dist\assets\index-B2AtTpBq.js
+uploaded backend\dashboard\dist\assets\useBulk-C91y03xS.js
+uploaded backend\dashboard\dist\index.html
+removed stale admin/assets/SettingsView-BAlwcx4y.js
+removed stale admin/assets/NotificationsView-D8JA_wC2.js
+removed stale admin/assets/RoomCupView-Bx5qYBq-.js
+removed stale admin/assets/GameAdsView-CwIrho4p.js
+removed stale admin/assets/UserDetailView-BqZhfsCd.js
+removed stale admin/assets/CoinPackagesView-GGGL8kls.js
+removed stale admin/assets/BulkActionBar-D8MgRLgi.js
+removed stale admin/assets/RoomsView-ttOweDvm.js
+removed stale admin/assets/RankingView-jklFMh7B.js
+removed stale admin/assets/GamesView-Cw1Gyv9p.js
+removed stale admin/assets/ChartCard-cyH-EeTi.js
+removed stale admin/assets/StatCard-Cvkvzrkz.js
+removed stale admin/assets/GiftsView-CJLar6UT.js
+removed stale admin/assets/NavIconsView-B4dgYG-z.js
+removed stale admin/assets/RechargeAgentsView-CImT44xd.js
+removed stale admin/assets/DashboardView-BCjLstxT.js
+removed stale admin/assets/OffersView-B2Ld1JlR.js
+removed stale admin/assets/AdminLayout-DONvlrwl.js
+removed stale admin/assets/PolicyBrochureView-lhKzd_6B.js
+removed stale admin/assets/DramaView-CgwqcKA5.js
+removed stale admin/assets/index-BHR99uDo.js
+removed stale admin/assets/CosmeticsView-C3eFrDHy.js
+removed stale admin/assets/AlertMessage-DzaUpCQL.js
+removed stale admin/assets/LoadingSpinner-CTMU2IlI.js
+removed stale admin/assets/CountryFlag-j5P4inoE.js
+removed stale admin/assets/TasksView-C7Lchve-.js
+removed stale admin/assets/GenderVerificationsView-D5_xS4uC.js
+removed stale admin/assets/ConfirmDialog-hOqwMg1R.js
+removed stale admin/assets/VipView-NZ9LRDjV.js
+removed stale admin/assets/LogsView-DtUxG0ZC.js
+removed stale admin/assets/ContestsView-Dnnq-JXK.js
+removed stale admin/assets/BulkCheck-C4fgJYoF.js
+removed stale admin/assets/HostTargetView-4Ubf9Vv2.js
+removed stale admin/assets/PageHeader-CbK85edl.js
+removed stale admin/assets/WalletView-b3PK66_7.js
+removed stale admin/assets/UsersView-C56SYpeQ.js
+removed stale admin/assets/useBulk-Leg4MHs5.js
+removed stale admin/assets/StatusBadge-VZoKbLKs.js
+removed stale admin/assets/BannersView-CHx7WJB5.js
+removed stale admin/assets/LoginView-Dwsvkl5J.js
+removed stale admin/assets/VanityIdsView-BMCjBcvx.js
+removed stale admin/assets/ReportsView-g3cuQoAT.js
+removed stale admin/assets/PromosView-B0cQb8hZ.js
+removed stale admin/assets/AgenciesView-DiuHK9HV.js
+removed stale admin/assets/LuckyBoxesView-ECbOI9d1.js
+$ rm -rf /www/wwwroot/api.adnova.bbs.tr/public/admin
+$ cd /www/wwwroot/api.adnova.bbs.tr && rm -rf dist.cursor-backup && if [ -d dist ]; then cp -a dist dist.cursor-backup; fi && rm -f tsconfig*.tsbuildinfo && (npm run build || { rm -rf dist; if [ -d dist.cursor-backup ]; then mv dist.cursor-backup dist; fi; exit 1; }) && rm -rf dist.cursor-backup && pm2 restart auralive-api --update-env
+
+> auralive-backend@1.0.0 build
+> nest build
+
+[PM2] Applying action restartProcessId on app [auralive-api](ids: [ 0 ])
+[PM2] [auralive-api](0) Γ£ô
+ΓöîΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé id Γöé name            Γöé namespace   Γöé version Γöé mode    Γöé pid      Γöé uptime Γöé Γå║    Γöé status    Γöé cpu      Γöé mem      Γöé user     Γöé watching Γöé
+Γö£ΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+Γöé 0  Γöé auralive-api    Γöé default     Γöé 1.0.0   Γöé fork    Γöé 2132848  Γöé 0s     Γöé 2952 Γöé online    Γöé 0%       Γöé 25.1mb   Γöé root     Γöé disabled Γöé
+Γöé 1  Γöé lyvo-cloud      Γöé default     Γöé 1.0.0   Γöé fork    Γöé 1645241  Γöé 3D     Γöé 4    Γöé online    Γöé 0%       Γöé 76.7mb   Γöé root     Γöé disabled Γöé
+ΓööΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+host metrics | cpu: 20.5% | ram usage: 33.9% | lo: Γçô 0.014mb/s Γçæ 0.014mb/s | eth0: Γçô 0.405mb/s Γçæ 0.037mb/s | disk: Γçô 0.013mb/s Γçæ 0.743mb/s |
+incremental deploy complete: backend=2, static=0, dashboard_artifacts=46, dashboard_removed=45, visual_artifacts=0, visual_removed=0, retired_local_removed=0

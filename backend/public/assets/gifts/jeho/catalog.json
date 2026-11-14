@@ -1,0 +1,308 @@
+{
+  "version": 1,
+  "source": "jeho-designed",
+  "flags": [
+    {
+      "code": "SA",
+      "nameAr": "علم السعودية",
+      "nameEn": "Flag Saudi Arabia",
+      "coinPrice": 99,
+      "iconUrl": "/assets/gifts/jeho/flags/sa.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/sa.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/sa.svg",
+      "category": "country",
+      "sortOrder": 100
+    },
+    {
+      "code": "AE",
+      "nameAr": "علم الإمارات",
+      "nameEn": "Flag UAE",
+      "coinPrice": 99,
+      "iconUrl": "/assets/gifts/jeho/flags/ae.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/ae.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/ae.svg",
+      "category": "country",
+      "sortOrder": 101
+    },
+    {
+      "code": "KW",
+      "nameAr": "علم الكويت",
+      "nameEn": "Flag Kuwait",
+      "coinPrice": 79,
+      "iconUrl": "/assets/gifts/jeho/flags/kw.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/kw.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/kw.svg",
+      "category": "country",
+      "sortOrder": 102
+    },
+    {
+      "code": "QA",
+      "nameAr": "علم قطر",
+      "nameEn": "Flag Qatar",
+      "coinPrice": 79,
+      "iconUrl": "/assets/gifts/jeho/flags/qa.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/qa.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/qa.svg",
+      "category": "country",
+      "sortOrder": 103
+    },
+    {
+      "code": "BH",
+      "nameAr": "علم البحرين",
+      "nameEn": "Flag Bahrain",
+      "coinPrice": 59,
+      "iconUrl": "/assets/gifts/jeho/flags/bh.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/bh.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/bh.svg",
+      "category": "country",
+      "sortOrder": 104
+    },
+    {
+      "code": "OM",
+      "nameAr": "علم عُمان",
+      "nameEn": "Flag Oman",
+      "coinPrice": 59,
+      "iconUrl": "/assets/gifts/jeho/flags/om.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/om.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/om.svg",
+      "category": "country",
+      "sortOrder": 105
+    },
+    {
+      "code": "YE",
+      "nameAr": "علم اليمن",
+      "nameEn": "Flag Yemen",
+      "coinPrice": 49,
+      "iconUrl": "/assets/gifts/jeho/flags/ye.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/ye.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/ye.svg",
+      "category": "country",
+      "sortOrder": 106
+    },
+    {
+      "code": "IQ",
+      "nameAr": "علم العراق",
+      "nameEn": "Flag Iraq",
+      "coinPrice": 69,
+      "iconUrl": "/assets/gifts/jeho/flags/iq.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/iq.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/iq.svg",
+      "category": "country",
+      "sortOrder": 107
+    },
+    {
+      "code": "SY",
+      "nameAr": "علم سوريا",
+      "nameEn": "Flag Syria",
+      "coinPrice": 69,
+      "iconUrl": "/assets/gifts/jeho/flags/sy.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/sy.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/sy.svg",
+      "category": "country",
+      "sortOrder": 108
+    },
+    {
+      "code": "JO",
+      "nameAr": "علم الأردن",
+      "nameEn": "Flag Jordan",
+      "coinPrice": 59,
+      "iconUrl": "/assets/gifts/jeho/flags/jo.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/jo.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/jo.svg",
+      "category": "country",
+      "sortOrder": 109
+    },
+    {
+      "code": "LB",
+      "nameAr": "علم لبنان",
+      "nameEn": "Flag Lebanon",
+      "coinPrice": 59,
+      "iconUrl": "/assets/gifts/jeho/flags/lb.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/lb.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/lb.svg",
+      "category": "country",
+      "sortOrder": 110
+    },
+    {
+      "code": "PS",
+      "nameAr": "علم فلسطين",
+      "nameEn": "Flag Palestine",
+      "coinPrice": 49,
+      "iconUrl": "/assets/gifts/jeho/flags/ps.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/ps.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/ps.svg",
+      "category": "country",
+      "sortOrder": 111
+    },
+    {
+      "code": "EG",
+      "nameAr": "علم مصر",
+      "nameEn": "Flag Egypt",
+      "coinPrice": 69,
+      "iconUrl": "/assets/gifts/jeho/flags/eg.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/eg.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/eg.svg",
+      "category": "country",
+      "sortOrder": 112
+    },
+    {
+      "code": "SD",
+      "nameAr": "علم السودان",
+      "nameEn": "Flag Sudan",
+      "coinPrice": 49,
+      "iconUrl": "/assets/gifts/jeho/flags/sd.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/sd.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/sd.svg",
+      "category": "country",
+      "sortOrder": 113
+    },
+    {
+      "code": "LY",
+      "nameAr": "علم ليبيا",
+      "nameEn": "Flag Libya",
+      "coinPrice": 49,
+      "iconUrl": "/assets/gifts/jeho/flags/ly.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/ly.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/ly.svg",
+      "category": "country",
+      "sortOrder": 114
+    },
+    {
+      "code": "TN",
+      "nameAr": "علم تونس",
+      "nameEn": "Flag Tunisia",
+      "coinPrice": 49,
+      "iconUrl": "/assets/gifts/jeho/flags/tn.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/tn.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/tn.svg",
+      "category": "country",
+      "sortOrder": 115
+    },
+    {
+      "code": "DZ",
+      "nameAr": "علم الجزائر",
+      "nameEn": "Flag Algeria",
+      "coinPrice": 59,
+      "iconUrl": "/assets/gifts/jeho/flags/dz.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/dz.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/dz.svg",
+      "category": "country",
+      "sortOrder": 116
+    },
+    {
+      "code": "MA",
+      "nameAr": "علم المغرب",
+      "nameEn": "Flag Morocco",
+      "coinPrice": 59,
+      "iconUrl": "/assets/gifts/jeho/flags/ma.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/ma.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/ma.svg",
+      "category": "country",
+      "sortOrder": 117
+    },
+    {
+      "code": "TR",
+      "nameAr": "علم تركيا",
+      "nameEn": "Flag Turkey",
+      "coinPrice": 79,
+      "iconUrl": "/assets/gifts/jeho/flags/tr.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/tr.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/tr.svg",
+      "category": "country",
+      "sortOrder": 118
+    },
+    {
+      "code": "US",
+      "nameAr": "علم أمريكا",
+      "nameEn": "Flag USA",
+      "coinPrice": 89,
+      "iconUrl": "/assets/gifts/jeho/flags/us.png",
+      "animationUrl": "/assets/gifts/jeho/flags_anim/us.mp4",
+      "svgUrl": "/assets/gifts/jeho/flags/us.svg",
+      "category": "country",
+      "sortOrder": 119
+    }
+  ],
+  "premium": [
+    {
+      "nameAr": "أسد ذهبي",
+      "nameEn": "Golden Lion",
+      "coinPrice": 1999,
+      "iconUrl": "/assets/gifts/jeho/premium/golden_lion.png",
+      "animationUrl": "/assets/cosmetics/entries/entry_mikoo_247_golden_lion_roar.mp4",
+      "previewUrl": "/assets/gifts/jeho/premium/golden_lion_preview.mp4",
+      "category": "premium",
+      "sortOrder": 10
+    },
+    {
+      "nameAr": "أسد البرق",
+      "nameEn": "Lightning Lion",
+      "coinPrice": 2499,
+      "iconUrl": "/assets/gifts/jeho/premium/lightning_lion.png",
+      "animationUrl": "/assets/cosmetics/entries/entry_mikoo_256_lightning_lion.mp4",
+      "previewUrl": "/assets/gifts/jeho/premium/lightning_lion_preview.mp4",
+      "category": "premium",
+      "sortOrder": 20
+    },
+    {
+      "nameAr": "طائرة ذهبية",
+      "nameEn": "Golden Airplane",
+      "coinPrice": 1599,
+      "iconUrl": "/assets/gifts/jeho/premium/dubai_plane.png",
+      "animationUrl": "/assets/cosmetics/entries/entry_mikoo_179_dubai_golden_airplane.mp4",
+      "previewUrl": "/assets/gifts/jeho/premium/dubai_plane_preview.mp4",
+      "category": "premium",
+      "sortOrder": 30
+    },
+    {
+      "nameAr": "سيارة فاخرة",
+      "nameEn": "Luxury Car",
+      "coinPrice": 1299,
+      "iconUrl": "/assets/gifts/jeho/premium/luxury_car.png",
+      "animationUrl": "/assets/cosmetics/entries/entry_mikoo_265_luxury_car_team.mp4",
+      "previewUrl": "/assets/gifts/jeho/premium/luxury_car_preview.mp4",
+      "category": "premium",
+      "sortOrder": 40
+    },
+    {
+      "nameAr": "تاج ملكي",
+      "nameEn": "Royal Crown",
+      "coinPrice": 999,
+      "iconUrl": "/assets/gifts/jeho/premium/royal_crown.png",
+      "animationUrl": "/assets/cosmetics/entries/entry_mikoo_268_royal_family.mp4",
+      "previewUrl": "/assets/gifts/jeho/premium/royal_crown_preview.mp4",
+      "category": "premium",
+      "sortOrder": 50
+    },
+    {
+      "nameAr": "كأس البطولة",
+      "nameEn": "Championship Trophy",
+      "coinPrice": 899,
+      "iconUrl": "/assets/gifts/jeho/premium/world_trophy.png",
+      "animationUrl": "/assets/cosmetics/entries/entry_mikoo_196_football_trophy.mp4",
+      "previewUrl": "/assets/gifts/jeho/premium/world_trophy_preview.mp4",
+      "category": "premium",
+      "sortOrder": 60
+    },
+    {
+      "nameAr": "مجرة VIP",
+      "nameEn": "VIP Galaxy",
+      "coinPrice": 2999,
+      "iconUrl": "/assets/gifts/jeho/premium/vip_galaxy.png",
+      "animationUrl": "/assets/cosmetics/entries/entry_mikoo_73_vip7.mp4",
+      "previewUrl": "/assets/gifts/jeho/premium/vip_galaxy_preview.mp4",
+      "category": "premium",
+      "sortOrder": 5
+    },
+    {
+      "nameAr": "هدف ناري",
+      "nameEn": "Fire Goal",
+      "coinPrice": 699,
+      "iconUrl": "/assets/gifts/jeho/premium/goal_fire.png",
+      "animationUrl": "/assets/cosmetics/entries/entry_mikoo_190_goal.mp4",
+      "previewUrl": "/assets/gifts/jeho/premium/goal_fire_preview.mp4",
+      "category": "premium",
+      "sortOrder": 70
+    }
+  ]
+}

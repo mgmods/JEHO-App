@@ -1,0 +1,3 @@
+-- Host target period keys stay varchar(7):
+-- monthly YYYY-MM | weekly YYYYWww (e.g. 2026W32)
+-- No column widen required.

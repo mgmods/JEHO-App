@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fallbacks when dynamic palette color resources from Material fail to link. -->
+    <color name="m3_ref_palette_dynamic_neutral_variant4">#FF0E0D12</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant6">#FF141318</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant12">#FF211F26</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant17">#FF2B2930</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant22">#FF36343B</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant24">#FF3B383E</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant87">#FFEBE6F0</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant92">#FFF3EEF7</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant94">#FFF6F1F9</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant96">#FFF9F5FC</color>
+    <color name="m3_ref_palette_dynamic_neutral_variant98">#FFFFFBFE</color>
+</resources>

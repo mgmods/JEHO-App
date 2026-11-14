@@ -1,0 +1,358 @@
+{
+  "version": "mikoo-countries-1",
+  "count": 44,
+  "items": [
+    {
+      "id": 53,
+      "name": "Portugal",
+      "nameAr": "البرتغال",
+      "short": "PT",
+      "icon": "https://pic.vchat-onlie.com/flag/ic_portugal.png",
+      "groupId": 4
+    },
+    {
+      "id": 2,
+      "name": "USA",
+      "nameAr": "الولايات",
+      "short": "US",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_usa.png",
+      "groupId": 4
+    },
+    {
+      "id": 49,
+      "name": "Brazil",
+      "nameAr": "البرازيل",
+      "short": "BR",
+      "icon": "https://res.coccolive.com/country/flag/ic_brazil.png",
+      "groupId": 4
+    },
+    {
+      "id": 55,
+      "name": "Colombia",
+      "nameAr": "كولومبيا",
+      "short": "CO",
+      "icon": "https://pic.vchat-onlie.com/flag/ic_Colombia.png",
+      "groupId": 4
+    },
+    {
+      "id": 10,
+      "name": "Canada",
+      "nameAr": "كندا",
+      "short": "CA",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_canada.png",
+      "groupId": 4
+    },
+    {
+      "id": 14,
+      "name": "Germany",
+      "nameAr": "ألمانيا",
+      "short": "DE",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_germany.png",
+      "groupId": 4
+    },
+    {
+      "id": 61,
+      "name": "Mexico",
+      "nameAr": "المكسيك",
+      "short": "MX",
+      "icon": "https://pic.vchat-onlie.com/flag/ic_Mexico.png",
+      "groupId": 4
+    },
+    {
+      "id": 184,
+      "name": "Nigeria",
+      "nameAr": "نيجيريا",
+      "short": "NG",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_nigeria.png",
+      "groupId": 4
+    },
+    {
+      "id": 35,
+      "name": "Russia",
+      "nameAr": "روسيا",
+      "short": "RU",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_russia.png",
+      "groupId": 4
+    },
+    {
+      "id": 36,
+      "name": "Spain",
+      "nameAr": "إسبانيا",
+      "short": "ES",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_spain.png",
+      "groupId": 4
+    },
+    {
+      "id": 52,
+      "name": "Venezuela",
+      "nameAr": "فنزويلا",
+      "short": "VE",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_venezuela.png",
+      "groupId": 4
+    },
+    {
+      "id": 33,
+      "name": "Philippines",
+      "nameAr": "الفلبين",
+      "short": "PH",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_philippines.png",
+      "groupId": 2
+    },
+    {
+      "id": 16,
+      "name": "Indonesia",
+      "nameAr": "إندونيسيا",
+      "short": "ID",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_indonesia.png",
+      "groupId": 2
+    },
+    {
+      "id": 144,
+      "name": "Cambodia",
+      "nameAr": "كمبوديا",
+      "short": "KH",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_cambodia.png",
+      "groupId": 2
+    },
+    {
+      "id": 27,
+      "name": "Malaysia",
+      "nameAr": "ماليزيا",
+      "short": "MY",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_malaysia.png",
+      "groupId": 2
+    },
+    {
+      "id": 204,
+      "name": "Singapore",
+      "nameAr": "سنغافورة",
+      "short": "SG",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_singapore.png",
+      "groupId": 2
+    },
+    {
+      "id": 39,
+      "name": "Thailand",
+      "nameAr": "تايلاند",
+      "short": "TH",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_thailand.png",
+      "groupId": 2
+    },
+    {
+      "id": 46,
+      "name": "Vietnam",
+      "nameAr": "فيتنام",
+      "short": "VN",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_vietnam.png",
+      "groupId": 2
+    },
+    {
+      "id": 9,
+      "name": "Bangladesh",
+      "nameAr": "بنغلاديش",
+      "short": "BD",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_bangladesh.png",
+      "groupId": 3
+    },
+    {
+      "id": 15,
+      "name": "India",
+      "nameAr": "الهند",
+      "short": "IN",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_india.png",
+      "groupId": 3
+    },
+    {
+      "id": 31,
+      "name": "Pakistan",
+      "nameAr": "باكستان",
+      "short": "PK",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_pakistan.png",
+      "groupId": 3
+    },
+    {
+      "id": 22,
+      "name": "Saudi",
+      "nameAr": "السعودية",
+      "short": "SA",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_saudi_arabia.png",
+      "groupId": 1
+    },
+    {
+      "id": 11,
+      "name": "Egypt",
+      "nameAr": "مصر",
+      "short": "EG",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_egypt.png",
+      "groupId": 1
+    },
+    {
+      "id": 34,
+      "name": "Qatar",
+      "nameAr": "قطر",
+      "short": "QA",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_qatar.png",
+      "groupId": 1
+    },
+    {
+      "id": 5,
+      "name": "Algeria",
+      "nameAr": "الجزائر",
+      "short": "DZ",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_algeria.png",
+      "groupId": 1
+    },
+    {
+      "id": 18,
+      "name": "Iraq",
+      "nameAr": "العراق",
+      "short": "IQ",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_iraq.png",
+      "groupId": 1
+    },
+    {
+      "id": 21,
+      "name": "Jordan",
+      "nameAr": "الأردن",
+      "short": "JO",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_jordan.png",
+      "groupId": 1
+    },
+    {
+      "id": 24,
+      "name": "Kuwait",
+      "nameAr": "الكويت",
+      "short": "KW",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_kuwait.png",
+      "groupId": 1
+    },
+    {
+      "id": 26,
+      "name": "Libya",
+      "nameAr": "ليبيا",
+      "short": "LY",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_libya.png",
+      "groupId": 1
+    },
+    {
+      "id": 25,
+      "name": "Lebanon",
+      "nameAr": "لبنان",
+      "short": "LB",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_lebanon.png",
+      "groupId": 1
+    },
+    {
+      "id": 28,
+      "name": "Morocco",
+      "nameAr": "المغرب",
+      "short": "MA",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_morocco.png",
+      "groupId": 1
+    },
+    {
+      "id": 30,
+      "name": "Oman",
+      "nameAr": "عمان",
+      "short": "OM",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_oman.png",
+      "groupId": 1
+    },
+    {
+      "id": 32,
+      "name": "Palestine",
+      "nameAr": "فلسطين",
+      "short": "PS",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_palestine.png",
+      "groupId": 1
+    },
+    {
+      "id": 38,
+      "name": "Syria",
+      "nameAr": "سوريا",
+      "short": "SY",
+      "icon": "https://res.coccolive.com/country/flag/ic_syria.png",
+      "groupId": 1
+    },
+    {
+      "id": 41,
+      "name": "Turkey",
+      "nameAr": "تركيا",
+      "short": "TR",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_turkey.png",
+      "groupId": 1
+    },
+    {
+      "id": 40,
+      "name": "Tunisia",
+      "nameAr": "تونس",
+      "short": "TN",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_tunisia.png",
+      "groupId": 1
+    },
+    {
+      "id": 42,
+      "name": "United Arab Emirates",
+      "nameAr": "الامارات",
+      "short": "AE",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_the_united_arab_emirates.png",
+      "groupId": 1
+    },
+    {
+      "id": 45,
+      "name": "Yemen",
+      "nameAr": "اليمن",
+      "short": "YE",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_yemen.png",
+      "groupId": 1
+    },
+    {
+      "id": 77,
+      "name": "Azerbaijan",
+      "nameAr": "أذربيجان",
+      "short": "AZ",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_azerbaijan.png",
+      "groupId": 5
+    },
+    {
+      "id": 70,
+      "name": "Albania",
+      "nameAr": "ألبانيا",
+      "short": "AL",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_albania.png",
+      "groupId": 5
+    },
+    {
+      "id": 67,
+      "name": "Afghanistan",
+      "nameAr": "أفغانستان",
+      "short": "AF",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_afghanistan.png",
+      "groupId": 5
+    },
+    {
+      "id": 17,
+      "name": "Iran",
+      "nameAr": "إيران",
+      "short": "IR",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_iran.png",
+      "groupId": 5
+    },
+    {
+      "id": 221,
+      "name": "Tajikistan",
+      "nameAr": " طاجيكستان",
+      "short": "TJ",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_tajikistan.png",
+      "groupId": 5
+    },
+    {
+      "id": 231,
+      "name": "Uzbekistan",
+      "nameAr": " أوزبكستان",
+      "short": "UZ",
+      "icon": "https://pic.vchat-onlie.com/country/flag/ic_uzbekistan.png",
+      "groupId": 5
+    }
+  ]
+}

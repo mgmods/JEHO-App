@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE rooms
+  ADD COLUMN IF NOT EXISTS "giftSoundsEnabled" boolean NOT NULL DEFAULT true;
+
+COMMIT;

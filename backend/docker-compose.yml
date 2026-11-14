@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: auralive-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: auralive
+      POSTGRES_PASSWORD: auralive_secret
+      POSTGRES_DB: auralive
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auralive -d auralive"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: auralive-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: auralive-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.example
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: auralive
+      DB_PASSWORD: auralive_secret
+      DB_DATABASE: auralive
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: change-me-jwt-secret-min-32-chars-long
+      JWT_REFRESH_SECRET: change-me-refresh-secret-min-32-chars
+      UPLOAD_DIR: /app/uploads
+      CORS_ORIGINS: "*"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:

@@ -1,0 +1,493 @@
+package com.Dramizo.Series.data.local.prefs;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.util.Log;
+
+import com.Dramizo.Series.AuraLiveApp;
+import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.google.gson.Gson;
+
+/**
+ * Plain SharedPreferences session store on the unwrapped app context.
+ * Locale-wrapped Application contexts can fail to reload saved tokens on cold start.
+ */
+public class SessionManager {
+    private static final String TAG = "SessionManager";
+    private static final String PREFS = "auralive_session";
+    private static final String PREFS_LEGACY_SECURE = "auralive_secure_session";
+    private static final String PREFS_LEGACY_PLAIN = "auralive_session_plain";
+
+    public static final java.util.concurrent.locks.ReentrantLock AUTH_REFRESH_LOCK =
+            new java.util.concurrent.locks.ReentrantLock();
+
+    private final Context storageContext;
+    private final SharedPreferences prefs;
+    private final Gson gson = new Gson();
+
+    public SessionManager(Context context) {
+        storageContext = AuraLiveApp.storageContext(context);
+        prefs = storageContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        migrateLegacyIfNeeded();
+    }
+
+    private void migrateLegacyIfNeeded() {
+        if (hasToken(prefs)) return;
+        SharedPreferences plain = storageContext.getSharedPreferences(PREFS_LEGACY_PLAIN, Context.MODE_PRIVATE);
+        if (hasToken(plain)) {
+            copyAuth(plain, prefs);
+            return;
+        }
+        try {
+            androidx.security.crypto.MasterKey key = new androidx.security.crypto.MasterKey.Builder(storageContext)
+                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                    .build();
+            SharedPreferences secure = androidx.security.crypto.EncryptedSharedPreferences.create(
+                    storageContext, PREFS_LEGACY_SECURE, key,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM);
+            if (hasToken(secure)) {
+                copyAuth(secure, prefs);
+                return;
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            SharedPreferences legacy = storageContext.getSharedPreferences(PREFS_LEGACY_SECURE, Context.MODE_PRIVATE);
+            if (hasToken(legacy)) copyAuth(legacy, prefs);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static boolean hasToken(SharedPreferences p) {
+        String t = p.getString("access_token", null);
+        return t != null && !t.isEmpty();
+    }
+
+    private static void copyAuth(SharedPreferences from, SharedPreferences to) {
+        to.edit()
+                .putString("access_token", from.getString("access_token", null))
+                .putString("refresh_token", from.getString("refresh_token", null))
+                .putString("user_json", from.getString("user_json", null))
+                .putString("user_id", from.getString("user_id", null))
+                .commit();
+    }
+
+    public void saveSession(AuthDtos.AuthResult result) {
+        if (result == null || result.accessToken == null || result.accessToken.isEmpty()) {
+            Log.w(TAG, "saveSession skipped — missing access token");
+            return;
+        }
+        if (!prefs.edit()
+                .putString("access_token", result.accessToken)
+                .putString("refresh_token", result.refreshToken)
+                .putString("user_json", result.user != null ? gson.toJson(result.user) : prefs.getString("user_json", null))
+                .putString("user_id", result.user != null ? result.user.id : prefs.getString("user_id", null))
+                .commit()) {
+            Log.e(TAG, "saveSession commit failed");
+        }
+    }
+
+    /**
+     * Replace the cached profile with a complete server profile. Unlike
+     * updateCachedUser(), this intentionally preserves explicit nulls such as
+     * chatBubbleUrl=null after the user removes a worn CP chat bubble.
+     */
+    public void updateCachedUserAuthoritative(AuthDtos.UserDto user) {
+        if (user == null) return;
+        prefs.edit()
+                .putString("user_json", gson.toJson(user))
+                .putString("user_id", user.id != null ? user.id : prefs.getString("user_id", null))
+                .commit();
+        saveAccountSnapshot();
+    }
+
+    public void updateCachedUser(AuthDtos.UserDto user) {
+        if (user == null) return;
+        String identifier = user.username != null ? user.username
+                : (user.email != null ? user.email : user.publicId);
+        user = restoreSavedAccountProfile(user, identifier);
+        prefs.edit()
+                .putString("user_json", gson.toJson(user))
+                .putString("user_id", user.id != null ? user.id : prefs.getString("user_id", null))
+                .commit();
+        // Keep the per-account snapshot fresh so logout/login never loses profile fields.
+        saveAccountSnapshot();
+    }
+
+    /**
+     * Restore fields omitted by a partial login /me response from this same account's
+     * last saved snapshot. Non-empty values returned by the server always win.
+     */
+    public AuthDtos.UserDto restoreSavedAccountProfile(AuthDtos.UserDto incoming, String identifier) {
+        if (incoming == null || identifier == null || identifier.trim().isEmpty()) return incoming;
+        AuthDtos.UserDto saved = getSavedAccountUser(identifier);
+        if (saved == null || incoming.id == null || saved.id == null
+                || !incoming.id.equals(saved.id)) return incoming;
+        try {
+            for (java.lang.reflect.Field field : AuthDtos.UserDto.class.getFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+                Object fresh = field.get(incoming);
+                Object old = field.get(saved);
+                if (old == null) continue;
+                boolean restore = fresh == null;
+                if (fresh instanceof String) {
+                    restore = ((String) fresh).trim().isEmpty();
+                } else if (fresh instanceof java.util.Collection) {
+                    restore = ((java.util.Collection<?>) fresh).isEmpty();
+                } else if (fresh instanceof java.util.Map) {
+                    restore = ((java.util.Map<?, ?>) fresh).isEmpty();
+                } else if (field.getType().isPrimitive()) {
+                    if (field.getType() == boolean.class) {
+                        restore = !((Boolean) fresh) && ((Boolean) old);
+                    } else if (field.getType() == int.class) {
+                        restore = ((Integer) fresh) == 0 && ((Integer) old) != 0;
+                    } else if (field.getType() == long.class) {
+                        restore = ((Long) fresh) == 0L && ((Long) old) != 0L;
+                    } else if (field.getType() == double.class) {
+                        restore = ((Double) fresh) == 0d && ((Double) old) != 0d;
+                    } else if (field.getType() == float.class) {
+                        restore = ((Float) fresh) == 0f && ((Float) old) != 0f;
+                    }
+                }
+                if (restore) field.set(incoming, old);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not merge saved account profile", e);
+        }
+        return incoming;
+    }
+
+    public String getAccessToken() { return prefs.getString("access_token", null); }
+    public String getRefreshToken() { return prefs.getString("refresh_token", null); }
+    public String getUserId() { return prefs.getString("user_id", null); }
+
+    public AuthDtos.UserDto getUser() {
+        String json = prefs.getString("user_json", null);
+        if (json == null || json.isEmpty() || "null".equals(json)) return null;
+        try {
+            return gson.fromJson(json, AuthDtos.UserDto.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public String getDisplayName() {
+        AuthDtos.UserDto user = getUser();
+        if (user == null) return null;
+        if (user.displayName != null && !user.displayName.isEmpty()) return user.displayName;
+        return user.username;
+    }
+
+    public int getVipLevel() {
+        AuthDtos.UserDto user = getUser();
+        if (user == null) return 0;
+        if (user.vipLevel > 0) return user.vipLevel;
+        try {
+            String json = prefs.getString("user_json", null);
+            if (json == null) return 0;
+            com.google.gson.JsonObject o = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+            if (o.has("activeVip") && o.get("activeVip").isJsonObject()) {
+                com.google.gson.JsonObject vip = o.getAsJsonObject("activeVip");
+                if (vip.has("level") && !vip.get("level").isJsonNull()) {
+                    return Math.max(0, vip.get("level").getAsInt());
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return 0;
+    }
+
+    public int getUserLevel() {
+        AuthDtos.UserDto user = getUser();
+        return user != null ? Math.max(1, user.level) : 1;
+    }
+
+    public String getEntryEffectUrl() {
+        AuthDtos.UserDto user = getUser();
+        if (user == null) return null;
+        if (user.entryEffectUrl != null && !user.entryEffectUrl.isEmpty()) return user.entryEffectUrl;
+        return null;
+    }
+
+    public String getEntryAnimationUrl() {
+        AuthDtos.UserDto user = getUser();
+        return user != null ? user.entryAnimationUrl : null;
+    }
+
+    public String getRoomCardUrl() {
+        AuthDtos.UserDto user = getUser();
+        return user != null ? user.roomCardUrl : null;
+    }
+
+    public String getAvatarUrl() {
+        AuthDtos.UserDto user = getUser();
+        return user != null ? user.avatarUrl : null;
+    }
+
+    public String getHostBadgeUrl() {
+        AuthDtos.UserDto user = getUser();
+        return user != null ? user.hostBadgeUrl : null;
+    }
+
+    public boolean isLoggedIn() {
+        String t = getAccessToken();
+        return t != null && !t.isEmpty();
+    }
+
+    public void clearAuth() {
+        // Logout ends authentication only; preserve the complete account snapshot first.
+        saveAccountSnapshot();
+        prefs.edit()
+                .remove("access_token")
+                .remove("refresh_token")
+                .remove("user_json")
+                .remove("user_id")
+                .commit();
+    }
+
+    public void clear() { prefs.edit().clear().apply(); }
+    public void saveFcmToken(String token) { prefs.edit().putString("fcm_token", token).apply(); }
+    public String getFcmToken() { return prefs.getString("fcm_token", null); }
+    public void setDarkMode(boolean enabled) { prefs.edit().putBoolean("dark_mode", enabled).apply(); }
+    public boolean isDarkMode() { return prefs.getBoolean("dark_mode", false); }
+
+    public void setMuteMessageNotifications(boolean muted) {
+        prefs.edit().putBoolean("mute_message_notifications", muted).apply();
+    }
+
+    public boolean isMuteMessageNotifications() {
+        return prefs.getBoolean("mute_message_notifications", false);
+    }
+
+    /** Mute win/game/profit popup bubbles and celebration toasts. */
+    public void setMuteCelebrationPopups(boolean muted) {
+        prefs.edit().putBoolean("mute_celebration_popups", muted).apply();
+    }
+
+    public boolean isMuteCelebrationPopups() {
+        return prefs.getBoolean("mute_celebration_popups", false);
+    }
+
+    public void setFriendsOnlyMessages(boolean enabled) {
+        prefs.edit().putBoolean("friends_only_messages", enabled).apply();
+    }
+
+    public boolean isFriendsOnlyMessages() {
+        return prefs.getBoolean("friends_only_messages", false);
+    }
+
+    public void setFemaleOnlyVoiceHostsFromServer(boolean enabled) {
+        prefs.edit().putBoolean("server_female_only_hosts", enabled).apply();
+    }
+
+    public boolean isFemaleOnlyVoiceHostsFromServer() {
+        return prefs.getBoolean("server_female_only_hosts", false);
+    }
+
+    public void setMicWithoutHostApprovalFromServer(boolean enabled) {
+        prefs.edit().putBoolean("server_mic_without_approval", enabled).apply();
+    }
+
+    public boolean isMicWithoutHostApprovalFromServer() {
+        return prefs.getBoolean("server_mic_without_approval", true);
+    }
+
+    public void setGiftSoundsEnabledFromServer(boolean enabled) {
+        prefs.edit().putBoolean("server_gift_sounds_enabled", enabled).apply();
+    }
+
+    public boolean isGiftSoundsEnabledFromServer() {
+        return prefs.getBoolean("server_gift_sounds_enabled", true);
+    }
+
+    public void setTasksEnabledFromServer(boolean enabled) {
+        prefs.edit().putBoolean("server_tasks_enabled", enabled).apply();
+    }
+
+    /** Master flag from GET /config/features — default ON until server says otherwise. */
+    public boolean isTasksEnabledFromServer() {
+        return prefs.getBoolean("server_tasks_enabled", true);
+    }
+
+    public void setChatPromoFilterFromServer(boolean enabled) {
+        prefs.edit().putBoolean("server_chat_promo_filter", enabled).apply();
+    }
+
+    public boolean isChatPromoFilterFromServer() {
+        return prefs.getBoolean("server_chat_promo_filter", true);
+    }
+
+    public void setChatExtraKeywordsFromServer(String keywordsCsv) {
+        prefs.edit().putString("server_chat_extra_keywords", keywordsCsv != null ? keywordsCsv : "").apply();
+    }
+
+    public String getChatExtraKeywordsFromServer() {
+        return prefs.getString("server_chat_extra_keywords", "");
+    }
+
+    public void setLanguage(String lang) {
+        prefs.edit().putString("language", lang).commit();
+        try {
+            storageContext.getSharedPreferences("auralive_lang", Context.MODE_PRIVATE)
+                    .edit().putString("language", lang).commit();
+        } catch (Exception ignored) {
+        }
+    }
+
+    public String getLanguage() { return prefs.getString("language", "ar"); }
+
+    private String createRoomKey(String field) {
+        String uid = getUserId();
+        if (uid == null || uid.isEmpty()) uid = "_guest";
+        return "create_room_" + field + "_" + uid;
+    }
+
+    public void saveCreateRoomDefaults(String title, String coverUrl) {
+        android.content.SharedPreferences.Editor e = prefs.edit();
+        if (title != null) e.putString(createRoomKey("title"), title);
+        if (coverUrl != null) e.putString(createRoomKey("cover"), coverUrl);
+        e.apply();
+    }
+
+    public void saveCreateRoomTitle(String title) {
+        if (title == null) return;
+        prefs.edit().putString(createRoomKey("title"), title).apply();
+    }
+
+    public void saveCreateRoomCover(String coverUrl) {
+        if (coverUrl == null) return;
+        prefs.edit().putString(createRoomKey("cover"), coverUrl).apply();
+    }
+
+    public String getCreateRoomTitle() {
+        return prefs.getString(createRoomKey("title"), null);
+    }
+
+    public String getCreateRoomCoverUrl() {
+        return prefs.getString(createRoomKey("cover"), null);
+    }
+
+    public void saveAccountSnapshot() {
+        AuthDtos.UserDto u = getUser();
+        if (u == null || u.username == null) return;
+        String key = "acc_" + u.username;
+        String blob = gson.toJson(new SavedAccount(getAccessToken(), getRefreshToken(), u));
+        prefs.edit().putString(key, blob).apply();
+        java.util.HashSet<String> set = new java.util.HashSet<>(prefs.getStringSet("saved_accounts", new java.util.HashSet<>()));
+        set.add(u.username);
+        prefs.edit().putStringSet("saved_accounts", set).apply();
+    }
+
+    public java.util.List<String> listSavedAccounts() {
+        return new java.util.ArrayList<>(prefs.getStringSet("saved_accounts", new java.util.HashSet<>()));
+    }
+
+
+    /** Full saved account cards (display name, avatar, frame, public ID). */
+    public java.util.List<SavedAccountInfo> listSavedAccountDetails() {
+        java.util.ArrayList<SavedAccountInfo> out = new java.util.ArrayList<>();
+        for (String username : listSavedAccounts()) {
+            if (username == null) continue;
+            String blob = prefs.getString("acc_" + username, null);
+            SavedAccountInfo info = new SavedAccountInfo();
+            info.usernameKey = username;
+            if (blob != null) {
+                try {
+                    SavedAccount a = gson.fromJson(blob, SavedAccount.class);
+                    if (a != null && a.user != null) {
+                        info.user = a.user;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            out.add(info);
+        }
+        return out;
+    }
+
+    public boolean switchToAccount(String username) {
+        String blob = prefs.getString("acc_" + username, null);
+        if (blob == null) return false;
+        SavedAccount a = gson.fromJson(blob, SavedAccount.class);
+        if (a == null || a.accessToken == null) return false;
+        prefs.edit()
+                .putString("access_token", a.accessToken)
+                .putString("refresh_token", a.refreshToken)
+                .putString("user_json", gson.toJson(a.user))
+                .putString("user_id", a.user != null ? a.user.id : null)
+                .commit();
+        return true;
+    }
+
+    /** Return the last saved server profile for an account after logout or a transient /me failure. */
+    public AuthDtos.UserDto getSavedAccountUser(String identifier) {
+        if (identifier == null || identifier.trim().isEmpty()) return null;
+        String key = identifier.trim();
+        for (String username : listSavedAccounts()) {
+            if (username == null) continue;
+            String blob = prefs.getString("acc_" + username, null);
+            if (blob == null) continue;
+            try {
+                SavedAccount account = gson.fromJson(blob, SavedAccount.class);
+                AuthDtos.UserDto user = account != null ? account.user : null;
+                if (user == null) continue;
+                if (username.equalsIgnoreCase(key)
+                        || (user.username != null && user.username.equalsIgnoreCase(key))
+                        || (user.email != null && user.email.equalsIgnoreCase(key))
+                        || (user.publicId != null && user.publicId.equalsIgnoreCase(key))) {
+                    return user;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return null;
+    }
+
+    public void removeSavedAccount(String username) {
+        if (username == null) return;
+        java.util.HashSet<String> set = new java.util.HashSet<>(prefs.getStringSet("saved_accounts", new java.util.HashSet<>()));
+        set.remove(username);
+        prefs.edit().remove("acc_" + username).putStringSet("saved_accounts", set).apply();
+    }
+
+    public static final class SavedAccountInfo {
+        public String usernameKey;
+        public AuthDtos.UserDto user;
+
+        public String displayName() {
+            if (user != null) {
+                if (user.displayName != null && !user.displayName.trim().isEmpty()) {
+                    return user.displayName.trim();
+                }
+                if (user.username != null) return user.username;
+            }
+            return usernameKey != null ? usernameKey : "—";
+        }
+
+        public String publicId() {
+            return user != null ? user.displayPublicId() : "";
+        }
+
+        public String avatarUrl() {
+            return user != null ? user.avatarUrl : null;
+        }
+
+        /** Personal VIP avatar frame only (same as profile). */
+        public String frameUrl() {
+            if (user == null) return null;
+            return user.vipBadgeUrl;
+        }
+    }
+
+    private static class SavedAccount {
+        String accessToken;
+        String refreshToken;
+        AuthDtos.UserDto user;
+        SavedAccount(String accessToken, String refreshToken, AuthDtos.UserDto user) {
+            this.accessToken = accessToken;
+            this.refreshToken = refreshToken;
+            this.user = user;
+        }
+    }
+}

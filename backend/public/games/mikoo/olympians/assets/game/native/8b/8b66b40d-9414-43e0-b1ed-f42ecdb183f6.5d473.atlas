@@ -1,0 +1,76 @@
+
+liudong.png
+size: 968,962
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+2_00000
+  rotate: false
+  xy: 2, 379
+  size: 400, 187
+  orig: 402, 189
+  offset: 1, 1
+  index: -1
+2_00001
+  rotate: false
+  xy: 2, 2
+  size: 400, 186
+  orig: 402, 188
+  offset: 1, 1
+  index: -1
+2_00002
+  rotate: true
+  xy: 404, 190
+  size: 400, 186
+  orig: 402, 188
+  offset: 1, 1
+  index: -1
+2_00003
+  rotate: true
+  xy: 592, 190
+  size: 400, 186
+  orig: 402, 188
+  offset: 1, 1
+  index: -1
+2_00004
+  rotate: false
+  xy: 2, 761
+  size: 400, 199
+  orig: 402, 201
+  offset: 1, 1
+  index: -1
+2_00005
+  rotate: false
+  xy: 404, 774
+  size: 400, 186
+  orig: 402, 188
+  offset: 1, 1
+  index: -1
+2_00006
+  rotate: false
+  xy: 404, 2
+  size: 400, 186
+  orig: 402, 188
+  offset: 1, 1
+  index: -1
+2_00007
+  rotate: true
+  xy: 780, 372
+  size: 400, 186
+  orig: 402, 188
+  offset: 1, 1
+  index: -1
+2_00008
+  rotate: false
+  xy: 2, 568
+  size: 400, 191
+  orig: 402, 193
+  offset: 1, 1
+  index: -1
+2_00009
+  rotate: false
+  xy: 2, 190
+  size: 400, 187
+  orig: 402, 201
+  offset: 1, 1
+  index: -1

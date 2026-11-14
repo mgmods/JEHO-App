@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>ONO · AuraLive</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;background:radial-gradient(ellipse at top,#3a1450,#12081c 55%,#07040c);color:#fff;font-family:Tahoma,Arial,sans-serif;display:flex;flex-direction:column;padding:12px;gap:10px}
+.top{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:22px;background:linear-gradient(90deg,#ffe566,#ff6b9d);-webkit-background-clip:text;color:transparent;font-weight:900}
+.badge{background:rgba(255,255,255,.1);border:1px solid rgba(255,214,120,.35);border-radius:999px;padding:6px 12px;font-size:12px}
+.aura-badge{display:none;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border-radius:999px;background:rgba(0,0,0,.35);border:1px solid rgba(255,214,120,.45);font-size:16px;margin-inline-end:6px}
+.aura-badge.on{display:inline-flex}
+.table{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(0,0,0,.22);border:1px solid rgba(255,214,120,.2);border-radius:22px;padding:16px;min-height:220px}
+.opp{font-size:13px;opacity:.85}
+#pile{width:86px;height:120px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.45);border:3px solid rgba(255,255,255,.35)}
+.hand{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;min-height:110px}
+.card{width:68px;height:96px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;cursor:pointer;border:2px solid rgba(255,255,255,.35);box-shadow:0 6px 14px rgba(0,0,0,.35);transition:transform .12s}
+.card:active{transform:scale(.94)}
+.card.wild{background:linear-gradient(135deg,#222,#555);color:#ffe566}
+.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+button{border:0;border-radius:16px;padding:12px 18px;font-weight:800;color:#fff;cursor:pointer}
+#draw{background:linear-gradient(90deg,#7b2ff7,#f107a3)}
+#new{background:linear-gradient(90deg,#00c6ff,#0072ff)}
+#msg{text-align:center;min-height:22px;color:#ffd7e6;font-size:14px}
+.colors{display:none;gap:8px;justify-content:center}
+.colors.show{display:flex}
+.sw{width:42px;height:42px;border-radius:50%;border:3px solid #fff;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="top"><h1>ONO</h1><div style="display:flex;align-items:center"><span class="aura-badge" id="stampBadge"></span><span class="aura-badge" id="emojiBadge"></span><div class="badge" id="score">أنت 0 · خصم 0</div></div></div>
+<div class="table">
+  <div class="opp" id="opp">خصم · 7 أوراق</div>
+  <div id="pile"></div>
+  <div id="msg">جاري التجهيز…</div>
+</div>
+<div class="hand" id="hand"></div>
+<div class="colors" id="colors">
+  <div class="sw" style="background:#e63946" data-c="0"></div>
+  <div class="sw" style="background:#457b9d" data-c="1"></div>
+  <div class="sw" style="background:#2a9d8f" data-c="2"></div>
+  <div class="sw" style="background:#f4a261" data-c="3"></div>
+</div>
+<div class="actions">
+  <button id="draw">اسحب ورقة</button>
+  <button id="new">جولة جديدة</button>
+</div>
+<script>
+const COLORS=['#e63946','#457b9d','#2a9d8f','#f4a261'];
+let pile, hand=[], oppCount=7, turn='you', score={you:0,opp:0};
+let pvp=false, role=1, p1Hand=[], p2Hand=[], turnN=1, applying=false;
+
+function isPvp(){ return !!(window.__AURA_PVP__&&window.__AURA_PVP__.active)||(window.AuraBridge&&AuraBridge.isPvP&&AuraBridge.isPvP()); }
+function myRole(){ if(window.__AURA_PVP__&&window.__AURA_PVP__.role) return window.__AURA_PVP__.role; try{return AuraBridge.myRole()}catch(e){return 1} }
+function card(c,n,special){return {c,n,special:special||null};}
+function randCard(){
+  const r=Math.random();
+  if(r<.08) return card(-1,0,'wild');
+  if(r<.16) return card(Math.floor(Math.random()*4),0,'plus2');
+  return card(Math.floor(Math.random()*4),1+Math.floor(Math.random()*9));
+}
+function canPlay(c){
+  if(c.special==='wild') return true;
+  if(c.special==='plus2') return c.c===pile.c || pile.special==='plus2';
+  return c.c===pile.c || c.n===pile.n;
+}
+function syncLocalFromGlobal(){
+  role=myRole();
+  hand = role===1 ? p1Hand.slice() : p2Hand.slice();
+  oppCount = role===1 ? p2Hand.length : p1Hand.length;
+  turn = (turnN===role) ? 'you' : 'opp';
+  score.you = role===1 ? (score._1||0) : (score._2||0);
+  score.opp = role===1 ? (score._2||0) : (score._1||0);
+}
+function pushState(msg){
+  if(!pvp||applying) return;
+  const payload={
+    p1Hand:p1Hand, p2Hand:p2Hand, pile:pile, turn:turnN,
+    score:{_1:score._1||0,_2:score._2||0}, msg:msg||'', kind:'ono'
+  };
+  try{ AuraBridge.postState(JSON.stringify(payload)); }catch(e){}
+}
+function render(){
+  const pileEl=document.getElementById('pile');
+  if(!pile){ document.getElementById('msg').textContent='انتظار الخصم…'; return; }
+  pileEl.style.background=pile.c>=0?COLORS[pile.c]:'linear-gradient(135deg,#222,#666)';
+  pileEl.textContent=pile.special==='wild'?'★':pile.special==='plus2'?'+2':pile.n;
+  document.getElementById('opp').textContent=(pvp?'خصم حقيقي':'خصم الذكاء')+' · '+oppCount+' أوراق';
+  document.getElementById('score').textContent='أنت '+score.you+' · خصم '+score.opp;
+  const handEl=document.getElementById('hand'); handEl.innerHTML='';
+  hand.forEach((c,i)=>{
+    const el=document.createElement('div');
+    el.className='card'+(c.special==='wild'?' wild':'');
+    el.style.background=c.c>=0?COLORS[c.c]:'';
+    el.textContent=c.special==='wild'?'★':c.special==='plus2'?'+2':c.n;
+    el.onclick=()=>play(i);
+    handEl.appendChild(el);
+  });
+}
+function play(i){
+  if(turn!=='you') return;
+  const c=hand[i];
+  if(!canPlay(c)){ document.getElementById('msg').textContent='لا تطابق!'; return; }
+  hand.splice(i,1);
+  if(pvp){ if(role===1) p1Hand=hand.slice(); else p2Hand=hand.slice(); }
+  pile=c;
+  if(!hand.length){
+    if(pvp){ if(role===1) score._1=(score._1||0)+1; else score._2=(score._2||0)+1; }
+    else score.you++;
+    document.getElementById('msg').textContent='فزت! 🎉';
+    syncLocalFromGlobal(); render();
+    if(pvp){ pushState('win'); setTimeout(()=>{ if(role===1) deal(true); },900); }
+    else setTimeout(deal,900);
+    return;
+  }
+  if(c.special==='wild'){ document.getElementById('colors').classList.add('show'); document.getElementById('msg').textContent='اختر لوناً'; turn='color'; render(); return; }
+  if(c.special==='plus2'){
+    if(pvp){
+      const extra=[randCard(),randCard()];
+      if(role===1) p2Hand=p2Hand.concat(extra); else p1Hand=p1Hand.concat(extra);
+      document.getElementById('msg').textContent='+2 على الخصم';
+    } else { oppCount+=2; document.getElementById('msg').textContent='+2 على الخصم'; }
+  } else document.getElementById('msg').textContent='دورك انتهى';
+  if(pvp){ turnN = role===1?2:1; syncLocalFromGlobal(); render(); pushState(document.getElementById('msg').textContent); }
+  else { turn='bot'; render(); setTimeout(botPlay,500); }
+}
+function chooseColor(c){
+  pile.c=c; pile.special=null; pile.n=Math.floor(Math.random()*9)+1;
+  document.getElementById('colors').classList.remove('show');
+  document.getElementById('msg').textContent='تم اختيار اللون';
+  if(pvp){ turnN=role===1?2:1; syncLocalFromGlobal(); render(); pushState('color'); }
+  else { turn='bot'; render(); setTimeout(botPlay,450); }
+}
+document.querySelectorAll('.sw').forEach(el=>el.onclick=()=>chooseColor(+el.dataset.c));
+function botPlay(){
+  if(turn!=='bot'||pvp) return;
+  let played=null;
+  if(Math.random()<.75){
+    if(Math.random()<.15) played=card(-1,0,'wild');
+    else if(Math.random()<.2) played=card(pile.c,0,'plus2');
+    else played=card(pile.c,1+Math.floor(Math.random()*9));
+    oppCount=Math.max(0,oppCount-1);
+  } else {
+    oppCount++;
+    document.getElementById('msg').textContent='الخصم سحب ورقة';
+    turn='you'; render(); return;
+  }
+  pile=played;
+  if(played.special==='wild'){ pile.c=Math.floor(Math.random()*4); pile.special=null; pile.n=5; }
+  if(played.special==='plus2'){ hand.push(randCard()); hand.push(randCard()); document.getElementById('msg').textContent='الخصم لعب +2'; }
+  else document.getElementById('msg').textContent='الخصم لعب';
+  if(oppCount<=0){ score.opp++; document.getElementById('msg').textContent='الخصم فاز'; render(); setTimeout(deal,900); return; }
+  turn='you'; render();
+}
+function deal(force){
+  if(pvp && role!==1 && !force){ document.getElementById('msg').textContent='انتظار المضيف ليوزّع…'; return; }
+  p1Hand=[]; p2Hand=[];
+  for(let i=0;i<7;i++){ p1Hand.push(randCard()); p2Hand.push(randCard()); }
+  pile=randCard(); while(pile.special) pile=randCard();
+  turnN=1; score._1=score._1||0; score._2=score._2||0;
+  document.getElementById('colors').classList.remove('show');
+  document.getElementById('msg').textContent='طابق اللون أو الرقم';
+  if(pvp){ syncLocalFromGlobal(); render(); pushState('deal'); }
+  else {
+    hand=p1Hand.slice(); oppCount=7; turn='you'; score={you:score.you||0,opp:score.opp||0};
+    render();
+  }
+}
+document.getElementById('draw').onclick=()=>{
+  if(turn!=='you')return;
+  const c=randCard();
+  hand.push(c);
+  if(pvp){ if(role===1) p1Hand=hand.slice(); else p2Hand=hand.slice(); turnN=role===1?2:1; syncLocalFromGlobal(); render(); pushState('draw'); }
+  else { turn='bot'; render(); setTimeout(botPlay,400); }
+};
+document.getElementById('new').onclick=()=>{ if(pvp&&role!==1){document.getElementById('msg').textContent='فقط المضيف يبدأ جولة جديدة';return;} deal(true); };
+
+window.applyAuraState=function(raw){
+  try{
+    applying=true;
+    const s=typeof raw==='string'?JSON.parse(raw):raw;
+    if(!s||!s.pile) return;
+    pvp=true; role=myRole();
+    p1Hand=s.p1Hand||[]; p2Hand=s.p2Hand||[]; pile=s.pile; turnN=s.turn||1;
+    score._1=(s.score&&s.score._1)||0; score._2=(s.score&&s.score._2)||0;
+    syncLocalFromGlobal();
+    if(s.msg) document.getElementById('msg').textContent=s.msg;
+    render();
+  }catch(e){}
+  finally{ applying=false; }
+};
+window.onAuraPvPReady=function(){
+  pvp=true; role=myRole();
+  document.getElementById('opp').textContent='خصم حقيقي';
+  if(role===1) deal(true);
+  else document.getElementById('msg').textContent='تم الاتصال — انتظار توزيع الأوراق…';
+};
+function boot(){
+  pvp=isPvp();
+  if(pvp){ role=myRole(); if(role===1) deal(true); else document.getElementById('msg').textContent='انتظار الخصم…'; }
+  else { hand=[]; for(let i=0;i<7;i++) hand.push(randCard()); oppCount=7; pile=randCard(); while(pile.special)pile=randCard(); turn='you'; score={you:0,opp:0}; document.getElementById('msg').textContent='طابق اللون أو الرقم'; render(); }
+}
+setTimeout(boot,200);
+const STAMPS={stamp_heart:'💖',stamp_crown:'👑',stamp_vip:'⭐'};
+const EMOJIS={emoji_laugh:'😂',emoji_fire:'🔥',emoji_crown:'👑'};
+function setBadge(el,text){ if(!el)return; if(text){el.textContent=text;el.classList.add('on');}else{el.textContent='';el.classList.remove('on');} }
+window.applyAuraCosmetics=function(c){
+  c=c||window.__AURA_COSMETICS__||{};
+  setBadge(document.getElementById('stampBadge'), STAMPS[c.stamp]||'');
+  setBadge(document.getElementById('emojiBadge'), EMOJIS[c.emoji]||'');
+  const tile=c.tiles;
+  if(tile==='tile_rose') document.querySelector('.table').style.borderColor='rgba(233,30,140,.55)';
+  else if(tile==='tile_royal') document.querySelector('.table').style.borderColor='rgba(155,89,182,.55)';
+};
+if(window.__AURA_COSMETICS__) window.applyAuraCosmetics(window.__AURA_COSMETICS__);
+</script>
+</body>
+</html>

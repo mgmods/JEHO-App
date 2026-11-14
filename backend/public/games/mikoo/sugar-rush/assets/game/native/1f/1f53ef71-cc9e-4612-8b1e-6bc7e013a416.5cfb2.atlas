@@ -1,0 +1,111 @@
+
+kuang.png
+size: 1454,80
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+000
+  rotate: false
+  xy: 1359, 5
+  size: 93, 73
+  orig: 95, 75
+  offset: 1, 1
+  index: -1
+001
+  rotate: false
+  xy: 1072, 4
+  size: 94, 74
+  orig: 96, 76
+  offset: 1, 1
+  index: -1
+002
+  rotate: false
+  xy: 783, 3
+  size: 94, 75
+  orig: 96, 77
+  offset: 1, 1
+  index: -1
+003
+  rotate: false
+  xy: 1264, 4
+  size: 93, 74
+  orig: 95, 76
+  offset: 1, 1
+  index: -1
+004
+  rotate: false
+  xy: 1168, 4
+  size: 94, 74
+  orig: 96, 76
+  offset: 1, 1
+  index: -1
+005
+  rotate: false
+  xy: 201, 2
+  size: 94, 76
+  orig: 96, 78
+  offset: 1, 1
+  index: -1
+006
+  rotate: false
+  xy: 297, 2
+  size: 94, 76
+  orig: 96, 78
+  offset: 1, 1
+  index: -1
+007
+  rotate: false
+  xy: 879, 3
+  size: 94, 75
+  orig: 96, 77
+  offset: 1, 1
+  index: -1
+008
+  rotate: false
+  xy: 393, 3
+  size: 95, 75
+  orig: 97, 77
+  offset: 1, 1
+  index: -1
+009
+  rotate: false
+  xy: 587, 4
+  size: 96, 74
+  orig: 98, 76
+  offset: 1, 1
+  index: -1
+010
+  rotate: false
+  xy: 490, 3
+  size: 95, 75
+  orig: 97, 77
+  offset: 1, 1
+  index: -1
+011
+  rotate: false
+  xy: 102, 3
+  size: 97, 75
+  orig: 99, 77
+  offset: 1, 1
+  index: -1
+012
+  rotate: false
+  xy: 2, 3
+  size: 98, 75
+  orig: 100, 77
+  offset: 1, 1
+  index: -1
+013
+  rotate: false
+  xy: 685, 4
+  size: 96, 74
+  orig: 98, 76
+  offset: 1, 1
+  index: -1
+014
+  rotate: false
+  xy: 975, 4
+  size: 95, 74
+  orig: 97, 76
+  offset: 1, 1
+  index: -1

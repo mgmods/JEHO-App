@@ -1,0 +1,1134 @@
+<template>
+  <div>
+    <PageHeader :title="t('games.title')" :subtitle="t('games.subtitle')">
+      <template #actions>
+        <button class="btn btn-outline-light btn-sm" type="button" :disabled="loading" @click="resetDefaults">
+          {{ t('games.resetDefaults') }}
+        </button>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="save">
+          {{ t('games.saveToApp') }}
+        </button>
+      </template>
+    </PageHeader>
+
+    <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
+    <div v-if="pageRuntimeError" class="alert alert-danger d-flex flex-wrap justify-content-between align-items-center gap-2" role="alert">
+      <span>تعذّر عرض جزء من صفحة الألعاب: {{ pageRuntimeError }}</span>
+      <button class="btn btn-sm btn-outline-light" type="button" @click="retryPage">إعادة تحميل بيانات الألعاب</button>
+    </div>
+    <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
+
+    <div class="glass p-3 mb-3 small text-muted">
+      {{ t('games.hint') }}
+    </div>
+
+    <nav class="glass p-3 mb-4 d-flex flex-wrap gap-2" aria-label="أقسام إدارة الألعاب">
+      <a class="btn btn-outline-light btn-sm" href="#game-catalog">قائمة الألعاب وإظهارها</a>
+      <a class="btn btn-outline-light btn-sm" href="#game-odds">الإعدادات العامة وحدود الرهان</a>
+      <a class="btn btn-outline-light btn-sm" href="#game-runtime-controls">تشغيل وإيقاف الألعاب</a>
+      <a class="btn btn-outline-light btn-sm" href="#game-win-rates">نسب الفوز</a>
+      <a class="btn btn-outline-light btn-sm" href="#game-store">متجر الألعاب</a>
+    </nav>
+
+    <div id="game-catalog" class="glass p-3">
+      <LoadingSpinner v-if="loading && !safeGames.length" />
+      <div v-else-if="!safeGames.length" class="empty-state p-5 text-center">
+        <i class="bi bi-controller fs-1 d-block mb-2"></i>
+        <strong class="d-block">قائمة الألعاب فارغة — استعد القائمة الأساسية</strong>
+        <p class="small text-muted mt-2 mb-3">استعادة القائمة لا تغيّر إعدادات نسب الفوز. بعد الاستعادة اضغط «حفظ إلى التطبيق» لتثبيت الألعاب في الخادم.</p>
+        <div class="d-flex justify-content-center flex-wrap gap-2">
+          <button class="btn btn-outline-light btn-sm" type="button" @click="load">إعادة تحميل البيانات</button>
+          <button class="btn btn-aurora btn-sm" type="button" @click="resetDefaults">استعادة الألعاب الأساسية</button>
+          <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="resetDefaults(); save()">استعادة وحفظ الألعاب</button>
+        </div>
+      </div>
+      <div v-else class="catalog-grid widget-grid">
+        <article
+          v-for="(g, idx) in safeGames"
+          :key="g.id || idx"
+          class="catalog-card widget-card"
+          :class="{ 'is-off': g.enabled === false }"
+        >
+          <div class="catalog-card__art widget-card-media">
+            <img
+              v-if="g.coverUrl && !coverBroken[g.id]"
+              :src="g.coverUrl"
+              :alt="displayTitle(g)"
+              loading="lazy"
+              @error="markCoverBroken(g.id)"
+            />
+            <div v-else class="catalog-card__fallback">
+              <i class="bi bi-controller"></i>
+            </div>
+            <div v-if="g.enabled === false" class="catalog-card__veil">
+              <span>{{ t('games.hidden') }}</span>
+            </div>
+            <div class="catalog-card__toolbar">
+              <button
+                type="button"
+                class="tool-btn"
+                :title="t('common.edit')"
+                @click="openEdit(idx)"
+              >
+                <i class="bi bi-pencil-fill"></i>
+              </button>
+              <button
+                type="button"
+                class="tool-btn"
+                :title="g.enabled === false ? t('games.showInApp') : t('games.hideInApp')"
+                @click="toggleEnabled(idx)"
+              >
+                <i class="bi" :class="g.enabled === false ? 'bi-eye-slash-fill' : 'bi-eye-fill'"></i>
+              </button>
+            </div>
+          </div>
+          <div class="catalog-card__meta">
+            <h4 class="catalog-card__title" :title="displayTitle(g)">{{ displayTitle(g) }}</h4>
+            <p class="catalog-card__sub">{{ g.titleEn && g.titleEn !== g.title ? g.titleEn : g.id }}</p>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <div id="game-runtime-controls" class="glass p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div><h3 class="h6 mb-1">التحكم بتشغيل وإيقاف كل الألعاب</h3><p class="small text-muted mb-0">كل لعبة لها مفتاح مستقل. احفظ التغييرات لتطبيق حالة التشغيل من إعدادات الخادم.</p><div class="small text-muted mt-1">عدد الألعاب المتاحة للإدارة: {{ manageableGames.length }}</div></div>
+        <div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="setAllGamesEnabled(false)">إيقاف الكل</button><button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="setAllGamesEnabled(true)">تشغيل الكل</button><button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ حالة الألعاب</button></div>
+      </div>
+      <div class="row g-2">
+        <div v-for="game in safeManageableGames" :key="game.id" class="col-6 col-md-4 col-lg-3">
+          <label class="form-check form-switch border rounded p-2 ps-5 d-block h-100"><input class="form-check-input" type="checkbox" :checked="!disabledGames.includes(game.id)" @change="setGameEnabled(game.id, $event.target.checked)" /><span class="small">{{ game.label }}</span><span class="d-block small" :class="disabledGames.includes(game.id) ? 'text-danger' : 'text-success'">{{ disabledGames.includes(game.id) ? 'متوقفة' : 'مفعّلة' }}</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div id="game-odds" class="glass p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h3 class="h6 mb-1">{{ t('games.oddsTitle') }}</h3>
+          <div class="small text-muted">{{ t('games.oddsHint') }}</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <span class="badge bg-success-subtle text-success-emphasis">
+            {{ t('games.houseEdge') }}: {{ houseEdgePct }}%
+          </span>
+          <span class="badge bg-info-subtle text-info-emphasis">
+            {{ t('games.playerRtp') }}: {{ playerRtpPct }}%
+          </span>
+          <button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="applyOddsPreset('conservative')">
+            {{ t('games.presetConservative') }}
+          </button>
+          <button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="applyOddsPreset('balanced')">
+            {{ t('games.presetBalanced') }}
+          </button>
+          <button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="applyOddsPreset('generous')">
+            {{ t('games.presetGenerous') }}
+          </button>
+          <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">
+            {{ t('games.saveOdds') }}
+          </button>
+        </div>
+      </div>
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.playerRtp') }} (0.55–0.82)</label>
+          <input v-model.number="odds.playerRtp" type="number" min="0.55" max="0.82" step="0.01" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.spinHitRate') }}</label>
+          <input v-model.number="odds.spinHitRate" type="number" min="0.05" max="0.22" step="0.005" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.fishingHitRate') }}</label>
+          <input v-model.number="odds.fishingHitRate" type="number" min="0.04" max="0.18" step="0.005" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.crashCashoutRake') }}</label>
+          <input v-model.number="odds.crashCashoutRake" type="number" min="0.9" max="0.99" step="0.01" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.hiloPayoutMult') }}</label>
+          <input v-model.number="odds.hiloPayoutMult" type="number" min="1.15" max="1.7" step="0.05" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.royalBattlePayGate') }}</label>
+          <input v-model.number="odds.royalBattlePayGate" type="number" min="0.2" max="0.55" step="0.01" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.maxBet') }}</label>
+          <input v-model.number="odds.maxBet" type="number" min="100" max="50000" step="100" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.maxWinMult') }}</label>
+          <input v-model.number="odds.maxWinMult" type="number" min="3" max="25" step="1" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.maxWinAbsolute') }}</label>
+          <input v-model.number="odds.maxWinAbsolute" type="number" min="1000" max="500000" step="1000" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.maxCrashRatio') }}</label>
+          <input v-model.number="odds.maxCrashRatio" type="number" min="3" max="20" step="1" class="form-control" />
+        </div>
+      </div>
+      <div class="small text-muted mt-2">{{ t('games.oddsSafety') }}</div>
+      <div class="small mt-2">
+        <span class="text-muted">{{ t('games.oddsCoverage', { count: coveredCount }) }}</span>
+        <span class="ms-1">{{ coveredGamesLabel }}</span>
+      </div>
+    </div>
+
+
+
+    <div id="game-win-rates" class="glass p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div>
+          <h3 class="h6 mb-1">التحكم بنسبة الربح والخسارة لكل لعبة</h3>
+          <p class="small text-muted mb-0">لكل لعبة إعداد مستقل. نسبة الخسارة تكمل نسبة الفوز إلى 100%، والتغيير يطبّق على جميع اللاعبين بالتساوي. الألعاب ذات النتيجة المشتركة لها إعداد عائد مستقل (RTP).</p>
+        </div>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ إعدادات الربح والخسارة</button>
+      </div>
+      <div class="row g-2">
+        <div v-for="game in safeManageableGames" :key="'rate-'+game.id" class="col-12 col-md-6 col-xl-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+              <strong class="small">{{ game.label }}</strong>
+              <span class="badge" :class="supportsDirectWinRate(game.id) ? 'bg-success-subtle text-success-emphasis' : 'bg-info-subtle text-info-emphasis'">{{ supportsDirectWinRate(game.id) ? 'تحكم مباشر' : 'نتيجة مشتركة' }}</span>
+            </div>
+            <template v-if="supportsDirectWinRate(game.id)">
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label small mb-1">نسبة الفوز %</label>
+                  <input :value="gameWinRates[game.id] ?? ''" @input="setGameWinRate(game.id, $event.target.value)" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label small mb-1">نسبة الخسارة %</label>
+                  <input :value="gameLossRate(game.id)" @input="setGameLossRate(game.id, $event.target.value)" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
+                </div>
+              </div>
+              <div class="small mt-2 text-success">{{ game.id === 'crash' ? 'احتمال وصول الجولة إلى ×1.50 أو أكثر — يتحكم به الخادم' : 'النسبتان متعاكستان ومجموعهما 100% — يتحكم بهما الخادم' }}</div>
+              <div v-if="gameWinRates[game.id] === undefined || gameWinRates[game.id] === ''" class="small text-muted mt-1">فارغ = استخدام الاحتمال الافتراضي لمحرك اللعبة.</div>
+            </template>
+            <template v-else-if="supportsSharedRtp(game.id)">
+              <label class="form-label small mb-1">العائد للاعب RTP %</label>
+              <input :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
+              <div class="small text-muted mt-2">هذه اللعبة تعرض نتيجة مشتركة للجولة؛ لذلك نضبط العائد المتوقع بدلاً من فرض فوز أو خسارة منفصلة لكل لاعب.</div>
+            </template>
+            <div v-else class="small text-muted">محرك المزوّد الخارجي لا يتيح ضبط احتمال الفوز من خادم JEHO؛ يمكن إيقاف اللعبة بالكامل.</div>
+            <hr class="my-3" />
+            <div class="small fw-semibold mb-2">حدود الرهان والتحكم بالمراهنة</div>
+            <div v-if="isProviderOnlyGame(game.id)" class="small text-warning mb-2">هذه اللعبة تعمل عبر مزوّد خارجي؛ لا يستطيع خادم JEHO فرض قيم الرهان أو تغيير نسب الفوز فيها. إيقاف المراهنة هنا يمنع فتح جلسة اللعبة من JEHO.</div>
+            <template v-else>
+              <div class="row g-2">
+                <div class="col-6"><label class="form-label small mb-1">أقل رهان</label><input :value="betSetting(game.id).minBet" @input="setGameBetSetting(game.id, 'minBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
+                <div class="col-6"><label class="form-label small mb-1">أعلى رهان</label><input :value="betSetting(game.id).maxBet" @input="setGameBetSetting(game.id, 'maxBet', $event.target.value)" type="number" min="1" max="50000" class="form-control form-control-sm" /></div>
+              </div>
+              <div class="mt-2"><label class="form-label small mb-1">قيم أزرار الرهان (افصل بينها بفاصلة)</label><input :value="betSetting(game.id).chips.join(', ')" @change="setGameBetChips(game.id, $event.target.value)" type="text" class="form-control form-control-sm" placeholder="50, 100, 500, 1000, 5000" /><div class="form-text">مثال: 500, 1000, 5000 — حتى 12 قيمة، ضمن حدود الرهان المحددة.</div></div>
+            </template>
+            <label class="form-check form-switch mt-2 mb-0"><input class="form-check-input" type="checkbox" :checked="betSetting(game.id).bettingEnabled !== false" @change="setGameBetSetting(game.id, 'bettingEnabled', $event.target.checked)" /><span class="form-check-label small">السماح بالمراهنة داخل هذه اللعبة</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="small text-muted mt-3">0% فوز = خسارة في كل محاولة مؤهلة، و100% فوز = فوز في كل محاولة مؤهلة للألعاب ذات التحكم المباشر. حدود الرهان والجوائز القصوى تبقى مطبّقة كطبقة حماية.</div>
+    </div>
+
+    <div class="small text-muted mb-4">تظهر لكل لعبة آلية الضبط التي يدعمها محركها: نسبة فوز مباشرة، أو عائد نتيجة مشتركة، أو خصم السحب في Crash. لا يُعرض ضبط شكلي لا يقرأه الخادم.</div>
+
+    <div v-if="editIdx !== null && editDraft" class="edit-overlay" @click.self="closeEdit">
+      <div class="glass edit-panel">
+        <div class="edit-panel__head">
+          <div class="edit-panel__preview">
+            <img
+              v-if="editDraft.coverUrl"
+              :src="editDraft.coverUrl"
+              :alt="editDraft.title"
+              @error="onCoverError($event)"
+            />
+            <div v-else class="catalog-card__fallback"><i class="bi bi-controller"></i></div>
+          </div>
+          <div class="flex-grow-1 min-w-0">
+            <h3 class="h5 mb-1 text-truncate">{{ displayTitle(editDraft) || t('common.edit') }}</h3>
+            <div class="small text-muted font-monospace" dir="ltr">{{ editDraft.id }}</div>
+          </div>
+          <button class="btn btn-sm btn-ghost" type="button" @click="closeEdit">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small">{{ t('games.titleAr') }}</label>
+          <input v-model="editDraft.title" class="form-control" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">{{ t('games.titleEn') }}</label>
+          <input v-model="editDraft.titleEn" class="form-control" dir="ltr" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">{{ t('games.cover') || 'غلاف اللعبة' }}</label>
+          <input type="file" accept="image/*,.webp" class="form-control" @change="onCoverFile" />
+          <div class="form-text">اختر صورة الغلاف — بدون رابط</div>
+          <img
+            v-if="editDraft.coverUrl"
+            :src="editDraft.coverUrl"
+            alt=""
+            class="mt-2 rounded-circle"
+            style="width: 96px; height: 96px; object-fit: cover"
+          />
+        </div>
+        <div class="form-check form-switch mb-4">
+          <input id="edit-enabled" v-model="editDraft.enabled" class="form-check-input" type="checkbox" />
+          <label class="form-check-label" for="edit-enabled">{{ t('games.showInApp') }}</label>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+          <button class="btn btn-outline-light" type="button" @click="closeEdit">{{ t('common.cancel') }}</button>
+          <button class="btn btn-aurora" type="button" @click="applyEdit">{{ t('common.save') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="game-store" class="glass p-3 mt-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="h6 mb-0">{{ t('games.store') }}</h3>
+        <div class="d-flex gap-2">
+          <button class="btn btn-ghost btn-sm" type="button" :disabled="loadingStore" @click="loadStore">{{ t('common.refresh') }}</button>
+          <button class="btn btn-aurora btn-sm" type="button" :disabled="savingStore" @click="saveStore">{{ t('games.saveCatalog') }}</button>
+        </div>
+      </div>
+      <p class="small text-muted mb-3">{{ t('games.storeHint') }}</p>
+      <LoadingSpinner v-if="loadingStore" />
+      <div v-else class="table-responsive">
+        <table class="table table-glass table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>{{ t('common.title') }}</th>
+              <th>{{ t('games.section') }}</th>
+              <th>{{ t('common.coins') }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(item, idx) in storeItems" :key="idx">
+              <td><input v-model="item.sku" class="form-control form-control-sm" /></td>
+              <td><input v-model="item.title" class="form-control form-control-sm" /></td>
+              <td><input v-model="item.section" class="form-control form-control-sm" /></td>
+              <td style="width:100px"><input v-model.number="item.costPoints" type="number" min="0" class="form-control form-control-sm" /></td>
+              <td><button class="btn btn-sm btn-ghost" type="button" @click="storeItems.splice(idx,1)"><i class="bi bi-trash"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+        <button class="btn btn-ghost btn-sm mt-2" type="button" @click="storeItems.push({ sku: '', title: '', section: 'store', costPoints: 50 })">+ {{ t('games.addItem') }}</button>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, onErrorCaptured, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { gamesCatalogApi, gameStoreApi, uploadsApi, gameOddsApi } from '@/api'
+import { toast } from '@/composables/useToast'
+import PageHeader from '@/components/PageHeader.vue'
+import AlertMessage from '@/components/AlertMessage.vue'
+import LoadingSpinner from '@/components/LoadingSpinner.vue'
+
+const { t } = useI18n()
+
+const games = ref([])
+// Never let malformed/null rows from a stale catalog crash the entire admin page.
+const safeGames = computed(() => (Array.isArray(games.value) ? games.value : [])
+  .filter((game) => game && typeof game === 'object' && !Array.isArray(game))
+  .map((game, index) => ({ ...game, id: String(game.id || `recovered-game-${index}`) })))
+const storeItems = ref([])
+const loading = ref(false)
+const loadingStore = ref(false)
+const saving = ref(false)
+const savingStore = ref(false)
+const savingOdds = ref(false)
+const error = ref('')
+const success = ref('')
+const pageRuntimeError = ref('')
+const coverBroken = reactive({})
+const editIdx = ref(null)
+const editDraft = ref(null)
+const odds = reactive({
+  playerRtp: 0.7,
+  spinHitRate: 0.115,
+  fishingHitRate: 0.09,
+  crashCashoutRake: 0.97,
+  hiloPayoutMult: 1.4,
+  royalBattlePayGate: 0.36,
+  maxBet: 10000,
+  maxWinMult: 12,
+  maxWinAbsolute: 80000,
+  maxCrashRatio: 8,
+})
+const coveredGames = ref([])
+const disabledGames = ref([])
+const gameWinRates = reactive({})
+const gameLossRates = reactive({})
+const gameRtpRates = reactive({})
+const gameBetSettings = reactive({})
+// One stable ID per game. Mikoo/provider IDs stay separate from JEHO-owned mini-games;
+ // in particular, do not duplicate crash/hilo IDs and accidentally apply the wrong controls.
+const manageableGames = [
+  { id: '7updown', label: '٧ فوق تحت' },
+  { id: 'bounty-football', label: 'كرة القدم الجوائز' },
+  { id: 'camel-racing', label: 'سباق الأسود' },
+  { id: 'cleopatra-slot', label: 'كليوباترا (مزود خارجي)' },
+  { id: 'cleopatra-slots', label: 'فتحات كليوباترا' },
+  { id: 'crash', label: 'كراش' },
+  { id: 'fishing', label: 'صيد السمك (مزود خارجي)' },
+  { id: 'football-plinko', label: 'بلينكو كرة القدم (مزود خارجي)' },
+  { id: 'fortune-slot', label: 'جواهر الحظ' },
+  { id: 'greedy-box', label: 'صندوق الطمع' },
+  { id: 'greedy-lion', label: 'الأسد الطماع (مزود خارجي)' },
+  { id: 'hilo', label: 'هاي لو (نسخة JEHO ومزوّد خارجي)' },
+  { id: 'line-slots', label: 'فتحات الخط' },
+  { id: 'luck-car', label: 'سيارة الحظ' },
+  { id: 'lucky77', label: 'لاكي ٧٧' },
+  { id: 'megaways-slots', label: 'ميجاوايز' },
+  { id: 'olympians', label: 'الأوليمبيون' },
+  { id: 'pirate-king', label: 'ملك القراصنة' },
+  { id: 'royal-battle', label: 'المعركة الملكية (مزود خارجي)' },
+  { id: 'slot777', label: 'سلوت ٧٧٧ (مزود خارجي)' },
+  { id: 'sugar-rush', label: 'سكر راش' },
+  { id: 'swimsuit-party', label: 'حفلة السباحة (مزود خارجي)' },
+  { id: 'slots', label: 'السلوت المصغّر' },
+  { id: 'roulette', label: 'الروليت' },
+  { id: 'plinko', label: 'بلينكو' },
+  { id: 'rps', label: 'حجر ورقة مقص' },
+  { id: 'witch', label: 'العرافة' },
+  { id: 'blackjack', label: 'بلاك جاك' },
+  { id: 'poker', label: 'بوكر النرد' },
+  { id: 'tarot', label: 'التاروت' },
+  { id: 'penalty', label: 'ركلة الجزاء' },
+  { id: 'reaction', label: 'رد الفعل' },
+  { id: 'dice', label: 'النرد' },
+  { id: 'lucky-wheel', label: 'عجلة الحظ' },
+]
+// Guard all render/save paths against malformed entries injected by stale hot reloads or cached state.
+const safeManageableGames = manageableGames.filter((game) => game && typeof game === 'object' && typeof game.id === 'string' && game.id.trim())
+const directWinRateGameIds = new Set([
+  // JEHO-owned mini-games: outcome is resolved directly in our backend.
+  'slots','roulette','plinko','rps','witch','blackjack','poker','tarot','penalty','reaction','dice','lucky-wheel',
+  // Server-hosted Mikoo/BaiShun adapters: JEHO settles the wallet and outcome.
+  'cleopatra-slot','cleopatra-slots','fortune-slot','fishing','football-plinko','slot777','swimsuit-party',
+  'line-slots','megaways-slots','olympians','pirate-king','sugar-rush',
+  // These game engines have dedicated server-side win-gate logic.
+  'hilo','crash','royal-battle',
+])
+function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
+// All listed Mikoo/BaiShun bridges are settled by JEHO's own backend adapters.
+// Keep per-game bet controls available; never label these as uncontrollable external providers.
+const providerOnlyGameIds = new Set()
+function isProviderOnlyGame(gameId) { return providerOnlyGameIds.has(String(gameId || '').toLowerCase()) }
+const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
+function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(gameId || '').toLowerCase()) }
+function betSetting(gameId) {
+  return gameBetSettings[gameId] || { minBet: 50, maxBet: 20000, bettingEnabled: true, chips: [50, 100, 500, 1000, 5000] }
+}
+function normalizedBetSetting(gameId) {
+  const raw = betSetting(gameId)
+  const ceiling = Math.max(1, Math.min(50000, Math.floor(Number(odds.maxBet) || 10000)))
+  const minBet = Math.min(ceiling, Math.max(1, Math.floor(Number(raw.minBet) || 50)))
+  const maxBet = Math.max(minBet, Math.min(ceiling, Math.floor(Number(raw.maxBet) || ceiling)))
+  const chips = [...new Set((raw.chips || []).map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x >= minBet && x <= maxBet))].sort((a, b) => a - b).slice(0, 12)
+  return { minBet, maxBet, bettingEnabled: raw.bettingEnabled !== false, chips: chips.length ? chips : [minBet] }
+}
+function setGameBetSetting(gameId, key, raw) {
+  const current = { ...betSetting(gameId), chips: [...betSetting(gameId).chips] }
+  if (key === 'bettingEnabled') current.bettingEnabled = Boolean(raw)
+  else current[key] = Math.max(1, Math.min(Math.min(50000, Number(odds.maxBet) || 10000), Math.floor(Number(raw) || 1)))
+  if (key === 'minBet' && current.minBet > current.maxBet) current.maxBet = current.minBet
+  if (key === 'maxBet' && current.maxBet < current.minBet) current.minBet = current.maxBet
+  current.chips = current.chips.filter((x) => x >= current.minBet && x <= current.maxBet)
+  if (!current.chips.length) current.chips = [current.minBet]
+  gameBetSettings[gameId] = current
+}
+function setGameBetChips(gameId, raw) {
+  const values = String(raw || '').split(/[ ,،]+/).map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x > 0 && x <= 50000)
+  const min = betSetting(gameId).minBet
+  const max = betSetting(gameId).maxBet
+  const chips = [...new Set(values.filter((x) => x >= min && x <= max))].sort((a, b) => a - b).slice(0, 12)
+  gameBetSettings[gameId] = { ...betSetting(gameId), chips: chips.length ? chips : [min] }
+}
+
+function setGameWinRate(gameId, raw) {
+  gameWinRates[gameId] = raw === '' ? undefined : Math.max(0, Math.min(100, Number(raw)))
+  gameLossRates[gameId] = raw === '' ? undefined : 100 - gameWinRates[gameId]
+}
+
+function gameLossRate(gameId) {
+  const win = Number(gameWinRates[gameId])
+  return gameWinRates[gameId] === undefined || gameWinRates[gameId] === '' || !Number.isFinite(win)
+    ? ''
+    : Number.isFinite(Number(gameLossRates[gameId]))
+      ? Number(gameLossRates[gameId])
+      : 100 - Math.max(0, Math.min(100, win))
+}
+
+function setGameLossRate(gameId, raw) {
+  gameWinRates[gameId] = raw === '' ? undefined : 100 - Math.max(0, Math.min(100, Number(raw)))
+  gameLossRates[gameId] = raw === '' ? undefined : Math.max(0, Math.min(100, Number(raw)))
+}
+
+const coveredCount = computed(() => coveredGames.value.length || 22)
+const coveredGamesLabel = computed(() =>
+  coveredGames.value.length ? coveredGames.value.join(' · ') : t('games.oddsCoverageAll'),
+)
+const playerRtpPct = computed(() => Math.round((Number(odds.playerRtp) || 0) * 1000) / 10)
+const houseEdgePct = computed(() => Math.round((1 - (Number(odds.playerRtp) || 0)) * 1000) / 10)
+
+function applyOddsPayload(data) {
+  if (!data || typeof data !== 'object') return
+  ;[
+    'playerRtp',
+    'spinHitRate',
+    'fishingHitRate',
+    'crashCashoutRake',
+    'hiloPayoutMult',
+    'royalBattlePayGate',
+    'maxBet',
+    'maxWinMult',
+    'maxWinAbsolute',
+    'maxCrashRatio',
+  ].forEach((k) => {
+    if (data[k] != null && Number.isFinite(Number(data[k]))) odds[k] = Number(data[k])
+  })
+  if (Array.isArray(data.coveredGames)) coveredGames.value = data.coveredGames.map(String)
+  if (Array.isArray(data.disabledGames)) disabledGames.value = data.disabledGames.map(String)
+  if (data.gameWinRates && typeof data.gameWinRates === 'object') {
+    Object.keys(gameWinRates).forEach((id) => delete gameWinRates[id])
+    Object.entries(data.gameWinRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameWinRates[id] = Math.max(0, Math.min(100, Number(value))) })
+  }
+  if (data.gameLossRates && typeof data.gameLossRates === 'object') {
+    Object.keys(gameLossRates).forEach((id) => delete gameLossRates[id])
+    Object.entries(data.gameLossRates).forEach(([id, value]) => {
+      if (Number.isFinite(Number(value))) gameLossRates[id] = Math.max(0, Math.min(100, Number(value)))
+    })
+  }
+  if (data.gameRtpRates && typeof data.gameRtpRates === 'object') {
+    Object.keys(gameRtpRates).forEach((id) => delete gameRtpRates[id])
+    Object.entries(data.gameRtpRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameRtpRates[id] = Math.max(0.55, Math.min(0.82, Number(value))) })
+  }
+  if (data.gameBetSettings && typeof data.gameBetSettings === 'object') {
+    Object.keys(gameBetSettings).forEach((id) => delete gameBetSettings[id])
+    Object.entries(data.gameBetSettings).forEach(([id, value]) => {
+      if (!value || typeof value !== 'object') return
+      const minBet = Math.max(1, Math.min(50000, Math.floor(Number(value.minBet) || 50)))
+      const maxBet = Math.max(minBet, Math.min(50000, Math.floor(Number(value.maxBet) || 20000)))
+      const chips = Array.isArray(value.chips) ? value.chips.map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x >= minBet && x <= maxBet) : [50, 100, 500, 1000, 5000].filter((x) => x >= minBet && x <= maxBet)
+      gameBetSettings[id] = { minBet, maxBet, bettingEnabled: value.bettingEnabled !== false, chips: [...new Set(chips)].sort((a, b) => a - b) }
+      if (!gameBetSettings[id].chips.length) gameBetSettings[id].chips = [minBet]
+    })
+  }
+}
+
+async function loadOdds() {
+  try {
+    const { data, error: err } = await gameOddsApi.get()
+    if (err) {
+      error.value = 'تعذّر تحميل إعدادات التحكم بالألعاب: ' + err.message
+      return
+    }
+    applyOddsPayload(data?.data ?? data)
+  } catch (err) {
+    error.value = 'تعذّر تحميل إعدادات التحكم بالألعاب: ' + (err?.message || String(err))
+  }
+}
+
+function setGameEnabled(gameId, enabled) {
+  const id = String(gameId || '').trim().toLowerCase()
+  if (!id) return
+  disabledGames.value = enabled
+    ? disabledGames.value.filter((item) => item !== id)
+    : [...new Set([...disabledGames.value, id])]
+}
+
+function setAllGamesEnabled(enabled) {
+  disabledGames.value = enabled ? [] : safeManageableGames.map((game) => game.id)
+}
+
+async function saveOdds() {
+  savingOdds.value = true
+  error.value = ''
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameBetSettings: Object.fromEntries(safeManageableGames.map(g => [g.id, normalizedBetSetting(g.id)])), gameWinRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), clearGameWinRates: safeManageableGames.filter(g => g && supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).map(g => g.id), gameRtpRates: Object.fromEntries(safeManageableGames.filter(g => g && supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
+  savingOdds.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  applyOddsPayload(data?.data ?? data)
+  // Confirm persistence through a fresh GET; do not claim success on a transient UI update.
+  const readBack = await gameOddsApi.get()
+  const stored = readBack?.data?.data ?? readBack?.data
+  if (readBack?.error || !stored || !Array.isArray(stored.disabledGames)) {
+    error.value = 'تم إرسال الإعدادات لكن تعذّر تأكيد قراءتها من الخادم. حدّث الصفحة وتحقق قبل الاعتماد عليها.'
+    toast().danger(error.value)
+    return
+  }
+  const expectedDisabled = [...disabledGames.value].sort().join(',')
+  const actualDisabled = [...stored.disabledGames].sort().join(',')
+  const expectedRates = Object.fromEntries(Object.entries(gameWinRates).filter(([id, value]) => supportsDirectWinRate(id) && value !== undefined && value !== '').map(([id, value]) => [id, Number(value)]))
+  const ratesMatch = Object.entries(expectedRates).every(([id, value]) => Number(stored.gameWinRates?.[id]) === value)
+  const clearedRatesMatch = safeManageableGames.filter(g => supportsDirectWinRate(g.id) && (gameWinRates[g.id] === undefined || gameWinRates[g.id] === '')).every(g => stored.gameWinRates?.[g.id] === undefined)
+  const expectedRtpRates = Object.fromEntries(safeManageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)]))
+  const rtpRatesMatch = Object.entries(expectedRtpRates).every(([id, value]) => Math.abs(Number(stored.gameRtpRates?.[id]) - value) < 0.000001)
+  const expectedBetSettings = Object.fromEntries(safeManageableGames.map(g => [g.id, normalizedBetSetting(g.id)]))
+  const betSettingsMatch = Object.entries(expectedBetSettings).every(([id, value]) => Number(stored.gameBetSettings?.[id]?.minBet) === Number(value.minBet) && Number(stored.gameBetSettings?.[id]?.maxBet) === Number(value.maxBet) && (stored.gameBetSettings?.[id]?.bettingEnabled !== false) === (value.bettingEnabled !== false) && JSON.stringify([...(stored.gameBetSettings?.[id]?.chips || [])].sort((a,b)=>a-b)) === JSON.stringify([...(value.chips || [])].sort((a,b)=>a-b)))
+  const numericKeys = ['playerRtp', 'spinHitRate', 'fishingHitRate', 'crashCashoutRake', 'hiloPayoutMult', 'royalBattlePayGate', 'maxBet', 'maxWinMult', 'maxWinAbsolute', 'maxCrashRatio']
+  const globalSettingsMatch = numericKeys.every((key) => Math.abs(Number(stored[key]) - Number(odds[key])) < 0.000001)
+  if (expectedDisabled !== actualDisabled || !ratesMatch || !clearedRatesMatch || !rtpRatesMatch || !betSettingsMatch || !globalSettingsMatch) {
+    error.value = 'الخادم لم يُرجع جميع إعدادات الألعاب وحدود الرهان ونسب الفوز والعائد كما حُفظت؛ لم يتم تأكيد الحفظ.'
+    toast().danger(error.value)
+    return
+  }
+  applyOddsPayload(stored)
+  success.value = t('games.oddsSaved')
+  toast().success(success.value)
+}
+
+async function applyOddsPreset(preset) {
+  savingOdds.value = true
+  error.value = ''
+  const { data, error: err } = await gameOddsApi.applyPreset(preset)
+  savingOdds.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  applyOddsPayload(data?.data ?? data)
+  success.value = t('games.oddsSaved')
+  toast().success(success.value)
+}
+
+const ORIGIN = (() => {
+  const configured = String(import.meta.env.VITE_API_BASE_URL || '').trim()
+  const fallback = typeof window !== 'undefined' ? window.location.origin : ''
+  return (configured || fallback).replace(/\/api\/v1\/?$/i, '').replace(/\/+$/, '')
+})()
+const MIKOO = [
+  ['7updown', '٧ فوق تحت', '7 Up Down'],
+  ['bounty-football', 'كرة القدم الجوائز', 'Bounty Football'],
+  ['camel-racing', 'سباق الأسود', 'Camel Racing'],
+  ['cleopatra-slot', 'كليوباترا', 'Cleopatra Slot'],
+  ['cleopatra-slots', 'فتحات كليوباترا', 'Cleopatra Spins'],
+  ['crash', 'كراش', 'Crash'],
+  ['fishing', 'صيد السمك', 'Fishing'],
+  ['football-plinko', 'بلينكو كرة القدم', 'Football Plinko'],
+  ['fortune-slot', 'جواهر الحظ', 'Fortune Gems'],
+  ['greedy-box', 'صندوق الطمع', 'Greedy Box'],
+  ['greedy-lion', 'الأسد الطماع', 'Greedy Lion'],
+  ['hilo', 'هاي لو', 'Hilo'],
+  ['line-slots', 'فتحات الخط', 'Line slots'],
+  ['luck-car', 'سيارة الحظ', 'Lucky Car'],
+  ['lucky77', 'لاكي ٧٧', 'Lucky 77'],
+  ['megaways-slots', 'ميجاوايز', 'Megaways Slots'],
+  ['olympians', 'الأوليمبيون', 'Olympians'],
+  ['pirate-king', 'ملك القراصنة', 'Pirate King'],
+  ['royal-battle', 'المعركة الملكية', 'Royal Battle'],
+  ['slot777', 'سلوت ٧٧٧', 'Slot 777'],
+  ['sugar-rush', 'سكر راش', 'Sugar Rush'],
+  ['swimsuit-party', 'حفلة السباحة', 'Swimsuit Party'],
+]
+
+function isLegacyHtmlGame(g) {
+  // Keep every saved game visible in the dashboard, including legacy or temporarily unavailable entries.
+  // Availability and launch health are separate from catalog visibility.
+  return !g || typeof g !== 'object' || Array.isArray(g)
+}
+
+function buildDefaults() {
+  let order = 10
+  return MIKOO.map(([id, title, titleEn]) => ({
+    id,
+    title,
+    titleEn: titleEn || title,
+    coverUrl: `${ORIGIN}/games/mikoo/covers/${id}.jpg?v=20260807coversJpg1`,
+    playUrl: `${ORIGIN}/games/mikoo/${id}/index.html`,
+    sortOrder: order++,
+    mode: 'mikoo_slot',
+    enabled: true,
+  }))
+}
+
+const defaults = buildDefaults()
+// Render the known catalog immediately; slow settings requests must not look like an empty route.
+games.value = defaults.map((game) => ({ ...game }))
+
+function normalizeGame(g) {
+  // A stale/corrupt catalog may contain null, strings or arrays. Normalize defensively
+  // before reading fields so one malformed record can never crash the entire dashboard.
+  if (!g || typeof g !== 'object' || Array.isArray(g)) g = {}
+  const normalizeGameUrl = (value) => {
+    const raw = String(value || '').trim()
+    if (!raw) return ''
+    // Old saved catalog rows may contain retired API/provider hosts; keep their
+    // IDs/settings but always resolve bundled game assets through the current backend.
+    if (/^https?:\/\/(?:api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com)(?=\/|$)/i.test(raw)) {
+      return raw.replace(/^https?:\/\/(?:api\.adnova\.bbs\.tr|jieyou\.shop|sruner\.com|zkruner\.com)/i, ORIGIN)
+    }
+    if (raw.startsWith('/')) return `${ORIGIN}${raw}`
+    if (!/^https?:\/\//i.test(raw) && !raw.startsWith('data:')) {
+      return `${ORIGIN}/${raw.replace(/^\/+/, '')}`
+    }
+    return raw
+  }
+  return {
+    ...g,
+    coverUrl: normalizeGameUrl(g.coverUrl),
+    playUrl: normalizeGameUrl(g.playUrl),
+    enabled: g.enabled !== false && g.visible !== false,
+    mode: g.mode || 'mikoo_slot',
+  }
+}
+
+function displayTitle(g) {
+  if (!g) return ''
+  return (g.title && String(g.title).trim()) || g.titleEn || g.id || ''
+}
+
+function markCoverBroken(id) {
+  if (id) coverBroken[id] = true
+}
+
+function onCoverError(ev) {
+  ev.target.style.visibility = 'hidden'
+}
+
+function openEdit(idx) {
+  const g = games.value[idx]
+  if (!g) return
+  editIdx.value = idx
+  editDraft.value = {
+    id: g.id,
+    title: g.title || '',
+    titleEn: g.titleEn || '',
+    coverUrl: g.coverUrl || '',
+    playUrl: g.playUrl || '',
+    mode: g.mode || 'mikoo_slot',
+    enabled: g.enabled !== false,
+    sortOrder: g.sortOrder,
+    bridge: g.bridge,
+    bsModuleId: g.bsModuleId,
+    gameType: g.gameType,
+  }
+}
+
+function closeEdit() {
+  editIdx.value = null
+  editDraft.value = null
+}
+
+async function onCoverFile(e) {
+  const file = e.target.files?.[0]
+  if (!file || !editDraft.value) return
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    toast().danger(err.message)
+    return
+  }
+  let url = data?.url || data?.data?.url || ''
+  if (url && !String(url).startsWith('http')) {
+    url = `${ORIGIN}${String(url).startsWith('/') ? '' : '/'}${url}`
+  }
+  editDraft.value.coverUrl = url
+  toast().success(t('app.success') || 'تم')
+  e.target.value = ''
+}
+
+function applyEdit() {
+  if (editIdx.value === null || !editDraft.value) return
+  const i = editIdx.value
+  const prev = games.value[i] || {}
+  games.value[i] = normalizeGame({
+    ...prev,
+    ...editDraft.value,
+    enabled: editDraft.value.enabled !== false,
+  })
+  if (editDraft.value.id) delete coverBroken[editDraft.value.id]
+  closeEdit()
+}
+
+function toggleEnabled(idx) {
+  const g = games.value[idx]
+  if (!g) return
+  g.enabled = g.enabled === false
+}
+
+function resetDefaults() {
+  Object.keys(coverBroken).forEach((k) => delete coverBroken[k])
+  // Merge missing built-in entries without replacing or deleting any existing catalog rows.
+  const merged = new Map()
+  for (const game of Array.isArray(games.value) ? games.value : []) {
+    if (!game || typeof game !== 'object' || Array.isArray(game)) continue
+    const normalized = normalizeGame(game)
+    const id = String(normalized.id || '').trim().toLowerCase()
+    if (id) merged.set(id, normalized)
+  }
+  for (const game of defaults) {
+    const normalized = normalizeGame(game)
+    const id = String(normalized.id || '').trim().toLowerCase()
+    if (id && !merged.has(id)) merged.set(id, normalized)
+  }
+  games.value = [...merged.values()].sort((a, b) => Number(a.sortOrder || 9999) - Number(b.sortOrder || 9999))
+}
+
+async function load() {
+  loading.value = true
+  error.value = ''
+  // Keep the known catalog visible even if the API returns an empty/stale value.
+  // This prevents the Games dashboard from rendering an empty catalog after backend sleep
+  // or when the app_games setting has not been initialized yet.
+  const fallbackCatalog = () => defaults.map(normalizeGame)
+  if (!Array.isArray(games.value) || games.value.length === 0) {
+    games.value = fallbackCatalog()
+  }
+  try {
+    const response = await gamesCatalogApi.get()
+    if (response?.error) {
+      error.value = 'تعذّر تحميل قائمة الألعاب المحفوظة؛ تم عرض القائمة الأساسية مؤقتاً. ' + response.error.message
+      games.value = fallbackCatalog()
+      return
+    }
+
+    const payload = response?.data?.data ?? response?.data ?? {}
+    const rawCatalog = typeof payload === 'string'
+      ? payload
+      : (payload?.value ?? payload?.catalog ?? '')
+    let saved = []
+    if (Array.isArray(rawCatalog)) {
+      saved = rawCatalog
+    } else if (String(rawCatalog || '').trim()) {
+      try {
+        const parsed = JSON.parse(String(rawCatalog))
+        if (Array.isArray(parsed)) saved = parsed
+      } catch (_) {
+        error.value = 'قائمة الألعاب المحفوظة غير صالحة؛ تم عرض القائمة الأساسية مؤقتاً.'
+      }
+    }
+
+    const merged = new Map()
+    // Add defaults first, then overlay saved values so missing/deleted rows cannot blank the page.
+    for (const game of defaults) {
+      const normalized = normalizeGame(game)
+      merged.set(String(normalized.id || '').toLowerCase(), normalized)
+    }
+    for (const game of saved.filter((item) => item && typeof item === 'object' && !Array.isArray(item))) {
+      const normalized = normalizeGame(game)
+      const id = String(normalized.id || '').trim().toLowerCase()
+      if (!id) continue
+      merged.set(id, { ...(merged.get(id) || {}), ...normalized })
+    }
+
+    games.value = [...merged.values()].sort((a, b) => {
+      const ao = Number(a.sortOrder)
+      const bo = Number(b.sortOrder)
+      return (Number.isFinite(ao) ? ao : 9999) - (Number.isFinite(bo) ? bo : 9999)
+    })
+    if (!games.value.length) games.value = fallbackCatalog()
+  } catch (err) {
+    error.value = 'حدث خطأ أثناء تحميل الألعاب؛ تم عرض القائمة الأساسية مؤقتاً. ' + (err?.message || String(err))
+    games.value = fallbackCatalog()
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadStore() {
+  loadingStore.value = true
+  try {
+    const { data, error: err } = await gameStoreApi.catalog()
+    if (err) {
+      error.value = 'تعذّر تحميل متجر الألعاب: ' + err.message
+      storeItems.value = []
+      return
+    }
+    const payload = data?.data ?? data ?? {}
+    storeItems.value = (Array.isArray(payload.items) ? payload.items : (Array.isArray(payload) ? payload : [])).map((i) => ({ ...i }))
+  } catch (err) {
+    error.value = 'تعذّر تحميل متجر الألعاب: ' + (err?.message || String(err))
+    storeItems.value = []
+  } finally {
+    loadingStore.value = false
+  }
+}
+
+async function retryPage() {
+  pageRuntimeError.value = ''
+  await Promise.all([load(), loadStore(), loadOdds()])
+}
+
+onErrorCaptured((err, instance, info) => {
+  pageRuntimeError.value = [
+    err?.message || String(err || 'خطأ غير معروف'),
+    info ? `Vue phase: ${info}` : '',
+    err?.stack || '',
+  ].filter(Boolean).join('\n\n')
+  console.error('[JEHO Games] captured component error', { error: err, info, component: instance?.$options?.name || instance?.$?.type?.__name || 'unknown' })
+  return false
+})
+
+async function saveStore() {
+  savingStore.value = true
+  error.value = ''
+  const { error: err } = await gameStoreApi.saveCatalog(storeItems.value)
+  savingStore.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+  } else {
+    success.value = t('games.catalogSaved')
+    toast().success(success.value)
+  }
+}
+
+async function save() {
+  saving.value = true
+  error.value = ''
+  const payload = games.value
+    .filter((g) => g && typeof g === 'object' && !Array.isArray(g))
+    .map((g, i) => ({
+      ...g,
+      sortOrder: i + 1,
+      enabled: g.enabled !== false,
+    }))
+  const { error: err } = await gamesCatalogApi.save(JSON.stringify(payload))
+  saving.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  // Verify the durable catalog with a fresh GET so the dashboard cannot report a false save.
+  const readBack = await gamesCatalogApi.get()
+  const readError = readBack?.error
+  const wrapped = readBack?.data?.data ?? readBack?.data ?? {}
+  const raw = typeof wrapped === 'string' ? wrapped : (wrapped?.value ?? wrapped?.catalog ?? '')
+  let stored = Array.isArray(raw) ? raw : []
+  if (!stored.length && String(raw || '').trim()) {
+    try { const parsed = JSON.parse(String(raw)); if (Array.isArray(parsed)) stored = parsed } catch (_) {}
+  }
+  const expectedIds = payload.map((g) => String(g.id).toLowerCase()).sort().join(',')
+  const storedIds = stored.map((g) => String(g?.id || '').toLowerCase()).filter(Boolean).sort().join(',')
+  if (readError || expectedIds !== storedIds) {
+    error.value = 'لم يتم تأكيد قائمة الألعاب المحفوظة بعد إعادة قراءتها من الخادم؛ لم نعرض رسالة نجاح.'
+    toast().danger(error.value)
+    return
+  }
+  games.value = stored.map(normalizeGame).sort((a, b) => Number(a.sortOrder || 9999) - Number(b.sortOrder || 9999))
+  success.value = t('games.gamesSaved')
+  toast().success(success.value)
+}
+
+onMounted(() => {
+  load()
+  loadStore()
+  loadOdds()
+})
+</script>
+
+<style scoped>
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 14px;
+}
+
+.catalog-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: visible;
+  padding: 14px 10px 12px;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.catalog-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+.catalog-card.is-off {
+  opacity: 0.62;
+}
+
+.catalog-card__art {
+  position: relative;
+  width: min(100%, 128px);
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.12), transparent 55%),
+    rgba(0, 0, 0, 0.28);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12), 0 8px 20px rgba(0, 0, 0, 0.28);
+}
+
+.catalog-card__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 50%;
+}
+
+.catalog-card__fallback {
+  width: 100%;
+  height: 100%;
+  min-height: 96px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.catalog-card__veil {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 10, 18, 0.55);
+  backdrop-filter: blur(2px);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.catalog-card__toolbar {
+  position: absolute;
+  inset-inline: 6px;
+  bottom: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.catalog-card:hover .catalog-card__toolbar,
+.catalog-card:focus-within .catalog-card__toolbar {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tool-btn {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(12, 14, 22, 0.78);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.tool-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.tool-btn--danger:hover {
+  background: rgba(220, 53, 69, 0.85);
+}
+
+.catalog-card__meta {
+  padding: 10px 8px 12px;
+  text-align: center;
+}
+
+.catalog-card__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em;
+}
+
+.catalog-card__sub {
+  margin: 4px 0 0;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: ltr;
+}
+
+.edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(4, 6, 12, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.edit-panel {
+  width: min(440px, 100%);
+  padding: 1.15rem;
+  border-radius: 18px;
+}
+
+.edit-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.edit-panel__preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: 0 0 64px;
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+
+.edit-panel__preview img,
+.edit-panel__preview .catalog-card__fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  min-height: 0;
+  font-size: 1.4rem;
+}
+
+.font-monospace {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (hover: none) {
+  .catalog-card__toolbar {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (min-width: 1200px) {
+  .catalog-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+</style>

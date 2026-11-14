@@ -1,0 +1,41 @@
+
+start selection.png
+size: 1018,297
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+HONG
+  rotate: false
+  xy: 2, 124
+  size: 746, 171
+  orig: 748, 171
+  offset: 2, 0
+  index: -1
+SELECTION1
+  rotate: false
+  xy: 2, 2
+  size: 333, 52
+  orig: 334, 52
+  offset: 0, 0
+  index: -1
+START
+  rotate: false
+  xy: 337, 2
+  size: 201, 52
+  orig: 202, 52
+  offset: 0, 0
+  index: -1
+gaoguang
+  rotate: false
+  xy: 2, 56
+  size: 748, 66
+  orig: 748, 73
+  offset: 0, 3
+  index: -1
+zwq
+  rotate: true
+  xy: 752, 18
+  size: 277, 264
+  orig: 277, 264
+  offset: 0, 0
+  index: -1

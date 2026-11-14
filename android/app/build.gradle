@@ -1,0 +1,247 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.google.gms.google-services'
+}
+
+// Allows CI/release builds to bypass a Windows antivirus/indexer lock on generated DEX files.
+if (project.hasProperty('alternateBuildDir')) {
+    layout.buildDirectory.set(file(project.property('alternateBuildDir')))
+
+}
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+// CI can supply -PJEHO_OWN_API_URL; local builds may use android/local.properties.
+// Keep the API URL in BuildConfig so both debug and release variants use the same backend.
+def configuredApi = (
+    project.findProperty('JEHO_OWN_API_URL') ?:
+    System.getenv('JEHO_OWN_API_URL') ?:
+    localProperties.getProperty('API_BASE_URL', '')
+).toString().trim()
+android {
+    namespace 'com.Dramizo.Series'
+    compileSdk 36
+    // NDK r28+ defaults to 16 KB ELF page alignment (Play requirement).
+    ndkVersion "28.0.12433566"
+    defaultConfig {
+        applicationId "com.mgwa.chat"
+        minSdk 24
+        targetSdk 36
+        versionCode 51
+        versionName "2.0.53"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // Never bake ZEGO AppSign into the APK. AppID comes from the server (/config/zego + join token).
+        buildConfigField "long", "ZEGO_APP_ID", "0L"
+        buildConfigField "String", "ZEGO_APP_SIGN", "\"\""
+        // Production always uses ApiOrigin. Debug may override via local.properties.
+        buildConfigField "String", "API_BASE_URL", "\"${configuredApi}\""
+        // ABI selection is configured once in android.splits.abi below.
+    }
+    // Build separate APKs per CPU architecture to reduce each download size.
+    // This preserves app features and both 32-bit and 64-bit device support.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a'
+            universalApk true
+        }
+    }
+
+    signingConfigs {
+        release {
+            // Prefer project-local keystore (android/app/keystore/Dramizo.jks).
+            def keystoreProps = new Properties()
+            def keystorePropsFile = file("${projectDir}/keystore.properties")
+            if (keystorePropsFile.exists()) {
+                keystorePropsFile.withInputStream { keystoreProps.load(it) }
+
+            }
+            def storePath = keystoreProps.getProperty('storeFile',
+            localProperties.getProperty('STORE_FILE', 'keystore/Dramizo.jks'))
+            def store = file(storePath)
+            if (!store.exists()) {
+                store = file("${projectDir}/keystore/Dramizo.jks")
+            }
+            if (store.exists()) {
+            storeFile store
+            storePassword keystoreProps.getProperty('storePassword',
+             localProperties.getProperty('STORE_PASSWORD', ''))
+            keyAlias keystoreProps.getProperty('keyAlias',
+            localProperties.getProperty('KEY_ALIAS', 'dramizo'))
+            keyPassword keystoreProps.getProperty('keyPassword',
+            localProperties.getProperty('KEY_PASSWORD', ''))
+
+            }
+        }
+
+    }
+    buildTypes {
+        release {
+            // R8 minify/obfuscate crashes Zego Express native init (SIGSEGV in
+            // libZegoExpressEngine.so / engineInitJni). Keep release stable for store.
+            // Size cuts instead: strip unused release assets + Play AAB ABI splits.
+            minifyEnabled false
+            shrinkResources false
+            crunchPngs true
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Native symbols uploaded separately via Play; keep APK/AAB lean.
+            ndk {
+                debugSymbolLevel 'NONE'
+            }
+        }
+        debug {
+            minifyEnabled false
+            // API_BASE_URL is shared with defaultConfig for this build.
+            // CI supplies this exact keystore path so the APK certificate stays stable across runners.
+            def ciDebugKeystore = System.getenv('JEHO_DEBUG_KEYSTORE')
+            if (ciDebugKeystore && file(ciDebugKeystore).isFile()) {
+                signingConfig signingConfigs.debug
+                signingConfigs.debug.storeFile file(ciDebugKeystore)
+                signingConfigs.debug.storePassword(System.getenv('JEHO_DEBUG_STORE_PASSWORD') ?: 'android')
+                signingConfigs.debug.keyAlias(System.getenv('JEHO_DEBUG_KEY_ALIAS') ?: 'AndroidDebugKey')
+                signingConfigs.debug.keyPassword(System.getenv('JEHO_DEBUG_KEY_PASSWORD') ?: 'android')
+            }
+        }
+    }
+    bundle {
+        language {
+            enableSplit = true
+        }
+
+        density {
+            enableSplit = true
+
+        }
+        abi {
+            enableSplit = true
+
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+    packaging {
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE']
+        }
+        // Uncompressed + 16 KB zip-aligned native libs (AGP 8.5.1+).
+        // Required for Google Play 16 KB page-size compliance.
+        jniLibs {
+            // Keep one direct-install APK small by compressing the native libraries.
+            // The release APK targets Android phones (ARM 32-bit + ARM 64-bit); do not bundle
+            // desktop/emulator x86 native libraries in the universal phone APK.
+            useLegacyPackaging = true
+            excludes += ['**/x86/**', '**/x86_64/**']
+        }
+    }
+}
+
+// Bundle the exact public mall HTML/CSS/JS from the backend source into the APK.
+// This avoids a blank WebView when the deployed server is behind the app branch, while
+// keeping a single maintained source of these pages (backend/public/mall).
+def mallHtmlSource = file("${projectDir}/../../backend/public/mall")
+def mallHtmlAssets = layout.buildDirectory.dir("generated/mallAssets")
+android.sourceSets.main.assets.srcDir(mallHtmlAssets)
+
+tasks.register('syncMallHtmlAssets', Sync) {
+    from mallHtmlSource
+    into mallHtmlAssets.map { it.dir('mall') }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('syncMallHtmlAssets')
+}
+
+// Release size: cosmetics frames/gift SFX live on the CDN (AssetCatalog + API URLs).
+// Strip local duplicates from the store APK (~60MB). Debug keeps them for offline fallback.
+android.applicationVariants.configureEach { variant ->
+    if (variant.buildType.name != 'release') return
+    variant.mergeAssetsProvider.configure {
+        doLast {
+            def outDir = outputDir.get().asFile
+            delete fileTree(dir: outDir, includes: [
+                    'visual-system/host-frames/**',
+                    'visual-system/gifts/audio/**',
+            ])
+        }
+    }
+}
+
+dependencies {
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.0.21'
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'androidx.viewpager2:viewpager2:1.0.0'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+    implementation 'androidx.activity:activity-ktx:1.8.2'
+    implementation 'androidx.fragment:fragment-ktx:1.6.2'
+    implementation 'androidx.navigation:navigation-fragment:2.7.7'
+    implementation 'androidx.navigation:navigation-ui:2.7.7'
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'androidx.room:room-runtime:2.6.1'
+    annotationProcessor 'androidx.room:room-compiler:2.6.1'
+    implementation 'androidx.preference:preference:1.2.1'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+    implementation 'com.github.yalantis:ucrop:2.2.8'
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
+    implementation 'com.github.bumptech.glide:okhttp3-integration:4.16.0'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
+    // Load SVG icons from assets/icons by file name (no res conversion).
+    implementation 'com.caverock:androidsvg-aar:1.4'
+    implementation 'im.zego:express-video:3.24.0'
+    // Free open-source voice alternative (self-hosted LiveKit server).
+    implementation 'io.livekit:livekit-android:2.27.0'
+    implementation('io.socket:socket.io-client:2.1.0') {
+        exclude group: 'org.json', module: 'json'
+    }
+    implementation platform('com.google.firebase:firebase-bom:32.7.2')
+    implementation 'com.google.firebase:firebase-messaging'
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.android.gms:play-services-auth:20.7.0'
+    implementation 'com.android.billingclient:billing:8.0.0'
+    implementation 'com.airbnb.android:lottie:6.3.0'
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'androidx.work:work-runtime:2.9.0'
+    implementation 'androidx.media3:media3-exoplayer:1.4.1'
+    implementation 'androidx.media3:media3-ui:1.4.1'
+    // Same VAP player Mikoo uses for entry rides (RGB|alpha mp4 with vapc).
+    implementation 'io.github.tencent:vap:2.0.28'
+    // Same SVGA player Mikoo uses for animated avatar frames (headwear vggUrl).
+    implementation 'com.github.yyued:SVGAPlayer-Android:2.6.1'
+    implementation 'androidx.camera:camera-camera2:1.3.4'
+    implementation 'androidx.camera:camera-lifecycle:1.3.4'
+    implementation 'androidx.camera:camera-view:1.3.4'
+    implementation 'com.google.mlkit:face-detection:16.1.7'
+    implementation 'com.google.android.gms:play-services-ads:22.6.0'
+    // Google Play In-App Updates (store version prompt).
+    implementation 'com.google.android.play:app-update:2.1.0'
+    // Play Install Referrer — capture invite code after Play Store install.
+    implementation 'com.android.installreferrer:installreferrer:2.2'
+    implementation 'de.hdodenhof:circleimageview:3.1.0'
+}
+

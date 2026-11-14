@@ -1,0 +1,27 @@
+
+ready go.png
+size: 791,415
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+Go
+  rotate: false
+  xy: 483, 70
+  size: 234, 197
+  orig: 241, 205
+  offset: 3, 4
+  index: -1
+Ready
+  rotate: false
+  xy: 483, 269
+  size: 306, 144
+  orig: 314, 151
+  offset: 4, 4
+  index: -1
+guang
+  rotate: false
+  xy: 2, 2
+  size: 479, 411
+  orig: 494, 420
+  offset: 7, 5
+  index: -1

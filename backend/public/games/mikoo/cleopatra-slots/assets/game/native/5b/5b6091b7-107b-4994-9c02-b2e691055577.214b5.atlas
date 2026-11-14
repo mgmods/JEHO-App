@@ -1,0 +1,27 @@
+
+freespin.png
+size: 781,466
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+光
+  rotate: false
+  xy: 2, 2
+  size: 462, 462
+  orig: 462, 462
+  offset: 0, 0
+  index: -1
+文案
+  rotate: true
+  xy: 655, 149
+  size: 315, 124
+  orig: 315, 124
+  offset: 0, 0
+  index: -1
+盾牌
+  rotate: true
+  xy: 466, 132
+  size: 332, 187
+  orig: 332, 187
+  offset: 0, 0
+  index: -1

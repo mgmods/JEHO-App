@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>توقع واربح العملات</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(180deg, #0a0e27 0%, #1a1f4d 50%, #0d1235 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            color: white;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        .game-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 5px;
+        }
+
+        /* Room WebView embed: compact full UI — no clipping */
+        html.embed, html.embed body {
+            height: 100% !important;
+            max-height: 100% !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            display: flex !important;
+            align-items: stretch !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: linear-gradient(180deg, #0a0e27 0%, #1a1f4d 50%, #0d1235 100%) !important;
+        }
+        html.embed .game-container {
+            transform-origin: top center;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 4px 6px !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            box-sizing: border-box !important;
+        }
+        html.embed .top-bar { display: none !important; }
+        html.embed .wheel-section {
+            margin: 2px 0 !important;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        html.embed .wheel-container {
+            width: min(58vw, 42vh, 260px) !important;
+            height: min(58vw, 42vh, 260px) !important;
+            margin: 4px auto !important;
+        }
+        html.embed .header-banner { padding: 4px 6px !important; margin-bottom: 4px !important; }
+        html.embed .header-banner h1 { font-size: 15px !important; }
+        html.embed .today-win-box { padding: 4px !important; margin: 4px 0 !important; }
+        html.embed .today-win-value { font-size: 16px !important; }
+        html.embed .result-box { height: 56px !important; }
+        html.embed .result-icon img { width: 34px !important; height: 34px !important; }
+        html.embed .chip { width: 44px !important; height: 44px !important; font-size: 12px !important; }
+        html.embed .spin-btn { min-height: 36px !important; font-size: 13px !important; padding: 6px !important; margin-top: 4px !important; }
+        html.embed .bet-section { padding: 4px !important; margin: 4px 0 !important; }
+        html.embed .chips-row { gap: 6px !important; flex-wrap: wrap !important; justify-content: center !important; }
+
+        .top-bar {
+            background: linear-gradient(90deg, #1a1f3a, #2a2f5a);
+            padding: 8px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .top-icons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            width: 35px;
+            height: 35px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            display: flex;            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .balance-box {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #1a1f3a;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+        }
+
+        .header-banner {
+            background: linear-gradient(90deg, #2d8a4e, #1a4d2e);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+            border: 2px solid #4ade80;
+        }
+
+        .header-banner h1 {
+            color: #fff;
+            font-size: 22px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .today-win-box {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(255,215,0,0.3);
+        }
+
+        .today-win-label {
+            font-size: 16px;
+            color: #ffd700;
+            margin-bottom: 5px;
+        }
+
+        .today-win-value {            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .wheel-section {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 350px;
+            height: 350px;
+        }
+
+        .wheel-spin {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 5;
+            transform-origin: 50% 50%;
+            will-change: transform;
+        }
+
+        .wheel-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            filter: drop-shadow(0 0 20px rgba(255,215,0,0.6));
+        }
+
+        .result-icon img {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            display: block;
+            background: transparent;
+            mix-blend-mode: normal;
+        }
+
+        .segment-path {
+            stroke: #ffd700;
+            stroke-width: 2;
+        }
+
+        .segment-text {
+            font-size: 40px;
+            font-weight: bold;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.6));
+        }
+
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;            height: 0;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-top: 50px solid #c026d3;
+            z-index: 100;
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5));
+        }
+
+        .center-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #ffd700, #ff8c00, #ff6b00);
+            border-radius: 50%;
+            border: 5px solid #fff;
+            box-shadow: 0 0 25px rgba(0,0,0,0.6), inset 0 0 15px rgba(255,255,255,0.6);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+
+        .outer-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ffd700, #ffed4e, #ffa500);
+            padding: 10px;
+            box-shadow: 0 0 30px rgba(255,215,0,0.8);
+            border: 3px solid #ff8c00;
+        }
+
+        .lights-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+        }
+
+        .light {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border-radius: 50%;            box-shadow: 0 0 10px #fff, 0 0 20px #ffd700;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .results-section {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            padding: 15px;
+            margin: 15px 0;
+            box-shadow: 0 0 25px rgba(255,215,0,0.4);
+        }
+
+        .results-label {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .result-slots {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .result-box {
+            width: 95px;
+            height: 105px;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border: 3px solid #ffd700;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.1);
+        }
+
+        .result-icon {
+            font-size: 45px;
+            margin-bottom: 5px;
+        }
+        .result-multiplier {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .bet-section {
+            margin: 20px 0;
+        }
+
+        .chips-row {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            border: 4px dashed rgba(255,255,255,0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .chip::before {
+            content: '';
+            position: absolute;
+            width: 75%;
+            height: 75%;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
+        }
+
+        .chip:hover:not(:disabled) {
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+        }
+
+        .chip.selected {
+            box-shadow: 0 0 0 4px #fff, 0 0 25px rgba(255,255,255,0.9);
+            transform: scale(1.15);        }
+
+        .chip:disabled,
+        .chip.busy {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .chip-100 {
+            background: radial-gradient(circle, #f472b6, #db2777, #be185d);
+        }
+
+        .chip-1k {
+            background: radial-gradient(circle, #4ade80, #22c55e, #16a34a);
+        }
+
+        .chip-10k {
+            background: radial-gradient(circle, #60a5fa, #3b82f6, #2563eb);
+        }
+
+        .chip-50k {
+            background: radial-gradient(circle, #fb923c, #f97316, #ea580c);
+        }
+
+        .chip-100k {
+            background: radial-gradient(circle, #a78bfa, #8b5cf6, #7c3aed);
+        }
+
+        .chip-value {
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            z-index: 1;
+        }
+
+        .spin-btn {
+            width: 100%;
+            padding: 18px;
+            font-size: 22px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            color: #1a1f3a;
+            box-shadow: 0 8px 25px rgba(255,215,0,0.5);
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        .spin-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(255,215,0,0.7);
+        }
+
+        .spin-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .message {
+            text-align: center;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.5);
+            font-size: 16px;
+            min-height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .win {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            animation: pulse 0.5s infinite;
+        }
+
+        .lose {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .balance-info {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 10px;
+        }
+
+        .info-box {
+            background: rgba(255,255,255,0.1);
+            padding: 8px 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid rgba(255,215,0,0.4);
+        }
+        .info-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="top-bar">
+            <div class="top-icons">
+                <div class="icon-btn" id="btnClose" onclick="closeGame()"><i class="fas fa-times"></i></div>
+                <div class="icon-btn" id="btnHelp" onclick="showHelp()"><i class="fas fa-question"></i></div>
+                <div class="icon-btn" id="btnSound" onclick="toggleSound()"><i class="fas fa-volume-up"></i></div>
+                <div class="icon-btn"><i class="fas fa-clock"></i></div>
+            </div>
+            <div class="balance-box">
+                <i class="fas fa-coins"></i>
+                <span id="topBalance">...</span>
+            </div>
+        </div>
+
+        <div class="header-banner">
+            <h1><i class="fas fa-bullseye"></i> توقع واربح الفضية <i class="fas fa-coins"></i></h1>
+        </div>
+
+        <div class="today-win-box">
+            <div class="today-win-label">فوز اليوم</div>
+            <div class="today-win-value" id="todayWin">0</div>
+        </div>
+
+        <div class="balance-info">
+            <div class="info-box">
+                <div class="info-label">رصيد الفضية</div>
+                <div class="info-value" id="balanceDisplay">...</div>
+            </div>
+            <div class="info-box">
+                <div class="info-label">الرهان</div>
+                <div class="info-value" id="currentBet">0</div>
+            </div>
+        </div>
+
+        <div class="wheel-section">
+            <div class="wheel-container">
+                <div class="pointer"></div>
+                <div class="outer-ring">
+                    <div class="lights-ring" id="wheelLights"></div>
+                </div>
+                <div class="wheel-spin" id="wheelSpin">
+                    <svg class="wheel-svg" viewBox="0 0 350 350">
+                        <g id="wheelGroup">
+                            <!-- Segments will be generated by JS -->
+                        </g>
+                    </svg>
+                </div>
+                <div class="center-circle">
+                    <i class="fas fa-star"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-section">
+            <div class="results-label">النتائج :</div>
+            <div class="result-slots">
+                <div class="result-box" id="slot1">
+                    <div class="result-icon"><img src="lucky-wheel/planet-red.png" alt="" width="42" height="42"></div>
+                    <div class="result-multiplier">x2</div>
+                </div>
+                <div class="result-box" id="slot2">
+                    <div class="result-icon"><img src="lucky-wheel/seven-77.png" alt="77" width="48" height="48"></div>
+                    <div class="result-multiplier">x8</div>
+                </div>
+                <div class="result-box" id="slot3">
+                    <div class="result-icon"><img src="lucky-wheel/planet-orange.png" alt="" width="42" height="42"></div>
+                    <div class="result-multiplier">x2</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="message" id="message">اختر قيمة الرهان واضغط على دوران!</div>
+
+        <div class="bet-section">
+            <div class="chips-row">
+                <button class="chip chip-100" onclick="selectBet(100)" id="chip100">
+                    <span class="chip-value">100</span>
+                </button>
+                <button class="chip chip-1k" onclick="selectBet(1000)" id="chip1k">
+                    <span class="chip-value">1K</span>
+                </button>
+                <button class="chip chip-10k" onclick="selectBet(10000)" id="chip10k">
+                    <span class="chip-value">10K</span>
+                </button>
+                <button class="chip chip-50k" onclick="selectBet(50000)" id="chip50k">
+                    <span class="chip-value">50K</span>
+                </button>
+                <button class="chip chip-100k" onclick="selectBet(100000)" id="chip100k">                    <span class="chip-value">100K</span>
+                </button>
+            </div>
+        </div>
+
+        <button class="spin-btn" id="spinBtn" onclick="spin()" disabled>
+            <i class="fas fa-sync-alt"></i> دوران العجلة <i class="fas fa-sync-alt"></i>
+        </button>
+    </div>
+
+    <script>
+        var q = new URLSearchParams(location.search);
+        if (q.get('embed') === '1') document.documentElement.classList.add('embed');
+        var token = q.get('token') || localStorage.getItem('accessToken') || '';
+        if (!token && window.AuraBridge && typeof AuraBridge.getAccessToken === 'function') {
+            try { token = AuraBridge.getAccessToken() || ''; } catch (_) {}
+        }
+        var roomId = q.get('roomId') || '';
+        var apiBase = (q.get('apiBase') || '').replace(/\/$/, '');
+        if (!apiBase) {
+            if (location.protocol === 'http:' || location.protocol === 'https:') apiBase = location.origin;
+            else apiBase = 'https://api.adnova.bbs.tr';
+        }
+        var origin = apiBase.replace(/\/api\/v1\/?$/, '');
+        var apiRoot = origin + '/api/v1';
+        var ASSET = (location.protocol === 'file:')
+            ? 'lucky-wheel/'
+            : (origin + '/games/lucky-wheel/');
+
+        var balance = 0;
+        var balanceReady = false;
+        var currentBetAmount = 0;
+        var isSpinning = false;
+        var todayWinTotal = 0;
+        var currentRotation = 0;
+        var soundOn = true;
+        var maxBet = 50000;
+        var audioOk = false;
+
+        var IMG = {
+            seven: ASSET + 'seven-77.png',
+            orange: ASSET + 'planet-orange.png',
+            red: ASSET + 'planet-red.png'
+        };
+
+        // Same angles/colors as the original game
+        var segments = [
+            { id: 'seven', icon: '77', text: '77', multiplier: 8, angle: 0, color: '#c026d3', iconColor: '#ffd700', kind: 'seven' },
+            { id: 'orange', icon: 'orange', text: '', multiplier: 2, angle: 45, color: '#2563eb', iconColor: '#f97316', kind: 'orange' },
+            { id: 'lose', icon: 'empty1', text: '', multiplier: 0, angle: 90, color: '#1d4ed8', iconColor: '#fff', kind: 'empty' },
+            { id: 'orange', icon: 'orange2', text: '', multiplier: 2, angle: 135, color: '#2563eb', iconColor: '#f97316', kind: 'orange' },
+            { id: 'red', icon: 'red', text: '', multiplier: 2, angle: 180, color: '#1d4ed8', iconColor: '#ef4444', kind: 'red' },
+            { id: 'lose', icon: 'empty2', text: '', multiplier: 0, angle: 225, color: '#2563eb', iconColor: '#fff', kind: 'empty' },
+            { id: 'red', icon: 'red2', text: '', multiplier: 2, angle: 270, color: '#1d4ed8', iconColor: '#ef4444', kind: 'red' },
+            { id: 'orange', icon: 'orange3', text: '', multiplier: 2, angle: 315, color: '#2563eb', iconColor: '#f97316', kind: 'orange' }
+        ];
+
+        var sfx = {};
+        function ensureSfx() {
+            if (sfx.click) return;
+            ['click', 'spin', 'win', 'lose'].forEach(function (n) {
+                try {
+                    var a = new Audio(ASSET + 'sfx-' + n + '.wav');
+                    a.preload = 'auto';
+                    a.volume = 0.6;
+                    sfx[n] = a;
+                } catch (e) {}
+            });
+        }
+        function unlockAudio() {
+            if (audioOk) return;
+            audioOk = true;
+            ensureSfx();
+            try {
+                if (sfx.click) {
+                    var p = sfx.click.play();
+                    if (p && p.then) p.then(function () { sfx.click.pause(); sfx.click.currentTime = 0; }).catch(function () {});
+                }
+            } catch (e) {}
+        }
+        function play(name) {
+            if (!soundOn) return;
+            ensureSfx();
+            try {
+                var a = sfx[name];
+                if (!a) return;
+                a.currentTime = 0;
+                a.play().catch(function () {});
+            } catch (e) {}
+        }
+
+        function api(path, options) {
+            options = options || {};
+            return fetch(apiRoot + path, {
+                method: options.method || 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                },
+                body: options.body || undefined
+            }).then(function (res) {
+                return res.json().catch(function () { return {}; }).then(function (body) {
+                    var data = (body && body.data !== undefined) ? body.data : body;
+                    if (!res.ok) {
+                        var msg = Array.isArray(body.message) ? body.message.join(', ') : (body.message || body.error || ('HTTP ' + res.status));
+                        throw new Error(msg);
+                    }
+                    return data;
+                });
+            });
+        }
+
+        function createWheel() {
+            var wheelGroup = document.getElementById('wheelGroup');
+            wheelGroup.innerHTML = '';
+            var radius = 150;
+            var centerX = 175;
+            var centerY = 175;
+            var segmentAngle = 360 / 8;
+
+            segments.forEach(function (seg) {
+                var startAngle = (seg.angle - segmentAngle / 2) * Math.PI / 180;
+                var endAngle = (seg.angle + segmentAngle / 2) * Math.PI / 180;
+                var x1 = centerX + radius * Math.cos(startAngle);
+                var y1 = centerY + radius * Math.sin(startAngle);
+                var x2 = centerX + radius * Math.cos(endAngle);
+                var y2 = centerY + radius * Math.sin(endAngle);
+
+                var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                var d = 'M ' + centerX + ' ' + centerY + ' L ' + x1 + ' ' + y1 + ' A ' + radius + ' ' + radius + ' 0 0 1 ' + x2 + ' ' + y2 + ' Z';
+                path.setAttribute('d', d);
+                path.setAttribute('fill', seg.color);
+                path.setAttribute('class', 'segment-path');
+                wheelGroup.appendChild(path);
+
+                var textX = centerX + (radius * 0.65) * Math.cos(seg.angle * Math.PI / 180);
+                var textY = centerY + (radius * 0.65) * Math.sin(seg.angle * Math.PI / 180);
+
+                if (seg.kind === 'seven' || seg.kind === 'orange' || seg.kind === 'red') {
+                    var foreignObject = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+                    foreignObject.setAttribute('x', textX - 28);
+                    foreignObject.setAttribute('y', textY - 28);
+                    foreignObject.setAttribute('width', 56);
+                    foreignObject.setAttribute('height', 56);
+                    var src = seg.kind === 'seven' ? IMG.seven : (seg.kind === 'red' ? IMG.red : IMG.orange);
+                    foreignObject.innerHTML = '<div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;"><img src="' + src + '" width="48" height="48" style="object-fit:contain;background:transparent;" onerror="this.style.display=\'none\';this.parentNode.textContent=\'' + (seg.kind === 'seven' ? '77' : '★') + '\';this.parentNode.style.color=\'' + seg.iconColor + '\';this.parentNode.style.fontWeight=\'bold\';this.parentNode.style.fontSize=\'22px\';"/></div>';
+                    wheelGroup.appendChild(foreignObject);
+                }
+            });
+
+            var lightsContainer = document.getElementById('wheelLights');
+            lightsContainer.innerHTML = '';
+            for (var i = 0; i < 24; i++) {
+                var light = document.createElement('div');
+                light.className = 'light';
+                var angle = (i / 24) * 360;
+                var lr = 167;
+                var x = 167 + lr * Math.cos((angle - 90) * Math.PI / 180);
+                var y = 167 + lr * Math.sin((angle - 90) * Math.PI / 180);
+                light.style.left = x + 'px';
+                light.style.top = y + 'px';
+                light.style.animationDelay = (i * 0.1) + 's';
+                lightsContainer.appendChild(light);
+            }
+
+            // absolute URLs for result slot images
+            var imgs = document.querySelectorAll('.result-icon img');
+            if (imgs[0]) imgs[0].src = IMG.red;
+            if (imgs[1]) imgs[1].src = IMG.seven;
+            if (imgs[2]) imgs[2].src = IMG.orange;
+        }
+
+        function setChipsBusy(busy) {
+            document.querySelectorAll('.chip').forEach(function (chip) {
+                // Never use chip.disabled on Android WebView — it breaks later clicks.
+                if (busy) chip.classList.add('busy');
+                else {
+                    chip.classList.remove('busy');
+                    chip.removeAttribute('disabled');
+                }
+            });
+        }
+
+        function finishRoundUi() {
+            isSpinning = false;
+            currentBetAmount = 0;
+            document.getElementById('currentBet').textContent = '0';
+            setChipsBusy(false);
+            document.querySelectorAll('.chip').forEach(function (chip) {
+                chip.classList.remove('selected');
+            });
+            var spinBtn = document.getElementById('spinBtn');
+            if (spinBtn) spinBtn.disabled = true;
+        }
+
+        function selectBet(amount) {
+            unlockAudio();
+            if (isSpinning) return;
+            play('click');
+            if (!token) {
+                showMessage('<i class="fas fa-times-circle"></i> سجّل الدخول للعب', 'lose');
+                return;
+            }
+            if (!balanceReady) {
+                showMessage('<i class="fas fa-spinner fa-spin"></i> جاري تحميل الرصيد...');
+                loadBalance();
+                return;
+            }
+            if (amount > maxBet) amount = maxBet;
+            if (amount > balance) {
+                showMessage('<i class="fas fa-times-circle"></i> رصيد الفضية غير كافي! <button type="button" onclick="openWallet()" style="margin:0 6px;padding:4px 10px;border:0;border-radius:10px;background:#ffd700;color:#1a1f3a;font-weight:700;">شراء فضية</button>', 'lose');
+                return;
+            }
+
+            currentBetAmount = amount;
+            document.getElementById('currentBet').textContent = formatNumber(currentBetAmount);
+            document.querySelectorAll('.chip').forEach(function (chip) { chip.classList.remove('selected'); });
+
+            var chipId = 'chip100';
+            if (amount === 1000) chipId = 'chip1k';
+            else if (amount === 10000) chipId = 'chip10k';
+            else if (amount === 50000) chipId = 'chip50k';
+            else if (amount === 100000) chipId = 'chip100k';
+            var el = document.getElementById(chipId);
+            if (el) el.classList.add('selected');
+            showMessage('<i class="fas fa-check-circle"></i> تم اختيار رهان ' + formatNumber(amount));
+            var spinBtn = document.getElementById('spinBtn');
+            if (spinBtn) {
+                spinBtn.removeAttribute('disabled');
+                spinBtn.disabled = false;
+            }
+        }
+
+        function spin() {
+            unlockAudio();
+            if (isSpinning || currentBetAmount === 0) return;
+            if (!token) {
+                showMessage('<i class="fas fa-times-circle"></i> سجّل الدخول للعب', 'lose');
+                return;
+            }
+            if (!balanceReady || currentBetAmount > balance) {
+                showMessage('<i class="fas fa-times-circle"></i> رصيد الفضية غير كافي!', 'lose');
+                return;
+            }
+
+            isSpinning = true;
+            document.getElementById('spinBtn').disabled = true;
+            setChipsBusy(true);
+            play('spin');
+            showMessage('<i class="fas fa-spinner fa-spin"></i> جاري الدوران...');
+
+            var body = { amount: currentBetAmount };
+            if (roomId) body.roomId = roomId;
+
+            api('/games/lucky-wheel/spin', { method: 'POST', body: JSON.stringify(body) })
+                .then(function (payload) {
+                    var selectedIndex = Number(payload.sectorIndex || 0);
+                    if (!Number.isFinite(selectedIndex) || selectedIndex < 0 || selectedIndex > 7) selectedIndex = 0;
+                    var segmentAngle = 360 / 8;
+                    var rotations = 8 + Math.floor(Math.random() * 4);
+                    // Pointer is at top; align selected sector center under pointer.
+                    var targetAngle = selectedIndex * segmentAngle;
+                    var startRot = currentRotation;
+                    var endRot = currentRotation + (rotations * 360) + (360 - targetAngle);
+                    currentRotation = endRot;
+
+                    var wheelSpin = document.getElementById('wheelSpin');
+                    if (!wheelSpin) wheelSpin = document.querySelector('.wheel-spin');
+
+                    function easeOutCubic(t) {
+                        return 1 - Math.pow(1 - t, 3);
+                    }
+
+                    function applyRot(deg) {
+                        if (!wheelSpin) return;
+                        var v = 'rotate(' + deg + 'deg)';
+                        wheelSpin.style.webkitTransform = v;
+                        wheelSpin.style.transform = v;
+                    }
+
+                    // Force a starting frame so WebView always animates (CSS transition alone often fails).
+                    applyRot(startRot);
+                    if (wheelSpin) {
+                        wheelSpin.offsetWidth;
+                    }
+
+                    var duration = 5200;
+                    var t0 = Date.now();
+                    function tick() {
+                        var p = Math.min(1, (Date.now() - t0) / duration);
+                        applyRot(startRot + (endRot - startRot) * easeOutCubic(p));
+                        if (p < 1) {
+                            requestAnimationFrame(tick);
+                        }
+                    }
+                    requestAnimationFrame(tick);
+
+                    setTimeout(function () {
+                        try {
+                            applyRot(endRot);
+                            balance = Number(payload.balance || 0);
+                            balanceReady = true;
+                            todayWinTotal = Number(payload.todayWins || todayWinTotal);
+                            updateBalance();
+                            document.getElementById('todayWin').textContent = formatNumber(todayWinTotal);
+                            updateResults(segments[selectedIndex] || segments[0]);
+
+                            if (payload.won && payload.payout > 0) {
+                                play('win');
+                                showMessage('<i class="fas fa-trophy"></i> مبروك! ربحت ' + formatNumber(payload.payout) + '!', 'win');
+                            } else {
+                                play('lose');
+                                showMessage('<i class="fas fa-sad-tear"></i> حظ أوفر في المرة القادمة!', 'lose');
+                            }
+                        } catch (err) {
+                            showMessage('<i class="fas fa-times-circle"></i> ' + ((err && err.message) || 'خطأ'), 'lose');
+                        } finally {
+                            finishRoundUi();
+                            setTimeout(function () {
+                                if (!isSpinning && currentBetAmount === 0) {
+                                    showMessage('اختر قيمة الرهان واضغط على دوران!');
+                                }
+                            }, 1800);
+                        }
+                    }, duration + 80);
+                })
+                .catch(function (e) {
+                    finishRoundUi();
+                    var msg = (e && e.message) || 'خطأ';
+                    showMessage('<i class="fas fa-times-circle"></i> ' + msg, 'lose');
+                    play('lose');
+                    loadBalance();
+                });
+        }
+
+        function updateResults(result) {
+            document.getElementById('slot1').innerHTML =
+                '<div class="result-icon"><img src="' + IMG.red + '" width="42" height="42"></div><div class="result-multiplier">x2</div>';
+            if (result && result.id === 'seven') {
+                document.getElementById('slot2').innerHTML =
+                    '<div class="result-icon"><img src="' + IMG.seven + '" width="48" height="48"></div><div class="result-multiplier">x8</div>';
+            } else if (result && result.id === 'orange') {
+                document.getElementById('slot2').innerHTML =
+                    '<div class="result-icon"><img src="' + IMG.orange + '" width="42" height="42"></div><div class="result-multiplier">x2</div>';
+            } else if (result && result.id === 'red') {
+                document.getElementById('slot2').innerHTML =
+                    '<div class="result-icon"><img src="' + IMG.red + '" width="42" height="42"></div><div class="result-multiplier">x2</div>';
+            } else {
+                document.getElementById('slot2').innerHTML =
+                    '<div class="result-icon" style="font-size:28px;opacity:.45;">—</div><div class="result-multiplier">x0</div>';
+            }
+            document.getElementById('slot3').innerHTML =
+                '<div class="result-icon"><img src="' + IMG.orange + '" width="42" height="42"></div><div class="result-multiplier">x2</div>';
+        }
+
+        function showMessage(text, type) {
+            var msgEl = document.getElementById('message');
+            msgEl.innerHTML = text;
+            msgEl.className = 'message';
+            if (type === 'win') msgEl.classList.add('win');
+            else if (type === 'lose') msgEl.classList.add('lose');
+        }
+
+        function updateBalance() {
+            document.getElementById('balanceDisplay').textContent = formatNumber(balance);
+            document.getElementById('topBalance').textContent = formatNumber(balance);
+        }
+
+        function formatNumber(num) {
+            return Math.floor(Number(num) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        function loadBalance() {
+            if (!token) {
+                document.getElementById('balanceDisplay').textContent = '0';
+                document.getElementById('topBalance').textContent = '0';
+                showMessage('<i class="fas fa-times-circle"></i> سجّل الدخول للعب', 'lose');
+                return;
+            }
+            showMessage('<i class="fas fa-spinner fa-spin"></i> جاري تحميل الرصيد...');
+            api('/games/lucky-wheel').then(function (data) {
+                balance = Number(data.balance || 0);
+                balanceReady = true;
+                todayWinTotal = Number(data.todayWins || 0);
+                if (data.config && data.config.maxBet) maxBet = Number(data.config.maxBet);
+                updateBalance();
+                document.getElementById('todayWin').textContent = formatNumber(todayWinTotal);
+                var chip100k = document.getElementById('chip100k');
+                if (chip100k && maxBet < 100000) chip100k.style.display = 'none';
+                showMessage('اختر قيمة الرهان واضغط على دوران!');
+            }).catch(function (e) {
+                balanceReady = false;
+                showMessage('<i class="fas fa-times-circle"></i> ' + ((e && e.message) || 'تعذر تحميل الرصيد'), 'lose');
+            });
+        }
+
+        function closeGame() {
+            try { if (window.AuraBridge && AuraBridge.closeGame) AuraBridge.closeGame(); } catch (e) {}
+        }
+        function showHelp() {
+            alert('اختر شريحة رهان ثم اضغط دوران. الكوكب ×2 والرقم 77 ×8. النتيجة من السيرفر.');
+        }
+        function toggleSound() {
+            soundOn = !soundOn;
+            unlockAudio();
+            var b = document.getElementById('btnSound');
+            if (b) b.innerHTML = soundOn ? '<i class="fas fa-volume-up"></i>' : '<i class="fas fa-volume-mute"></i>';
+        }
+        function openWallet() {
+            try { if (window.AuraBridge && AuraBridge.openWallet) AuraBridge.openWallet(); } catch (e) {}
+        }
+
+        document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+        document.addEventListener('click', unlockAudio, { once: true });
+
+        window.selectBet = selectBet;
+        window.spin = spin;
+        window.closeGame = closeGame;
+        window.showHelp = showHelp;
+        window.toggleSound = toggleSound;
+        window.openWallet = openWallet;
+
+        window.onload = function () {
+            createWheel();
+            loadBalance();
+        };
+    </script>
+</body>
+</html>

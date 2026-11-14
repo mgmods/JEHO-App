@@ -1,0 +1,118 @@
+
+baozha.png
+size: 756,200
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+000
+  rotate: true
+  xy: 2, 2
+  size: 82, 83
+  orig: 150, 150
+  offset: 33, 36
+  index: -1
+001
+  rotate: true
+  xy: 87, 2
+  size: 82, 83
+  orig: 150, 150
+  offset: 33, 36
+  index: -1
+002
+  rotate: true
+  xy: 172, 2
+  size: 82, 83
+  orig: 150, 150
+  offset: 33, 36
+  index: -1
+003
+  rotate: false
+  xy: 257, 3
+  size: 82, 83
+  orig: 150, 150
+  offset: 33, 36
+  index: -1
+004
+  rotate: false
+  xy: 341, 6
+  size: 82, 83
+  orig: 150, 150
+  offset: 33, 36
+  index: -1
+005
+  rotate: false
+  xy: 425, 6
+  size: 82, 83
+  orig: 150, 150
+  offset: 33, 36
+  index: -1
+006
+  rotate: false
+  xy: 509, 6
+  size: 82, 83
+  orig: 150, 150
+  offset: 33, 36
+  index: -1
+007
+  rotate: false
+  xy: 593, 12
+  size: 82, 83
+  orig: 150, 150
+  offset: 33, 36
+  index: -1
+008
+  rotate: false
+  xy: 2, 86
+  size: 112, 112
+  orig: 150, 150
+  offset: 18, 20
+  index: -1
+009
+  rotate: false
+  xy: 116, 86
+  size: 112, 112
+  orig: 150, 150
+  offset: 18, 20
+  index: -1
+010
+  rotate: true
+  xy: 230, 88
+  size: 110, 108
+  orig: 150, 150
+  offset: 19, 22
+  index: -1
+011
+  rotate: true
+  xy: 340, 91
+  size: 107, 106
+  orig: 150, 150
+  offset: 21, 23
+  index: -1
+012
+  rotate: true
+  xy: 448, 91
+  size: 107, 106
+  orig: 150, 150
+  offset: 22, 23
+  index: -1
+013
+  rotate: true
+  xy: 556, 97
+  size: 101, 100
+  orig: 150, 150
+  offset: 24, 26
+  index: -1
+014
+  rotate: false
+  xy: 658, 102
+  size: 96, 96
+  orig: 150, 150
+  offset: 26, 28
+  index: -1
+015
+  rotate: true
+  xy: 677, 65
+  size: 35, 36
+  orig: 150, 150
+  offset: 56, 59
+  index: -1

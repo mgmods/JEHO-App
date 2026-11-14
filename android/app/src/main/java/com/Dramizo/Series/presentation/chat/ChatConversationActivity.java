@@ -1,0 +1,2471 @@
+package com.Dramizo.Series.presentation.chat;
+import com.Dramizo.Series.presentation.common.ThemedActivity;
+
+import android.content.Intent;
+import android.app.Activity;
+import android.app.ProgressDialog;
+import android.content.DialogInterface;
+import android.content.res.AssetFileDescriptor;
+import android.media.MediaMetadataRetriever;
+import android.provider.MediaStore;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
+import android.media.MediaRecorder;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.MenuItem;
+import android.view.ScaleGestureDetector;
+import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.widget.ImageView;
+import android.widget.VideoView;
+import android.widget.PopupMenu;
+import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.Dramizo.Series.R;
+import com.Dramizo.Series.data.remote.api.UploadApi;
+import com.Dramizo.Series.data.remote.dto.ApiResponse;
+import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.Dramizo.Series.data.remote.dto.ChatDtos;
+import com.Dramizo.Series.databinding.ActivityChatConversationBinding;
+import com.Dramizo.Series.di.AppContainer;
+import com.Dramizo.Series.domain.model.Result;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
+import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
+import com.Dramizo.Series.presentation.common.ViewModelFactory;
+import com.Dramizo.Series.presentation.gifts.GiftBottomSheet;
+import com.Dramizo.Series.realtime.RealtimeClient;
+import com.Dramizo.Series.util.ApiCall;
+import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.util.AuraDialogHelper;
+import com.Dramizo.Series.util.AvatarCosmetics;
+import com.Dramizo.Series.util.DeviceTimeFormat;
+import com.Dramizo.Series.util.GenderVerifiedBadge;
+import com.Dramizo.Series.util.VipNameStyle;
+import com.Dramizo.Series.util.PermissionHelper;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.bumptech.glide.Glide;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
+
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
+import okio.BufferedSink;
+import okio.Okio;
+import retrofit2.Call;
+import retrofit2.Response;
+
+public class ChatConversationActivity extends ThemedActivity {
+    public static final String EXTRA_CONVERSATION_ID = "conversation_id";
+    public static final String EXTRA_TITLE = "title";
+    public static final String EXTRA_PEER_ID = "peer_id";
+    public static final String EXTRA_AVATAR = "avatar";
+    public static final String EXTRA_FOCUS_COMPOSER = "focus_composer_from_notification";
+    public static final String EXTRA_HOST_BADGE = "host_badge";
+
+    private ActivityChatConversationBinding binding;
+    private ChatViewModel viewModel;
+    private MessageAdapter adapter;
+    private String conversationId;
+    private String peerId;
+    private String peerRoomTrackingId;
+    private final Handler roomTrackingHandler = new Handler(Looper.getMainLooper());
+    private final Runnable roomTrackingRefresh = new Runnable() {
+        @Override public void run() {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            refreshPeerRoomPresence();
+            roomTrackingHandler.postDelayed(this, 15_000L);
+        }
+    };
+    private boolean peerBlocked;
+    private String peerLastSeenAt;
+    private boolean peerOnline;
+    private boolean peerTyping;
+    private boolean showOnlineAllowed = true;
+    private String editingMessageId;
+    private String pendingPaidDraft;
+    private Runnable typingStop;
+    private MediaRecorder mediaRecorder;
+    private File voiceFile;
+    private long voiceStartedAt;
+    private boolean voiceCancelled;
+    private float voiceDownRawY;
+    private float voiceDownRawX;
+    private final Handler voiceUiHandler = new Handler(Looper.getMainLooper());
+    private final Runnable voiceTick = new Runnable() {
+        @Override public void run() {
+            if (binding == null || voiceStartedAt <= 0 || binding.voiceRecordOverlay == null
+                    || binding.voiceRecordOverlay.getVisibility() != View.VISIBLE) return;
+            long elapsed = Math.max(0, SystemClock.elapsedRealtime() - voiceStartedAt);
+            int totalSec = (int) (elapsed / 1000L);
+            if (binding.tvVoiceTimer != null) {
+                binding.tvVoiceTimer.setText(String.format(java.util.Locale.US, "%d:%02d",
+                        totalSec / 60, totalSec % 60));
+            }
+            voiceUiHandler.postDelayed(this, 200);
+        }
+    };
+
+    private final RealtimeClient.UserListener presenceListener = new RealtimeClient.UserListener() {
+        @Override
+        public void onPresenceOnline(String userId, String username) {
+            if (peerId == null || userId == null || !peerId.equals(userId)) return;
+            runOnUiThread(() -> {
+                peerOnline = true;
+                refreshPeerStatusUi();
+            });
+        }
+
+        @Override
+        public void onPresenceOffline(String userId) {
+            if (peerId == null || userId == null || !peerId.equals(userId)) return;
+            runOnUiThread(() -> {
+                peerOnline = false;
+                peerLastSeenAt = String.valueOf(System.currentTimeMillis());
+                refreshPeerStatusUi();
+            });
+        }
+
+        @Override
+        public void onConnected() {
+            requestPeerPresence();
+        }
+    };
+
+    private final ActivityResultLauncher<String> pickGallery =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null) uploadAndSendImage(uri);
+            });
+
+    private final ActivityResultLauncher<String> pickVideo =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null) previewVideoBeforeSend(uri);
+            });
+
+    private final ActivityResultLauncher<String> pickChatBackgroundImage =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null) showChatBackgroundCrop(uri);
+            });
+
+    private final ActivityResultLauncher<String> pickChatBackgroundVideo =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null) uploadChatBackground(uri, true);
+            });
+
+    private VideoView chatBackgroundVideo;
+
+    private final ActivityResultLauncher<Intent> captureVideo =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null
+                        && result.getData().getData() != null) {
+                    previewVideoBeforeSend(result.getData().getData());
+                }
+            });
+
+    private final ActivityResultLauncher<Void> takePicturePreview =
+            registerForActivityResult(new ActivityResultContracts.TakePicturePreview(), bitmap -> {
+                if (bitmap != null) uploadAndSendBitmap(bitmap);
+            });
+
+    private final ActivityResultLauncher<String> requestCameraPermission =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted) {
+                    try {
+                        takePicturePreview.launch(null);
+                    } catch (Exception e) {
+                        Toast.makeText(this, "تعذر فتح الكاميرا", Toast.LENGTH_LONG).show();
+                    }
+                } else {
+                    Toast.makeText(this, "اسمح للتطبيق باستخدام الكاميرا حتى تتمكن من التقاط صورة", Toast.LENGTH_LONG).show();
+                }
+            });
+
+    private static final java.util.concurrent.ConcurrentHashMap<String, PendingVideoUpload> PENDING_VIDEO_UPLOADS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final class PendingVideoUpload {
+        final Uri uri;
+        PendingVideoUpload(Uri uri) { this.uri = uri; }
+    }
+
+    private void restorePendingVideoUpload() {
+        if (binding == null || conversationId == null) return;
+        PendingVideoUpload pending = PENDING_VIDEO_UPLOADS.get(conversationId);
+        if (pending == null) {
+            binding.mediaUploadBanner.setVisibility(View.GONE);
+            return;
+        }
+        binding.mediaUploadBanner.setVisibility(View.VISIBLE);
+        binding.progressMediaUpload.setVisibility(View.VISIBLE);
+        binding.tvMediaUploadStatus.setText("جارٍ إرسال الفيديو");
+        Glide.with(this).load(pending.uri).centerCrop().into(binding.imgMediaUploadPreview);
+    }
+
+    private void clearPendingVideoUpload() {
+        if (binding != null && binding.mediaUploadBanner != null) {
+            binding.mediaUploadBanner.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        EdgeToEdgeHelper.apply(this);
+        binding = ActivityChatConversationBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+        chatBackgroundVideo = findViewById(R.id.videoThemeBg);
+        applyInsetsForKeyboard();
+
+        conversationId = firstExtra(getIntent(), EXTRA_CONVERSATION_ID, "conversationId");
+        applyChatBackground();
+        com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
+        peerId = firstExtra(getIntent(), EXTRA_PEER_ID, "peerId", "senderId", "userId");
+        String title = firstExtra(getIntent(), EXTRA_TITLE, "senderName", "peerName", "name");
+        String avatar = firstExtra(getIntent(), EXTRA_AVATAR, "avatarUrl", "senderAvatarUrl");
+        String hostBadge = getIntent().getStringExtra(EXTRA_HOST_BADGE);
+        String vipFrame = firstExtra(getIntent(), "vipBadgeUrl", "frameUrl", "peerFrameUrl");
+        if (vipFrame == null || vipFrame.isEmpty()) {
+            // Legacy EXTRA_HOST_BADGE was often filled with the VIP head frame URL.
+            vipFrame = hostBadge;
+            hostBadge = null;
+        }
+
+        bindPeerName(title, null);
+        if (binding.tvPeerStatus != null) {
+            binding.tvPeerStatus.setText(R.string.loading);
+        }
+        View.OnClickListener openPeerProfile = v -> openPeerProfile();
+        if (binding.imgPeerAvatar != null) {
+            AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, avatar);
+            AvatarCosmetics.applyHostWear(
+                    binding.imgPeerFrame, binding.imgPeerHostBadge, binding.imgPeerAvatar,
+                    vipFrame, null, null, null);
+            binding.imgPeerAvatar.setOnClickListener(openPeerProfile);
+            if (binding.imgPeerFrame != null) binding.imgPeerFrame.setOnClickListener(openPeerProfile);
+        }
+        if (binding.tvPeerName != null) binding.tvPeerName.setOnClickListener(openPeerProfile);
+        if (binding.tvPeerUsername != null) binding.tvPeerUsername.setOnClickListener(openPeerProfile);
+        if (binding.imgStripAvatar != null) {
+            AvatarCosmetics.bindAvatar(binding.imgStripAvatar, avatar);
+            binding.imgStripAvatar.setOnClickListener(openPeerProfile);
+        }
+        if (binding.tvStripName != null) {
+            binding.tvStripName.setOnClickListener(openPeerProfile);
+            if (title != null && !title.isEmpty()) binding.tvStripName.setText(title);
+        }
+        if (binding.peerProfileStrip != null) {
+            binding.peerProfileStrip.setOnClickListener(openPeerProfile);
+        }
+        if (binding.btnRoomTracking != null) {
+            binding.btnRoomTracking.setOnClickListener(v -> openPeerTrackedRoom());
+        }
+        binding.btnBack.setOnClickListener(v -> navigateUp());
+        bindGiftButton();
+        paintComposerBrandChrome();
+        if (binding.btnChatMenu != null) {
+            binding.btnChatMenu.setOnClickListener(v -> showChatMenu());
+        }
+        if (binding.btnCancelEdit != null) {
+            binding.btnCancelEdit.setOnClickListener(v -> clearEditing());
+        }
+
+        viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
+                .get(ChatViewModel.class);
+        if (binding.btnCancelReply != null) {
+            binding.btnCancelReply.setOnClickListener(v -> viewModel.clearReply());
+        }
+        com.Dramizo.Series.data.local.prefs.SessionManager session =
+                ContainerProvider.from(this).getSessionManager();
+        String myId = session.getUserId();
+        if ((myId == null || myId.isEmpty()) && session.getUser() != null) {
+            myId = session.getUser().id;
+        }
+        adapter = new MessageAdapter(myId, session.getUser(), new MessageAdapter.Listener() {
+            @Override
+            public void onLongClick(ChatDtos.MessageDto msg) {
+                onMessageLongClick(msg);
+            }
+
+            @Override
+            public void onSwipeReply(ChatDtos.MessageDto msg) {
+                beginReply(msg);
+            }
+
+            @Override
+            public void onTranslate(ChatDtos.MessageDto msg, int adapterPosition) {
+                translateInline(msg);
+            }
+
+            @Override
+            public void onAvatarClick(String userId) {
+                String id = (userId != null && !userId.isEmpty()) ? userId : peerId;
+                openUserCard(id);
+            }
+
+            @Override
+            public void onAgencyInviteAgree(
+                    ChatDtos.MessageDto msg,
+                    com.Dramizo.Series.util.AgencyInviteCodec.Parsed invite) {
+                acceptAgencyInvite(msg, invite);
+            }
+
+            @Override
+            public void onAgencyInviteDisagree(
+                    ChatDtos.MessageDto msg,
+                    com.Dramizo.Series.util.AgencyInviteCodec.Parsed invite) {
+                rejectAgencyInvite(msg, invite);
+            }
+        });
+        LinearLayoutManager lm = new LinearLayoutManager(this);
+        lm.setStackFromEnd(true);
+        binding.recycler.setLayoutManager(lm);
+        binding.recycler.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        binding.recycler.setAdapter(adapter);
+        attachSwipeToReply();
+        binding.recycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                if (dy < 0 && lm.findFirstVisibleItemPosition() <= 2) {
+                    viewModel.loadOlder();
+                }
+            }
+        });
+
+        binding.btnSend.setOnClickListener(v -> sendNow());
+        if (binding.btnPaidMessageRecharge != null) {
+            binding.btnPaidMessageRecharge.setOnClickListener(v ->
+                    com.Dramizo.Series.util.BalanceRedirect.openRecharge(this));
+        }
+        if (binding.btnDismissPaidMessageRecharge != null) {
+            binding.btnDismissPaidMessageRecharge.setOnClickListener(v -> {
+                if (binding.paidMessageRechargeBanner != null) {
+                    binding.paidMessageRechargeBanner.setVisibility(View.GONE);
+                }
+            });
+        }
+        setupVoiceButton();
+        binding.btnAttach.setOnClickListener(v -> showAttachPicker());
+        if (binding.btnChatGift != null) {
+            binding.btnChatGift.setOnClickListener(v -> openChatGifts());
+        }
+        getSupportFragmentManager().setFragmentResultListener(
+                "gift_sent_chat",
+                this,
+                (key, bundle) -> {
+                    try {
+                        String name = bundle != null ? bundle.getString("name") : null;
+                        String icon = bundle != null ? bundle.getString("icon") : null;
+                        if (conversationId == null || conversationId.isEmpty()) return;
+                        if (name == null || name.isEmpty()) name = "هدية";
+                        viewModel.sendGiftMessage(conversationId, name, icon);
+                    } catch (Exception e) {
+                        Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
+                    }
+                });
+        if (binding.btnChatEmoji != null) {
+            binding.btnChatEmoji.setOnClickListener(v -> showChatEmojiPicker());
+        }
+        binding.etMessage.setOnEditorActionListener((tv, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                sendNow();
+                return true;
+            }
+            return false;
+        });
+
+        binding.etMessage.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                refreshSendMicVisibility();
+                if (conversationId == null) return;
+                viewModel.setTyping(s != null && s.length() > 0);
+                if (typingStop != null) binding.etMessage.removeCallbacks(typingStop);
+                typingStop = () -> viewModel.setTyping(false);
+                binding.etMessage.postDelayed(typingStop, 1500);
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+        refreshSendMicVisibility();
+
+        viewModel.getMessages().observe(this, list -> {
+            int previousCount = adapter.getItemCount();
+            int firstVisible = lm.findFirstVisibleItemPosition();
+            View firstView = lm.findViewByPosition(firstVisible);
+            int firstOffset = firstView != null ? firstView.getTop() : 0;
+            boolean wasNearBottom =
+                    previousCount == 0 || lm.findLastVisibleItemPosition() >= previousCount - 2;
+            adapter.submit(list);
+            int newCount = list != null ? list.size() : 0;
+            if (previousCount > 0 && newCount > previousCount && firstVisible <= 2) {
+                lm.scrollToPositionWithOffset(firstVisible + (newCount - previousCount), firstOffset);
+            } else if (wasNearBottom && newCount > 0) {
+                binding.recycler.scrollToPosition(list.size() - 1);
+            }
+        });
+        viewModel.getReplyTarget().observe(this, this::bindReplyBanner);
+        viewModel.getPeerLastReadAt().observe(this, at -> {
+            if (adapter != null && at != null) adapter.setPeerLastReadAt(at);
+        });
+        viewModel.getTyping().observe(this, t -> {
+            peerTyping = Boolean.TRUE.equals(t);
+            if (peerTyping) peerOnline = true;
+            refreshPeerStatusUi();
+        });
+        viewModel.getError().observe(this, e -> {
+            if (e == null) return;
+            String msg = e;
+            if (msg.contains("DM_GIFT_REQUIRED") || msg.contains("أرسل هدية أولاً")) {
+                Toast.makeText(this, R.string.send_gift_to_open_chat, Toast.LENGTH_LONG).show();
+                openGiftGateSheet();
+                return;
+            }
+            if (msg.contains("تحتاج إلى") && msg.contains("عملة")) {
+                if (pendingPaidDraft != null && !pendingPaidDraft.isEmpty() && binding.etMessage != null) {
+                    binding.etMessage.setText(pendingPaidDraft);
+                    binding.etMessage.setSelection(binding.etMessage.getText().length());
+                }
+                if (binding.paidMessageRechargeBanner != null) {
+                    if (binding.tvPaidMessageRechargeText != null) {
+                        binding.tvPaidMessageRechargeText.setText(msg + " — اشحن رصيدك للمتابعة.");
+                    }
+                    binding.paidMessageRechargeBanner.setVisibility(View.VISIBLE);
+                } else {
+                    com.Dramizo.Series.util.BalanceRedirect.handle(this, msg);
+                }
+                return;
+            }
+            if (com.Dramizo.Series.util.BalanceRedirect.looksLikeInsufficient(msg)) {
+                com.Dramizo.Series.util.BalanceRedirect.handle(this, msg);
+                return;
+            }
+            Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
+        });
+        viewModel.getConversationDeleted().observe(this, deleted -> {
+            if (!Boolean.TRUE.equals(deleted)) return;
+            Toast.makeText(this, R.string.conversation_deleted, Toast.LENGTH_SHORT).show();
+            finish();
+        });
+
+        RealtimeClient.getInstance().addUserListener(presenceListener);
+
+        if (conversationId != null) {
+            loadPeerHeader();
+        }
+    }
+
+    private void applyInsetsForKeyboard() {
+        final int headerPadL = binding.headerBar.getPaddingLeft();
+        final int headerPadT = binding.headerBar.getPaddingTop();
+        final int headerPadR = binding.headerBar.getPaddingRight();
+        final int headerPadB = binding.headerBar.getPaddingBottom();
+        final int inputPadL = binding.inputBar.getPaddingLeft();
+        final int inputPadT = binding.inputBar.getPaddingTop();
+        final int inputPadR = binding.inputBar.getPaddingRight();
+        final int inputPadB = binding.inputBar.getPaddingBottom();
+        final int voicePadL = binding.voiceRecordBar.getPaddingLeft();
+        final int voicePadT = binding.voiceRecordBar.getPaddingTop();
+        final int voicePadR = binding.voiceRecordBar.getPaddingRight();
+        final int voicePadB = binding.voiceRecordBar.getPaddingBottom();
+        // Fixed content height of header toolbar (without system inset).
+        final int toolbarMinH = (int) (50f * getResources().getDisplayMetrics().density + 0.5f);
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root, (v, insets) -> {
+            Insets bars = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout());
+            Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+
+            // White header fills under status bar; content sits below it.
+            binding.headerBar.setPadding(
+                    headerPadL, headerPadT + bars.top, headerPadR, headerPadB);
+            binding.headerBar.setMinimumHeight(toolbarMinH + bars.top);
+
+            int bottom = Math.max(bars.bottom, ime.bottom);
+            binding.inputBar.setPadding(inputPadL, inputPadT, inputPadR, inputPadB + bottom);
+
+            // Voice overlay sits above system nav / gesture bar.
+            binding.voiceRecordBar.setPadding(
+                    voicePadL, voicePadT, voicePadR, voicePadB + Math.max(bars.bottom, 0));
+            if (binding.voiceRecordOverlay != null) {
+                binding.voiceRecordOverlay.setPadding(0, 0, 0, Math.max(bars.bottom, 0));
+            }
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(binding.root);
+    }
+
+    private void sendNow() {
+        String text = binding.etMessage.getText() != null ? binding.etMessage.getText().toString().trim() : "";
+        if (text.isEmpty() || conversationId == null) return;
+        com.Dramizo.Series.data.local.prefs.SessionManager sm =
+                ContainerProvider.from(this).getSessionManager();
+        if (sm.isChatPromoFilterFromServer()) {
+            java.util.List<String> extra =
+                    com.Dramizo.Series.util.ChatContentFilter.parseExtraKeywords(
+                            sm.getChatExtraKeywordsFromServer());
+            if (com.Dramizo.Series.util.ChatContentFilter.isBlocked(text, extra)) {
+                Toast.makeText(
+                                this,
+                                com.Dramizo.Series.util.ChatContentFilter.BLOCK_REASON,
+                                Toast.LENGTH_LONG)
+                        .show();
+                return;
+            }
+        }
+        if (editingMessageId != null) {
+            viewModel.editMessage(editingMessageId, text);
+            clearEditing();
+            return;
+        }
+        pendingPaidDraft = text;
+        viewModel.send(conversationId, text);
+        binding.etMessage.setText("");
+    }
+
+    private void beginEditing(ChatDtos.MessageDto msg) {
+        if (msg == null || msg.id == null) return;
+        editingMessageId = msg.id;
+        String content = msg.content != null ? msg.content : "";
+        binding.etMessage.setText(content);
+        binding.etMessage.setSelection(content.length());
+        if (binding.editBanner != null) {
+            binding.editBanner.setVisibility(View.VISIBLE);
+            if (binding.tvEditPreview != null) {
+                binding.tvEditPreview.setText(content);
+            }
+        }
+        binding.etMessage.requestFocus();
+        android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(binding.etMessage, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        }
+    }
+
+    private void clearEditing() {
+        editingMessageId = null;
+        if (binding.editBanner != null) binding.editBanner.setVisibility(View.GONE);
+        if (binding.tvEditPreview != null) binding.tvEditPreview.setText("");
+        binding.etMessage.setText("");
+    }
+
+    private boolean isMyMessage(ChatDtos.MessageDto msg) {
+        if (msg == null) return false;
+        if (msg.localPending) return true;
+        if (msg.id != null && msg.id.startsWith("local:")) return true;
+        String myId = ContainerProvider.from(this).getSessionManager().getUserId();
+        AuthDtos.UserDto me = ContainerProvider.from(this).getSessionManager().getUser();
+        if (myId == null || myId.isEmpty()) {
+            if (me != null) myId = me.id;
+        }
+        if (myId == null || myId.isEmpty()) return false;
+        if (myId.equals(msg.senderId)) return true;
+        if (msg.sender != null && myId.equals(msg.sender.id)) return true;
+        return false;
+    }
+
+    private void showChatEmojiPicker() {
+        String[] emojis = {
+                "😀", "😁", "😂", "🤣", "😃", "😄", "😅", "😆", "😉", "😊", "😋", "😎",
+                "😍", "😘", "🥰", "😗", "😙", "😚", "🙂", "🤗", "🤩", "🤔", "🤨", "😐",
+                "😏", "😣", "😥", "😮", "🤐", "😯", "😪", "😫", "🥱", "😴", "😌", "😛",
+                "😜", "😝", "🤤", "😒", "😓", "😔", "😕", "🙃", "🤑", "😲", "☹️", "🙁",
+                "😖", "😞", "😟", "😤", "😢", "😭", "😦", "😧", "😨", "😩", "🤯", "😬",
+                "😰", "😱", "🥵", "🥶", "😳", "🤪", "😵", "😡", "😠", "🤬", "😷", "🤒",
+                "👍", "👎", "👏", "🙌", "👐", "🤝", "🙏", "💪", "✌️", "🤞", "🤟", "🤘",
+                "👌", "🤌", "👈", "👉", "👆", "👇", "☝️", "✋", "🤚", "🖐️", "🖖", "👋",
+                "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕",
+                "💞", "💓", "💗", "💖", "💘", "💝", "💟", "🔥", "✨", "⭐", "🌟", "💫",
+                "🎉", "🎊", "🎈", "🎁", "🏆", "🥇", "🎯", "🎮", "🎵", "🎶", "🌹", "🌸",
+                "☕", "🍕", "🍔", "🍟", "🍰", "🎂", "🍩", "🍪", "🍎", "🍓", "🍒", "🍉"
+        };
+        BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
+        android.view.View sheet = getLayoutInflater().inflate(R.layout.dialog_emoji_picker, null);
+        AuraDialogHelper.applyContent(sheet);
+        dialog.setContentView(sheet);
+        android.view.View stickers = sheet.findViewById(R.id.recyclerStickers);
+        if (stickers != null) stickers.setVisibility(android.view.View.GONE);
+        android.view.View stickersLabel = sheet.findViewById(R.id.tvStickersLabel);
+        if (stickersLabel != null) stickersLabel.setVisibility(android.view.View.GONE);
+        RecyclerView rv = sheet.findViewById(R.id.recyclerEmojis);
+        if (rv != null) {
+            rv.setNestedScrollingEnabled(true);
+            rv.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(this, 8));
+            rv.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+                @NonNull
+                @Override
+                public RecyclerView.ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
+                    android.view.View v = getLayoutInflater().inflate(R.layout.item_emoji_cell, parent, false);
+                    return new RecyclerView.ViewHolder(v) {};
+                }
+                @Override
+                public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+                    android.widget.TextView tv = holder.itemView.findViewById(R.id.tvEmoji);
+                    tv.setText(emojis[position]);
+                    holder.itemView.setOnClickListener(v -> {
+                        CharSequence cur = binding.etMessage.getText();
+                        binding.etMessage.setText((cur != null ? cur.toString() : "") + emojis[position]);
+                        if (binding.etMessage.getText() != null) {
+                            binding.etMessage.setSelection(binding.etMessage.getText().length());
+                        }
+                    });
+                }
+                @Override
+                public int getItemCount() { return emojis.length; }
+            });
+        }
+        dialog.show();
+    }
+
+    private void showAttachPicker() {
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int horizontal = (20 * getResources().getDisplayMetrics().density + 0.5f) > 0
+                ? (int) (20 * getResources().getDisplayMetrics().density + 0.5f) : 20;
+        root.setPadding(horizontal, (int) (18 * getResources().getDisplayMetrics().density),
+                horizontal, (int) (24 * getResources().getDisplayMetrics().density));
+        root.setBackgroundColor(android.graphics.Color.WHITE);
+
+        android.widget.TextView title = new android.widget.TextView(this);
+        title.setText("إرسال مرفق");
+        title.setTextColor(android.graphics.Color.rgb(35, 37, 48));
+        title.setTextSize(17);
+        title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        title.setGravity(android.view.Gravity.CENTER);
+        title.setPadding(0, 0, 0, (int) (18 * getResources().getDisplayMetrics().density));
+        root.addView(title, new android.widget.LinearLayout.LayoutParams(-1, -2));
+
+        android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+        row.setGravity(android.view.Gravity.CENTER);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        root.addView(row, new android.widget.LinearLayout.LayoutParams(-1, -2));
+
+        addAttachmentTile(row, "📷", "الكاميرا", () -> {
+            sheet.dismiss();
+            launchCameraCapture();
+        });
+        addAttachmentTile(row, "🖼️", "الصور", () -> {
+            sheet.dismiss();
+            pickGallery.launch("image/*");
+        });
+        addAttachmentTile(row, "🎥", "تصوير فيديو", () -> {
+            sheet.dismiss();
+            launchVideoCapture();
+        });
+        addAttachmentTile(row, "▶️", "فيديو", () -> {
+            sheet.dismiss();
+            pickVideo.launch("video/*");
+        });
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
+    private void addAttachmentTile(android.widget.LinearLayout row, String icon, String label, Runnable action) {
+        float density = getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout tile = new android.widget.LinearLayout(this);
+        tile.setOrientation(android.widget.LinearLayout.VERTICAL);
+        tile.setGravity(android.view.Gravity.CENTER);
+        tile.setPadding(0, (int) (8 * density), 0, (int) (8 * density));
+        android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(0, -2, 1f);
+        params.setMargins((int) (3 * density), 0, (int) (3 * density), 0);
+        row.addView(tile, params);
+
+        android.widget.TextView glyph = new android.widget.TextView(this);
+        glyph.setText(icon);
+        glyph.setTextSize(25);
+        glyph.setGravity(android.view.Gravity.CENTER);
+        android.graphics.drawable.GradientDrawable circle = new android.graphics.drawable.GradientDrawable();
+        circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        circle.setColor(android.graphics.Color.rgb(243, 239, 255));
+        glyph.setBackground(circle);
+        tile.addView(glyph, new android.widget.LinearLayout.LayoutParams((int) (58 * density), (int) (58 * density)));
+
+        android.widget.TextView text = new android.widget.TextView(this);
+        text.setText(label);
+        text.setTextSize(11);
+        text.setTextColor(android.graphics.Color.rgb(55, 53, 68));
+        text.setGravity(android.view.Gravity.CENTER);
+        text.setPadding(0, (int) (7 * density), 0, 0);
+        tile.addView(text, new android.widget.LinearLayout.LayoutParams(-1, -2));
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setOnClickListener(v -> action.run());
+    }
+
+    private void launchVideoCapture() {
+        try {
+            Intent intent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+            intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
+            if (intent.resolveActivity(getPackageManager()) != null) captureVideo.launch(intent);
+            else Toast.makeText(this, "لا يوجد تطبيق كاميرا لتصوير الفيديو", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "تعذر فتح كاميرا الفيديو", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void previewVideoBeforeSend(@NonNull Uri uri) {
+        // Send directly from the picker; upload status is shown in the chat composer.
+        uploadAndSendVideo(uri);
+    }
+
+    private void launchCameraCapture() {
+        // Request camera permission with a result callback, then launch immediately after approval.
+        // The old one-way permission request returned here without ever opening the camera.
+        if (!PermissionHelper.hasCameraPermission(this)) {
+            requestCameraPermission.launch(android.Manifest.permission.CAMERA);
+            return;
+        }
+        try {
+            takePicturePreview.launch(null);
+        } catch (Exception e) {
+            Toast.makeText(this, "تعذر فتح الكاميرا", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void uploadAndSendImage(Uri uri) {
+        if (conversationId == null) return;
+        Toast.makeText(this, R.string.uploading_image, Toast.LENGTH_SHORT).show();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                byte[] bytes;
+                try (InputStream in = getContentResolver().openInputStream(uri)) {
+                    if (in == null) throw new IllegalStateException("cannot open image");
+                    bytes = readAll(in);
+                }
+                uploadImageBytes(c, bytes);
+            } catch (Exception e) {
+                runOnUiThread(() ->
+                        Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void uploadAndSendVideo(@NonNull Uri uri) {
+        if (conversationId == null || conversationId.isEmpty()) return;
+        AppContainer c = ContainerProvider.from(this);
+        final long maxBytes = 50L * 1024L * 1024L;
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        AtomicReference<Call<ApiResponse<UploadApi.UploadResult>>> callRef = new AtomicReference<>();
+        PENDING_VIDEO_UPLOADS.put(conversationId, new PendingVideoUpload(uri));
+        runOnUiThread(this::restorePendingVideoUpload);
+        c.getIoExecutor().execute(() -> {
+            try {
+                String mimeType = getContentResolver().getType(uri);
+                if (mimeType == null || !mimeType.toLowerCase(java.util.Locale.US).startsWith("video/")) {
+                    throw new IOException("الملف المحدد ليس فيديو صالحاً");
+                }
+                long size = getVideoSize(uri, maxBytes);
+                if (size <= 0L) throw new IOException("تعذر قراءة حجم الفيديو");
+                if (size > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
+                int durationSec = getVideoDurationSeconds(uri);
+                // Upload a small poster separately so the thumbnail remains available in history.
+                String thumbnailUrl = uploadVideoThumbnail(c, uri);
+                String extension = "video/quicktime".equalsIgnoreCase(mimeType) ? ".mov"
+                        : "video/webm".equalsIgnoreCase(mimeType) ? ".webm"
+                        : "video/3gpp".equalsIgnoreCase(mimeType) ? ".3gp" : ".mp4";
+                runOnUiThread(() -> {
+                    if (!cancelled.get() && binding != null && binding.mediaUploadBanner != null) {
+                        binding.tvMediaUploadStatus.setText("جارٍ إرسال الفيديو");
+                    }
+                });
+                RequestBody body = new RequestBody() {
+                    @Override public MediaType contentType() { return MediaType.parse(mimeType); }
+                    @Override public long contentLength() { return size; }
+                    @Override public void writeTo(@NonNull BufferedSink sink) throws IOException {
+                        try (InputStream input = getContentResolver().openInputStream(uri)) {
+                            if (input == null) throw new IOException("تعذر فتح الفيديو");
+                            byte[] buffer = new byte[32 * 1024];
+                            long uploaded = 0L;
+                            int count;
+                            while ((count = input.read(buffer)) != -1) {
+                                if (cancelled.get()) throw new IOException("تم إلغاء رفع الفيديو");
+                                sink.write(buffer, 0, count);
+                                uploaded += count;
+                                final int value = (int) Math.min(100L, uploaded * 100L / size);
+                                runOnUiThread(() -> {
+                                    if (!cancelled.get() && binding != null && binding.progressMediaUpload != null) {
+                                        // Keep a compact indeterminate spinner over the thumbnail corner.
+                                        binding.progressMediaUpload.setVisibility(View.VISIBLE);
+                                    }
+                                });
+                            }
+                            sink.flush();
+                        }
+                    }
+                };
+                MultipartBody.Part part = MultipartBody.Part.createFormData("file", "chat-video" + extension, body);
+                Call<ApiResponse<UploadApi.UploadResult>> call = c.getUploadApi().upload(part);
+                callRef.set(call);
+                if (cancelled.get()) {
+                    call.cancel();
+                    return;
+                }
+                Response<ApiResponse<UploadApi.UploadResult>> resp = call.execute();
+                if (cancelled.get()) return;
+                if (resp.isSuccessful() && resp.body() != null && resp.body().success
+                        && resp.body().data != null && resp.body().data.url != null) {
+                    String url = AssetCatalog.absoluteUrl(resp.body().data.url);
+                    runOnUiThread(() -> {
+                        PENDING_VIDEO_UPLOADS.remove(conversationId);
+                        clearPendingVideoUpload();
+                        viewModel.sendVideo(conversationId, url, thumbnailUrl, mimeType, size, durationSec);
+                    });
+                } else {
+                    String error = UploadApi.errorMessage(resp, "تعذر رفع الفيديو");
+                    runOnUiThread(() -> {
+                        PENDING_VIDEO_UPLOADS.remove(conversationId);
+                        clearPendingVideoUpload();
+                        Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+                    });
+                }
+            } catch (Exception e) {
+                if (cancelled.get()) {
+                    runOnUiThread(() -> {
+                        PENDING_VIDEO_UPLOADS.remove(conversationId);
+                        clearPendingVideoUpload();
+                    });
+                    return;
+                }
+                String error = e.getMessage();
+                if (error == null || error.trim().isEmpty()) error = "تعذر رفع الفيديو";
+                final String message = error;
+                runOnUiThread(() -> {
+                    PENDING_VIDEO_UPLOADS.remove(conversationId);
+                    clearPendingVideoUpload();
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    @Nullable
+    private String uploadVideoThumbnail(@NonNull AppContainer c, @NonNull Uri uri) {
+        Bitmap frame = null;
+        try {
+            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+            try {
+                retriever.setDataSource(this, uri);
+                frame = retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+            } finally {
+                try { retriever.release(); } catch (Exception ignored) {}
+            }
+            if (frame == null) return null;
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            frame.compress(Bitmap.CompressFormat.JPEG, 82, out);
+            byte[] bytes = out.toByteArray();
+            RequestBody body = RequestBody.create(bytes, MediaType.parse("image/jpeg"));
+            MultipartBody.Part part = MultipartBody.Part.createFormData("file", "chat-video-preview.jpg", body);
+            Response<ApiResponse<UploadApi.UploadResult>> response = c.getUploadApi().upload(part).execute();
+            if (response.isSuccessful() && response.body() != null && response.body().success
+                    && response.body().data != null && response.body().data.url != null) {
+                return AssetCatalog.absoluteUrl(response.body().data.url);
+            }
+        } catch (Exception ignored) {
+            // A poster failure must not discard an otherwise valid video message.
+        } finally {
+            if (frame != null && !frame.isRecycled()) frame.recycle();
+        }
+        return null;
+    }
+
+    private long getVideoSize(@NonNull Uri uri, long maxBytes) throws Exception {
+        long descriptorLength = -1;
+        try (AssetFileDescriptor descriptor = getContentResolver().openAssetFileDescriptor(uri, "r")) {
+            if (descriptor != null) descriptorLength = descriptor.getLength();
+        } catch (Exception ignored) {
+            // Some gallery providers do not expose a descriptor length; count the stream below.
+        }
+        if (descriptorLength > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
+        if (descriptorLength > 0) return descriptorLength;
+        long total = 0;
+        try (InputStream input = getContentResolver().openInputStream(uri)) {
+            if (input == null) throw new IOException("تعذر فتح الفيديو");
+            byte[] buffer = new byte[16 * 1024];
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                total += count;
+                if (total > maxBytes) throw new IOException("حجم الفيديو يتجاوز 50 ميغابايت");
+            }
+        }
+        return total;
+    }
+
+    private int getVideoDurationSeconds(@NonNull Uri uri) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(this, uri);
+            String raw = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            return raw == null ? 0 : Math.max(0, (int) (Long.parseLong(raw) / 1000L));
+        } catch (Exception ignored) {
+            return 0;
+        } finally {
+            try { retriever.release(); } catch (Exception ignored) {}
+        }
+    }
+
+    private void uploadAndSendBitmap(@NonNull Bitmap bitmap) {
+        if (conversationId == null) return;
+        Toast.makeText(this, R.string.uploading_image, Toast.LENGTH_SHORT).show();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
+                uploadImageBytes(c, out.toByteArray());
+            } catch (Exception e) {
+                runOnUiThread(() ->
+                        Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void uploadImageBytes(AppContainer c, byte[] bytes) throws Exception {
+        RequestBody body = RequestBody.create(bytes, MediaType.parse("image/jpeg"));
+        MultipartBody.Part part = MultipartBody.Part.createFormData("file", "chat.jpg", body);
+        Response<ApiResponse<UploadApi.UploadResult>> resp = c.getUploadApi().upload(part).execute();
+        if (resp.isSuccessful() && resp.body() != null && resp.body().success
+                && resp.body().data != null && resp.body().data.url != null) {
+            String url = AssetCatalog.absoluteUrl(resp.body().data.url);
+            runOnUiThread(() -> viewModel.sendImage(conversationId, url));
+        } else {
+            runOnUiThread(() ->
+                    Toast.makeText(this, R.string.upload_image_failed, Toast.LENGTH_LONG).show());
+        }
+    }
+
+    private static byte[] readAllLimited(InputStream in, long maxBytes) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int count;
+        long total = 0;
+        while ((count = in.read(buffer)) != -1) {
+            total += count;
+            if (total > maxBytes) throw new IOException("حجم الخلفية أكبر من الحد المسموح");
+            out.write(buffer, 0, count);
+        }
+        return out.toByteArray();
+    }
+
+    private static byte[] readAll(InputStream in) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) >= 0) out.write(buf, 0, n);
+        return out.toByteArray();
+    }
+
+    private void refreshPeerRoomPresence() {
+        final String targetId = peerId;
+        if (targetId == null || targetId.trim().isEmpty() || binding == null) {
+            if (binding != null && binding.btnRoomTracking != null) binding.btnRoomTracking.setVisibility(View.GONE);
+            return;
+        }
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(
+                    ContainerProvider.from(this).getUserApi().roomPresence(targetId));
+            boolean inRoom = result.success && result.data != null
+                    && Boolean.TRUE.equals(result.data.get("inRoom"));
+            String roomId = inRoom && result.data.get("roomId") != null
+                    ? String.valueOf(result.data.get("roomId")) : null;
+            String roomName = inRoom && result.data.get("roomName") != null
+                    ? String.valueOf(result.data.get("roomName")) : "";
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed() || !targetId.equals(peerId)) return;
+                peerRoomTrackingId = roomId;
+                if (binding.btnRoomTracking != null) {
+                    boolean visible = inRoom && roomId != null && !roomId.isEmpty();
+                    binding.btnRoomTracking.setText(visible
+                            ? "●  في غرفة: " + (roomName.isEmpty() ? "غرفة صوتية" : roomName) : "");
+                    binding.btnRoomTracking.setVisibility(visible ? View.VISIBLE : View.GONE);
+                }
+            });
+        });
+    }
+
+    private void openPeerTrackedRoom() {
+        final String targetId = peerId;
+        if (targetId == null || targetId.trim().isEmpty()) return;
+        // Re-check on tap so a stale room id can never bypass a newly changed privacy choice.
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(
+                    ContainerProvider.from(this).getUserApi().roomPresence(targetId));
+            String roomId = result.success && result.data != null
+                    && Boolean.TRUE.equals(result.data.get("inRoom"))
+                    && result.data.get("roomId") != null
+                    ? String.valueOf(result.data.get("roomId")) : null;
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed() || !targetId.equals(peerId)) return;
+                peerRoomTrackingId = roomId;
+                if (roomId == null || roomId.trim().isEmpty()) {
+                    if (binding.btnRoomTracking != null) binding.btnRoomTracking.setVisibility(View.GONE);
+                    return;
+                }
+                Intent intent = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
+                intent.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
+                startActivity(intent);
+            });
+        });
+    }
+
+    private void loadPeerHeader() {
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            AuthDtos.UserDto peer = null;
+            Result<ChatDtos.ConversationDto> conv =
+                    ApiCall.execute(ContainerProvider.from(this).getChatApi().conversation(conversationId));
+            if (conv.success && conv.data != null) {
+                peer = conv.data.peer;
+                if (peerId == null && peer != null) peerId = peer.id;
+                final String name = resolveName(conv.data);
+                final String username = peer != null ? peer.username : null;
+                final String av = peer != null && peer.avatarUrl != null ? peer.avatarUrl
+                        : conv.data.avatarUrl;
+                final String hb = peer != null ? peer.vipBadgeUrl : null;
+                final AuthDtos.UserDto headerPeer = peer;
+                runOnUiThread(() -> {
+                    if (binding == null) return;
+                    bindPeerName(name, username, headerPeer);
+                    AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, av);
+                    AvatarCosmetics.applyHostWear(
+                            binding.imgPeerFrame,
+                            binding.imgPeerHostBadge,
+                            binding.imgPeerAvatar,
+                            hb,
+                            null,
+                            null,
+                            null);
+                    if (adapter != null && headerPeer != null) adapter.setPeerProfile(headerPeer);
+                });
+            }
+            if (peerId != null) {
+                Result<AuthDtos.UserDto> u =
+                        ApiCall.execute(ContainerProvider.from(this).getUserApi().getUser(peerId));
+                if (u.success && u.data != null) peer = u.data;
+            }
+            final AuthDtos.UserDto finalPeer = peer;
+            runOnUiThread(() -> {
+                bindPeerProfile(finalPeer);
+                requestPeerPresence();
+                refreshPeerRoomPresence();
+            });
+        });
+    }
+
+    private String resolveName(ChatDtos.ConversationDto c) {
+        if (c.peer != null) {
+            if (c.peer.displayName != null && !c.peer.displayName.isEmpty()) return c.peer.displayName;
+            if (c.peer.username != null) return c.peer.username;
+        }
+        if (c.title != null && !c.title.isEmpty()) return c.title;
+        return getString(R.string.chat);
+    }
+
+    private void bindPeerName(String displayName, String username) {
+        bindPeerName(displayName, username, null);
+    }
+
+    private void bindPeerName(String displayName, String username, @Nullable AuthDtos.UserDto peer) {
+        if (binding == null) return;
+        String name = displayName != null && !displayName.isEmpty()
+                ? displayName
+                : (username != null && !username.isEmpty() ? username : getString(R.string.chat));
+        binding.tvPeerName.setText(name);
+        VipNameStyle.bind(binding.tvPeerName, peer);
+        if (binding.tvStripName != null) {
+            binding.tvStripName.setText(name);
+            VipNameStyle.bind(binding.tvStripName, peer);
+        }
+        String publicId = peer != null ? peer.displayPublicId() : "";
+        if (publicId.isEmpty() && username != null && !username.isEmpty()) {
+            publicId = username;
+        }
+        if (!publicId.isEmpty() && binding.tvPeerUsername != null) {
+            binding.tvPeerUsername.setText("(ID:" + publicId + ")");
+            binding.tvPeerUsername.setVisibility(View.VISIBLE);
+        } else if (binding.tvPeerUsername != null) {
+            binding.tvPeerUsername.setVisibility(View.GONE);
+        }
+        if (binding.tvStripName != null) binding.tvStripName.setText(name);
+        ImageView peerVerified = binding.getRoot().findViewById(R.id.imgPeerVerified);
+        GenderVerifiedBadge.bind(binding.tvPeerName, peerVerified, peer != null && peer.genderVerified);
+        if (binding.tvStripName != null) {
+            GenderVerifiedBadge.bind(binding.tvStripName, null, peer != null && peer.genderVerified);
+        }
+    }
+
+    private void bindPeerProfile(AuthDtos.UserDto peer) {
+        if (binding == null) return;
+        if (peer == null) {
+            refreshPeerStatusUi();
+            return;
+        }
+        if (peerId == null) peerId = peer.id;
+        bindPeerName(peer.displayName, peer.username, peer);
+        if (binding.imgPeerAvatar != null) {
+            AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, peer.avatarUrl);
+        }
+        if (binding.imgStripAvatar != null) {
+            AvatarCosmetics.bindAvatar(binding.imgStripAvatar, peer.avatarUrl);
+        }
+        if (binding.imgPeerFrame != null || binding.imgPeerHostBadge != null) {
+            AvatarCosmetics.applyHostWear(
+                    binding.imgPeerFrame,
+                    binding.imgPeerHostBadge,
+                    binding.imgPeerAvatar,
+                    peer.vipBadgeUrl,
+                    null,
+                    null,
+                    null);
+        }
+        if (binding.imgStripFlag != null) {
+            com.Dramizo.Series.util.FlagImages.bind(binding.imgStripFlag, peer.country);
+        }
+        if (binding.tvStripLv1 != null) {
+            binding.tvStripLv1.setText(String.valueOf(Math.max(1, peer.level)));
+        }
+        if (binding.tvStripLv2 != null) {
+            long pop = peer.popularityLevel > 0 ? peer.popularityLevel : peer.popularityScore;
+            binding.tvStripLv2.setText(String.valueOf(Math.max(0, pop)));
+        }
+        if (binding.tvStripLv3 != null) {
+            long w = peer.wealthLevel > 0 ? peer.wealthLevel : peer.wealthScore;
+            binding.tvStripLv3.setText(String.valueOf(Math.max(0, w)));
+        }
+        // Female gradient strip when known.
+        if (binding.imgPeerStripBg != null && peer.gender != null) {
+            String g = peer.gender.trim().toLowerCase(java.util.Locale.US);
+            if ("female".equals(g) || "f".equals(g) || "انثى".equals(g) || "أنثى".equals(g)) {
+                binding.imgPeerStripBg.setImageResource(R.drawable.p2p_nvbg);
+            } else {
+                binding.imgPeerStripBg.setImageResource(R.drawable.p2p_nanbg);
+            }
+        }
+        if (binding.btnUpgradeRelation != null) {
+            binding.btnUpgradeRelation.setOnClickListener(v -> {
+                try {
+                    startActivity(new Intent(this,
+                            com.Dramizo.Series.presentation.cp.CpCenterActivity.class));
+                } catch (Exception e) {
+                    Toast.makeText(this, R.string.upgrade_relation, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+        if (adapter != null) {
+            adapter.setPeerProfile(peer);
+        }
+        showOnlineAllowed = peer.showOnlineStatus == null || Boolean.TRUE.equals(peer.showOnlineStatus);
+        peerLastSeenAt = peer.lastSeenAt;
+        if (showOnlineAllowed) {
+            java.util.Date d = DeviceTimeFormat.parse(peer.lastSeenAt);
+            if (d != null && System.currentTimeMillis() - d.getTime() < 2 * 60_000L) {
+                peerOnline = true;
+            }
+        }
+        refreshPeerStatusUi();
+    }
+
+    private void requestPeerPresence() {
+        if (peerId == null || !showOnlineAllowed) return;
+        RealtimeClient.getInstance().checkPresence(peerId, (userId, online) -> runOnUiThread(() -> {
+            if (peerId == null || !peerId.equals(userId)) return;
+            peerOnline = online;
+            refreshPeerStatusUi();
+        }));
+    }
+
+    private void refreshPeerStatusUi() {
+        if (binding == null || binding.tvPeerStatus == null) return;
+        // Typing only under the name — never duplicate below the chat list.
+        if (binding.tvTyping != null) binding.tvTyping.setVisibility(View.GONE);
+        View onlineDot = binding.getRoot().findViewById(R.id.dotPeerOnline);
+        if (peerTyping) {
+            binding.tvPeerStatus.setText(R.string.typing);
+            binding.tvPeerStatus.setTextColor(0xFFFE2C55);
+            if (onlineDot != null) onlineDot.setVisibility(View.GONE);
+            return;
+        }
+        if (!showOnlineAllowed) {
+            binding.tvPeerStatus.setText(R.string.offline);
+            binding.tvPeerStatus.setTextColor(0xFF9F9F9F);
+            if (onlineDot != null) onlineDot.setVisibility(View.GONE);
+            return;
+        }
+        if (peerOnline) {
+            binding.tvPeerStatus.setText(R.string.chat_status_online);
+            binding.tvPeerStatus.setTextColor(0xFF34D399);
+            if (onlineDot != null) onlineDot.setVisibility(View.VISIBLE);
+            return;
+        }
+        binding.tvPeerStatus.setText(DeviceTimeFormat.lastSeen(this, peerLastSeenAt));
+        binding.tvPeerStatus.setTextColor(0xFF9F9F9F);
+        if (onlineDot != null) onlineDot.setVisibility(View.GONE);
+    }
+
+    private void openPeerProfile() {
+        openUserCard(peerId);
+    }
+
+    private void openUserCard(@Nullable String userId) {
+        String id = userId;
+        if (id == null || id.isEmpty()) id = peerId;
+        if (id == null || id.isEmpty()) {
+            Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String name = binding.tvPeerName != null && binding.tvPeerName.getText() != null
+                ? binding.tvPeerName.getText().toString()
+                : (binding.tvStripName != null && binding.tvStripName.getText() != null
+                        ? binding.tvStripName.getText().toString()
+                        : null);
+        String avatar = null;
+        try {
+            avatar = getIntent().getStringExtra(EXTRA_AVATAR);
+        } catch (Exception ignored) {
+        }
+        UserProfileCardSheet.show(this, id, name, avatar);
+    }
+
+    /** Reject the invite on the server and notify the agency owner. */
+    private void rejectAgencyInvite(
+            @Nullable ChatDtos.MessageDto msg,
+            @Nullable com.Dramizo.Series.util.AgencyInviteCodec.Parsed invite) {
+        com.Dramizo.Series.util.AgencyInviteCodec.Parsed parsed = invite;
+        if (parsed == null && msg != null) {
+            parsed = com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content);
+        }
+        if (parsed == null || parsed.agencyId == null || parsed.agencyId.trim().isEmpty()) {
+            Toast.makeText(this, "تعذر تحديد دعوة الوكالة", Toast.LENGTH_LONG).show();
+            return;
+        }
+        final String agencyId = parsed.agencyId.trim();
+        final String code = parsed.code == null ? "" : parsed.code.trim();
+        // A legacy card without a verification code cannot be reported to the
+        // server as a verified rejection. Dismiss it locally without exposing
+        // transport/validation errors to the recipient.
+        if (code.isEmpty()) {
+            if (msg != null && msg.id != null && !msg.id.isEmpty()) {
+                viewModel.dismissMessageLocally(msg.id);
+            }
+            Toast.makeText(this, "تم تجاهل دعوة الوكالة", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String messageId = msg != null ? msg.id : null;
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            java.util.Map<String, String> payload = new java.util.HashMap<>();
+            payload.put("code", code);
+            Result<Object> result = ApiCall.execute(c.getAgencyApi().rejectInvite(agencyId, payload));
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (result.success) {
+                    if (messageId != null && !messageId.isEmpty()) {
+                        viewModel.dismissMessageLocally(messageId);
+                    }
+                    Toast.makeText(this, "تم رفض دعوة الوكالة", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, result.error != null ? result.error
+                            : "تعذر رفض الدعوة", Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+    }
+
+    /** Join family/agency from invite card; remove the card after success. */
+    private void acceptAgencyInvite(
+            @Nullable ChatDtos.MessageDto msg,
+            @Nullable com.Dramizo.Series.util.AgencyInviteCodec.Parsed invite) {
+        String code = invite != null && invite.code != null ? invite.code.trim() : "";
+        // Fallback: re-parse raw message body (handles legacy / slightly mutated payloads).
+        if (code.isEmpty() && msg != null && msg.content != null) {
+            com.Dramizo.Series.util.AgencyInviteCodec.Parsed again =
+                    com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content);
+            if (again != null && again.code != null) code = again.code.trim();
+        }
+        // Older invite cards may not contain an activation code. Do not block
+        // those users: the compatibility endpoint creates a pending join request.
+        final String joinCode = code;
+        final String agencyPublicId = invite != null && invite.agencyId != null
+                ? invite.agencyId.trim()
+                : (msg != null && msg.content != null
+                    && com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content) != null
+                    ? com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content).agencyId
+                    : "");
+        if (agencyPublicId.isEmpty()) {
+            Toast.makeText(this, R.string.agency_invite_missing_code, Toast.LENGTH_LONG).show();
+            return;
+        }
+        final String messageId = msg != null ? msg.id : null;
+        Toast.makeText(this, R.string.loading, Toast.LENGTH_SHORT).show();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            java.util.Map<String, String> payload = new java.util.HashMap<>();
+            Result<Object> r;
+            if (!joinCode.isEmpty()) {
+                payload.put("code", joinCode);
+                // The agency UUID is a route parameter, never a publicId.
+                r = ApiCall.execute(c.getAgencyApi().acceptInvite(agencyPublicId, payload));
+            } else {
+                // Backward-compatible route: a legacy card without a code
+                // becomes a regular pending membership request, not a dead link.
+                r = ApiCall.execute(c.getAgencyApi().joinLegacyInvite(agencyPublicId, payload));
+            }
+            runOnUiThread(() -> {
+                if (r.success) {
+                    if (messageId != null && !messageId.isEmpty()) {
+                        viewModel.dismissMessageLocally(messageId);
+                    }
+                    if (joinCode.isEmpty()) {
+                        Toast.makeText(this, "تم إرسال طلب الانضمام إلى الوكالة وبانتظار الموافقة",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, R.string.agency_invite_joined, Toast.LENGTH_SHORT).show();
+                    }
+                    try {
+                        startActivity(new Intent(this,
+                                com.Dramizo.Series.presentation.agency.AgencyActivity.class));
+                    } catch (Exception ignored) {
+                    }
+                } else {
+                    Toast.makeText(
+                            this,
+                            r.error != null ? r.error : getString(R.string.error_generic),
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+    }
+
+    private void onMessageLongClick(ChatDtos.MessageDto msg) {
+        if (msg == null || msg.id == null) return;
+        boolean mine = isMyMessage(msg);
+        BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
+        View sheet = getLayoutInflater().inflate(R.layout.dialog_message_actions, null);
+        AuraDialogHelper.applyContent(sheet);
+        dialog.setContentView(sheet);
+        View actReply = sheet.findViewById(R.id.actReply);
+        View actCopy = sheet.findViewById(R.id.actCopy);
+        View actEdit = sheet.findViewById(R.id.actEdit);
+        View actDelete = sheet.findViewById(R.id.actDelete);
+        View actTranslate = sheet.findViewById(R.id.actTranslate);
+        if (actEdit != null) actEdit.setVisibility(mine ? View.VISIBLE : View.GONE);
+        if (actDelete != null) actDelete.setVisibility(mine ? View.VISIBLE : View.GONE);
+        if (actCopy != null) {
+            boolean canCopy = msg.content != null && !msg.content.trim().isEmpty();
+            actCopy.setVisibility(canCopy ? View.VISIBLE : View.GONE);
+            actCopy.setOnClickListener(v -> {
+                dialog.dismiss();
+                android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                        getSystemService(CLIPBOARD_SERVICE);
+                if (cm != null && msg.content != null) {
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("message", msg.content));
+                    Toast.makeText(this, R.string.message_copied, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+        if (actReply != null) {
+            actReply.setOnClickListener(v -> {
+                dialog.dismiss();
+                beginReply(msg);
+            });
+        }
+        if (actEdit != null) {
+            actEdit.setOnClickListener(v -> {
+                dialog.dismiss();
+                beginEditing(msg);
+            });
+        }
+        if (actDelete != null) {
+            actDelete.setOnClickListener(v -> {
+                dialog.dismiss();
+                AuraDialogHelper.confirmRes(this,
+                        R.string.delete_message,
+                        R.string.delete_message_confirm,
+                        android.R.string.ok,
+                        () -> viewModel.unsendMessage(msg.id));
+            });
+        }
+        if (actTranslate != null) {
+            // Inline translate lives under the bubble; hide sheet action.
+            actTranslate.setVisibility(View.GONE);
+        }
+        dialog.show();
+    }
+
+    private void translateInline(ChatDtos.MessageDto msg) {
+        if (msg == null || msg.id == null) return;
+        String text = msg.content;
+        if (text == null || text.trim().isEmpty()) return;
+        if (adapter.hasTranslation(msg.id)) {
+            adapter.clearTranslation(msg.id);
+            return;
+        }
+        String target = java.util.Locale.getDefault().getLanguage();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            java.util.Map<String, String> body = new java.util.HashMap<>();
+            body.put("text", text);
+            body.put("targetLang", target);
+            Result<java.util.Map<String, Object>> r = ApiCall.execute(c.getConfigApi().translate(body));
+            runOnUiThread(() -> {
+                if (!r.success || r.data == null) {
+                    Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic),
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Object translated = r.data.get("translated");
+                String out = translated != null ? String.valueOf(translated) : "";
+                if (out.trim().isEmpty()) {
+                    Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                adapter.setTranslation(msg.id, out);
+            });
+        });
+    }
+
+    private void translateAndShow(String text) {
+        // Kept for compatibility — prefer inline bubble translate.
+        if (text == null || text.trim().isEmpty()) return;
+        String target = java.util.Locale.getDefault().getLanguage();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            java.util.Map<String, String> body = new java.util.HashMap<>();
+            body.put("text", text);
+            body.put("targetLang", target);
+            Result<java.util.Map<String, Object>> r = ApiCall.execute(c.getConfigApi().translate(body));
+            runOnUiThread(() -> {
+                if (!r.success || r.data == null) {
+                    Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic),
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Object translated = r.data.get("translated");
+                String out = translated != null ? String.valueOf(translated) : text;
+                Toast.makeText(this, out, Toast.LENGTH_LONG).show();
+            });
+        });
+    }
+
+    private void beginReply(ChatDtos.MessageDto msg) {
+        if (msg == null) return;
+        clearEditing();
+        viewModel.setReplyTarget(msg);
+        binding.etMessage.requestFocus();
+    }
+
+    private void bindReplyBanner(ChatDtos.MessageDto msg) {
+        if (binding.replyBanner == null) return;
+        if (msg == null) {
+            binding.replyBanner.setVisibility(View.GONE);
+            return;
+        }
+        binding.replyBanner.setVisibility(View.VISIBLE);
+        if (binding.tvReplyTitle != null) {
+            binding.tvReplyTitle.setText(R.string.replying_to);
+        }
+        if (binding.tvReplyPreview != null) {
+            String preview = msg.content;
+            if (preview == null || preview.isEmpty()) {
+                String type = msg.type != null ? msg.type.toLowerCase() : "";
+                if ("image".equals(type)) preview = getString(R.string.chat_preview_photo);
+                else if ("video".equals(type)) preview = "🎬 فيديو";
+                else if ("audio".equals(type)) preview = getString(R.string.chat_preview_voice);
+                else if ("gift".equals(type)) preview = getString(R.string.chat_preview_gift,
+                        getString(R.string.gift_message));
+                else preview = getString(R.string.chat_message_generic);
+            }
+            binding.tvReplyPreview.setText(preview);
+        }
+    }
+
+    private void refreshSendMicVisibility() {
+        CharSequence text = binding.etMessage.getText();
+        boolean hasText = text != null && text.toString().trim().length() > 0;
+        // Mic alone when empty; send replaces mic when typing.
+        if (binding.btnVoice != null) {
+            binding.btnVoice.setVisibility(hasText ? View.GONE : View.VISIBLE);
+        }
+        binding.btnSend.setVisibility(hasText ? View.VISIBLE : View.GONE);
+        binding.btnSend.setEnabled(hasText);
+        binding.btnSend.setAlpha(1f);
+        if (binding.imgChatSend != null) {
+            binding.imgChatSend.setAlpha(1f);
+        }
+        // Ensure brand chrome sticks after visibility swaps.
+        paintComposerBrandChrome();
+    }
+
+    /**
+     * Brand filled circles (+ / mic / send). Icon glyph is always white; never paint a
+     * light/near-white fill (dashboard mis-config would make the button look blank).
+     */
+    private void paintComposerBrandChrome() {
+        if (binding == null) return;
+        int primary = resolveAppPrimaryColor();
+        paintOvalChrome(binding.btnAttach, primary);
+        paintOvalChrome(binding.btnVoice, primary);
+        paintOvalChrome(binding.btnSend, primary);
+        paintOvalChrome(binding.getRoot().findViewById(R.id.voiceMicCircle), primary);
+        View voiceSend = binding.getRoot().findViewById(R.id.btnVoiceSend);
+        paintOvalChrome(voiceSend, primary);
+        tintComposerGlyph(binding.imgChatImage);
+        tintComposerGlyph(binding.imgChatVoice);
+        tintComposerGlyph(binding.imgChatSend);
+        if (voiceSend instanceof android.widget.ImageView) {
+            tintComposerGlyph((android.widget.ImageView) voiceSend);
+        }
+    }
+
+    private static void tintComposerGlyph(@Nullable android.widget.ImageView iv) {
+        if (iv == null) return;
+        // White plane/mic on brand oval — vectors only; avoid whitening baked-in raster circles.
+        iv.clearColorFilter();
+        androidx.core.widget.ImageViewCompat.setImageTintList(
+                iv, android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE));
+    }
+
+    private int resolveAppPrimaryColor() {
+        int brandFallback = 0xFFFE2C55;
+        try {
+            brandFallback = getColor(R.color.gift_accent);
+        } catch (Exception ignored) {
+        }
+        int remote = com.Dramizo.Series.util.RemoteTheme.primaryColor(this);
+        if (isUnusableBrandFill(remote)) {
+            return brandFallback;
+        }
+        return remote;
+    }
+
+    /** Reject white / near-white / ghostly grays as button fills. */
+    private static boolean isUnusableBrandFill(int color) {
+        int a = (color >>> 24) & 0xFF;
+        if (a < 180) return true;
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        // Relative luminance (sRGB approx).
+        double lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0;
+        if (lum >= 0.78) return true;
+        int max = Math.max(r, Math.max(g, b));
+        int min = Math.min(r, Math.min(g, b));
+        // Near-gray and very light → unusable on white composer bar.
+        return (max - min) < 18 && lum > 0.55;
+    }
+
+    private static void paintOvalChrome(@Nullable View view, int color) {
+        if (view == null) return;
+        android.graphics.drawable.GradientDrawable oval =
+                new android.graphics.drawable.GradientDrawable();
+        oval.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        oval.setColor(color);
+        view.setBackground(oval);
+    }
+
+    private void attachSwipeToReply() {
+        ItemTouchHelper helper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
+            @Override
+            public int getMovementFlags(@NonNull RecyclerView recyclerView,
+                                        @NonNull RecyclerView.ViewHolder viewHolder) {
+                int pos = viewHolder.getBindingAdapterPosition();
+                if (adapter != null && adapter.isSwipeLocked(pos)) {
+                    return 0;
+                }
+                return super.getMovementFlags(recyclerView, viewHolder);
+            }
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView,
+                                  @NonNull RecyclerView.ViewHolder viewHolder,
+                                  @NonNull RecyclerView.ViewHolder target) {
+                return false;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                int pos = viewHolder.getBindingAdapterPosition();
+                ChatDtos.MessageDto msg = adapter.getItem(pos);
+                adapter.notifyItemChanged(pos);
+                if (msg != null) beginReply(msg);
+            }
+
+            @Override
+            public float getSwipeThreshold(@NonNull RecyclerView.ViewHolder viewHolder) {
+                return 0.28f;
+            }
+        });
+        helper.attachToRecyclerView(binding.recycler);
+    }
+
+    private boolean voiceRecordingActive;
+
+    private void setupVoiceButton() {
+        if (binding.btnVoice == null) return;
+        // WhatsApp/Telegram-like: tap mic to start, then Cancel / Send on the bar.
+        binding.btnVoice.setOnClickListener(v -> {
+            if (voiceRecordingActive) return;
+            startVoiceRecording();
+        });
+        if (binding.btnVoiceCancel != null) {
+            binding.btnVoiceCancel.setOnClickListener(v -> {
+                voiceCancelled = true;
+                stopVoiceRecording(false);
+            });
+        }
+        if (binding.btnVoiceSend != null) {
+            binding.btnVoiceSend.setOnClickListener(v -> {
+                voiceCancelled = false;
+                stopVoiceRecording(true);
+            });
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void startVoiceRecording() {
+        if (!PermissionHelper.hasAudioPermission(this)) {
+            PermissionHelper.ensureMediaPermissions(this, false);
+            Toast.makeText(this, R.string.hold_to_record, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            stopRecorderQuiet();
+            voiceFile = new File(getCacheDir(), "chat_voice_" + System.currentTimeMillis() + ".m4a");
+            mediaRecorder = new MediaRecorder();
+            mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            mediaRecorder.setAudioEncodingBitRate(96000);
+            mediaRecorder.setAudioSamplingRate(44100);
+            mediaRecorder.setOutputFile(voiceFile.getAbsolutePath());
+            mediaRecorder.prepare();
+            mediaRecorder.start();
+            voiceStartedAt = SystemClock.elapsedRealtime();
+            voiceCancelled = false;
+            voiceRecordingActive = true;
+            showVoiceHud(true);
+        } catch (Exception e) {
+            voiceRecordingActive = false;
+            stopRecorderQuiet();
+            hideVoiceHud();
+            Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showVoiceHud(boolean recording) {
+        if (binding.voiceRecordOverlay == null) return;
+        binding.voiceRecordOverlay.setVisibility(View.VISIBLE);
+        if (binding.tvVoiceTimer != null) {
+            binding.tvVoiceTimer.setVisibility(View.VISIBLE);
+            binding.tvVoiceTimer.setText("0:00");
+        }
+        if (binding.tvVoiceHint != null) {
+            binding.tvVoiceHint.setText(R.string.press_to_record);
+            binding.tvVoiceHint.setTextColor(0xFF333333);
+        }
+        if (binding.imgChatVoice != null) {
+            binding.imgChatVoice.setColorFilter(0xFFE53935);
+        }
+        if (binding.voiceMicCircle != null) {
+            binding.voiceMicCircle.setAlpha(1f);
+            binding.voiceMicCircle.animate()
+                    .scaleX(1.06f).scaleY(1.06f)
+                    .setDuration(450)
+                    .withEndAction(new Runnable() {
+                        @Override public void run() {
+                            if (binding == null || !voiceRecordingActive
+                                    || binding.voiceMicCircle == null) return;
+                            binding.voiceMicCircle.animate()
+                                    .scaleX(1f).scaleY(1f)
+                                    .setDuration(450)
+                                    .withEndAction(this)
+                                    .start();
+                        }
+                    })
+                    .start();
+        }
+        voiceUiHandler.removeCallbacks(voiceTick);
+        voiceUiHandler.post(voiceTick);
+    }
+
+    private void hideVoiceHud() {
+        voiceUiHandler.removeCallbacks(voiceTick);
+        voiceRecordingActive = false;
+        if (binding == null) return;
+        if (binding.imgChatVoice != null) binding.imgChatVoice.clearColorFilter();
+        if (binding.voiceMicCircle != null) {
+            binding.voiceMicCircle.animate().cancel();
+            binding.voiceMicCircle.setScaleX(1f);
+            binding.voiceMicCircle.setScaleY(1f);
+        }
+        if (binding.voiceRecDot != null) {
+            binding.voiceRecDot.animate().cancel();
+            binding.voiceRecDot.setAlpha(1f);
+        }
+        if (binding.voiceRecordOverlay != null) {
+            binding.voiceRecordOverlay.setVisibility(View.GONE);
+        }
+    }
+
+    private void stopVoiceRecording(boolean send) {
+        voiceRecordingActive = false;
+        hideVoiceHud();
+        int durationSec = 0;
+        if (mediaRecorder != null && voiceStartedAt > 0) {
+            durationSec = Math.max(1, (int) ((SystemClock.elapsedRealtime() - voiceStartedAt) / 1000L));
+        }
+        try {
+            if (mediaRecorder != null) {
+                mediaRecorder.stop();
+            }
+        } catch (Exception ignored) {
+            send = false;
+        }
+        stopRecorderQuiet();
+        if (!send || voiceCancelled || voiceFile == null || !voiceFile.exists()) {
+            if (voiceFile != null) {
+                //noinspection ResultOfMethodCallIgnored
+                voiceFile.delete();
+            }
+            voiceFile = null;
+            return;
+        }
+        if (durationSec < 1) {
+            //noinspection ResultOfMethodCallIgnored
+            voiceFile.delete();
+            voiceFile = null;
+            Toast.makeText(this, R.string.hold_to_record, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        uploadAndSendVoice(voiceFile, durationSec);
+        voiceFile = null;
+    }
+
+    private void stopRecorderQuiet() {
+        if (mediaRecorder != null) {
+            try { mediaRecorder.release(); } catch (Exception ignored) {}
+            mediaRecorder = null;
+        }
+        voiceStartedAt = 0;
+    }
+
+    private void uploadAndSendVoice(File file, int durationSec) {
+        if (conversationId == null || file == null) return;
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                byte[] bytes;
+                try (InputStream in = new FileInputStream(file)) {
+                    bytes = readAll(in);
+                }
+                RequestBody body = RequestBody.create(bytes, MediaType.parse("audio/mp4"));
+                MultipartBody.Part part = MultipartBody.Part.createFormData("file", "voice.m4a", body);
+                Response<ApiResponse<UploadApi.UploadResult>> resp = c.getUploadApi().upload(part).execute();
+                if (resp.isSuccessful() && resp.body() != null && resp.body().success
+                        && resp.body().data != null && resp.body().data.url != null) {
+                    // Remove the local recording only after durable upload succeeds.
+                    // If upload fails or the host is temporarily unavailable, retain it for recovery.
+                    //noinspection ResultOfMethodCallIgnored
+                    file.delete();
+                    String url = AssetCatalog.absoluteUrl(resp.body().data.url);
+                    runOnUiThread(() -> viewModel.sendAudio(conversationId, url, durationSec));
+                } else {
+                    runOnUiThread(() ->
+                            Toast.makeText(this, R.string.error_generic, Toast.LENGTH_LONG).show());
+                }
+            } catch (Exception e) {
+                runOnUiThread(() ->
+                        Toast.makeText(this, R.string.error_generic, Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void bindGiftButton() {
+        if (binding.btnChatGift != null) {
+            binding.btnChatGift.setVisibility(View.VISIBLE);
+        }
+        // Gift icon comes from activity_chat_conversation.xml android:src.
+    }
+
+    private void openGiftGateSheet() {
+        openChatGifts();
+    }
+
+    private void openChatGifts() {
+        if (peerId == null || peerId.isEmpty()) {
+            Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        GiftBottomSheet.showForChat(getSupportFragmentManager(), peerId);
+    }
+
+    private void showChatMenu() {
+        if (binding == null || binding.btnChatMenu == null) return;
+        BottomSheetDialog sheet = AuraDialogHelper.bottomSheet(this);
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = dp(20);
+        root.setPadding(pad, dp(12), pad, dp(22));
+        root.setBackground(roundRect(0xFFFFFFFF, dp(26), 0xFFEDEDF2, dp(1)));
+
+        View handle = new View(this);
+        handle.setBackground(roundRect(0xFFD8D9E0, dp(4), 0xFFD8D9E0, 0));
+        android.widget.LinearLayout.LayoutParams hp = new android.widget.LinearLayout.LayoutParams(dp(38), dp(4));
+        hp.gravity = android.view.Gravity.CENTER;
+        hp.bottomMargin = dp(18);
+        root.addView(handle, hp);
+
+        android.widget.LinearLayout heading = new android.widget.LinearLayout(this);
+        heading.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        heading.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        root.addView(heading, new android.widget.LinearLayout.LayoutParams(-1, -2));
+        android.widget.LinearLayout headingText = new android.widget.LinearLayout(this);
+        headingText.setOrientation(android.widget.LinearLayout.VERTICAL);
+        headingText.setLayoutDirection(View.LAYOUT_DIRECTION_LOCALE);
+        heading.addView(headingText, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
+        android.widget.TextView title = menuText("خيارات المحادثة", 18, 0xFF191B24, true);
+        headingText.addView(title);
+        String peerName = binding.tvPeerName != null && binding.tvPeerName.getText() != null
+                ? binding.tvPeerName.getText().toString().trim() : "";
+        android.widget.TextView subtitle = menuText(peerName.isEmpty() ? "إدارة المحادثة وإعداداتها" : peerName, 12, 0xFF858894, false);
+        android.widget.LinearLayout.LayoutParams stp = new android.widget.LinearLayout.LayoutParams(-1, -2);
+        stp.topMargin = dp(3);
+        headingText.addView(subtitle, stp);
+        android.widget.TextView close = menuText("×", 28, 0xFF626673, false);
+        close.setGravity(android.view.Gravity.CENTER);
+        close.setBackground(roundRect(0xFFF3F4F7, dp(22), 0, 0));
+        heading.addView(close, new android.widget.LinearLayout.LayoutParams(dp(40), dp(40)));
+        close.setOnClickListener(v -> sheet.dismiss());
+
+        addMenuSectionLabel(root, "الحساب");
+        addChatMenuRow(root, android.R.drawable.ic_menu_myplaces, "عرض الملف الشخصي",
+                "معلومات وصورة المستخدم", false, () -> { sheet.dismiss(); openPeerProfile(); });
+
+        addMenuSectionLabel(root, "المظهر");
+        addChatMenuRow(root, android.R.drawable.ic_menu_gallery, "خلفية المحادثة",
+                "اختيار صورة أو خلفية متحركة وتخصيصها", false, () -> { sheet.dismiss(); showChatBackgroundOptions(); });
+
+        addMenuSectionLabel(root, "إدارة المحادثة");
+        addChatMenuRow(root, android.R.drawable.ic_lock_lock,
+                peerBlocked ? "إلغاء حظر المستخدم" : "حظر المستخدم",
+                peerBlocked ? "السماح باستقبال الرسائل مجدداً" : "منع الرسائل والتواصل من هذا المستخدم",
+                false, () -> { sheet.dismiss(); if (peerBlocked) confirmUnblockPeer(); else confirmBlockPeer(); });
+
+        addMenuDivider(root);
+        addChatMenuRow(root, android.R.drawable.ic_menu_delete, "حذف المحادثة",
+                "حذف المحادثة من حسابك", true, () -> { sheet.dismiss(); confirmDeleteConversation(); });
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
+    private android.graphics.drawable.GradientDrawable roundRect(int color, int radius, int strokeColor, int strokeWidth) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(radius);
+        if (strokeWidth > 0) d.setStroke(strokeWidth, strokeColor);
+        return d;
+    }
+
+    private android.widget.TextView menuText(String value, float size, int color, boolean bold) {
+        android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText(value);
+        tv.setTextSize(size);
+        tv.setTextColor(color);
+        if (bold) tv.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        tv.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        return tv;
+    }
+
+    private void addMenuSectionLabel(android.widget.LinearLayout root, String label) {
+        android.widget.TextView tv = menuText(label, 11, 0xFF9699A4, true);
+        tv.setLetterSpacing(0.02f);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-1, -2);
+        lp.topMargin = dp(18);
+        lp.bottomMargin = dp(7);
+        root.addView(tv, lp);
+    }
+
+    private void addMenuDivider(android.widget.LinearLayout root) {
+        View divider = new View(this);
+        divider.setBackgroundColor(0xFFEDEEF2);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-1, dp(1));
+        lp.topMargin = dp(9);
+        lp.bottomMargin = dp(8);
+        root.addView(divider, lp);
+    }
+
+    private void addChatMenuRow(android.widget.LinearLayout root, int iconRes, String label,
+                                String description, boolean danger, Runnable action) {
+        android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setPadding(dp(8), dp(9), dp(8), dp(9));
+        row.setBackground(roundRect(0xFFFFFFFF, dp(15), 0xFFF0F1F4, dp(1)));
+        android.widget.LinearLayout.LayoutParams rowLp = new android.widget.LinearLayout.LayoutParams(-1, -2);
+        rowLp.bottomMargin = dp(7);
+        root.addView(row, rowLp);
+
+        android.widget.FrameLayout iconTile = new android.widget.FrameLayout(this);
+        iconTile.setBackground(roundRect(danger ? 0xFFFFF0F1 : 0xFFF3F4F8, dp(13), 0, 0));
+        row.addView(iconTile, new android.widget.LinearLayout.LayoutParams(dp(44), dp(44)));
+        android.widget.ImageView icon = new android.widget.ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(danger ? 0xFFE54858 : 0xFF555B6B);
+        android.widget.FrameLayout.LayoutParams ip = new android.widget.FrameLayout.LayoutParams(dp(21), dp(21), android.view.Gravity.CENTER);
+        iconTile.addView(icon, ip);
+
+        android.widget.LinearLayout texts = new android.widget.LinearLayout(this);
+        texts.setOrientation(android.widget.LinearLayout.VERTICAL);
+        texts.setLayoutDirection(View.LAYOUT_DIRECTION_LOCALE);
+        android.widget.LinearLayout.LayoutParams textLp = new android.widget.LinearLayout.LayoutParams(0, -2, 1f);
+        textLp.setMargins(dp(12), 0, dp(8), 0);
+        row.addView(texts, textLp);
+        texts.addView(menuText(label, 14, danger ? 0xFFE54858 : 0xFF242733, true));
+        android.widget.TextView hint = menuText(description, 11, 0xFF8A8E99, false);
+        android.widget.LinearLayout.LayoutParams hintLp = new android.widget.LinearLayout.LayoutParams(-1, -2);
+        hintLp.topMargin = dp(3);
+        texts.addView(hint, hintLp);
+        android.widget.TextView chevron = menuText("›", 24, 0xFFB2B5BE, false);
+        row.addView(chevron, new android.widget.LinearLayout.LayoutParams(dp(22), dp(38)));
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(v -> action.run());
+    }
+
+    private void showChatBackgroundOptions() {
+        String[] options = {"اختيار صورة مع القص والتكبير", "اختيار خلفية متحركة", "إزالة الخلفية"};
+        new AlertDialog.Builder(this)
+                .setTitle("خلفية المحادثة")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) pickChatBackgroundImage.launch("image/*");
+                    else if (which == 1) pickChatBackgroundVideo.launch("video/*");
+                    else clearChatBackground();
+                })
+                .show();
+    }
+
+    private android.content.SharedPreferences chatBackgroundPrefs() {
+        return getSharedPreferences("jeho_chat_backgrounds", MODE_PRIVATE);
+    }
+
+    private void clearChatBackground() {
+        if (conversationId != null) {
+            chatBackgroundPrefs().edit()
+                    .remove(conversationId + "_url")
+                    .remove(conversationId + "_type")
+                    .apply();
+        }
+        if (chatBackgroundVideo != null) {
+            chatBackgroundVideo.stopPlayback();
+            chatBackgroundVideo.setVisibility(View.GONE);
+        }
+        if (binding != null && binding.imgThemeBg != null) {
+            Glide.with(this).clear(binding.imgThemeBg);
+            binding.imgThemeBg.setVisibility(View.GONE);
+        }
+        Toast.makeText(this, "تمت إزالة خلفية المحادثة", Toast.LENGTH_SHORT).show();
+    }
+
+    private void applyChatBackground() {
+        if (conversationId == null || binding == null) return;
+        String url = chatBackgroundPrefs().getString(conversationId + "_url", null);
+        String type = chatBackgroundPrefs().getString(conversationId + "_type", "image");
+        if (url == null || url.isEmpty()) {
+            if (chatBackgroundVideo != null) {
+                chatBackgroundVideo.stopPlayback();
+                chatBackgroundVideo.setVisibility(View.GONE);
+            }
+            binding.imgThemeBg.setVisibility(View.GONE);
+            return;
+        }
+        if ("video".equals(type) && chatBackgroundVideo != null) {
+            Glide.with(this).clear(binding.imgThemeBg);
+            binding.imgThemeBg.setVisibility(View.GONE);
+            chatBackgroundVideo.setVisibility(View.VISIBLE);
+            chatBackgroundVideo.setOnPreparedListener(player -> {
+                player.setLooping(true);
+                player.setVolume(0f, 0f);
+                chatBackgroundVideo.start();
+            });
+            chatBackgroundVideo.setOnErrorListener((player, what, extra) -> {
+                chatBackgroundVideo.setVisibility(View.GONE);
+                return true;
+            });
+            chatBackgroundVideo.setVideoURI(Uri.parse(url));
+        } else {
+            if (chatBackgroundVideo != null) {
+                chatBackgroundVideo.stopPlayback();
+                chatBackgroundVideo.setVisibility(View.GONE);
+            }
+            binding.imgThemeBg.setVisibility(View.VISIBLE);
+            Glide.with(this).load(url).centerCrop().into(binding.imgThemeBg);
+        }
+    }
+
+    private void showChatBackgroundCrop(@NonNull Uri uri) {
+        final String targetConversationId = conversationId;
+        AppContainer container = ContainerProvider.from(this);
+        container.getIoExecutor().execute(() -> {
+            try {
+                BitmapFactory.Options bounds = new BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                try (InputStream in = getContentResolver().openInputStream(uri)) {
+                    if (in == null) throw new IOException("تعذر قراءة الصورة");
+                    BitmapFactory.decodeStream(in, null, bounds);
+                }
+                int sample = 1;
+                while (Math.max(bounds.outWidth / sample, bounds.outHeight / sample) > 2400) sample *= 2;
+                BitmapFactory.Options opts = new BitmapFactory.Options();
+                opts.inSampleSize = sample;
+                Bitmap source;
+                try (InputStream in = getContentResolver().openInputStream(uri)) {
+                    if (in == null) throw new IOException("تعذر قراءة الصورة");
+                    source = BitmapFactory.decodeStream(in, null, opts);
+                }
+                if (source == null) throw new IOException("صيغة الصورة غير مدعومة");
+                runOnUiThread(() -> openChatBackgroundCropEditor(source, targetConversationId));
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this,
+                        e.getMessage() != null ? e.getMessage() : "تعذر فتح الصورة",
+                        Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void openChatBackgroundCropEditor(@NonNull Bitmap source, @NonNull String targetConversationId) {
+        BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        root.setPadding(dp(18), dp(14), dp(18), dp(20));
+        root.setBackground(roundRect(0xFFFFFFFF, dp(24), 0, 0));
+
+        android.widget.TextView title = menuText("ضبط خلفية المحادثة", 18, 0xFF20232D, true);
+        title.setGravity(android.view.Gravity.CENTER);
+        root.addView(title, new android.widget.LinearLayout.LayoutParams(-1, dp(34)));
+        android.widget.TextView hint = menuText("كبّر أو صغّر الصورة واسحبها لتحديد الجزء الظاهر", 12, 0xFF858A96, false);
+        hint.setGravity(android.view.Gravity.CENTER);
+        android.widget.LinearLayout.LayoutParams hintLp = new android.widget.LinearLayout.LayoutParams(-1, -2);
+        hintLp.bottomMargin = dp(12);
+        root.addView(hint, hintLp);
+
+        android.widget.FrameLayout cropFrame = new android.widget.FrameLayout(this);
+        cropFrame.setBackground(roundRect(0xFF171923, dp(16), 0, 0));
+        cropFrame.setClipToOutline(true);
+        android.widget.LinearLayout.LayoutParams frameLp = new android.widget.LinearLayout.LayoutParams(-1, dp(390));
+        root.addView(cropFrame, frameLp);
+        android.widget.ImageView preview = new android.widget.ImageView(this);
+        preview.setScaleType(android.widget.ImageView.ScaleType.MATRIX);
+        preview.setImageBitmap(source);
+        cropFrame.addView(preview, new android.widget.FrameLayout.LayoutParams(-1, -1));
+
+        android.graphics.Matrix matrix = new android.graphics.Matrix();
+        Runnable fit = () -> {
+            if (preview.getWidth() <= 0 || preview.getHeight() <= 0) return;
+            float scale = Math.max((float) preview.getWidth() / source.getWidth(),
+                    (float) preview.getHeight() / source.getHeight());
+            float dx = (preview.getWidth() - source.getWidth() * scale) / 2f;
+            float dy = (preview.getHeight() - source.getHeight() * scale) / 2f;
+            matrix.reset();
+            matrix.postScale(scale, scale);
+            matrix.postTranslate(dx, dy);
+            preview.setImageMatrix(matrix);
+        };
+        preview.post(fit);
+        final float[] last = new float[2];
+        final ScaleGestureDetector scaleDetector = new ScaleGestureDetector(this,
+                new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    @Override public boolean onScale(ScaleGestureDetector detector) {
+                        matrix.postScale(detector.getScaleFactor(), detector.getScaleFactor(), detector.getFocusX(), detector.getFocusY());
+                        preview.setImageMatrix(matrix);
+                        return true;
+                    }
+                });
+        preview.setOnTouchListener((v, event) -> {
+            scaleDetector.onTouchEvent(event);
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+                last[0] = event.getX(); last[1] = event.getY();
+                return true;
+            }
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_MOVE && event.getPointerCount() == 1
+                    && !scaleDetector.isInProgress()) {
+                matrix.postTranslate(event.getX() - last[0], event.getY() - last[1]);
+                last[0] = event.getX(); last[1] = event.getY();
+                preview.setImageMatrix(matrix);
+                return true;
+            }
+            return true;
+        });
+
+        android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
+        actions.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        android.widget.LinearLayout.LayoutParams actionsLp = new android.widget.LinearLayout.LayoutParams(-1, dp(50));
+        actionsLp.topMargin = dp(12);
+        root.addView(actions, actionsLp);
+        android.widget.TextView cancel = menuText("إلغاء", 14, 0xFF626775, true);
+        cancel.setGravity(android.view.Gravity.CENTER);
+        cancel.setBackground(roundRect(0xFFF2F3F6, dp(14), 0, 0));
+        actions.addView(cancel, new android.widget.LinearLayout.LayoutParams(0, -1, 1f));
+        android.widget.TextView save = menuText("اعتماد الخلفية", 14, 0xFFFFFFFF, true);
+        save.setGravity(android.view.Gravity.CENTER);
+        save.setBackground(roundRect(0xFFFE2C55, dp(14), 0, 0));
+        android.widget.LinearLayout.LayoutParams saveLp = new android.widget.LinearLayout.LayoutParams(0, -1, 1f);
+        saveLp.setMargins(dp(9), 0, 0, 0);
+        actions.addView(save, saveLp);
+        cancel.setOnClickListener(v -> { dialog.dismiss(); source.recycle(); });
+        save.setOnClickListener(v -> {
+            if (preview.getWidth() <= 0 || preview.getHeight() <= 0) return;
+            Bitmap cropped = Bitmap.createBitmap(preview.getWidth(), preview.getHeight(), Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(cropped);
+            canvas.drawColor(android.graphics.Color.BLACK);
+            canvas.drawBitmap(source, matrix, new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG | android.graphics.Paint.ANTI_ALIAS_FLAG));
+            dialog.dismiss();
+            source.recycle();
+            uploadChatBackgroundBitmap(cropped, targetConversationId);
+        });
+        dialog.setContentView(root);
+        dialog.setOnDismissListener(d -> { if (!source.isRecycled()) source.recycle(); });
+        dialog.show();
+        preview.post(fit);
+    }
+
+    private void uploadChatBackgroundBitmap(@NonNull Bitmap bitmap, @NonNull String targetConversationId) {
+        AppContainer container = ContainerProvider.from(this);
+        Toast.makeText(this, "جارٍ رفع خلفية المحادثة…", Toast.LENGTH_SHORT).show();
+        container.getIoExecutor().execute(() -> {
+            try {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out);
+                bitmap.recycle();
+                byte[] bytes = out.toByteArray();
+                if (bytes.length == 0 || bytes.length > 12L * 1024L * 1024L) {
+                    throw new IOException("حجم الصورة بعد القص غير مناسب");
+                }
+                RequestBody requestBody = RequestBody.create(bytes, MediaType.parse("image/jpeg"));
+                MultipartBody.Part part = MultipartBody.Part.createFormData(
+                        "file", "chat-background-" + System.currentTimeMillis() + ".jpg", requestBody);
+                Response<ApiResponse<UploadApi.UploadResult>> response = container.getUploadApi().upload(part).execute();
+                if (!response.isSuccessful() || response.body() == null || !response.body().success
+                        || response.body().data == null || response.body().data.url == null) {
+                    throw new IOException(UploadApi.errorMessage(response, "تعذر رفع الخلفية"));
+                }
+                String uploadedUrl = AssetCatalog.absoluteUrl(response.body().data.url);
+                if (uploadedUrl == null || uploadedUrl.isEmpty()) throw new IOException("رابط الخلفية غير صالح");
+                runOnUiThread(() -> {
+                    chatBackgroundPrefs().edit().putString(targetConversationId + "_url", uploadedUrl)
+                            .putString(targetConversationId + "_type", "image").apply();
+                    if (targetConversationId.equals(conversationId)) applyChatBackground();
+                    Toast.makeText(this, "تم حفظ خلفية هذه المحادثة", Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> Toast.makeText(this,
+                        error.getMessage() != null ? error.getMessage() : "تعذر رفع الخلفية",
+                        Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void uploadChatBackground(@NonNull Uri uri, boolean video) {
+        if (conversationId == null || conversationId.isEmpty()) return;
+        final String targetConversationId = conversationId;
+        AppContainer container = ContainerProvider.from(this);
+        Toast.makeText(this, "جارٍ رفع خلفية المحادثة…", Toast.LENGTH_SHORT).show();
+        container.getIoExecutor().execute(() -> {
+            try {
+                String mime = getContentResolver().getType(uri);
+                if (mime == null || !(video ? mime.startsWith("video/") : mime.startsWith("image/"))) {
+                    throw new IOException("نوع الملف غير مدعوم");
+                }
+                long limit = video ? 25L * 1024L * 1024L : 12L * 1024L * 1024L;
+                byte[] bytes;
+                try (InputStream input = getContentResolver().openInputStream(uri)) {
+                    if (input == null) throw new IOException("تعذر قراءة الملف");
+                    bytes = readAllLimited(input, limit);
+                }
+                if (bytes.length == 0) throw new IOException("الملف فارغ");
+                String ext = video ? ".mp4" : ".jpg";
+                RequestBody requestBody = RequestBody.create(bytes, MediaType.parse(mime));
+                MultipartBody.Part part = MultipartBody.Part.createFormData(
+                        "file", "chat-background-" + System.currentTimeMillis() + ext, requestBody);
+                Response<ApiResponse<UploadApi.UploadResult>> response =
+                        container.getUploadApi().upload(part).execute();
+                if (!response.isSuccessful() || response.body() == null || !response.body().success
+                        || response.body().data == null || response.body().data.url == null) {
+                    throw new IOException(UploadApi.errorMessage(response, "تعذر رفع الخلفية"));
+                }
+                String uploadedUrl = AssetCatalog.absoluteUrl(response.body().data.url);
+                if (uploadedUrl == null || uploadedUrl.isEmpty()) {
+                    throw new IOException("رابط الخلفية غير صالح");
+                }
+                runOnUiThread(() -> {
+                    chatBackgroundPrefs().edit()
+                            .putString(targetConversationId + "_url", uploadedUrl)
+                            .putString(targetConversationId + "_type", video ? "video" : "image")
+                            .apply();
+                    if (targetConversationId.equals(conversationId)) applyChatBackground();
+                    Toast.makeText(this, "تم حفظ خلفية هذه المحادثة", Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> Toast.makeText(
+                        this, error.getMessage() != null ? error.getMessage() : "تعذر رفع الخلفية",
+                        Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void confirmDeleteConversation() {
+        AuraDialogHelper.confirmRes(this,
+                R.string.delete_conversation,
+                R.string.delete_conversation,
+                android.R.string.ok,
+                this::deleteConversation);
+    }
+
+    private void deleteConversation() {
+        if (conversationId == null) return;
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<Object> r = ApiCall.execute(c.getChatApi().deleteConversation(conversationId));
+            runOnUiThread(() -> {
+                if (r.success) {
+                    Toast.makeText(this, R.string.conversation_deleted, Toast.LENGTH_SHORT).show();
+                    finish();
+                } else {
+                    Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic),
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
+
+    private void confirmBlockPeer() {
+        if (peerId == null || peerId.isEmpty()) {
+            Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        AuraDialogHelper.confirmRes(this,
+                R.string.block_user,
+                R.string.block_user,
+                android.R.string.ok,
+                this::blockPeer);
+    }
+
+    private void confirmUnblockPeer() {
+        if (peerId == null || peerId.isEmpty()) {
+            Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        AuraDialogHelper.confirmRes(this,
+                R.string.unblock_user,
+                R.string.unblock_user,
+                android.R.string.ok,
+                this::unblockPeer);
+    }
+
+    private void blockPeer() {
+        if (peerId == null) return;
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<Object> r = ApiCall.execute(c.getUserApi().block(peerId, new java.util.HashMap<>()));
+            runOnUiThread(() -> {
+                if (r.success) {
+                    peerBlocked = true;
+                    Toast.makeText(this, R.string.user_blocked, Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic),
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
+
+    private void unblockPeer() {
+        if (peerId == null) return;
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<Object> r = ApiCall.execute(c.getUserApi().unblock(peerId));
+            runOnUiThread(() -> {
+                if (r.success) {
+                    peerBlocked = false;
+                    Toast.makeText(this, R.string.user_unblocked, Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic),
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
+
+    private void refreshPeerBlockStatus() {
+        if (peerId == null || peerId.isEmpty()) return;
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<com.Dramizo.Series.data.remote.dto.MiscDtos.ListResult<AuthDtos.UserDto>> r =
+                    ApiCall.execute(c.getUserApi().blocked());
+            boolean blocked = false;
+            if (r.success && r.data != null && r.data.items != null) {
+                for (AuthDtos.UserDto u : r.data.items) {
+                    if (u != null && peerId.equals(u.id)) {
+                        blocked = true;
+                        break;
+                    }
+                }
+            }
+            boolean finalBlocked = blocked;
+            runOnUiThread(() -> peerBlocked = finalBlocked);
+        });
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent == null) return;
+        setIntent(intent);
+        String nextId = firstExtra(intent, EXTRA_CONVERSATION_ID, "conversationId");
+        if (nextId == null || nextId.isEmpty()) return;
+        if (nextId.equals(conversationId)) {
+            if (viewModel != null) viewModel.load(conversationId);
+            focusComposerFromNotification();
+            return;
+        }
+        com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
+        conversationId = nextId;
+        com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
+        applyChatBackground();
+        peerId = firstExtra(intent, EXTRA_PEER_ID, "peerId", "senderId", "userId");
+        String title = firstExtra(intent, EXTRA_TITLE, "senderName", "peerName", "name");
+        String avatar = firstExtra(intent, EXTRA_AVATAR, "avatarUrl", "senderAvatarUrl");
+        String hostBadge = intent.getStringExtra(EXTRA_HOST_BADGE);
+        bindPeerName(title, null);
+        AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, avatar);
+        AvatarCosmetics.applyHostWear(
+                binding.imgPeerFrame, binding.imgPeerHostBadge, binding.imgPeerAvatar,
+                hostBadge, null, null, null);
+        if (adapter != null) adapter.submit(java.util.Collections.emptyList());
+        if (viewModel != null) {
+            viewModel.clearReply();
+            viewModel.load(conversationId);
+        }
+        refreshPeerBlockStatus();
+        loadPeerHeader();
+    }
+
+    private static String firstExtra(Intent intent, String... keys) {
+        if (intent == null || keys == null) return null;
+        for (String key : keys) {
+            String v = intent.getStringExtra(key);
+            if (v != null && !v.trim().isEmpty()) return v.trim();
+        }
+        return null;
+    }
+
+    private void focusComposerFromNotification() {
+        Intent launch = getIntent();
+        if (launch == null || !launch.getBooleanExtra(EXTRA_FOCUS_COMPOSER, false)) return;
+        launch.removeExtra(EXTRA_FOCUS_COMPOSER);
+        if (binding == null || binding.etMessage == null) return;
+        binding.etMessage.post(() -> {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            binding.etMessage.requestFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(binding.etMessage,
+                        android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
+    }
+
+    private void refreshWornChatBubbleProfiles() {
+        final AppContainer container = ContainerProvider.from(this);
+        final String myId = container.getSessionManager().getUserId();
+        if (myId == null || myId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            Result<AuthDtos.UserDto> result = ApiCall.execute(container.getUserApi().getUser(myId));
+            if (!result.success || result.data == null) return;
+            container.getSessionManager().updateCachedUserAuthoritative(result.data);
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()) return;
+                if (adapter != null) adapter.setMyProfile(result.data);
+            });
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        focusComposerFromNotification();
+        applyChatBackground();
+        com.Dramizo.Series.util.ActiveChatTracker.set(conversationId);
+        refreshPeerBlockStatus();
+        refreshWornChatBubbleProfiles();
+        loadPeerHeader();
+        roomTrackingHandler.removeCallbacks(roomTrackingRefresh);
+        refreshPeerRoomPresence();
+        roomTrackingHandler.postDelayed(roomTrackingRefresh, 15_000L);
+        if (conversationId != null && viewModel != null) {
+            viewModel.load(conversationId);
+            restorePendingVideoUpload();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        roomTrackingHandler.removeCallbacks(roomTrackingRefresh);
+        if (chatBackgroundVideo != null && chatBackgroundVideo.isPlaying()) {
+            chatBackgroundVideo.pause();
+        }
+        // Stop advertising this thread as actively viewed while backgrounded.
+        // The server uses this room membership to decide whether a push is needed.
+        com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
+        if (conversationId != null) {
+            RealtimeClient.getInstance().leaveConversation(conversationId);
+        }
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        com.Dramizo.Series.util.ActiveChatTracker.clear(conversationId);
+        roomTrackingHandler.removeCallbacksAndMessages(null);
+        RealtimeClient.getInstance().removeUserListener(presenceListener);
+        if (typingStop != null && binding != null) binding.etMessage.removeCallbacks(typingStop);
+        if (conversationId != null && viewModel != null) viewModel.setTyping(false);
+        if (adapter != null) adapter.releasePlayer();
+        hideVoiceHud();
+        stopRecorderQuiet();
+        if (chatBackgroundVideo != null) chatBackgroundVideo.stopPlayback();
+        voiceUiHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
+    }
+}

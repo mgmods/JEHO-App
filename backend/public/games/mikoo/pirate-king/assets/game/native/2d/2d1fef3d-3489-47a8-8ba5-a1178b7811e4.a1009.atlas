@@ -1,0 +1,90 @@
+
+haimian.png
+size: 877,469
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+海/海_00000
+  rotate: true
+  xy: 442, 90
+  size: 377, 85
+  orig: 377, 100
+  offset: 0, 11
+  index: -1
+海/海_00001
+  rotate: true
+  xy: 529, 90
+  size: 377, 85
+  orig: 377, 100
+  offset: 0, 11
+  index: -1
+海/海_00002
+  rotate: true
+  xy: 616, 90
+  size: 377, 85
+  orig: 377, 100
+  offset: 0, 11
+  index: -1
+海/海_00003
+  rotate: true
+  xy: 703, 90
+  size: 377, 85
+  orig: 377, 100
+  offset: 0, 11
+  index: -1
+海/海_00004
+  rotate: true
+  xy: 790, 90
+  size: 377, 85
+  orig: 377, 100
+  offset: 0, 11
+  index: -1
+海/海_00005
+  rotate: true
+  xy: 2, 90
+  size: 377, 86
+  orig: 377, 100
+  offset: 0, 10
+  index: -1
+海/海_00006
+  rotate: false
+  xy: 2, 2
+  size: 377, 86
+  orig: 377, 100
+  offset: 0, 10
+  index: -1
+海/海_00007
+  rotate: true
+  xy: 90, 90
+  size: 377, 86
+  orig: 377, 100
+  offset: 0, 10
+  index: -1
+海/海_00008
+  rotate: true
+  xy: 178, 90
+  size: 377, 86
+  orig: 377, 100
+  offset: 0, 10
+  index: -1
+海/海_00009
+  rotate: true
+  xy: 266, 90
+  size: 377, 86
+  orig: 377, 100
+  offset: 0, 10
+  index: -1
+海/海_00010
+  rotate: true
+  xy: 354, 90
+  size: 377, 86
+  orig: 377, 100
+  offset: 0, 10
+  index: -1
+海/海_00011
+  rotate: false
+  xy: 381, 2
+  size: 377, 86
+  orig: 377, 100
+  offset: 0, 10
+  index: -1

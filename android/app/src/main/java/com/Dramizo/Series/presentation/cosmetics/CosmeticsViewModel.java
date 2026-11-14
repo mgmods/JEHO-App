@@ -1,0 +1,462 @@
+package com.Dramizo.Series.presentation.cosmetics;
+
+import androidx.annotation.Nullable;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.ViewModel;
+
+import com.Dramizo.Series.data.remote.dto.CosmeticDtos;
+import com.Dramizo.Series.di.AppContainer;
+import com.Dramizo.Series.domain.model.Result;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class CosmeticsViewModel extends ViewModel {
+    public static final String EXTRA_TYPE = "cosmetic_type";
+    /** Default mall lease length — matches backend mallLeaseDays(). */
+    public static final int LEASE_DAYS = 30;
+
+    public static final class CatalogPage {
+        public final String type;
+        public final List<CosmeticDtos.CosmeticDto> items;
+
+        public CatalogPage(String type, List<CosmeticDtos.CosmeticDto> items) {
+            this.type = type;
+            this.items = items != null ? items : Collections.emptyList();
+        }
+    }
+
+    private final AppContainer container;
+    private final MutableLiveData<CatalogPage> catalogPage =
+            new MutableLiveData<>(new CatalogPage(null, Collections.emptyList()));
+    private final MutableLiveData<String> message = new MutableLiveData<>();
+    private final MutableLiveData<String> error = new MutableLiveData<>();
+    private final MutableLiveData<String> selectedId = new MutableLiveData<>(null);
+    private final MutableLiveData<CosmeticDtos.CosmeticDto> selectedItem = new MutableLiveData<>(null);
+    private final Set<String> ownedIds = new HashSet<>();
+    private final Set<String> equippedIds = new HashSet<>();
+    private final Map<String, String> expiresAtById = new HashMap<>();
+    /** Private entry effects are returned only by the authenticated inventory endpoint, never the public catalog. */
+    private final List<CosmeticDtos.CosmeticDto> privateEntryInventory = new ArrayList<>();
+    private final AtomicInteger loadSeq = new AtomicInteger();
+    private volatile String filterType;
+    private volatile boolean bagMode;
+    private volatile String currentRoomId;
+    private volatile long inventoryLoadedAtMs;
+    private static final long INVENTORY_CACHE_MS = 8_000L;
+
+    public CosmeticsViewModel(AppContainer container) {
+        this.container = container;
+    }
+
+    public LiveData<CatalogPage> getCatalogPage() { return catalogPage; }
+    public LiveData<String> getMessage() { return message; }
+    public LiveData<String> getError() { return error; }
+    public LiveData<String> getSelectedId() { return selectedId; }
+    public LiveData<CosmeticDtos.CosmeticDto> getSelectedItem() { return selectedItem; }
+
+    public String getFilterType() { return filterType; }
+
+    public void setFilterType(String type) { this.filterType = type; }
+
+    public boolean isBagMode() { return bagMode; }
+
+    public void setCurrentRoomId(@Nullable String roomId) {
+        this.currentRoomId = roomId == null || roomId.trim().isEmpty() ? null : roomId.trim();
+    }
+
+    public void setBagMode(boolean bagMode) { this.bagMode = bagMode; }
+
+    /** Per-item validity configured by the dashboard; defaults to the legacy 30 days. */
+    public int leaseDays(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (item == null || item.meta == null) return LEASE_DAYS;
+        Object raw = item.meta.get("leaseDays");
+        try {
+            int days = raw instanceof Number
+                    ? ((Number) raw).intValue()
+                    : Integer.parseInt(String.valueOf(raw));
+            return days >= 1 && days <= 3650 ? days : LEASE_DAYS;
+        } catch (Exception ignored) {
+            return LEASE_DAYS;
+        }
+    }
+
+    public boolean isOwned(String cosmeticId) {
+        if (cosmeticId == null) return false;
+        synchronized (ownedIds) {
+            if (!ownedIds.contains(cosmeticId)) return false;
+            return !isExpired(cosmeticId);
+        }
+    }
+
+    public boolean isEquipped(String cosmeticId) {
+        if (cosmeticId == null) return false;
+        synchronized (ownedIds) {
+            return equippedIds.contains(cosmeticId) && isOwned(cosmeticId);
+        }
+    }
+
+    /** Days left (1+) or null if permanent / not owned. 0 if expired. */
+    @Nullable
+    public Integer daysLeft(String cosmeticId) {
+        if (cosmeticId == null) return null;
+        String exp;
+        synchronized (ownedIds) {
+            if (!ownedIds.contains(cosmeticId)) return null;
+            exp = expiresAtById.get(cosmeticId);
+        }
+        if (exp == null || exp.isEmpty()) return null;
+        long end = parseExpiresMs(exp);
+        if (end <= 0L) return null;
+        long ms = end - System.currentTimeMillis();
+        if (ms <= 0L) return 0;
+        return (int) Math.max(1L, (ms + 86_399_999L) / 86_400_000L);
+    }
+
+    public boolean isExpired(String cosmeticId) {
+        Integer d = daysLeftInternal(cosmeticId);
+        return d != null && d == 0;
+    }
+
+    @Nullable
+    private Integer daysLeftInternal(String cosmeticId) {
+        String exp = expiresAtById.get(cosmeticId);
+        if (exp == null || exp.isEmpty()) return null;
+        long end = parseExpiresMs(exp);
+        if (end <= 0L) return null;
+        long ms = end - System.currentTimeMillis();
+        if (ms <= 0L) return 0;
+        return (int) Math.max(1L, (ms + 86_399_999L) / 86_400_000L);
+    }
+
+    public void select(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (item == null) {
+            selectedId.postValue(null);
+            selectedItem.postValue(null);
+            return;
+        }
+        selectedId.postValue(item.id);
+        selectedItem.postValue(item);
+    }
+
+    public void clearSelection() {
+        selectedId.setValue(null);
+        selectedItem.setValue(null);
+    }
+
+    public void load() {
+        loadForType(filterType);
+    }
+
+    public void loadForType(String type) {
+        final String loadType = type;
+        final int seq = loadSeq.incrementAndGet();
+        filterType = loadType;
+        container.getIoExecutor().execute(() -> {
+            boolean needInventory;
+            synchronized (ownedIds) {
+                boolean openingPrivateEntryBag = bagMode
+                        && ("entry_effect".equals(loadType) || "join_toast".equals(loadType));
+                needInventory = openingPrivateEntryBag
+                        || System.currentTimeMillis() - inventoryLoadedAtMs > INVENTORY_CACHE_MS
+                        || ownedIds.isEmpty();
+            }
+            if (needInventory) {
+                Result<List<CosmeticDtos.UserCosmeticDto>> inv =
+                        container.getCosmeticsRepository().inventory();
+                if (inv.success && inv.data != null) {
+                    synchronized (ownedIds) {
+                        ownedIds.clear();
+                        equippedIds.clear();
+                        expiresAtById.clear();
+                        privateEntryInventory.clear();
+                        for (CosmeticDtos.UserCosmeticDto row : inv.data) {
+                            if (row.cosmeticId == null) continue;
+                            ownedIds.add(row.cosmeticId);
+                            if (row.expiresAt != null && !row.expiresAt.isEmpty()) {
+                                expiresAtById.put(row.cosmeticId, row.expiresAt);
+                            }
+                            if (row.equipped) equippedIds.add(row.cosmeticId);
+                            if (row.cosmetic != null && row.cosmetic.meta != null
+                                    && Boolean.TRUE.equals(row.cosmetic.meta.get("privateEntry"))) {
+                                privateEntryInventory.add(row.cosmetic);
+                            }
+                        }
+                    }
+                    inventoryLoadedAtMs = System.currentTimeMillis();
+                }
+            }
+            Result<List<CosmeticDtos.CosmeticDto>> cat =
+                    container.getCosmeticsRepository().catalog(loadType);
+            // Accept only the latest in-flight request.
+            if (seq != loadSeq.get()) return;
+            if (cat.success && cat.data != null) {
+                List<CosmeticDtos.CosmeticDto> items = new ArrayList<>(cat.data);
+                if (bagMode) {
+                    List<CosmeticDtos.CosmeticDto> ownedOnly = new ArrayList<>();
+                    synchronized (ownedIds) {
+                        for (CosmeticDtos.CosmeticDto row : items) {
+                            if (row != null && row.id != null && isOwned(row.id)) {
+                                ownedOnly.add(row);
+                            }
+                        }
+                    }
+                    if ("entry_effect".equals(loadType) || "join_toast".equals(loadType)) {
+                        synchronized (ownedIds) {
+                            for (CosmeticDtos.CosmeticDto privateEntry : privateEntryInventory) {
+                                if (privateEntry != null && privateEntry.id != null
+                                        && isOwned(privateEntry.id)) {
+                                    boolean alreadyAdded = false;
+                                    for (CosmeticDtos.CosmeticDto existing : ownedOnly) {
+                                        if (privateEntry.id.equals(existing.id)) { alreadyAdded = true; break; }
+                                    }
+                                    if (!alreadyAdded) ownedOnly.add(privateEntry);
+                                }
+                            }
+                        }
+                    }
+                    items = ownedOnly;
+                }
+                catalogPage.postValue(new CatalogPage(loadType, items));
+                // Keep selection if still in this page.
+                CosmeticDtos.CosmeticDto sel = selectedItem.getValue();
+                if (sel != null && loadType != null && loadType.equals(filterType)) {
+                    CosmeticDtos.CosmeticDto found = null;
+                    for (CosmeticDtos.CosmeticDto row : items) {
+                        if (row != null && sel.id != null && sel.id.equals(row.id)) {
+                            found = row;
+                            break;
+                        }
+                    }
+                    if (found == null && !items.isEmpty()) {
+                        select(items.get(0));
+                    } else if (found != null) {
+                        selectedItem.postValue(found);
+                    }
+                } else if ((selectedItem.getValue() == null) && !items.isEmpty()
+                        && loadType != null && loadType.equals(filterType)) {
+                    // Auto-preview first item when opening a tab (Majlis-like feel).
+                    select(items.get(0));
+                }
+            } else {
+                error.postValue(cat.error);
+            }
+        });
+    }
+
+    public void purchase(String cosmeticId) {
+        final String type = filterType;
+        // Client-side VIP gate before API (clearer UX for frames).
+        CosmeticDtos.CosmeticDto target = findInCurrentPage(cosmeticId);
+        if (target != null && !isOwned(cosmeticId) && target.minVipLevel > 0) {
+            int myVip = Math.max(0, container.getSessionManager().getVipLevel());
+            if (myVip < target.minVipLevel) {
+                error.postValue("يتطلب VIP " + target.minVipLevel
+                        + " (مستواك VIP " + myVip + ")");
+                return;
+            }
+        }
+        container.getIoExecutor().execute(() -> {
+            Result<CosmeticDtos.UserCosmeticDto> r =
+                    container.getCosmeticsRepository().purchase(cosmeticId);
+            if (!r.success) {
+                error.postValue(r.error);
+                return;
+            }
+            // Successful purchase means ownership even for permanent items (expiresAt == null).
+            synchronized (ownedIds) {
+                ownedIds.add(cosmeticId);
+                if (r.data != null && r.data.expiresAt != null && !r.data.expiresAt.isEmpty()) {
+                    expiresAtById.put(cosmeticId, r.data.expiresAt);
+                } else {
+                    expiresAtById.remove(cosmeticId);
+                }
+            }
+            // Purchase only adds the item to the bag. Wearing is a separate explicit action.
+            // Do not call equip here: the card must switch from "شراء" to "ارتداء".
+            inventoryLoadedAtMs = 0;
+            message.postValue("تم الشراء بنجاح — يمكنك ارتداء العنصر من الحقيبة");
+            loadForType(type);
+        });
+    }
+
+    @Nullable
+    private CosmeticDtos.CosmeticDto findInCurrentPage(@Nullable String id) {
+        if (id == null) return null;
+        CatalogPage page = catalogPage.getValue();
+        if (page == null || page.items == null) return null;
+        for (CosmeticDtos.CosmeticDto row : page.items) {
+            if (row != null && id.equals(row.id)) return row;
+        }
+        return null;
+    }
+
+    /** Buy again / half-price extend — same API as purchase when already owned. */
+    public void renew(String cosmeticId) {
+        purchase(cosmeticId);
+    }
+
+    public void equip(String cosmeticId) {
+        final String type = filterType;
+        final CosmeticDtos.CosmeticDto target = findInCurrentPage(cosmeticId);
+        final boolean roomBackground = target != null && "room_background".equals(target.type);
+        final String room = currentRoomId;
+        if (roomBackground && (room == null || room.isEmpty())) {
+            error.postValue("لتطبيق خلفية الغرفة، افتح المتجر من داخل الغرفة أولاً");
+            return;
+        }
+        container.getIoExecutor().execute(() -> {
+            // Avatar frames are one exclusive slot across VIP and host/contest frame types.
+            // Remove every previously equipped frame before applying the newly selected one.
+            if (isAvatarFrameType(target != null ? target.type : type)) {
+                Result<List<CosmeticDtos.UserCosmeticDto>> inventory =
+                        container.getCosmeticsRepository().inventory();
+                if (!inventory.success || inventory.data == null) {
+                    error.postValue(inventory.error != null ? inventory.error
+                            : "تعذر التحقق من الإطار المرتدى حالياً");
+                    return;
+                }
+                for (CosmeticDtos.UserCosmeticDto worn : inventory.data) {
+                    if (worn == null || !worn.equipped || worn.cosmeticId == null
+                            || cosmeticId.equals(worn.cosmeticId)
+                            || worn.cosmetic == null
+                            || !isAvatarFrameType(worn.cosmetic.type)) continue;
+                    Result<CosmeticDtos.EquipResult> removed =
+                            container.getCosmeticsRepository().unequip(worn.cosmeticId);
+                    if (removed == null || !removed.success) {
+                        error.postValue(removed != null && removed.error != null
+                                ? removed.error : "تعذر خلع الإطار السابق؛ لم يتم تغيير الإطار الحالي");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                }
+            }
+            Result<CosmeticDtos.EquipResult> r =
+                    container.getCosmeticsRepository().equip(cosmeticId);
+            if (r.success) {
+                if (r.data != null && r.data.profile != null) {
+                    applyEquipProfile(r.data.profile);
+                }
+                Result<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto> me =
+                        container.getUserRepository().getMe();
+                if (me.success && me.data != null) {
+                    container.getSessionManager().updateCachedUser(me.data);
+                }
+                if (roomBackground) {
+                    String backgroundUrl = target.previewUrl;
+                    if (backgroundUrl == null || backgroundUrl.trim().isEmpty()) {
+                        backgroundUrl = target.animationUrl;
+                    }
+                    if (backgroundUrl == null || backgroundUrl.trim().isEmpty()) {
+                        error.postValue("هذا العنصر لا يحتوي على رابط خلفية صالح");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                    Result<Object> applied = container.getRoomRepository().setBackground(room, backgroundUrl);
+                    if (applied == null || !applied.success) {
+                        error.postValue(applied != null && applied.error != null
+                                ? applied.error : "تم ارتداء العنصر لكن تعذر تطبيق خلفية الغرفة");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                    message.postValue("تم تطبيق خلفية الغرفة بنجاح");
+                } else {
+                    message.postValue("تم الارتداء بنجاح");
+                }
+                inventoryLoadedAtMs = 0;
+                loadForType(type);
+            } else {
+                error.postValue(r.error);
+            }
+        });
+    }
+
+    public void unequip(String cosmeticId) {
+        final String type = filterType;
+        container.getIoExecutor().execute(() -> {
+            Result<CosmeticDtos.EquipResult> r =
+                    container.getCosmeticsRepository().unequip(cosmeticId);
+            if (r.success) {
+                if (r.data != null && r.data.profile != null) {
+                    applyEquipProfile(r.data.profile);
+                } else {
+                    Result<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto> me =
+                            container.getUserRepository().getMe();
+                    if (me.success && me.data != null) {
+                        container.getSessionManager().updateCachedUser(me.data);
+                    }
+                }
+                inventoryLoadedAtMs = 0;
+                message.postValue("تم الخلع");
+                loadForType(type);
+            } else {
+                error.postValue(r.error);
+            }
+        });
+    }
+
+    private static boolean isAvatarFrameType(@Nullable String type) {
+        if (type == null) return false;
+        String value = type.trim().toLowerCase(Locale.ROOT);
+        return "vip_badge".equals(value) || "host_badge".equals(value)
+                || "frame".equals(value) || "frames".equals(value);
+    }
+
+    private void applyEquipProfile(CosmeticDtos.EquipProfile profile) {
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto cached =
+                container.getSessionManager().getUser();
+        if (cached == null || profile == null) return;
+        cached.entryEffectUrl = profile.entryEffectUrl;
+        cached.entryAnimationUrl = profile.entryAnimationUrl;
+        cached.roomCardUrl = profile.roomCardUrl;
+        cached.profileCardUrl = profile.profileCardUrl;
+        cached.chatBubbleUrl = profile.chatBubbleUrl;
+        cached.nameplateUrl = profile.nameplateUrl;
+        cached.levelBadgeUrl = profile.levelBadgeUrl;
+        cached.vipBadgeUrl = profile.vipBadgeUrl;
+        cached.hostBadgeUrl = profile.hostBadgeUrl;
+        container.getSessionManager().updateCachedUser(cached);
+    }
+
+    private static long parseExpiresMs(String raw) {
+        if (raw == null || raw.isEmpty()) return 0L;
+        String s = raw.trim();
+        try {
+            // Instant / ISO-8601 with Z
+            return java.time.Instant.parse(s).toEpochMilli();
+        } catch (Exception ignored) {
+        }
+        String[] patterns = {
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+                "yyyy-MM-dd'T'HH:mm:ssXXX",
+                "yyyy-MM-dd HH:mm:ss"
+        };
+        for (String p : patterns) {
+            try {
+                SimpleDateFormat f = new SimpleDateFormat(p, Locale.US);
+                f.setTimeZone(TimeZone.getTimeZone("UTC"));
+                Date d = f.parse(s);
+                if (d != null) return d.getTime();
+            } catch (ParseException ignored) {
+            }
+        }
+        return 0L;
+    }
+}

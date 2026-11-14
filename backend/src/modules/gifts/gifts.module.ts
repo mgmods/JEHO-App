@@ -1,0 +1,71 @@
+import { Module, forwardRef } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { GiftsController } from './gifts.controller';
+import { GiftsService } from './gifts.service';
+import { CustomGiftGrant } from '../../database/entities/custom-gift-grant.entity';
+import { CustomGiftsService } from './custom-gifts.service';
+import { CustomGiftsController } from './custom-gifts.controller';
+import { Gift } from '../../database/entities/gift.entity';
+import { GiftSend } from '../../database/entities/gift-send.entity';
+import { GiftCategory } from '../../database/entities/gift-category.entity';
+import { Cosmetic } from '../../database/entities/cosmetic.entity';
+import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
+import { Badge } from '../../database/entities/badge.entity';
+import { UserBadge } from '../../database/entities/user-badge.entity';
+import { Wallet } from '../../database/entities/wallet.entity';
+import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
+import { User } from '../../database/entities/user.entity';
+import { UserVip } from '../../database/entities/user-vip.entity';
+import { VipPlan } from '../../database/entities/vip-plan.entity';
+import { UserProfile } from '../../database/entities/user-profile.entity';
+import { Agency } from '../../database/entities/agency.entity';
+import { AgencyMember } from '../../database/entities/agency-member.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
+import { Room } from '../../database/entities/room.entity';
+import { RoomSeat } from '../../database/entities/room-seat.entity';
+import { TasksModule } from '../tasks/tasks.module';
+import { ContestsModule } from '../contests/contests.module';
+import { RealtimeModule } from '../realtime/realtime.module';
+import { HostTargetModule } from '../host-target/host-target.module';
+import { CpModule } from '../cp/cp.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { BadgesModule } from '../badges/badges.module';
+import { AuthModule } from '../auth/auth.module';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      Gift,
+      GiftCategory,
+      GiftSend,
+      CustomGiftGrant,
+      Cosmetic,
+      UserCosmetic,
+      Badge,
+      UserBadge,
+      Wallet,
+      WalletTransaction,
+      UserProfile,
+      User,
+      UserVip,
+      VipPlan,
+      Agency,
+      AgencyMember,
+      AppSetting,
+      Room,
+      RoomSeat,
+    ]),
+    TasksModule,
+    forwardRef(() => ContestsModule),
+    RealtimeModule,
+    HostTargetModule,
+    CpModule,
+    NotificationsModule,
+    BadgesModule,
+    AuthModule,
+  ],
+  controllers: [GiftsController, CustomGiftsController],
+  providers: [GiftsService, CustomGiftsService],
+  exports: [GiftsService],
+})
+export class GiftsModule {}

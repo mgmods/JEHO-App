@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<!-- Ported from Mikoo for gift/join toast layouts -->
+<string name="all">All</string>
+<string name="detail">Detail</string>
+<string name="first_charge">First Charge</string>
+<string name="gift_cp_level">CP level needs %s ECP to upgrade to</string>
+<string name="gift_gold_init">0 coins</string>
+<string name="gift_no_cp">Give CP rings to your friends to become CP</string>
+<string name="gift_number_1">1</string>
+<string name="gift_number_10">7</string>
+<string name="gift_number_1314">1314</string>
+<string name="gift_number_38">17</string>
+<string name="gift_number_520">520</string>
+<string name="gift_number_66">177</string>
+<string name="history_send">History</string>
+<string name="level_less_than_sth" formatted="false">LV.%s Progress: %s</string>
+<string name="message_type_not_supported">Not supported message type</string>
+<string name="reward">Reward</string>
+<string name="room_my_join">Joined</string>
+<string name="send">Send</string>
+<string name="send_to_all">Send gifts to all users in this room</string>
+<string name="gift_number_188">777</string>
+<string name="welcome">Welcome</string>
+</resources>

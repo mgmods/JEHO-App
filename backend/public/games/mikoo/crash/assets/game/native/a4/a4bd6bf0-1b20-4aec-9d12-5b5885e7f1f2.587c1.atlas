@@ -1,0 +1,139 @@
+
+huojianbaozha.png
+size: 2005,422
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+火箭
+  rotate: false
+  xy: 1243, 199
+  size: 121, 221
+  orig: 122, 221
+  offset: 1, 0
+  index: -1
+火箭火焰1
+  rotate: true
+  xy: 1562, 307
+  size: 113, 441
+  orig: 121, 452
+  offset: 5, 8
+  index: -1
+火箭火焰2
+  rotate: false
+  xy: 112, 3
+  size: 110, 417
+  orig: 121, 452
+  offset: 6, 32
+  index: -1
+火箭火焰3
+  rotate: false
+  xy: 460, 26
+  size: 121, 394
+  orig: 121, 452
+  offset: 0, 56
+  index: -1
+火箭火焰4
+  rotate: false
+  xy: 706, 33
+  size: 121, 387
+  orig: 121, 452
+  offset: 0, 63
+  index: -1
+火箭火焰5
+  rotate: false
+  xy: 224, 4
+  size: 111, 416
+  orig: 121, 452
+  offset: 8, 34
+  index: -1
+火箭火焰6
+  rotate: true
+  xy: 1562, 192
+  size: 113, 441
+  orig: 121, 452
+  offset: 5, 8
+  index: -1
+火箭火焰7
+  rotate: false
+  xy: 2, 2
+  size: 108, 418
+  orig: 121, 452
+  offset: 8, 32
+  index: -1
+火箭火焰8
+  rotate: false
+  xy: 337, 25
+  size: 121, 395
+  orig: 121, 452
+  offset: 0, 56
+  index: -1
+火箭火焰9
+  rotate: false
+  xy: 583, 32
+  size: 121, 388
+  orig: 121, 452
+  offset: 0, 63
+  index: -1
+爆炸1
+  rotate: true
+  xy: 1366, 212
+  size: 208, 194
+  orig: 231, 212
+  offset: 8, 9
+  index: -1
+爆炸2
+  rotate: true
+  xy: 829, 192
+  size: 228, 208
+  orig: 231, 212
+  offset: 0, 2
+  index: -1
+爆炸3
+  rotate: true
+  xy: 1039, 194
+  size: 226, 202
+  orig: 231, 212
+  offset: 4, 5
+  index: -1
+爆炸4
+  rotate: false
+  xy: 1029, 9
+  size: 194, 181
+  orig: 231, 212
+  offset: 28, 8
+  index: -1
+爆炸5
+  rotate: false
+  xy: 829, 6
+  size: 198, 184
+  orig: 231, 212
+  offset: 26, 7
+  index: -1
+爆炸6
+  rotate: false
+  xy: 1225, 15
+  size: 197, 177
+  orig: 231, 212
+  offset: 27, 14
+  index: -1
+爆炸7
+  rotate: true
+  xy: 1562, 28
+  size: 162, 154
+  orig: 231, 212
+  offset: 62, 41
+  index: -1
+爆炸8
+  rotate: true
+  xy: 1424, 53
+  size: 157, 136
+  orig: 231, 212
+  offset: 63, 57
+  index: -1
+爆炸9
+  rotate: true
+  xy: 1718, 79
+  size: 111, 108
+  orig: 231, 212
+  offset: 79, 78
+  index: -1

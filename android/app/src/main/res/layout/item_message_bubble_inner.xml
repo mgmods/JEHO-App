@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared bubble body â€” pixel-match light chat message body. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/bubbleRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_chat_bubble_peer"
+    android:orientation="vertical"
+    android:paddingHorizontal="12dp"
+    android:paddingTop="9dp"
+    android:paddingBottom="7dp">
+
+    <TextView
+        android:id="@+id/tvVipChip"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/rowBadges"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone">
+        <TextView android:id="@+id/tvWealthChip" android:layout_width="0dp" android:layout_height="0dp" />
+        <TextView android:id="@+id/tvCharmChip" android:layout_width="0dp" android:layout_height="0dp" />
+        <TextView android:id="@+id/tvLevelChip" android:layout_width="0dp" android:layout_height="0dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvMeta"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvSender"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:maxWidth="240dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/replyQuote"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/bg_chat_reply_quote"
+        android:orientation="vertical"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="5dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvReplyAuthor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxWidth="230dp"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvReplyBody"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:maxWidth="230dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Image message: photo + reaction + time overlay -->
+    <FrameLayout
+        android:id="@+id/imageWrap"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/imgMedia"
+            android:layout_width="238dp"
+            android:layout_height="170dp"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Rounded16" />
+
+        <VideoView
+            android:id="@+id/videoMedia"
+            android:layout_width="238dp"
+            android:layout_height="170dp"
+            android:background="#000000"
+            android:contentDescription="فيديو المحادثة"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgVideoThumbnail"
+            android:layout_width="238dp"
+            android:layout_height="170dp"
+            android:background="#151923"
+            android:contentDescription="معاينة الفيديو"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+
+        <FrameLayout
+            android:id="@+id/btnVideoPlay"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_chat_header_icon_circle"
+            android:clickable="true"
+            android:contentDescription="تشغيل الفيديو"
+            android:elevation="4dp"
+            android:focusable="true"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_audio_play"
+                app:tint="#FFFFFFFF" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/rowImageReaction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_chat_image_reaction"
+            android:elevation="2dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvImageReaction"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="â¤ï¸ 3"
+                android:textColor="@color/text_primary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvImageTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_chat_image_time"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:textColor="@color/text_primary"
+            android:textSize="10sp"
+            android:visibility="gone"
+            tools:text="9:44 PM" />
+    </FrameLayout>
+
+    <!-- Voice note: play Â· waveform Â· duration -->
+    <LinearLayout
+        android:id="@+id/audioRow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minWidth="176dp"
+        android:minHeight="44dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="2dp"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:id="@+id/audioPlayWrap"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="@drawable/bg_chat_audio_play_dot">
+
+            <ImageView
+                android:id="@+id/imgAudioPlay"
+                android:layout_width="15dp"
+                android:layout_height="15dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/voice_message"
+                android:src="@drawable/ic_audio_play"
+                app:tint="@color/gift_accent" />
+        </FrameLayout>
+
+        <com.Dramizo.Series.presentation.chat.AudioWaveformView
+            android:id="@+id/waveAudio"
+            android:layout_width="108dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="8dp" />
+
+        <TextView
+            android:id="@+id/tvAudioDur"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:minWidth="30dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            tools:text="0:18" />
+
+        <SeekBar
+            android:id="@+id/seekAudio"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Agency invite -->
+    <LinearLayout
+        android:id="@+id/agencyInviteRow"
+        android:layout_width="270dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_chat_room_share_card"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/imgAgencyInviteLogo"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_room_share_cover_clip"
+                android:clipToOutline="true"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:src="@drawable/icon_agency" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvAgencyInviteName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvAgencyInviteBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/agency_invite_body"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnAgencyInviteNo"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_agency_invite_no"
+                android:gravity="center"
+                android:text="@string/agency_invite_disagree"
+                android:textColor="@color/gift_accent"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnAgencyInviteYes"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_chat_join_room_btn"
+                android:gravity="center"
+                android:text="@string/agency_invite_agree"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Gift card -->
+    <LinearLayout
+        android:id="@+id/giftRow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:minWidth="188dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="2dp"
+        android:paddingVertical="2dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/imgGiftLeading"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_marginEnd="10dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_gift"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvGiftCaption"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/gift_message"
+                android:textColor="@color/gift_accent"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvGiftLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:maxWidth="130dp"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="Rose" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/giftIconTrail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/imgGift"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_asset_gift" />
+
+            <TextView
+                android:id="@+id/tvGiftQty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="-4dp"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="x10"
+                tools:visibility="visible" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Live room invite card -->
+    <LinearLayout
+        android:id="@+id/roomShareRow"
+        android:layout_width="288dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_chat_room_share_card"
+        android:foreground="?attr/selectableItemBackground"
+        android:layoutDirection="ltr"
+        android:orientation="vertical"
+        android:padding="11dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/imgRoomShareCover"
+                android:layout_width="92dp"
+                android:layout_height="92dp"
+                android:background="@drawable/bg_room_share_cover_clip"
+                android:clipToOutline="true"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_default_avatar" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvRoomShareLive"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_chat_live_badge"
+                        android:paddingHorizontal="7dp"
+                        android:paddingVertical="2dp"
+                        android:text="LIVE"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvRoomShareListeners"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_chat_listening_chip"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:paddingHorizontal="7dp"
+                        android:paddingVertical="2dp"
+                        android:textColor="@color/aurora_success"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        tools:text="128 listening" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvRoomShareTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="Late Night Lounge" />
+
+                <TextView
+                    android:id="@+id/tvRoomShareSubtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:text="@string/chat_room_share_subtitle"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/rowRoomShareAvatars"
+                android:layout_width="0dp"
+                android:layout_height="26dp"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/imgRoomShareAvatar1"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/bg_chat_avatar_stack"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:id="@+id/imgRoomShareAvatar2"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginStart="-8dp"
+                    android:background="@drawable/bg_chat_avatar_stack"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:id="@+id/imgRoomShareAvatar3"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginStart="-8dp"
+                    android:background="@drawable/bg_chat_avatar_stack"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvRoomSharePeople"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    tools:text="+12" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvRoomShareCta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_chat_join_room_btn"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="8dp"
+                android:text="@string/chat_join_room"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvContent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:gravity="start"
+        android:lineSpacingExtra="2dp"
+        android:maxWidth="250dp"
+        android:textColor="@color/text_primary"
+        android:textDirection="locale"
+        android:textSize="15sp"
+        tools:text="Heyy! How are you?" />
+
+    <TextView
+        android:id="@+id/tvPaidMessageInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:maxWidth="250dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:visibility="gone"
+        tools:text="💰 10 عملة · بانتظار الرد" />
+
+    <TextView
+        android:id="@+id/tvTranslateAction"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:paddingVertical="2dp"
+        android:text="@string/translate"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvTranslated"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:maxWidth="240dp"
+        android:textColor="@color/text_secondary"
+        android:textDirection="locale"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/rowMetaFooter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="3dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_hint"
+            android:textSize="10sp"
+            tools:text="9:41 PM" />
+
+        <ImageView
+            android:id="@+id/imgMsgStatus"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:layout_marginStart="4dp"
+            android:contentDescription="@null"
+            android:visibility="gone"
+            tools:src="@drawable/ic_msg_read"
+            tools:visibility="visible" />
+    </LinearLayout>
+</LinearLayout>
+
+

@@ -1,0 +1,34 @@
+
+stop selection.png
+size: 1078,211
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+SELECTION
+  rotate: false
+  xy: 749, 2
+  size: 324, 48
+  orig: 324, 48
+  offset: 0, 0
+  index: -1
+STOP
+  rotate: true
+  xy: 1028, 54
+  size: 155, 48
+  orig: 155, 48
+  offset: 0, 0
+  index: -1
+qiumen
+  rotate: false
+  xy: 749, 52
+  size: 277, 157
+  orig: 277, 157
+  offset: 0, 0
+  index: -1
+zi
+  rotate: false
+  xy: 2, 40
+  size: 745, 169
+  orig: 747, 169
+  offset: 2, 0
+  index: -1

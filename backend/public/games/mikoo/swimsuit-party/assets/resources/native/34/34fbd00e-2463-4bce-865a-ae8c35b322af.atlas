@@ -1,0 +1,132 @@
+
+yanjing.png
+size: 608,168
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+mojing
+  rotate: false
+  xy: 245, 8
+  size: 81, 72
+  orig: 81, 72
+  offset: 0, 0
+  index: -1
+yj/yjsg_00001
+  rotate: false
+  xy: 522, 56
+  size: 37, 53
+  orig: 141, 125
+  offset: 24, 49
+  index: -1
+yj/yjsg_00002
+  rotate: false
+  xy: 561, 112
+  size: 47, 56
+  orig: 141, 125
+  offset: 24, 48
+  index: -1
+yj/yjsg_00003
+  rotate: false
+  xy: 400, 10
+  size: 60, 71
+  orig: 141, 125
+  offset: 23, 33
+  index: -1
+yj/yjsg_00004
+  rotate: false
+  xy: 89, 0
+  size: 70, 80
+  orig: 141, 125
+  offset: 23, 25
+  index: -1
+yj/yjsg_00005
+  rotate: false
+  xy: 418, 86
+  size: 82, 82
+  orig: 141, 125
+  offset: 23, 23
+  index: -1
+yj/yjsg_00006
+  rotate: true
+  xy: 334, 83
+  size: 85, 82
+  orig: 141, 125
+  offset: 23, 22
+  index: -1
+yj/yjsg_00007
+  rotate: true
+  xy: 83, 82
+  size: 86, 82
+  orig: 141, 125
+  offset: 24, 22
+  index: -1
+yj/yjsg_00008
+  rotate: true
+  xy: 167, 82
+  size: 86, 82
+  orig: 141, 125
+  offset: 24, 22
+  index: -1
+yj/yjsg_00009
+  rotate: true
+  xy: 251, 82
+  size: 86, 81
+  orig: 141, 125
+  offset: 24, 22
+  index: -1
+yj/yjsg_00010
+  rotate: true
+  xy: 0, 81
+  size: 87, 81
+  orig: 141, 125
+  offset: 24, 22
+  index: -1
+yj/yjsg_00011
+  rotate: false
+  xy: 0, 0
+  size: 87, 79
+  orig: 141, 125
+  offset: 24, 22
+  index: -1
+yj/yjsg_00012
+  rotate: false
+  xy: 161, 3
+  size: 82, 77
+  orig: 141, 125
+  offset: 29, 22
+  index: -1
+yj/yjsg_00013
+  rotate: true
+  xy: 328, 9
+  size: 71, 70
+  orig: 141, 125
+  offset: 39, 23
+  index: -1
+yj/yjsg_00014
+  rotate: true
+  xy: 462, 24
+  size: 60, 58
+  orig: 141, 125
+  offset: 50, 24
+  index: -1
+yj/yjsg_00015
+  rotate: false
+  xy: 502, 111
+  size: 57, 57
+  orig: 141, 125
+  offset: 53, 25
+  index: -1
+yj/yjsg_00016
+  rotate: false
+  xy: 522, 3
+  size: 50, 51
+  orig: 141, 125
+  offset: 59, 27
+  index: -1
+yj/yjsg_00017
+  rotate: true
+  xy: 561, 71
+  size: 39, 42
+  orig: 141, 125
+  offset: 69, 31
+  index: -1

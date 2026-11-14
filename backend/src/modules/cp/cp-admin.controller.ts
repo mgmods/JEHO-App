@@ -1,0 +1,578 @@
+import { Body, Controller, Get, Patch, Post, Delete, Param, UseGuards, BadRequestException, InternalServerErrorException, NotFoundException, Header } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
+import { DataSource } from 'typeorm';
+import { CpService } from './cp.service';
+import { AdminGuard } from '../../common/guards/admin.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators';
+import { CpType } from '../../database/entities/cp-relationship.entity';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { CosmeticsService } from '../cosmetics/cosmetics.service';
+import { CosmeticType } from '../../database/entities/cosmetic.entity';
+
+class CpTypeConfigDto {
+  type?: CpType;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000000) priceCoins?: number;
+  @IsOptional() @IsString() giftId?: string;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000000) giftPoints?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000000) giftInteractionPoints?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1000) maxLevel?: number;
+  @IsOptional() @IsArray() levels?: Array<Record<string, any>>;
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  @IsOptional() @IsObject() rules?: Record<string, unknown>;
+}
+
+@ApiTags('Admin CP')
+@ApiBearerAuth()
+@Controller('admin/cp')
+@UseGuards(JwtAuthGuard, AdminGuard)
+export class CpAdminController {
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly cp: CpService,
+    private readonly realtime: RealtimeGateway,
+    private readonly cosmetics: CosmeticsService,
+  ) {}
+
+  @Get('store')
+  @ApiOperation({ summary: 'List only CP-exclusive store items for the CP dashboard' })
+  storeItems() {
+    return this.cosmetics.adminListCpStore();
+  }
+
+  @Post('store')
+  @ApiOperation({ summary: 'Create a CP-exclusive frame, card, nameplate or reward item' })
+  async createStoreItem(@CurrentUser('sub') adminId: string, @Body() body: Record<string, any>) {
+    const enteredCode = String(body?.code || '').trim();
+    const code = enteredCode.startsWith('cp_') ? enteredCode : `cp_${enteredCode}`;
+    const name = String(body?.name || '').trim();
+    const type = String(body?.type || '') as CosmeticType;
+    const previewUrl = String(body?.previewUrl || '').trim();
+    const animationUrl = String(body?.animationUrl || '').trim();
+    const coinPrice = Number(body?.coinPrice);
+    const leaseDays = Number(body?.leaseDays ?? 30);
+    if (!/^cp_[a-zA-Z0-9_-]{2,61}$/.test(code) || !name || name.length > 128 ||
+        !Object.values(CosmeticType).includes(type) || type === CosmeticType.ROOM_BACKGROUND ||
+        !/^https?:\/\//i.test(previewUrl) || previewUrl.length > 2048 ||
+        (animationUrl && (!/^https?:\/\//i.test(animationUrl) || animationUrl.length > 2048)) ||
+        !Number.isSafeInteger(coinPrice) || coinPrice < 1 || coinPrice > 1000000000 ||
+        !Number.isInteger(leaseDays) || leaseDays < 1 || leaseDays > 3650) {
+      throw new BadRequestException('بيانات عنصر متجر CP غير صالحة. تحقق من الرمز والصورة والسعر والمدة والفئة.');
+    }
+    const saved = await this.cosmetics.adminCreate({
+      type, code, name, description: String(body.description || '').slice(0, 500),
+      previewUrl, animationUrl: animationUrl || null, coinPrice,
+      isActive: body.isActive !== false, sortOrder: Number(body.sortOrder) || 0,
+      meta: { cpStore: true, leaseDays },
+    } as any);
+    await this.dataSource.query(
+      `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+       VALUES ($1,'store_item_create','cp_store_item',$2,$3::jsonb,now())`,
+      [adminId, saved.id, JSON.stringify({ code, type, coinPrice, leaseDays })],
+    );
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp_store', updatedAt: new Date().toISOString() });
+    return saved;
+  }
+
+  @Patch('store/:id')
+  @ApiOperation({ summary: 'Update price, duration, media, visibility or category of a CP-only item' })
+  async updateStoreItem(@CurrentUser('sub') adminId: string, @Param('id') id: string, @Body() body: Record<string, any>) {
+    const item = (await this.cosmetics.adminListCpStore()).find(row => row.id === id);
+    if (!item) throw new NotFoundException('عنصر متجر CP غير موجود');
+    const leaseDays = Number(body?.leaseDays ?? (item.meta as any)?.leaseDays ?? 30);
+    const coinPrice = Number(body?.coinPrice ?? item.coinPrice);
+    const name = String(body?.name ?? item.name).trim();
+    const type = String(body?.type ?? item.type) as CosmeticType;
+    const previewUrl = String(body?.previewUrl ?? item.previewUrl).trim();
+    const animationUrl = body?.animationUrl === undefined ? String(item.animationUrl || '') : String(body.animationUrl || '').trim();
+    if (!name || name.length > 128 || !Object.values(CosmeticType).includes(type) ||
+        type === CosmeticType.ROOM_BACKGROUND || !/^https?:\/\//i.test(previewUrl) ||
+        (animationUrl && !/^https?:\/\//i.test(animationUrl)) ||
+        !Number.isSafeInteger(coinPrice) || coinPrice < 1 || coinPrice > 1000000000 ||
+        !Number.isInteger(leaseDays) || leaseDays < 1 || leaseDays > 3650) {
+      throw new BadRequestException('بيانات تحديث عنصر CP غير صالحة');
+    }
+    const saved = await this.cosmetics.adminUpdate(id, {
+      type, name, description: body.description === undefined ? item.description : String(body.description || '').slice(0, 500),
+      previewUrl, animationUrl: animationUrl || null, coinPrice,
+      isActive: body.isActive === undefined ? item.isActive : body.isActive === true,
+      sortOrder: body.sortOrder === undefined ? item.sortOrder : Number(body.sortOrder) || 0,
+      meta: { ...((item.meta || {}) as any), cpStore: true, leaseDays },
+    });
+    await this.dataSource.query(
+      `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+       VALUES ($1,'store_item_update','cp_store_item',$2,$3::jsonb,now())`,
+      [adminId, id, JSON.stringify({ name, type, coinPrice, leaseDays, isActive: saved.isActive })],
+    );
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp_store', updatedAt: new Date().toISOString() });
+    return saved;
+  }
+
+  @Delete('store/:id')
+  @ApiOperation({ summary: 'Hide a CP-only store item without deleting users inventory history' })
+  async hideStoreItem(@CurrentUser('sub') adminId: string, @Param('id') id: string) {
+    const item = (await this.cosmetics.adminListCpStore()).find(row => row.id === id);
+    if (!item) throw new NotFoundException('عنصر متجر CP غير موجود');
+    const saved = await this.cosmetics.adminUpdate(id, { isActive: false });
+    await this.dataSource.query(
+      `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+       VALUES ($1,'store_item_hide','cp_store_item',$2,'{}'::jsonb,now())`,
+      [adminId, id],
+    );
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp_store', updatedAt: new Date().toISOString() });
+    return saved;
+  }
+
+  @Get('config')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
+  @ApiOperation({ summary: 'Read CP types and admin-configured prices, gifts, levels and rules' })
+  async getConfig() {
+    const rows = await this.dataSource.query(
+      `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%' ORDER BY key`,
+    );
+    // app_settings.value is TEXT. Older CP writers and migration paths have
+    // occasionally persisted JSON values that were JSON-encoded more than once.
+    // Decode only the setting's outer value (never nested user strings) so legacy
+    // rows such as a JSON-encoded JSON array are read as the same array the editor sent.
+    const decodeSettingValue = (raw: unknown): unknown => {
+      let value = raw;
+      for (let depth = 0; depth < 3 && typeof value === 'string'; depth += 1) {
+        const candidate = value.trim();
+        if (!candidate) break;
+        try {
+          const decoded = JSON.parse(candidate);
+          if (decoded === value) break;
+          value = decoded;
+        } catch {
+          break;
+        }
+      }
+      return value;
+    };
+    const settings = Object.fromEntries(rows.map((row: { key: string; value: unknown }) =>
+      [row.key, decodeSettingValue(row.value)],
+    ));
+    const types: Array<Record<string, unknown>> = [];
+    for (const type of [CpType.RELATIONSHIP]) {
+      const giftId = settings[`cp.gift.${type}`] ?? null;
+      const price = Number(settings[`cp.price.${type}`]);
+      const [gift] = giftId ? await this.dataSource.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true AND category=$2', [giftId, 'cp']) : [];
+      types.push({
+        type,
+        priceCoins: Number.isSafeInteger(price) && price > 0 ? price : null,
+        giftId: giftId || null,
+        gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
+        giftPoints: settings[`cp.gift_points.${type}`] ?? 0,
+        giftInteractionPoints: settings[`cp.points.gift_send.${type}`] ?? 0,
+        maxLevel: Array.isArray(settings[`cp.levels.${type}`]) ? settings[`cp.levels.${type}`].length : 0,
+        levels: Array.isArray(settings[`cp.levels.${type}`])
+          ? settings[`cp.levels.${type}`].slice(0, 100)
+          : [],
+        // Keep the per-type switch independent from the global CP master switch.
+        // The runtime catalog combines both switches when deciding whether users can access CP.
+        enabled: settings[`cp.enabled.${type}`] !== false && settings[`cp.enabled.${type}`] !== 'false',
+        rules: settings[`cp.rules.${type}`] ?? {},
+      });
+    }
+    let taskConfig: Record<string, any> = {};
+    try {
+      const configured = settings['cp.tasks.config'];
+      taskConfig = configured && typeof configured === 'object' && !Array.isArray(configured)
+        ? configured
+        : JSON.parse(String(configured || '{}'));
+    } catch { taskConfig = {}; }
+    const tasks = { ...taskConfig };
+    tasks.memory_today = { enabled: true, title: 'ذكرى جديدة', description: 'أضيفوا ذكرى مشتركة اليوم', condition: 'memory_count', target: 1, rewardPoints: 10, rewardCosmeticCode: '', ...(tasks.memory_today || {}) };
+    tasks.earn_points_today = { enabled: true, title: 'نشاط مشترك', description: 'اجمعوا نقاط العلاقة اليوم', condition: 'points_today', target: 10, rewardPoints: 15, rewardCosmeticCode: '', ...(tasks.earn_points_today || {}) };
+    return {
+      globallyEnabled: settings['cp.enabled.global'] !== false && settings['cp.enabled.global'] !== 'false',
+      giftTabEnabled: settings['cp.gift_tab.enabled'] !== false && settings['cp.gift_tab.enabled'] !== 'false',
+      tasks,
+      types,
+      policy: {
+        requestExpiryMinutes: settings['cp.policy.request_expiry_minutes'] ?? 30,
+        rules: settings['cp.policy.rules'] ?? {},
+        fullRefundOnReject: settings['cp.policy.full_refund_on_reject'] ?? true,
+        fullRefundOnExpiry: settings['cp.policy.full_refund_on_expiry'] ?? true,
+        allowEitherPartyToEnd: settings['cp.policy.allow_either_party_to_end'] ?? true,
+      },
+      note: 'Prices and levels are intentionally unset until an administrator configures them.',
+    };
+  }
+
+
+  @Patch('features')
+  @ApiOperation({ summary: 'Enable/disable CP globally and configure the supported daily CP missions' })
+  async updateFeatures(
+    @CurrentUser('sub') adminId: string,
+    @Body() body: {
+      globallyEnabled?: boolean;
+      giftTabEnabled?: boolean;
+      tasks?: Record<string, { enabled?: boolean; title?: string; description?: string; condition?: string; target?: number; rewardPoints?: number; rewardCosmeticCode?: string }>;
+    },
+  ) {
+    let current: Record<string, any> = {};
+    if (body.tasks !== undefined) {
+      if (!body.tasks || typeof body.tasks !== 'object' || Array.isArray(body.tasks) || Object.keys(body.tasks).length > 100) {
+        throw new BadRequestException('إعدادات مهمات CP غير صالحة');
+      }
+      for (const id of Object.keys(body.tasks)) {
+        if (!/^[a-zA-Z0-9_-]{2,64}$/.test(id)) throw new BadRequestException('معرّف مهمة CP غير صالح');
+        const task = body.tasks[id];
+        if (!task || typeof task !== 'object' || Array.isArray(task)) throw new BadRequestException('بيانات المهمة غير صالحة');
+        if (task.enabled !== undefined && typeof task.enabled !== 'boolean') throw new BadRequestException('حالة المهمة غير صالحة');
+        if (task.condition !== undefined && !['memory_count', 'points_today', 'gift_exchange_today'].includes(String(task.condition))) throw new BadRequestException('شرط المهمة غير مدعوم');
+        if (task.description !== undefined && (typeof task.description !== 'string' || task.description.length > 240)) throw new BadRequestException('وصف المهمة غير صالح');
+        if (task.target !== undefined && (!Number.isSafeInteger(task.target) || task.target < 1 || task.target > 1000000)) throw new BadRequestException('هدف المهمة يجب أن يكون بين 1 و1,000,000');
+        if (task.rewardPoints !== undefined && (!Number.isSafeInteger(task.rewardPoints) || task.rewardPoints < 0 || task.rewardPoints > 1000000)) throw new BadRequestException('مكافأة المهمة يجب أن تكون بين 0 و1,000,000 نقطة');
+        if (task.title !== undefined && (typeof task.title !== 'string' || !task.title.trim() || task.title.length > 100)) throw new BadRequestException('عنوان المهمة غير صالح');
+        if (task.rewardCosmeticCode !== undefined) {
+          const code = String(task.rewardCosmeticCode || '').trim();
+          if (code && !/^[a-zA-Z0-9_-]{2,64}$/.test(code)) throw new BadRequestException('رمز هدية المهمة غير صالح');
+          if (code) {
+            const [item] = await this.dataSource.query(
+              'SELECT id FROM cosmetics WHERE code=$1 AND "isActive"=true LIMIT 1',
+              [code],
+            );
+            if (!item) throw new BadRequestException('مكافأة المهمة يجب أن تكون عنصراً تجميلياً مفعّلاً');
+          }
+          task.rewardCosmeticCode = code;
+        }
+        current[id] = { ...task, ...(task.title !== undefined ? { title: task.title.trim() } : {}), ...(task.description !== undefined ? { description: task.description.trim() } : {}) };
+      }
+    }
+    const values: Record<string, string> = {};
+    if (body.globallyEnabled !== undefined) values['cp.enabled.global'] = String(body.globallyEnabled);
+    if (body.giftTabEnabled !== undefined) values['cp.gift_tab.enabled'] = String(body.giftTabEnabled);
+    if (body.tasks !== undefined) values['cp.tasks.config'] = JSON.stringify(current);
+    await this.dataSource.transaction(async manager => {
+      for (const [key, value] of Object.entries(values)) {
+        await manager.query(
+          `INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
+           VALUES (gen_random_uuid(),$1,$2,$3,now(),now())
+           ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,description=EXCLUDED.description,"updatedAt"=now()`,
+          [key, value, 'CP features and missions configured by admin'],
+        );
+      }
+      await manager.query(
+        `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+         VALUES ($1,'features_update','cp_features','global',$2::jsonb,now())`,
+        [adminId, JSON.stringify({ keys: Object.keys(values), globallyEnabled: body.globallyEnabled ?? null })],
+      );
+    });
+    // Verify the exact feature-setting rows after the transaction commits.
+    // Do not return success if the database read-back differs from the request.
+    const expectedEntries = Object.entries(values);
+    const persistedRows = expectedEntries.length
+      ? await this.dataSource.query(
+          'SELECT key,value FROM app_settings WHERE key = ANY($1::text[])',
+          [expectedEntries.map(([key]) => key)],
+        )
+      : [];
+    const persistedValues = new Map(
+      persistedRows.map((row: { key: string; value: unknown }) => [row.key, String(row.value ?? '')]),
+    );
+    const mismatches = expectedEntries
+      .filter(([key, expected]) => persistedValues.get(key) !== expected)
+      .map(([key]) => key);
+    if (mismatches.length) {
+      throw new InternalServerErrorException(
+        'تعذر تأكيد حفظ إعدادات CP في قاعدة البيانات. المفاتيح التي لم تتطابق: ' + mismatches.join('، ') + '.',
+      );
+    }
+    const saved = await this.getConfig();
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp', updatedAt: new Date().toISOString() });
+    return saved;
+  }
+
+  @Patch('policy')
+  @ApiOperation({ summary: 'Configure CP request expiry and lifecycle policy without weakening full refunds' })
+  async updatePolicy(
+    @CurrentUser('sub') adminId: string,
+    @Body() body: { requestExpiryMinutes?: number; rules?: Record<string, unknown> },
+  ) {
+    const config: Record<string, string> = {};
+    if (body.requestExpiryMinutes !== undefined) {
+      if (!Number.isInteger(body.requestExpiryMinutes) || body.requestExpiryMinutes < 5 || body.requestExpiryMinutes > 1440) {
+        throw new BadRequestException('مهلة الطلب يجب أن تكون بين 5 دقائق و24 ساعة');
+      }
+      config['cp.policy.request_expiry_minutes'] = String(body.requestExpiryMinutes);
+    }
+    if (body.rules !== undefined) config['cp.policy.rules'] = JSON.stringify(body.rules);
+    await this.dataSource.transaction(async manager => {
+      for (const [key, value] of Object.entries(config)) {
+        await manager.query(
+          `INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
+           VALUES (gen_random_uuid(),$1,$2,$3,now(),now())
+           ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,description=EXCLUDED.description,"updatedAt"=now()`,
+          [key, value, 'CP lifecycle policy configured by admin'],
+        );
+      }
+      await manager.query(
+        `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+         VALUES ($1,'policy_update','cp_policy','global',$2::jsonb,now())`,
+        [adminId, JSON.stringify({ keys: Object.keys(config) })],
+      );
+    });
+    const saved = await this.getConfig();
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp', updatedAt: new Date().toISOString() });
+    return saved;
+  }
+
+  @Patch('config/:type')
+  async setTypeConfig(
+    @CurrentUser('sub') adminId: string,
+    @Param('type') type: CpType,
+    @Body() body: CpTypeConfigDto,
+  ) {
+    if (type !== CpType.RELATIONSHIP) throw new BadRequestException('نظام CP يعتمد نوع ارتباط واحداً فقط');
+    if (body.priceCoins !== undefined && (!Number.isSafeInteger(body.priceCoins) || body.priceCoins < 0)) {
+      throw new BadRequestException('سعر العملات يجب أن يكون عدداً صحيحاً غير سالب؛ الصفر يعطّل الشراء');
+    }
+    if (body.levels !== undefined) {
+      if (!Array.isArray(body.levels) || body.levels.length < 1 || body.levels.length > 100) throw new BadRequestException('أضف مستوى واحداً على الأقل، والحد الأقصى 100 مستوى.');
+      let previous = -1;
+      for (const [levelIndex, level] of body.levels.entries()) {
+        if (!Number.isInteger(level?.level) || level.level !== levelIndex + 1 || !Number.isSafeInteger(level?.pointsRequired) || level.pointsRequired < 0 || level.pointsRequired < previous) {
+          throw new BadRequestException('تأكد أن أرقام المستويات متسلسلة وأن نقاط كل مستوى لا تقل عن السابق');
+        }
+        previous = level.pointsRequired;
+        if (level.name !== undefined && (typeof level.name !== 'string' || level.name.length > 100)) {
+          throw new BadRequestException('اسم مستوى CP غير صالح');
+        }
+        if (level.description !== undefined && (typeof level.description !== 'string' || level.description.length > 500)) {
+          throw new BadRequestException('تفاصيل مستوى CP غير صالحة؛ الحد الأقصى 500 حرف');
+        }
+        if (level.giftBonusPercent !== undefined &&
+            (!Number.isFinite(Number(level.giftBonusPercent)) || Number(level.giftBonusPercent) < 0 || Number(level.giftBonusPercent) > 500)) {
+          throw new BadRequestException('نسبة نقاط هدايا المستوى يجب أن تكون بين 0 و500');
+        }
+        if (level.rewardCosmeticCode !== undefined && level.rewardCosmeticCode !== '') {
+          if (typeof level.rewardCosmeticCode !== 'string' || !/^[a-zA-Z0-9_-]{2,64}$/.test(level.rewardCosmeticCode)) {
+            throw new BadRequestException('رمز المكافأة التجميلية لمستوى CP غير صالح');
+          }
+          const rewardCosmetic = (await this.cosmetics.adminListCpStore())
+            .find(item => item.isActive && item.code === level.rewardCosmeticCode);
+          if (!rewardCosmetic) throw new BadRequestException('اختر مكافأة نشطة من متجر CP فقط');
+        }
+        if (level.rewardCosmeticCodes !== undefined) {
+          if (!Array.isArray(level.rewardCosmeticCodes) || level.rewardCosmeticCodes.length > 30) {
+            throw new BadRequestException('قائمة المكافآت التجميلية للمستوى غير صالحة');
+          }
+          const codes = Array.from(new Set(level.rewardCosmeticCodes.map((code: any) => String(code || '').trim()).filter(Boolean)));
+          if (codes.some((code: string) => !/^[a-zA-Z0-9_-]{2,64}$/.test(code))) {
+            throw new BadRequestException('أحد رموز المكافآت التجميلية للمستوى غير صالح');
+          }
+          if (codes.length) {
+            const activeItems = (await this.cosmetics.adminListCpStore())
+              .filter(item => item.isActive && codes.includes(item.code));
+            if (activeItems.length !== codes.length) {
+              throw new BadRequestException('كل المكافآت التجميلية للمستوى يجب أن تكون عناصر نشطة من متجر CP');
+            }
+          }
+        }
+        const extraRewards = [
+          ...(Array.isArray(level.benefits) ? level.benefits : []),
+          ...(Array.isArray(level.rewards) ? level.rewards : []),
+        ];
+        if (extraRewards.length > 30) throw new BadRequestException('لا يمكن إضافة أكثر من 30 مكافأة للمستوى');
+        for (const reward of extraRewards) {
+          const code = String(reward?.cosmeticCode || reward?.code || '').trim();
+          if (!code) continue;
+          if (!/^[a-zA-Z0-9_-]{2,64}$/.test(code)) throw new BadRequestException('رمز إحدى مكافآت المستوى غير صالح');
+          const activeReward = (await this.cosmetics.adminListCpStore())
+            .find(item => item.isActive && item.code === code);
+          if (!activeReward) throw new BadRequestException('كل مكافآت المستوى يجب أن تكون عناصر نشطة من متجر CP');
+        }
+        if (level.rewardDays !== undefined && (!Number.isInteger(Number(level.rewardDays)) || Number(level.rewardDays) < 1 || Number(level.rewardDays) > 365)) {
+          throw new BadRequestException('مدة مكافأة مستوى CP يجب أن تكون بين يوم و365 يوماً');
+        }
+        if (level.rewardPermanent !== undefined && typeof level.rewardPermanent !== 'boolean') {
+          throw new BadRequestException('خيار ديمومة مكافأة مستوى CP غير صالح');
+        }
+        const rewardGiftIds = Array.from(new Set([
+          ...(Array.isArray(level.rewardGiftIds) ? level.rewardGiftIds : []),
+          level.rewardGiftId,
+        ].map((id: any) => String(id || '').trim()).filter(Boolean)));
+        if (rewardGiftIds.length > 30 || rewardGiftIds.some((id: string) =>
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
+          throw new BadRequestException('قائمة هدايا مكافأة المستوى غير صالحة');
+        }
+        if (rewardGiftIds.length) {
+          const activeGifts = await this.dataSource.query(
+            'SELECT id FROM gifts WHERE id=ANY($1::uuid[]) AND "isActive"=true AND category=$2',
+            [rewardGiftIds, 'cp'],
+          );
+          if (activeGifts.length !== rewardGiftIds.length) {
+            throw new BadRequestException('كل هدايا مكافأة المستوى يجب أن تكون هدايا نشطة من الكتالوج');
+          }
+        }
+        if (level.giftPresentation !== undefined) {
+          if (!level.giftPresentation || typeof level.giftPresentation !== 'object' || Array.isArray(level.giftPresentation)) {
+            throw new BadRequestException('إعدادات هدية مستوى CP غير صالحة');
+          }
+          const animationUrl = level.giftPresentation.animationUrl;
+          if (animationUrl !== undefined && animationUrl !== '' &&
+              (typeof animationUrl !== 'string' || animationUrl.length > 2048 ||
+               !(animationUrl.startsWith('https://') || animationUrl.startsWith('http://')))) {
+            throw new BadRequestException('رابط أنيميشن هدية CP غير صالح');
+          }
+          if (level.giftPresentation.showPartnerAvatars !== undefined &&
+              typeof level.giftPresentation.showPartnerAvatars !== 'boolean') {
+            throw new BadRequestException('خيار صور الشريكين في هدية CP غير صالح');
+          }
+        }
+        if (level.seatEffect !== undefined) {
+          const effect = level.seatEffect;
+          if (!effect || typeof effect !== 'object' || Array.isArray(effect)) {
+            throw new BadRequestException('إعدادات مؤثر مقاعد مستوى CP غير صالحة');
+          }
+          if (effect.enabled !== undefined && typeof effect.enabled !== 'boolean') {
+            throw new BadRequestException('حالة مؤثر مقاعد المستوى غير صالحة');
+          }
+          if (effect.url !== undefined && effect.url !== '' &&
+              (typeof effect.url !== 'string' || effect.url.length > 2048 ||
+               !(effect.url.startsWith('https://') || effect.url.startsWith('http://')))) {
+            throw new BadRequestException('رابط مؤثر مقاعد المستوى غير صالح');
+          }
+          // Keep the API validation aligned with the dashboard's 10–36 dp control.
+          // A valid value from the admin UI must never be rejected on save.
+          if (effect.sizeDp !== undefined &&
+              (!Number.isInteger(Number(effect.sizeDp)) || Number(effect.sizeDp) < 10 || Number(effect.sizeDp) > 36)) {
+            throw new BadRequestException('حجم مؤثر مقاعد المستوى يجب أن يكون بين 10 و36');
+          }
+          if (effect.durationMs !== undefined &&
+              (!Number.isInteger(Number(effect.durationMs)) || Number(effect.durationMs) < 500 || Number(effect.durationMs) > 10000)) {
+            throw new BadRequestException('مدة مؤثر مقاعد المستوى يجب أن تكون بين 500 و10000 مللي ثانية');
+          }
+        }
+        if (level.presentation !== undefined) {
+          if (!level.presentation || typeof level.presentation !== 'object' || Array.isArray(level.presentation)) {
+            throw new BadRequestException('إعدادات عرض مستوى CP غير صالحة');
+          }
+          for (const field of ['frameUrl', 'levelLogoUrl', 'logoUrl', 'badgeUrl', 'cardBackgroundUrl']) {
+            const url = level.presentation[field];
+            if (url !== undefined && url !== '' &&
+                (typeof url !== 'string' || url.length > 2048 || !(url.startsWith('https://') || url.startsWith('http://')))) {
+              throw new BadRequestException('رابط صورة مستوى CP غير صالح: ' + field);
+            }
+          }
+          if (level.presentation.nameColor !== undefined &&
+              (typeof level.presentation.nameColor !== 'string' || !/^#[0-9a-f]{6}$/i.test(level.presentation.nameColor))) {
+            throw new BadRequestException('لون اسم مستوى CP غير صالح');
+          }
+          if (level.presentation.nameGlow !== undefined && typeof level.presentation.nameGlow !== 'boolean') {
+            throw new BadRequestException('خيار توهج اسم مستوى CP غير صالح');
+          }
+        }
+      }
+    }
+    if (body.giftId !== undefined && body.giftId) {
+      const [selectedGift] = await this.dataSource.query(
+        'SELECT id FROM gifts WHERE id=$1 AND "isActive"=true AND category=$2 LIMIT 1',
+        [body.giftId, 'cp'],
+      );
+      if (!selectedGift) throw new BadRequestException('اختر هدية موجودة ومفعّلة من كتالوج الهدايا');
+    }
+    const config: Record<string, unknown> = {};
+    if (body.priceCoins !== undefined) config[`cp.price.${type}`] = String(body.priceCoins);
+    if (body.giftId !== undefined) config[`cp.gift.${type}`] = body.giftId;
+    if (body.giftPoints !== undefined) config[`cp.gift_points.${type}`] = String(body.giftPoints);
+    if (body.giftInteractionPoints !== undefined) config[`cp.points.gift_send.${type}`] = String(body.giftInteractionPoints);
+    config[`cp.max_level.${type}`] = String(body.levels?.length ?? 1);
+    if (body.levels !== undefined) config[`cp.levels.${type}`] = JSON.stringify(body.levels.map((level, index) => ({ ...level, level: index + 1 })));
+    if (body.enabled !== undefined) config[`cp.enabled.${type}`] = String(body.enabled);
+    if (body.rules !== undefined) config[`cp.rules.${type}`] = JSON.stringify(body.rules);
+    await this.dataSource.transaction(async manager => {
+      const entries = Object.entries(config);
+      if (entries.length) {
+        // Persist all CP fields with one database round-trip. The previous
+        // per-key loop made a single Save wait on several sequential writes.
+        await manager.query(
+          `INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
+           SELECT gen_random_uuid(), item.key, item.value, $3, now(), now()
+           FROM unnest($1::text[], $2::text[]) AS item(key, value)
+           WHERE true
+           ON CONFLICT (key) DO UPDATE
+             SET value=EXCLUDED.value, description=EXCLUDED.description, "updatedAt"=now()`,
+          [entries.map(([key]) => key), entries.map(([, value]) => String(value)), 'CP settings configured through the protected admin API'],
+        );
+      }
+      await manager.query(
+        `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+         VALUES ($1,'config_update','cp_type',$2,$3::jsonb,now())`,
+        [adminId, type, JSON.stringify({ keys: Object.keys(config) })],
+      );
+    });
+
+    // Verify the exact persisted app_settings rows, not the public getConfig()
+    // projection. getConfig() intentionally normalizes values for the UI (for
+    // example null/default values and active-gift joins); comparing that projection
+    // with the raw PATCH DTO can report a false mismatch even when the write is sound.
+    const expectedEntries = Object.entries(config).map(([key, value]) => [key, String(value)] as const);
+    const persistedRows = expectedEntries.length
+      ? await this.dataSource.query(
+          'SELECT key,value FROM app_settings WHERE key = ANY($1::text[])',
+          [expectedEntries.map(([key]) => key)],
+        )
+      : [];
+    const persistedValues = new Map(
+      persistedRows.map((row: { key: string; value: unknown }) => [row.key, String(row.value ?? '')]),
+    );
+    const mismatches = expectedEntries
+      .filter(([key, expected]) => persistedValues.get(key) !== expected)
+      .map(([key]) => key);
+    if (mismatches.length) {
+      throw new InternalServerErrorException(
+        'تعذر تأكيد حفظ إعدادات CP في قاعدة البيانات. المفاتيح التي لم تتطابق: ' + mismatches.join('، ') + '.',
+      );
+    }
+    const savedConfig = await this.getConfig();
+    this.realtime.emitToAll('cp:config-updated', { scope: 'cp', updatedAt: new Date().toISOString() });
+    return savedConfig;
+  }
+
+
+  @Post('relationships/points')
+  @ApiOperation({ summary: 'Admin-only point adjustment recorded in the idempotent CP ledger' })
+  async adjustRelationshipPoints(
+    @CurrentUser('sub') adminId: string,
+    @Body() body: { relationshipId: string; eventType: string; referenceType: string; referenceId: string; points: number; metadata?: Record<string, unknown> },
+  ) {
+    if (!body?.relationshipId || !body.eventType || !body.referenceType || !body.referenceId || !Number.isSafeInteger(body.points) || body.points < 0) {
+      throw new BadRequestException('بيانات نقاط العلاقة غير صالحة');
+    }
+    const result = await this.cp.recordPoints(
+      body.relationshipId, body.eventType, body.referenceType, body.referenceId, body.points, body.metadata || {},
+    );
+    await this.dataSource.query(
+      `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+       VALUES ($1,'points_adjustment','cp_relationship',$2,$3::jsonb,now())`,
+      [adminId, body.relationshipId, JSON.stringify({ eventType: body.eventType, referenceType: body.referenceType, referenceId: body.referenceId, points: body.points, duplicate: (result as any).duplicate })],
+    );
+    return result;
+  }
+
+  @Get('audit')
+  @ApiOperation({ summary: 'Review CP admin changes and lifecycle events' })
+  async audit() {
+    return this.dataSource.query(
+      `SELECT id,"adminUserId",action,"entityType","entityId",details,"createdAt"
+       FROM cp_audit_logs ORDER BY "createdAt" DESC LIMIT 200`,
+    );
+  }
+
+  @Get('requests')
+  async requestLog() {
+    return this.dataSource.query(
+      `SELECT q.id,q.type,q.status,q."fromUserId",a.username AS "fromUsername",
+       q."toUserId",b.username AS "toUsername",q."priceCoins",q."roomId",
+       q."createdAt",q."expiresAt",q."respondedAt",q."refundedAt"
+       FROM cp_requests q JOIN users a ON a.id=q."fromUserId" JOIN users b ON b.id=q."toUserId"
+       ORDER BY q."createdAt" DESC LIMIT 200`,
+    );
+  }
+}

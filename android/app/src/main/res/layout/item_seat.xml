@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mikoo item_rv_multi_audio_micro: 80dp cell, 55dp avatar/empty seat -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingTop="4dp"
+    android:paddingBottom="6dp"
+    android:paddingHorizontal="2dp">
+
+    <FrameLayout
+        android:layout_width="76dp"
+        android:layout_height="76dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <!-- Speak waves: larger than avatar so rings expand around the seat -->
+        <com.Dramizo.Series.widget.SeatSpeakLightningView
+            android:id="@+id/seatSpeakAura"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_gravity="center"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="invisible" />
+
+        <View
+            android:id="@+id/seatRing"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_seat_avatar_ring"
+            android:visibility="gone" />
+
+        <!-- Legacy ids kept for binding; unused -->
+        <View
+            android:id="@+id/seatRippleOuter"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/seatRippleMid"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/seatRippleInner"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
+
+        <!-- Empty / locked classic Mikoo seat -->
+        <ImageView
+            android:id="@+id/imgSeatShell"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_classic_seat_normal" />
+
+        <ImageView
+            android:id="@+id/imgAvatar"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_seat_avatar_ring"
+            android:contentDescription="@string/seats"
+            android:padding="1.5dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_default_avatar"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgFrame"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgHostBadge"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/superAdminSeatFrame"
+            android:layout_width="62dp"
+            android:layout_height="62dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:visibility="gone" />
+
+        <!-- Room-support medal: upper corner of the occupied seat/avatar, like a crown. -->
+        <ImageView
+            android:id="@+id/imgRoomSupportMedal"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="top|start"
+            android:layout_marginTop="-4dp"
+            android:layout_marginStart="-4dp"
+            android:contentDescription="@null"
+            android:elevation="20dp"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <com.Dramizo.Series.util.HostSignalView
+            android:id="@+id/seatHostSignal"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <!-- Reaction ABOVE frame/badge so stickers are never hidden by wear. -->
+        <ImageView
+            android:id="@+id/imgSeatReaction"
+            android:layout_width="84dp"
+            android:layout_height="84dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:elevation="8dp"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <com.airbnb.lottie.LottieAnimationView
+            android:id="@+id/lottieSeatReaction"
+            android:layout_width="84dp"
+            android:layout_height="84dp"
+            android:layout_gravity="center"
+            android:elevation="8dp"
+            android:scaleType="centerInside"
+            android:visibility="gone"
+            app:lottie_autoPlay="false"
+            app:lottie_fileName="lottie/emoji_react.json"
+            app:lottie_loop="false" />
+
+        <ImageView
+            android:id="@+id/imgMuted"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="18dp"
+            android:layout_marginBottom="16dp"
+            android:contentDescription="@null"
+            android:elevation="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_mic_close"
+            android:visibility="gone" />
+
+        <!-- Gift-target highlight (under seat) while gift panel selects recipients. -->
+        <View
+            android:id="@+id/giftSelectRing"
+            android:layout_width="58dp"
+            android:layout_height="58dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_gift_seat_select_ring"
+            android:elevation="6dp"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/giftSelectUnderline"
+            android:layout_width="28dp"
+            android:layout_height="3dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/bg_gift_seat_select_underline"
+            android:elevation="7dp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- Name row: optional mic badge + nickname (Mikoo white 50%) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="2dp">
+
+        <ImageView
+            android:id="@+id/imgSeatHostMark"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginEnd="2dp"
+            android:contentDescription="@null"
+            android:src="@drawable/mic_fz"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxWidth="72dp"
+            android:maxLines="1"
+            android:textColor="#80FFFFFF"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvAgencyClub"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_agency_affiliation_badge"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxWidth="104dp"
+        android:maxLines="1"
+        android:paddingHorizontal="7dp"
+        android:paddingVertical="2dp"
+        android:textColor="#FFFFE4A6"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvAgencyRoleBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_agency_affiliation_badge"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxWidth="104dp"
+        android:maxLines="1"
+        android:paddingHorizontal="7dp"
+        android:paddingVertical="2dp"
+        android:textColor="#FFFFE4A6"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Decorative admin-assigned rank. This is separate from platform staff permissions. -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:id="@+id/rowCustomDisplayRank">
+
+        <ImageView
+            android:id="@+id/imgCustomRankBadge"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginEnd="2dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter" />
+
+        <TextView
+            android:id="@+id/tvCustomRankBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxWidth="84dp"
+            android:maxLines="1"
+            android:paddingHorizontal="4dp"
+            android:paddingVertical="1dp"
+            android:textColor="#FFFFD580"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Platform staff (super / manager) under seat name -->
+    <TextView
+        android:id="@+id/tvStaffSeatBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:paddingHorizontal="5dp"
+        android:paddingVertical="1dp"
+        android:textColor="@android:color/white"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Charm / gift count — Mikoo grey pill -->
+    <TextView
+        android:id="@+id/tvGiftCount"
+        android:layout_width="wrap_content"
+        android:layout_height="13dp"
+        android:layout_marginTop="3dp"
+        android:background="@drawable/bg_mikoo_mic_charm"
+        android:drawablePadding="2dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="4dp"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+</LinearLayout>
