@@ -1940,8 +1940,8 @@ public class ProfileActivity extends ThemedActivity {
     private void openProfileMoments() {
         String id = loadedProfileId;
         if (id == null || id.trim().isEmpty()) return;
-        Intent moments = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
-        moments.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, id);
+        Intent moments = new Intent(this, ProfileDetailsActivity.class);
+        moments.putExtra(ProfileDetailsActivity.EXTRA_USER_ID, id);
         startActivity(moments);
     }
 
