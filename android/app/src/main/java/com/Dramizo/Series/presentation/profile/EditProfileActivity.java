@@ -57,6 +57,8 @@ public class EditProfileActivity extends ThemedActivity {
     private ProfileViewModel vm;
     private AppContainer c;
     private boolean pickingCover;
+    // -1 adds a cover; a non-negative value replaces that gallery position.
+    private int replacingCoverIndex = -1;
     private final ArrayList<String> profileCoverUrls = new ArrayList<>();
     private String lastGender = "";
     private String originalCountryCode = "";
@@ -76,6 +78,7 @@ public class EditProfileActivity extends ThemedActivity {
     private final ActivityResultLauncher<Intent> cropImage = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() != RESULT_OK || result.getData() == null) {
+                    replacingCoverIndex = -1;
                     if (result.getResultCode() == UCrop.RESULT_ERROR && result.getData() != null) {
                         Throwable error = UCrop.getError(result.getData());
                         Toast.makeText(this, error != null && error.getMessage() != null
@@ -143,6 +146,7 @@ public class EditProfileActivity extends ThemedActivity {
             if (user.profileCoverUrls != null) profileCoverUrls.addAll(user.profileCoverUrls);
             else if (user.coverUrl != null && !user.coverUrl.trim().isEmpty()) profileCoverUrls.add(user.coverUrl);
             updateCoverGalleryCount();
+            refreshCoverGalleryThumbnails();
             binding.etBirthday.setText(normalizeBirthday(user.birthday));
             selectGender(user.gender);
             lastGender = user.gender != null ? user.gender : "";
@@ -449,34 +453,97 @@ public class EditProfileActivity extends ThemedActivity {
         if (binding == null || binding.coverGalleryItems == null) return;
         binding.coverGalleryItems.removeAllViews();
         final float density = getResources().getDisplayMetrics().density;
-        for (int i = 0; i < profileCoverUrls.size(); i++) {
+        for (int i = 0; i < 5; i++) {
             final int index = i;
-            String url = profileCoverUrls.get(i);
-            android.widget.FrameLayout tile = new android.widget.FrameLayout(this);
-            LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams((int)(76*density), (int)(54*density));
+            final boolean hasImage = i < profileCoverUrls.size();
+            final String url = hasImage ? profileCoverUrls.get(i) : null;
+            LinearLayout tile = new LinearLayout(this);
+            tile.setOrientation(LinearLayout.VERTICAL);
+            tile.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+            tile.setPadding((int)(6*density), (int)(6*density), (int)(6*density), (int)(6*density));
+            android.graphics.drawable.GradientDrawable tileBg = new android.graphics.drawable.GradientDrawable();
+            tileBg.setColor(0xFFF8F8FC);
+            tileBg.setCornerRadius(12*density);
+            tileBg.setStroke((int)Math.max(1, density), 0xFFE4E5ED);
+            tile.setBackground(tileBg);
+            LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams((int)(132*density), ViewGroup.LayoutParams.WRAP_CONTENT);
             tileLp.setMargins(0, 0, (int)(8*density), 0);
-            ImageView thumb = new ImageView(this);
-            thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            tile.addView(thumb, new android.widget.FrameLayout.LayoutParams(-1, -1));
-            Glide.with(this).load(url).centerCrop().into(thumb);
-            TextView remove = new TextView(this);
-            remove.setText("×"); remove.setTextColor(Color.WHITE); remove.setTextSize(17f);
-            remove.setTypeface(remove.getTypeface(), android.graphics.Typeface.BOLD);
-            remove.setGravity(android.view.Gravity.CENTER);
-            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-            bg.setShape(android.graphics.drawable.GradientDrawable.OVAL); bg.setColor(0xDDC62828);
-            remove.setBackground(bg);
-            android.widget.FrameLayout.LayoutParams removeLp = new android.widget.FrameLayout.LayoutParams(
-                    (int)(23*density), (int)(23*density), android.view.Gravity.TOP|android.view.Gravity.END);
-            removeLp.setMargins(0,(int)(2*density),(int)(2*density),0);
-            tile.addView(remove, removeLp);
-            remove.setOnClickListener(v -> confirmRemoveCover(index));
-            thumb.setOnClickListener(v -> confirmRemoveCover(index));
-            binding.coverGalleryItems.addView(tile, tileLp);
+            tile.setLayoutParams(tileLp);
+            ImageView preview = new ImageView(this);
+            preview.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            preview.setBackgroundColor(0xFFE9EAF0);
+            preview.setContentDescription(hasImage ? "معاينة صورة الغلاف " + (i+1) : "إضافة صورة غلاف");
+            tile.addView(preview, new LinearLayout.LayoutParams((int)(118*density), (int)(76*density)));
+            if (hasImage) {
+                Glide.with(this).load(url).centerCrop().placeholder(ImagePlaceholder.cover())
+                        .error(ImagePlaceholder.cover()).into(preview);
+                preview.setOnClickListener(v -> showCoverPreview(url));
+                TextView label = new TextView(this);
+                label.setText("صورة " + (i+1));
+                label.setTextColor(0xFF555B70);
+                label.setTextSize(11f);
+                label.setGravity(android.view.Gravity.CENTER);
+                LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT);
+                labelLp.topMargin = (int)(4*density);
+                tile.addView(label, labelLp);
+                LinearLayout actions = new LinearLayout(this);
+                actions.setOrientation(LinearLayout.HORIZONTAL);
+                actions.setGravity(android.view.Gravity.CENTER);
+                LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT);
+                actionsLp.topMargin = (int)(3*density);
+                tile.addView(actions, actionsLp);
+                com.google.android.material.button.MaterialButton replace = new com.google.android.material.button.MaterialButton(this);
+                replace.setText("تبديل"); replace.setTextSize(10f); replace.setMinWidth(0); replace.setMinimumWidth(0);
+                replace.setInsetTop(0); replace.setInsetBottom(0);
+                replace.setPadding((int)(6*density), 0, (int)(6*density), 0);
+                LinearLayout.LayoutParams replaceLp = new LinearLayout.LayoutParams(0, (int)(34*density), 1f);
+                replaceLp.setMarginEnd((int)(3*density));
+                actions.addView(replace, replaceLp);
+                replace.setOnClickListener(v -> startCoverPicker(index));
+                com.google.android.material.button.MaterialButton remove = new com.google.android.material.button.MaterialButton(this);
+                remove.setText("حذف"); remove.setTextSize(10f); remove.setMinWidth(0); remove.setMinimumWidth(0);
+                remove.setInsetTop(0); remove.setInsetBottom(0);
+                remove.setPadding((int)(6*density), 0, (int)(6*density), 0);
+                remove.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFFFE8E8));
+                remove.setTextColor(0xFFC62828);
+                actions.addView(remove, new LinearLayout.LayoutParams(0, (int)(34*density), 1f));
+                remove.setOnClickListener(v -> confirmRemoveCover(index));
+            } else {
+                preview.setImageResource(ImagePlaceholder.cover());
+                preview.setOnClickListener(v -> startCoverPicker(index));
+                TextView add = new TextView(this);
+                add.setText("+ إضافة صورة"); add.setTextColor(0xFF6850A8); add.setTextSize(12f);
+                add.setTypeface(add.getTypeface(), android.graphics.Typeface.BOLD);
+                add.setGravity(android.view.Gravity.CENTER);
+                tile.addView(add, new LinearLayout.LayoutParams(-1, (int)(38*density)));
+                add.setOnClickListener(v -> startCoverPicker(index));
+            }
+            binding.coverGalleryItems.addView(tile);
         }
     }
 
-    private void confirmRemoveCover(int index) {
+    private void startCoverPicker(int replaceIndex) {
+        if (profileCoverUrls.size() >= 5 && replaceIndex < 0) {
+            Toast.makeText(this, "وصلت للحد الأقصى: 5 صور", Toast.LENGTH_LONG).show();
+            return;
+        }
+        pickingCover = true;
+        replacingCoverIndex = replaceIndex;
+        pickImage.launch("image/*");
+    }
+
+    private void showCoverPreview(String url) {
+        if (url == null || url.trim().isEmpty()) return;
+        ImageView image = new ImageView(this);
+        image.setAdjustViewBounds(true);
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        int pad = (int)(12 * getResources().getDisplayMetrics().density);
+        image.setPadding(pad, pad, pad, pad);
+        Glide.with(this).load(url).fitCenter().into(image);
+        new AlertDialog.Builder(this).setView(image).setPositiveButton("إغلاق", null).show();
+    }
+
+        private void confirmRemoveCover(int index) {
         if (index < 0 || index >= profileCoverUrls.size()) return;
         new AlertDialog.Builder(this).setTitle("حذف صورة الغلاف")
                 .setMessage("هل تريد حذف هذه الصورة من صور الغلاف؟")
@@ -565,7 +632,7 @@ public class EditProfileActivity extends ThemedActivity {
     }
 
     private void onImagePicked(Uri uri) {
-        if (uri == null || binding == null) return;
+        if (uri == null || binding == null) { replacingCoverIndex = -1; return; }
         final boolean cover = pickingCover;
         binding.progress.setVisibility(View.VISIBLE);
         c.getIoExecutor().execute(() -> {
@@ -646,6 +713,8 @@ public class EditProfileActivity extends ThemedActivity {
         if (uri == null || binding == null) return;
         binding.progress.setVisibility(View.VISIBLE);
         final boolean cover = pickingCover;
+        final int requestedReplaceIndex = replacingCoverIndex;
+        final ArrayList<String> previousCoverUrls = new ArrayList<>(profileCoverUrls);
         if (cover) {
             AvatarImageLoader.loadMedia(binding.imgCoverPreview, uri, ImagePlaceholder.cover());
         } else {
@@ -665,10 +734,15 @@ public class EditProfileActivity extends ThemedActivity {
                     // so unsaved name/bio edits in this form are not overwritten.
                     MiscDtos.UpdateProfileRequest imagePatch = new MiscDtos.UpdateProfileRequest();
                     if (cover) {
-                        imagePatch.coverUrl = url;
                         ArrayList<String> updatedCovers = new ArrayList<>(profileCoverUrls);
-                        updatedCovers.remove(url); updatedCovers.add(0, url);
+                        if (requestedReplaceIndex >= 0 && requestedReplaceIndex < updatedCovers.size()) {
+                            updatedCovers.set(requestedReplaceIndex, url);
+                        } else {
+                            updatedCovers.remove(url);
+                            updatedCovers.add(0, url);
+                        }
                         while (updatedCovers.size() > 5) updatedCovers.remove(updatedCovers.size() - 1);
+                        imagePatch.coverUrl = updatedCovers.isEmpty() ? url : updatedCovers.get(0);
                         imagePatch.profileCoverUrls = updatedCovers;
                     } else imagePatch.avatarUrl = url;
                     Response<ApiResponse<AuthDtos.UserDto>> saved =
@@ -688,11 +762,21 @@ public class EditProfileActivity extends ThemedActivity {
                         if (cover) {
                             binding.etCover.setText(url);
                             profileCoverUrls.clear();
-                            if (saved.body().data != null && saved.body().data.profileCoverUrls != null)
+                            if (saved.body().data != null && saved.body().data.profileCoverUrls != null
+                                    && !saved.body().data.profileCoverUrls.isEmpty()) {
                                 profileCoverUrls.addAll(saved.body().data.profileCoverUrls);
-                            else profileCoverUrls.add(url);
+                            } else {
+                                profileCoverUrls.addAll(previousCoverUrls);
+                                if (requestedReplaceIndex >= 0 && requestedReplaceIndex < profileCoverUrls.size())
+                                    profileCoverUrls.set(requestedReplaceIndex, url);
+                                else { profileCoverUrls.remove(url); profileCoverUrls.add(0, url); }
+                            }
+                            if (profileCoverUrls.isEmpty()) profileCoverUrls.add(url);
+                            replacingCoverIndex = -1;
                             updateCoverGalleryCount(); refreshCoverGalleryThumbnails();
-                            AvatarImageLoader.loadMedia(binding.imgCoverPreview, url, ImagePlaceholder.cover());
+                            String activeCover = profileCoverUrls.get(0);
+                            binding.etCover.setText(activeCover);
+                            AvatarImageLoader.loadMedia(binding.imgCoverPreview, activeCover, ImagePlaceholder.cover());
                         } else {
                             binding.etAvatar.setText(url);
                             AvatarImageLoader.load(binding.imgAvatarPreview, url);
