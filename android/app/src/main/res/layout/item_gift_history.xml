@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="116dp"
+    android:layout_height="132dp"
     android:layout_margin="4dp"
     android:background="@drawable/bg_list_card"
     android:gravity="center"
@@ -11,8 +11,8 @@
 
     <ImageView
         android:id="@+id/imgGift"
-        android:layout_width="62dp"
-        android:layout_height="62dp"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
         android:contentDescription="@null"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_asset_gift" />
