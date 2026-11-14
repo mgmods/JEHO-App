@@ -651,8 +651,8 @@
 
                     <HorizontalScrollView
                         android:layout_width="match_parent"
-                        android:layout_height="44dp"
-                        android:layout_marginTop="2dp"
+                        android:layout_height="54dp"
+                        android:layout_marginTop="0dp"
                         android:fillViewport="false"
                         android:overScrollMode="never"
                         android:scrollbars="none">
@@ -1354,9 +1354,9 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnFollow"
                         style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-                        android:layout_width="58dp"
-                        android:layout_height="58dp"
-                        android:layout_marginEnd="22dp"
+                        android:layout_width="52dp"
+                        android:layout_height="52dp"
+                        android:layout_marginEnd="12dp"
                         android:layout_weight="0"
                         android:background="@drawable/bg_profile_action_light"
                         android:insetTop="0dp"
@@ -1370,7 +1370,7 @@
                         app:cornerRadius="29dp"
                         app:icon="@drawable/ic_profile_action_follow"
                         app:iconGravity="textStart"
-                        app:iconSize="25dp"
+                        app:iconSize="24dp"
                         app:iconTint="#FFFFFFFF" />
 
                     
@@ -1382,9 +1382,9 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnMessage"
                         style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginHorizontal="22dp"
+                        android:layout_width="52dp"
+                        android:layout_height="52dp"
+                        android:layout_marginHorizontal="12dp"
                         android:layout_weight="0"
                         android:background="@drawable/bg_profile_action_light"
                         android:insetTop="0dp"
@@ -1398,7 +1398,7 @@
                         app:cornerRadius="28dp"
                         app:icon="@drawable/ic_profile_action_message"
                         app:iconGravity="textStart"
-                        app:iconSize="28dp"
+                        app:iconSize="24dp"
                         app:iconTint="#FFFFFFFF" />
 
                     <com.google.android.material.button.MaterialButton
