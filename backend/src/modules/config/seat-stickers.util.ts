@@ -1,6 +1,6 @@
 /**
  * Seat mic reaction stickers — managed from dashboard (AppSetting `seat_stickers`).
- * Defaults point at `/assets/seat-stickers/eXX.gif|webp` on the API origin.
+ * Admin-created catalog only; legacy bundled e01-e74 stickers are retired.
  */
 
 export type SeatStickerItem = {
@@ -72,7 +72,8 @@ function defaultItems(): SeatStickerItem[] {
 
 export function defaultSeatStickersConfig(
   origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
-): SeatStickersConfig {
+ ): SeatStickersConfig {
+  void origin;
   return {
     version: 4,
     enabled: true,
