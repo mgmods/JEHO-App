@@ -88,6 +88,8 @@ export class GiftsService implements OnModuleInit {
   private readonly log = new Logger(GiftsService.name);
   private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
   private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
+  private roomTopCardsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingTopCardsRoomId: string | null = null;
 
   constructor(
     @InjectRepository(Gift) private readonly giftsRepo: Repository<Gift>,
@@ -118,6 +120,24 @@ export class GiftsService implements OnModuleInit {
     private readonly contestsService?: ContestsService,
     @Optional() private readonly hostTarget?: HostTargetService,
   ) {}
+
+  /** Coalesce gift bursts and push a home-feed refresh so TOP cards re-rank immediately. */
+  private scheduleRoomTopCardsRefresh(roomId: string) {
+    if (!this.realtime || !roomId) return;
+    this.pendingTopCardsRoomId = roomId;
+    if (this.roomTopCardsRefreshTimer) clearTimeout(this.roomTopCardsRefreshTimer);
+    this.roomTopCardsRefreshTimer = setTimeout(() => {
+      const sourceRoomId = this.pendingTopCardsRoomId;
+      this.roomTopCardsRefreshTimer = null;
+      this.pendingTopCardsRoomId = null;
+      this.realtime?.emitToAll('room:event', {
+        roomId: 'home',
+        event: 'room:top_cards_changed',
+        payload: { sourceRoomId, updatedAt: new Date().toISOString() },
+        at: new Date().toISOString(),
+      });
+    }, 250);
+  }
 
   async onModuleInit() {
     // Schema-only fix is always safe. Catalog seeds never run against live DB.
@@ -3377,6 +3397,8 @@ export class GiftsService implements OnModuleInit {
       return result;
     });
 
+    if (dto.roomId && !sendResult?.alreadyProcessed) this.scheduleRoomTopCardsRefresh(dto.roomId);
+
     // Process support-chest progress after the gift transaction and gift fan-out
     // complete. This keeps the room reward/opening flow isolated from gift delivery
     // and ensures a chest-side failure cannot roll back or interrupt the sent gift.
@@ -3934,6 +3956,7 @@ export class GiftsService implements OnModuleInit {
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
       return result;
     });
+    if (dto.roomId && !sendResult?.alreadyProcessed) this.scheduleRoomTopCardsRefresh(dto.roomId);
     if (dto.roomId && !sendResult?.alreadyProcessed) {
       try {
         await this.applySupportChestGift(
