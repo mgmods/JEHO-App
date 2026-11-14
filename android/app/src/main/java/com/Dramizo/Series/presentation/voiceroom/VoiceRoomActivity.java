@@ -8453,7 +8453,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void showEmojiPicker() { showEmojiPicker(false); }
 
-    private void showSeatStickerPicker() { showEmojiPicker(true); }
+    private void showSeatStickerPicker() {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                RemoteSeatStickers.refreshBlocking(c);
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) showEmojiPicker(true);
+                });
+            });
+        } catch (Exception ignored) {
+            showEmojiPicker(true);
+        }
+    }
 
     private void showEmojiPicker(boolean seatOnly) {
         Dialog dialog = new Dialog(this, R.style.MikooBottomPanelDialog);
@@ -8483,13 +8495,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         final java.util.List<SeatReactionEmojis.Item> stickerItems =
                 new java.util.ArrayList<>(SeatReactionEmojis.items());
-        if (stickerItems.isEmpty()) {
-            try {
-                AppContainer c = ContainerProvider.from(this);
-                c.getIoExecutor().execute(() -> RemoteSeatStickers.refreshBlocking(c));
-            } catch (Exception ignored) {
-            }
-            Toast.makeText(this, "جاري تحميل ملصقات المقاعد…", Toast.LENGTH_SHORT).show();
+        if (stickerItems.isEmpty() && seatOnly) {
+            Toast.makeText(this, "لا توجد ملصقات مفعّلة حالياً", Toast.LENGTH_SHORT).show();
         }
         String[] emojis = {
                 "😀", "😁", "😂", "🤣", "😃", "😄", "😅", "😆", "😉", "😊", "😋", "😎",
