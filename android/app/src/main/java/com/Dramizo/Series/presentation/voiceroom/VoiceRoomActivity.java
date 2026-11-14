@@ -601,8 +601,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Room id + ViewModel ASAP so network join can overlap with the rest of onCreate.
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(VoiceRoomViewModel.class);
-        // Fail closed on stale sticker data, then load the latest dashboard catalog for this room.
-        SeatReactionEmojis.setFromDto(null);
+        // Restore the last downloaded seat-sticker catalog immediately; refresh silently when opened.
+        RemoteSeatStickers.hydrateFromCache(ContainerProvider.from(this));
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
         // The tapped room card already knows this ID, so show it on first paint instead of
         // waiting for the network join response to carry the same value back.
@@ -8457,37 +8457,32 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void showEmojiPicker() { showEmojiPicker(false); }
 
     private void showSeatStickerPicker() {
+        final AppContainer stickerContainer;
         try {
-            AppContainer c = ContainerProvider.from(this);
-            c.getIoExecutor().execute(() -> {
-                RemoteSeatStickers.refreshBlocking(c);
+            stickerContainer = ContainerProvider.from(this);
+            // Show the persisted catalog immediately; never block the user on a network round-trip.
+            RemoteSeatStickers.hydrateFromCache(stickerContainer);
+            boolean hasCachedStickers = !SeatReactionEmojis.items().isEmpty();
+            if (hasCachedStickers) showEmojiPickerContent(true);
+            if (seatStickerRefreshInFlight) return;
+            seatStickerRefreshInFlight = true;
+            stickerContainer.getIoExecutor().execute(() -> {
+                RemoteSeatStickers.refreshBlocking(stickerContainer);
                 runOnUiThread(() -> {
-                    if (!isFinishing() && !isDestroyed()) showEmojiPicker(true);
+                    seatStickerRefreshInFlight = false;
+                    if (!hasCachedStickers && !isFinishing() && !isDestroyed()) {
+                        showEmojiPickerContent(true);
+                    }
                 });
             });
         } catch (Exception ignored) {
-            showEmojiPicker(true);
+            if (SeatReactionEmojis.items().isEmpty()) showEmojiPickerContent(true);
         }
     }
 
     private void showEmojiPicker(boolean seatOnly) {
         if (seatOnly) {
-            if (seatStickerRefreshInFlight) {
-                Toast.makeText(this, "جارٍ تحديث الملصقات، انتظر لحظة", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            seatStickerRefreshInFlight = true;
-            // Never show a stale catalog after an admin disables or replaces stickers.
-            SeatReactionEmojis.setFromDto(null);
-            AppContainer stickerContainer = ContainerProvider.from(this);
-            stickerContainer.getIoExecutor().execute(() -> {
-                RemoteSeatStickers.refreshBlocking(stickerContainer);
-                runOnUiThread(() -> {
-                    seatStickerRefreshInFlight = false;
-                    if (!isFinishing() && !isDestroyed()) showEmojiPickerContent(true);
-                });
-            });
-            Toast.makeText(this, "جارٍ تحديث الملصقات", Toast.LENGTH_SHORT).show();
+            showSeatStickerPicker();
             return;
         }
         showEmojiPickerContent(false);
