@@ -267,10 +267,15 @@ public final class RoomCardBinder {
             b.itemCard.setBackgroundResource(android.R.color.transparent);
         }
         if (b.imgCardFrame == null) return;
-        // Prefer room frame; fall back to host-equipped mall card (same as in-room header).
-        String url = room != null ? room.roomCardUrl : null;
-        if ((url == null || url.isEmpty()) && room != null && room.host != null) {
-            url = room.host.roomCardUrl;
+        // TOP 1/2/3 is a temporary replacement for the room's own card,
+        // not an extra overlay. When a room loses its TOP rank, its original
+        // room/host card is restored automatically from the same payload.
+        String url = room != null ? room.roomTopFrameUrl : null;
+        if (url == null || url.trim().isEmpty()) {
+            url = room != null ? room.roomCardUrl : null;
+            if ((url == null || url.isEmpty()) && room != null && room.host != null) {
+                url = room.host.roomCardUrl;
+            }
         }
         String key = room != null ? room.id : null;
         String lower = url != null ? url.toLowerCase(Locale.ROOT) : "";
@@ -281,15 +286,10 @@ public final class RoomCardBinder {
         RoomKenarHelper.bind(b.imgCardFrame, b.itemCard, url, key, animated, false);
     }
 
-    /** Independent TOP winner frame layered above the room's own equipped card frame. */
+    /** TOP artwork is now bound as the card frame itself, so never stack a second frame. */
     private static void bindTopFrame(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
         if (b.imgTopFrame == null) return;
-        String url = room != null ? room.roomTopFrameUrl : null;
-        String lower = url != null ? url.toLowerCase(Locale.ROOT) : "";
-        boolean animated = lower.contains(".gif") || lower.contains(".webp")
-                || RoomKenarHelper.isRoomFrameUrl(url);
-        String key = room != null ? room.id + ":top:" + room.roomTopRank : null;
-        RoomKenarHelper.bind(b.imgTopFrame, b.itemCard, url, key, animated, false);
+        RoomKenarHelper.bind(b.imgTopFrame, b.itemCard, null, null, false, false);
     }
 
     private static void bindAvatars(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
