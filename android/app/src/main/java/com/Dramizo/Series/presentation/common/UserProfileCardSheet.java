@@ -105,6 +105,7 @@ public final class UserProfileCardSheet {
         TextView tvPropSupporters = sheet.findViewById(R.id.tvPropSupportersCount);
         TextView tvPropFriends = sheet.findViewById(R.id.tvPropFriendsCount);
         View propFamily = sheet.findViewById(R.id.propFamily);
+        View propSupporters = sheet.findViewById(R.id.propSupporters);
         ImageView imgVipMedal = sheet.findViewById(R.id.imgVipMedal);
         ImageView imgEntryRide = sheet.findViewById(R.id.imgEntryRide);
         ImageView img = sheet.findViewById(R.id.imgUserAvatar);
@@ -494,7 +495,15 @@ public final class UserProfileCardSheet {
                     tvPropFriends.setText(String.valueOf(Math.max(0, u.friendsCount)));
                 }
                 if (tvPropSupporters != null) {
-                    tvPropSupporters.setText(String.valueOf(Math.max(0, u.followersCount)));
+                    tvPropSupporters.setText("…");
+                    container.getIoExecutor().execute(() -> {
+                        Result<List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto>> supportersResult =
+                                ApiCall.execute(container.getGiftApi().supporters(u.id));
+                        activity.runOnUiThread(() -> {
+                            if (tvPropSupporters != null && supportersResult.success && supportersResult.data != null)
+                                tvPropSupporters.setText(String.valueOf(supportersResult.data.size()));
+                        });
+                    });
                 }
                 if (tvPropFamily != null) {
                     if (u.agency != null && u.agency.name != null && !u.agency.name.isEmpty()) {
@@ -557,6 +566,15 @@ public final class UserProfileCardSheet {
                 }
             });
         });
+
+        if (propSupporters != null) {
+            propSupporters.setOnClickListener(v -> {
+                dialog.dismiss();
+                Intent intent = new Intent(activity, com.Dramizo.Series.presentation.profile.SupportersActivity.class);
+                intent.putExtra(ProfileActivity.EXTRA_USER_ID, uid);
+                activity.startActivity(intent);
+            });
+        }
 
         View actProfile = sheet.findViewById(R.id.actProfile);
         if (actProfile != null) {
