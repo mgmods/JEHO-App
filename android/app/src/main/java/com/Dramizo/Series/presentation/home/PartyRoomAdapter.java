@@ -186,6 +186,19 @@ public class PartyRoomAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         return items.size();
     }
 
+    /** True only when the already-rendered rows still match the incoming prefix. */
+    public boolean matchesPrefix(@Nullable List<RoomDtos.RoomDto> data, int count) {
+        if (data == null || count < 0 || count > items.size() || count > data.size()) return false;
+        for (int i = 0; i < count; i++) {
+            RoomDtos.RoomDto current = items.get(i);
+            RoomDtos.RoomDto incoming = data.get(i);
+            if (current == null || incoming == null || !Objects.equals(current.id, incoming.id)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     static class VH extends RecyclerView.ViewHolder {
         final ItemPartyRoomBinding b;
 
@@ -241,6 +254,9 @@ public class PartyRoomAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
                     && Objects.equals(a.title, b.title)
                     && Objects.equals(a.coverUrl, b.coverUrl)
                     && Objects.equals(a.roomCardUrl, b.roomCardUrl)
+                    && Objects.equals(a.roomTopRank, b.roomTopRank)
+                    && Objects.equals(a.roomTopFrameUrl, b.roomTopFrameUrl)
+                    && Objects.equals(a.roomTopPeriod, b.roomTopPeriod)
                     && Objects.equals(a.displayRoomId, b.displayRoomId)
                     && Objects.equals(hostAvatar(a), hostAvatar(b))
                     && Objects.equals(a.status, b.status);
@@ -256,6 +272,9 @@ public class PartyRoomAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
                     || !Objects.equals(a.title, b.title)
                     || !Objects.equals(a.coverUrl, b.coverUrl)
                     || !Objects.equals(a.roomCardUrl, b.roomCardUrl)
+                    || !Objects.equals(a.roomTopRank, b.roomTopRank)
+                    || !Objects.equals(a.roomTopFrameUrl, b.roomTopFrameUrl)
+                    || !Objects.equals(a.roomTopPeriod, b.roomTopPeriod)
                     || !Objects.equals(hostAvatar(a), hostAvatar(b))
                     || !Objects.equals(a.status, b.status);
             if (heavy) return null;
