@@ -495,6 +495,9 @@ public final class GlobalCelebrationToast {
             @Nullable String kind,
             @Nullable String roomId
     ) {
+        // Winner notifications are intentionally disabled: no "حظ سعيد" popup
+        // should appear from any room, home, or realtime event path.
+        if (isLuckyToastKind(kind)) return;
         // Never render the retired gift-send confirmation toast, regardless of caller.
         if ("gift_send".equalsIgnoreCase(kind)) return;
         if (activity == null || activity.isFinishing()) return;
