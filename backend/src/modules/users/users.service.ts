@@ -380,6 +380,7 @@ export class UsersService {
       isSuperAdmin: staffRole === 'super',
       bio: p?.bio ?? user['bio'] ?? null,
       coverUrl: p?.coverUrl ?? null,
+      profileCoverUrls: Array.isArray(p?.profileCoverUrls) ? p.profileCoverUrls : (p?.coverUrl ? [p.coverUrl] : []),
       entryEffectUrl: p?.entryEffectUrl ?? null,
       entryAnimationUrl: p?.entryAnimationUrl ?? null,
       roomCardUrl: p?.roomCardUrl ?? null,
@@ -799,6 +800,13 @@ export class UsersService {
     if (dto.coverUrl !== undefined) {
       this.mediaCleanup.replaceUpload(profile.coverUrl, dto.coverUrl);
       profile.coverUrl = dto.coverUrl;
+    }
+    if (dto.profileCoverUrls !== undefined) {
+      const nextCovers = [...new Set((dto.profileCoverUrls || []).map(url => String(url || '').trim()).filter(Boolean))].slice(0, 5);
+      const oldCovers = Array.isArray(profile.profileCoverUrls) ? profile.profileCoverUrls : [];
+      for (const oldUrl of oldCovers) if (!nextCovers.includes(oldUrl) && oldUrl !== profile.coverUrl) this.mediaCleanup.deleteUploadUrl(oldUrl);
+      profile.profileCoverUrls = nextCovers;
+      if (nextCovers.length && !profile.coverUrl) profile.coverUrl = nextCovers[0];
     }
     if (dto.showOnlineStatus !== undefined) profile.showOnlineStatus = dto.showOnlineStatus;
     if (dto.allowDmFromStrangers !== undefined) {

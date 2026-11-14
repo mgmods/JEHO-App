@@ -47,6 +47,10 @@ export class UserProfile {
   @Column({ type: 'varchar', length: 512, nullable: true })
   coverUrl: string | null;
 
+  /** Up to five static profile cover images owned by this user. */
+  @Column({ type: 'simple-array', nullable: true })
+  profileCoverUrls: string[] | null;
+
   @Column({ type: 'varchar', length: 512, nullable: true })
   entryEffectUrl: string | null;
 

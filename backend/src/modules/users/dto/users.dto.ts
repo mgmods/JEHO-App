@@ -86,6 +86,13 @@ export class UpdateProfileDto {
   @IsString()
   coverUrl?: string;
 
+  @ApiPropertyOptional({ description: 'Up to five static profile cover image URLs owned by this user' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  profileCoverUrls?: string[];
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

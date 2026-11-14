@@ -131,6 +131,7 @@ public final class AuthDtos {
         @SerializedName("mysteriousMode") public Boolean mysteriousMode;
         @SerializedName("mysteriousManEligible") public Boolean mysteriousManEligible;
         @SerializedName("coverUrl") public String coverUrl;
+        @SerializedName("profileCoverUrls") public java.util.List<String> profileCoverUrls;
         @SerializedName("levelBadgeUrl") public String levelBadgeUrl;
         @SerializedName("vipBadgeUrl") public String vipBadgeUrl;
         /** Fixed VIP nobility frame (ud_vip_tou_{n}) for profile/card — not mall wear. */
