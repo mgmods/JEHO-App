@@ -2018,9 +2018,9 @@ public class ProfileActivity extends ThemedActivity {
         stats.setPadding(0, pad, 0, pad);
         addProfileDetailStat(stats, "المتابعون", binding.tvStatFriends.getText().toString(),
                 () -> { if (!id.isEmpty()) UserSocialNav.openFollowers(this, id, viewerId); });
-        addProfileDetailStat(stats, "المعجبون", binding.tvStatFans.getText().toString(),
+        addProfileDetailStat(stats, "المعجبون", binding.tvStatFollowing.getText().toString(),
                 () -> { if (!id.isEmpty()) UserSocialNav.openFollowing(this, id, viewerId); });
-        addProfileDetailStat(stats, "الزوار", binding.tvStatVisitors.getText().toString(),
+        addProfileDetailStat(stats, "الزوار", binding.tvStatFans.getText().toString(),
                 () -> { if (!id.isEmpty()) UserSocialNav.openVisitors(this, id, viewerId); });
         root.addView(stats);
 
@@ -2051,7 +2051,7 @@ public class ProfileActivity extends ThemedActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         scroll.addView(root);
         sheet.setContentView(scroll);
-        sheet.setDraggable(true);
+        sheet.getBehavior().setDraggable(true);
         sheet.show();
     }
 
