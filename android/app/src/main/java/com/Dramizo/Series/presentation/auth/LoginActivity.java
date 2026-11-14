@@ -230,6 +230,9 @@ public class LoginActivity extends ThemedActivity {
         registerMode = register;
         binding.emailLayout.setVisibility(register ? View.VISIBLE : View.GONE);
         binding.confirmPasswordLayout.setVisibility(register ? View.VISIBLE : View.GONE);
+        binding.googleLoginGroup.setVisibility(register ? View.GONE : View.VISIBLE);
+        binding.tvAuthDivider.setVisibility(register ? View.GONE : View.VISIBLE);
+        binding.tvLoginHint.setVisibility(register ? View.GONE : View.VISIBLE);
         binding.usernameLayout.setVisibility(View.GONE);
         binding.identifierLayout.setVisibility(register ? View.GONE : View.VISIBLE);
         binding.btnAuthSubmit.setText(register ? R.string.register : R.string.login);
