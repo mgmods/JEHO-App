@@ -909,7 +909,8 @@ public class ProfileActivity extends ThemedActivity {
             StaffIdentityConfigCache.load(this, () -> {
                 if (binding == null || binding.tvStaffBadge == null || !role.equals(binding.tvStaffBadge.getTag())) return;
                 StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(role);
-                binding.tvStaffBadge.setText(latest.label.isEmpty() ? fallbackLabel : latest.label);
+                binding.tvStaffBadge.setText(StaffRoleHelper.genderizeLabel(
+                        latest.label.isEmpty() ? fallbackLabel : latest.label, user.gender));
                 if (!latest.frameUrl.isEmpty() && binding.imgFrame != null) {
                     try {
                         binding.imgFrame.setVisibility(View.VISIBLE);
