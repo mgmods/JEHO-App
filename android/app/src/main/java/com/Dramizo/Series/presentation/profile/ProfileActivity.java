@@ -992,10 +992,15 @@ public class ProfileActivity extends ThemedActivity {
                     });
         }
         // Refresh from the server for every profile viewer; cache TTL prevents repeated requests.
+        final String renderedBadgeUrl = badgeUrl == null ? "" : badgeUrl;
         AgencyRoleBadgeCache.load(this, () -> runOnUiThread(() -> {
             if (binding == null || isFinishing() || isDestroyed()) return;
-            // Rebind using the latest public role-image URLs without moving the badge slot.
-            bindAgencyRoleBadge(user);
+            AgencyRoleBadgeCache.Badges latest = AgencyRoleBadgeCache.get();
+            String latestUrl = leader ? latest.leader : (host ? latest.host : "");
+            if (!renderedBadgeUrl.equals(latestUrl == null ? "" : latestUrl)) {
+                // Only redraw when the server value actually changed; never recurse on a cache hit.
+                bindAgencyRoleBadge(user);
+            }
         }));
     }
 
