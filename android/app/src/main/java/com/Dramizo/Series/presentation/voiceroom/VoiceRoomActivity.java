@@ -600,6 +600,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Room id + ViewModel ASAP so network join can overlap with the rest of onCreate.
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(VoiceRoomViewModel.class);
+        // Fail closed on stale sticker data, then load the latest dashboard catalog for this room.
+        SeatReactionEmojis.setFromDto(null);
+        AppContainer stickerContainer = ContainerProvider.from(this);
+        stickerContainer.ioExecutor.execute(() -> RemoteSeatStickers.refreshBlocking(stickerContainer));
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
         // The tapped room card already knows this ID, so show it on first paint instead of
         // waiting for the network join response to carry the same value back.
