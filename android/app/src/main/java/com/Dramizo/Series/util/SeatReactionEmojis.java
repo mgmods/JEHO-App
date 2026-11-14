@@ -59,6 +59,7 @@ public final class SeatReactionEmojis {
 
     public static void setFromDto(@Nullable MiscDtos.SeatStickersDto dto) {
         if (dto == null || !dto.enabled || dto.items == null || dto.items.isEmpty()) {
+            CATEGORIES = Collections.emptyList();
             setCatalog(Collections.emptyList());
             return;
         }
