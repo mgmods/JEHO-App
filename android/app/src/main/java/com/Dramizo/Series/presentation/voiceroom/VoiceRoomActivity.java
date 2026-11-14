@@ -8480,7 +8480,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Never show a stale catalog after an admin disables or replaces stickers.
             SeatReactionEmojis.setFromDto(null);
             AppContainer stickerContainer = ContainerProvider.from(this);
-            stickerContainer.ioExecutor.execute(() -> {
+            stickerContainer.getIoExecutor().execute(() -> {
                 RemoteSeatStickers.refreshBlocking(stickerContainer);
                 runOnUiThread(() -> {
                     seatStickerRefreshInFlight = false;
