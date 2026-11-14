@@ -188,18 +188,8 @@ public class ProfileActivity extends ThemedActivity {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
-        // Medal cabinet is shown on the profile itself, beneath the identity and moments rows.
-        // Public/custom IDs are resolved to the actual UUID by ProfileViewModel before loading.
-        if (binding.rowBadges != null) {
-            binding.rowBadges.setVisibility(View.VISIBLE);
-            binding.rowBadges.setOnClickListener(v -> {
-                String profileId = targetUserIdHold[0];
-                if (profileId == null || profileId.trim().isEmpty()) return;
-                Intent medals = new Intent(this, MedalActivity.class);
-                medals.putExtra(EXTRA_USER_ID, profileId);
-                startActivity(medals);
-            });
-        }
+        // The badges-and-medals cabinet is available from the Details page only.
+        if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
         if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
         if (binding.rowProfileAchievementBadges != null) {
             binding.rowProfileAchievementBadges.setVisibility(View.GONE);
@@ -562,7 +552,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.propProfileSupporters.setVisibility(View.VISIBLE);
                 binding.propProfileSupporters.setOnClickListener(v -> openProfileDetails());
             }
-            if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("اللحظات");
+            if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("تفاصيل");
         });
         vm.getError().observe(this, e -> {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
@@ -1762,7 +1752,7 @@ public class ProfileActivity extends ThemedActivity {
                 // Keep the existing earned-medal cabinet populated for backward compatibility.
                 List<com.Dramizo.Series.data.remote.dto.BadgeDto> badges =
                         owned == null ? java.util.Collections.emptyList() : owned;
-                binding.rowBadges.setVisibility(View.VISIBLE);
+                binding.rowBadges.setVisibility(View.GONE);
                 binding.tvBadgeCount.setText(badges.size() + " مكتسبة");
                 binding.rowEarnedBadges.removeAllViews();
                 if (badges.isEmpty()) {
@@ -1775,7 +1765,7 @@ public class ProfileActivity extends ThemedActivity {
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges) {
                         if (badge == null || !badge.earned || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
                         ImageView image = new ImageView(this);
-                        int size = Math.round(50 * getResources().getDisplayMetrics().density);
+                        int size = Math.round(34 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
                         lp.setMargins(0, 0, Math.round(8 * getResources().getDisplayMetrics().density), 0);
                         image.setLayoutParams(lp);
