@@ -17,7 +17,7 @@
     <p class="text-secondary small mb-3">{{ t('seatStickers.hint') }}</p>
     <section class="glass p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <strong>أقسام وحزم الملصقات</strong>
+        <strong>أقسام الملصقات وشروطها</strong>
         <button class="btn btn-outline-light btn-sm" type="button" @click="addCategory">إضافة قسم</button>
       </div>
       <div v-for="(category, index) in categories" :key="category.id" class="row g-2 align-items-end mb-3">
@@ -29,7 +29,8 @@
         <div class="col-md-1"><label class="form-label small">VIP</label><input v-model.number="category.requiredVipLevel" type="number" min="1" max="7" class="form-control form-control-sm" /></div>
         <div class="col-md-1"><div class="form-check"><input v-model="category.isActive" class="form-check-input" type="checkbox" /><label class="form-check-label small">نشط</label></div><button class="btn btn-link btn-sm text-danger px-0" @click="categories.splice(index,1)">حذف</button></div>
         <div class="col-md-3"><label class="form-label small">الفئة</label><select v-model="category.audience" class="form-select form-select-sm"><option value="all">الجميع</option><option value="male">الشباب</option><option value="female">البنات</option></select></div>
-        <div class="col-md-3"><label class="form-label small">رابط أيقونة القسم</label><input v-model="category.iconUrl" class="form-control form-control-sm" placeholder="/uploads/..." /></div>
+        <div class="col-md-3"><label class="form-label small">رابط أيقونة القسم</label><input v-model="category.iconUrl" class="form-control form-control-sm" placeholder="https://... أو /uploads/..." />
+        <div class="col-md-3"><label class="form-label small">رفع أيقونة القسم</label><input type="file" accept="image/*" class="form-control form-control-sm" @change="(e) => onCategoryIcon(e, category)" /></div></div>
         <div class="col-md-3"><div class="form-check"><input v-model="category.requiresCp" class="form-check-input" type="checkbox" /><label class="form-check-label small">يشترط CP فعال</label></div></div>
       </div>
     </section>
@@ -37,7 +38,7 @@
     <LoadingSpinner v-if="loading" />
     <template v-else>
       <div v-if="!rows.length" class="glass p-4 empty-state mb-3">{{ t('seatStickers.empty') }}</div>
-      <div class="glass p-3 mb-3"><div class="form-check form-switch"><input id="seat-stickers-enabled" v-model="enabled" class="form-check-input" type="checkbox" /><label class="form-check-label" for="seat-stickers-enabled">تفعيل ملصقات المقاعد والإيموجيات المتحركة</label></div><small class="text-secondary">عند الإيقاف تختفي جميع الملصقات من التطبيق.</small></div>
+      <div class="glass p-3 mb-3"><div class="form-check form-switch"><input id="seat-stickers-enabled" v-model="enabled" class="form-check-input" type="checkbox" /><label class="form-check-label" for="seat-stickers-enabled">تفعيل الملصقات</label></div><small class="text-secondary">عند الإيقاف تختفي جميع الملصقات من التطبيق.</small></div>
       <div class="sticker-grid">
         <article v-for="(row, idx) in rows" :key="row.id || row.key || idx" class="glass p-3 sticker-card">
           <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
@@ -64,6 +65,8 @@
           <label class="form-label small mb-1">الفئة</label><select v-model="row.audience" class="form-select form-select-sm mb-2"><option value="all">الجميع</option><option value="male">الشباب</option><option value="female">البنات</option></select>
           <label class="form-label small mb-1">مستوى VIP المطلوب</label><input v-model.number="row.requiredVipLevel" type="number" min="1" max="7" class="form-control form-control-sm mb-2" />
           <div class="form-check mb-2"><input v-model="row.requiresCp" class="form-check-input" type="checkbox" /><label class="form-check-label small">يشترط علاقة CP فعالة</label></div>
+          <label class="form-label small mb-1">رابط الملصق (اختياري بدل الرفع)</label>
+          <input v-model.trim="row.url" class="form-control form-control-sm mb-2" placeholder="https://... أو /uploads/..." />
           <label class="form-label small mb-1">{{ t('seatStickers.file') }}</label>
           <input
             type="file"
@@ -161,6 +164,31 @@ async function load() {
   }
 }
 
+async function onCategoryIcon(e, category) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    error.value = 'اختر صورة صالحة لأيقونة القسم.'
+    e.target.value = ''
+    return
+  }
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+  } else {
+    const url = data?.url || data?.data?.url || ''
+    if (!url) {
+      error.value = 'لم يُرجع الخادم رابط الصورة.'
+      toast().danger(error.value)
+    } else {
+      category.iconUrl = absUrl(url)
+      toast().success('تم رفع أيقونة القسم. احفظ التغييرات لتثبيتها.')
+    }
+  }
+  e.target.value = ''
+}
+
 function addCategory() {
   const id = 'category' + Date.now().toString(36)
   categories.value.push({ id, name: 'ملصقات جديدة', sortOrder: categories.value.length + 1, isActive: true, accessType: 'free', priceCoins: 0, durationDays: 0, audience: 'all', requiredVipLevel: 1, requiresCp: false, iconUrl: '' })
@@ -216,8 +244,13 @@ async function save() {
       requiresCp: r.requiresCp === true,
       categoryId: r.categoryId || categories.value[0]?.id || 'male',
     }))
+  const normalizedCategories = categories.value
+    .filter((x) => x && x.id !== 'classic' && String(x.name || '').trim())
+    .map((x, i) => ({ ...x, id: String(x.id || ('category' + (i + 1))).trim().toLowerCase(), name: String(x.name).trim(), sortOrder: i + 1 }))
+  const validIds = new Set(normalizedCategories.map((x) => x.id))
+  const safeItems = items.filter((item) => validIds.has(item.categoryId))
   const payload = {
-    seat_stickers: JSON.stringify({ version: 4, enabled: enabled.value, categories: categories.value.filter((x) => x.id !== 'classic').map((x, i) => ({ ...x, id: String(x.id || ('category' + (i + 1))).trim().toLowerCase(), sortOrder: i + 1 })), items }),
+    seat_stickers: JSON.stringify({ version: 4, enabled: enabled.value, categories: normalizedCategories, items: safeItems }),
   }
   const { error: err } = await settingsApi.update(payload)
   saving.value = false
