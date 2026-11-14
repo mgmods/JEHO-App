@@ -967,6 +967,7 @@ public class ProfileActivity extends ThemedActivity {
                 return;
             }
             profileAgencyVisibleBeforeDetails = true;
+            profileAgencyVisibleBeforeDetails = true;
             binding.rowProfileAgency.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
             if (binding.tvAgencyName != null) {
                 binding.tvAgencyName.setText(club.agencyName == null || club.agencyName.trim().isEmpty()
@@ -1647,6 +1648,7 @@ public class ProfileActivity extends ThemedActivity {
             binding.imgCpLevelIcon.setVisibility(View.GONE);
         }
         if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.VISIBLE);
+        profileCpVisibleBeforeDetails = false;
         profileCpVisibleBeforeDetails = false;
         if (binding.rowProfileCpCv != null) {
             binding.rowProfileCpCv.setVisibility(View.GONE);
