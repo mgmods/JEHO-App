@@ -3227,11 +3227,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         overflow.setOrientation(LinearLayout.VERTICAL);
         overflow.setGravity(android.view.Gravity.RIGHT);
         overflow.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        // The bubble is capped at 340dp; subtract avatar, gap and horizontal padding.
+        // Give every badge row the exact remaining width so Android cannot wrap a
+        // single badge unexpectedly inside an already-created row.
+        overflow.setLayoutParams(new LinearLayout.LayoutParams(
+                dp(262), LinearLayout.LayoutParams.WRAP_CONTENT));
         TextView chatName = row.findViewById(R.id.tvChatName);
         float measuredName = chatName != null && chatName.getText() != null
                 ? chatName.getPaint().measureText(chatName.getText().toString()) : dp(72);
         int firstLineLimit = Math.max(dp(42), dp(270) - Math.min(dp(116), (int) measuredName) - dp(18));
-        int overflowLineLimit = dp(282);
+        int overflowLineLimit = dp(262);
         int[] inlineUsed = new int[] { 0 };
         int[] overflowUsed = new int[] { 0 };
         LinearLayout[] overflowLine = new LinearLayout[] { null };
@@ -3349,7 +3354,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     .fitCenter().into(medal);
             addRoomChatBadge(inline, overflow, medal, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
-        inline.setVisibility(total > 0 ? View.VISIBLE : View.GONE);
+        inline.setVisibility(View.GONE);
         overflow.setVisibility(overflow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
     }
 
@@ -11895,7 +11900,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
-    /** Lucky-win announcement: the dashboard-controlled top toast is the only toast surface. */
+    /** Lucky-win toast intentionally removed: no "حظ سعيد" popup is shown in rooms. */
     public void showLuckyResultToast(
             @Nullable String displayName,
             @Nullable String avatarUrl,
@@ -11903,18 +11908,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int vipLevel,
             @Nullable String message
     ) {
-        if (areCelebrationPopupsMuted() || binding == null) return;
-        String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
-        String who = displayName != null && !displayName.trim().isEmpty()
-                ? displayName.trim() : "مستخدم";
-        String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
-        // Do not use the legacy mid-room ComingMsgView. Keep the compact top toast as the
-        // visible announcement, so this path cannot silently degrade to chat-only output.
-        GlobalCelebrationToast.show(
-                this, who, msg, safeAvatar, null,
-                "room-result-" + who + "-" + System.currentTimeMillis(),
-                28, 0d, 0L, who, "lucky_hit", null);
-        if (roomBannerEnabled()) appendGameCelebrationLine(msg, null);
+        // Lucky results remain reflected by the wallet/reward flow; no toast/banner.
     }
 
     /** World celebration while inside a room — Migo bubble (name/avatar/game/win) + chat. */
@@ -12443,50 +12437,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return collectOccupiedMicUserIds();
     }
 
-    /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
-    public void showLuckyHitBanner(@Nullable String senderId, @Nullable String displayName, @Nullable String avatarUrl,
-                                   long wonCoins, double multiplier, @Nullable String eventKey) {
-        // Only positive payouts show the lucky toast; losses stay silent.
-        if (wonCoins <= 0) return;
-
-        String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
-        String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
-        // Keep the lucky-win announcement and multiplier, but never expose the
-        // amount credited to the winner inside the live room.
-        String line;
-        if (multiplier > 0d && multiplier < 1d) {
-            line = "مردود ×" + formatLuckyMultiplier(multiplier);
-        } else if (multiplier <= 0d) {
-            line = "مردود";
-        } else {
-            line = "ضرب حظه وربح ×" + formatLuckyMultiplier(multiplier);
-        }
-        String key = eventKey == null || eventKey.trim().isEmpty()
-                ? "lucky-room-hit-" + System.currentTimeMillis() : eventKey.trim();
-        boolean highWin = GlobalCelebrationToast.isHighWin(multiplier, wonCoins);
-        boolean isWinner = senderId != null && myUserId != null && sameUser(senderId, myUserId);
-        if (highWin) {
-            // Every member of this room gets the top high-win announcement.
-            GlobalCelebrationToast.show(
-                    this, who, line, safeAvatar, null, key,
-                    28, Math.max(0d, multiplier), 0L, who,
-                    "lucky_hit_high", roomId);
-            // Only the sender's own device gets the additional center celebration.
-            // Reuse the event key so the toast queue can pair the two placements safely.
-            if (isWinner) {
-                GlobalCelebrationToast.showRoomCenter(
-                        this, who, line, safeAvatar, null, key,
-                        Math.max(0d, multiplier), 0L, who,
-                        "lucky_hit_high", roomId);
-            }
-        } else {
-            // Ordinary wins/returns stay in this room and never become app-wide banners.
-            String kind = multiplier > 0d && multiplier < 1d
-                    ? "lucky_hit_return" : "lucky_hit_normal";
-            GlobalCelebrationToast.show(
-                    this, who, line, safeAvatar, null, key,
-                    28, Math.max(0d, multiplier), 0L, who, kind, roomId);
-        }
+    /** Lucky-win notification removed at the room surface as requested. */
+    public void showLuckyHitBanner(@Nullable String senderId, @Nullable String displayName,
+                                   @Nullable String avatarUrl, long wonCoins,
+                                   double multiplier, @Nullable String eventKey) {
+        // Deliberately silent: do not show the "حظ سعيد" winner toast.
     }
 
     private static String formatLuckyMultiplier(double multiplier) {
