@@ -2859,7 +2859,10 @@ export class AdminService {
             prevVer = 0;
           }
         }
-        clean.version = prevVer + 1;
+        // v4 is the first dashboard-managed sticker catalog format. Never
+        // downgrade a fresh save to v1 when the setting row is missing/legacy:
+        // the next dashboard load treats versions below 4 as retired bundled data.
+        clean.version = Math.max(4, prevVer + 1);
         clean.updatedAt = new Date().toISOString();
         rememberSeatStickersCache(clean);
         nextValue = JSON.stringify(clean);
