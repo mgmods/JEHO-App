@@ -246,6 +246,15 @@ public class ProfileActivity extends ThemedActivity {
                 UserSocialNav.openVisitors(this, id, myId);
             });
         }
+        if (binding.sectionProfileSupporters != null) {
+            binding.sectionProfileSupporters.setOnClickListener(v -> {
+                String id = targetUserIdHold[0];
+                if (id == null || id.trim().isEmpty()) return;
+                Intent supporters = new Intent(this, SupportersActivity.class);
+                supporters.putExtra(EXTRA_USER_ID, id);
+                startActivity(supporters);
+            });
+        }
         // The supporters count opens the actual gift-supporters list.
         if (binding.propProfileSupporters != null) {
             binding.propProfileSupporters.setOnClickListener(v -> {
