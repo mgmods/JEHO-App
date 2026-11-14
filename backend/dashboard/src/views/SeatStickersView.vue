@@ -145,10 +145,10 @@ async function load() {
   }
   const cfg = parseSetting(data, 'seat_stickers')
   enabled.value = cfg?.enabled !== false
-  categories.value = Array.isArray(cfg?.categories) ? cfg.categories.filter((x) => x && x.id !== 'classic').map((x, i) => ({ ...x, sortOrder: Number(x.sortOrder) || i + 1 })) : []
-  if (cfg && Array.isArray(cfg.items) && cfg.items.length) {
-    const legacyCatalog = Number(cfg.version || 0) < 4
-    rows.value = cfg.items.filter((r) => r && r.categoryId !== 'classic' && !(legacyCatalog && /^e(?:0[1-9]|[1-6][0-9]|7[0-4])$/i.test(String(r.key || '')))).map((r, i) => ({
+  const legacyCatalog = Number(cfg?.version || 0) < 4
+  categories.value = legacyCatalog ? [] : (Array.isArray(cfg?.categories) ? cfg.categories.filter((x) => x && x.id !== 'classic').map((x, i) => ({ ...x, sortOrder: Number(x.sortOrder) || i + 1 })) : [])
+  if (!legacyCatalog && cfg && Array.isArray(cfg.items) && cfg.items.length) {
+    rows.value = cfg.items.filter((r) => r && r.categoryId !== 'classic').map((r, i) => ({
       id: r.id || r.key || `s${i + 1}`,
       key: r.key || '',
       url: r.url || '',
