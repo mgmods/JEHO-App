@@ -3354,8 +3354,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     .fitCenter().into(medal);
             addRoomChatBadge(inline, overflow, medal, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
-        inline.setVisibility(View.GONE);
-        overflow.setVisibility(overflow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+        inline.setVisibility(inline.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+        overflow.removeAllViews();
+        overflow.setVisibility(View.GONE);
     }
 
     private void addRoomChatBadge(
