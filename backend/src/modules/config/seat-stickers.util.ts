@@ -145,16 +145,34 @@ export function sanitizeSeatStickersConfig(
       requiresCp: row.requiresCp === true,
     }];
   });
-  // One-time migration: discard the entire pre-v4 catalog (including its old sections).
-  // After the dashboard saves v4, admins can create any fresh key/name/category.
+
+  // Never silently erase a sticker because its category was omitted, renamed,
+  // or supplied by an older dashboard. Keep every valid media URL visible by
+  // attaching orphaned items to a safe general category.
   const legacyCatalog = Math.floor(Number(obj.version) || 0) < 4;
+  if (!legacyCatalog && items.length) {
+    if (!categories.length) {
+      const id = 'general';
+      categories.push({
+        id, name: 'عام', sortOrder: 1, isActive: true, accessType: 'free',
+        priceCoins: 0, durationDays: 0, audience: 'all',
+        requiredVipLevel: 1, requiresCp: false,
+      });
+      categorySeen.add(id);
+    }
+    const fallbackCategoryId = categories[0].id;
+    for (const item of items) {
+      if (!item.categoryId || !categorySeen.has(item.categoryId)) {
+        item.categoryId = fallbackCategoryId;
+      }
+    }
+  }
+
+  // Pre-v4 data is intentionally migrated only when it is the old bundled
+  // catalog. A v4 dashboard save is always retained, including URL-only items.
   if (legacyCatalog) {
     categories.splice(0, categories.length);
     items.splice(0, items.length);
-  } else {
-    for (let i = items.length - 1; i >= 0; i--) {
-      if (!categorySeen.has(items[i].categoryId)) items.splice(i, 1);
-    }
   }
   items.sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
   return {
