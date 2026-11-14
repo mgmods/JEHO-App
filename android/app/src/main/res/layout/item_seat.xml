@@ -126,8 +126,8 @@
         <!-- Reaction ABOVE frame/badge so stickers are never hidden by wear. -->
         <ImageView
             android:id="@+id/imgSeatReaction"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
             android:layout_gravity="center"
             android:contentDescription="@null"
             android:elevation="8dp"
@@ -136,8 +136,8 @@
 
         <com.airbnb.lottie.LottieAnimationView
             android:id="@+id/lottieSeatReaction"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
             android:layout_gravity="center"
             android:elevation="8dp"
             android:scaleType="centerInside"
