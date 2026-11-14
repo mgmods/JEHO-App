@@ -1761,9 +1761,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.rowEarnedBadges.removeAllViews();
                 if (badges.isEmpty()) {
                     binding.rowEarnedBadges.setVisibility(View.GONE);
-                    binding.tvBadgesEmpty.setVisibility(View.GONE);
                 } else {
-                    binding.tvBadgesEmpty.setVisibility(View.GONE);
                     binding.rowEarnedBadges.setVisibility(View.VISIBLE);
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges) {
                         if (badge == null || !badge.earned || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
