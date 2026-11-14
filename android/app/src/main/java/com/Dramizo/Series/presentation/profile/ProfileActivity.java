@@ -1750,20 +1750,18 @@ public class ProfileActivity extends ThemedActivity {
                 // Keep the existing earned-medal cabinet populated for backward compatibility.
                 List<com.Dramizo.Series.data.remote.dto.BadgeDto> badges =
                         owned == null ? java.util.Collections.emptyList() : owned;
-                binding.rowBadges.setVisibility(View.GONE);
-                binding.tvBadgeCount.setText(badges.size() + " مكتسبة");
+                binding.rowBadges.setVisibility(badges.isEmpty() ? View.GONE : View.VISIBLE);
                 binding.rowEarnedBadges.removeAllViews();
                 if (badges.isEmpty()) {
                     binding.rowEarnedBadges.setVisibility(View.GONE);
-                    binding.tvBadgesEmpty.setVisibility(View.VISIBLE);
-                    binding.tvBadgesEmpty.setText("لا توجد ميداليات مكتسبة بعد");
+                    binding.tvBadgesEmpty.setVisibility(View.GONE);
                 } else {
                     binding.tvBadgesEmpty.setVisibility(View.GONE);
                     binding.rowEarnedBadges.setVisibility(View.VISIBLE);
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges) {
                         if (badge == null || !badge.earned || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
                         ImageView image = new ImageView(this);
-                        int size = Math.round(34 * getResources().getDisplayMetrics().density);
+                        int size = Math.round(40 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
                         lp.setMargins(0, 0, Math.round(8 * getResources().getDisplayMetrics().density), 0);
                         image.setLayoutParams(lp);
@@ -1945,25 +1943,7 @@ public class ProfileActivity extends ThemedActivity {
         }
 
         if (!profileDetailsViewsAttached) {
-            // Reuse the existing gift-history cabinet and earned-medals strip, preserving
-            // their original adapters, visuals and click behavior.
-            View giftHistory = binding.recyclerProfileGiftHistory == null
-                    ? null : (View) binding.recyclerProfileGiftHistory.getParent();
-            if (giftHistory != null && giftHistory.getParent() instanceof ViewGroup) {
-                ((ViewGroup) giftHistory.getParent()).removeView(giftHistory);
-                panel.addView(giftHistory, new android.widget.LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            }
-            if (binding.rowProfileAchievementBadges != null) {
-                View badges = binding.rowProfileAchievementBadges;
-                if (badges.getParent() instanceof ViewGroup) {
-                    ((ViewGroup) badges.getParent()).removeView(badges);
-                }
-                badges.setVisibility(View.VISIBLE);
-                panel.addView(badges, new android.widget.LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            }
-
+            // Details order: moments first, then the existing gift-history section.
             TextView moments = new TextView(this);
             moments.setText("اللحظات  ›");
             moments.setTextColor(0xFFFFFFFF);
@@ -1980,7 +1960,16 @@ public class ProfileActivity extends ThemedActivity {
             moments.setOnClickListener(v -> openProfileMomentsLegacy());
             panel.addView(moments, new android.widget.LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            View giftHistory = binding.recyclerProfileGiftHistory == null
+                    ? null : (View) binding.recyclerProfileGiftHistory.getParent();
+            if (giftHistory != null && giftHistory.getParent() instanceof ViewGroup) {
+                ((ViewGroup) giftHistory.getParent()).removeView(giftHistory);
+                panel.addView(giftHistory, new android.widget.LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
             profileDetailsViewsAttached = true;
+        }
         }
 
         if (binding.recyclerProfileGiftHistory != null
