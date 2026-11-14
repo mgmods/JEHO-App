@@ -191,9 +191,14 @@ public class ProfileActivity extends ThemedActivity {
         // Medal cabinet is shown on the profile itself, beneath the identity and moments rows.
         // Public/custom IDs are resolved to the actual UUID by ProfileViewModel before loading.
         if (binding.rowBadges != null) {
-            // The reference keeps medals in the compact strip under the ID.
-            binding.rowBadges.setVisibility(View.GONE);
-            binding.rowBadges.setOnClickListener(null);
+            binding.rowBadges.setVisibility(View.VISIBLE);
+            binding.rowBadges.setOnClickListener(v -> {
+                String profileId = targetUserIdHold[0];
+                if (profileId == null || profileId.trim().isEmpty()) return;
+                Intent medals = new Intent(this, MedalActivity.class);
+                medals.putExtra(EXTRA_USER_ID, profileId);
+                startActivity(medals);
+            });
         }
         if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
         if (binding.rowProfileAchievementBadges != null) {
@@ -248,15 +253,7 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
         // The supporters count opens the actual gift-supporters list.
-        if (binding.propProfileSupporters != null) {
-            binding.propProfileSupporters.setOnClickListener(v -> {
-                String id = targetUserIdHold[0];
-                if (id == null || id.trim().isEmpty()) return;
-                Intent moments = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
-                moments.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, id);
-                startActivity(moments);
-            });
-        }
+        if (binding.propProfileSupporters != null) binding.propProfileSupporters.setOnClickListener(v -> openProfileMoments());
         if (binding.propProfileFriends != null) {
             binding.propProfileFriends.setOnClickListener(v -> {
                 String id = targetUserIdHold[0];
@@ -597,23 +594,19 @@ public class ProfileActivity extends ThemedActivity {
 
             // Only show the agency/family tile when the backend confirms an active
             // membership. Deleted or suspended agencies must disappear from every profile.
-            boolean hasActiveAgency = user.agency != null
-                    && user.agency.id != null && !user.agency.id.trim().isEmpty()
-                    && user.agency.name != null && !user.agency.name.trim().isEmpty();
-            String agencyId = hasActiveAgency ? user.agency.id : null;
+            // Profile tabs are fixed: ملكية / لحظاتي. Agency navigation remains available
+            // from the dedicated agency strip elsewhere, not by replacing the tab label.
             if (binding.propProfileFamily != null) {
-                binding.propProfileFamily.setVisibility(hasActiveAgency ? View.VISIBLE : View.GONE);
+                binding.propProfileFamily.setVisibility(View.VISIBLE);
+                binding.propProfileFamily.setOnClickListener(v -> showProfileProperty());
             }
-            if (binding.tvProfileAgencyName != null) {
-                binding.tvProfileAgencyName.setText(hasActiveAgency
-                        ? user.agency.name.trim() : "");
+            if (binding.tvProfileAgencyName != null) binding.tvProfileAgencyName.setText("ملكية");
+            if (binding.propProfileSupporters != null) {
+                binding.propProfileSupporters.setVisibility(View.VISIBLE);
+                binding.propProfileSupporters.setOnClickListener(v -> openProfileMoments());
             }
-            UserSocialNav.bindFamilyClick(
-                    this,
-                    binding.propProfileFamily,
-                    agencyId,
-                    null);
-            bindAgencyStrip(hasActiveAgency ? user.agency : null, user.agencyClub);
+            if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("لحظاتي");
+            if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(View.GONE);
         });
         vm.getError().observe(this, e -> {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
@@ -1984,5 +1977,23 @@ public class ProfileActivity extends ThemedActivity {
                 .show();
     }
 
+
+    private void openProfileMoments() {
+        String id = targetUserIdHold[0];
+        if (id == null || id.trim().isEmpty()) return;
+        Intent moments = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
+        moments.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, id);
+        startActivity(moments);
+    }
+
+    private void showProfileProperty() {
+        if (binding == null) return;
+        if (binding.rowProfileCpCv != null) {
+            binding.rowProfileCpCv.setVisibility(binding.rowProfileCpCv.getVisibility() == View.VISIBLE
+                    ? View.VISIBLE : View.VISIBLE);
+        }
+        if (binding.rowGiftHistory != null) binding.rowGiftHistory.setVisibility(View.VISIBLE);
+        if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.VISIBLE);
+    }
 
 }
