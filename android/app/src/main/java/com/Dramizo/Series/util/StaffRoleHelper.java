@@ -75,13 +75,15 @@ public final class StaffRoleHelper {
         boolean male = gender != null && ("male".equalsIgnoreCase(gender.trim())
                 || "m".equalsIgnoreCase(gender.trim()) || "ذكر".equals(gender.trim()));
         if (male) {
-            value = value.replace("مضيفة", "مضيف").replace("مضيفـة", "مضيف")
+            return value.replace("مضيفة", "مضيف").replace("مضيفـة", "مضيف")
                     .replace("قائدة", "قائد").replace("مديرة", "مدير").replace("مشرفة", "مشرف");
-        } else if (female) {
-            value = value.replace("مضيف وكالة", "مضيفة وكالة").replace("مضيف", "مضيفة")
-                    .replace("قائد وكالة", "قائدة وكالة").replace("قائد", "قائدة")
-                    .replace("مدير وكالة", "مديرة وكالة").replace("مدير", "مديرة")
-                    .replace("مشرف", "مشرفة");
+        }
+        if (female) {
+            // Avoid re-processing the ة added by an earlier replacement.
+            return value.replaceAll("مضيف(?!ة)", "مضيفة")
+                    .replaceAll("قائد(?!ة)", "قائدة")
+                    .replaceAll("مدير(?!ة)", "مديرة")
+                    .replaceAll("مشرف(?!ة)", "مشرفة");
         }
         return value;
     }
