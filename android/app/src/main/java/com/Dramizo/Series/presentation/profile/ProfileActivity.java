@@ -962,6 +962,7 @@ public class ProfileActivity extends ThemedActivity {
         if (binding == null || binding.rowProfileAgency == null) return;
         if (agency == null || agency.name == null || agency.name.trim().isEmpty()) {
             if (club == null || club.label == null || club.label.trim().isEmpty()) {
+                profileAgencyVisibleBeforeDetails = false;
                 binding.rowProfileAgency.setVisibility(View.GONE);
                 return;
             }
@@ -991,7 +992,8 @@ public class ProfileActivity extends ThemedActivity {
             });
             return;
         }
-        binding.rowProfileAgency.setVisibility(View.VISIBLE);
+        profileAgencyVisibleBeforeDetails = true;
+        binding.rowProfileAgency.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
         if (binding.tvAgencyName != null) {
             binding.tvAgencyName.setText(agency.name.trim());
         }
@@ -1536,7 +1538,8 @@ public class ProfileActivity extends ThemedActivity {
         binding.tvProfileCpCvLevel.setText("Lv." + Math.max(1, level));
         binding.tvProfileCpCvDays.setText("علاقة نشطة");
         applyCpCardBackground("");
-        binding.rowProfileCpCv.setVisibility(View.VISIBLE);
+        profileCpVisibleBeforeDetails = true;
+        binding.rowProfileCpCv.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
         if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
         binding.rowProfileCp.setVisibility(View.VISIBLE);
         binding.btnCpRequest.setVisibility(View.GONE);
