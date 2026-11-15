@@ -53,9 +53,9 @@ const actions = [
   { key: 'tools', label: 'الأدوات' },
   { key: 'settings', label: 'الإعدادات' },
   { key: 'support', label: 'الدعم' },
-  { key: 'follow', label: 'زر المتابعة في الملف الشخصي' },
-  { key: 'message', label: 'زر المراسلة في الملف الشخصي' },
-  { key: 'room', label: 'زر الغرفة في الملف الشخصي' },
+  { key: 'profileFollow', label: 'أيقونة المتابعة السفلية في الملف الشخصي' },
+  { key: 'profileMessage', label: 'أيقونة المراسلة السفلية في الملف الشخصي' },
+  { key: 'profileRoom', label: 'أيقونة الغرفة السفلية في الملف الشخصي' },
 ]
 const form = reactive(Object.fromEntries(actions.map(x => [x.key, ''])))
 const baseConfig = ref({ version: 1 })
