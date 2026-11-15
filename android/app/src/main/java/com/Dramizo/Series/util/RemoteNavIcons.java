@@ -7,6 +7,7 @@ import android.os.Looper;
 import android.widget.ImageView;
 
 import androidx.annotation.Nullable;
+import com.google.android.material.button.MaterialButton;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
@@ -142,6 +143,39 @@ public final class RemoteNavIcons {
                 view.setImageResource(fallbackRes);
             }
         }
+    }
+
+    /** Bind a dashboard-uploaded icon to a sticky profile action button. */
+    public static void bindProfileAction(@Nullable MaterialButton button, @Nullable String actionKey, int fallbackRes) {
+        if (button == null) return;
+        MiscDtos.NavIconsDto cfg = cached;
+        String raw = cfg != null && cfg.profileActions != null && actionKey != null ? cfg.profileActions.get(actionKey) : null;
+        if (raw == null || raw.trim().isEmpty()) { button.setIconResource(fallbackRes); return; }
+        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(raw.trim()));
+        button.setIconTint(null);
+        if (isSvgUrl(url)) {
+            button.setTag(R.id.tag_image_url, url);
+            SVG_IO.execute(() -> {
+                Drawable drawable = decodeRemoteSvg(url);
+                MAIN.post(() -> {
+                    if (!url.equals(button.getTag(R.id.tag_image_url))) return;
+                    if (drawable != null) button.setIcon(drawable); else button.setIconResource(fallbackRes);
+                });
+            });
+            return;
+        }
+        Object previous = button.getTag(R.id.tag_image_url);
+        if (previous instanceof String && url.equals(previous) && button.getIcon() != null) return;
+        button.setTag(R.id.tag_image_url, url);
+        try {
+            Glide.with(button).load(url).apply(MediaAssetSync.requestOptions()).dontAnimate().fitCenter()
+                    .into(new com.bumptech.glide.request.target.CustomTarget<Drawable>() {
+                        @Override public void onResourceReady(Drawable resource, @Nullable com.bumptech.glide.request.transition.Transition<? super Drawable> transition) {
+                            if (url.equals(button.getTag(R.id.tag_image_url))) button.setIcon(resource);
+                        }
+                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                    });
+        } catch (Exception ignored) { button.setIconResource(fallbackRes); }
     }
 
     /** Bind a dashboard-managed icon for one of the chat inbox channels. */
