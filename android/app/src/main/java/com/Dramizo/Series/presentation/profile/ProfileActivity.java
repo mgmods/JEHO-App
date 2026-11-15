@@ -887,8 +887,7 @@ public class ProfileActivity extends ThemedActivity {
 
         String role = "";
         String fallbackLabel = "";
-        if (agency != null && agency.id != null && !agency.id.trim().isEmpty()
-                && agency.name != null && !agency.name.trim().isEmpty()) {
+        if (agency != null && agency.id != null && !agency.id.trim().isEmpty()) {
             role = agency.role == null ? "" : agency.role.trim().toLowerCase(Locale.US);
             if (role.contains("pending") || role.contains("request")) {
                 binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
@@ -900,8 +899,8 @@ public class ProfileActivity extends ThemedActivity {
             else fallbackLabel = "مضيف";
         } else if (club != null && club.label != null && !club.label.trim().isEmpty()) {
             role = club.role == null ? "" : club.role.trim().toLowerCase(Locale.US);
-            fallbackLabel = "owner".equals(role) ? "قائد الوكالة"
-                    : ("host".equals(role) ? "مضيف" : club.label.trim());
+            fallbackLabel = "owner".equals(role) || "leader".equals(role) ? "قائد الوكالة"
+                    : ("host".equals(role) || "member".equals(role) ? "مضيف" : club.label.trim());
         } else {
             binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
             return;
