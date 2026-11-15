@@ -485,9 +485,9 @@
 
                         <ImageView
                             android:id="@+id/imgVipMedal"
-                            android:layout_width="22dp"
-                            android:layout_height="14dp"
-                            android:layout_marginStart="5dp"
+                            android:layout_width="18dp"
+                            android:layout_height="13dp"
+                            android:layout_marginStart="4dp"
                             android:adjustViewBounds="true"
                             android:contentDescription="VIP"
                             android:scaleType="fitCenter"
@@ -509,10 +509,10 @@
 
                         <ImageView
                             android:id="@+id/imgRankIcon"
-                            android:layout_width="12dp"
-                            android:layout_height="12dp"
-                            android:layout_marginStart="4dp"
-                            android:contentDescription="الترتيب"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_marginStart="3dp"
+                            android:contentDescription="الشعبية"
                             android:scaleType="fitCenter"
                             android:src="@drawable/ic_me_rank" />
 
@@ -520,20 +520,20 @@
                             android:id="@+id/tvCharmChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
+                            android:layout_marginStart="3dp"
                             android:background="@drawable/bg_chip_charm"
                             android:paddingHorizontal="4dp"
                             android:paddingVertical="1dp"
                             android:text="0"
                             android:textColor="#FFFFFFFF"
-                            android:textSize="12sp"
+                            android:textSize="11sp"
                             android:textStyle="bold" />
 
                         <ImageView
                             android:id="@+id/imgWealthIcon"
-                            android:layout_width="14dp"
-                            android:layout_height="14dp"
-                            android:layout_marginStart="4dp"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_marginStart="3dp"
                             android:contentDescription="الثروة"
                             android:scaleType="fitCenter"
                             android:src="@drawable/ic_asset_diamond" />
@@ -542,13 +542,13 @@
                             android:id="@+id/tvWealthChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
+                            android:layout_marginStart="3dp"
                             android:background="@drawable/bg_chip_wealth"
-                            android:paddingHorizontal="5dp"
+                            android:paddingHorizontal="4dp"
                             android:paddingVertical="1dp"
                             android:text="0"
                             android:textColor="#FFFFFFFF"
-                            android:textSize="12sp"
+                            android:textSize="11sp"
                             android:textStyle="bold" />
 
                         <ImageView
