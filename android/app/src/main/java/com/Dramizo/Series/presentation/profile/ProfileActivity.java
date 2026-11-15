@@ -2061,32 +2061,23 @@ public class ProfileActivity extends ThemedActivity {
     }
 
     private void addProfileMomentGrid(LinearLayout parent, List<Map<String, Object>> posts) {
-        LinearLayout row = null;
+        parent.setOrientation(LinearLayout.HORIZONTAL);
         for (int i = 0; i < posts.size(); i++) {
-            if (i % 2 == 0) {
-                row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                parent.addView(row, new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(116)));
-            }
             Map<String, Object> post = posts.get(i);
             LinearLayout tile = new LinearLayout(this);
             tile.setOrientation(LinearLayout.VERTICAL);
             tile.setPadding(dpProfile(4), dpProfile(4), dpProfile(4), dpProfile(4));
             tile.setGravity(Gravity.CENTER);
             tile.setBackground(roundProfile(0xFFFFFFFF, 0xFF4A3A48, 12));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dpProfile(110), 1f);
-            lp.setMargins(dpProfile(3), dpProfile(2), dpProfile(3), dpProfile(2));
-            row.addView(tile, lp);
-
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dpProfile(142), dpProfile(110));
+            lp.setMargins(dpProfile(3), dpProfile(2), dpProfile(5), dpProfile(2));
+            parent.addView(tile, lp);
             String imageUrl = stringProfile(post, "imageUrl");
             if (!imageUrl.isEmpty()) {
                 ImageView image = new ImageView(this);
                 image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                tile.addView(image, new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(76)));
-                Glide.with(this).load(imageUrl).centerCrop()
-                        .placeholder(ImagePlaceholder.cover()).into(image);
+                tile.addView(image, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(76)));
+                Glide.with(this).load(imageUrl).centerCrop().placeholder(ImagePlaceholder.cover()).into(image);
             } else {
                 TextView body = new TextView(this);
                 body.setText(stringProfile(post, "body"));
@@ -2094,16 +2085,14 @@ public class ProfileActivity extends ThemedActivity {
                 body.setTextSize(11);
                 body.setMaxLines(4);
                 body.setGravity(Gravity.CENTER);
-                tile.addView(body, new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(76)));
+                tile.addView(body, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(76)));
             }
             TextView likes = new TextView(this);
             likes.setText("♡ " + stringProfile(post, "likeCount"));
             likes.setTextColor(0xFFB70F52);
             likes.setTextSize(9);
             likes.setGravity(Gravity.CENTER);
-            tile.addView(likes, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(22)));
+            tile.addView(likes, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(22)));
             tile.setOnClickListener(v -> {
                 Intent intent = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
                 intent.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, loadedProfileId);
