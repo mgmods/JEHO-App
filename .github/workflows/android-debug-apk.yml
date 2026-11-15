@@ -51,7 +51,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           test -n "$SDK_ROOT" && test -d "$SDK_ROOT/cmdline-tools"
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print -quit)"
@@ -138,13 +137,13 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Validate JEHO-OWN Cumin API URL
+      - name: Validate JEHO-OWN Blitz API URL
         env:
           JEHO_OWN_API_URL: https://jeho-own-backend.mgs.prod.page/api/v1
         shell: bash
         run: |
           if [[ "$JEHO_OWN_API_URL" != "https://jeho-own-backend.mgs.prod.page/api/v1" ]]; then
-            echo "::error::The APK must target the dedicated JEHO-OWN Cumin API."
+            echo "::error::The APK must target the dedicated JEHO-OWN Blitz API."
             exit 1
           fi
 
