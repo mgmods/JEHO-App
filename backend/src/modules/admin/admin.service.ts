@@ -274,13 +274,9 @@ export class AdminService {
       const parsed = JSON.parse(row.value);
       const clean = (value: unknown) => {
         const url = typeof value === 'string' ? value.trim() : '';
-        // Dashboard uploads may be served from nested upload folders or the API asset route.
-        // Accept only absolute HTTP(S) URLs or safe app-relative asset paths.
+        // Dashboard uploads may use nested upload folders or API asset routes.
         const absolute = /^https?:\/\/[^\s]+$/i.test(url);
-        const relative = /^\/?(?:uploads|assets|api)\/[A-Za-z0-9._~!      const clean = (value: unknown) => {
-        const url = typeof value === 'string' ? value.trim() : '';
-        return url.length <= 2048 && /^(https:\/\/[^\\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(url) ? url : '';
-      };'()*+,;=:@%/?-]+$/.test(url);
+        const relative = /^\/?(?:uploads|assets|api)\/[A-Za-z0-9._~!$&()*+,;=:@%/?-]+$/.test(url);
         return url.length <= 2048 && (absolute || relative) ? url : '';
       };
       return { leaderBadgeUrl: clean(parsed?.leaderBadgeUrl), hostBadgeUrl: clean(parsed?.hostBadgeUrl) };
