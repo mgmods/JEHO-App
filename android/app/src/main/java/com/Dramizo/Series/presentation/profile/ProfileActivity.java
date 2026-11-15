@@ -1953,9 +1953,9 @@ public class ProfileActivity extends ThemedActivity {
 
     private void bindStickyProfileActionIcons() {
         if (binding == null) return;
-        RemoteNavIcons.bindProfileAction(binding.btnFollowSticky, "follow", R.drawable.ic_profile_action_follow);
-        RemoteNavIcons.bindProfileAction(binding.btnMessageSticky, "message", R.drawable.ic_profile_action_message);
-        RemoteNavIcons.bindProfileAction(binding.btnRoomSticky, "room", R.drawable.ic_profile_action_room);
+        RemoteNavIcons.bindProfileAction(binding.btnFollowSticky, "profileFollow", R.drawable.ic_profile_action_follow);
+        RemoteNavIcons.bindProfileAction(binding.btnMessageSticky, "profileMessage", R.drawable.ic_profile_action_message);
+        RemoteNavIcons.bindProfileAction(binding.btnRoomSticky, "profileRoom", R.drawable.ic_profile_action_room);
     }
 
     private int dpProfile(float value) {
