@@ -8,7 +8,7 @@ package com.Dramizo.Series.util;
  * values cannot redirect the installed app to another JEHO copy or host.
  */
 public final class ApiOrigin {
-    private static final String CANONICAL_API = "https://jeho-own-web-910481ae.hosted.cumin.dev";
+    private static final String CANONICAL_API = "https://jeho-own-backend.mgs.prod.page";
 
     private ApiOrigin() {}
 
