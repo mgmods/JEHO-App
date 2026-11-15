@@ -777,13 +777,27 @@
                     android:background="@drawable/bg_profile_panel"
                     android:orientation="vertical"
                     android:padding="2dp">
-                    <TextView
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="الداعمون"
-                        android:textColor="#FFFFFFFF"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+                        <ImageView
+                            android:id="@+id/imgProfileSupportersDiamond"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_marginEnd="5dp"
+                            android:contentDescription="الداعمون"
+                            android:src="@drawable/ic_profile_diamond"
+                            android:scaleType="fitCenter" />
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="الداعمون"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/recyclerProfileSupporters"
                         android:layout_width="match_parent"
@@ -915,6 +929,8 @@
                         android:orientation="vertical"
                         app:layout_constraintBottom_toBottomOf="@id/imgAgencyBannerBg"
                         app:layout_constraintStart_toStartOf="@id/imgAgencyBannerBg"
+                        app:layout_constraintEnd_toEndOf="@id/imgAgencyBannerBg"
+                        app:layout_constraintHorizontal_bias="0.5"
                         app:layout_constraintTop_toTopOf="@id/imgAgencyBannerBg">
 
                         <ImageView
@@ -952,8 +968,10 @@
                         android:orientation="vertical"
                         app:layout_constraintBottom_toBottomOf="@id/imgAgencyBannerBg"
                         app:layout_constraintEnd_toEndOf="@id/imgAgencyBannerBg"
-                        app:layout_constraintStart_toEndOf="@id/agencyLogoWrap"
-                        app:layout_constraintTop_toTopOf="@id/imgAgencyBannerBg">
+                        app:layout_constraintStart_toStartOf="@id/imgAgencyBannerBg"
+                        app:layout_constraintHorizontal_bias="0.5"
+                        app:layout_constraintTop_toBottomOf="@id/agencyLogoWrap"
+                        android:layout_marginTop="2dp">
 
                         <TextView
                             android:id="@+id/tvAgencyName"
@@ -1449,4 +1467,49 @@
 
         </LinearLayout>
     </ScrollView>
+    <!-- Sticky profile actions: always visible while scrolling. -->
+    <LinearLayout
+        android:id="@+id/profileStickyActions"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom"
+        android:background="#E612000F"
+        android:elevation="12dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnFollowSticky"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1"
+            android:layout_marginEnd="6dp" android:background="@drawable/bg_profile_action_light"
+            android:insetTop="0dp" android:insetBottom="0dp" android:text="متابعة"
+            android:textAllCaps="false" android:textColor="#FFFFFFFF" android:textSize="12sp"
+            app:backgroundTint="@null" app:cornerRadius="24dp"
+            app:icon="@drawable/ic_profile_action_follow" app:iconGravity="textStart"
+            app:iconSize="20dp" app:iconTint="#FFFFFFFF" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnMessageSticky"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1"
+            android:layout_marginHorizontal="6dp" android:background="@drawable/bg_profile_action_light"
+            android:insetTop="0dp" android:insetBottom="0dp" android:text="مراسلة"
+            android:textAllCaps="false" android:textColor="#FFFFFFFF" android:textSize="12sp"
+            app:backgroundTint="@null" app:cornerRadius="24dp"
+            app:icon="@drawable/ic_profile_action_message" app:iconGravity="textStart"
+            app:iconSize="20dp" app:iconTint="#FFFFFFFF" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRoomSticky"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1"
+            android:layout_marginStart="6dp" android:background="@drawable/bg_profile_action_light"
+            android:insetTop="0dp" android:insetBottom="0dp" android:text="الغرفة"
+            android:textAllCaps="false" android:textColor="#FFFFFFFF" android:textSize="12sp"
+            app:backgroundTint="@null" app:cornerRadius="24dp"
+            app:icon="@drawable/ic_profile_action_room" app:iconGravity="textStart"
+            app:iconSize="20dp" app:iconTint="#FFFFFFFF" />
+    </LinearLayout>
 </FrameLayout>
