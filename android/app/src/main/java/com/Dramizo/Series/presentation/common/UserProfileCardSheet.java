@@ -359,9 +359,13 @@ public final class UserProfileCardSheet {
                     if (rowAgency != null) rowAgency.setOnClickListener(v -> {
                         if (u.agency.id != null) AgencyFamilyInfoSheet.show(activity, u.agency.id);
                     });
-                } else if (u.agencyClub != null && u.agencyClub.label != null && !u.agencyClub.label.trim().isEmpty()) {
+                } else if (u.agencyClub != null && u.agencyClub.role != null && !u.agencyClub.role.trim().isEmpty()) {
+                    String clubRole = u.agencyClub.role.trim().toLowerCase(java.util.Locale.ROOT);
+                    String clubRoleLabel = "owner".equals(clubRole) || "leader".equals(clubRole)
+                            ? "♛  قائد الوكالة"
+                            : ("host".equals(clubRole) || "member".equals(clubRole) ? "مضيف" : "أدمن وكالة");
                     if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
-                    if (tvAgencyName != null) tvAgencyName.setText(StaffRoleHelper.genderizeLabel(u.agencyClub.label, u.gender));
+                    if (tvAgencyName != null) tvAgencyName.setText(StaffRoleHelper.genderizeLabel(clubRoleLabel, u.gender));
                     if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
                     if (imgAgencyLogo != null) {
                         String clubLogo = u.agencyClub.agencyLogoUrl;
