@@ -302,6 +302,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
   }
 
 
+  private async agencyClubMapForUsers(userIds: string[]): Promise<Map<string, any>> {
+    // Legacy supporter-club membership has no table in the current schema.
+    // Return an empty map while preserving the chat decoration call sites.
+    return new Map<string, any>();
+  }
+
   private async agencyRoleMapForUsers(userIds: string[]): Promise<Map<string, any>> {
     const ids = Array.from(new Set((userIds || []).filter(Boolean)));
     const result = new Map<string, any>();
