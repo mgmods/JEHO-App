@@ -270,8 +270,8 @@ public class ProfileActivity extends ThemedActivity {
                     binding.btnFollow.setEnabled(true);
                     if (r.success) {
                         isFollowingTarget = !unfollow;
-                        binding.btnFollow.setText(
-                                isFollowingTarget ? R.string.unfollow : R.string.follow);
+                        binding.btnFollow.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
+                        if (binding.btnFollowSticky != null) binding.btnFollowSticky.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
                         Toast.makeText(this,
                                 isFollowingTarget ? "تمت المتابعة" : "تم إلغاء المتابعة",
                                 Toast.LENGTH_SHORT).show();
@@ -300,6 +300,9 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
         binding.btnBack.setOnClickListener(v -> navigateUp());
+        if (binding.btnFollowSticky != null) binding.btnFollowSticky.setOnClickListener(v -> binding.btnFollow.performClick());
+        if (binding.btnMessageSticky != null) binding.btnMessageSticky.setOnClickListener(v -> binding.btnMessage.performClick());
+        if (binding.btnRoomSticky != null) binding.btnRoomSticky.setOnClickListener(v -> binding.btnRoom.performClick());
         if (binding.btnRoomTracking != null) {
             binding.btnRoomTracking.setOnClickListener(v -> openTrackedRoom());
         }
@@ -540,8 +543,8 @@ public class ProfileActivity extends ThemedActivity {
             } else {
                 binding.btnFollow.setVisibility(View.VISIBLE);
                 isFollowingTarget = Boolean.TRUE.equals(user.isFollowing);
-                binding.btnFollow.setText(
-                        isFollowingTarget ? R.string.unfollow : R.string.follow);
+                binding.btnFollow.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
+                if (binding.btnFollowSticky != null) binding.btnFollowSticky.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
             }
 
             // Only show the agency/family tile when the backend confirms an active
@@ -1966,9 +1969,17 @@ public class ProfileActivity extends ThemedActivity {
                 && binding.rowProfileCpCv.getVisibility() == View.VISIBLE;
         if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(View.GONE);
         if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(View.GONE);
+        if (binding.rowProfileAchievementBadges != null) binding.rowProfileAchievementBadges.setVisibility(View.GONE);
+        if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
 
         if (!profileDetailsViewsAttached) {
-            // Details order: moments first, then the existing gift-history section.
+            // Details order: badges first, then Moments, then gift history.
+            if (binding.rowProfileAchievementBadges != null) {
+                View badges = binding.rowProfileAchievementBadges;
+                if (badges.getParent() instanceof ViewGroup) ((ViewGroup) badges.getParent()).removeView(badges);
+                panel.addView(badges, new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                badges.setVisibility(View.VISIBLE);
+            }
             TextView moments = new TextView(this);
             moments.setText("اللحظات  ›");
             moments.setTextColor(0xFFFFFFFF);
