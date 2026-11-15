@@ -1223,33 +1223,28 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (holder.b.tvAgencyRoleBadge == null) return;
         String label = null;
-        if (user != null && user.agencyClub != null
-                && user.agencyClub.label != null && !user.agencyClub.label.trim().isEmpty()) {
-            holder.b.tvAgencyRoleBadge.setText("");
-            holder.b.tvAgencyRoleBadge.setVisibility(View.GONE);
-            return;
-        }
         com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency =
                 user != null ? user.agency : null;
-        if (agency != null) {
-            String role = agency.role == null ? "" : agency.role.trim().toLowerCase(Locale.ROOT);
-            String agencyId = agency.id == null ? "" : agency.id.trim();
-            String agencyName = agency.name == null ? "" : agency.name.trim();
-            boolean female = user != null && "female".equalsIgnoreCase(user.gender);
-            if ("owner".equals(role)) {
-                // The club chip already carries the global leader title when available.
-                if (user.agencyClub == null) {
-                    label = agencyName.isEmpty() ? "قائد وكالة" : "قائد وكالة · " + agencyName;
-                }
-            } else if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
+        com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club =
+                user != null ? user.agencyClub : null;
+        String role = agency != null && agency.role != null
+                ? agency.role.trim().toLowerCase(Locale.ROOT)
+                : (club != null && club.role != null ? club.role.trim().toLowerCase(Locale.ROOT) : "");
+        String agencyId = agency != null && agency.id != null ? agency.id.trim() : "";
+        boolean female = user != null && "female".equalsIgnoreCase(user.gender);
+        if ("owner".equals(role) || "leader".equals(role)) {
+            label = female ? "قائدة الوكالة" : "قائد الوكالة";
+        } else if ("host".equals(role) || "member".equals(role)) {
+            // Host titles are shown only in the matching agency room.
+            if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
                     && !agencyId.isEmpty() && roomAgencyId.equals(agencyId)) {
-                String userId = user.id == null ? "" : normalizeUserId(user.id);
-                if ("host".equals(role)) label = female ? "مضيفة" : "مضيف";
-                else if ("manager".equals(role)
-                        || (!userId.isEmpty() && roomAgencyModeratorIds.contains(userId))) {
-                    label = female ? "مشرفة" : "مشرف";
-                }
+                label = female ? "مضيفة" : "مضيف";
             }
+        } else if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
+                && !agencyId.isEmpty() && roomAgencyId.equals(agencyId)
+                && ("manager".equals(role) || (user != null && user.id != null
+                    && roomAgencyModeratorIds.contains(normalizeUserId(user.id))))) {
+            label = female ? "مشرفة" : "مشرف";
         }
         holder.b.tvAgencyRoleBadge.setText(label == null ? "" : label);
         holder.b.tvAgencyRoleBadge.setVisibility(label == null ? View.GONE : View.VISIBLE);
