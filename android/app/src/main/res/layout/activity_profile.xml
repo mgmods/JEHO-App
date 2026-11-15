@@ -379,10 +379,10 @@
                     <ImageView
                         android:id="@+id/imgAgencyRoleBadge"
                         android:layout_width="wrap_content"
-                        android:layout_height="28dp"
-                        android:maxWidth="112dp"
-                        android:maxHeight="28dp"
-                        android:minWidth="64dp"
+                        android:layout_height="32dp"
+                        android:maxWidth="132dp"
+                        android:maxHeight="32dp"
+                        android:minWidth="72dp"
                         android:adjustViewBounds="true"
                         android:scaleType="fitCenter"
                         android:visibility="gone"
@@ -852,6 +852,7 @@
                             android:textSize="17sp"
                             android:textStyle="bold" />
                         <View
+                            android:id="@+id/profilePropertyUnderline"
                             android:layout_width="30dp"
                             android:layout_height="3dp"
                             android:layout_marginTop="7dp"
@@ -870,9 +871,16 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="تفاصيل"
-                            android:textColor="#FFB58AAE"
+                            android:textColor="#FFFFFFFF"
                             android:textSize="17sp"
                             android:textStyle="bold" />
+                        <View
+                            android:id="@+id/profileDetailsUnderline"
+                            android:layout_width="30dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="7dp"
+                            android:background="#FFFF6FB7"
+                            android:visibility="gone" />
                     </LinearLayout>
 
                     <LinearLayout
