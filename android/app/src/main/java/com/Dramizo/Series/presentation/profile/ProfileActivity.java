@@ -75,7 +75,8 @@ import java.util.UUID;
 import java.util.Locale;
 import java.text.NumberFormat;
 
-public class ProfileActivity extends ThemedActivity {\n    // Profile UI refinements: compact medals, clean supporters, moments-only navigation.
+public class ProfileActivity extends ThemedActivity {
+    // Profile UI refinements: compact medals, clean supporters, moments-only navigation.
     // Profile inline supporters and gifts use live gift aggregates, never social followers.
     public static final String EXTRA_USER_ID = "user_id";
     private ActivityProfileBinding binding;
@@ -607,8 +608,10 @@ public class ProfileActivity extends ThemedActivity {\n    // Profile UI refinem
                         name.setText(supporter.displayName == null || supporter.displayName.trim().isEmpty()
                                 ? supporter.username : supporter.displayName);
                         TextView diamonds = holder.itemView.findViewById(R.id.tvSupporterDiamonds);
-                        if (diamonds != null) diamonds.setText("♦ " + NumberFormat.getNumberInstance(Locale.US)
-                                .format(Math.max(0L, supporter.totalSupport)));
+                        if (diamonds != null) {
+                            diamonds.setVisibility(View.VISIBLE);
+                            diamonds.setText("◆ " + formatSupportAmount(supporter.totalSupport));
+                        }
                         AvatarCosmetics.bindStacked(avatar, frame, liveFrame, supporter.avatarUrl, supporter.frameUrl, null);
                         holder.itemView.setOnClickListener(v -> {
                             String id = profileId;
@@ -1962,7 +1965,15 @@ public class ProfileActivity extends ThemedActivity {\n    // Profile UI refinem
     }
 
     /** Details tab: moments first, then medals/badges, then gifts. */
-    private void openProfileMomentsOnly() {\n        String id = loadedProfileId;\n        if (id == null || id.trim().isEmpty()) return;\n        Intent intent = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);\n        intent.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, id);\n        startActivity(intent);\n    }\n\n    private void openProfileDetails() {
+    private void openProfileMomentsOnly() {
+        String id = loadedProfileId;
+        if (id == null || id.trim().isEmpty()) return;
+        Intent intent = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
+        intent.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, id);
+        startActivity(intent);
+    }
+
+    private void openProfileDetails() {
         if (binding == null || binding.profileDetailsInlinePanel == null) return;
         profileDetailsExpanded = true;
         setProfileTab(true);
@@ -1974,7 +1985,8 @@ public class ProfileActivity extends ThemedActivity {\n    // Profile UI refinem
 
         if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(View.GONE);
         if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(View.GONE);
-        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.VISIBLE);\n        if (binding.rowProfileAchievementBadges != null) binding.rowProfileAchievementBadges.setVisibility(View.GONE);
+        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.VISIBLE);
+        if (binding.rowProfileAchievementBadges != null) binding.rowProfileAchievementBadges.setVisibility(View.GONE);
         if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
         if (binding.rowGiftHistory != null) binding.rowGiftHistory.setVisibility(View.GONE);
 
@@ -2268,6 +2280,19 @@ public class ProfileActivity extends ThemedActivity {\n    // Profile UI refinem
         empty.setGravity(Gravity.CENTER);
         parent.addView(empty, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(72)));
+    }
+
+    private String formatSupportAmount(long value) {
+        long amount = Math.max(0L, value);
+        if (amount >= 1_000_000_000L) return trimSupportDecimal(amount / 1_000_000_000.0) + "B";
+        if (amount >= 1_000_000L) return trimSupportDecimal(amount / 1_000_000.0) + "M";
+        if (amount >= 1_000L) return trimSupportDecimal(amount / 1_000.0) + "K";
+        return NumberFormat.getNumberInstance(Locale.US).format(amount);
+    }
+
+    private String trimSupportDecimal(double value) {
+        if (value >= 100) return String.format(Locale.US, "%.0f", value);
+        return String.format(Locale.US, "%.1f", value).replace(".0", "");
     }
 
     private String stringProfile(Map<String, Object> map, String key) {
