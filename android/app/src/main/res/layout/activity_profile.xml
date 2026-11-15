@@ -1044,6 +1044,18 @@
                 </LinearLayout>
 
                 <!-- CP relationship card: live server data, original CP background, responsive horizontal layout. -->
+                <TextView
+                    android:id="@+id/tvProfileCpSectionLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="18dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginEnd="18dp"
+                    android:text="CP"
+                    android:textColor="#FFFF79B9"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
                 <FrameLayout
                     android:id="@+id/rowProfileCpCv"
                     android:layout_width="match_parent"
