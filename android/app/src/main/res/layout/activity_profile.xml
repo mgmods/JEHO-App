@@ -283,6 +283,17 @@
                             android:layout_width="0dp"
                             android:layout_height="0dp"
                             android:visibility="gone" />
+
+<ImageView
+                            android:id="@+id/imgCpLevelIcon"
+                            android:layout_width="wrap_content"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="7dp"
+                            android:adjustViewBounds="true"
+                            android:maxWidth="72dp"
+                            android:contentDescription="أيقونة مستوى CP"
+                            android:scaleType="fitCenter"
+                            android:visibility="gone" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -1106,16 +1117,7 @@
                             android:textSize="11sp"
                             android:textStyle="bold" />
 
-                        <ImageView
-                            android:id="@+id/imgCpLevelIcon"
-                            android:layout_width="wrap_content"
-                            android:layout_height="24dp"
-                            android:layout_marginStart="7dp"
-                            android:adjustViewBounds="true"
-                            android:maxWidth="72dp"
-                            android:contentDescription="أيقونة مستوى CP"
-                            android:scaleType="fitCenter"
-                            android:visibility="gone" />
+                        
 
                         <ImageView
                             android:id="@+id/imgLevelIcon"
