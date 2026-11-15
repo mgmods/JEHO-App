@@ -369,9 +369,9 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:includeFontPadding="false"
-                        android:paddingHorizontal="12dp"
+                        android:paddingHorizontal="13dp"
                         android:paddingVertical="5dp"
-                        android:textSize="11sp"
+                        android:textSize="12sp"
                         android:textStyle="bold"
                         android:visibility="gone"
                         tools:text="قائد الوكالة" />
