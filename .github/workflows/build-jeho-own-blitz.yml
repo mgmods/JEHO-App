@@ -1,8 +1,9 @@
-name: Legacy JEHO-OWN Blitz image publisher (isolated from MG-JEHO)
+name: JEHO-OWN Blitz image publisher
 
 on:
-  # Deliberately manual and restricted to the legacy branch. MG-JEHO must
-  # publish and deploy only through the dedicated Cumin/Ghaymah workflow.
+  push:
+    branches:
+      - MG-JEHO
   workflow_dispatch:
 
 permissions:
@@ -11,12 +12,14 @@ permissions:
 
 jobs:
   build-and-publish:
-    if: ${{ github.ref_name == 'jeho-own' }}
+    if: ${{ github.ref_name == 'MG-JEHO' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Check out legacy branch
+      - name: Check out current JEHO source
         uses: actions/checkout@v4
+        with:
+          ref: MG-JEHO
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Log in to GitHub Container Registry
@@ -25,16 +28,16 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish legacy branch image only
+      - name: Build and publish the current MG-JEHO backend and admin dashboard for Blitz
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ghcr.io/mgmods/jeho-own-backend:jeho-own
-            ghcr.io/mgmods/jeho-own-backend:legacy-${{ github.sha }}
+            ghcr.io/mgmods/jeho-own-backend:blitz
+            ghcr.io/mgmods/jeho-own-backend:blitz-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/mgmods/JEHO-App
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.title=Legacy JEHO-OWN (Blitz only)
+            org.opencontainers.image.title=JEHO-OWN (Blitz)
