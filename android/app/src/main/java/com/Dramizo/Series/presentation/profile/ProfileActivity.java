@@ -2139,7 +2139,7 @@ public class ProfileActivity extends ThemedActivity {
             List<BadgeDto> earned = new ArrayList<>();
             try {
                 retrofit2.Response<ApiResponse<List<BadgeDto>>> response =
-                        container.getUserApi().badges(profileId).execute();
+                        container.getUserApi().earnedBadges(profileId).execute();
                 if (response.isSuccessful() && response.body() != null && response.body().data != null) {
                     for (BadgeDto badge : response.body().data) {
                         if (badge != null && badge.earned && badge.imageUrl != null
