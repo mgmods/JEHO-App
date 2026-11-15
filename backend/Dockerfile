@@ -46,4 +46,4 @@ COPY --from=builder /app/scripts ./scripts
 
 CMD ["node", "scripts/start-production.js"]
 
-# Rebuild trigger: publish a fresh immutable Ghaymah image from MG-JEHO.
+# Rebuild trigger: publish a fresh immutable Blitz image from MG-JEHO.
