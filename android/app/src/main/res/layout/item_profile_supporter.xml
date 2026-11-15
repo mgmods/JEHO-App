@@ -41,7 +41,7 @@
         android:textColor="#FFFFFFFF"
         android:textSize="10sp"
         android:textStyle="bold"
-        android:visibility="gone" />
+ />
 
     <TextView
         android:id="@+id/tvSupporterDiamonds"
@@ -52,6 +52,7 @@
         android:maxLines="1"
         android:textColor="#FFFFD36A"
         android:textSize="10sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:visibility="gone" />
 
 </LinearLayout>
