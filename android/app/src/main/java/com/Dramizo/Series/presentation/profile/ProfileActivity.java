@@ -193,7 +193,12 @@ public class ProfileActivity extends ThemedActivity {
                 startActivity(new Intent(this, AdminConsoleActivity.class));
             });
         }
-        hideProfileContentBelowStickyActions();\n\n        final String[] targetUserIdHold = {
+        hideProfileContentBelowStickyActions();
+        // Keep the identity stats row directly under the ID visible; it is part of the
+        // profile identity (popularity + wealth + VIP), not one of the lower action rows.
+        ensureProfileIdentityStatsVisible();
+
+        final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
@@ -1968,7 +1973,22 @@ public class ProfileActivity extends ThemedActivity {
         loadProfileGiftsPreview(loadedProfileId);
     }
 
-    /** Keep the public profile page bounded by the three dashboard-controlled CP actions.\n     *  Everything rendered below those actions is legacy/duplicate navigation and stays hidden.\n     *  The Details panel and the earned medals strip are above this boundary and remain usable.\n     */\n    private void hideProfileContentBelowStickyActions() {\n        if (binding == null || binding.profileInlineActions == null) return;\n        View parentView = binding.profileInlineActions.getParent();\n        if (!(parentView instanceof ViewGroup)) return;\n        ViewGroup parent = (ViewGroup) parentView;\n        int actionIndex = parent.indexOfChild(binding.profileInlineActions);\n        if (actionIndex < 0) return;\n        for (int i = actionIndex + 1; i < parent.getChildCount(); i++) {\n            View child = parent.getChildAt(i);\n            if (child != null) child.setVisibility(View.GONE);\n        }\n    }\n\n    private void bindStickyProfileActionIcons() {
+    /** Keep the public profile page bounded by the three dashboard-controlled CP actions.\n     *  Everything rendered below those actions is legacy/duplicate navigation and stays hidden.\n     *  The Details panel and the earned medals strip are above this boundary and remain usable.\n     */\n    private void hideProfileContentBelowStickyActions() {\n        if (binding == null || binding.profileInlineActions == null) return;\n        View parentView = binding.profileInlineActions.getParent();\n        if (!(parentView instanceof ViewGroup)) return;\n        ViewGroup parent = (ViewGroup) parentView;\n        int actionIndex = parent.indexOfChild(binding.profileInlineActions);\n        if (actionIndex < 0) return;\n        for (int i = actionIndex + 1; i < parent.getChildCount(); i++) {\n            View child = parent.getChildAt(i);\n            if (child != null) child.setVisibility(View.GONE);\n        }\n    }\n\n    private void ensureProfileIdentityStatsVisible() {
+        if (binding == null || binding.rowProfileMedals == null) return;
+        binding.rowProfileMedals.setVisibility(View.VISIBLE);
+        binding.rowProfileMedals.setAlpha(1f);
+        if (binding.imgVipMedal != null) binding.imgVipMedal.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        if (binding.imgRankIcon != null) {
+            binding.imgRankIcon.setVisibility(View.VISIBLE);
+            binding.imgRankIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        }
+        if (binding.tvCharmChip != null) binding.tvCharmChip.setVisibility(View.VISIBLE);
+        if (binding.imgWealthIcon != null) binding.imgWealthIcon.setVisibility(View.VISIBLE);
+        if (binding.tvWealthChip != null) binding.tvWealthChip.setVisibility(View.VISIBLE);
+        binding.rowProfileMedals.bringToFront();
+    }
+
+    private void bindStickyProfileActionIcons() {
         if (binding == null) return;
         // Use ImageViews rather than text buttons: uploaded PNG/SVG icons remain centered
         // and visible even though these actions intentionally have no text labels.
