@@ -3,7 +3,7 @@
     android:layout_width="68dp"
     android:layout_height="wrap_content"
     android:layout_marginEnd="5dp"
-    android:background="@drawable/bg_profile_section_light"
+    android:background="@android:color/transparent"
     android:gravity="center"
     android:orientation="vertical"
     android:padding="2dp">
@@ -38,9 +38,10 @@
         android:ellipsize="end"
         android:gravity="center"
         android:maxLines="1"
-        android:textColor="#FF283047"
+        android:textColor="#FFFFFFFF"
         android:textSize="10sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/tvSupporterDiamonds"
