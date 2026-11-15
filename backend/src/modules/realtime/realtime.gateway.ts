@@ -429,24 +429,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       ...profilePayload,
     });
 
-    // Room presence is an in-room announcement, not a phone notification.
-    if (!userAlreadyPresent && profilePayload.agencyClub?.label) {
-      this.server.to(roomChannel).emit('room:event', {
-        roomId: data.roomId,
-        event: 'agency:club_member_entered',
-        payload: {
-          roomId: data.roomId,
-          userId: client.userId,
-          displayName: profilePayload.displayName || profilePayload.username || 'عضو',
-          agencyId: profilePayload.agencyClub.agencyId,
-          agencyName: profilePayload.agencyClub.agencyName,
-          agencyLogoUrl: profilePayload.agencyClub.agencyLogoUrl || null,
-          role: profilePayload.agencyClub.role,
-          clubBadgeLabel: profilePayload.agencyClub.label,
-        },
-        at: new Date().toISOString(),
-      });
-    }
+    // Legacy supporter-club announcements are disabled because this relation is not in the current schema.
 
     const membersPayload = await this.emitRoomMembers(data.roomId);
     this.server.to(`room:${data.roomId}`).emit('room:event', {
