@@ -1,4 +1,4 @@
-package com.Dramizo.Series.presentation.profile;
+package com.Dramizo.Series.presentation.        hideProfileContentBelowStickyActions();\nprofile;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.content.ClipData;
@@ -1968,7 +1968,7 @@ public class ProfileActivity extends ThemedActivity {
         loadProfileGiftsPreview(loadedProfileId);
     }
 
-    private void bindStickyProfileActionIcons() {
+    /** Keep the public profile page bounded by the three dashboard-controlled CP actions.\n     *  Everything rendered below those actions is legacy/duplicate navigation and stays hidden.\n     *  The Details panel and the earned medals strip are above this boundary and remain usable.\n     */\n    private void hideProfileContentBelowStickyActions() {\n        if (binding == null || binding.profileInlineActions == null) return;\n        View parentView = binding.profileInlineActions.getParent();\n        if (!(parentView instanceof ViewGroup)) return;\n        ViewGroup parent = (ViewGroup) parentView;\n        int actionIndex = parent.indexOfChild(binding.profileInlineActions);\n        if (actionIndex < 0) return;\n        for (int i = actionIndex + 1; i < parent.getChildCount(); i++) {\n            View child = parent.getChildAt(i);\n            if (child != null) child.setVisibility(View.GONE);\n        }\n    }\n\n    private void bindStickyProfileActionIcons() {
         if (binding == null) return;
         // Use ImageViews rather than text buttons: uploaded PNG/SVG icons remain centered
         // and visible even though these actions intentionally have no text labels.
