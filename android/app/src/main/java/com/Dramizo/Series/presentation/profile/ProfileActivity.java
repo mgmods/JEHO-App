@@ -1647,7 +1647,17 @@ public class ProfileActivity extends ThemedActivity {
                 if (strip == null || showcase == null) return;
                 strip.removeAllViews();
                 List<String> selected = profile != null && profile.displayedMedalIds != null
-                        ? profile.displayedMedalIds : java.util.Collections.emptyList();
+                        ? new ArrayList<>(profile.displayedMedalIds) : new ArrayList<>();
+                // If the user has not pinned a custom selection, show earned medals by default.
+                // This keeps the medals visible on both the main profile and the Details tab.
+                if (selected.isEmpty() && owned != null) {
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : owned) {
+                        if (badge != null && badge.earned && badge.id != null
+                                && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) {
+                            selected.add(badge.id);
+                        }
+                    }
+                }
                 // Always refresh the showcase after profile data arrives; an empty selection
                 // must not leave a stale hidden row when switching between profile owners.
                 showcase.setVisibility(View.GONE);
@@ -1701,6 +1711,10 @@ public class ProfileActivity extends ThemedActivity {
                                 .error(R.drawable.ic_medal_default).into(image);
                     }
                     showcase.setVisibility(strip.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+                }
+                if (binding.rowProfileMedals != null) {
+                    binding.rowProfileMedals.setVisibility(View.VISIBLE);
+                    binding.rowProfileMedals.bringToFront();
                 }
                 // Keep the existing earned-medal cabinet populated for backward compatibility.
                 List<com.Dramizo.Series.data.remote.dto.BadgeDto> badges =
@@ -1924,7 +1938,10 @@ public class ProfileActivity extends ThemedActivity {
 
         if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(View.GONE);
         if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(View.GONE);
-        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.VISIBLE);
+        if (binding.rowProfileMedals != null) {
+            binding.rowProfileMedals.setVisibility(View.VISIBLE);
+            binding.rowProfileMedals.bringToFront();
+        }
         if (binding.rowProfileAchievementBadges != null) binding.rowProfileAchievementBadges.setVisibility(View.GONE);
         if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
         if (binding.rowGiftHistory != null) binding.rowGiftHistory.setVisibility(View.GONE);
@@ -1953,9 +1970,23 @@ public class ProfileActivity extends ThemedActivity {
 
     private void bindStickyProfileActionIcons() {
         if (binding == null) return;
-        RemoteNavIcons.bindProfileAction(binding.btnFollowSticky, "profileFollow", R.drawable.ic_profile_action_follow);
-        RemoteNavIcons.bindProfileAction(binding.btnMessageSticky, "profileMessage", R.drawable.ic_profile_action_message);
-        RemoteNavIcons.bindProfileAction(binding.btnRoomSticky, "profileRoom", R.drawable.ic_profile_action_room);
+        // Use ImageViews rather than text buttons: uploaded PNG/SVG icons remain centered
+        // and visible even though these actions intentionally have no text labels.
+        if (binding.btnFollowSticky != null) {
+            binding.btnFollowSticky.setVisibility(View.VISIBLE);
+            binding.btnFollowSticky.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            RemoteNavIcons.bindProfileAction(binding.btnFollowSticky, "profileFollow", R.drawable.ic_profile_action_follow);
+        }
+        if (binding.btnMessageSticky != null) {
+            binding.btnMessageSticky.setVisibility(View.VISIBLE);
+            binding.btnMessageSticky.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            RemoteNavIcons.bindProfileAction(binding.btnMessageSticky, "profileMessage", R.drawable.ic_profile_action_message);
+        }
+        if (binding.btnRoomSticky != null) {
+            binding.btnRoomSticky.setVisibility(View.VISIBLE);
+            binding.btnRoomSticky.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            RemoteNavIcons.bindProfileAction(binding.btnRoomSticky, "profileRoom", R.drawable.ic_profile_action_room);
+        }
     }
 
     private int dpProfile(float value) {
