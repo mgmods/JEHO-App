@@ -464,35 +464,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     const profile = await this.profilesRepo.findOne({ where: { userId } });
     // Resolve approved agency identity independently from room staff permissions.
-    const clubRows = await this.profilesRepo.manager.query(
-      `SELECT a.id AS "agencyId", a.name AS "agencyName",
-              a."logoUrl" AS "agencyLogoUrl",
-              'supporter' AS role
-         FROM agency_club_members cm
-         JOIN agencies a ON a.id = cm."agencyId"
-        WHERE cm."userId" = $1
-          AND cm.status = 'active'
-          AND a.status = 'active'
-          AND (a."ownerId" IS NULL OR a."ownerId" <> cm."userId")
-          AND NOT EXISTS (
-            SELECT 1 FROM agency_members am
-             WHERE am."agencyId" = a.id
-               AND am."userId" = cm."userId"
-               AND am.status = 'active'
-               AND am."isActive" = true
-          )
-        ORDER BY cm."createdAt" ASC
-        LIMIT 1`,
-      [userId],
-    );
-    const clubRow = clubRows?.[0];
-    const agencyClub = clubRow ? {
-      agencyId: clubRow.agencyId,
-      agencyName: clubRow.agencyName,
-      agencyLogoUrl: clubRow.agencyLogoUrl || null,
-      role: clubRow.role,
-      label: 'عضو نادي ' + clubRow.agencyName,
-    } : null;
+    // Legacy supporter-club relation is not part of the current schema.
+    const agencyClub = null;
     const activeCosmeticRows: Array<{
       type: string;
       previewUrl: string | null;
