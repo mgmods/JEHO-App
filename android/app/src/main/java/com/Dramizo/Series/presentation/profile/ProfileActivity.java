@@ -1,4 +1,4 @@
-package com.Dramizo.Series.presentation.        hideProfileContentBelowStickyActions();\nprofile;
+package com.Dramizo.Series.presentation.profile;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.content.ClipData;
@@ -193,7 +193,7 @@ public class ProfileActivity extends ThemedActivity {
                 startActivity(new Intent(this, AdminConsoleActivity.class));
             });
         }
-        final String[] targetUserIdHold = {
+        hideProfileContentBelowStickyActions();\n\n        final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
