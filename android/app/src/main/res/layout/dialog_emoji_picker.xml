@@ -33,22 +33,26 @@
         android:layout_marginEnd="16dp"
         android:text="ملصقات"
         android:textColor="#99FFFFFF"
-        android:textSize="12sp" />
+        android:textSize="14sp"
+        android:textStyle="bold" />
 
-    <ScrollView
+    <HorizontalScrollView
         android:id="@+id/scrollStickerCategories"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:scrollbars="none">
+        android:fillViewport="true"
+        android:horizontalScrollBarEnabled="false"
+        android:overScrollMode="never">
         <LinearLayout
             android:id="@+id/layoutStickerCategories"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
             android:paddingStart="12dp"
             android:paddingEnd="12dp" />
-    </ScrollView>
+    </HorizontalScrollView>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerStickers"

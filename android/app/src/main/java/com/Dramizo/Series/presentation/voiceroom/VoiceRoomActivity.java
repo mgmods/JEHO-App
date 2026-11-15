@@ -8600,27 +8600,42 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     SeatReactionEmojis.categories();
             if (packCategories != null && !packCategories.isEmpty()) {
                 categoryScroll.setVisibility(View.VISIBLE);
+                final java.util.List<TextView> categoryTabViews = new java.util.ArrayList<>();
                 for (com.Dramizo.Series.data.remote.dto.MiscDtos.SeatStickerCategoryDto category : packCategories) {
                     if (category == null || !category.isActive) continue;
                     TextView tab = new TextView(this);
                     tab.setText(category.name != null ? category.name : category.id);
-                    tab.setTextColor(Color.WHITE);
-                    tab.setTextSize(12f);
-                    tab.setPadding(14, 9, 14, 9);
+                    tab.setGravity(android.view.Gravity.CENTER);
+                    tab.setTextColor(0xFFD9E0E8);
+                    tab.setTextSize(14f);
+                    tab.setTypeface(null, android.graphics.Typeface.BOLD);
+                    tab.setPadding(18, 10, 18, 10);
                     android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
                     bg.setColor(0xFF26343B);
                     bg.setCornerRadius(24f);
+                    bg.setStroke(1, 0xFF46545F);
                     tab.setBackground(bg);
                     android.widget.LinearLayout.LayoutParams tabLp = new android.widget.LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                     tabLp.setMargins(4, 2, 4, 2);
                     categoryTabs.addView(tab, tabLp);
+                    categoryTabViews.add(tab);
                     tab.setOnClickListener(v -> {
                         visibleStickerItems.clear();
                         for (SeatReactionEmojis.Item sticker : stickerItems) {
                             if (category.id != null && category.id.equals(sticker.categoryId)) visibleStickerItems.add(sticker);
                         }
                         stickerAdapter.notifyDataSetChanged();
+                        for (TextView categoryTab : categoryTabViews) {
+                            boolean selected = categoryTab == tab;
+                            android.graphics.drawable.GradientDrawable selectedBg =
+                                    new android.graphics.drawable.GradientDrawable();
+                            selectedBg.setColor(selected ? 0xFFB88A45 : 0xFF26343B);
+                            selectedBg.setCornerRadius(24f);
+                            selectedBg.setStroke(1, selected ? 0xFFFFD98A : 0xFF46545F);
+                            categoryTab.setBackground(selectedBg);
+                            categoryTab.setTextColor(selected ? Color.WHITE : 0xFFD9E0E8);
+                        }
                     });
                 }
                 if (categoryTabs.getChildCount() > 0) categoryTabs.getChildAt(0).performClick();
