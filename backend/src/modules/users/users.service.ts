@@ -491,26 +491,9 @@ export class UsersService {
       Number(user.profile?.totalSentCoins || 0),
     );
     const agency = await this.resolveActiveAgency(userId);
-    const clubRows = await this.dataSource.query(
-      `SELECT a.id, a.name, a."logoUrl" AS "agencyLogoUrl", 'supporter' AS role
-       FROM agency_club_members cm
-       JOIN agencies a ON a.id = cm."agencyId"
-       WHERE cm."userId" = $1
-         AND cm.status = 'active'
-         AND a.status = 'active'
-         AND (a."ownerId" IS NULL OR a."ownerId" <> cm."userId")
-         AND NOT EXISTS (
-           SELECT 1 FROM agency_members am
-           WHERE am."agencyId" = a.id
-             AND am."userId" = cm."userId"
-             AND am.status = 'active'
-             AND am."isActive" = true
-         )
-       ORDER BY cm.id ASC LIMIT 1`,
-      [userId],
-    );
-    const clubRow = clubRows && clubRows[0];
-    const agencyClub = clubRow ? { agencyId: clubRow.id, agencyName: clubRow.name, agencyLogoUrl: clubRow.agencyLogoUrl || null, role: clubRow.role, label: 'عضو نادي ' + clubRow.name } : null;
+    // Legacy agency_club_members is not part of the current agency schema.
+    // Agency staff membership is resolved separately through agency_members.
+    const agencyClub = null;
     const flat = this.applyFixedVipWear(
       {
         ...this.flatten(user),
@@ -575,29 +558,9 @@ export class UsersService {
       isFollowing = !!follow;
     }
     const agency = await this.resolveActiveAgency(id);
-    const clubRows = await this.dataSource.query(
-      `SELECT a.id, a.name, a."logoUrl" AS "agencyLogoUrl", 'supporter' AS role
-       FROM agency_club_members cm
-       JOIN agencies a ON a.id = cm."agencyId"
-       WHERE cm."userId" = $1
-         AND cm.status = 'active'
-         AND a.status = 'active'
-         AND (a."ownerId" IS NULL OR a."ownerId" <> cm."userId")
-         AND NOT EXISTS (
-           SELECT 1 FROM agency_members am
-           WHERE am."agencyId" = a.id
-             AND am."userId" = cm."userId"
-             AND am.status = 'active'
-             AND am."isActive" = true
-         )
-       ORDER BY cm.id ASC LIMIT 1`,
-      [id],
-    );
-    const clubRow = clubRows && clubRows[0];
-    const agencyClub = clubRow ? {
-      agencyId: clubRow.id, agencyName: clubRow.name, agencyLogoUrl: clubRow.agencyLogoUrl || null, role: clubRow.role,
-      label: 'عضو نادي ' + clubRow.name,
-    } : null;
+    // Legacy agency_club_members is not part of the current agency schema.
+    // Agency staff membership is resolved separately through agency_members.
+    const agencyClub = null;
     const activeRechargeAgent = await this.rechargeAgentsRepo.findOne({
       where: { userId: id, status: RechargeAgentStatus.ACTIVE },
       select: { id: true },
@@ -666,26 +629,9 @@ export class UsersService {
       relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
-    const clubRows = await this.dataSource.query(
-      `SELECT a.id, a.name, a."logoUrl" AS "agencyLogoUrl", 'supporter' AS role
-       FROM agency_club_members cm
-       JOIN agencies a ON a.id = cm."agencyId"
-       WHERE cm."userId" = $1
-         AND cm.status = 'active'
-         AND a.status = 'active'
-         AND (a."ownerId" IS NULL OR a."ownerId" <> cm."userId")
-         AND NOT EXISTS (
-           SELECT 1 FROM agency_members am
-           WHERE am."agencyId" = a.id
-             AND am."userId" = cm."userId"
-             AND am.status = 'active'
-             AND am."isActive" = true
-         )
-       ORDER BY cm.id ASC LIMIT 1`,
-      [user.id],
-    );
-    const clubRow = clubRows && clubRows[0];
-    const agencyClub = clubRow ? { agencyId: clubRow.id, agencyName: clubRow.name, agencyLogoUrl: clubRow.agencyLogoUrl || null, role: clubRow.role, label: 'عضو نادي ' + clubRow.name } : null;
+    // Legacy agency_club_members is not part of the current agency schema.
+    // Agency staff membership is resolved separately through agency_members.
+    const agencyClub = null;
     const mysteriousMan = await this.isMysteriousModeAllowed(user, vip);
     const safeUser = {
       ...this.flatten(user),
