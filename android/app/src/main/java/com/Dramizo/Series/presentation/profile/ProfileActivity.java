@@ -1974,11 +1974,20 @@ public class ProfileActivity extends ThemedActivity {
         header.addView(more);
         section.addView(header);
 
+        HorizontalScrollView horizontal = new HorizontalScrollView(this);
+        horizontal.setHorizontalScrollBarEnabled(false);
+        horizontal.setFillViewport(false);
+        horizontal.setClipToPadding(false);
+        horizontal.setPadding(0, dpProfile(6), 0, 0);
         LinearLayout preview = new LinearLayout(this);
-        preview.setOrientation(LinearLayout.VERTICAL);
+        preview.setOrientation(LinearLayout.HORIZONTAL);
+        preview.setGravity(Gravity.CENTER_VERTICAL);
         preview.setTag("profile_preview_" + title);
-        preview.setPadding(0, dpProfile(6), 0, 0);
-        section.addView(preview, new LinearLayout.LayoutParams(
+        preview.setClipChildren(false);
+        preview.setClipToPadding(false);
+        horizontal.addView(preview, new HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        section.addView(horizontal, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         panel.addView(section, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT) {{
@@ -2116,16 +2125,16 @@ public class ProfileActivity extends ThemedActivity {
                     return;
                 }
                 LinearLayout row = new LinearLayout(this);
-                row.setGravity(Gravity.CENTER);
+                row.setGravity(Gravity.CENTER_VERTICAL);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 target.addView(row, new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(104)));
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dpProfile(104)));
                 for (BadgeDto badge : latest) {
                     LinearLayout item = new LinearLayout(this);
                     item.setOrientation(LinearLayout.VERTICAL);
                     item.setGravity(Gravity.CENTER);
                     item.setPadding(dpProfile(4), dpProfile(4), dpProfile(4), dpProfile(4));
-                    row.addView(item, new LinearLayout.LayoutParams(0, dpProfile(100), 1f));
+                    row.addView(item, new LinearLayout.LayoutParams(dpProfile(76), dpProfile(100)));
                     ImageView icon = new ImageView(this);
                     icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     item.addView(icon, new LinearLayout.LayoutParams(dpProfile(52), dpProfile(58)));
@@ -2211,7 +2220,7 @@ public class ProfileActivity extends ThemedActivity {
         empty.setTextSize(11);
         empty.setGravity(Gravity.CENTER);
         parent.addView(empty, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(72)));
+                dpProfile(220), dpProfile(72)));
     }
 
     private String formatSupportAmount(long value) {
