@@ -1737,24 +1737,17 @@ public class ProfileActivity extends ThemedActivity {
                         LinearLayout item = new LinearLayout(this);
                         item.setOrientation(LinearLayout.VERTICAL);
                         item.setGravity(Gravity.CENTER);
-                        int width = Math.round(31 * getResources().getDisplayMetrics().density);
+                        int width = Math.round(27 * getResources().getDisplayMetrics().density);
                         LinearLayout.LayoutParams itemLp = new LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
                         itemLp.setMargins(0, 0, Math.round(5 * getResources().getDisplayMetrics().density), 0);
                         item.setLayoutParams(itemLp);
                         ImageView image = new ImageView(this);
-                        int size = Math.round(22 * getResources().getDisplayMetrics().density);
+                        int size = Math.round(19 * getResources().getDisplayMetrics().density);
                         image.setLayoutParams(new LinearLayout.LayoutParams(size, size));
                         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
                         image.setContentDescription(label);
                         item.addView(image);
-                        TextView caption = new TextView(this);
-                        caption.setText(label);
-                        caption.setTextColor(0xFF697187);
-                        caption.setTextSize(8);
-                        caption.setGravity(Gravity.CENTER);
-                        caption.setMaxLines(1);
-                        caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                        item.addView(caption);
+    
                         strip.addView(item);
                         displayedMedalCount++;
                         Glide.with(this).load(AssetCatalog.absoluteUrl(imageUrl))
@@ -1965,7 +1958,7 @@ public class ProfileActivity extends ThemedActivity {
     }
 
     /** Details tab: moments first, then medals/badges, then gifts. */
-    private void openProfileDetails() {
+    private void openProfileMomentsOnly() {\n        String id = loadedProfileId;\n        if (id == null || id.trim().isEmpty()) return;\n        Intent intent = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);\n        intent.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, id);\n        startActivity(intent);\n    }\n\n    private void openProfileDetails() {
         if (binding == null || binding.profileDetailsInlinePanel == null) return;
         profileDetailsExpanded = true;
         setProfileTab(true);
@@ -1977,7 +1970,7 @@ public class ProfileActivity extends ThemedActivity {
 
         if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(View.GONE);
         if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(View.GONE);
-        if (binding.rowProfileAchievementBadges != null) binding.rowProfileAchievementBadges.setVisibility(View.GONE);
+        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.VISIBLE);\n        if (binding.rowProfileAchievementBadges != null) binding.rowProfileAchievementBadges.setVisibility(View.GONE);
         if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
         if (binding.rowGiftHistory != null) binding.rowGiftHistory.setVisibility(View.GONE);
 
@@ -1986,7 +1979,7 @@ public class ProfileActivity extends ThemedActivity {
             panel.removeAllViews();
             panel.setPadding(dpProfile(2), dpProfile(2), dpProfile(2), dpProfile(8));
 
-            addProfilePreviewSection(panel, "اللحظات", "عرض الكل", v -> openProfileMomentsLegacy());
+            addProfilePreviewSection(panel, "اللحظات", "عرض الكل", v -> openProfileMomentsOnly());
             addProfilePreviewSection(panel, "الشارات والمداليات", "عرض الكل", v -> openBadgeCabinet(loadedProfileId));
             addProfilePreviewSection(panel, "الهدايا", "عرض الكل", v -> {
                 if (loadedProfileId == null || loadedProfileId.trim().isEmpty()) return;
