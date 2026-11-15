@@ -687,29 +687,25 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         LinearLayout row = (LinearLayout) holder.b.rowBadges;
         row.removeAllViews();
         AuthDtos.UserDto user = mine ? me : msg.sender;
+        AuthDtos.UserDto.AgencySnip agency = user != null ? user.agency : null;
         AuthDtos.AgencyClubDto club = user != null ? user.agencyClub : null;
-        String role = club != null && club.role != null
-                ? club.role.trim().toLowerCase(java.util.Locale.ROOT) : "";
-        // Chat messages have no agency-room context: only the agency leader gets a global badge.
-        if (club == null || !"owner".equals(role)) {
+        String role = agency != null && agency.role != null
+                ? agency.role.trim().toLowerCase(java.util.Locale.ROOT)
+                : (club != null && club.role != null
+                    ? club.role.trim().toLowerCase(java.util.Locale.ROOT) : "");
+        boolean female = user != null && "female".equalsIgnoreCase(user.gender);
+        String roleLabel;
+        if ("owner".equals(role) || "leader".equals(role)) {
+            roleLabel = female ? "قائدة الوكالة" : "قائد الوكالة";
+        } else if ("host".equals(role) || "member".equals(role)) {
+            roleLabel = female ? "مضيفة" : "مضيف";
+        } else {
             row.setVisibility(View.GONE);
             return;
         }
-        String agencyName = club.agencyName == null ? "" : club.agencyName.trim();
-        if (club.agencyLogoUrl != null && !club.agencyLogoUrl.trim().isEmpty()) {
-            ImageView logo = new ImageView(holder.itemView.getContext());
-            logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            logo.setBackgroundResource(R.drawable.icon_agency);
-            logo.setClipToOutline(true);
-            Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(club.agencyLogoUrl))
-                    .placeholder(R.drawable.icon_agency).error(R.drawable.icon_agency)
-                    .centerCrop().into(logo);
-            LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(holder, 18), dp(holder, 18));
-            logoLp.setMargins(0, 0, dp(holder, 4), 0);
-            row.addView(logo, logoLp);
-        }
+        // Messages show a plain role label only: no dashboard image and no agency name.
         TextView chip = new TextView(holder.itemView.getContext());
-        chip.setText(agencyName.isEmpty() ? "♛ قائد وكالة" : "♛ قائد وكالة · " + agencyName);
+        chip.setText("♛ " + roleLabel);
         chip.setTextColor(0xFF805A19);
         chip.setTextSize(10);
         chip.setTypeface(null, android.graphics.Typeface.BOLD);
