@@ -18,6 +18,7 @@ export async function ensureUserProfileColumns(dataSource: DataSource): Promise<
 
   await dataSource.query(`
     ALTER TABLE "jeho_own"."user_profiles"
+      ADD COLUMN IF NOT EXISTS "profileCoverUrls" text,
       ADD COLUMN IF NOT EXISTS "displayedMedalIds" text,
       ADD COLUMN IF NOT EXISTS "allowDmFromStrangers" boolean NOT NULL DEFAULT true,
       ADD COLUMN IF NOT EXISTS "dmEnabled" boolean NOT NULL DEFAULT true,
@@ -26,5 +27,5 @@ export async function ensureUserProfileColumns(dataSource: DataSource): Promise<
       ADD COLUMN IF NOT EXISTS "dmRequiredGiftId" uuid
   `);
 
-  console.log('[UserProfileBootstrap] Verified medal display and DM privacy columns.');
+  console.log('[UserProfileBootstrap] Verified profile cover, medal display, and DM privacy columns.');
 }
