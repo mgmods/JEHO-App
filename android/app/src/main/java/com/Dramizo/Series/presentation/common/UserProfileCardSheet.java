@@ -322,8 +322,8 @@ public final class UserProfileCardSheet {
             AuthDtos.UserDto u = r.data;
             List<com.Dramizo.Series.data.remote.dto.BadgeDto> earnedMedals = java.util.Collections.emptyList();
             try {
-                Result<List<com.Dramizo.Series.data.remote.dto.BadgeDto>> badgeResult = ApiCall.execute(container.getUserApi().earnedBadges(uid));
-                if (badgeResult.success && badgeResult.data != null) earnedMedals = badgeResult.data;
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> badgeResponse = container.getUserApi().earnedBadges(uid).execute();
+                if (badgeResponse.isSuccessful() && badgeResponse.body() != null && badgeResponse.body().data != null) earnedMedals = badgeResponse.body().data;
             } catch (Exception ignored) { }
             final List<com.Dramizo.Series.data.remote.dto.BadgeDto> profileMedals = earnedMedals;
             activity.runOnUiThread(() -> {
