@@ -63,6 +63,7 @@ import com.Dramizo.Series.util.StaffRoleHelper;
 import com.Dramizo.Series.util.StaffIdentityConfigCache;
 import com.Dramizo.Series.presentation.admin.AdminConsoleActivity;
 import com.Dramizo.Series.util.VipStyle;
+import com.Dramizo.Series.util.RemoteNavIcons;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
@@ -138,6 +139,12 @@ public class ProfileActivity extends ThemedActivity {
         });
         EdgeToEdgeHelper.padBottom(binding.contentRoot);
         container = ContainerProvider.from(this);
+        RemoteNavIcons.hydrateFromCache(container);
+        bindStickyProfileActionIcons();
+        container.getIoExecutor().execute(() -> {
+            RemoteNavIcons.refreshBlocking(container);
+            runOnUiThread(this::bindStickyProfileActionIcons);
+        });
         cpConfigListener = new com.Dramizo.Series.realtime.RealtimeClient.UserListener() {
             @Override public void onUserEvent(String event, com.google.gson.JsonObject payload) {
                 if (!"cp:config-updated".equals(event)) return;
@@ -198,7 +205,7 @@ public class ProfileActivity extends ThemedActivity {
             binding.rowProfileAchievementBadges.setOnClickListener(v -> openBadgeCabinet(targetUserIdHold[0]));
         }
         // Keep the VIP, charm and wealth chips visible on the light profile card.
-        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.VISIBLE);
+        if (binding.rowProfileMedals != null) { binding.rowProfileMedals.setVisibility(View.VISIBLE); binding.rowProfileMedals.bringToFront(); }
 
         if (binding.rowMoments != null) {
             binding.rowMoments.setOnClickListener(v -> openProfileDetails());
@@ -1942,6 +1949,13 @@ public class ProfileActivity extends ThemedActivity {
         loadProfileMomentsPreview(loadedProfileId);
         loadProfileMedalsPreview(loadedProfileId);
         loadProfileGiftsPreview(loadedProfileId);
+    }
+
+    private void bindStickyProfileActionIcons() {
+        if (binding == null) return;
+        RemoteNavIcons.bindProfileAction(binding.btnFollowSticky, "follow", R.drawable.ic_profile_action_follow);
+        RemoteNavIcons.bindProfileAction(binding.btnMessageSticky, "message", R.drawable.ic_profile_action_message);
+        RemoteNavIcons.bindProfileAction(binding.btnRoomSticky, "room", R.drawable.ic_profile_action_room);
     }
 
     private int dpProfile(float value) {
