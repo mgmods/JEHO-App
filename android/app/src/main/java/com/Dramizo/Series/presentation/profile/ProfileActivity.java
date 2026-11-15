@@ -1973,7 +1973,24 @@ public class ProfileActivity extends ThemedActivity {
         loadProfileGiftsPreview(loadedProfileId);
     }
 
-    /** Keep the public profile page bounded by the three dashboard-controlled CP actions.\n     * Everything rendered below those actions is legacy/duplicate navigation and stays hidden.\n     * The Details panel and the earned medals strip are above this boundary and remain usable.\n     */\n    private void hideProfileContentBelowStickyActions() {\n        if (binding == null || binding.profileInlineActions == null) return;\n        View parentView = binding.profileInlineActions.getParent();\n        if (!(parentView instanceof ViewGroup)) return;\n        ViewGroup parent = (ViewGroup) parentView;\n        int actionIndex = parent.indexOfChild(binding.profileInlineActions);\n        if (actionIndex < 0) return;\n        for (int i = actionIndex + 1; i < parent.getChildCount(); i++) {\n            View child = parent.getChildAt(i);\n            if (child != null) child.setVisibility(View.GONE);\n        }\n    }\n\n    private void ensureProfileIdentityStatsVisible() {
+    /** Keep the public profile page bounded by the three dashboard-controlled CP actions.
+     * Everything rendered below those actions is legacy/duplicate navigation and stays hidden.
+     * The Details panel and the earned medals strip are above this boundary and remain usable.
+     */
+    private void hideProfileContentBelowStickyActions() {
+        if (binding == null || binding.profileInlineActions == null) return;
+        View parentView = binding.profileInlineActions.getParent();
+        if (!(parentView instanceof ViewGroup)) return;
+        ViewGroup parent = (ViewGroup) parentView;
+        int actionIndex = parent.indexOfChild(binding.profileInlineActions);
+        if (actionIndex < 0) return;
+        for (int i = actionIndex + 1; i < parent.getChildCount(); i++) {
+            View child = parent.getChildAt(i);
+            if (child != null) child.setVisibility(View.GONE);
+        }
+    }
+
+    private void ensureProfileIdentityStatsVisible() {
         if (binding == null || binding.rowProfileMedals == null) return;
         binding.rowProfileMedals.setVisibility(View.VISIBLE);
         binding.rowProfileMedals.setAlpha(1f);
