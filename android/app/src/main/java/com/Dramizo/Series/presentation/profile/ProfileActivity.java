@@ -277,7 +277,7 @@ public class ProfileActivity extends ThemedActivity {
                     if (r.success) {
                         isFollowingTarget = !unfollow;
                         binding.btnFollow.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
-                        if (binding.btnFollowSticky != null) binding.btnFollowSticky.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
+                        if (binding.btnFollowSticky != null) binding.btnFollowSticky.setContentDescription(getString(isFollowingTarget ? R.string.unfollow : R.string.follow));
                         Toast.makeText(this,
                                 isFollowingTarget ? "تمت المتابعة" : "تم إلغاء المتابعة",
                                 Toast.LENGTH_SHORT).show();
@@ -550,7 +550,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.btnFollow.setVisibility(View.VISIBLE);
                 isFollowingTarget = Boolean.TRUE.equals(user.isFollowing);
                 binding.btnFollow.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
-                if (binding.btnFollowSticky != null) binding.btnFollowSticky.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
+                if (binding.btnFollowSticky != null) binding.btnFollowSticky.setContentDescription(getString(isFollowingTarget ? R.string.unfollow : R.string.follow));
             }
 
             // Only show the agency/family tile when the backend confirms an active
