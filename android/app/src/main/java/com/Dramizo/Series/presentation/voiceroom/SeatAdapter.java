@@ -681,10 +681,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
 
             if (holder.b.tvAgencyClub != null) {
-                String clubLabel = seat.user != null && seat.user.agencyClub != null
-                        ? seat.user.agencyClub.label : null;
-                holder.b.tvAgencyClub.setText(clubLabel == null ? "" : clubLabel);
-                holder.b.tvAgencyClub.setVisibility(clubLabel == null || clubLabel.trim().isEmpty() ? View.GONE : View.VISIBLE);
+                // Agency role is rendered once through tvAgencyRoleBadge, without agency name.
+                holder.b.tvAgencyClub.setText("");
+                holder.b.tvAgencyClub.setVisibility(View.GONE);
             }
             if (seat.user != null) {
                 holder.b.tvName.setText(seat.user.displayName != null
@@ -1230,7 +1229,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         String role = agency != null && agency.role != null
                 ? agency.role.trim().toLowerCase(Locale.ROOT)
                 : (club != null && club.role != null ? club.role.trim().toLowerCase(Locale.ROOT) : "");
-        String agencyId = agency != null && agency.id != null ? agency.id.trim() : "";
+        String agencyId = agency != null && agency.id != null ? agency.id.trim()
+                : (club != null && club.agencyId != null ? club.agencyId.trim() : "");
         boolean female = user != null && "female".equalsIgnoreCase(user.gender);
         if ("owner".equals(role) || "leader".equals(role)) {
             label = female ? "قائدة الوكالة" : "قائد الوكالة";
