@@ -282,57 +282,8 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const ids = [...new Set((userIds || []).filter(Boolean))];
     const result = new Map<string, { customDisplayRankName: string | null; customDisplayRankImageUrl: string | null; customDisplayRankAnimated: boolean }>();
     if (!ids.length) return result;
-    const rows = await this.dataSource.query(
-      `SELECT DISTINCT ON (ub."userId")
-              ub."userId" AS "userId", b.name AS "name",
-              b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated"
-         FROM user_badges ub JOIN badges b ON b.id = ub."badgeId"
-        WHERE ub."userId" = ANY($1::uuid[])
-          AND b.category = 'display_rank' AND b."isActive" = true
-          AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
-        ORDER BY ub."userId", ub."grantedAt" DESC, b."sortOrder" ASC`,
-      [ids],
-    );
-    for (const row of rows || []) result.set(String(row.userId), {
-      customDisplayRankName: row.name ? String(row.name) : null,
-      customDisplayRankImageUrl: row.imageUrl ? String(row.imageUrl) : null,
-      customDisplayRankAnimated: row.isAnimated === true || row.isAnimated === 'true',
-    });
-    return result;
-  }
-
-  private async agencyClubMapForUsers(userIds: string[]): Promise<Map<string, any>> {
-    const ids = Array.from(new Set((userIds || []).filter(Boolean)));
-    const result = new Map<string, any>();
-    if (!ids.length) return result;
-    const rows = await this.dataSource.query(
-      `SELECT cm."userId", a.id AS "agencyId", a.name AS "agencyName",
-              a."logoUrl" AS "agencyLogoUrl", 'supporter' AS role
-       FROM agency_club_members cm
-       JOIN agencies a ON a.id = cm."agencyId"
-       WHERE cm."userId" = ANY($1::uuid[])
-         AND cm.status = 'active'
-         AND a.status = 'active'
-         AND (a."ownerId" IS NULL OR a."ownerId" <> cm."userId")
-         AND NOT EXISTS (
-           SELECT 1 FROM agency_members am
-           WHERE am."agencyId" = a.id AND am."userId" = cm."userId"
-             AND am.status = 'active' AND am."isActive" = true
-         )
-       ORDER BY cm.id ASC`,
-      [ids],
-    );
-    for (const row of rows || []) {
-      if (!result.has(String(row.userId))) {
-        result.set(String(row.userId), {
-          agencyId: row.agencyId,
-          agencyName: row.agencyName,
-          agencyLogoUrl: row.agencyLogoUrl || null,
-          role: row.role || 'supporter',
-          label: 'عضو نادي ' + row.agencyName,
-        });
-      }
-    }
+    // Supporter club membership has no backing table in the current schema.
+    // Keep conversation decoration independent from the removed legacy relation.
     return result;
   }
 
