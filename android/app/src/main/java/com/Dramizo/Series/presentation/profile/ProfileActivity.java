@@ -75,7 +75,7 @@ import java.util.UUID;
 import java.util.Locale;
 import java.text.NumberFormat;
 
-public class ProfileActivity extends ThemedActivity {
+public class ProfileActivity extends ThemedActivity {\n    // Profile UI refinements: compact medals, clean supporters, moments-only navigation.
     // Profile inline supporters and gifts use live gift aggregates, never social followers.
     public static final String EXTRA_USER_ID = "user_id";
     private ActivityProfileBinding binding;
