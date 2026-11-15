@@ -227,13 +227,10 @@ public class ProfileActivity extends ThemedActivity {
         }
         if (binding.sectionProfileSupporters != null) {
             binding.sectionProfileSupporters.setVisibility(View.VISIBLE);
-            binding.sectionProfileSupporters.setOnClickListener(v -> {
-                String id = targetUserIdHold[0];
-                if (id == null || id.trim().isEmpty()) return;
-                Intent supporters = new Intent(this, SupportersActivity.class);
-                supporters.putExtra(EXTRA_USER_ID, id);
-                startActivity(supporters);
-            });
+            binding.sectionProfileSupporters.setOnClickListener(v -> openProfileSupportersPage(targetUserIdHold[0]));
+        }
+        if (binding.tvProfileSupportersAll != null) {
+            binding.tvProfileSupportersAll.setOnClickListener(v -> openProfileSupportersPage(targetUserIdHold[0]));
         }
         // Gift history is accessed from Details only; keep its existing dedicated screen/design.
         if (binding.recyclerProfileGiftHistory != null && binding.recyclerProfileGiftHistory.getParent() instanceof View) {
@@ -570,6 +567,13 @@ public class ProfileActivity extends ThemedActivity {
     }
 
 
+
+    private void openProfileSupportersPage(String profileId) {
+        if (profileId == null || profileId.trim().isEmpty()) return;
+        Intent supporters = new Intent(this, SupportersActivity.class);
+        supporters.putExtra(EXTRA_USER_ID, profileId);
+        startActivity(supporters);
+    }
 
     /** Top accounts that actually sent gifts to this profile — never followers. */
     private void loadProfileSupporters(String profileId) {
