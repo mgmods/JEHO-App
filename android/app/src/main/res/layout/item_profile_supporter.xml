@@ -53,6 +53,6 @@
         android:textColor="#FFFFD36A"
         android:textSize="10sp"
         android:textStyle="bold"
-        android:visibility="gone" />
+        android:visibility="visible" />
 
 </LinearLayout>
