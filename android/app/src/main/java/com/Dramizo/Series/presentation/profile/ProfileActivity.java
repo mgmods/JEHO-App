@@ -607,7 +607,7 @@ public class ProfileActivity extends ThemedActivity {
                                 .format(Math.max(0L, supporter.totalSupport)));
                         AvatarCosmetics.bindStacked(avatar, frame, liveFrame, supporter.avatarUrl, supporter.frameUrl, null);
                         holder.itemView.setOnClickListener(v -> {
-                            String id = targetUserIdHold[0];
+                            String id = profileId;
                             if (id == null || id.trim().isEmpty()) return;
                             Intent supporters = new Intent(ProfileActivity.this, SupportersActivity.class);
                             supporters.putExtra(EXTRA_USER_ID, id);
@@ -618,7 +618,7 @@ public class ProfileActivity extends ThemedActivity {
                 });
                 binding.tvProfileSupportersEmpty.setVisibility(supporters.isEmpty() ? View.VISIBLE : View.GONE);
                 if (binding.tvPropProfileSupporters != null) {
-                    binding.tvPropProfileSupporters.setText(formatScore(supporters.size()));
+                    binding.tvPropProfileSupporters.setText("تفاصيل");
                 }
             });
         });
