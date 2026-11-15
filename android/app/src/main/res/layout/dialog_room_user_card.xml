@@ -416,6 +416,26 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <HorizontalScrollView
+        android:id="@+id/userCardEarnedMedalsScroll"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginEnd="12dp"
+        android:scrollbars="none"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ll_model">
+        <LinearLayout
+            android:id="@+id/userCardEarnedMedals"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
     <!-- Agency / guild strip (Mikoo clGuildInfo + icon_info_guild_bg_base_lvN) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/rowAgency"
@@ -428,7 +448,7 @@
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/ll_model"
+        app:layout_constraintTop_toBottomOf="@id/userCardEarnedMedalsScroll"
         tools:visibility="visible">
 
         <ImageView
