@@ -1979,9 +1979,8 @@ public class ProfileActivity extends ThemedActivity {
      */
     private void hideProfileContentBelowStickyActions() {
         if (binding == null || binding.profileInlineActions == null) return;
-        View parentView = binding.profileInlineActions.getParent();
-        if (!(parentView instanceof ViewGroup)) return;
-        ViewGroup parent = (ViewGroup) parentView;
+        ViewGroup parent = (ViewGroup) binding.profileInlineActions.getParent();
+        if (parent == null) return;
         int actionIndex = parent.indexOfChild(binding.profileInlineActions);
         if (actionIndex < 0) return;
         for (int i = actionIndex + 1; i < parent.getChildCount(); i++) {
