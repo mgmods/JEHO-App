@@ -125,6 +125,7 @@ public final class UserProfileCardSheet {
         TextView chipCharm = sheet.findViewById(R.id.chipCharm);
         TextView chipWealth = sheet.findViewById(R.id.chipWealth);
         LinearLayout earnedMedalsRow = sheet.findViewById(R.id.userCardEarnedMedals);
+        View earnedMedalsScroll = sheet.findViewById(R.id.userCardEarnedMedalsScroll);
         TextView chipFirstDay = sheet.findViewById(R.id.chipFirstDay);
         TextView btnHi = sheet.findViewById(R.id.btnHi);
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
@@ -579,7 +580,14 @@ public final class UserProfileCardSheet {
                         earnedMedalsRow.addView(medal);
                         Glide.with(activity).load(AssetCatalog.absoluteUrl(badge.imageUrl)).placeholder(R.drawable.ic_medal_default).error(R.drawable.ic_medal_default).into(medal);
                     }
-                    earnedMedalsRow.setVisibility(earnedMedalsRow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+                    boolean hasEarnedMedals = earnedMedalsRow.getChildCount() > 0;
+                    earnedMedalsRow.setVisibility(hasEarnedMedals ? View.VISIBLE : View.GONE);
+                    // The inner row was populated but its parent HorizontalScrollView stayed GONE,
+                    // which made medals disappear in room/chat profile popups.
+                    if (earnedMedalsScroll != null) {
+                        earnedMedalsScroll.setVisibility(hasEarnedMedals ? View.VISIBLE : View.GONE);
+                        if (hasEarnedMedals) earnedMedalsScroll.bringToFront();
+                    }
                 }
                 boolean showHi = u.showHiBadge || u.isFirstDay;
                 if (chipFirstDay != null) {
