@@ -606,10 +606,11 @@ public class ProfileActivity extends ThemedActivity {
                                 .format(Math.max(0L, supporter.totalSupport)));
                         AvatarCosmetics.bindStacked(avatar, frame, liveFrame, supporter.avatarUrl, supporter.frameUrl, null);
                         holder.itemView.setOnClickListener(v -> {
-                            if (supporter.id == null || supporter.id.isEmpty()) return;
-                            Intent profile = new Intent(ProfileActivity.this, ProfileActivity.class);
-                            profile.putExtra(EXTRA_USER_ID, supporter.id);
-                            startActivity(profile);
+                            String id = targetUserIdHold[0];
+                            if (id == null || id.trim().isEmpty()) return;
+                            Intent supporters = new Intent(ProfileActivity.this, SupportersActivity.class);
+                            supporters.putExtra(EXTRA_USER_ID, id);
+                            startActivity(supporters);
                         });
                     }
                     @Override public int getItemCount() { return supporters.size(); }
@@ -1949,71 +1950,354 @@ public class ProfileActivity extends ThemedActivity {
     private boolean profileAgencyVisibleBeforeDetails = false;
     private boolean profileCpVisibleBeforeDetails = false;
 
-    /** Expand the existing profile sections in place; never navigate away or open a modal. */
+    private void setProfileTab(boolean details) {
+        if (binding == null) return;
+        if (binding.tvProfileAgencyName != null) {
+            binding.tvProfileAgencyName.setTextColor(details ? 0xFFB58AAE : 0xFFFFFFFF);
+        }
+        if (binding.tvPropProfileSupporters != null) {
+            binding.tvPropProfileSupporters.setText("تفاصيل");
+            binding.tvPropProfileSupporters.setTextColor(details ? 0xFFFFFFFF : 0xFFB58AAE);
+        }
+        if (binding.profilePropertyUnderline != null) {
+            binding.profilePropertyUnderline.setVisibility(details ? View.GONE : View.VISIBLE);
+        }
+        if (binding.profileDetailsUnderline != null) {
+            binding.profileDetailsUnderline.setVisibility(details ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    /** Details tab: moments first, then medals/badges, then gifts. */
     private void openProfileDetails() {
         if (binding == null || binding.profileDetailsInlinePanel == null) return;
-        ViewGroup panel = binding.profileDetailsInlinePanel;
-        profileDetailsExpanded = !profileDetailsExpanded;
-        if (!profileDetailsExpanded) {
-            panel.setVisibility(View.GONE);
-            if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(
-                    profileAgencyVisibleBeforeDetails ? View.VISIBLE : View.GONE);
-            if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(
-                    profileCpVisibleBeforeDetails ? View.VISIBLE : View.GONE);
-            if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("تفاصيل");
-            return;
-        }
+        profileDetailsExpanded = true;
+        setProfileTab(true);
+
         profileAgencyVisibleBeforeDetails = binding.rowProfileAgency != null
                 && binding.rowProfileAgency.getVisibility() == View.VISIBLE;
         profileCpVisibleBeforeDetails = binding.rowProfileCpCv != null
                 && binding.rowProfileCpCv.getVisibility() == View.VISIBLE;
+
         if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(View.GONE);
         if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(View.GONE);
         if (binding.rowProfileAchievementBadges != null) binding.rowProfileAchievementBadges.setVisibility(View.GONE);
         if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
+        if (binding.rowGiftHistory != null) binding.rowGiftHistory.setVisibility(View.GONE);
 
+        LinearLayout panel = binding.profileDetailsInlinePanel;
         if (!profileDetailsViewsAttached) {
-            // Details order: badges first, then Moments, then gift history.
-            if (binding.rowProfileAchievementBadges != null) {
-                View badges = binding.rowProfileAchievementBadges;
-                if (badges.getParent() instanceof ViewGroup) ((ViewGroup) badges.getParent()).removeView(badges);
-                panel.addView(badges, new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                badges.setVisibility(View.VISIBLE);
-            }
-            TextView moments = new TextView(this);
-            moments.setText("اللحظات  ›");
-            moments.setTextColor(0xFFFFFFFF);
-            moments.setTextSize(14);
-            moments.setTypeface(null, android.graphics.Typeface.BOLD);
-            moments.setGravity(Gravity.CENTER);
-            moments.setPadding(0, Math.round(14 * getResources().getDisplayMetrics().density),
-                    0, Math.round(14 * getResources().getDisplayMetrics().density));
-            android.graphics.drawable.GradientDrawable momentsBg =
-                    new android.graphics.drawable.GradientDrawable();
-            momentsBg.setColor(0xFF302536);
-            momentsBg.setCornerRadius(Math.round(12 * getResources().getDisplayMetrics().density));
-            moments.setBackground(momentsBg);
-            moments.setOnClickListener(v -> openProfileMomentsLegacy());
-            panel.addView(moments, new android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            panel.removeAllViews();
+            panel.setPadding(dpProfile(2), dpProfile(2), dpProfile(2), dpProfile(8));
 
-            View giftHistory = binding.recyclerProfileGiftHistory == null
-                    ? null : (View) binding.recyclerProfileGiftHistory.getParent();
-            if (giftHistory != null && giftHistory.getParent() instanceof ViewGroup) {
-                ((ViewGroup) giftHistory.getParent()).removeView(giftHistory);
-                panel.addView(giftHistory, new android.widget.LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            }
+            addProfilePreviewSection(panel, "اللحظات", "عرض الكل", v -> openProfileMomentsLegacy());
+            addProfilePreviewSection(panel, "الشارات والمداليات", "عرض الكل", v -> openBadgeCabinet(loadedProfileId));
+            addProfilePreviewSection(panel, "الهدايا", "عرض الكل", v -> {
+                if (loadedProfileId == null || loadedProfileId.trim().isEmpty()) return;
+                Intent intent = new Intent(this, GiftHistoryActivity.class);
+                intent.putExtra(GiftHistoryActivity.EXTRA_USER_ID, loadedProfileId);
+                startActivity(intent);
+            });
             profileDetailsViewsAttached = true;
         }
-
-        if (binding.recyclerProfileGiftHistory != null
-                && binding.recyclerProfileGiftHistory.getParent() instanceof ViewGroup) {
-            View row = (View) binding.recyclerProfileGiftHistory.getParent();
-            row.setVisibility(View.VISIBLE);
-        }
-        if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("إخفاء");
         panel.setVisibility(View.VISIBLE);
+
+        loadProfileMomentsPreview(loadedProfileId);
+        loadProfileMedalsPreview(loadedProfileId);
+        loadProfileGiftsPreview(loadedProfileId);
+    }
+
+    private int dpProfile(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void addProfilePreviewSection(LinearLayout panel, String title, String actionText,
+            View.OnClickListener action) {
+        LinearLayout section = new LinearLayout(this);
+        section.setOrientation(LinearLayout.VERTICAL);
+        section.setPadding(dpProfile(8), dpProfile(8), dpProfile(8), dpProfile(8));
+        section.setBackground(roundProfile(0xFF211A22, 0xFF3D303F, 16));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView titleView = new TextView(this);
+        titleView.setText(title);
+        titleView.setTextColor(0xFFFFFFFF);
+        titleView.setTextSize(16);
+        titleView.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        header.addView(titleView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView more = new TextView(this);
+        more.setText(actionText + "  ›");
+        more.setTextColor(0xFFFF79B9);
+        more.setTextSize(11);
+        more.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        more.setPadding(dpProfile(8), dpProfile(6), dpProfile(4), dpProfile(6));
+        more.setOnClickListener(action);
+        header.addView(more);
+        section.addView(header);
+
+        LinearLayout preview = new LinearLayout(this);
+        preview.setOrientation(LinearLayout.VERTICAL);
+        preview.setTag("profile_preview_" + title);
+        preview.setPadding(0, dpProfile(6), 0, 0);
+        section.addView(preview, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        panel.addView(section, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT) {{
+            bottomMargin = dpProfile(8);
+        }});
+    }
+
+    private android.graphics.drawable.Drawable roundProfile(int fill, int stroke, int radiusDp) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(fill);
+        d.setCornerRadius(dpProfile(radiusDp));
+        d.setStroke(dpProfile(1), stroke);
+        return d;
+    }
+
+    private LinearLayout findProfilePreview(String title) {
+        if (binding == null || binding.profileDetailsInlinePanel == null) return null;
+        String tag = "profile_preview_" + title;
+        for (int i = 0; i < binding.profileDetailsInlinePanel.getChildCount(); i++) {
+            View section = binding.profileDetailsInlinePanel.getChildAt(i);
+            if (section instanceof ViewGroup) {
+                View found = section.findViewWithTag(tag);
+                if (found instanceof LinearLayout) return (LinearLayout) found;
+            }
+        }
+        return null;
+    }
+
+    private void loadProfileMomentsPreview(String profileId) {
+        LinearLayout preview = findProfilePreview("اللحظات");
+        if (preview == null) return;
+        preview.removeAllViews();
+        if (profileId == null || profileId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            List<Map<String, Object>> posts = new ArrayList<>();
+            try {
+                retrofit2.Response<ApiResponse<List<Map<String, Object>>>> response =
+                        container.getUserApi().userMoments(profileId).execute();
+                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
+                    posts.addAll(response.body().data);
+                }
+            } catch (Exception ignored) { }
+            final List<Map<String, Object>> latest = posts.size() > 4
+                    ? new ArrayList<>(posts.subList(0, 4)) : posts;
+            runOnUiThread(() -> {
+                if (binding == null || !profileDetailsExpanded) return;
+                LinearLayout target = findProfilePreview("اللحظات");
+                if (target == null) return;
+                target.removeAllViews();
+                if (latest.isEmpty()) {
+                    addProfileEmptyPreview(target, "لا توجد لحظات منشورة");
+                    return;
+                }
+                addProfileMomentGrid(target, latest);
+            });
+        });
+    }
+
+    private void addProfileMomentGrid(LinearLayout parent, List<Map<String, Object>> posts) {
+        LinearLayout row = null;
+        for (int i = 0; i < posts.size(); i++) {
+            if (i % 2 == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                parent.addView(row, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(116)));
+            }
+            Map<String, Object> post = posts.get(i);
+            LinearLayout tile = new LinearLayout(this);
+            tile.setOrientation(LinearLayout.VERTICAL);
+            tile.setPadding(dpProfile(4), dpProfile(4), dpProfile(4), dpProfile(4));
+            tile.setGravity(Gravity.CENTER);
+            tile.setBackground(roundProfile(0xFFFFFFFF, 0xFF4A3A48, 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dpProfile(110), 1f);
+            lp.setMargins(dpProfile(3), dpProfile(2), dpProfile(3), dpProfile(2));
+            row.addView(tile, lp);
+
+            String imageUrl = stringProfile(post, "imageUrl");
+            if (!imageUrl.isEmpty()) {
+                ImageView image = new ImageView(this);
+                image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                tile.addView(image, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(76)));
+                Glide.with(this).load(imageUrl).centerCrop()
+                        .placeholder(ImagePlaceholder.cover()).into(image);
+            } else {
+                TextView body = new TextView(this);
+                body.setText(stringProfile(post, "body"));
+                body.setTextColor(0xFF3A313A);
+                body.setTextSize(11);
+                body.setMaxLines(4);
+                body.setGravity(Gravity.CENTER);
+                tile.addView(body, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(76)));
+            }
+            TextView likes = new TextView(this);
+            likes.setText("♡ " + stringProfile(post, "likeCount"));
+            likes.setTextColor(0xFFB70F52);
+            likes.setTextSize(9);
+            likes.setGravity(Gravity.CENTER);
+            tile.addView(likes, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(22)));
+            tile.setOnClickListener(v -> {
+                Intent intent = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
+                intent.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, loadedProfileId);
+                startActivity(intent);
+            });
+        }
+    }
+
+    private void loadProfileMedalsPreview(String profileId) {
+        LinearLayout preview = findProfilePreview("الشارات والمداليات");
+        if (preview == null || profileId == null || profileId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            List<BadgeDto> earned = new ArrayList<>();
+            try {
+                retrofit2.Response<ApiResponse<List<BadgeDto>>> response =
+                        container.getUserApi().badges(profileId).execute();
+                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
+                    for (BadgeDto badge : response.body().data) {
+                        if (badge != null && badge.earned && badge.imageUrl != null
+                                && !badge.imageUrl.trim().isEmpty()) earned.add(badge);
+                    }
+                }
+            } catch (Exception ignored) { }
+            final List<BadgeDto> latest = earned.size() > 4
+                    ? new ArrayList<>(earned.subList(0, 4)) : earned;
+            runOnUiThread(() -> {
+                if (binding == null || !profileDetailsExpanded) return;
+                LinearLayout target = findProfilePreview("الشارات والمداليات");
+                if (target == null) return;
+                target.removeAllViews();
+                if (latest.isEmpty()) {
+                    addProfileEmptyPreview(target, "لا توجد شارات أو مداليات");
+                    return;
+                }
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                target.addView(row, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(104)));
+                for (BadgeDto badge : latest) {
+                    LinearLayout item = new LinearLayout(this);
+                    item.setOrientation(LinearLayout.VERTICAL);
+                    item.setGravity(Gravity.CENTER);
+                    item.setPadding(dpProfile(4), dpProfile(4), dpProfile(4), dpProfile(4));
+                    row.addView(item, new LinearLayout.LayoutParams(0, dpProfile(100), 1f));
+                    ImageView icon = new ImageView(this);
+                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    item.addView(icon, new LinearLayout.LayoutParams(dpProfile(52), dpProfile(58)));
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(badge.imageUrl))
+                            .placeholder(R.drawable.ic_medal_default).into(icon);
+                    TextView name = new TextView(this);
+                    name.setText(badge.name == null ? "مدالية" : badge.name);
+                    name.setTextColor(0xFFFFFFFF);
+                    name.setTextSize(9);
+                    name.setGravity(Gravity.CENTER);
+                    name.setMaxLines(1);
+                    name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    item.addView(name, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(22)));
+                }
+            });
+        });
+    }
+
+    private void loadProfileGiftsPreview(String profileId) {
+        LinearLayout preview = findProfilePreview("الهدايا");
+        if (preview == null || profileId == null || profileId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto> gifts = new ArrayList<>();
+            try {
+                Result<List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto>> result =
+                        com.Dramizo.Series.util.ApiCall.execute(container.getGiftApi().receivedHistory(profileId));
+                if (result.success && result.data != null) gifts.addAll(result.data);
+            } catch (Exception ignored) { }
+            final List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto> latest =
+                    gifts.size() > 4 ? new ArrayList<>(gifts.subList(0, 4)) : gifts;
+            runOnUiThread(() -> {
+                if (binding == null || !profileDetailsExpanded) return;
+                LinearLayout target = findProfilePreview("الهدايا");
+                if (target == null) return;
+                target.removeAllViews();
+                if (latest.isEmpty()) {
+                    addProfileEmptyPreview(target, "لا توجد هدايا مستلمة بعد");
+                    return;
+                }
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                target.addView(row, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(104)));
+                for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto gift : latest) {
+                    LinearLayout item = new LinearLayout(this);
+                    item.setOrientation(LinearLayout.VERTICAL);
+                    item.setGravity(Gravity.CENTER);
+                    item.setPadding(dpProfile(4), dpProfile(4), dpProfile(4), dpProfile(4));
+                    row.addView(item, new LinearLayout.LayoutParams(0, dpProfile(100), 1f));
+                    ImageView icon = new ImageView(this);
+                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    item.addView(icon, new LinearLayout.LayoutParams(dpProfile(54), dpProfile(54)));
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(gift.giftIconUrl))
+                            .placeholder(ImagePlaceholder.gift()).into(icon);
+                    TextView name = new TextView(this);
+                    name.setText(gift.giftName == null ? "هدية" : gift.giftName);
+                    name.setTextColor(0xFFFFFFFF);
+                    name.setTextSize(9);
+                    name.setGravity(Gravity.CENTER);
+                    name.setMaxLines(1);
+                    name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    item.addView(name, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(20)));
+                    TextView qty = new TextView(this);
+                    qty.setText("× " + NumberFormat.getNumberInstance(Locale.US)
+                            .format(Math.max(0L, gift.quantity)));
+                    qty.setTextColor(0xFFFFD36A);
+                    qty.setTextSize(8);
+                    qty.setGravity(Gravity.CENTER);
+                    item.addView(qty, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(18)));
+                }
+            });
+        });
+    }
+
+    private void addProfileEmptyPreview(LinearLayout parent, String text) {
+        TextView empty = new TextView(this);
+        empty.setText(text);
+        empty.setTextColor(0xFFB9A7B8);
+        empty.setTextSize(11);
+        empty.setGravity(Gravity.CENTER);
+        parent.addView(empty, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(72)));
+    }
+
+    private String stringProfile(Map<String, Object> map, String key) {
+        if (map == null || map.get(key) == null) return "";
+        return String.valueOf(map.get(key));
+    }
+
+    /** Switch back to the ownership tab; its content stays in the profile. */
+    private void showProfileProperty() {
+        if (binding == null) return;
+        profileDetailsExpanded = false;
+        setProfileTab(false);
+        if (binding.profileDetailsInlinePanel != null) binding.profileDetailsInlinePanel.setVisibility(View.GONE);
+        if (binding.rowProfileAgency != null) {
+            binding.rowProfileAgency.setVisibility(profileAgencyVisibleBeforeDetails ? View.VISIBLE : View.GONE);
+        }
+        if (binding.rowProfileCpCv != null) {
+            binding.rowProfileCpCv.setVisibility(profileCpVisibleBeforeDetails ? View.VISIBLE : View.GONE);
+        }
+        if (binding.rowProfileAgency != null && binding.rowProfileAgency.getVisibility() == View.GONE
+                && binding.rowProfileCpCv != null && binding.rowProfileCpCv.getVisibility() == View.GONE) {
+            // Keep the ownership tab useful even when the profile has no agency/CP content.
+            // No fake ownership data is created.
+        }
     }
 
     private void addProfileDetailStat(android.widget.LinearLayout parent, String label,
