@@ -11,7 +11,7 @@
 
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
-    <p class="text-secondary small mb-3">الأيقونات التي تُطبّق على جميع المستخدمين: VIP، المستوى، المتجر، الغرفة، الوكالة، فعالياتي، فتح وكالة، مركز المهام، وكيل الشحن، الأدوات. إعدادات هذه الأيقونات مشتركة مع أيقونات التبويبات، ولن تتأثر عند حفظ أيقونات التبويبات. ترك الأيقونة فارغة يعيد أيقونة التطبيق الافتراضية.</p>
+    <p class="text-secondary small mb-3">الأيقونات التي تُطبّق على جميع المستخدمين: VIP، المستوى، المتجر، الغرفة، الوكالة، فعالياتي، فتح وكالة، مركز المهام، وكيل الشحن، الأدوات وأزرار المتابعة والمراسلة والغرفة في الملف الشخصي. إعدادات هذه الأيقونات مشتركة مع أيقونات التبويبات، ولن تتأثر عند حفظ أيقونات التبويبات. ترك الأيقونة فارغة يعيد أيقونة التطبيق الافتراضية.</p>
 
     <LoadingSpinner v-if="loading" />
     <div v-else class="profile-icons-grid">
@@ -53,6 +53,9 @@ const actions = [
   { key: 'tools', label: 'الأدوات' },
   { key: 'settings', label: 'الإعدادات' },
   { key: 'support', label: 'الدعم' },
+  { key: 'follow', label: 'زر المتابعة في الملف الشخصي' },
+  { key: 'message', label: 'زر المراسلة في الملف الشخصي' },
+  { key: 'room', label: 'زر الغرفة في الملف الشخصي' },
 ]
 const form = reactive(Object.fromEntries(actions.map(x => [x.key, ''])))
 const baseConfig = ref({ version: 1 })
