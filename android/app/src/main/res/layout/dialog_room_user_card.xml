@@ -221,7 +221,7 @@
         android:paddingVertical="10dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowRoleBadges">
+        app:layout_constraintTop_toBottomOf="@id/userCardEarnedMedalsScroll">
 
         <LinearLayout
             android:id="@+id/cellStatFollowers"
@@ -427,7 +427,7 @@
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/ll_model">
+        app:layout_constraintTop_toBottomOf="@id/rowRoleBadges">
         <LinearLayout
             android:id="@+id/userCardEarnedMedals"
             android:layout_width="wrap_content"
@@ -448,7 +448,7 @@
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/userCardEarnedMedalsScroll"
+        app:layout_constraintTop_toBottomOf="@id/ll_model"
         tools:visibility="visible">
 
         <ImageView
