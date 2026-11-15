@@ -68,6 +68,7 @@ import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.List;
 import java.util.UUID;
@@ -205,7 +206,7 @@ public class ProfileActivity extends ThemedActivity {
         // Mikoo card taps on full profile page.
         if (binding.cellProfileFollowers != null) {
             binding.cellProfileFollowers.setOnClickListener(v -> {
-                String id = targetUserIdHold[0];
+                String id = loadedProfileId;
                 if (id == null || id.isEmpty()) return;
                 UserSocialNav.openFollowers(this, id, myId);
             });
@@ -821,10 +822,6 @@ public class ProfileActivity extends ThemedActivity {
                 binding.rowProfileAchievementBadges.setOnClickListener(v -> openBadgeCabinet(profileId));
             });
         });
-    }
-
-    private int dpProfile(float value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private String formatScore(long value) {
@@ -2343,18 +2340,6 @@ public class ProfileActivity extends ThemedActivity {
         Glide.with(this).load(AssetCatalog.absoluteUrl(selectedFrame))
                 .fitCenter().into(frame);
         frame.bringToFront();
-    }
-
-    private void showProfileProperty() {
-        if (binding == null) return;
-        if (binding.rowProfileAgency != null && profileDetailsExpanded) {
-            binding.rowProfileAgency.setVisibility(View.GONE);
-        }
-        if (binding.rowProfileCpCv != null && profileDetailsExpanded) {
-            binding.rowProfileCpCv.setVisibility(View.GONE);
-        }
-        if (binding.rowGiftHistory != null) binding.rowGiftHistory.setVisibility(View.VISIBLE);
-        if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.VISIBLE);
     }
 
 }
