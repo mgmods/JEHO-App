@@ -123,6 +123,7 @@ public final class UserProfileCardSheet {
         TextView chipMember = sheet.findViewById(R.id.chipMember);
         TextView chipCharm = sheet.findViewById(R.id.chipCharm);
         TextView chipWealth = sheet.findViewById(R.id.chipWealth);
+        LinearLayout earnedMedalsRow = sheet.findViewById(R.id.userCardEarnedMedals);
         TextView chipFirstDay = sheet.findViewById(R.id.chipFirstDay);
         TextView btnHi = sheet.findViewById(R.id.btnHi);
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
@@ -318,6 +319,12 @@ public final class UserProfileCardSheet {
                     ApiCall.execute(container.getUserApi().getUser(uid));
             if (!r.success || r.data == null) return;
             AuthDtos.UserDto u = r.data;
+            List<com.Dramizo.Series.data.remote.dto.BadgeDto> earnedMedals = java.util.Collections.emptyList();
+            try {
+                Result<List<com.Dramizo.Series.data.remote.dto.BadgeDto>> badgeResult = ApiCall.execute(container.getUserApi().earnedBadges(uid));
+                if (badgeResult.success && badgeResult.data != null) earnedMedals = badgeResult.data;
+            } catch (Exception ignored) { }
+            final List<com.Dramizo.Series.data.remote.dto.BadgeDto> profileMedals = earnedMedals;
             activity.runOnUiThread(() -> {
                 if (!dialog.isShowing()) return;
                 int liveVip = Math.max(0, u.vipLevel);
@@ -555,6 +562,24 @@ public final class UserProfileCardSheet {
                     chipWealth.setText(String.valueOf(Math.max(0, wl)));
                 }
                 styleStatChips(chipCharm, chipWealth);
+                if (earnedMedalsRow != null) {
+                    earnedMedalsRow.removeAllViews();
+                    int medalCount = 0;
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : profileMedals) {
+                        if (badge == null || !badge.earned || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
+                        if (medalCount++ >= 8) break;
+                        ImageView medal = new ImageView(activity);
+                        int medalSize = Math.round(34 * activity.getResources().getDisplayMetrics().density);
+                        LinearLayout.LayoutParams medalLp = new LinearLayout.LayoutParams(medalSize, medalSize);
+                        medalLp.setMargins(0, 0, Math.round(6 * activity.getResources().getDisplayMetrics().density), 0);
+                        medal.setLayoutParams(medalLp);
+                        medal.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        medal.setContentDescription(badge.name == null ? "شارة" : badge.name);
+                        earnedMedalsRow.addView(medal);
+                        Glide.with(activity).load(AssetCatalog.absoluteUrl(badge.imageUrl)).placeholder(R.drawable.ic_medal_default).error(R.drawable.ic_medal_default).into(medal);
+                    }
+                    earnedMedalsRow.setVisibility(earnedMedalsRow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+                }
                 boolean showHi = u.showHiBadge || u.isFirstDay;
                 if (chipFirstDay != null) {
                     chipFirstDay.setVisibility(showHi ? View.VISIBLE : View.GONE);
