@@ -10752,10 +10752,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         setViewSize(binding.hostStageAvatarWrap, hostFrameSize, hostFrameSize);
         // webHostSignal is match_parent inside the wrap — size the wrap only.
 
-        ViewGroup.MarginLayoutParams hostStageParams =
-                (ViewGroup.MarginLayoutParams) binding.hostStage.getLayoutParams();
-        hostStageParams.topMargin = dp(shortScreen ? 0 : 2);
-        binding.hostStage.setLayoutParams(hostStageParams);
+        ViewGroup.LayoutParams hostStageRaw = binding.hostStage.getLayoutParams();
+        if (hostStageRaw instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams hostStageParams = (ViewGroup.MarginLayoutParams) hostStageRaw;
+            hostStageParams.topMargin = dp(shortScreen ? 0 : 2);
+            binding.hostStage.setLayoutParams(hostStageParams);
+        } else if (hostStageRaw != null) {
+            // hostStage is a LinearLayout in the current room XML; never cast it to a margin type.
+            ViewGroup.LayoutParams safe = new ViewGroup.LayoutParams(hostStageRaw);
+            binding.hostStage.setLayoutParams(safe);
+        }
 
         if (currentSeats != null && !currentSeats.isEmpty()) {
             applyMikooSeatGrid(guestSeatsOnly(currentSeats).size());
