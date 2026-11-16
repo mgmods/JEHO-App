@@ -3007,11 +3007,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     AvatarCosmetics.bindStacked(avatar, frameView, hostSignal, avatarUrl, frameUrl, null);
                 }
             }
-            // Agency role is rendered once in chatBadgesRow by applyRoomChatDecorations.
-            // A second host chip beside the name duplicated the same agency label.
+            // Restore the room agency/host role label beside the sender name.
+            // This is only an identity chip in the chat row; it is NOT an avatar overlay.
             if (hostChip != null) {
-                hostChip.setVisibility(View.GONE);
-                hostChip.setText("");
+                String roleLabel = agencyRoleLabelForRoomUser(userId);
+                boolean hostUser = roomHostId != null && sameUser(userId, roomHostId);
+                if ((roleLabel == null || roleLabel.trim().isEmpty()) && hostUser) {
+                    AuthDtos.UserDto roleUser = null;
+                    try {
+                        RoomDtos.RoomDto activeRoom = viewModel != null ? viewModel.getRoom().getValue() : null;
+                        if (activeRoom != null) roleUser = activeRoom.host;
+                    } catch (Exception ignored) { }
+                    boolean female = roleUser != null && "female".equalsIgnoreCase(roleUser.gender);
+                    roleLabel = female ? "مضيفة" : "مضيف";
+                }
+                if (roleLabel != null && !roleLabel.trim().isEmpty()) {
+                    hostChip.setText(roleLabel);
+                    hostChip.setVisibility(View.VISIBLE);
+                    hostChip.setClickable(false);
+                    hostChip.setFocusable(false);
+                } else {
+                    hostChip.setVisibility(View.GONE);
+                    hostChip.setText("");
+                }
             }
 
             // VIP/CP/ID/medals now sit inline beside the display name.
@@ -3063,6 +3081,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (avatar != null) {
             avatar.setOnClickListener(openUserMenu);
             avatar.setOnLongClickListener(openUserMenuLong);
+        }
+        // The avatar frame/signal can cover the ImageView visually, so bind the
+        // same user menu to the whole avatar hit-area as well.
+        if (avatarWrap != null) {
+            avatarWrap.setClickable(true);
+            avatarWrap.setFocusable(true);
+            avatarWrap.setOnClickListener(openUserMenu);
+            avatarWrap.setOnLongClickListener(openUserMenuLong);
+        }
+        if (frameView != null) {
+            frameView.setOnClickListener(openUserMenu);
+            frameView.setOnLongClickListener(openUserMenuLong);
         }
         bubble.setOnClickListener(null);
         bubble.setOnLongClickListener(openUserMenuLong);
@@ -3331,13 +3361,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         badge.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
         int width = Math.max(dp(12), badge.getMeasuredWidth()) + dp(2);
-        if (inlineUsed[0] + width <= firstLineLimit) {
+        if (inline.getChildCount() < 6 && inlineUsed[0] + width <= firstLineLimit) {
             inline.addView(badge);
             inlineUsed[0] += width;
             inline.setVisibility(View.VISIBLE);
             return;
         }
-        if (overflowLine[0] == null || overflowUsed[0] + width > overflowLineLimit) {
+        if (overflowLine[0] == null
+                || overflowLine[0].getChildCount() >= 6
+                || overflowUsed[0] + width > overflowLineLimit) {
             LinearLayout line = new LinearLayout(this);
             line.setOrientation(LinearLayout.HORIZONTAL);
             line.setGravity(android.view.Gravity.CENTER_VERTICAL);
