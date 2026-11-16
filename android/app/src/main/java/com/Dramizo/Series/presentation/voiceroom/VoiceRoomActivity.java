@@ -324,10 +324,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int luckyCannonGiftQuantity = 1;
     private final List<String> luckyCannonTargets = new ArrayList<>();
     private boolean luckyCannonSending;
-    /** Number of cannon economy requests currently in flight. */
+    /** Keep a tiny bounded pipeline: fast enough to feel continuous without flooding the economy API. */
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 2;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 110L;
     private int luckyCannonInFlight;
     private boolean luckyCannonHoldActive;
-    // Repeat immediately after each confirmed send; server response time is the only pacing limit.
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
             if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
@@ -4938,10 +4939,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        // Keep exactly one economy request in flight. A repeat is scheduled only
-        // after this request succeeds, so slow networks cannot build a request queue.
-        // ACTION_UP removes the next repeat immediately; only the current request may finish.
-        if (luckyCannonInFlight > 0) return;
+        // A two-request bounded pipeline hides part of network round-trip latency while
+        // preventing an unbounded queue or runaway parallel wallet charges. ACTION_UP
+        // cancels the next launch immediately; requests already accepted by the server finish.
+        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) return;
         final AppContainer container;
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
         final String giftId = luckyCannonGiftId;
@@ -4955,6 +4956,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         luckyCannonInFlight++;
         luckyCannonSending = true;
         if (luckyCannonView != null) luckyCannonView.setEnabled(true);
+        // Schedule the next shot on a short fixed cadence instead of waiting for the
+        // previous HTTP response. The in-flight cap above bounds concurrency.
+        if (luckyCannonHoldActive && !isFinishing() && !isDestroyed()) {
+            handler.removeCallbacks(luckyCannonRepeatRunnable);
+            handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
+        }
         container.getIoExecutor().execute(() -> {
             Result<GiftDtos.SendGiftResult> result;
             if (targets.size() > 1) {
@@ -5009,9 +5016,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Server emits the canonical room gift event; animation is rendered locally by
                 // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                // No artificial cooldown: fire the next request immediately after confirmation.
-                // Releasing the finger still cancels this callback before another request starts.
-                if (luckyCannonHoldActive && !isFinishing() && !isDestroyed()) {
+                // If a request finishes before the next cadence tick, use the freed slot
+                // immediately. The touch-up handler still cancels every not-yet-started shot.
+                if (luckyCannonHoldActive && luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT
+                        && !isFinishing() && !isDestroyed()) {
                     handler.removeCallbacks(luckyCannonRepeatRunnable);
                     handler.post(luckyCannonRepeatRunnable);
                 }
