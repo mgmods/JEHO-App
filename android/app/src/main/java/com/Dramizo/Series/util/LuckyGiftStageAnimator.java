@@ -134,7 +134,12 @@ public final class LuckyGiftStageAnimator {
             fadeAndRemove(stage, onEnd);
             return;
         }
-        hero.animate().alpha(0f).scaleX(0.7f).scaleY(0.7f).setDuration(180L).start();
+        // Keep the main lucky gift visible at its center anchor while copies
+        // split out from underneath it toward the microphones.
+        hero.animate().cancel();
+        hero.setAlpha(1f);
+        hero.setScaleX(1f);
+        hero.setScaleY(1f);
         final int[] remaining = {valid.size()};
         int size = Math.round(46f * density);
         for (int i = 0; i < valid.size(); i++) {
