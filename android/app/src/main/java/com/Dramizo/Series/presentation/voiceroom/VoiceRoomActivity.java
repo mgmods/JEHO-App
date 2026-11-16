@@ -2890,9 +2890,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             AuthDtos.UserDto selfUser = session.getUser();
             if (selfUser != null) {
                 if (avatarUrl == null || avatarUrl.isEmpty()) avatarUrl = selfUser.avatarUrl;
-                if (frameUrl == null || frameUrl.isEmpty()) {
-                    frameUrl = selfUser.vipBadgeUrl;
-                }
+                // The signed-in user's currently equipped frame is authoritative,
+                // even when an older room event carries a legacy hostBadge frameUrl.
+                frameUrl = selfUser.vipBadgeUrl;
             }
         }
         // The message payload's legacy frameUrl may contain an agency host badge.
