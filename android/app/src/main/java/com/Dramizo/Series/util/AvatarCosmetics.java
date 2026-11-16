@@ -261,7 +261,8 @@ public final class AvatarCosmetics {
             @Nullable String hostBadgeUrl,
             @Nullable Map<String, ?> frameMeta,
             @Nullable Map<String, ?> hostBadgeMeta) {
-        hostBadgeUrl = isContestWear(hostBadgeUrl) ? null : hostBadgeUrl;
+        // Agency/host/competition role marks are not avatar cosmetics; keep VIP frames only.
+        hostBadgeUrl = null;
         frameUrl = isContestWear(frameUrl) ? null : frameUrl;
         boolean hasBadge = hostBadgeUrl != null && !hostBadgeUrl.isEmpty();
         boolean hasFrame = frameUrl != null && !frameUrl.isEmpty();
