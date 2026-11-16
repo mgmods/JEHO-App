@@ -152,7 +152,11 @@ public final class UserProfileCardSheet {
         if (chipMember != null) chipMember.setText(String.valueOf(Math.max(1, userLevel)));
         styleStatChips(chipCharm, chipWealth);
         AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
-        bindVipMedal(imgVipMedal, vipLevel, null);
+        // The VIP medal icon is intentionally hidden on the room user profile card.
+        if (imgVipMedal != null) {
+            imgVipMedal.setVisibility(View.GONE);
+            imgVipMedal.setImageDrawable(null);
+        }
         bindVipHead(vipHead, vipLevel, null);
         AvatarCosmetics.bindProfileWear(
                 userCardHostSignal, img, frame, avatarHold[0], vipFrameHold[0],
@@ -345,7 +349,10 @@ public final class UserProfileCardSheet {
                         u.vipHeadUrl != null ? u.vipHeadUrl : VipStyle.fixedHeadPath(liveVip));
                 // Head owns: ride entry + VIP medal (Mikoo property head).
                 bindEntryRide(imgEntryRide, firstNonEmpty(u.entryAnimationUrl, u.entryEffectUrl));
-                bindVipMedal(imgVipMedal, liveVip, u.levelBadgeUrl);
+                if (imgVipMedal != null) {
+                    imgVipMedal.setVisibility(View.GONE);
+                    imgVipMedal.setImageDrawable(null);
+                }
                 bindAgency(activity, rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, u.agency);
                 boolean isAgencyOwner = u.agency != null && "owner".equalsIgnoreCase(u.agency.role);
                 if (isAgencyOwner) {
