@@ -212,7 +212,16 @@ public class AppContainer {
         okhttp3.Cache httpCache = new okhttp3.Cache(
                 new java.io.File(appContext.getCacheDir(), "http_cache"),
                 64L * 1024L * 1024L);
+        // The API host is shared by room joins, chat, gifts, wallet and config calls.
+        // OkHttp's default per-host limit (5) makes fast room/gift bursts queue behind
+        // unrelated requests. Raise the connection concurrency without changing request semantics.
+        okhttp3.Dispatcher httpDispatcher = new okhttp3.Dispatcher(
+                java.util.concurrent.Executors.newFixedThreadPool(16));
+        httpDispatcher.setMaxRequests(48);
+        httpDispatcher.setMaxRequestsPerHost(16);
         OkHttpClient client = new OkHttpClient.Builder()
+                .dispatcher(httpDispatcher)
+                .connectionPool(new okhttp3.ConnectionPool(10, 2, TimeUnit.MINUTES))
                 .cache(httpCache)
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(25, TimeUnit.SECONDS)
