@@ -452,9 +452,29 @@ public class RealtimeClient {
 
     private final Emitter.Listener onConnect = args -> {
         Log.i(TAG, "Connected");
-        for (RoomListener l : roomListeners) l.onConnected();
-        for (ChatListener l : chatListeners) l.onConnected();
-        for (UserListener l : userListeners) l.onConnected();
+        // A stale Activity listener must never crash Socket.IO's callback thread and
+        // take down realtime delivery for every other screen/listener.
+        for (RoomListener l : roomListeners) {
+            try {
+                l.onConnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Room onConnected listener failed", error);
+            }
+        }
+        for (ChatListener l : chatListeners) {
+            try {
+                l.onConnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Chat onConnected listener failed", error);
+            }
+        }
+        for (UserListener l : userListeners) {
+            try {
+                l.onConnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "User onConnected listener failed", error);
+            }
+        }
         // Room re-join is owned by VoiceRoomActivity.connectRealtimeRoom (full profile).
         // Skipping bare room:join here avoids double presence traffic on every reconnect.
         for (String cid : new HashSet<>(joinedConversations)) {
@@ -472,9 +492,29 @@ public class RealtimeClient {
         // Server-side Socket.IO room membership is lost on disconnect. Clear the
         // local cache so VoiceRoomActivity can re-join before sending room events.
         joinedRooms.clear();
-        for (RoomListener l : roomListeners) l.onDisconnected();
-        for (ChatListener l : chatListeners) l.onDisconnected();
-        for (UserListener l : userListeners) l.onDisconnected();
+        // Isolate callbacks: an Activity being destroyed during a network transition
+        // must not throw out of Socket.IO's thread and terminate the app process.
+        for (RoomListener l : roomListeners) {
+            try {
+                l.onDisconnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Room onDisconnected listener failed", error);
+            }
+        }
+        for (ChatListener l : chatListeners) {
+            try {
+                l.onDisconnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Chat onDisconnected listener failed", error);
+            }
+        }
+        for (UserListener l : userListeners) {
+            try {
+                l.onDisconnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "User onDisconnected listener failed", error);
+            }
+        }
     };
 
     private final Emitter.Listener onRoomEvent = args -> {
