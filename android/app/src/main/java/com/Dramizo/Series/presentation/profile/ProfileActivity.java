@@ -854,7 +854,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
                 return;
             }
-            if ("owner".equals(role)) fallbackLabel = "قائد الوكالة";
+            if ("owner".equals(role) || "leader".equals(role)) fallbackLabel = "قائد الوكالة";
             else if ("host".equals(role)) fallbackLabel = "مضيف";
             else if ("manager".equals(role) || "admin".equals(role) || "agency_admin".equals(role))
                 fallbackLabel = "أدمن وكالة";
