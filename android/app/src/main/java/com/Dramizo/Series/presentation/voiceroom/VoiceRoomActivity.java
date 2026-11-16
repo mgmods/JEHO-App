@@ -4978,7 +4978,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             handler.removeCallbacks(luckyCannonRepeatRunnable);
             handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
         }
-        container.getIoExecutor().execute(() -> {
+        container.getLuckyCannonExecutor().execute(() -> {
             Result<GiftDtos.SendGiftResult> result;
             if (targets.size() > 1) {
                 GiftDtos.SendAllMicRequest request =
