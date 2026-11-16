@@ -327,13 +327,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Number of cannon economy requests currently in flight. */
     private int luckyCannonInFlight;
     private boolean luckyCannonHoldActive;
-    private static final long LUCKY_CANNON_REPEAT_MS = 75L;
-    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 4;
+    // Small cooldown after each confirmed send; requests never overlap or queue.
+    private static final long LUCKY_CANNON_REPEAT_MS = 120L;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
             if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
             sendLuckyCannonGift(true);
-            handler.postDelayed(this, LUCKY_CANNON_REPEAT_MS);
         }
     };
     @Nullable private String luckyCannonRequestId;
@@ -4941,10 +4940,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        // Do not serialize cannon shots behind network round-trips. Allow a small
-        // bounded number of requests in flight. Releasing the finger stops creating
-        // new requests immediately; there is no queued shot to drain afterwards.
-        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) return;
+        // Keep exactly one economy request in flight. A repeat is scheduled only
+        // after this request succeeds, so slow networks cannot build a request queue.
+        // ACTION_UP removes the next repeat immediately; only the current request may finish.
+        if (luckyCannonInFlight > 0) return;
         final AppContainer container;
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
         final String giftId = luckyCannonGiftId;
@@ -5012,8 +5011,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Server emits the canonical room gift event; animation is rendered locally by
                 // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                // The repeat runnable drives the next shot independently; there is
-                // deliberately no post-release queue to drain.
+                // Pace the next shot from completion, not a fixed timer. This prevents
+                // overlapping requests and guarantees release leaves no queued shots.
+                if (luckyCannonHoldActive && !isFinishing() && !isDestroyed()) {
+                    handler.removeCallbacks(luckyCannonRepeatRunnable);
+                    handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_MS);
+                }
             });
         });
     }
