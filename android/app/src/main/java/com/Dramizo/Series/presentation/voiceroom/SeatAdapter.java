@@ -322,6 +322,14 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && Objects.equals(a.user.nameStyle, b.user.nameStyle)
                 && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.label,
                         b.user.agencyClub == null ? null : b.user.agencyClub.label)
+                && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.role,
+                        b.user.agencyClub == null ? null : b.user.agencyClub.role)
+                && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.agencyId,
+                        b.user.agencyClub == null ? null : b.user.agencyClub.agencyId)
+                && Objects.equals(a.user.agency == null ? null : a.user.agency.role,
+                        b.user.agency == null ? null : b.user.agency.role)
+                && Objects.equals(a.user.agency == null ? null : a.user.agency.id,
+                        b.user.agency == null ? null : b.user.agency.id)
                 && Objects.equals(a.user.hostBadgeMeta, b.user.hostBadgeMeta)
                 && a.user.level == b.user.level
                 && a.user.vipLevel == b.user.vipLevel;
@@ -1221,10 +1229,36 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
     private void bindAgencyRoleSeatBadge(VH holder,
             @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
-        if (holder.b.tvAgencyRoleBadge != null) {
-            holder.b.tvAgencyRoleBadge.setText("");
-            holder.b.tvAgencyRoleBadge.setVisibility(View.GONE);
+        TextView badge = holder.b.tvAgencyRoleBadge;
+        if (badge == null) return;
+        badge.setText("");
+        badge.setVisibility(View.GONE);
+        if (user == null) return;
+
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency = user.agency;
+        com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club = user.agencyClub;
+        String role = "";
+        String memberAgencyId = "";
+        if (agency != null && agency.role != null) {
+            role = agency.role.trim().toLowerCase(Locale.ROOT);
+            memberAgencyId = agency.id == null ? "" : agency.id.trim();
         }
+        if ((role.isEmpty() || "member".equals(role)) && club != null && club.role != null) {
+            role = club.role.trim().toLowerCase(Locale.ROOT);
+            memberAgencyId = club.agencyId == null ? "" : club.agencyId.trim();
+        }
+
+        boolean leader = "owner".equals(role) || "leader".equals(role);
+        boolean host = "host".equals(role);
+        // A leader's identity follows the user into every room. A host badge is
+        // room-scoped and is shown only inside the agency room that appointed them.
+        if (!leader && !(host && agencyRoom && roomAgencyId != null
+                && !roomAgencyId.isEmpty() && roomAgencyId.equals(memberAgencyId))) return;
+
+        String label = StaffRoleHelper.genderizeLabel(
+                leader ? "♛  قائد الوكالة" : "مضيف", user.gender);
+        badge.setText(label);
+        badge.setVisibility(View.VISIBLE);
     }
 
     private void bindStaffSeatBadge(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
