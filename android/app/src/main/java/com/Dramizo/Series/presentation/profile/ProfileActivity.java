@@ -193,10 +193,10 @@ public class ProfileActivity extends ThemedActivity {
                 startActivity(new Intent(this, AdminConsoleActivity.class));
             });
         }
-        hideProfileContentBelowStickyActions();
-        // Keep the identity stats row directly under the ID visible; it is part of the
-        // profile identity (popularity + wealth + VIP), not one of the lower action rows.
+        // Keep the identity stats row directly under the ID. The three profile actions
+        // are the final row of the page and must not hide or remove any profile content.
         ensureProfileIdentityStatsVisible();
+        moveProfileInlineActionsToBottom();
 
         final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
@@ -1973,20 +1973,15 @@ public class ProfileActivity extends ThemedActivity {
         loadProfileGiftsPreview(loadedProfileId);
     }
 
-    /** Keep the public profile page bounded by the three dashboard-controlled CP actions.
-     * Everything rendered below those actions is legacy/duplicate navigation and stays hidden.
-     * The Details panel and the earned medals strip are above this boundary and remain usable.
-     */
-    private void hideProfileContentBelowStickyActions() {
+    /** Keep VIP/wealth/popularity under the ID while making the three profile actions
+     * the final controls at the bottom of the public profile. No content is hidden. */
+    private void moveProfileInlineActionsToBottom() {
         if (binding == null || binding.profileInlineActions == null) return;
         ViewGroup parent = (ViewGroup) binding.profileInlineActions.getParent();
         if (parent == null) return;
-        int actionIndex = parent.indexOfChild(binding.profileInlineActions);
-        if (actionIndex < 0) return;
-        for (int i = actionIndex + 1; i < parent.getChildCount(); i++) {
-            View child = parent.getChildAt(i);
-            if (child != null) child.setVisibility(View.GONE);
-        }
+        parent.removeView(binding.profileInlineActions);
+        parent.addView(binding.profileInlineActions);
+        binding.profileInlineActions.setVisibility(View.VISIBLE);
     }
 
     private void ensureProfileIdentityStatsVisible() {
