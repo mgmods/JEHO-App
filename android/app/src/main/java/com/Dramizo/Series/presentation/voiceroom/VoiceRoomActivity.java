@@ -328,8 +328,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
     // Keep a small pipeline so cannon cadence is not tied to one slow HTTP response.
     // Wallet transactions remain serialized safely by the backend's sender-wallet row lock.
-    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 110L;
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 5;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 65L;
     private int luckyCannonInFlight;
     private int luckyCannonPendingQuantity;
     private boolean luckyCannonHoldActive;
@@ -3275,10 +3275,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         || "admin".equals(agencyRole) || "agency_admin".equals(agencyRole) || roomModerator) {
                     agencyBadgeLabel = female ? "مشرفة" : "مشرف";
                 }
-            } else if (!isAgencyRoom && liveRoom != null && liveRoom.hostId != null
-                    && decoration.userId != null && sameUser(liveRoom.hostId, decoration.userId)) {
-                agencyBadgeLabel = female ? "مضيفة" : "مضيف";
             }
+            // Host/hostess labels are room-local: only show them inside their own agency room.
+            // In personal rooms or another agency's room, the profile still carries the role,
+            // but the mic/chat identity must stay clean.
         }
         if (agencyBadgeLabel != null) {
             TextView agencyBadge = new TextView(this);
