@@ -5108,34 +5108,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * Returns the reveal point slightly below guest seat 18, in giftOverlay coordinates.
      * The seat view is resolved from the same sorted guest list used by the grid adapter.
      */
+    /**
+     * Fixed lucky-gift reveal anchor: independent of seat numbers or room layout.
+     * The anchor stays around the visual middle of the screen, slightly below center,
+     * matching the familiar placement used by global live-room apps.
+     */
     @Nullable
     private PointF resolveLuckyGiftRevealCenter() {
-        if (binding == null || binding.recyclerSeats == null || binding.giftOverlay == null) return null;
-        List<RoomDtos.SeatDto> guests = prepareGuestSeatsForGrid(currentSeats);
-        int adapterPosition = -1;
-        for (int i = 0; i < guests.size(); i++) {
-            RoomDtos.SeatDto seat = guests.get(i);
-            if (seat != null && seat.seatIndex == 8) {
-                adapterPosition = i;
-                break;
-            }
-        }
-        if (adapterPosition < 0) return null;
-        RecyclerView.ViewHolder holder =
-                binding.recyclerSeats.findViewHolderForAdapterPosition(adapterPosition);
-        View seatView = holder != null ? holder.itemView
-                : binding.recyclerSeats.getLayoutManager() != null
-                ? binding.recyclerSeats.getLayoutManager().findViewByPosition(adapterPosition) : null;
-        if (seatView == null || seatView.getWidth() <= 0 || seatView.getHeight() <= 0) return null;
-
-        int[] seatLocation = new int[2];
-        int[] overlayLocation = new int[2];
-        seatView.getLocationOnScreen(seatLocation);
-        binding.giftOverlay.getLocationOnScreen(overlayLocation);
-        float density = getResources().getDisplayMetrics().density;
-        float x = seatLocation[0] - overlayLocation[0] + seatView.getWidth() * 0.5f;
-        float y = seatLocation[1] - overlayLocation[1] + seatView.getHeight() + 34f * density;
-        return new PointF(x, y);
+        if (binding == null || binding.giftOverlay == null) return null;
+        int w = Math.max(binding.giftOverlay.getWidth(), 1);
+        int h = Math.max(binding.giftOverlay.getHeight(), 1);
+        return new PointF(w * 0.50f, h * 0.52f);
     }
 
     /** Highlight occupied seats matching gift recipients while the gift sheet is open. */
