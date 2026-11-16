@@ -1348,6 +1348,11 @@ public class ProfileActivity extends ThemedActivity {
                 // and wear, but intentionally does not change the caller's visibility.
                 binding.imgProfileCpSelf.setVisibility(View.VISIBLE);
                 binding.imgProfileCpPartner.setVisibility(View.VISIBLE);
+                binding.imgProfileCpPartner.setOnClickListener(null);
+                binding.tvProfileCpHeart.setOnClickListener(null);
+                binding.imgProfileCpCvPartner.setOnClickListener(null);
+                binding.tvProfileCpCvHeart.setOnClickListener(null);
+                binding.rowProfileCpCv.setOnClickListener(null);
                 com.Dramizo.Series.util.AvatarCosmetics.bindWear(
                         binding.imgProfileCpSelf,
                         binding.imgProfileCpSelfFrame,
@@ -1500,6 +1505,11 @@ public class ProfileActivity extends ThemedActivity {
         if (isFinishing() || binding == null) return;
         bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
         bindRealCpAvatar(binding.imgProfileCpPartner, partnerAvatarUrl);
+        binding.imgProfileCpPartner.setOnClickListener(null);
+        binding.tvProfileCpHeart.setOnClickListener(null);
+        binding.imgProfileCpCvPartner.setOnClickListener(null);
+        binding.tvProfileCpCvHeart.setOnClickListener(null);
+        binding.rowProfileCpCv.setOnClickListener(null);
         com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpSelfFrame, ownFrameUrl);
         com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpPartnerFrame, partnerFrameUrl);
         binding.tvProfileCpLabel.setVisibility(View.GONE);
