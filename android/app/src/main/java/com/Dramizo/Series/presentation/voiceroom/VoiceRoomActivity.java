@@ -16601,14 +16601,39 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     mul = rawMultiplier <= 0d ? 0 : Math.max(1, (int) Math.round(rawMultiplier));
                 }
             }
-            // The "حظ سعيد" winner toast/banner is intentionally disabled.
+            // Every authoritative lucky outcome must show its dashboard-configured
+            // profit/return/loss toast to room participants. Do not gate this on payout:
+            // X0/loss and partial returns are real outcomes too.
+            String luckyEventId = firstNonEmpty(memberStr(payload, "eventId"),
+                    memberStr(payload, "openId"), memberStr(payload, "sendId"),
+                    memberStr(payload, "requestId"), memberStr(payload, "createdAt"));
+            String luckyToastKey = luckyEventId != null
+                    ? "lucky-hit-" + luckyEventId
+                    : "lucky-hit-" + String.valueOf(senderId) + "-" + String.valueOf(won)
+                            + "-" + String.valueOf(rawMultiplier) + "-" + (System.currentTimeMillis() / 1000L);
+            String luckyAvatar = firstNonEmpty(memberStr(payload, "senderAvatarUrl"),
+                    memberStr(payload, "avatarUrl"), memberStr(payload, "winnerAvatarUrl"));
+            String luckyBadge = firstNonEmpty(memberStr(payload, "senderBadgeUrl"),
+                    memberStr(payload, "vipBadgeUrl"), memberStr(payload, "badgeUrl"));
+            String luckyBody = firstNonEmpty(memberStr(payload, "message"),
+                    memberStr(payload, "resultText"), memberStr(payload, "body"));
+            if (luckyBody == null) {
+                luckyBody = won > 0
+                        ? ("فاز بـ " + won + " عملة" + (rawMultiplier > 0d ? " · ×" + rawMultiplier : ""))
+                        : (soft ? "استرجاع جزئي · ×" + rawMultiplier : "لم يحالفه الحظ هذه المرة");
+            }
+            String luckyToastKind = rawMultiplier > 0d && rawMultiplier < 1d
+                    ? "lucky_hit_return"
+                    : (won >= 1000L || rawMultiplier >= 10d
+                            ? "lucky_hit_high" : "lucky_hit_normal");
+            GlobalCelebrationToast.show(
+                    this, who, luckyBody, luckyAvatar, luckyBadge, luckyToastKey,
+                    28, rawMultiplier, won, who, luckyToastKind, roomId);
+
             if (won > 0) {
                 GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
-                // Only float/rain on the winner's seat when a payout actually occurred.
-                if (senderId != null && !senderId.isEmpty()) {
-                    // Lucky wins are announced by the configured toast only.
-                    // Do not spawn coin rain or floating coin values across the room.
-                }
+                // Coin rain/floating values remain disabled; the configured toast is the
+                // single visual result announcement, matching the established room UX.
             }
         } else if ("game:update".equals(event) || "game:invite".equals(event)) {
             // XO retired — ignore legacy realtime payloads
