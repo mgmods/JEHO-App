@@ -855,13 +855,17 @@ public class ProfileActivity extends ThemedActivity {
                 return;
             }
             if ("owner".equals(role)) fallbackLabel = "قائد الوكالة";
+            else if ("host".equals(role)) fallbackLabel = "مضيف";
             else if ("manager".equals(role) || "admin".equals(role) || "agency_admin".equals(role))
                 fallbackLabel = "أدمن وكالة";
-            else fallbackLabel = "مضيف";
+            else {
+                binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
+                return;
+            }
         } else if (club != null && club.role != null && !club.role.trim().isEmpty()) {
             role = club.role.trim().toLowerCase(Locale.US);
             if ("owner".equals(role) || "leader".equals(role)) fallbackLabel = "قائد الوكالة";
-            else if ("host".equals(role) || "member".equals(role)) fallbackLabel = "مضيف";
+            else if ("host".equals(role)) fallbackLabel = "مضيف";
             else if ("manager".equals(role) || "admin".equals(role) || "agency_admin".equals(role))
                 fallbackLabel = "أدمن وكالة";
             else {
@@ -874,9 +878,7 @@ public class ProfileActivity extends ThemedActivity {
         }
 
         boolean leader = "owner".equals(role) || "leader".equals(role);
-        boolean host = "host".equals(role) || "member".equals(role)
-                || (agency != null && !leader && !"manager".equals(role)
-                    && !"admin".equals(role) && !"agency_admin".equals(role));
+        boolean host = "host".equals(role);
         String label = StaffRoleHelper.genderizeLabel(fallbackLabel, user == null ? null : user.gender);
         binding.tvAgencyRoleBadge.setText(label);
         binding.imgAgencyRoleBadge.setImageDrawable(null);
