@@ -13007,6 +13007,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onStop() {
+        // A backgrounded room must never keep a hold-to-fire gesture running.
+        stopLuckyCannonHold();
         handler.removeCallbacks(luckyButtonStylePoll);
         handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
