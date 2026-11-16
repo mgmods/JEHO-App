@@ -23,7 +23,7 @@
         android:maxWidth="340dp"
         android:minWidth="0dp"
         android:orientation="horizontal"
-        android:layoutDirection="rtl"
+        android:layoutDirection="ltr"
         android:paddingStart="9dp"
         android:paddingTop="6dp"
         android:paddingEnd="11dp"
