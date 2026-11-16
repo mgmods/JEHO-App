@@ -598,9 +598,11 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             AuthDtos.UserDto sender = msg.sender;
             avatarUrl = sender != null && sender.avatarUrl != null
                     ? sender.avatarUrl : peerAvatarUrl;
-            // Render only the sender's equipped avatar frame. Host/agency identity
-            // artwork must never replace the personal frame in message avatars.
-            frameUrl = sender != null ? sender.vipBadgeUrl : null;
+            // Prefer the sender's equipped frame; peer profile is the fallback when
+            // an individual message payload omits cosmetic fields.
+            frameUrl = firstNonEmpty(
+                    sender != null ? sender.vipBadgeUrl : null,
+                    peerHostBadgeUrl);
             hostBadgeUrl = null;
             name = firstNonEmpty(
                     sender != null ? sender.displayName : null,
