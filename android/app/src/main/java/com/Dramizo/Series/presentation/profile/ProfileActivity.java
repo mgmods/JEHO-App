@@ -208,7 +208,7 @@ public class ProfileActivity extends ThemedActivity {
             binding.rowProfileAchievementBadges.setOnClickListener(v -> openBadgeCabinet(targetUserIdHold[0]));
         }
         // Keep the VIP, charm and wealth chips visible on the light profile card.
-        if (binding.rowProfileMedals != null) { binding.rowProfileMedals.setVisibility(View.VISIBLE); binding.rowProfileMedals.bringToFront(); }
+        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.VISIBLE);
 
         if (binding.rowMoments != null) {
             binding.rowMoments.setOnClickListener(v -> openProfileDetails());
@@ -1717,7 +1717,6 @@ public class ProfileActivity extends ThemedActivity {
                 }
                 if (binding.rowProfileMedals != null) {
                     binding.rowProfileMedals.setVisibility(View.VISIBLE);
-                    binding.rowProfileMedals.bringToFront();
                 }
                 // Keep the existing earned-medal cabinet populated for backward compatibility.
                 List<com.Dramizo.Series.data.remote.dto.BadgeDto> badges =
@@ -1943,7 +1942,6 @@ public class ProfileActivity extends ThemedActivity {
         if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(View.GONE);
         if (binding.rowProfileMedals != null) {
             binding.rowProfileMedals.setVisibility(View.VISIBLE);
-            binding.rowProfileMedals.bringToFront();
         }
         if (binding.rowProfileAchievementBadges != null) binding.rowProfileAchievementBadges.setVisibility(View.GONE);
         if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
@@ -1990,7 +1988,6 @@ public class ProfileActivity extends ThemedActivity {
         if (binding.tvCharmChip != null) binding.tvCharmChip.setVisibility(View.VISIBLE);
         if (binding.imgWealthIcon != null) binding.imgWealthIcon.setVisibility(View.VISIBLE);
         if (binding.tvWealthChip != null) binding.tvWealthChip.setVisibility(View.VISIBLE);
-        binding.rowProfileMedals.bringToFront();
     }
 
     private void bindStickyProfileActionIcons() {
