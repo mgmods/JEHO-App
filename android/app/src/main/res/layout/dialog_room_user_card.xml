@@ -198,7 +198,7 @@
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/id_layout">
+        app:layout_constraintTop_toBottomOf="@id/ll_model">
 
         <LinearLayout
             android:id="@+id/roleBadgesContainer"
@@ -323,7 +323,7 @@
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowSocialStats">
+        app:layout_constraintTop_toBottomOf="@id/id_layout">
 
         <ImageView
             android:id="@+id/imgEntryRide"
