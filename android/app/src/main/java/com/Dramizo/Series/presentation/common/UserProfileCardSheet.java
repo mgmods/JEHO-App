@@ -368,18 +368,16 @@ public final class UserProfileCardSheet {
                     if (rowAgency != null) rowAgency.setOnClickListener(v -> {
                         if (u.agency.id != null) AgencyFamilyInfoSheet.show(activity, u.agency.id);
                     });
-                } else if (u.agencyClub != null && u.agencyClub.role != null && !u.agencyClub.role.trim().isEmpty()) {
-                    String clubRole = u.agencyClub.role.trim().toLowerCase(java.util.Locale.ROOT);
-                    String clubRoleLabel = "owner".equals(clubRole) || "leader".equals(clubRole)
-                            ? "♛  قائد الوكالة"
-                            : ("host".equals(clubRole) || "member".equals(clubRole) ? "مضيف" : "أدمن وكالة");
+                } else if (u.agency != null && "host".equalsIgnoreCase(u.agency.role)) {
                     if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
-                    if (tvAgencyName != null) tvAgencyName.setText(StaffRoleHelper.genderizeLabel(clubRoleLabel, u.gender));
+                    if (tvAgencyName != null) {
+                        tvAgencyName.setText(StaffRoleHelper.genderizeLabel("مضيف", u.gender));
+                    }
                     if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
                     if (imgAgencyLogo != null) {
-                        String clubLogo = u.agencyClub.agencyLogoUrl;
-                        if (clubLogo != null && !clubLogo.trim().isEmpty()) {
-                            Glide.with(activity).load(AssetCatalog.absoluteUrl(clubLogo))
+                        String hostAgencyLogo = u.agency.logoUrl;
+                        if (hostAgencyLogo != null && !hostAgencyLogo.trim().isEmpty()) {
+                            Glide.with(activity).load(AssetCatalog.absoluteUrl(hostAgencyLogo))
                                     .placeholder(R.drawable.icon_agency)
                                     .error(R.drawable.icon_agency)
                                     .centerCrop().into(imgAgencyLogo);
@@ -388,8 +386,36 @@ public final class UserProfileCardSheet {
                         }
                     }
                     if (rowAgency != null) rowAgency.setOnClickListener(v -> {
-                        if (u.agencyClub.agencyId != null) AgencyFamilyInfoSheet.show(activity, u.agencyClub.agencyId);
+                        if (u.agency.id != null) AgencyFamilyInfoSheet.show(activity, u.agency.id);
                     });
+                } else if (u.agencyClub != null && u.agencyClub.role != null && !u.agencyClub.role.trim().isEmpty()) {
+                    String clubRole = u.agencyClub.role.trim().toLowerCase(java.util.Locale.ROOT);
+                    String clubRoleLabel = "owner".equals(clubRole) || "leader".equals(clubRole)
+                            ? "♛  قائد الوكالة"
+                            : ("host".equals(clubRole) ? "مضيف"
+                                : (("manager".equals(clubRole) || "admin".equals(clubRole)
+                                    || "agency_admin".equals(clubRole)) ? "أدمن وكالة" : ""));
+                    if (clubRoleLabel.isEmpty()) {
+                        if (rowAgency != null) rowAgency.setVisibility(View.GONE);
+                    } else {
+                        if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
+                        if (tvAgencyName != null) tvAgencyName.setText(StaffRoleHelper.genderizeLabel(clubRoleLabel, u.gender));
+                        if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
+                        if (imgAgencyLogo != null) {
+                            String clubLogo = u.agencyClub.agencyLogoUrl;
+                            if (clubLogo != null && !clubLogo.trim().isEmpty()) {
+                                Glide.with(activity).load(AssetCatalog.absoluteUrl(clubLogo))
+                                        .placeholder(R.drawable.icon_agency)
+                                        .error(R.drawable.icon_agency)
+                                        .centerCrop().into(imgAgencyLogo);
+                            } else {
+                                imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                            }
+                        }
+                        if (rowAgency != null) rowAgency.setOnClickListener(v -> {
+                            if (u.agencyClub.agencyId != null) AgencyFamilyInfoSheet.show(activity, u.agencyClub.agencyId);
+                        });
+                    }
                 }
                 AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, liveVip);
                 // Dashboard-uploaded profile-card art and nameplate are applied from equipped cosmetics.
