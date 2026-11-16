@@ -347,7 +347,8 @@ public final class UserProfileCardSheet {
                 bindEntryRide(imgEntryRide, firstNonEmpty(u.entryAnimationUrl, u.entryEffectUrl));
                 bindVipMedal(imgVipMedal, liveVip, u.levelBadgeUrl);
                 bindAgency(activity, rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, u.agency);
-                boolean isAgencyOwner = u.agency != null && "owner".equalsIgnoreCase(u.agency.role);
+                boolean isAgencyOwner = u.agency != null && ("owner".equalsIgnoreCase(u.agency.role)
+                        || "leader".equalsIgnoreCase(u.agency.role));
                 if (isAgencyOwner) {
                     if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
                     if (tvAgencyName != null) {
