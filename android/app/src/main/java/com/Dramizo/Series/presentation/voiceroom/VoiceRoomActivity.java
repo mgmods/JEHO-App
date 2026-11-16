@@ -3296,7 +3296,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ImageView vip = new ImageView(this);
             vip.setContentDescription("VIP");
             vip.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            vip.setLayoutParams(roomBadgeImageParams(25, 25, 2));
+            // Match the compact inline comment-badge scale.
+            vip.setLayoutParams(roomBadgeImageParams(18, 18, 2));
             if (decoration.vipBadgeUrl != null && !decoration.vipBadgeUrl.trim().isEmpty()) {
                 Glide.with(vip).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(
                         decoration.vipBadgeUrl)).fitCenter().into(vip);
@@ -3367,8 +3368,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @NonNull View badge, int index, int firstLineLimit, int[] inlineUsed,
             int overflowLineLimit, int[] overflowUsed, LinearLayout[] overflowLine) {
         // Keep sender decorations beside the sender name, not on a second line.
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ViewGroup.LayoutParams existing = badge.getLayoutParams();
+        int badgeWidth = existing != null ? existing.width : ViewGroup.LayoutParams.WRAP_CONTENT;
+        int badgeHeight = existing != null ? existing.height : ViewGroup.LayoutParams.WRAP_CONTENT;
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(badgeWidth, badgeHeight);
         params.setMarginEnd(dp(2));
         badge.setLayoutParams(params);
         inline.addView(badge);
