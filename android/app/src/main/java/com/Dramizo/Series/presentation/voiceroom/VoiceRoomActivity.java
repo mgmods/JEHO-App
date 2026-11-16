@@ -326,6 +326,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyCannonSending;
     /** One wallet request at a time; held shots are coalesced into a quantity batch. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
+    // Keep a small pipeline so cannon cadence is not tied to one slow HTTP response.
+    // Wallet transactions remain serialized safely by the backend's sender-wallet row lock.
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
     private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 110L;
     private int luckyCannonInFlight;
     private int luckyCannonPendingQuantity;
@@ -4945,10 +4948,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        // Never queue competing wallet transactions for the same sender. While one
-        // request is in flight, fold each held repeat into the next quantity batch.
-        // ACTION_UP clears that unsent batch immediately; the accepted request may finish.
-        if (luckyCannonInFlight >= 1) {
+        // Keep up to three cannon requests in flight. This overlaps the expensive
+        // post-commit response work while the backend serializes wallet debits with
+        // its sender-wallet row lock. If the pipeline is full, coalesce held repeats
+        // into one bounded batch instead of creating an unbounded request queue.
+        // ACTION_UP clears that unsent batch immediately; already-started requests finish.
+        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) {
             if (luckyCannonHoldActive && !animatePress) {
                 luckyCannonPendingQuantity = Math.min(
                         LUCKY_CANNON_MAX_BATCH_QUANTITY,
@@ -4972,8 +4977,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         luckyCannonInFlight++;
         luckyCannonSending = true;
         if (luckyCannonView != null) luckyCannonView.setEnabled(true);
-        // Schedule the next shot on a short fixed cadence instead of waiting for the
-        // previous HTTP response. The in-flight cap above bounds concurrency.
+        // Schedule the next shot on a short fixed cadence. A bounded in-flight
+        // pipeline prevents a single slow response from throttling every subsequent shot.
         if (luckyCannonHoldActive && !isFinishing() && !isDestroyed()) {
             handler.removeCallbacks(luckyCannonRepeatRunnable);
             handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
