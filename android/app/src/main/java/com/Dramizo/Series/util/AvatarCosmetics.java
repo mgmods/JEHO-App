@@ -100,65 +100,25 @@ public final class AvatarCosmetics {
             @Nullable String hostBadgeUrl,
             @Nullable Map<String, ?> hostBadgeMeta,
             int fallbackLevel) {
-        // Always clear stacked imgFrame — HostSignalView owns the only frame (no double ring).
-        clearStackedFrame(frameView);
-        if (hostSignal == null) {
-            if (avatarView != null) {
-                avatarView.setVisibility(View.VISIBLE);
-                bindAvatar(avatarView, avatarUrl);
-            }
-            return false;
-        }
-        if (hostBadgeUrl == null || hostBadgeUrl.isEmpty()) {
+        // Role/competition artwork is never an avatar overlay. Keep the real photo visible;
+        // only a purchased/equipped frame may surround it.
+        if (hostSignal != null) {
             hostSignal.setOnFrameReadyListener(null);
             hostSignal.clearSignal();
             hostSignal.setVisibility(View.GONE);
             hostSignal.setAlpha(1f);
-            if (avatarView != null) {
-                avatarView.setVisibility(View.VISIBLE);
-                bindAvatar(avatarView, avatarUrl);
-            }
-            return false;
         }
-        // Keep full circular avatar visible until the real frame paints — no half-frame flash.
-        // Mikoo: face stays the same dp with/without wear (no match_parent blow-up).
         if (avatarView != null) {
             resetWearTransform(avatarView);
             avatarView.setVisibility(View.VISIBLE);
             bindAvatar(avatarView, avatarUrl);
-            avatarView.bringToFront();
         }
-        hostSignal.setAlpha(0f);
-        hostSignal.setVisibility(View.VISIBLE);
-        hostSignal.setOnFrameReadyListener(() -> {
-            if (avatarView != null) {
-                try {
-                    Glide.with(avatarView).clear(avatarView);
-                } catch (Exception ignored) {
-                }
-                resetWearTransform(avatarView);
-                avatarView.setVisibility(View.GONE);
-                avatarView.setImageDrawable(null);
-            }
-            clearStackedFrame(frameView);
-            hostSignal.setAlpha(1f);
-            hostSignal.bringToFront();
-            hostSignal.resumeMotion();
-        });
-        boolean ok = hostSignal.bind(
-                hostBadgeUrl, avatarUrl, hostBadgeMeta, Math.max(1, fallbackLevel));
-        if (!ok) {
-            hostSignal.setOnFrameReadyListener(null);
-            hostSignal.clearSignal();
-            hostSignal.setVisibility(View.GONE);
-            hostSignal.setAlpha(1f);
-            if (avatarView != null) {
-                resetWearTransform(avatarView);
-                avatarView.setVisibility(View.VISIBLE);
-                bindAvatar(avatarView, avatarUrl);
-            }
+        clearStackedFrame(frameView);
+        if (hostBadgeUrl != null && !hostBadgeUrl.trim().isEmpty()) {
+            applyFrame(frameView, hostBadgeUrl, hostBadgeMeta);
+            return true;
         }
-        return ok;
+        return false;
     }
 
     private static void clearStackedFrame(@Nullable ImageView frameView) {
@@ -261,30 +221,12 @@ public final class AvatarCosmetics {
             @Nullable String hostBadgeUrl,
             @Nullable Map<String, ?> frameMeta,
             @Nullable Map<String, ?> hostBadgeMeta) {
-        hostBadgeUrl = isContestWear(hostBadgeUrl) ? null : hostBadgeUrl;
-        frameUrl = isContestWear(frameUrl) ? null : frameUrl;
-        boolean hasBadge = hostBadgeUrl != null && !hostBadgeUrl.isEmpty();
-        boolean hasFrame = frameUrl != null && !frameUrl.isEmpty();
-        if (avatarView != null) resetWearTransform(avatarView);
-        if (hasBadge) {
-            ImageView target = badgeView != null ? badgeView : frameView;
-            if (badgeView != null && frameView != null) {
-                resetWearTransform(frameView);
-                frameView.setVisibility(View.GONE);
-                frameView.setImageDrawable(null);
-            }
-            if (target != null) {
-                target.setVisibility(View.VISIBLE);
-                target.setAlpha(1f);
-                clipFrameArtworkToAvatar(target);
-                // Frame/badge fills the stack; do not inflate past the box (clips lists).
-                applyWearMeta(target, hostBadgeMeta, 1f);
-                loadWearImage(target, hostBadgeUrl);
-                stopWearMotion(target, avatarView);
-            }
-            // Avatar must match stack size first, then shrink into the frame opening.
-            fitAvatarInsideWear(avatarView, hostBadgeMeta);
-            return;
+        // Competition, host and agency marks are role labels, not avatar wearables.
+        // Never draw them over the user's photo or replace the photo with a badge.
+        boolean hasFrame = frameUrl != null && !frameUrl.isEmpty() && !isContestWear(frameUrl);
+        if (avatarView != null) {
+            resetWearTransform(avatarView);
+            avatarView.setVisibility(View.VISIBLE);
         }
         if (badgeView != null) {
             stopWearMotion(badgeView, avatarView);
@@ -292,13 +234,9 @@ public final class AvatarCosmetics {
             badgeView.setVisibility(View.GONE);
             badgeView.setImageDrawable(null);
         }
-        applyFrame(frameView, frameUrl, frameMeta);
+        applyFrame(frameView, hasFrame ? frameUrl : null, frameMeta);
         stopWearMotion(frameView, avatarView);
-        if (hasFrame) {
-            fitAvatarInsideWear(avatarView, frameMeta);
-        } else if (avatarView != null) {
-            resetWearTransform(avatarView);
-        }
+        if (avatarView != null) resetWearTransform(avatarView);
     }
 
     /**
@@ -600,14 +538,7 @@ public final class AvatarCosmetics {
             if (wearKey.equals(prev) && (staticFrameReady || !hasWear)) return;
             avatarView.setTag(R.id.tag_wear_key, wearKey);
         }
-        // Personal profile: animate VIP frame via HostSignalView when present.
-        if (hostSignal != null && vipFrameUrl != null && !vipFrameUrl.isEmpty()
-                && shouldUseLiveWear(vipFrameUrl)) {
-            boolean live = bindHostLikeLive(
-                    hostSignal, avatarView, frameView, avatarUrl, vipFrameUrl, null,
-                    Math.max(1, fallbackLevel));
-            if (live) return;
-        }
+        // Keep the profile photo visible at all times; animated role overlays are disabled.
         if (hostSignal != null) {
             hostSignal.setOnFrameReadyListener(null);
             hostSignal.clearSignal();
@@ -642,37 +573,23 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> hostBadgeMeta,
             boolean agencyRoom,
             int fallbackLevel) {
-        final boolean hasHost =
-                hostBadgeUrl != null && !hostBadgeUrl.trim().isEmpty();
-        final String wearUrl = (agencyRoom && hasHost) ? hostBadgeUrl : vipFrameUrl;
-        final Map<String, ?> wearMeta = (agencyRoom && hasHost) ? hostBadgeMeta : null;
-
-        if (hostSignal != null && wearUrl != null && !wearUrl.isEmpty()
-                && (shouldUseLiveWear(wearUrl) || wearMeta != null)) {
-            boolean live = bindHostLikeLive(
-                    hostSignal, avatarView, frameView, avatarUrl, wearUrl, wearMeta,
-                    fallbackLevel);
-            if (live) {
-                if (hostBadgeView != null) {
-                    hostBadgeView.setVisibility(View.GONE);
-                    hostBadgeView.setImageDrawable(null);
-                }
-                return;
-            }
-        }
+        // Agency/host role art is intentionally not attached to the avatar.
         if (hostSignal != null) {
+            hostSignal.setOnFrameReadyListener(null);
             hostSignal.clearSignal();
             hostSignal.setVisibility(View.GONE);
+            hostSignal.setAlpha(1f);
+        }
+        if (hostBadgeView != null) {
+            hostBadgeView.setVisibility(View.GONE);
+            hostBadgeView.setImageDrawable(null);
         }
         if (avatarView != null) {
+            resetWearTransform(avatarView);
             avatarView.setVisibility(View.VISIBLE);
             bindAvatar(avatarView, avatarUrl);
         }
-        if (agencyRoom && hasHost) {
-            applyHostWear(frameView, hostBadgeView, avatarView, null, hostBadgeUrl, null, hostBadgeMeta);
-        } else {
-            applyHostWear(frameView, hostBadgeView, avatarView, vipFrameUrl, null, null, null);
-        }
+        applyHostWear(frameView, null, avatarView, vipFrameUrl, null, null, null);
     }
 
     /** Frame without reloading avatar — VIP frame only outside agency rooms. */
