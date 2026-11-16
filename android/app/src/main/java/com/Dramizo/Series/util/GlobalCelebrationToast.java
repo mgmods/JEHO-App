@@ -289,6 +289,7 @@ public final class GlobalCelebrationToast {
         return "lucky_hit".equals(normalized)
                 || "lucky_hit_normal".equals(normalized)
                 || "lucky_hit_high".equals(normalized)
+                || "lucky_hit_high_room".equals(normalized)
                 || "lucky_hit_return".equals(normalized)
                 || "lucky_return".equals(normalized)
                 || "lucky_high".equals(normalized);
@@ -495,9 +496,7 @@ public final class GlobalCelebrationToast {
             @Nullable String kind,
             @Nullable String roomId
     ) {
-        // Winner notifications are intentionally disabled: no "حظ سعيد" popup
-        // should appear from any room, home, or realtime event path.
-        if (isLuckyToastKind(kind)) return;
+        // Lucky result toasts are dashboard-configured and must render on both home and room paths.
         // Never render the retired gift-send confirmation toast, regardless of caller.
         if ("gift_send".equalsIgnoreCase(kind)) return;
         if (activity == null || activity.isFinishing()) return;
