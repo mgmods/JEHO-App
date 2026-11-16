@@ -2506,8 +2506,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         long charm = u != null ? Math.max(0L, u.charmScore) : 0L;
         String vipFrame = u != null ? u.vipBadgeUrl : null;
         String hostFrame = u != null ? u.hostBadgeUrl : null;
-        // Agency rooms show host signal; personal rooms show VIP frame.
-        String frame = isAgencyRoom ? hostFrame : vipFrame;
+        // Chat avatar always carries the user's equipped personal frame in every room.
+        String frame = vipFrame;
         JsonObject payload = new JsonObject();
         payload.addProperty("t", "chat");
         payload.addProperty("text", text);
@@ -2875,17 +2875,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 userLevel = Math.max(1, session.getUserLevel());
                 if (avatarUrl == null) avatarUrl = session.getAvatarUrl();
                 AuthDtos.UserDto selfUser = session.getUser();
-                if (frameUrl == null && selfUser != null) {
-                    if (isAgencyRoom) {
-                        frameUrl = selfUser.hostBadgeUrl;
-                        if (frameUrl == null || frameUrl.isEmpty()) frameUrl = selfUser.vipBadgeUrl;
-                    } else {
-                        frameUrl = selfUser.vipBadgeUrl;
-                    }
-                }
-                if ((frameUrl == null || frameUrl.isEmpty()) && isAgencyRoom) {
-                    frameUrl = session.getHostBadgeUrl();
-                }
                 if ((frameUrl == null || frameUrl.isEmpty()) && selfUser != null) {
                     frameUrl = selfUser.vipBadgeUrl;
                 }
@@ -2902,14 +2891,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (selfUser != null) {
                 if (avatarUrl == null || avatarUrl.isEmpty()) avatarUrl = selfUser.avatarUrl;
                 if (frameUrl == null || frameUrl.isEmpty()) {
-                    if (isAgencyRoom && selfUser.hostBadgeUrl != null && !selfUser.hostBadgeUrl.isEmpty()) {
-                        frameUrl = selfUser.hostBadgeUrl;
-                    } else if (selfUser.vipBadgeUrl != null && !selfUser.vipBadgeUrl.isEmpty()) {
-                        frameUrl = selfUser.vipBadgeUrl;
-                    } else if (isAgencyRoom) {
-                        frameUrl = session.getHostBadgeUrl();
-                    }
+                    frameUrl = selfUser.vipBadgeUrl;
                 }
+            }
+        }
+        // The message payload's legacy frameUrl may contain an agency host badge.
+        // Resolve the actual equipped avatar frame from the sender profile cache instead.
+        if (!system && !gameCel && !mysteriousLine && userId != null && !userId.trim().isEmpty()) {
+            RoomChatDecoration cachedWear = roomChatDecorationCache.get(userId);
+            if (cachedWear != null) {
+                frameUrl = cachedWear.vipBadgeUrl;
+            } else if (myUserId == null || !sameUser(userId, myUserId)) {
+                // First message for this sender: wait for the profile lookup below rather
+                // than briefly displaying a host badge as if it were the user's frame.
+                frameUrl = null;
             }
         }
         View row = getLayoutInflater().inflate(R.layout.item_room_chat_line, binding.chatLog, false);
@@ -3005,6 +3000,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         hostSignal.setVisibility(View.GONE);
                     }
                 } else {
+                    if (avatar != null) avatar.setTag(avatarUrl);
                     AvatarCosmetics.bindStacked(avatar, frameView, hostSignal, avatarUrl, frameUrl, null);
                 }
             }
@@ -3244,6 +3240,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             roomChatDecorationCache.put(userId, decoration);
             runOnUiThread(() -> {
                 if (!isFinishing() && !isDestroyed() && row.getParent() != null) {
+                    // Rebind the sender avatar with the server-confirmed equipped frame.
+                    // This also replaces stale/mislabelled frameUrl values from old room events.
+                    ImageView chatAvatar = row.findViewById(R.id.imgChatAvatar);
+                    ImageView chatFrame = row.findViewById(R.id.imgChatFrame);
+                    HostSignalView chatSignal = row.findViewById(R.id.webChatHostSignal);
+                    if (chatAvatar != null) {
+                        AvatarCosmetics.bindStacked(chatAvatar, chatFrame, chatSignal,
+                                chatAvatar.getTag() instanceof String ? (String) chatAvatar.getTag() : null,
+                                decoration.vipBadgeUrl, null);
+                    }
                     applyRoomChatDecorations(row, decoration, fallbackVip);
                 }
             });
