@@ -1991,6 +1991,25 @@ public class ProfileActivity extends ThemedActivity {
         }
         int idIndex = target.indexOfChild(binding.rowUserId);
         if (idIndex >= 0) target.addView(badges, idIndex + 1);
+
+        // Keep the configured CP level emblem in the same identity strip under the public ID.
+        // Reparent the existing view (do not clone it) so the live CP loader continues to update it.
+        if (binding.imgCpLevelIcon != null && badges instanceof android.widget.HorizontalScrollView) {
+            android.widget.HorizontalScrollView scroll = (android.widget.HorizontalScrollView) badges;
+            ViewGroup identityStrip = scroll.getChildCount() > 0 && scroll.getChildAt(0) instanceof ViewGroup
+                    ? (ViewGroup) scroll.getChildAt(0) : null;
+            if (identityStrip != null && binding.imgCpLevelIcon.getParent() != identityStrip) {
+                if (binding.imgCpLevelIcon.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) binding.imgCpLevelIcon.getParent()).removeView(binding.imgCpLevelIcon);
+                }
+                LinearLayout.LayoutParams cpIconParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dpProfile(24));
+                cpIconParams.setMargins(dpProfile(6), 0, dpProfile(4), 0);
+                binding.imgCpLevelIcon.setLayoutParams(cpIconParams);
+                binding.imgCpLevelIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                identityStrip.addView(binding.imgCpLevelIcon);
+            }
+        }
     }
 
     /** Remove the duplicate CP-adjacent action row from the view tree; keep the original bottom row. */
