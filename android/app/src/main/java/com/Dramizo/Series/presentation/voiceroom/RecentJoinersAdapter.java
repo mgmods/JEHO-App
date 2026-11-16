@@ -94,11 +94,10 @@ public class RecentJoinersAdapter extends RecyclerView.Adapter<RecentJoinersAdap
             }
             h.b.imgJoinerFrame.setVisibility(android.view.View.GONE);
         } else {
+            // Agency/host/competition marks are role labels, never avatar artwork.
             AvatarCosmetics.bindWear(
                     h.b.imgJoinerAvatar, h.b.imgJoinerFrame, j.avatarUrl,
-                    agencyRoom
-                            ? firstNonEmpty(j.hostBadgeUrl, j.vipBadgeUrl)
-                            : j.vipBadgeUrl);
+                    j.vipBadgeUrl);
         }
         h.itemView.setContentDescription(j.displayName);
         h.itemView.setOnClickListener(v -> {
