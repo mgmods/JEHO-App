@@ -327,8 +327,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Number of cannon economy requests currently in flight. */
     private int luckyCannonInFlight;
     private boolean luckyCannonHoldActive;
-    // Small cooldown after each confirmed send; requests never overlap or queue.
-    private static final long LUCKY_CANNON_REPEAT_MS = 120L;
+    // Repeat immediately after each confirmed send; server response time is the only pacing limit.
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
             if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
@@ -4908,7 +4907,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!luckyCannonEnabled || luckyCannonGiftId == null || luckyCannonTargets.isEmpty()) return;
         luckyCannonHoldActive = true;
         sendLuckyCannonGift(true);
-        handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_MS);
     }
 
     /** Releasing the cannon cancels every not-yet-started repeat immediately. */
@@ -5011,11 +5009,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Server emits the canonical room gift event; animation is rendered locally by
                 // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                // Pace the next shot from completion, not a fixed timer. This prevents
-                // overlapping requests and guarantees release leaves no queued shots.
+                // No artificial cooldown: fire the next request immediately after confirmation.
+                // Releasing the finger still cancels this callback before another request starts.
                 if (luckyCannonHoldActive && !isFinishing() && !isDestroyed()) {
                     handler.removeCallbacks(luckyCannonRepeatRunnable);
-                    handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_MS);
+                    handler.post(luckyCannonRepeatRunnable);
                 }
             });
         });
