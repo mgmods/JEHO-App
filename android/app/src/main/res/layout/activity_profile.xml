@@ -63,24 +63,6 @@
                     android:scaleType="centerInside"
                     android:visibility="gone" />
 
-                <!-- VIP tier plaque sits on the cover/profile divider, never below the avatar. -->
-                <TextView
-                    android:id="@+id/tvVipChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="28dp"
-                    android:layout_gravity="bottom|center_horizontal"
-                    android:layout_marginBottom="-1dp"
-                    android:background="@drawable/bg_chip_vip"
-                    android:gravity="center"
-                    android:minWidth="64dp"
-                    android:paddingHorizontal="14dp"
-                    android:text="VIP 0"
-                    android:textColor="#FFFFFFFF"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:elevation="12dp"
-                    android:visibility="gone" />
-
                 <TextView
                     android:id="@+id/btnRoomTracking"
                     android:layout_width="wrap_content"
@@ -520,6 +502,21 @@
                             android:adjustViewBounds="true"
                             android:contentDescription="VIP"
                             android:scaleType="fitCenter"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvVipChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="18dp"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_chip_vip"
+                            android:gravity="center"
+                            android:minWidth="42dp"
+                            android:paddingHorizontal="6dp"
+                            android:text="VIP 0"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
                             android:visibility="gone" />
 
 
