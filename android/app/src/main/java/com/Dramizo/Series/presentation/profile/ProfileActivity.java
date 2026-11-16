@@ -191,9 +191,10 @@ public class ProfileActivity extends ThemedActivity {
                 startActivity(new Intent(this, AdminConsoleActivity.class));
             });
         }
-        // Keep identity stats and the single original action row directly below the ID.
+        // Keep the original Follow/Message/Room controls at the bottom of the profile.
+        // Remove only the duplicate sticky icon row near the identity card.
         ensureProfileIdentityStatsVisible();
-        moveProfileActionsUnderId();
+        hideDuplicateProfileInlineActions();
 
         final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
@@ -1970,27 +1971,11 @@ public class ProfileActivity extends ThemedActivity {
         loadProfileGiftsPreview(loadedProfileId);
     }
 
-    /** Keep exactly one Follow/Message/Room row, immediately below the public ID. */
-    private void moveProfileActionsUnderId() {
-        if (binding == null || binding.rowUserId == null || binding.btnFollow == null) return;
-        View actionRow = (View) binding.btnFollow.getParent();
-        ViewGroup identityParent = (ViewGroup) binding.rowUserId.getParent();
-        if (actionRow == null || identityParent == null) return;
-
-        // Remove the newer duplicate icon row; the original functional buttons remain.
-        if (binding.profileInlineActions != null) {
+    /** Hide the extra icon row; preserve the original action buttons at the profile bottom. */
+    private void hideDuplicateProfileInlineActions() {
+        if (binding != null && binding.profileInlineActions != null) {
             binding.profileInlineActions.setVisibility(View.GONE);
         }
-
-        ViewGroup oldParent = (ViewGroup) actionRow.getParent();
-        if (oldParent != null) oldParent.removeView(actionRow);
-        int idIndex = identityParent.indexOfChild(binding.rowUserId);
-        if (idIndex < 0) {
-            identityParent.addView(actionRow);
-        } else {
-            identityParent.addView(actionRow, idIndex + 1);
-        }
-        actionRow.setVisibility(View.VISIBLE);
     }
 
     private void ensureProfileIdentityStatsVisible() {
