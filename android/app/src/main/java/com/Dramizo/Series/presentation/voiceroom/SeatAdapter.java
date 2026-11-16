@@ -1157,9 +1157,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
             return;
         }
-        String hostUrl = user.hostBadgeUrl;
+        // Keep VIP wearable/frame on the seat; role/agency/competition marks are not seat wear.
+        String hostUrl = null;
         String vipUrl = user.vipBadgeUrl;
-        java.util.Map<String, Object> badgeMeta = user.hostBadgeMeta;
+        java.util.Map<String, Object> badgeMeta = null;
         boolean self = selfUserId != null && selfUserId.equals(normalizeUserId(user.id));
         if (self) {
             if ((hostUrl == null || hostUrl.isEmpty()) && selfHostBadgeUrl != null) {
@@ -1220,34 +1221,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
     private void bindAgencyRoleSeatBadge(VH holder,
             @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
-        if (holder.b.tvAgencyRoleBadge == null) return;
-        String label = null;
-        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency =
-                user != null ? user.agency : null;
-        com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club =
-                user != null ? user.agencyClub : null;
-        String role = agency != null && agency.role != null
-                ? agency.role.trim().toLowerCase(Locale.ROOT)
-                : (club != null && club.role != null ? club.role.trim().toLowerCase(Locale.ROOT) : "");
-        String agencyId = agency != null && agency.id != null ? agency.id.trim()
-                : (club != null && club.agencyId != null ? club.agencyId.trim() : "");
-        boolean female = user != null && "female".equalsIgnoreCase(user.gender);
-        if ("owner".equals(role) || "leader".equals(role)) {
-            label = female ? "قائدة الوكالة" : "قائد الوكالة";
-        } else if ("host".equals(role) || "member".equals(role)) {
-            // Host titles are shown only in the matching agency room.
-            if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
-                    && !agencyId.isEmpty() && roomAgencyId.equals(agencyId)) {
-                label = female ? "مضيفة" : "مضيف";
-            }
-        } else if (agencyRoom && roomAgencyId != null && !roomAgencyId.isEmpty()
-                && !agencyId.isEmpty() && roomAgencyId.equals(agencyId)
-                && ("manager".equals(role) || (user != null && user.id != null
-                    && roomAgencyModeratorIds.contains(normalizeUserId(user.id))))) {
-            label = female ? "مشرفة" : "مشرف";
+        if (holder.b.tvAgencyRoleBadge != null) {
+            holder.b.tvAgencyRoleBadge.setText("");
+            holder.b.tvAgencyRoleBadge.setVisibility(View.GONE);
         }
-        holder.b.tvAgencyRoleBadge.setText(label == null ? "" : label);
-        holder.b.tvAgencyRoleBadge.setVisibility(label == null ? View.GONE : View.VISIBLE);
     }
 
     private void bindStaffSeatBadge(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
