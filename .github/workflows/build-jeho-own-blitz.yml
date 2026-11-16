@@ -28,16 +28,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and publish the current MG-JEHO backend and admin dashboard for Blitz
+      - name: Build and publish the current MG-JEHO backend and admin dashboard for Blitz and Cumin
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
           tags: |
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho-${{ github.sha }}
             ghcr.io/mgmods/jeho-own-backend:blitz
             ghcr.io/mgmods/jeho-own-backend:blitz-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/mgmods/JEHO-App
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.title=JEHO-OWN (Blitz)
+            org.opencontainers.image.title=JEHO-OWN backend and admin dashboard
