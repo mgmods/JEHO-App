@@ -107,6 +107,7 @@ public class AppContainer {
     private final EncryptedFeatureCache featureCache;
     private final AuraDatabase database;
     private final ExecutorService ioExecutor;
+    private final ExecutorService luckyCannonExecutor;
     private final Retrofit retrofit;
     private final AuthApi authApi;
     private final BillingHelper billingHelper;
@@ -184,6 +185,13 @@ public class AppContainer {
         // Four workers let long uploads/background calls queue latency-sensitive actions;
         // keep a little more headroom without creating an unbounded thread-per-request pool.
         ioExecutor = Executors.newFixedThreadPool(16);
+        // Dedicated workers keep cannon sends from waiting behind chat, uploads, and room refreshes.
+        // The cannon itself still allows only one wallet transaction in flight per sender.
+        luckyCannonExecutor = Executors.newFixedThreadPool(2, runnable -> {
+            Thread thread = new Thread(runnable, "jeho-lucky-cannon");
+            thread.setPriority(Thread.NORM_PRIORITY + 1);
+            return thread;
+        });
         database = Room.databaseBuilder(appContext, AuraDatabase.class, "auralive.db")
                 .fallbackToDestructiveMigration()
                 .build();
@@ -355,6 +363,7 @@ public class AppContainer {
     public EncryptedFeatureCache getFeatureCache() { return featureCache; }
     public AuraDatabase getDatabase() { return database; }
     public ExecutorService getIoExecutor() { return ioExecutor; }
+    public ExecutorService getLuckyCannonExecutor() { return luckyCannonExecutor; }
     public BillingHelper getBillingHelper() { return billingHelper; }
     public AuthRepository getAuthRepository() { return authRepository; }
     public UserRepository getUserRepository() { return userRepository; }
