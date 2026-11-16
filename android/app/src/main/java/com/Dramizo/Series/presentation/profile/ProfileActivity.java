@@ -1610,17 +1610,75 @@ public class ProfileActivity extends ThemedActivity {
             cpHeartAnimator.cancel();
             cpHeartAnimator = null;
         }
-        binding.rowProfileCp.setVisibility(View.GONE);
         if (binding.imgCpLevelIcon != null) {
             binding.imgCpLevelIcon.setImageDrawable(null);
             binding.imgCpLevelIcon.setVisibility(View.GONE);
         }
-        if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.VISIBLE);
-        profileCpVisibleBeforeDetails = false;
-        profileCpVisibleBeforeDetails = false;
-        if (binding.rowProfileCpCv != null) {
-            binding.rowProfileCpCv.setVisibility(View.GONE);
+
+        // Keep the CP card visible for every profile, including users who are not
+        // linked yet. The second portrait is an intentional, tappable empty slot.
+        if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
+        binding.rowProfileCp.setVisibility(View.VISIBLE);
+        binding.imgProfileCpSelf.setVisibility(View.VISIBLE);
+        binding.imgProfileCpPartner.setVisibility(View.VISIBLE);
+        com.Dramizo.Series.util.AvatarCosmetics.bindWear(
+                binding.imgProfileCpSelf, binding.imgProfileCpSelfFrame,
+                cpProfileOwnAvatarUrl, cpProfileOwnFrameUrl,
+                cpProfileOwnHostBadgeUrl, null, cpProfileOwnHostBadgeMeta);
+        binding.imgProfileCpPartner.setImageDrawable(cpEmptyPartnerDrawable());
+        binding.imgProfileCpPartnerFrame.setVisibility(View.GONE);
+        binding.imgProfileCpPartner.setOnClickListener(v -> showUnlinkedCpActions());
+        binding.tvProfileCpHeart.setText("+");
+        binding.tvProfileCpHeart.setOnClickListener(v -> showUnlinkedCpActions());
+
+        bindRealCpAvatar(binding.imgProfileCpCvSelf, cpProfileOwnAvatarUrl);
+        binding.imgProfileCpCvPartner.setImageDrawable(cpEmptyPartnerDrawable());
+        binding.imgProfileCpCvPartner.setOnClickListener(v -> showUnlinkedCpActions());
+        binding.imgProfileCpCvPartnerFrame.setVisibility(View.GONE);
+        binding.tvProfileCpCvType.setText("♥ علاقة CP");
+        if (binding.tvProfileCpCvPartnerName != null) {
+            binding.tvProfileCpCvPartnerName.setText("اضغط على الصورة لإضافة شريك");
+            binding.tvProfileCpCvPartnerName.setVisibility(View.VISIBLE);
         }
+        binding.tvProfileCpCvHeart.setText("+");
+        binding.tvProfileCpCvHeart.setOnClickListener(v -> showUnlinkedCpActions());
+        binding.tvProfileCpCvLevel.setText("بانتظار الارتباط");
+        binding.tvProfileCpCvDays.setText("أرسل هدية CP من الروم لبدء العلاقة");
+        applyCpCardBackground("");
+        binding.rowProfileCpCv.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
+        binding.rowProfileCpCv.setOnClickListener(v -> showUnlinkedCpActions());
+        binding.rowProfileCpCv.setContentDescription("بطاقة CP غير مرتبطة، اضغط لمعرفة طريقة الارتباط");
+        profileCpVisibleBeforeDetails = true;
+    }
+
+    private android.graphics.drawable.Drawable cpEmptyPartnerDrawable() {
+        android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+        shape.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        shape.setColor(android.graphics.Color.rgb(255, 239, 246));
+        shape.setStroke((int) (2 * getResources().getDisplayMetrics().density),
+                android.graphics.Color.rgb(224, 126, 166));
+        return shape;
+    }
+
+    private void showUnlinkedCpActions() {
+        if (isFinishing() || binding == null) return;
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("علاقة CP")
+                .setMessage("هذا الحساب غير مرتبط حالياً. يمكنك بدء محادثة معه، ولإتمام ارتباط CP أرسل له هدية CP من داخل الروم.")
+                .setPositiveButton("إرسال رسالة", (dialog, which) -> {
+                    if (binding != null && binding.btnMessage != null) binding.btnMessage.performClick();
+                })
+                .setNegativeButton("إرسال هدية CP", (dialog, which) -> {
+                    if (roomTrackingRoomId != null && !roomTrackingRoomId.trim().isEmpty()) {
+                        openTrackedRoom();
+                    } else {
+                        Toast.makeText(this,
+                                "ادخل إلى روم يتواجد فيه المستخدم ثم أرسل له هدية CP",
+                                Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNeutralButton("إلغاء", null)
+                .show();
     }
 
     private String cpTypeLabel(String type) {
