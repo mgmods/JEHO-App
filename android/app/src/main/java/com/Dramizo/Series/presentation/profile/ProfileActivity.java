@@ -132,9 +132,18 @@ public class ProfileActivity extends ThemedActivity {
         setContentView(binding.getRoot());
         ViewCompat.setOnApplyWindowInsetsListener(binding.btnBack, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
-            ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
-            lp.topMargin = bars.top + (int) (8 * getResources().getDisplayMetrics().density);
-            v.setLayoutParams(lp);
+            ViewGroup.LayoutParams raw = v.getLayoutParams();
+            if (raw instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) raw;
+                lp.topMargin = bars.top + (int) (8 * getResources().getDisplayMetrics().density);
+                v.setLayoutParams(lp);
+            } else {
+                ViewGroup.MarginLayoutParams lp = new ViewGroup.MarginLayoutParams(
+                        raw != null ? raw.width : ViewGroup.LayoutParams.WRAP_CONTENT,
+                        raw != null ? raw.height : ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.topMargin = bars.top + (int) (8 * getResources().getDisplayMetrics().density);
+                v.setLayoutParams(lp);
+            }
             return insets;
         });
         EdgeToEdgeHelper.padBottom(binding.contentRoot);
