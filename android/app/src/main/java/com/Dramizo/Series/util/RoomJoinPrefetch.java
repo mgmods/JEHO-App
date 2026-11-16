@@ -88,7 +88,16 @@ public final class RoomJoinPrefetch {
             final RoomDtos.JoinRoomResult sessionOut = result;
             final String errOut = error;
             for (Callback cb : toNotify) {
-                MAIN.post(() -> cb.onResult(sessionOut, errOut));
+                MAIN.post(() -> {
+                    try {
+                        cb.onResult(sessionOut, errOut);
+                    } catch (RuntimeException callbackError) {
+                        // A room launcher may be finishing while the prefetch completes.
+                        // A stale UI callback must not crash the app's main thread.
+                        android.util.Log.e("RoomJoinPrefetch",
+                                "Room join callback failed", callbackError);
+                    }
+                });
             }
         });
     }
