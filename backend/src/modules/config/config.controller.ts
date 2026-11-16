@@ -434,8 +434,24 @@ export class ConfigController {
       }
     }
     const safeUrl = (value: unknown) => {
-      const url = String(value || '').trim();
-      return url && url.length <= 2048 ? url : '';
+      const raw = String(value || '').trim();
+      if (!raw || raw.length > 2048) return '';
+      let url = raw;
+      if (raw.startsWith('/uploads/') && !raw.startsWith('//')) {
+        url = publicApiBase() + raw;
+      } else if (/^uploads\//i.test(raw)) {
+        url = publicApiBase() + '/' + raw;
+      } else if (/^https?:\/\//i.test(raw)) {
+        try {
+          const parsed = new URL(raw);
+          if (/^\/uploads\//i.test(parsed.pathname)) {
+            url = publicApiBase() + parsed.pathname + parsed.search;
+          }
+        } catch {
+          return '';
+        }
+      }
+      return url;
     };
     return {
       leaderBadgeUrl: safeUrl(config?.leaderBadgeUrl),
