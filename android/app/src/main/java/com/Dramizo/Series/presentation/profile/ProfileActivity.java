@@ -470,7 +470,8 @@ public class ProfileActivity extends ThemedActivity {
                         + " · " + getString(R.string.user_card_stat_visitors) + " " + visitors);
             }
             bindStaffBadge(user);
-            bindAgencyRoleBadge(user);
+            // Agency/competition role badges must not sit over the profile avatar.
+            // The agency information strip remains available separately below the profile.
             bindAgencyStrip(user.agency, user.agencyClub);
 
             // Level chip (same pill as card member chip).
@@ -2457,8 +2458,14 @@ public class ProfileActivity extends ThemedActivity {
     private void bindCpPartnerAvatarAndFrame(String avatarUrl, String frameUrl, String hostBadgeUrl) {
         if (binding == null) return;
         bindRealCpAvatar(binding.imgProfileCpPartner, avatarUrl);
-        String selectedFrame = hostBadgeUrl != null && !hostBadgeUrl.trim().isEmpty()
-                ? hostBadgeUrl.trim() : (frameUrl == null ? "" : frameUrl.trim());
+        // Do not use legacy host/agency/competition badge artwork as a CP/profile frame.
+        String selectedFrame = frameUrl == null ? "" : frameUrl.trim();
+        String selectedLower = selectedFrame.toLowerCase(Locale.ROOT);
+        if (selectedLower.contains("contest") || selectedLower.contains("competition")
+                || (selectedLower.contains("agency") && selectedLower.contains("badge"))
+                || selectedLower.contains("host_badge")) {
+            selectedFrame = "";
+        }
         ImageView frame = binding.imgProfileCpPartnerFrame;
         if (frame == null) return;
         if (selectedFrame.isEmpty()) {
