@@ -5115,7 +5115,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         int adapterPosition = -1;
         for (int i = 0; i < guests.size(); i++) {
             RoomDtos.SeatDto seat = guests.get(i);
-            if (seat != null && seat.seatIndex == 18) {
+            if (seat != null && seat.seatIndex == 8) {
                 adapterPosition = i;
                 break;
             }
@@ -12313,9 +12313,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (binding == null || binding.giftOverlay == null) return;
             List<PointF> destinations = resolveMicCenters(ids);
             if (destinations.isEmpty()) return;
-            int w = Math.max(binding.giftOverlay.getWidth(), 1);
-            int h = Math.max(binding.giftOverlay.getHeight(), 1);
-            PointF from = new PointF(w / 2f, Math.max(h * 0.72f, h - luckyCannonDp(110)));
+            PointF from = resolveLuckyGiftRevealCenter();
+            if (from == null) {
+                int w = Math.max(binding.giftOverlay.getWidth(), 1);
+                int h = Math.max(binding.giftOverlay.getHeight(), 1);
+                from = new PointF(w / 2f, h * 0.40f);
+            }
             GiftFlyAnimator.flyTogether(binding.giftOverlay, giftIconUrl, from, destinations, 620L);
             if (onScatterStart != null) {
                 try { onScatterStart.run(); } catch (Exception ignored) {}
