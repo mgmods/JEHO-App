@@ -633,13 +633,22 @@ public final class LiveKitEngineManager {
                                 throw new RuntimeException(e);
                             }
                         });
+                // LiveKit returns false when the track could not be enabled/published.
+                // Do not report a successful mic activation in that case: retry below.
+                if (result instanceof Boolean && !((Boolean) result)) {
+                    last = new IllegalStateException(
+                            "LiveKit setMicrophoneEnabled returned false (enabled=" + enabled + ")");
+                    Log.w(TAG, "setMicrophoneEnabled rejected attempt=" + attempt
+                            + " enabled=" + enabled);
+                    Thread.sleep(150L * attempt);
+                    continue;
+                }
                 applyAudioRoute();
                 // Keep remote levels audible when SPEAKER is the route (common room mode).
                 trySetRemotePlaybackGain(r, speakerMuted ? 0f : 1f);
                 Log.i(TAG, "setMicrophoneEnabled=" + enabled
                         + " attempt=" + attempt
-                        + " result="
-                        + (result != null ? result.getClass().getSimpleName() : "null"));
+                        + " result=" + result);
                 return;
             } catch (Throwable t) {
                 last = t;
