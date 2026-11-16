@@ -10,7 +10,7 @@ import { ZegoSettingsService } from '../zego/zego-settings.service';
 import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 
-const CURRENT_JEHO_API_ORIGIN = 'https://jeho-own-web-910481ae.hosted.cumin.dev';
+const CURRENT_JEHO_API_ORIGIN = 'https://jeho-own-backend.mgs.prod.page';
 
 function publicApiBase(): string {
   const configured = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || '')
@@ -18,7 +18,7 @@ function publicApiBase(): string {
     .replace(/\/+$/, '')
     .replace(/\/api\/v\d+$/i, '');
   // Some existing Cumin environments still carry the retired Blitz origin.
-  if (!configured || /jeho-own-backend\.mgs\.blitz\.cloud/i.test(configured)) {
+  if (!configured || /jeho-own-backend\.mgs\.blitz\.cloud|jeho-own-web-910481ae\.hosted\.cumin\.dev/i.test(configured)) {
     return CURRENT_JEHO_API_ORIGIN;
   }
   return configured;
