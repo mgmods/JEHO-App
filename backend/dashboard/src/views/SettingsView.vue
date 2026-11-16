@@ -50,6 +50,34 @@
         <template v-else-if="settingsTab === 'section-background'">
           <SectionBackgroundPanel />
         </template>
+        <template v-else-if="settingsTab === 'splash'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">صورة شاشة السبلاش</h3>
+            <p class="form-text mb-3">ارفع صورة شاشة البداية التي تظهر عند فتح JEHO. بعد الحفظ تُحمّل من السيرفر عند التشغيل التالي دون تحديث APK.</p>
+            <div class="mb-3 rounded-4 border bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden" style="min-height:220px">
+              <img v-if="splashPreviewUrl" :src="splashPreviewUrl" alt="معاينة صورة السبلاش" style="display:block;width:100%;max-height:420px;object-fit:contain" />
+              <span v-else class="text-secondary small">لم يتم تعيين صورة للسبلاش</span>
+            </div>
+            <div class="row g-3 align-items-end">
+              <div class="col-md-8">
+                <label class="form-label">صورة السبلاش (PNG / JPG / WebP)</label>
+                <input ref="splashFileInput" class="form-control" type="file" accept="image/png,image/jpeg,image/webp" @change="selectSplashImage" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">مدة العرض بالثواني</label>
+                <input v-model.number="splashDuration" class="form-control" type="number" min="1" max="5" />
+              </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <button type="button" class="btn btn-aurora" :disabled="!splashSelectedFile || splashUploading || splashSaving || !auth.can('settings', 'write')" @click="uploadAndSaveSplash">
+                <span v-if="splashUploading || splashSaving" class="spinner-border spinner-border-sm me-1"></span>
+                {{ splashUploading ? 'جارٍ رفع الصورة…' : splashSaving ? 'جارٍ حفظ الصورة…' : 'رفع وحفظ صورة السبلاش' }}
+              </button>
+              <button type="button" class="btn btn-ghost" :disabled="!splashSavedUrl || splashUploading || splashSaving || !auth.can('settings', 'write')" @click="removeSplashImage">إزالة الصورة</button>
+            </div>
+            <p v-if="splashMessage" class="form-text mt-3" role="status">{{ splashMessage }}</p>
+          </section>
+        </template>
 
         <template v-else-if="settingsTab === 'staff-identity'">
           <section class="settings-card">
@@ -790,6 +818,106 @@ const CORE_TABS = new Set(['general', 'economy', 'features', 'moderation', 'othe
 const isCoreTab = computed(() => CORE_TABS.has(settingsTab.value))
 const canWriteSettings = computed(() => auth.can('settings', 'write'))
 
+const splashFileInput = ref(null)
+const splashSelectedFile = ref(null)
+const splashPreviewUrl = ref('')
+const splashSavedUrl = ref('')
+const splashDuration = ref(5)
+const splashUploading = ref(false)
+const splashSaving = ref(false)
+const splashMessage = ref('')
+let splashThemeConfig = {}
+
+async function loadSplashSettings() {
+  const { data, error: err } = await settingsApi.get()
+  if (err) { splashMessage.value = err.message || 'تعذّر تحميل إعداد السبلاش.'; return }
+  const rows = data?.data || data || []
+  const row = Array.isArray(rows) ? rows.find(item => item.key === 'app_theme') : null
+  try { splashThemeConfig = row?.value ? JSON.parse(row.value) : {} } catch { splashThemeConfig = {} }
+  const splash = splashThemeConfig.splash || {}
+  const items = Array.isArray(splash.items) ? splash.items : []
+  const item = items.find(x => x && x.id === 'dashboard-main-splash' && x.active !== false && x.url) || items.find(x => x && x.active !== false && x.url)
+  splashSavedUrl.value = item?.url || splashThemeConfig.brand?.splashUrl || splashThemeConfig.backgrounds?.splash || ''
+  splashPreviewUrl.value = splashSavedUrl.value ? resolveAsset(splashSavedUrl.value) : ''
+  splashDuration.value = Math.max(1, Math.min(5, Number(item?.durationSeconds) || 5))
+}
+
+function selectSplashImage(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+    splashMessage.value = 'اختر صورة PNG أو JPG أو WebP.'
+    event.target.value = ''
+    return
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    splashMessage.value = 'حجم الصورة يجب ألا يتجاوز 12 ميغابايت.'
+    event.target.value = ''
+    return
+  }
+  splashSelectedFile.value = file
+  if (splashPreviewUrl.value.startsWith('blob:')) URL.revokeObjectURL(splashPreviewUrl.value)
+  splashPreviewUrl.value = URL.createObjectURL(file)
+  splashMessage.value = ''
+}
+
+async function persistSplashImage(url) {
+  const oldSplash = splashThemeConfig.splash || {}
+  const duration = Math.max(1, Math.min(5, Number(splashDuration.value) || 5))
+  const items = url ? [{ id: 'dashboard-main-splash', url, active: true, durationSeconds: duration, sortOrder: 0, targetType: 'home' }] : []
+  splashThemeConfig = {
+    ...splashThemeConfig,
+    version: (Number(splashThemeConfig.version) || 1) + 1,
+    updatedAt: new Date().toISOString(),
+    splash: { ...oldSplash, enabled: true, items },
+    brand: { ...(splashThemeConfig.brand || {}), splashUrl: url || '' },
+  }
+  const { error: err } = await settingsApi.update({ app_theme: JSON.stringify(splashThemeConfig) })
+  if (err) throw new Error(err.message || 'تعذّر حفظ إعداد السبلاش.')
+  splashSavedUrl.value = url || ''
+  splashPreviewUrl.value = url ? resolveAsset(url) : ''
+}
+
+async function uploadAndSaveSplash() {
+  if (!splashSelectedFile.value) return
+  splashUploading.value = true
+  splashMessage.value = ''
+  try {
+    const { data, error: err } = await uploadsApi.upload(splashSelectedFile.value)
+    if (err) throw new Error(err.message || 'تعذّر رفع الصورة.')
+    const uploaded = data?.data || data || {}
+    const url = String(uploaded.url || uploaded.path || (uploaded.filename ? '/uploads/' + uploaded.filename : '')).trim()
+    if (!url) throw new Error('تم الرفع لكن لم يرجع الخادم رابط الصورة.')
+    splashSaving.value = true
+    await persistSplashImage(url)
+    splashSelectedFile.value = null
+    if (splashFileInput.value) splashFileInput.value.value = ''
+    splashMessage.value = 'تم حفظ صورة السبلاش. ستظهر عند فتح التطبيق مرة أخرى.'
+    toast().success(splashMessage.value)
+  } catch (error) {
+    splashMessage.value = error.message || 'تعذّر رفع صورة السبلاش أو حفظها.'
+    toast().danger(splashMessage.value)
+  } finally {
+    splashUploading.value = false
+    splashSaving.value = false
+  }
+}
+
+async function removeSplashImage() {
+  splashSaving.value = true
+  splashMessage.value = ''
+  try {
+    await persistSplashImage('')
+    splashSelectedFile.value = null
+    if (splashFileInput.value) splashFileInput.value.value = ''
+    splashMessage.value = 'تمت إزالة صورة السبلاش.'
+  } catch (error) {
+    splashMessage.value = error.message || 'تعذّر إزالة صورة السبلاش.'
+  } finally {
+    splashSaving.value = false
+  }
+}
+
 const settingTabs = computed(() => {
   // Tabs inherit the narrowest existing module permission. Global/security tabs
   // remain Super-Admin-only and are not merely disabled for limited staff.
@@ -799,6 +927,7 @@ const settingTabs = computed(() => {
     { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin', permission: 'settings' },
     { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected', superOnly: true },
     { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image', permission: 'settings' },
+    { id: 'splash', label: 'صورة السبلاش', icon: 'bi-card-image', permission: 'settings' },
     { id: 'mysterious-man', label: 'إعدادات الرجل الغامض', icon: 'bi-incognito', superOnly: true },
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles', permission: 'settings' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check', permission: 'settings' },
@@ -1222,6 +1351,7 @@ function syncTabFromRoute() {
   if (settingsTab.value === 'admins') loadOperators()
 }
 
+watch(settingsTab, (id) => { if (id === 'splash') loadSplashSettings() })
 watch(() => route.query.tab, syncTabFromRoute)
 watch(settingTabs, () => {
   const allowed = new Set(settingTabs.value.map((x) => x.id))
@@ -1347,7 +1477,8 @@ async function load() {
 }
 
 function reloadActive() {
-  if (isCoreTab.value || settingsTab.value === 'app-update') load()
+  if (settingsTab.value === 'splash') loadSplashSettings()
+  else if (isCoreTab.value || settingsTab.value === 'app-update') load()
   else if (settingsTab.value === 'staff-identity') loadStaffIdentity()
   else if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
   else if (settingsTab.value === 'admins') loadOperators()
