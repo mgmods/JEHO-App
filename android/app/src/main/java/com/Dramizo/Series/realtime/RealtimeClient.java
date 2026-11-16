@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.socket.client.IO;
 import io.socket.client.Socket;
@@ -98,13 +100,15 @@ public class RealtimeClient {
         default void onDisconnected() {}
     }
 
-    private Socket socket;
+    private volatile Socket socket;
     private String token;
     private final CopyOnWriteArrayList<RoomListener> roomListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<ChatListener> chatListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<UserListener> userListeners = new CopyOnWriteArrayList<>();
-    private final Set<String> joinedRooms = new HashSet<>();
-    private final Set<String> joinedConversations = new HashSet<>();
+    // Socket callbacks and Android UI callers mutate these collections on different threads.
+    // Concurrent sets prevent reconnect/leave races and ConcurrentModificationException.
+    private final Set<String> joinedRooms = ConcurrentHashMap.newKeySet();
+    private final Set<String> joinedConversations = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> recentJoinEvents = new HashMap<>();
 
     public static synchronized RealtimeClient getInstance() {
@@ -240,12 +244,11 @@ public class RealtimeClient {
         }
         // Always emit room:join — skipping when joinedRooms is stale prevents entry effects
         // and leaves the socket outside the room after process death / incomplete leave.
-        final boolean[] done = {false};
+        final AtomicBoolean done = new AtomicBoolean(false);
         final android.os.Handler ackTimeout =
                 new android.os.Handler(android.os.Looper.getMainLooper());
         final Runnable timeout = () -> {
-            if (done[0]) return;
-            done[0] = true;
+            if (!done.compareAndSet(false, true)) return;
             Log.w(TAG, "room:join ack timeout " + roomId);
             if (callback != null) callback.onResult(false, "Join timeout", null);
         };
@@ -258,8 +261,7 @@ public class RealtimeClient {
             body.put("userLevel", Math.max(1, userLevel));
             ackTimeout.postDelayed(timeout, 12_000L);
             socket.emit("room:join", body, (Ack) args -> {
-                if (done[0]) return;
-                done[0] = true;
+                if (!done.compareAndSet(false, true)) return;
                 ackTimeout.removeCallbacks(timeout);
                 JSONObject response =
                         args != null && args.length > 0 && args[0] instanceof JSONObject
@@ -282,7 +284,7 @@ public class RealtimeClient {
             });
             Log.d(TAG, "room:join " + roomId);
         } catch (JSONException e) {
-            done[0] = true;
+            done.set(true);
             ackTimeout.removeCallbacks(timeout);
             Log.w(TAG, "joinRoom failed", e);
             if (callback != null) callback.onResult(false, e.getMessage(), null);
