@@ -203,7 +203,12 @@ public class CosmeticsViewModel extends ViewModel {
             // Accept only the latest in-flight request.
             if (seq != loadSeq.get()) return;
             if (cat.success && cat.data != null) {
-                List<CosmeticDtos.CosmeticDto> items = new ArrayList<>(cat.data);
+                // Agency/competition role badges are not mall cosmetics. Keep them out of the store
+                // even if an older backend catalog still returns legacy badge records.
+                List<CosmeticDtos.CosmeticDto> items = new ArrayList<>();
+                for (CosmeticDtos.CosmeticDto row : cat.data) {
+                    if (row != null && !isRoleBadge(row)) items.add(row);
+                }
                 if (bagMode) {
                     List<CosmeticDtos.CosmeticDto> ownedOnly = new ArrayList<>();
                     synchronized (ownedIds) {
@@ -408,6 +413,26 @@ public class CosmeticsViewModel extends ViewModel {
                 error.postValue(r.error);
             }
         });
+    }
+
+    /** Agency/competition role marks are not purchasable profile cosmetics. */
+    private static boolean isRoleBadge(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (item == null) return false;
+        String type = item.type == null ? "" : item.type.trim().toLowerCase(Locale.ROOT);
+        String code = item.code == null ? "" : item.code.trim().toLowerCase(Locale.ROOT);
+        String name = item.name == null ? "" : item.name.trim().toLowerCase(Locale.ROOT);
+        String preview = item.previewUrl == null ? "" : item.previewUrl.trim().toLowerCase(Locale.ROOT);
+        String animation = item.animationUrl == null ? "" : item.animationUrl.trim().toLowerCase(Locale.ROOT);
+        String all = type + " " + code + " " + name + " " + preview + " " + animation;
+        return "host_badge".equals(type)
+                || "agency_badge".equals(type)
+                || "contest_badge".equals(type)
+                || "competition_badge".equals(type)
+                || type.contains("contest")
+                || type.contains("competition")
+                || (all.contains("agency") && all.contains("badge"))
+                || (all.contains("contest") && all.contains("badge"))
+                || (all.contains("competition") && all.contains("badge"));
     }
 
     private static boolean isAvatarFrameType(@Nullable String type) {
