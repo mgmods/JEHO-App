@@ -13681,7 +13681,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override
             public void onRoomEvent(String rid, String event, JsonObject payload, String fromUserId, String fromUsername) {
                 if (rid == null || roomId == null || !roomId.equals(rid) || event == null) return;
-                handler.post(() -> handleRoomEvent(event, payload, fromUserId, fromUsername));
+                handler.post(() -> {
+                    if (exiting || isFinishing() || isDestroyed() || binding == null) return;
+                    try {
+                        handleRoomEvent(event, payload, fromUserId, fromUsername);
+                    } catch (RuntimeException crash) {
+                        // A malformed realtime payload must not kill the Android process.
+                        android.util.Log.e("VoiceRoom", "Room event ignored after UI exception: " + event, crash);
+                    }
+                });
             }
 
             @Override
