@@ -326,9 +326,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyCannonSending;
     /** One wallet request at a time; held shots are coalesced into a quantity batch. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
-    // Keep a small pipeline so cannon cadence is not tied to one slow HTTP response.
-    // Wallet transactions remain serialized safely by the backend's sender-wallet row lock.
-    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 5;
+    // Keep exactly one cannon charge request in flight. Releasing the finger clears
+    // every queued repeat, so a slow response cannot leave several already-submitted
+    // gifts waiting to appear after ACTION_UP.
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 1;
     private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 65L;
     private int luckyCannonInFlight;
     private int luckyCannonPendingQuantity;
@@ -4956,11 +4957,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        // Keep up to three cannon requests in flight. This overlaps the expensive
-        // post-commit response work while the backend serializes wallet debits with
-        // its sender-wallet row lock. If the pipeline is full, coalesce held repeats
-        // into one bounded batch instead of creating an unbounded request queue.
-        // ACTION_UP clears that unsent batch immediately; already-started requests finish.
+        // A single request may be active at a time. While it is active, held repeats
+        // are coalesced into a bounded batch; ACTION_UP clears that batch immediately.
+        // This prevents a backlog of independently charged gifts from appearing later.
         if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) {
             if (luckyCannonHoldActive && !animatePress) {
                 luckyCannonPendingQuantity = Math.min(
