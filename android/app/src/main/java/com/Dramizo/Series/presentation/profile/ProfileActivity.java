@@ -193,8 +193,9 @@ public class ProfileActivity extends ThemedActivity {
         }
         // Keep the original Follow/Message/Room controls at the bottom of the profile.
         // Remove only the duplicate sticky icon row near the identity card.
+        placeProfileIdentityBadgesUnderId();
         ensureProfileIdentityStatsVisible();
-        hideDuplicateProfileInlineActions();
+        removeDuplicateProfileInlineActions();
 
         final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
@@ -1969,10 +1970,27 @@ public class ProfileActivity extends ThemedActivity {
         loadProfileGiftsPreview(loadedProfileId);
     }
 
-    /** Hide the extra icon row; preserve the original action buttons at the profile bottom. */
-    private void hideDuplicateProfileInlineActions() {
-        if (binding != null && binding.profileInlineActions != null) {
-            binding.profileInlineActions.setVisibility(View.GONE);
+    /** Move the existing identity badges row directly after the public ID, without cloning it. */
+    private void placeProfileIdentityBadgesUnderId() {
+        if (binding == null || binding.rowUserId == null || binding.rowProfileMedals == null) return;
+        ViewGroup target = binding.rowUserId.getParent() instanceof ViewGroup
+                ? (ViewGroup) binding.rowUserId.getParent() : null;
+        if (target == null) return;
+        View badges = binding.rowProfileMedals;
+        if (badges.getParent() instanceof ViewGroup) {
+            ((ViewGroup) badges.getParent()).removeView(badges);
+        }
+        int idIndex = target.indexOfChild(binding.rowUserId);
+        if (idIndex >= 0) target.addView(badges, idIndex + 1);
+    }
+
+    /** Remove the duplicate CP-adjacent action row from the view tree; keep the original bottom row. */
+    private void removeDuplicateProfileInlineActions() {
+        if (binding == null || binding.profileInlineActions == null) return;
+        View duplicate = binding.profileInlineActions;
+        duplicate.setVisibility(View.GONE);
+        if (duplicate.getParent() instanceof ViewGroup) {
+            ((ViewGroup) duplicate.getParent()).removeView(duplicate);
         }
     }
 
