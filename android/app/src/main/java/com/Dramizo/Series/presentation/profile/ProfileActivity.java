@@ -140,11 +140,9 @@ public class ProfileActivity extends ThemedActivity {
         EdgeToEdgeHelper.padBottom(binding.contentRoot);
         container = ContainerProvider.from(this);
         RemoteNavIcons.hydrateFromCache(container);
-        bindStickyProfileActionIcons();
-        container.getIoExecutor().execute(() -> {
-            RemoteNavIcons.refreshBlocking(container);
-            runOnUiThread(this::bindStickyProfileActionIcons);
-        });
+        // Profile action icons are the original Follow/Message/Room row, moved
+        // directly below the public ID. Do not create a second sticky icon row.
+        container.getIoExecutor().execute(() -> RemoteNavIcons.refreshBlocking(container));
         cpConfigListener = new com.Dramizo.Series.realtime.RealtimeClient.UserListener() {
             @Override public void onUserEvent(String event, com.google.gson.JsonObject payload) {
                 if (!"cp:config-updated".equals(event)) return;
@@ -193,10 +191,9 @@ public class ProfileActivity extends ThemedActivity {
                 startActivity(new Intent(this, AdminConsoleActivity.class));
             });
         }
-        // Keep the identity stats row directly under the ID. The three profile actions
-        // are the final row of the page and must not hide or remove any profile content.
+        // Keep identity stats and the single original action row directly below the ID.
         ensureProfileIdentityStatsVisible();
-        moveProfileInlineActionsToBottom();
+        moveProfileActionsUnderId();
 
         final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
@@ -1973,15 +1970,27 @@ public class ProfileActivity extends ThemedActivity {
         loadProfileGiftsPreview(loadedProfileId);
     }
 
-    /** Keep VIP/wealth/popularity under the ID while making the three profile actions
-     * the final controls at the bottom of the public profile. No content is hidden. */
-    private void moveProfileInlineActionsToBottom() {
-        if (binding == null || binding.profileInlineActions == null) return;
-        ViewGroup parent = (ViewGroup) binding.profileInlineActions.getParent();
-        if (parent == null) return;
-        parent.removeView(binding.profileInlineActions);
-        parent.addView(binding.profileInlineActions);
-        binding.profileInlineActions.setVisibility(View.VISIBLE);
+    /** Keep exactly one Follow/Message/Room row, immediately below the public ID. */
+    private void moveProfileActionsUnderId() {
+        if (binding == null || binding.rowUserId == null || binding.btnFollow == null) return;
+        View actionRow = (View) binding.btnFollow.getParent();
+        ViewGroup identityParent = (ViewGroup) binding.rowUserId.getParent();
+        if (actionRow == null || identityParent == null) return;
+
+        // Remove the newer duplicate icon row; the original functional buttons remain.
+        if (binding.profileInlineActions != null) {
+            binding.profileInlineActions.setVisibility(View.GONE);
+        }
+
+        ViewGroup oldParent = (ViewGroup) actionRow.getParent();
+        if (oldParent != null) oldParent.removeView(actionRow);
+        int idIndex = identityParent.indexOfChild(binding.rowUserId);
+        if (idIndex < 0) {
+            identityParent.addView(actionRow);
+        } else {
+            identityParent.addView(actionRow, idIndex + 1);
+        }
+        actionRow.setVisibility(View.VISIBLE);
     }
 
     private void ensureProfileIdentityStatsVisible() {
