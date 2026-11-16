@@ -611,6 +611,19 @@ export class ConfigController {
         version,
         updatedAt,
       };
+      // Normalize every dashboard-managed brand/media URL so uploads from an
+      // older deployment are served by the current JEHO API origin.
+      if (next.brand && typeof next.brand === 'object') {
+        next.brand = { ...next.brand };
+        for (const key of ['logoUrl', 'splashUrl', 'faviconUrl']) {
+          if (next.brand[key]) next.brand[key] = bust(next.brand[key]);
+        }
+      }
+      if (next.assets && typeof next.assets === 'object') {
+        next.assets = Object.fromEntries(
+          Object.entries(next.assets).map(([key, value]) => [key, bust(value)]),
+        );
+      }
       // Normalize only the four top-level section wallpapers. Detail screens
       // (liveRoom, voiceRoom, createRoom) are deliberately left untouched.
       if (next.backgrounds && typeof next.backgrounds === 'object') {
