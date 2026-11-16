@@ -3245,53 +3245,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         LinearLayout[] overflowLine = new LinearLayout[] { null };
 
         int total = 0;
-        String agencyBadgeLabel = null;
-        String agencyRole = decoration.agencyRole == null ? ""
-                : decoration.agencyRole.trim().toLowerCase(java.util.Locale.ROOT);
-        String agencyName = decoration.agencyName == null ? "" : decoration.agencyName.trim();
-        boolean female = "female".equalsIgnoreCase(decoration.gender);
-        if ("owner".equals(agencyRole)) {
-            agencyBadgeLabel = "قائد وكالة";
-        } else {
-            RoomDtos.RoomDto liveRoom = viewModel != null ? viewModel.getRoom().getValue() : null;
-            String liveAgencyId = liveRoom != null && liveRoom.agencyId != null
-                    ? liveRoom.agencyId.trim() : "";
-            String memberAgencyId = decoration.agencyId == null ? "" : decoration.agencyId.trim();
-            boolean sameAgencyRoom = isAgencyRoom && !liveAgencyId.isEmpty()
-                    && !memberAgencyId.isEmpty() && liveAgencyId.equals(memberAgencyId);
-            boolean roomModerator = false;
-            if (sameAgencyRoom && liveRoom.moderatorIds != null && decoration.userId != null) {
-                for (String moderatorId : liveRoom.moderatorIds) {
-                    if (moderatorId != null && sameUser(moderatorId, decoration.userId)) {
-                        roomModerator = true;
-                        break;
-                    }
-                }
-            }
-            if (sameAgencyRoom) {
-                if ("host".equals(agencyRole)) {
-                    agencyBadgeLabel = female ? "مضيفة" : "مضيف";
-                } else if ("manager".equals(agencyRole) || "staff".equals(agencyRole)
-                        || "admin".equals(agencyRole) || "agency_admin".equals(agencyRole) || roomModerator) {
-                    agencyBadgeLabel = female ? "مشرفة" : "مشرف";
-                }
-            }
-            // Host/hostess labels are room-local: only show them inside their own agency room.
-            // In personal rooms or another agency's room, the profile still carries the role,
-            // but the mic/chat identity must stay clean.
-        }
-        if (agencyBadgeLabel != null) {
-            TextView agencyBadge = new TextView(this);
-            agencyBadge.setText(agencyBadgeLabel);
-            agencyBadge.setTextColor(0xFFFFE4A6);
-            agencyBadge.setTextSize(9f);
-            agencyBadge.setTypeface(null, android.graphics.Typeface.BOLD);
-            agencyBadge.setIncludeFontPadding(false);
-            agencyBadge.setPadding(dp(5), dp(2), dp(5), dp(2));
-            agencyBadge.setBackgroundResource(R.drawable.bg_agency_affiliation_badge);
-            agencyBadge.setLayoutParams(roomBadgeTextParams(2));
-            addRoomChatBadge(inline, overflow, agencyBadge, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
-        }
+        // Agency and competition marks are intentionally omitted from chat identity.
         if (fallbackVip > 0) {
             ImageView vip = new ImageView(this);
             vip.setContentDescription("VIP");
@@ -3359,25 +3313,44 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             addRoomChatBadge(inline, overflow, medal, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
         inline.setVisibility(inline.getChildCount() > 0 ? View.VISIBLE : View.GONE);
-        overflow.removeAllViews();
-        overflow.setVisibility(View.GONE);
+        overflow.setVisibility(overflow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
     }
 
     private void addRoomChatBadge(
             @NonNull LinearLayout inline, @NonNull LinearLayout overflow,
             @NonNull View badge, int index, int firstLineLimit, int[] inlineUsed,
             int overflowLineLimit, int[] overflowUsed, LinearLayout[] overflowLine) {
-        // Keep sender decorations beside the sender name, not on a second line.
         ViewGroup.LayoutParams existing = badge.getLayoutParams();
-        int badgeWidth = existing != null ? existing.width : ViewGroup.LayoutParams.WRAP_CONTENT;
-        int badgeHeight = existing != null ? existing.height : ViewGroup.LayoutParams.WRAP_CONTENT;
+        int badgeWidth = existing != null && existing.width > 0
+                ? existing.width : ViewGroup.LayoutParams.WRAP_CONTENT;
+        int badgeHeight = existing != null && existing.height > 0
+                ? existing.height : ViewGroup.LayoutParams.WRAP_CONTENT;
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(badgeWidth, badgeHeight);
         params.setMarginEnd(dp(2));
         badge.setLayoutParams(params);
-        inline.addView(badge);
-        inline.setVisibility(View.VISIBLE);
-        overflow.removeAllViews();
-        overflow.setVisibility(View.GONE);
+        badge.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        int width = Math.max(dp(12), badge.getMeasuredWidth()) + dp(2);
+        if (inlineUsed[0] + width <= firstLineLimit) {
+            inline.addView(badge);
+            inlineUsed[0] += width;
+            inline.setVisibility(View.VISIBLE);
+            return;
+        }
+        if (overflowLine[0] == null || overflowUsed[0] + width > overflowLineLimit) {
+            LinearLayout line = new LinearLayout(this);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            line.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            overflow.addView(line);
+            overflowLine[0] = line;
+            overflowUsed[0] = 0;
+        }
+        overflowLine[0].addView(badge);
+        overflowUsed[0] += width;
+        overflow.setVisibility(View.VISIBLE);
     }
 
     private LinearLayout.LayoutParams roomBadgeImageParams(int widthDp, int heightDp, int endMarginDp) {
