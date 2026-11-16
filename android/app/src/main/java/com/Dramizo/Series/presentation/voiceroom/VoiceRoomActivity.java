@@ -3138,7 +3138,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             roomChatDecorationLoading.remove(userId);
             return;
         }
-        container.getIoExecutor().execute(() -> {
+        container.getLuckyCannonExecutor().execute(() -> {
             RoomChatDecoration decoration = new RoomChatDecoration();
             decoration.userId = userId;
             Result<AuthDtos.UserDto> profile = ApiCall.execute(container.getUserApi().getUser(userId));
