@@ -643,15 +643,14 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> hostBadgeMeta,
             boolean agencyRoom,
             int fallbackLevel) {
-        final boolean hasHost =
-                hostBadgeUrl != null && !hostBadgeUrl.trim().isEmpty();
-        final String wearUrl = (agencyRoom && hasHost) ? hostBadgeUrl : vipFrameUrl;
-        final Map<String, ?> wearMeta = (agencyRoom && hasHost) ? hostBadgeMeta : null;
-
+        // The equipped VIP/avatar frame is personal cosmetics and must remain the
+        // same in agency rooms, personal rooms and every other room. Agency host
+        // identity artwork is not a replacement for the user's equipped frame.
+        final String wearUrl = vipFrameUrl;
         if (hostSignal != null && wearUrl != null && !wearUrl.isEmpty()
-                && (shouldUseLiveWear(wearUrl) || wearMeta != null)) {
+                && shouldUseLiveWear(wearUrl)) {
             boolean live = bindHostLikeLive(
-                    hostSignal, avatarView, frameView, avatarUrl, wearUrl, wearMeta,
+                    hostSignal, avatarView, frameView, avatarUrl, wearUrl, null,
                     fallbackLevel);
             if (live) {
                 if (hostBadgeView != null) {
@@ -662,18 +661,20 @@ public final class AvatarCosmetics {
             }
         }
         if (hostSignal != null) {
+            hostSignal.setOnFrameReadyListener(null);
             hostSignal.clearSignal();
             hostSignal.setVisibility(View.GONE);
+            hostSignal.setAlpha(1f);
+        }
+        if (hostBadgeView != null) {
+            hostBadgeView.setVisibility(View.GONE);
+            hostBadgeView.setImageDrawable(null);
         }
         if (avatarView != null) {
             avatarView.setVisibility(View.VISIBLE);
             bindAvatar(avatarView, avatarUrl);
         }
-        if (agencyRoom && hasHost) {
-            applyHostWear(frameView, hostBadgeView, avatarView, null, hostBadgeUrl, null, hostBadgeMeta);
-        } else {
-            applyHostWear(frameView, hostBadgeView, avatarView, vipFrameUrl, null, null, null);
-        }
+        applyHostWear(frameView, null, avatarView, vipFrameUrl, null, null, null);
     }
 
     /** Frame without reloading avatar — VIP frame only outside agency rooms. */
