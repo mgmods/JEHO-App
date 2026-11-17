@@ -494,11 +494,17 @@ public class ProfileActivity extends ThemedActivity {
                     : Math.max(0, Math.max(user.charmScore, user.popularityScore));
             long wealth = user.wealthLevel > 0 ? user.wealthLevel
                     : Math.max(0, user.wealthScore);
-            binding.tvVipChip.setText("VIP" + vip);
-            binding.tvVipChip.setVisibility(vip > 0 ? View.VISIBLE : View.GONE);
-            if (vip > 0) {
-                binding.tvVipChip.setBackgroundResource(R.drawable.bg_chip_vip);
-                binding.tvVipChip.setTextColor(0xFFFFFFFF);
+            if (binding.tvVipChip != null) { binding.tvVipChip.setText(null); binding.tvVipChip.setVisibility(View.GONE); }
+            if (binding.imgVipMedal != null) { binding.imgVipMedal.setImageDrawable(null); binding.imgVipMedal.setVisibility(View.GONE); }
+            if (binding.imgVipHorizontalBadge != null) {
+                String horizontalVipUrl = vip > 0 ? user.vipHorizontalBadgeUrl : null;
+                if (horizontalVipUrl == null || horizontalVipUrl.trim().isEmpty()) {
+                    binding.imgVipHorizontalBadge.setVisibility(View.GONE);
+                    binding.imgVipHorizontalBadge.setImageDrawable(null);
+                } else {
+                    binding.imgVipHorizontalBadge.setVisibility(View.VISIBLE);
+                    com.Dramizo.Series.util.ServerAssets.load(binding.imgVipHorizontalBadge, horizontalVipUrl.trim());
+                }
             }
             binding.tvCharmChip.setText(formatScore(charm));
             binding.tvCharmChip.setVisibility(View.VISIBLE);
