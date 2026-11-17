@@ -3140,6 +3140,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String agencyName;
         String agencyRole;
         String gender;
+        String vipBadgeUrl;
         int vipLevel;
         boolean cpActive;
         final List<String> medalUrls = new ArrayList<>();
@@ -3176,6 +3177,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     decoration.agencyRole = user.agency.role;
                 }
                 decoration.gender = user.gender;
+                decoration.vipBadgeUrl = user.vipBadgeUrl;
                 decoration.vipLevel = Math.max(0, user.vipLevel);
                 List<String> displayedIds = user.displayedMedalIds == null
                         ? java.util.Collections.emptyList() : user.displayedMedalIds;

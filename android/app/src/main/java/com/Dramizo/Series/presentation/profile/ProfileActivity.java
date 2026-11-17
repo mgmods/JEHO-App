@@ -840,6 +840,7 @@ public class ProfileActivity extends ThemedActivity {
 
     /** Agency identity is separate from platform-staff badges so both can be shown together. */
     /** Always show the agency role as readable text on the profile, including hosts. */
+    /** Always show the agency role as readable text on the profile, including hosts. */
     private void bindAgencyRoleBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (binding == null || binding.agencyRoleBadgeContainer == null
                 || binding.tvAgencyRoleBadge == null || binding.imgAgencyRoleBadge == null) return;
@@ -848,11 +849,11 @@ public class ProfileActivity extends ThemedActivity {
                 user == null ? null : user.agency;
         com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club =
                 user == null ? null : user.agencyClub;
-        String role = agency != null && agency.role != null
+        String agencyRole = agency != null && agency.role != null
                 ? agency.role.trim().toLowerCase(Locale.US) : "";
-        if (role.isEmpty() && club != null && club.role != null) {
-            role = club.role.trim().toLowerCase(Locale.US);
-        }
+        String clubRole = club != null && club.role != null
+                ? club.role.trim().toLowerCase(Locale.US) : "";
+        String role = isAgencyDisplayRole(agencyRole) ? agencyRole : clubRole;
         role = role.replace('-', '_').replace("agency_", "");
 
         String label;
@@ -881,6 +882,14 @@ public class ProfileActivity extends ThemedActivity {
                 leader ? R.drawable.bg_chip_staff_super : R.drawable.bg_chip_staff_manager);
         binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
         binding.agencyRoleBadgeContainer.setVisibility(View.VISIBLE);
+    }
+
+    private boolean isAgencyDisplayRole(String role) {
+        if (role == null) return false;
+        String normalized = role.trim().toLowerCase(Locale.US).replace('-', '_').replace("agency_", "");
+        return "owner".equals(normalized) || "leader".equals(normalized)
+                || "host".equals(normalized) || "manager".equals(normalized)
+                || "admin".equals(normalized);
     }
 
     private void bindAgencyStrip(
