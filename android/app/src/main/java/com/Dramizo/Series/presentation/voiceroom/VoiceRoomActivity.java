@@ -168,6 +168,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean pendingSeatInviteDialog;
 
     private ActivityVoiceRoomBinding binding;
+    private boolean unreadBadgeReceiverRegistered;
+    private final android.content.BroadcastReceiver unreadBadgeReceiver = new android.content.BroadcastReceiver() {
+        @Override public void onReceive(android.content.Context context, Intent intent) {
+            int count = intent != null ? intent.getIntExtra(
+                    com.Dramizo.Series.util.UnreadMessageBadge.EXTRA_COUNT, 0) : 0;
+            updateRoomUnreadDot(count);
+        }
+    };
+
+    private void updateRoomUnreadDot(int count) {
+        if (binding == null || binding.roomPrivateMsgUnreadDot == null) return;
+        binding.roomPrivateMsgUnreadDot.setVisibility(count > 0 ? View.VISIBLE : View.GONE);
+    }
     private boolean seatStickerRefreshInFlight;
     @Nullable private TextView roomPkScoreBanner;
     @Nullable private android.widget.LinearLayout roomPkSplitContainer;
@@ -12958,6 +12971,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         super.onStart();
         sRoomUiVisible = true;
         sAliveRoom = new java.lang.ref.WeakReference<>(this);
+        if (!unreadBadgeReceiverRegistered) {
+            androidx.core.content.ContextCompat.registerReceiver(
+                    this, unreadBadgeReceiver,
+                    new android.content.IntentFilter(com.Dramizo.Series.util.UnreadMessageBadge.ACTION_CHANGED),
+                    androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
+            unreadBadgeReceiverRegistered = true;
+        }
+        updateRoomUnreadDot(com.Dramizo.Series.util.UnreadMessageBadge.current(this));
         if (binding != null && binding.webHostSignal != null) {
             binding.webHostSignal.resumeMotion();
         }
@@ -12986,6 +13007,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         handler.removeCallbacks(luckyButtonStylePoll);
         handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
+        if (unreadBadgeReceiverRegistered) {
+            try { unregisterReceiver(unreadBadgeReceiver); } catch (Exception ignored) {}
+            unreadBadgeReceiverRegistered = false;
+        }
         // Do NOT clear chat / gift queues — user expects session to continue while in WhatsApp.
         if (binding != null && binding.webHostSignal != null) {
             binding.webHostSignal.pauseMotion();
@@ -13021,6 +13046,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Override
     protected void onResume() {
         super.onResume();
+        com.Dramizo.Series.util.UnreadMessageBadge.refresh(this);
+        updateRoomUnreadDot(com.Dramizo.Series.util.UnreadMessageBadge.current(this));
         // Cosmetics store returns through the room activity; rebind the current user's
         // equipped/unequipped frame on seats from the freshly updated session profile.
         refreshSelfHostWearOnSeats();
