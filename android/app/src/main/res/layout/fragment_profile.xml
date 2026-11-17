@@ -66,6 +66,15 @@
                 android:paddingHorizontal="18dp"
                 android:layoutDirection="rtl">
 
+                <ImageView
+                    android:id="@+id/imgVipPrimaryIcon"
+                    android:layout_width="76dp"
+                    android:layout_height="76dp"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@string/vip"
+                    android:scaleType="fitCenter"
+                    android:visibility="gone" />
+
                 <!-- Mikoo Me: face 70dp + frame 90dp centered (same locked pair with/without wear). -->
                 <FrameLayout
                     android:layout_width="116dp"
