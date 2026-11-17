@@ -145,6 +145,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
         })),
         // Default display = monthly (never permanent).
         durationDays: 30,
+        vipMainIconUrl: ((p.benefits as any)?.visuals || {}).vipMainIconUrl || null,
       }));
     });
   }
