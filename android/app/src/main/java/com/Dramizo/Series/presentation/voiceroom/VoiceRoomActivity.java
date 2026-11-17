@@ -9246,7 +9246,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     if (imgVipMainIcon != null && liveVip > 0
                             && mainVipIconUrl != null && !mainVipIconUrl.trim().isEmpty()) {
                         imgVipMainIcon.setVisibility(View.VISIBLE);
-                        ServerAssets.load(imgVipMainIcon, mainVipIconUrl.trim());
+                        com.Dramizo.Series.util.ServerAssets.load(imgVipMainIcon, mainVipIconUrl.trim());
                     } else if (imgVipMainIcon != null) {
                         imgVipMainIcon.setVisibility(View.GONE);
                         imgVipMainIcon.setImageDrawable(null);
@@ -9254,7 +9254,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     if (imgVipHorizontalBadge != null && r.data.vipHorizontalBadgeUrl != null
                             && !r.data.vipHorizontalBadgeUrl.trim().isEmpty()) {
                         imgVipHorizontalBadge.setVisibility(View.VISIBLE);
-                        ServerAssets.load(imgVipHorizontalBadge, r.data.vipHorizontalBadgeUrl.trim());
+                        com.Dramizo.Series.util.ServerAssets.load(imgVipHorizontalBadge, r.data.vipHorizontalBadgeUrl.trim());
                     } else if (imgVipHorizontalBadge != null) {
                         imgVipHorizontalBadge.setVisibility(View.GONE);
                         imgVipHorizontalBadge.setImageDrawable(null);
