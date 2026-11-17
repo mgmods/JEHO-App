@@ -95,7 +95,17 @@ const entityList = Object.values(entities).filter(
           ? { rejectUnauthorized: false }
           : undefined,
         schema: 'jeho_own',
-        extra: { options: '-c search_path=jeho_own,extensions,public', connectionTimeoutMillis: 8000 },
+        // Keep the pool deliberately small for the 1 GB managed PostgreSQL
+        // instance; reserve connections for maintenance/health checks.
+        extra: {
+          options: '-c search_path=jeho_own,extensions,public',
+          max: 5,
+          min: 0,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 20000,
+          keepAlive: true,
+          keepAliveInitialDelayMillis: 10000,
+        },
         entities: entityList,
         synchronize: config.get<boolean>('app.database.synchronize'),
         logging: config.get<boolean>('app.database.logging'),
@@ -112,9 +122,19 @@ const entityList = Object.values(entities).filter(
           schema: 'public',
           entities: [],
           synchronize: false,
-          extra: { connectionTimeoutMillis: 8000 },
+          // Bootstrap is short-lived and must not open an oversized pool.
+          extra: {
+            max: 1,
+            min: 0,
+            idleTimeoutMillis: 10000,
+            connectionTimeoutMillis: 20000,
+            keepAlive: true,
+          },
         } as any);
+        const bootstrapStartedAt = Date.now();
+        console.log('[JEHO-OWN DB] Opening bounded bootstrap connection...');
         await bootstrap.initialize();
+        console.log(`[JEHO-OWN DB] Bootstrap connection opened in ${Date.now() - bootstrapStartedAt}ms.`);
         try {
           // TypeORM UUID defaults call uuid_generate_v4(). Ensure uuid-ossp is
           // available before synchronize runs; it may live in public or extensions.
@@ -125,11 +145,21 @@ const entityList = Object.values(entities).filter(
         }
 
         console.log('[JEHO-OWN DB] Bootstrap connection ready; initializing application schema...');
+        const appInitStartedAt = Date.now();
         const appDataSource = await new DataSource({
           ...options,
-          extra: { ...((options as any).extra || {}), connectionTimeoutMillis: 8000 },
-          connectTimeoutMS: 8000,
+          extra: {
+            ...((options as any).extra || {}),
+            max: 5,
+            min: 0,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 20000,
+            keepAlive: true,
+            keepAliveInitialDelayMillis: 10000,
+          },
+          connectTimeoutMS: 20000,
         } as any).initialize();
+        console.log(`[JEHO-OWN DB] Application DataSource initialized in ${Date.now() - appInitStartedAt}ms (synchronize=${String(options.synchronize)}).`);
 
         // Additive support-box video URL column; preserves all existing lucky-box rows.
         try {
