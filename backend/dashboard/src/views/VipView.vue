@@ -175,6 +175,15 @@
                 </div>
                 <div class="small text-secondary mt-2">لكل مستوى VIP أيقونته المستقلة. تغييرها وحفظ الخطة يحدّثها من الخادم دون تحديث APK.</div>
               </div>
+              <div class="mb-3 p-3 rounded border">
+                <label class="form-label fw-semibold">الشارة الأفقية الجديدة — تظهر تحت ID بجانب اسم VIP</label>
+                <input type="file" class="form-control" accept="image/*,.gif,.webp" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, 'vipHorizontalBadgeUrl')" />
+                <div v-if="planForm.visuals.vipHorizontalBadgeUrl" class="vip-upload-preview">
+                  <img :src="assetUrl(planForm.visuals.vipHorizontalBadgeUrl)" alt="معاينة الشارة الأفقية الجديدة" />
+                  <button type="button" class="btn btn-sm btn-outline-danger mt-1" @click="planForm.visuals.vipHorizontalBadgeUrl = ''">إزالة الشارة الأفقية</button>
+                </div>
+                <div class="small text-secondary mt-2">ترفع صورة مستقلة لهذا المستوى، وتظهر بارتفاع كتابة VIP الحالية. لا تؤثر على الأيقونة الكبيرة.</div>
+              </div>
               <div class="mb-3">
                 <label class="form-label">شارة / شعار VIP القديمة (تبقى محفوظة للتوافق)</label>
                 <input type="file" class="form-control" accept="image/*,.gif,.webp" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, 'badgeUrl')" />
@@ -357,7 +366,7 @@ const showAssign = ref(false)
 const planForm = reactive({
   id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '',
   mysteriousManEnabled: false,
-  badgeUrl: '', visuals: { vipMainIconUrl: '', vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom', nameStyle: { enabled: false, mode: 'solid', animation: 'rainbow', color1: '#D946EF', color2: '#8B5CF6', color3: '#22D3EE', glow: false, speed: 1 } },
+  badgeUrl: '', visuals: { vipMainIconUrl: '', vipHorizontalBadgeUrl: '', vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom', nameStyle: { enabled: false, mode: 'solid', animation: 'rainbow', color1: '#D946EF', color2: '#8B5CF6', color3: '#22D3EE', glow: false, speed: 1 } },
 })
 const uploadingVisual = ref('')
 const assignForm = reactive({ userId: '', planId: '' })
@@ -468,6 +477,7 @@ function openPlan(p = null) {
       badgeUrl: p.badgeUrl || '',
       visuals: {
         vipMainIconUrl: planVisuals(p).vipMainIconUrl || p.vipMainIconUrl || '',
+        vipHorizontalBadgeUrl: planVisuals(p).vipHorizontalBadgeUrl || p.vipHorizontalBadgeUrl || '',
         vipFrameUrl: planVisuals(p).vipFrameUrl || '',
         vipCardUrl: planVisuals(p).vipCardUrl || '',
         profileCardUrl: planVisuals(p).profileCardUrl || '',
