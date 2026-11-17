@@ -310,7 +310,11 @@ public class ProfileFragment extends Fragment {
 
             int vip = Math.max(0, user.vipLevel);
             bindVipPrimaryIcon(vip);
-            bindVipHorizontalBadge(vip);
+            // The horizontal VIP tier badge belongs to viewers of this profile, not the owner's Me tab.
+            if (binding.imgVipHorizontalBadge != null) {
+                binding.imgVipHorizontalBadge.setImageDrawable(null);
+                binding.imgVipHorizontalBadge.setVisibility(View.GONE);
+            }
             long wealth = user.wealthLevel > 0 ? user.wealthLevel
                     : Math.max(0, user.wealthScore);
             long charm = user.popularityLevel > 0 ? user.popularityLevel
