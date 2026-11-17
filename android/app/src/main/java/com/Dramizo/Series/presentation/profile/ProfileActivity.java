@@ -82,6 +82,8 @@ public class ProfileActivity extends ThemedActivity {
     public static final String EXTRA_USER_ID = "user_id";
     private ActivityProfileBinding binding;
     private AppContainer container;
+    private ProfileViewModel profileVm;
+    private String profileTargetUserId;
     private boolean isFollowingTarget;
     private boolean isOwnProfile;
     private final Handler profileHandler = new Handler(Looper.getMainLooper());
@@ -167,9 +169,11 @@ public class ProfileActivity extends ThemedActivity {
             }
         };
         com.Dramizo.Series.realtime.RealtimeClient.getInstance().addUserListener(cpConfigListener);
-        ProfileViewModel vm = new ViewModelProvider(this, new ViewModelFactory(container))
+        profileVm = new ViewModelProvider(this, new ViewModelFactory(container))
                 .get(ProfileViewModel.class);
+        ProfileViewModel vm = profileVm;
         String userId = getIntent().getStringExtra(EXTRA_USER_ID);
+        profileTargetUserId = userId;
         String myId = container.getSessionManager().getUserId();
         AuthDtos.UserDto signedInUser = container.getSessionManager().getUser();
         if (myId != null && myId.equals(userId == null || userId.isEmpty() ? myId : userId)
@@ -1867,6 +1871,15 @@ public class ProfileActivity extends ThemedActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // Re-fetch the profile after returning from the cosmetics store so equip/unequip
+        // is reflected immediately on the avatar, without requiring an app restart.
+        if (profileVm != null) {
+            if (profileTargetUserId == null || profileTargetUserId.trim().isEmpty()) {
+                profileVm.loadMe(true);
+            } else {
+                profileVm.loadUser(profileTargetUserId);
+            }
+        }
         if (binding != null && binding.webProfileHostSignal != null
                 && binding.webProfileHostSignal.getVisibility() == android.view.View.VISIBLE) {
             binding.webProfileHostSignal.resumeMotion();
