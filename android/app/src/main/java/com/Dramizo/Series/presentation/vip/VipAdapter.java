@@ -106,11 +106,15 @@ public class VipAdapter {
                 Math.max(0, plan.coinPriceMonthly)));
         tvPlanTag.setText("إطار حصري · دخول مميز · هوية VIP · امتيازات");
 
+        // The level-specific primary icon replaces the legacy medal in the VIP catalog.
+        String primaryIcon = plan.vipMainIconUrl;
+        if (primaryIcon == null || primaryIcon.trim().isEmpty()) primaryIcon = VipCatalog.headUrl(level);
         imgMedal.setImageResource(VipCatalog.medalDrawable(level));
-        ServerAssets.load(imgMedal, VipCatalog.medalUrl(level));
+        ServerAssets.load(imgMedal, primaryIcon);
 
-        imgIncludeMedal.setImageResource(VipCatalog.medalDrawable(level));
-        ServerAssets.load(imgIncludeMedal, VipCatalog.medalUrl(level));
+        if (imgIncludeMedal != null) {
+            imgIncludeMedal.setVisibility(View.GONE);
+        }
         ServerAssets.load(imgIncludeFrame, VipCatalog.frameUrl(level));
         ServerAssets.load(imgIncludeHead, VipCatalog.headUrl(level));
 
