@@ -132,13 +132,16 @@ public class AuraMessagingService extends FirebaseMessagingService {
         // tap opens the exact conversation instead of merely opening the inbox.
         Activity active = AuraLiveApp.getForegroundActivity();
         if (active != null && !active.isFinishing() && !active.isDestroyed()) {
+            if (ActiveChatTracker.isChatType(type)) {
+                // In foreground, show a persistent unread dot instead of a floating alert.
+                // The inbox API is the source of truth, so opening a conversation clears it.
+                com.Dramizo.Series.util.UnreadMessageBadge.refresh(this);
+                return;
+            }
             String dedupeKey = conversationId != null && !conversationId.isEmpty()
                     ? "chat:" + conversationId + ":" + firstNonEmpty(data, "messageId", "message_id", "notificationId")
                     : (data != null ? firstNonEmpty(data, "notificationId", "messageId", "message_id") : null);
             InAppNotificationBanner.show(active, title, body, type, intent, dedupeKey, avatar);
-            // While JEHO is open, direct messages use the in-app queue only.
-            // Do not also post a system notification for the same foreground event.
-            if (ActiveChatTracker.isChatType(type)) return;
         }
 
         // Background/terminated delivery keeps the Android system notification.
