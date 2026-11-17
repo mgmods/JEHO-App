@@ -324,7 +324,8 @@ public class CosmeticsViewModel extends ViewModel {
         }
         container.getIoExecutor().execute(() -> {
             // Avatar frames are one exclusive slot across VIP and host/contest frame types.
-            // Remove every previously equipped frame before applying the newly selected one.
+            // Remember removed frames so a failed new equip can restore the previous wear.
+            List<String> removedFrameIds = new ArrayList<>();
             if (isAvatarFrameType(target != null ? target.type : type)) {
                 Result<List<CosmeticDtos.UserCosmeticDto>> inventory =
                         container.getCosmeticsRepository().inventory();
@@ -347,11 +348,12 @@ public class CosmeticsViewModel extends ViewModel {
                         loadForType(type);
                         return;
                     }
+                    removedFrameIds.add(worn.cosmeticId);
                 }
             }
             Result<CosmeticDtos.EquipResult> r =
                     container.getCosmeticsRepository().equip(cosmeticId);
-            if (r.success) {
+            if (r != null && r.success) {
                 if (r.data != null && r.data.profile != null) {
                     applyEquipProfile(r.data.profile);
                 }
@@ -386,7 +388,24 @@ public class CosmeticsViewModel extends ViewModel {
                 inventoryLoadedAtMs = 0;
                 loadForType(type);
             } else {
-                error.postValue(r.error);
+                // Do not leave the user without a frame if the replacement equip fails.
+                boolean restored = true;
+                for (String previousId : removedFrameIds) {
+                    Result<CosmeticDtos.EquipResult> restore =
+                            container.getCosmeticsRepository().equip(previousId);
+                    if (restore == null || !restore.success) restored = false;
+                }
+                Result<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto> latest =
+                        container.getUserRepository().getMe();
+                if (latest != null && latest.success && latest.data != null) {
+                    container.getSessionManager().updateCachedUser(latest.data);
+                }
+                inventoryLoadedAtMs = 0;
+                loadForType(type);
+                String failure = r != null && r.error != null
+                        ? r.error : "تعذر ارتداء الإطار الجديد";
+                if (!restored) failure += " — وتعذر استعادة الإطار السابق تلقائياً";
+                error.postValue(failure);
             }
         });
     }
@@ -396,7 +415,7 @@ public class CosmeticsViewModel extends ViewModel {
         container.getIoExecutor().execute(() -> {
             Result<CosmeticDtos.EquipResult> r =
                     container.getCosmeticsRepository().unequip(cosmeticId);
-            if (r.success) {
+            if (r != null && r.success) {
                 if (r.data != null && r.data.profile != null) {
                     applyEquipProfile(r.data.profile);
                 } else {
@@ -410,7 +429,8 @@ public class CosmeticsViewModel extends ViewModel {
                 message.postValue("تم الخلع");
                 loadForType(type);
             } else {
-                error.postValue(r.error);
+                error.postValue(r != null && r.error != null
+                        ? r.error : "تعذر خلع الإطار؛ لم يتم تغيير المظهر");
             }
         });
     }
