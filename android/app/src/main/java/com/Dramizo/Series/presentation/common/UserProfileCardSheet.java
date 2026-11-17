@@ -113,6 +113,8 @@ public final class UserProfileCardSheet {
         View superAdminFrame = sheet.findViewById(R.id.superAdminAvatarFrame);
         ImageView frame = sheet.findViewById(R.id.imgUserFrame);
         ImageView vipHead = sheet.findViewById(R.id.imgVipHead);
+        ImageView vipMainIcon = sheet.findViewById(R.id.imgVipMainIcon);
+        ImageView vipHorizontalBadge = sheet.findViewById(R.id.imgVipHorizontalBadge);
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
         View rowAgency = sheet.findViewById(R.id.rowAgency);
         ImageView imgAgencyLogo = sheet.findViewById(R.id.imgAgencyLogo);
@@ -147,8 +149,12 @@ public final class UserProfileCardSheet {
         if (tvName != null) {
             tvName.setText(displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0]);
         }
+        if (chipVip != null) chipVip.setVisibility(View.GONE);
+        if (imgVipMedal != null) imgVipMedal.setVisibility(View.GONE);
+        if (vipMainIcon != null) vipMainIcon.setVisibility(View.GONE);
+        if (vipHorizontalBadge != null) vipHorizontalBadge.setVisibility(View.GONE);
         AvatarCosmetics.styleUserCardBadges(
-                chipVip, chipMember, chipCharm, chipWealth, vipLevel, userLevel, 0L, 0L);
+                chipVip, chipMember, chipCharm, chipWealth, 0, userLevel, 0L, 0L);
         if (chipMember != null) chipMember.setText(String.valueOf(Math.max(1, userLevel)));
         styleStatChips(chipCharm, chipWealth);
         AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
@@ -345,7 +351,19 @@ public final class UserProfileCardSheet {
                         u.vipHeadUrl != null ? u.vipHeadUrl : VipStyle.fixedHeadPath(liveVip));
                 // Head owns: ride entry + VIP medal (Mikoo property head).
                 bindEntryRide(imgEntryRide, firstNonEmpty(u.entryAnimationUrl, u.entryEffectUrl));
-                bindVipMedal(imgVipMedal, liveVip, u.levelBadgeUrl);
+                // The legacy VIP badge/medal is intentionally absent from the popup.
+                if (imgVipMedal != null) { imgVipMedal.setImageDrawable(null); imgVipMedal.setVisibility(View.GONE); }
+                if (chipVip != null) { chipVip.setText(null); chipVip.setVisibility(View.GONE); }
+                if (vipMainIcon != null) {
+                    String mainIconUrl = liveVip > 0 ? firstNonEmpty(u.vipMainIconUrl, "") : "";
+                    if (mainIconUrl == null || mainIconUrl.trim().isEmpty()) { vipMainIcon.setImageDrawable(null); vipMainIcon.setVisibility(View.GONE); }
+                    else { vipMainIcon.setVisibility(View.VISIBLE); Glide.with(activity).load(AssetCatalog.absoluteUrl(mainIconUrl.trim())).into(vipMainIcon); }
+                }
+                if (vipHorizontalBadge != null) {
+                    String horizontalUrl = liveVip > 0 ? firstNonEmpty(u.vipHorizontalBadgeUrl, "") : "";
+                    if (horizontalUrl == null || horizontalUrl.trim().isEmpty()) { vipHorizontalBadge.setImageDrawable(null); vipHorizontalBadge.setVisibility(View.GONE); }
+                    else { vipHorizontalBadge.setVisibility(View.VISIBLE); Glide.with(activity).load(AssetCatalog.absoluteUrl(horizontalUrl.trim())).into(vipHorizontalBadge); }
+                }
                 bindAgency(activity, rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, u.agency);
                 boolean isAgencyOwner = u.agency != null && ("owner".equalsIgnoreCase(u.agency.role)
                         || "leader".equalsIgnoreCase(u.agency.role));
@@ -575,9 +593,10 @@ public final class UserProfileCardSheet {
                 long popularity = Math.max(
                         Math.max(0, u.popularityLevel),
                         Math.max(0, Math.max(u.charmScore, u.popularityScore)));
+                if (chipVip != null) { chipVip.setText(null); chipVip.setVisibility(View.GONE); }
                 AvatarCosmetics.styleUserCardBadges(
                         chipVip, chipMember, chipCharm, chipWealth,
-                        liveVip, Math.max(1, u.level),
+                        0, Math.max(1, u.level),
                         popularity, Math.max(0, u.wealthScore));
                 if (chipMember != null) {
                     chipMember.setText(String.valueOf(Math.max(1, u.level)));
