@@ -1429,6 +1429,16 @@
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_room_msg" />
+            <View
+                android:id="@+id/roomPrivateMsgUnreadDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="5dp"
+                android:layout_marginEnd="5dp"
+                android:background="@drawable/bg_unread_badge"
+                android:elevation="10dp"
+                android:visibility="gone" />
         </FrameLayout>
         <!-- Dedicated write-message control: stays visible and opens the room composer. -->
         <FrameLayout
