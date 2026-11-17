@@ -12277,7 +12277,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 int h = Math.max(binding.giftOverlay.getHeight(), 1);
                 from = new PointF(w / 2f, h * 0.40f);
             }
-            GiftFlyAnimator.flyTogether(binding.giftOverlay, giftIconUrl, from, destinations, 620L);
+            GiftFlyAnimator.flyTogether(binding.giftOverlay, giftIconUrl, from, destinations, 620L, Math.max(1, quantity));
             if (onScatterStart != null) {
                 try { onScatterStart.run(); } catch (Exception ignored) {}
             }
@@ -12327,7 +12327,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int w = Math.max(binding.giftOverlay.getWidth(), 1);
             int h = Math.max(binding.giftOverlay.getHeight(), 1);
             PointF from = new PointF(w / 2f, Math.max(h * 0.72f, h - luckyCannonDp(110)));
-            GiftFlyAnimator.flyTogether(binding.giftOverlay, giftIconUrl, from, destinations, 620L);
+            GiftFlyAnimator.flyTogether(binding.giftOverlay, giftIconUrl, from, destinations, 620L, Math.max(1, quantity));
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
