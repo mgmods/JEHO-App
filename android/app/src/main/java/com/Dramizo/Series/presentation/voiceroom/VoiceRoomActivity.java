@@ -9021,6 +9021,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView tvPropFriends = sheet.findViewById(R.id.tvPropFriendsCount);
         View propFamily = sheet.findViewById(R.id.propFamily);
         ImageView imgVipMedal = sheet.findViewById(R.id.imgVipMedal);
+        ImageView imgVipMainIcon = sheet.findViewById(R.id.imgVipMainIcon);
+        ImageView imgVipHorizontalBadge = sheet.findViewById(R.id.imgVipHorizontalBadge);
         ImageView imgEntryRide = sheet.findViewById(R.id.imgEntryRide);
         ImageView img = sheet.findViewById(R.id.imgUserAvatar);
         ImageView frame = sheet.findViewById(R.id.imgUserFrame);
@@ -9180,7 +9182,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             });
         }
                 com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
-        bindVipUserCardMedal(imgVipMedal, vipLevel, null);
+        // Retire the legacy VIP banner/medal in the viewer card. The configured
+        // primary icon and horizontal level badge are bound from the selected user's data.
+        if (vipHead != null) { vipHead.setVisibility(View.GONE); vipHead.setImageDrawable(null); }
+        if (imgVipMedal != null) { imgVipMedal.setVisibility(View.GONE); imgVipMedal.setImageDrawable(null); }
+        if (imgVipMainIcon != null) { imgVipMainIcon.setVisibility(View.GONE); imgVipMainIcon.setImageDrawable(null); }
+        if (imgVipHorizontalBadge != null) { imgVipHorizontalBadge.setVisibility(View.GONE); imgVipHorizontalBadge.setImageDrawable(null); }
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
         HostSignalView userCardHostSignal = sheet.findViewById(R.id.userCardHostSignal);
         // Show the actual equipped mall frame first; fixed VIP art is only the fallback.
@@ -9188,7 +9195,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 frameUrl != null && !frameUrl.trim().isEmpty()
                         ? frameUrl : VipStyle.profileNobilityFrameUrl(vipLevel, null)
         };
-        bindVipUserCardHead(vipHead, vipLevel, null);
         AvatarCosmetics.bindProfileWear(
                 userCardHostSignal, img, frame, avatarUrl, chatVipFrame[0],
                 null, null, Math.max(1, vipLevel));
@@ -9229,10 +9235,41 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             userCardHostSignal, img, frame,
                             r.data.avatarUrl != null ? r.data.avatarUrl : avatarUrl,
                             chatVipFrame[0], null, null, Math.max(1, liveVip));
-                    bindVipUserCardHead(vipHead, liveVip,
-                            r.data.vipHeadUrl != null ? r.data.vipHeadUrl
-                                    : VipStyle.fixedHeadPath(liveVip));
-                    // Head owns: entry ride + VIP medal.
+                    // Never render the retired legacy VIP banner or medal.
+                    if (vipHead != null) { vipHead.setVisibility(View.GONE); vipHead.setImageDrawable(null); }
+                    if (imgVipMedal != null) { imgVipMedal.setVisibility(View.GONE); imgVipMedal.setImageDrawable(null); }
+                    String mainVipIconUrl = r.data.vipMainIconUrl;
+                    if ((mainVipIconUrl == null || mainVipIconUrl.trim().isEmpty()) && liveVip > 0) {
+                        Result<com.Dramizo.Series.data.remote.dto.MiscDtos.VipPlanList> plans =
+                                ApiCall.execute(ContainerProvider.from(VoiceRoomActivity.this).getVipRepository().getPlans());
+                        if (plans.success && plans.data != null) {
+                            for (com.Dramizo.Series.data.remote.dto.MiscDtos.VipPlanDto plan : plans.data) {
+                                if (plan != null && plan.level == Math.min(7, liveVip)) {
+                                    mainVipIconUrl = plan.vipMainIconUrl;
+                                    if (imgVipHorizontalBadge != null
+                                            && plan.vipHorizontalBadgeUrl != null
+                                            && !plan.vipHorizontalBadgeUrl.trim().isEmpty()) {
+                                        imgVipHorizontalBadge.setVisibility(View.VISIBLE);
+                                        ServerAssets.load(imgVipHorizontalBadge, plan.vipHorizontalBadgeUrl);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (imgVipMainIcon != null && liveVip > 0
+                            && mainVipIconUrl != null && !mainVipIconUrl.trim().isEmpty()) {
+                        imgVipMainIcon.setVisibility(View.VISIBLE);
+                        ServerAssets.load(imgVipMainIcon, mainVipIconUrl.trim());
+                    } else if (imgVipMainIcon != null) {
+                        imgVipMainIcon.setVisibility(View.GONE);
+                    }
+                    if (imgVipHorizontalBadge != null && r.data.vipHorizontalBadgeUrl != null
+                            && !r.data.vipHorizontalBadgeUrl.trim().isEmpty()) {
+                        imgVipHorizontalBadge.setVisibility(View.VISIBLE);
+                        ServerAssets.load(imgVipHorizontalBadge, r.data.vipHorizontalBadgeUrl.trim());
+                    }
+                    // Entry ride is separate from the retired VIP medal.
                     if (imgEntryRide != null) {
                         String ride = r.data.entryAnimationUrl != null
                                 && !r.data.entryAnimationUrl.isEmpty()
@@ -9257,7 +9294,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             imgEntryRide.setVisibility(View.GONE);
                         }
                     }
-                    bindVipUserCardMedal(imgVipMedal, liveVip, r.data.levelBadgeUrl);
                     bindUserCardAgency(rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, r.data.agency);
                     bindRoomUserRoleBadges((android.widget.LinearLayout) sheet.findViewById(R.id.roleBadgesContainer), sheet.findViewById(R.id.rowRoleBadges), r.data);
                     com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(
