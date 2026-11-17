@@ -1874,7 +1874,7 @@ public class ProfileActivity extends ThemedActivity {
         // Re-fetch the profile after returning from the cosmetics store so equip/unequip
         // is reflected immediately on the avatar, without requiring an app restart.
         if (profileVm != null) {
-            if (profileTargetUserId == null || profileTargetUserId.trim().isEmpty()) {
+            if (isOwnProfile || profileTargetUserId == null || profileTargetUserId.trim().isEmpty()) {
                 profileVm.loadMe(true);
             } else {
                 profileVm.loadUser(profileTargetUserId);
