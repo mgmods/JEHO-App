@@ -1474,7 +1474,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     : (receiverId != null
                     ? java.util.Collections.singletonList(receiverId)
                     : java.util.Collections.emptyList());
-            boolean allMic = sendToAllMic && tgts.size() > 1;
+            // Any multi-recipient send uses one synchronized group animation, whether recipients
+            // were selected individually or via the all-mic shortcut.
+            boolean allMic = tgts.size() > 1;
             if (luckyGift) {
                 room.armLuckyGiftCannon(
                         gift != null ? gift.id : (selected != null ? selected.id : null),
