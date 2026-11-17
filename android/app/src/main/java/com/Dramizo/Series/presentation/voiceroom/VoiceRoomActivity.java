@@ -2911,6 +2911,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         ViewGroup bubble = row.findViewById(R.id.chatBubbleRoot);
         ImageView avatar = row.findViewById(R.id.imgChatAvatar);
         ImageView frameView = row.findViewById(R.id.imgChatFrame);
+        if (frameView != null) frameView.setTag(userId);
         ImageView giftIcon = row.findViewById(R.id.imgChatGift);
         TextView hostChip = row.findViewById(R.id.tvHostChip);
         TextView vipChip = row.findViewById(R.id.tvVipChip);
@@ -13023,6 +13024,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Cosmetics store returns through the room activity; rebind the current user's
         // equipped/unequipped frame on seats from the freshly updated session profile.
         refreshSelfHostWearOnSeats();
+        refreshSelfRoomChatFrames();
         sRoomUiVisible = true;
         handler.removeCallbacks(luckyButtonStylePoll);
         handler.postDelayed(luckyButtonStylePoll, 15_000L);
@@ -17777,6 +17779,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } catch (Exception ignored) {
         }
         seatAdapter.setSelfHostWear(myUserId, hostBadge, vipBadge, meta, displayName, avatarUrl);
+    }
+
+    /** Refresh already-rendered self chat bubbles after equipping/unequipping in the store. */
+    private void refreshSelfRoomChatFrames() {
+        if (binding == null || binding.chatLog == null || myUserId == null) return;
+        AuthDtos.UserDto me = null;
+        try {
+            me = ContainerProvider.from(this).getSessionManager().getUser();
+        } catch (Exception ignored) { }
+        if (me == null) return;
+        for (int i = 0; i < binding.chatLog.getChildCount(); i++) {
+            View row = binding.chatLog.getChildAt(i);
+            if (row == null) continue;
+            ImageView frame = row.findViewById(R.id.imgChatFrame);
+            ImageView avatar = row.findViewById(R.id.imgChatAvatar);
+            HostSignalView signal = row.findViewById(R.id.webChatHostSignal);
+            Object rowUserId = frame != null ? frame.getTag() : null;
+            if (!(rowUserId instanceof String) || !sameUser(myUserId, (String) rowUserId)
+                    || avatar == null || frame == null) continue;
+            String avatarUrl = avatar.getTag() instanceof String
+                    ? (String) avatar.getTag() : me.avatarUrl;
+            AvatarCosmetics.bindStacked(avatar, frame, signal, avatarUrl, me.vipBadgeUrl, null);
+        }
     }
 
     private RoomDtos.SeatDto findHostSeat(@Nullable List<RoomDtos.SeatDto> seats) {
