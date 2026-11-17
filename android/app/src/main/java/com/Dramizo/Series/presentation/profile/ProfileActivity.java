@@ -413,6 +413,16 @@ public class ProfileActivity extends ThemedActivity {
                     user.vipLevel, user.vipTouUrl, user.hostBadgeUrl, user.hostBadgeMeta);
             int vip = Math.max(0, user.vipLevel);
             int level = Math.max(1, user.level);
+            if (binding.imgVipMainIcon != null) {
+                String mainVipIconUrl = vip > 0 ? user.vipMainIconUrl : null;
+                if (mainVipIconUrl == null || mainVipIconUrl.trim().isEmpty()) {
+                    binding.imgVipMainIcon.setVisibility(View.GONE);
+                    binding.imgVipMainIcon.setImageDrawable(null);
+                } else {
+                    binding.imgVipMainIcon.setVisibility(View.VISIBLE);
+                    com.Dramizo.Series.util.ServerAssets.load(binding.imgVipMainIcon, mainVipIconUrl.trim());
+                }
+            }
 
             // Public profiles use the app's light settings palette, independent of room VIP-card styling.
             if (binding.userCardBg != null) {
