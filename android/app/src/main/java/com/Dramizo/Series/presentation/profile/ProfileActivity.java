@@ -470,6 +470,7 @@ public class ProfileActivity extends ThemedActivity {
                         + " · " + getString(R.string.user_card_stat_visitors) + " " + visitors);
             }
             bindStaffBadge(user);
+            bindAgencyRoleBadge(user);
             // Agency/competition role badges must not sit over the profile avatar.
             // The agency information strip remains available separately below the profile.
             bindAgencyStrip(user.agency, user.agencyClub);
@@ -838,91 +839,48 @@ public class ProfileActivity extends ThemedActivity {
     }
 
     /** Agency identity is separate from platform-staff badges so both can be shown together. */
+    /** Always show the agency role as readable text on the profile, including hosts. */
     private void bindAgencyRoleBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (binding == null || binding.agencyRoleBadgeContainer == null
                 || binding.tvAgencyRoleBadge == null || binding.imgAgencyRoleBadge == null) return;
+
         com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency =
                 user == null ? null : user.agency;
         com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club =
                 user == null ? null : user.agencyClub;
-
-        String role = "";
-        String fallbackLabel = "";
-        if (agency != null) {
-            role = agency.role == null ? "" : agency.role.trim().toLowerCase(Locale.US);
-            if (role.contains("pending") || role.contains("request")) {
-                binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
-                return;
-            }
-            if ("owner".equals(role) || "leader".equals(role)) fallbackLabel = "قائد الوكالة";
-            else if ("host".equals(role)) fallbackLabel = "مضيف";
-            else if ("manager".equals(role) || "admin".equals(role) || "agency_admin".equals(role))
-                fallbackLabel = "أدمن وكالة";
-            else {
-                binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
-                return;
-            }
-        } else if (club != null && club.role != null && !club.role.trim().isEmpty()) {
+        String role = agency != null && agency.role != null
+                ? agency.role.trim().toLowerCase(Locale.US) : "";
+        if (role.isEmpty() && club != null && club.role != null) {
             role = club.role.trim().toLowerCase(Locale.US);
-            if ("owner".equals(role) || "leader".equals(role)) fallbackLabel = "قائد الوكالة";
-            else if ("host".equals(role)) fallbackLabel = "مضيف";
-            else if ("manager".equals(role) || "admin".equals(role) || "agency_admin".equals(role))
-                fallbackLabel = "أدمن وكالة";
-            else {
-                binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
-                return;
-            }
+        }
+        role = role.replace('-', '_').replace("agency_", "");
+
+        String label;
+        boolean leader = "owner".equals(role) || "leader".equals(role);
+        if (leader) {
+            label = "قائد الوكالة";
+        } else if ("host".equals(role)) {
+            label = "مضيف";
+        } else if ("manager".equals(role) || "admin".equals(role)) {
+            label = "أدمن وكالة";
         } else {
             binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
+            binding.tvAgencyRoleBadge.setText("");
+            binding.imgAgencyRoleBadge.setVisibility(View.GONE);
+            binding.imgAgencyRoleBadge.setImageDrawable(null);
             return;
         }
 
-        boolean leader = "owner".equals(role) || "leader".equals(role);
-        boolean host = "host".equals(role);
-        String label = StaffRoleHelper.genderizeLabel(fallbackLabel, user == null ? null : user.gender);
-        binding.tvAgencyRoleBadge.setText(label);
-        binding.imgAgencyRoleBadge.setImageDrawable(null);
+        // Keep the role text visible even if a dashboard role icon is configured.
         binding.imgAgencyRoleBadge.setVisibility(View.GONE);
+        binding.imgAgencyRoleBadge.setImageDrawable(null);
+        binding.tvAgencyRoleBadge.setText(
+                StaffRoleHelper.genderizeLabel(label, user == null ? null : user.gender));
+        binding.tvAgencyRoleBadge.setTextColor(android.graphics.Color.WHITE);
+        binding.tvAgencyRoleBadge.setBackgroundResource(
+                leader ? R.drawable.bg_chip_staff_super : R.drawable.bg_chip_staff_manager);
         binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
         binding.agencyRoleBadgeContainer.setVisibility(View.VISIBLE);
-
-        AgencyRoleBadgeCache.Badges configured = AgencyRoleBadgeCache.get();
-        String badgeUrl = leader ? configured.leader : (host ? configured.host : "");
-        if (badgeUrl != null && !badgeUrl.trim().isEmpty()) {
-            binding.tvAgencyRoleBadge.setVisibility(View.GONE);
-            binding.imgAgencyRoleBadge.setVisibility(View.VISIBLE);
-            Glide.with(this)
-                    .load(AssetCatalog.absoluteUrl(badgeUrl))
-                    .fitCenter()
-                    .into(new CustomTarget<Drawable>() {
-                        @Override public void onResourceReady(@NonNull Drawable resource,
-                                @androidx.annotation.Nullable Transition<? super Drawable> transition) {
-                            if (binding == null || isFinishing() || isDestroyed()) return;
-                            binding.imgAgencyRoleBadge.setImageDrawable(resource);
-                            binding.imgAgencyRoleBadge.setVisibility(View.VISIBLE);
-                        }
-                        @Override public void onLoadCleared(@androidx.annotation.Nullable Drawable placeholder) {
-                            if (binding != null) binding.imgAgencyRoleBadge.setImageDrawable(null);
-                        }
-                        @Override public void onLoadFailed(@androidx.annotation.Nullable Drawable errorDrawable) {
-                            if (binding == null || isFinishing() || isDestroyed()) return;
-                            binding.imgAgencyRoleBadge.setVisibility(View.GONE);
-                            binding.tvAgencyRoleBadge.setText(label);
-                            binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
-                        }
-                    });
-        }
-        // Refresh from the server for every profile viewer; cache TTL prevents repeated requests.
-        final String renderedBadgeUrl = badgeUrl == null ? "" : badgeUrl;
-        AgencyRoleBadgeCache.load(this, () -> runOnUiThread(() -> {
-            if (binding == null || isFinishing() || isDestroyed()) return;
-            AgencyRoleBadgeCache.Badges latest = AgencyRoleBadgeCache.get();
-            String latestUrl = leader ? latest.leader : (host ? latest.host : "");
-            if (!renderedBadgeUrl.equals(latestUrl == null ? "" : latestUrl)) {
-                // Only redraw when the server value actually changed; never recurse on a cache hit.
-                bindAgencyRoleBadge(user);
-            }
-        }));
     }
 
     private void bindAgencyStrip(
