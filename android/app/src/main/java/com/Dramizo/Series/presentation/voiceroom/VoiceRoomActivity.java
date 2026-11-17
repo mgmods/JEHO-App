@@ -13020,6 +13020,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Override
     protected void onResume() {
         super.onResume();
+        // Cosmetics store returns through the room activity; rebind the current user's
+        // equipped/unequipped frame on seats from the freshly updated session profile.
+        refreshSelfHostWearOnSeats();
         sRoomUiVisible = true;
         handler.removeCallbacks(luckyButtonStylePoll);
         handler.postDelayed(luckyButtonStylePoll, 15_000L);
