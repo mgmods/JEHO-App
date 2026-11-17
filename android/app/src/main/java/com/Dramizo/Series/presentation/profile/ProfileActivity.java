@@ -515,10 +515,11 @@ public class ProfileActivity extends ThemedActivity {
                     binding.imgEntryRide,
                     firstNonEmpty(user.entryAnimationUrl, user.entryEffectUrl));
 
-            // Profile: fixed VIP nobility frame (ud_vip_tou); mall SVGA stays on mics only.
-            String nobilityFrame = VipStyle.profileNobilityFrameUrl(vip, user.vipTouUrl);
+            // Only the actually equipped personal frame is shown here.
+            // An empty vipBadgeUrl means the user unequipped their frame; do not
+            // silently replace it with a VIP-tier fallback frame.
             String profileFrame = user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()
-                    ? user.vipBadgeUrl : nobilityFrame;
+                    ? user.vipBadgeUrl.trim() : null;
             AvatarCosmetics.bindProfileWear(
                     binding.webProfileHostSignal,
                     binding.imgAvatar,
