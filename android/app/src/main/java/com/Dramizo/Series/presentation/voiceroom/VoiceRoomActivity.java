@@ -9052,6 +9052,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         tvName.setText(name != null ? name : "مستخدم");
         AvatarCosmetics.styleUserCardBadges(
                 chipVip, chipMember, chipCharm, chipWealth, vipLevel, userLevel, 0L, 0L);
+        if (chipVip != null) {
+            chipVip.setVisibility(View.GONE);
+            chipVip.setText(null);
+        }
         if (chipMember != null) {
             chipMember.setText(String.valueOf(Math.max(1, userLevel)));
         }
