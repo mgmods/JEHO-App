@@ -68,8 +68,8 @@
 
                 <ImageView
                     android:id="@+id/imgVipPrimaryIcon"
-                    android:layout_width="76dp"
-                    android:layout_height="76dp"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
                     android:layout_gravity="center_vertical"
                     android:contentDescription="@string/vip"
                     android:scaleType="fitCenter"
@@ -274,6 +274,15 @@
                         android:textColor="@color/white"
                         android:textSize="10sp"
                         android:textStyle="bold"
+                        android:visibility="gone" />
+                    
+                    <ImageView
+                        android:id="@+id/imgVipHorizontalBadge"
+                        android:layout_width="44dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="5dp"
+                        android:contentDescription="@string/vip"
+                        android:scaleType="fitCenter"
                         android:visibility="gone" />
 
                     <ImageView
