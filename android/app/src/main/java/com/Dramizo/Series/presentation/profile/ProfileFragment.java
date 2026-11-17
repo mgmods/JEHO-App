@@ -309,7 +309,7 @@ public class ProfileFragment extends Fragment {
             if (binding.tvCountryChip != null) binding.tvCountryChip.setVisibility(View.GONE);
 
             int vip = Math.max(0, user.vipLevel);
-            bindVipPrimaryIcon(vip);
+            bindVipHorizontalBadge(vip);
             long wealth = user.wealthLevel > 0 ? user.wealthLevel
                     : Math.max(0, user.wealthScore);
             long charm = user.popularityLevel > 0 ? user.popularityLevel
@@ -353,18 +353,18 @@ public class ProfileFragment extends Fragment {
         viewModel.loadMe();
     }
 
-    /** Load the per-level primary VIP icon from the public VIP plans API. */
-    private void bindVipPrimaryIcon(int level) {
+    /** Load the per-level horizontal VIP badge from the public VIP plans API. */
+    private void bindVipHorizontalBadge(int level) {
         if (binding == null || !isAdded()) return;
-        ImageView icon = binding.imgVipPrimaryIcon;
-        if (icon == null) return;
+        ImageView badge = binding.imgVipHorizontalBadge;
+        if (badge == null) return;
         if (level <= 0) {
-            icon.setVisibility(View.GONE);
-            icon.setImageDrawable(null);
+            badge.setVisibility(View.GONE);
+            badge.setImageDrawable(null);
             return;
         }
-        icon.setVisibility(View.VISIBLE);
-        icon.setImageResource(R.drawable.vip_medal_mikoo_1);
+        badge.setVisibility(View.VISIBLE);
+        badge.setImageDrawable(null);
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             Result<MiscDtos.VipPlanList> result = c.getVipRepository().getPlans();
@@ -372,18 +372,22 @@ public class ProfileFragment extends Fragment {
             if (result != null && result.success && result.data != null) {
                 for (MiscDtos.VipPlanDto plan : result.data) {
                     if (plan != null && plan.level == Math.min(7, level)) {
-                        url = plan.vipMainIconUrl;
+                        url = plan.vipHorizontalBadgeUrl;
                         break;
                     }
                 }
             }
-            final String iconUrl = (url == null || url.trim().isEmpty())
-                    ? com.Dramizo.Series.presentation.vip.VipCatalog.headUrl(Math.min(7, level))
-                    : url;
+            final String badgeUrl = url == null ? "" : url.trim();
             if (!isAdded()) return;
             requireActivity().runOnUiThread(() -> {
                 if (binding == null || !isAdded()) return;
-                ServerAssets.load(binding.imgVipPrimaryIcon, iconUrl);
+                if (badgeUrl.isEmpty()) {
+                    binding.imgVipHorizontalBadge.setVisibility(View.GONE);
+                    binding.imgVipHorizontalBadge.setImageDrawable(null);
+                } else {
+                    binding.imgVipHorizontalBadge.setVisibility(View.VISIBLE);
+                    ServerAssets.load(binding.imgVipHorizontalBadge, badgeUrl);
+                }
             });
         });
     }
