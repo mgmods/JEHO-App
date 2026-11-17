@@ -3739,6 +3739,7 @@ export class AdminService {
         `/assets/cosmetics/vip/vip_medal_mikoo_${Math.min(7, Math.max(1, p.level || 1))}.png?v=20260801vip7`,
       visuals: (p.benefits as any)?.visuals || {},
       vipMainIconUrl: ((p.benefits as any)?.visuals || {}).vipMainIconUrl || null,
+      vipHorizontalBadgeUrl: ((p.benefits as any)?.visuals || {}).vipHorizontalBadgeUrl || null,
       benefits: p.benefits?.extra?.length
         ? p.benefits.extra
         : [
