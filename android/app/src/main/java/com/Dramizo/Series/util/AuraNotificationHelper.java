@@ -213,9 +213,9 @@ public final class AuraNotificationHelper {
         if (isChat) {
             // Let Android render the expanded MessagingStyle and native action row.
             // A custom RemoteViews big view suppresses/obscures RemoteInput on some ROMs.
-            builder.setCustomContentView(compact)
-                    .setCustomHeadsUpContentView(compact)
-                    .setStyle(buildChatMessagingStyle(context, notificationId, title, avatar));
+            // Keep Android's native heads-up / expanded MessagingStyle surfaces so
+            // the RemoteInput reply action remains visible and opens the inline keyboard.
+            builder.setStyle(buildChatMessagingStyle(context, notificationId, title, avatar));
             androidx.core.app.RemoteInput remoteInput = new androidx.core.app.RemoteInput.Builder(
                     NotificationQuickReplyReceiver.EXTRA_REPLY)
                     .setLabel("اكتب ردك…")
