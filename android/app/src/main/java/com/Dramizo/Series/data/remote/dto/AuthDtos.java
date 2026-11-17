@@ -138,6 +138,7 @@ public final class AuthDtos {
         @SerializedName("vipTouUrl") public String vipTouUrl;
         /** VIP card head ornament (ic_head_vip_{n}) — only when vipLevel &gt; 0. */
         @SerializedName("vipHeadUrl") public String vipHeadUrl;
+        @SerializedName("vipMainIconUrl") public String vipMainIconUrl;
         @SerializedName("hostBadgeUrl") public String hostBadgeUrl;
         /** Cosmetic meta JSON for worn host badge: offsetX/offsetY/scale/avatarScale */
         @SerializedName("hostBadgeMeta") public java.util.Map<String, Object> hostBadgeMeta;
