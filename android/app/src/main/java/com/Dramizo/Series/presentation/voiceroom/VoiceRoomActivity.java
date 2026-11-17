@@ -3280,7 +3280,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         int effectiveVipLevel = Math.max(Math.max(0, fallbackVip), Math.max(0, decoration.vipLevel));
         if (effectiveVipLevel > 0) {
             TextView vip = new TextView(this);
-            vip.setText("VIP" + effectiveVipLevel);
+            vip.setText("VIP " + effectiveVipLevel);
             vip.setContentDescription("VIP " + effectiveVipLevel);
             vip.setTextSize(10f);
             vip.setTypeface(null, android.graphics.Typeface.BOLD);
