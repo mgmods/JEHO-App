@@ -930,11 +930,6 @@ class MainActivity : ThemedActivity() {
         playInAppUpdateHelper?.onResume()
     }
 
-    override fun onDestroy() {
-        try { unregisterReceiver(unreadBadgeReceiver) } catch (_: Exception) {}
-        super.onDestroy()
-    }
-
     private fun bindActiveRoomMini() {
         val b = binding ?: return
         val mini = b.activeRoomMini ?: return
@@ -1269,6 +1264,7 @@ class MainActivity : ThemedActivity() {
     }
 
     override fun onDestroy() {
+        try { unregisterReceiver(unreadBadgeReceiver) } catch (_: Exception) {}
         playInAppUpdateHelper?.onDestroy()
         playInAppUpdateHelper = null
         taskInviteListener?.let {
