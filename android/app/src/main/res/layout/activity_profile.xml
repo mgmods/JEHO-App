@@ -494,30 +494,12 @@
                             android:scaleType="fitCenter"
                             android:visibility="gone" />
 
-                        <ImageView
-                            android:id="@+id/imgVipMedal"
-                            android:layout_width="18dp"
-                            android:layout_height="13dp"
-                            android:layout_marginStart="4dp"
-                            android:adjustViewBounds="true"
-                            android:contentDescription="VIP"
-                            android:scaleType="fitCenter"
-                            android:visibility="gone" />
+                        <ImageView android:id="@+id/imgVipMedal" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
 
-                        <TextView
-                            android:id="@+id/tvVipChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="18dp"
-                            android:layout_marginStart="4dp"
-                            android:background="@drawable/bg_chip_vip"
-                            android:gravity="center"
-                            android:minWidth="42dp"
-                            android:paddingHorizontal="6dp"
-                            android:text="VIP 0"
-                            android:textColor="#FFFFFFFF"
-                            android:textSize="9sp"
-                            android:textStyle="bold"
-                            android:visibility="gone" />
+                        <TextView android:id="@+id/tvVipChip" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+                        <ImageView android:id="@+id/imgVipHorizontalBadge" android:layout_width="wrap_content"
+                            android:layout_height="18dp" android:layout_marginStart="4dp" android:adjustViewBounds="true"
+                            android:contentDescription="شارة VIP الأفقية" android:scaleType="fitCenter" android:visibility="gone" />
 
 
 
