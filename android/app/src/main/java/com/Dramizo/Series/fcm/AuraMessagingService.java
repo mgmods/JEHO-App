@@ -83,10 +83,11 @@ public class AuraMessagingService extends FirebaseMessagingService {
             }
         }
         String value = markers.toString().toLowerCase(java.util.Locale.ROOT);
-        boolean roomGameGiftContext = value.matches("(?s).*(room|roomid|game|gameid|slot|gift|giftid|gifttype|lucky|luckygift|room:|غرفة|روم|هدية|محظوظ|الحظ).*");
-        boolean winSignal = value.matches("(?s).*(win|won|winner|game_win|slot_win|reward|payout|coinswon|wincoins|profit|hit|فوز|فاز|ربح|ربحت|مردود).*");
+        boolean roomGameGiftContext = value.matches("(?s).*(room|roomid|game|gameid|slot|gift|giftid|gifttype|lucky|luckygift|room:|غرفة|روم|هدية|محظوظ|الحظ|لعبة|كوين|عملة).*");
+        boolean winSignal = value.matches("(?s).*(win|won|winner|winning|game_win|slot_win|lucky_win|reward|payout|coinswon|wincoins|profit|hit|فوز|فاز|فازت|فازوا|ربح|ربحت|ربحوا|مردود|مكسب).*");
+        boolean explicitWinCopy = value.matches("(?s).*(ربح|ربحت|ربحوا|فاز|فازت|فازوا|مردود|مكسب|winner|winning|\bwon\b|payout|profit).*");
         boolean arabicWinCopy = value.matches("(?s).*(فوز|فاز|ربح|ربحت|مكسب|مردود|مبروك).{0,35}(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين)|(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين).{0,35}(فوز|فاز|ربح|ربحت|مكسب|مردود).*");
-        return roomGameGiftContext && (winSignal || arabicWinCopy);
+        return winSignal && (roomGameGiftContext || explicitWinCopy || arabicWinCopy);
     }
 
     private void showNotification(String title, String body, String type, Map<String, String> data) {
