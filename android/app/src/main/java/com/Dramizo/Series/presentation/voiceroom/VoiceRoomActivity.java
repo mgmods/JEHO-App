@@ -3140,11 +3140,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String agencyName;
         String agencyRole;
         String gender;
-        String publicId;
-        String publicIdStyleMode;
-        String publicIdColor1;
-        String publicIdColor2;
-        String vipBadgeUrl;
+        int vipLevel;
         boolean cpActive;
         final List<String> medalUrls = new ArrayList<>();
     }
@@ -3180,11 +3176,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     decoration.agencyRole = user.agency.role;
                 }
                 decoration.gender = user.gender;
-                decoration.publicId = user.publicId;
-                decoration.publicIdStyleMode = user.publicIdStyleMode;
-                decoration.publicIdColor1 = user.publicIdStyleColor1;
-                decoration.publicIdColor2 = user.publicIdStyleColor2;
-                decoration.vipBadgeUrl = user.vipBadgeUrl;
+                decoration.vipLevel = Math.max(0, user.vipLevel);
                 List<String> displayedIds = user.displayedMedalIds == null
                         ? java.util.Collections.emptyList() : user.displayedMedalIds;
                 Result<List<com.Dramizo.Series.data.remote.dto.BadgeDto>> badges =
@@ -3283,18 +3275,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         int total = 0;
         // Agency and competition marks are intentionally omitted from chat identity.
-        if (fallbackVip > 0) {
+        int effectiveVipLevel = Math.max(Math.max(0, fallbackVip), Math.max(0, decoration.vipLevel));
+        if (effectiveVipLevel > 0) {
             ImageView vip = new ImageView(this);
             vip.setContentDescription("VIP");
             vip.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            // Match the compact inline comment-badge scale.
             vip.setLayoutParams(roomBadgeImageParams(18, 18, 2));
-            if (decoration.vipBadgeUrl != null && !decoration.vipBadgeUrl.trim().isEmpty()) {
-                Glide.with(vip).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(
-                        decoration.vipBadgeUrl)).fitCenter().into(vip);
-            } else {
-                vip.setImageResource(com.Dramizo.Series.util.AssetCatalog.vipMedal(fallbackVip));
-            }
+            int vipDrawable = com.Dramizo.Series.util.AssetCatalog.vipMedal(effectiveVipLevel);
+            String vipIconUrl = com.Dramizo.Series.util.AssetCatalog.vipMedalUrl(effectiveVipLevel);
+            Glide.with(vip).load(vipIconUrl)
+                    .placeholder(vipDrawable).error(vipDrawable).fitCenter().into(vip);
             addRoomChatBadge(inline, overflow, vip, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
         if (decoration.cpActive) {
@@ -3308,34 +3298,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             cp.setBackgroundResource(R.drawable.bg_cp_cv_badge);
             cp.setLayoutParams(roomBadgeTextParams(2));
             addRoomChatBadge(inline, overflow, cp, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
-        }
-        boolean styledId = decoration.publicId != null && !decoration.publicId.trim().isEmpty()
-                && decoration.publicIdStyleMode != null
-                && !"none".equalsIgnoreCase(decoration.publicIdStyleMode);
-        if (styledId) {
-            TextView id = new TextView(this);
-            id.setText("ID " + decoration.publicId);
-            id.setTextColor(Color.WHITE);
-            id.setTextSize(10f);
-            id.setTypeface(null, android.graphics.Typeface.BOLD);
-            id.setIncludeFontPadding(false);
-            id.setPadding(dp(5), dp(2), dp(5), dp(2));
-            try {
-                int c1 = Color.parseColor(decoration.publicIdColor1 == null
-                        ? "#7C5CFF" : decoration.publicIdColor1);
-                int c2 = Color.parseColor(decoration.publicIdColor2 == null
-                        ? "#D6A84B" : decoration.publicIdColor2);
-                android.graphics.drawable.GradientDrawable chip =
-                        new android.graphics.drawable.GradientDrawable(
-                                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                                new int[] { c1, c2 });
-                chip.setCornerRadius(dp(5));
-                id.setBackground(chip);
-            } catch (Exception ignored) {
-                id.setBackgroundResource(R.drawable.bg_vanity_chip);
-            }
-            id.setLayoutParams(roomBadgeTextParams(2));
-            addRoomChatBadge(inline, overflow, id, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
         for (String medalUrl : decoration.medalUrls) {
             if (medalUrl == null || medalUrl.trim().isEmpty()) continue;
