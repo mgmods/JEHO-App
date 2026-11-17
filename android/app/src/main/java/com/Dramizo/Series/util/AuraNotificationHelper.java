@@ -230,7 +230,7 @@ public final class AuraNotificationHelper {
                     replyIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
             NotificationCompat.Action replyAction = new NotificationCompat.Action.Builder(
-                    R.drawable.ic_stat_jeho, "رد", replyPendingIntent)
+                    R.drawable.ic_stat_jeho, "↩ الرد على الرسالة", replyPendingIntent)
                     .addRemoteInput(remoteInput)
                     .setAllowGeneratedReplies(true)
                     .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
