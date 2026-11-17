@@ -309,12 +309,8 @@ public class ProfileFragment extends Fragment {
             if (binding.tvCountryChip != null) binding.tvCountryChip.setVisibility(View.GONE);
 
             int vip = Math.max(0, user.vipLevel);
-            bindVipPrimaryIcon(vip);
-            // The horizontal VIP tier badge belongs to viewers of this profile, not the owner's Me tab.
-            if (binding.imgVipHorizontalBadge != null) {
-                binding.imgVipHorizontalBadge.setImageDrawable(null);
-                binding.imgVipHorizontalBadge.setVisibility(View.GONE);
-            }
+            // Keep the compact horizontal VIP tier badge on the owner's Me page.
+            bindVipHorizontalBadge(vip);
             long wealth = user.wealthLevel > 0 ? user.wealthLevel
                     : Math.max(0, user.wealthScore);
             long charm = user.popularityLevel > 0 ? user.popularityLevel
@@ -347,41 +343,6 @@ public class ProfileFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.loadMe();
-    }
-
-    /** Load the per-level primary VIP icon from the public VIP plans API. */
-    private void bindVipPrimaryIcon(int level) {
-        if (binding == null || !isAdded()) return;
-        ImageView icon = binding.imgVipPrimaryIcon;
-        if (icon == null) return;
-        if (level <= 0) {
-            icon.setVisibility(View.GONE);
-            icon.setImageDrawable(null);
-            return;
-        }
-        icon.setVisibility(View.VISIBLE);
-        icon.setImageResource(R.drawable.vip_medal_mikoo_1);
-        AppContainer c = ContainerProvider.from(requireActivity());
-        c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.VipPlanList> result = c.getVipRepository().getPlans();
-            String url = null;
-            if (result != null && result.success && result.data != null) {
-                for (MiscDtos.VipPlanDto plan : result.data) {
-                    if (plan != null && plan.level == Math.min(7, level)) {
-                        url = plan.vipMainIconUrl;
-                        break;
-                    }
-                }
-            }
-            final String iconUrl = (url == null || url.trim().isEmpty())
-                    ? com.Dramizo.Series.presentation.vip.VipCatalog.headUrl(Math.min(7, level))
-                    : url;
-            if (!isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
-                if (binding == null || !isAdded()) return;
-                ServerAssets.load(binding.imgVipPrimaryIcon, iconUrl);
-            });
-        });
     }
 
     /** Load the per-level horizontal VIP badge from the public VIP plans API. */
