@@ -9239,35 +9239,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     if (vipHead != null) { vipHead.setVisibility(View.GONE); vipHead.setImageDrawable(null); }
                     if (imgVipMedal != null) { imgVipMedal.setVisibility(View.GONE); imgVipMedal.setImageDrawable(null); }
                     String mainVipIconUrl = r.data.vipMainIconUrl;
-                    if ((mainVipIconUrl == null || mainVipIconUrl.trim().isEmpty()) && liveVip > 0) {
-                        Result<com.Dramizo.Series.data.remote.dto.MiscDtos.VipPlanList> plans =
-                                ApiCall.execute(ContainerProvider.from(VoiceRoomActivity.this).getVipRepository().getPlans());
-                        if (plans.success && plans.data != null) {
-                            for (com.Dramizo.Series.data.remote.dto.MiscDtos.VipPlanDto plan : plans.data) {
-                                if (plan != null && plan.level == Math.min(7, liveVip)) {
-                                    mainVipIconUrl = plan.vipMainIconUrl;
-                                    if (imgVipHorizontalBadge != null
-                                            && plan.vipHorizontalBadgeUrl != null
-                                            && !plan.vipHorizontalBadgeUrl.trim().isEmpty()) {
-                                        imgVipHorizontalBadge.setVisibility(View.VISIBLE);
-                                        ServerAssets.load(imgVipHorizontalBadge, plan.vipHorizontalBadgeUrl);
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
                     if (imgVipMainIcon != null && liveVip > 0
                             && mainVipIconUrl != null && !mainVipIconUrl.trim().isEmpty()) {
                         imgVipMainIcon.setVisibility(View.VISIBLE);
                         ServerAssets.load(imgVipMainIcon, mainVipIconUrl.trim());
                     } else if (imgVipMainIcon != null) {
                         imgVipMainIcon.setVisibility(View.GONE);
+                        imgVipMainIcon.setImageDrawable(null);
                     }
                     if (imgVipHorizontalBadge != null && r.data.vipHorizontalBadgeUrl != null
                             && !r.data.vipHorizontalBadgeUrl.trim().isEmpty()) {
                         imgVipHorizontalBadge.setVisibility(View.VISIBLE);
                         ServerAssets.load(imgVipHorizontalBadge, r.data.vipHorizontalBadgeUrl.trim());
+                    } else if (imgVipHorizontalBadge != null) {
+                        imgVipHorizontalBadge.setVisibility(View.GONE);
+                        imgVipHorizontalBadge.setImageDrawable(null);
                     }
                     // Entry ride is separate from the retired VIP medal.
                     if (imgEntryRide != null) {
