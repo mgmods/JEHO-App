@@ -89,6 +89,7 @@ public class VipActivity extends ThemedActivity {
         });
         vm.getPlans().observe(this, list -> {
             cachedPlans = list;
+            bindHero(currentVip);
             if (adapter != null) {
                 adapter.submit(layoutVipPlans, list, currentVip, wealthLevel);
             }
@@ -198,8 +199,18 @@ public class VipActivity extends ThemedActivity {
                 tvVipHeroSub.setText(getString(R.string.vip_hero_active_sub));
             }
             if (imgHeroMedal != null) {
+                String primaryIcon = null;
+                if (cachedPlans != null) {
+                    for (MiscDtos.VipPlanDto plan : cachedPlans) {
+                        if (plan != null && plan.level == tier) {
+                            primaryIcon = plan.vipMainIconUrl;
+                            break;
+                        }
+                    }
+                }
+                if (primaryIcon == null || primaryIcon.trim().isEmpty()) primaryIcon = VipCatalog.headUrl(tier);
                 imgHeroMedal.setImageResource(VipCatalog.medalDrawable(tier));
-                ServerAssets.load(imgHeroMedal, VipCatalog.medalUrl(tier));
+                ServerAssets.load(imgHeroMedal, primaryIcon);
                 imgHeroMedal.setVisibility(View.VISIBLE);
             }
             if (imgHeroFrame != null) {
