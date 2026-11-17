@@ -1045,8 +1045,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
         View content = LayoutInflater.from(requireContext())
                 .inflate(R.layout.popup_gift_qty, null, false);
-        int[] values = new int[]{17, 77, 177};
+        int[] values = new int[]{1, 17, 77, 177};
         View[] chips = {
+                content.findViewById(R.id.popupQty1),
                 content.findViewById(R.id.popupQty17),
                 content.findViewById(R.id.popupQty77),
                 content.findViewById(R.id.popupQty177)
