@@ -100,6 +100,17 @@ class MainActivity : ThemedActivity() {
     }
 
     private var binding: ActivityMainBinding? = null
+    private val unreadBadgeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            updateUnreadMessagesDot(intent?.getIntExtra(
+                com.Dramizo.Series.util.UnreadMessageBadge.EXTRA_COUNT, 0) ?: 0)
+        }
+    }
+
+    private fun updateUnreadMessagesDot(count: Int) {
+        binding?.tabChatUnreadDot?.visibility =
+            if (count > 0) android.view.View.VISIBLE else android.view.View.GONE
+    }
     private var mainPager: ViewPager2? = null
     private var currentPage: Int = 0
         private var agencyMine: MiscDtos.AgencyMineDto? = null
@@ -133,6 +144,12 @@ class MainActivity : ThemedActivity() {
         val b = ActivityMainBinding.inflate(layoutInflater)
         binding = b
         setContentView(b.root)
+        androidx.core.content.ContextCompat.registerReceiver(
+            this, unreadBadgeReceiver,
+            android.content.IntentFilter(com.Dramizo.Series.util.UnreadMessageBadge.ACTION_CHANGED),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        updateUnreadMessagesDot(com.Dramizo.Series.util.UnreadMessageBadge.current(this))
 
         playInAppUpdateHelper = PlayInAppUpdateHelper(this)
         RemoteTheme.applyActivityBackground(this, "home")
@@ -890,6 +907,8 @@ class MainActivity : ThemedActivity() {
     override fun onResume() {
         super.onResume()
         val container = ContainerProvider.from(this)
+        com.Dramizo.Series.util.UnreadMessageBadge.refresh(this)
+        updateUnreadMessagesDot(com.Dramizo.Series.util.UnreadMessageBadge.current(this))
         // The initial icon fetch is started in onCreate. Refresh again whenever
         // the user returns to the foreground so Dashboard changes appear without
         // requiring an APK update or a manual app restart.
@@ -909,6 +928,11 @@ class MainActivity : ThemedActivity() {
         container.ioExecutor.execute { AppFeatures.refresh(container) }
         bindActiveRoomMini()
         playInAppUpdateHelper?.onResume()
+    }
+
+    override fun onDestroy() {
+        try { unregisterReceiver(unreadBadgeReceiver) } catch (_: Exception) {}
+        super.onDestroy()
     }
 
     private fun bindActiveRoomMini() {
