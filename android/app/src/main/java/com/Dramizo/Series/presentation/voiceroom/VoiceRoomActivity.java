@@ -3279,14 +3279,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Agency and competition marks are intentionally omitted from chat identity.
         int effectiveVipLevel = Math.max(Math.max(0, fallbackVip), Math.max(0, decoration.vipLevel));
         if (effectiveVipLevel > 0) {
-            ImageView vip = new ImageView(this);
-            vip.setContentDescription("VIP");
-            vip.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            vip.setLayoutParams(roomBadgeImageParams(18, 18, 2));
-            int vipDrawable = com.Dramizo.Series.util.AssetCatalog.vipMedal(effectiveVipLevel);
-            String vipIconUrl = com.Dramizo.Series.util.AssetCatalog.vipMedalUrl(effectiveVipLevel);
-            Glide.with(vip).load(vipIconUrl)
-                    .placeholder(vipDrawable).error(vipDrawable).fitCenter().into(vip);
+            TextView vip = new TextView(this);
+            vip.setText("VIP" + effectiveVipLevel);
+            vip.setContentDescription("VIP " + effectiveVipLevel);
+            vip.setTextSize(10f);
+            vip.setTypeface(null, android.graphics.Typeface.BOLD);
+            vip.setIncludeFontPadding(false);
+            vip.setSingleLine(true);
+            vip.setPadding(dp(5), dp(2), dp(5), dp(2));
+            com.Dramizo.Series.util.VipStyle.applyChip(vip, effectiveVipLevel);
+            vip.setTextColor(com.Dramizo.Series.util.VipStyle.chipTextColor(effectiveVipLevel));
+            vip.setLayoutParams(roomBadgeTextParams(2));
             addRoomChatBadge(inline, overflow, vip, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
         }
         if (decoration.cpActive) {
