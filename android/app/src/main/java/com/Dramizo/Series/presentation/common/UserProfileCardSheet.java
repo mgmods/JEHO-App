@@ -159,7 +159,7 @@ public final class UserProfileCardSheet {
         styleStatChips(chipCharm, chipWealth);
         AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
         bindVipMedal(imgVipMedal, vipLevel, null);
-        bindVipHead(vipHead, vipLevel, null);
+        if (vipHead != null) { vipHead.setImageDrawable(null); vipHead.setVisibility(View.GONE); }
         AvatarCosmetics.bindProfileWear(
                 userCardHostSignal, img, frame, avatarHold[0], vipFrameHold[0],
                 null, null, Math.max(1, vipLevel));
@@ -347,8 +347,8 @@ public final class UserProfileCardSheet {
                 AvatarCosmetics.bindProfileWear(
                         userCardHostSignal, img, frame, avatarHold[0], vipFrameHold[0],
                         null, null, Math.max(1, liveVip));
-                bindVipHead(vipHead, liveVip,
-                        u.vipHeadUrl != null ? u.vipHeadUrl : VipStyle.fixedHeadPath(liveVip));
+                // Remove the old VIP head banner as well; only the dashboard main icon and horizontal badge remain.
+                if (vipHead != null) { vipHead.setImageDrawable(null); vipHead.setVisibility(View.GONE); }
                 // Head owns: ride entry + VIP medal (Mikoo property head).
                 bindEntryRide(imgEntryRide, firstNonEmpty(u.entryAnimationUrl, u.entryEffectUrl));
                 // The legacy VIP badge/medal is intentionally absent from the popup.
