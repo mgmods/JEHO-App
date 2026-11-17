@@ -331,19 +331,10 @@ public class ProfileFragment extends Fragment {
             }
             // Use the real VIP head emblem asset, not a text-only "VIP" chip.
             if (binding.tvVipChip != null) binding.tvVipChip.setVisibility(View.GONE);
+            // Legacy VIP emblem is removed everywhere; use the configured horizontal badge below ID.
             if (binding.imgVipBadge != null) {
-                String vipEmblem = user.vipHeadUrl;
-                if (vip > 0 && vipEmblem != null && !vipEmblem.trim().isEmpty()) {
-                    binding.imgVipBadge.setVisibility(View.VISIBLE);
-                    Glide.with(ProfileFragment.this)
-                            .load(AssetCatalog.absoluteUrl(vipEmblem))
-                            .placeholder(R.drawable.ic_medal_default)
-                            .error(R.drawable.ic_medal_default)
-                            .into(binding.imgVipBadge);
-                } else {
-                    binding.imgVipBadge.setVisibility(View.GONE);
-                    binding.imgVipBadge.setImageDrawable(null);
-                }
+                binding.imgVipBadge.setVisibility(View.GONE);
+                binding.imgVipBadge.setImageDrawable(null);
             }
             AppLoadingOverlay.hide(requireActivity());
         });
