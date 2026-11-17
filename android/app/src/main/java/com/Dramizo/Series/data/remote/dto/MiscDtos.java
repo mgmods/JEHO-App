@@ -49,6 +49,7 @@ public final class MiscDtos {
         @SerializedName("name") public String name;
         @SerializedName("coinPriceMonthly") public int coinPriceMonthly;
         @SerializedName("badgeUrl") public String badgeUrl;
+        @SerializedName("vipMainIconUrl") public String vipMainIconUrl;
         @SerializedName("benefits") public VipBenefits benefits;
         @SerializedName("isActive") public boolean isActive;
     }
