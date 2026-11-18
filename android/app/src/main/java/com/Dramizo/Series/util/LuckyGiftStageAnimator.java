@@ -119,7 +119,7 @@ public final class LuckyGiftStageAnimator {
                     try { onScatterStart.run(); } catch (Exception ignored) {}
                 }
                 stage.postDelayed(() -> scatter(overlay, stage, hero, giftIconUrl,
-                        centerX, centerY, micTargets, density, onEnd), 420L);
+                        centerX, centerY, micTargets, quantity, personCount, density, onEnd), 420L);
             }
         });
         reveal.start();
@@ -127,7 +127,7 @@ public final class LuckyGiftStageAnimator {
 
     private static void scatter(FrameLayout overlay, FrameLayout stage, ImageView hero,
             String iconUrl, float fromX, float fromY, @Nullable List<PointF> targets,
-            float density, @Nullable Runnable onEnd) {
+            int quantity, int personCount, float density, @Nullable Runnable onEnd) {
         List<PointF> seats = new ArrayList<>();
         if (targets != null) for (PointF p : targets) if (p != null) seats.add(p);
         if (seats.isEmpty()) {
