@@ -337,7 +337,10 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         // configured role card and refresh it asynchronously if the public config is stale.
         AuthDtos.UserDto bubbleSender = mine ? me : msg.sender;
         String staffRole = StaffRoleHelper.normalize(bubbleSender);
-        String customBubble = mine ? (me != null ? me.chatBubbleUrl : null) : peerChatBubbleUrl;
+        String customBubble = bubbleSender != null && bubbleSender.chatBubbleUrl != null
+                && !bubbleSender.chatBubbleUrl.trim().isEmpty()
+                ? bubbleSender.chatBubbleUrl
+                : (mine ? (me != null ? me.chatBubbleUrl : null) : peerChatBubbleUrl);
         if (StaffRoleHelper.isStaff(bubbleSender)) {
             StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(staffRole);
             if (identity.messageCardUrl != null && !identity.messageCardUrl.isEmpty()) {
