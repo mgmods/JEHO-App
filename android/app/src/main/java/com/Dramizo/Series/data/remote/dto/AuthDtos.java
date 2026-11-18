@@ -136,6 +136,8 @@ public final class AuthDtos {
         @SerializedName("vipBadgeUrl") public String vipBadgeUrl;
         /** Fixed VIP nobility frame (ud_vip_tou_{n}) for profile/card — not mall wear. */
         @SerializedName("vipTouUrl") public String vipTouUrl;
+        /** Dashboard-configured VIP avatar frame for the active membership level. */
+        @SerializedName("vipFrameUrl") public String vipFrameUrl;
         /** VIP card head ornament (ic_head_vip_{n}) — only when vipLevel &gt; 0. */
         @SerializedName("vipHeadUrl") public String vipHeadUrl;
         @SerializedName("vipMainIconUrl") public String vipMainIconUrl;
