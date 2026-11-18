@@ -889,7 +889,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         setSeatSize(holder.b.imgAvatar, avatar, ctx);
         setSeatSize(holder.b.imgFrame, frame, ctx);
         setSeatSize(holder.b.imgHostBadge, frame, ctx);
-        if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, 30, ctx);
+        if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, scaleMode == SCALE_MICRO ? 24 : 30, ctx);
         if (holder.b.seatHostSignal != null) {
             setSeatSize(holder.b.seatHostSignal, frame, ctx);
         }
@@ -906,11 +906,20 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 ViewGroup.LayoutParams nameRowRaw = nameRow.getLayoutParams();
                 if (nameRowRaw instanceof ViewGroup.MarginLayoutParams nameRowLp) {
                     nameRowLp.topMargin = 0;
+                    nameRowLp.bottomMargin = 0;
                     nameRow.setLayoutParams(nameRowLp);
                 }
                 ViewGroup.LayoutParams nameRaw = holder.b.tvName.getLayoutParams();
-                nameRaw.height = Math.round(18 * d);
+                nameRaw.height = Math.round(16 * d);
                 holder.b.tvName.setLayoutParams(nameRaw);
+                View rankRow = holder.b.rowCustomDisplayRank;
+                if (rankRow != null) {
+                    ViewGroup.LayoutParams rankRaw = rankRow.getLayoutParams();
+                    if (rankRaw instanceof ViewGroup.MarginLayoutParams rankLp) {
+                        rankLp.topMargin = Math.round(5 * d);
+                        rankRow.setLayoutParams(rankLp);
+                    }
+                }
             }
         }
         if (holder.b.imgSeatHostMark != null) {
