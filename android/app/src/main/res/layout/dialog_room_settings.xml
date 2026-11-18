@@ -110,53 +110,19 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:orientation="horizontal">
+        android:orientation="vertical">
 
         <TextView
-            android:id="@+id/btnSeats10"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
+            android:id="@+id/btnChooseSeatCount"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
             android:background="@drawable/bg_room_dialog_item"
+            android:drawableStart="@drawable/ic_room_seats"
+            android:drawablePadding="10dp"
             android:gravity="center"
-            android:text="10"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnSeats15"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_room_dialog_item"
-            android:gravity="center"
-            android:text="15"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnSeats20"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_room_dialog_item"
-            android:gravity="center"
-            android:text="20"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnSeats30"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_room_dialog_item"
-            android:gravity="center"
-            android:text="30"
-            android:textColor="@color/text_primary"
+            android:text="اختيار عدد المقاعد"
+            android:textColor="@color/aurora_teal"
+            android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>
 
