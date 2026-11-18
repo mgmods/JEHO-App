@@ -2783,22 +2783,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             try { user = ContainerProvider.from(this).getSessionManager().getUser(); }
             catch (Exception ignored) { }
         }
-        AuthDtos.AgencyClubDto club = user != null ? user.agencyClub : null;
-        if (club != null) {
-            String role = club.role == null ? "" : club.role.trim().toLowerCase(java.util.Locale.ROOT);
-            String agencyId = club.agencyId == null ? "" : club.agencyId.trim();
-            String agencyName = club.agencyName == null ? "" : club.agencyName.trim();
-            boolean female = user != null && "female".equalsIgnoreCase(user.gender);
-            if ("owner".equals(role)) {
-                return "قائد وكالة";
-            }
-            if (isAgencyRoom && room.agencyId != null && room.agencyId.equals(agencyId)) {
-                if ("host".equals(role)) return female ? "مضيفة" : "مضيف";
-                if ("manager".equals(role) || "staff".equals(role)) return female ? "مشرفة" : "مشرف";
+        String role = "";
+        String agencyId = "";
+        if (user != null && user.agency != null && user.agency.role != null) {
+            role = user.agency.role.trim().toLowerCase(java.util.Locale.ROOT);
+            agencyId = user.agency.id == null ? "" : user.agency.id.trim();
+        }
+        if ((role.isEmpty() || "member".equals(role)) && user != null && user.agencyClub != null) {
+            role = user.agencyClub.role == null ? "" : user.agencyClub.role.trim().toLowerCase(java.util.Locale.ROOT);
+            agencyId = user.agencyClub.agencyId == null ? "" : user.agencyClub.agencyId.trim();
+        }
+        role = role.replace('-', '_').replace("agency_", "");
+        boolean female = user != null && "female".equalsIgnoreCase(user.gender);
+        // Agency leader is a permanent identity. Agency host/manager are scoped to
+        // the exact agency room, never inferred from being the owner of a personal room.
+        if ("owner".equals(role) || "leader".equals(role)) return "قائد وكالة";
+        if (isAgencyRoom && room.agencyId != null && !room.agencyId.trim().isEmpty()
+                && room.agencyId.trim().equals(agencyId)) {
+            if ("host".equals(role)) return female ? "مضيفة" : "مضيف";
+            if ("manager".equals(role) || "staff".equals(role) || "admin".equals(role)) {
+                return female ? "مشرفة" : "مشرف";
             }
         }
         if (isAgencyRoom && roomModeratorIds.contains(userId)) {
-            boolean female = user != null && "female".equalsIgnoreCase(user.gender);
             return female ? "مشرفة" : "مشرف";
         }
         return null;
@@ -3021,16 +3028,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // This is only an identity chip in the chat row; it is NOT an avatar overlay.
             if (hostChip != null) {
                 String roleLabel = agencyRoleLabelForRoomUser(userId);
-                boolean hostUser = roomHostId != null && sameUser(userId, roomHostId);
-                if ((roleLabel == null || roleLabel.trim().isEmpty()) && hostUser) {
-                    AuthDtos.UserDto roleUser = null;
-                    try {
-                        RoomDtos.RoomDto activeRoom = viewModel != null ? viewModel.getRoom().getValue() : null;
-                        if (activeRoom != null) roleUser = activeRoom.host;
-                    } catch (Exception ignored) { }
-                    boolean female = roleUser != null && "female".equalsIgnoreCase(roleUser.gender);
-                    roleLabel = female ? "مضيفة" : "مضيف";
-                }
+                // Being the owner/host of an ordinary room is not an agency role.
+                // Only agencyRoleLabelForRoomUser may authorize an agency identity chip.
                 if (roleLabel != null && !roleLabel.trim().isEmpty()) {
                     hostChip.setText(roleLabel);
                     hostChip.setVisibility(View.VISIBLE);
