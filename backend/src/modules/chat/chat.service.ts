@@ -253,10 +253,15 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       // on that plan must not inherit a lower plan's name treatment.
       resolved.add(row.userId);
       const benefits: any = row.vipPlan?.benefits || {};
-      const style = benefits?.visuals?.nameStyle;
-      if (style && (style.enabled === true || String(style.enabled).toLowerCase() === 'true')) {
-        result.set(row.userId, style);
-      }
+      const visuals = benefits?.visuals && typeof benefits.visuals === 'object'
+        ? benefits.visuals : {};
+      const style = visuals.nameStyle;
+      result.set(row.userId, {
+        ...visuals,
+        badgeUrl: row.vipPlan?.badgeUrl || null,
+        nameStyle: style && (style.enabled === true || String(style.enabled).toLowerCase() === 'true')
+          ? style : null,
+      });
     }
     return result;
   }
@@ -340,7 +345,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
-  private mapMessage(message: ChatMessage, vipLevel = 0, displayRank?: any, agencyClub?: any, agency?: any, nameStyle?: any) {
+  private mapMessage(message: ChatMessage, vipLevel = 0, displayRank?: any, agencyClub?: any, agency?: any, vipVisuals?: any) {
     const sender: any = message.sender;
     const profile = sender?.profile;
     const reply = (message as any).replyTo as ChatMessage | undefined;
@@ -369,7 +374,13 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
             username: sender.username,
             displayName: sender.displayName,
             avatarUrl: sender.avatarUrl,
-            nameStyle: nameStyle || null,
+            nameStyle: vipVisuals?.nameStyle || null,
+            vipFrameUrl: vipVisuals?.vipFrameUrl || null,
+            vipCardUrl: vipVisuals?.vipCardUrl || null,
+            profileCardUrl: vipVisuals?.profileCardUrl || vipVisuals?.vipCardUrl || profile?.profileCardUrl || null,
+            chatBubbleUrl: vipVisuals?.chatBubbleUrl || profile?.chatBubbleUrl || null,
+            nameplateUrl: vipVisuals?.nameplateUrl || null,
+            vipHeadUrl: vipVisuals?.badgeUrl || null,
             customDisplayRankName: displayRank?.customDisplayRankName ?? null,
             customDisplayRankImageUrl: displayRank?.customDisplayRankImageUrl ?? null,
             customDisplayRankAnimated: displayRank?.customDisplayRankAnimated === true,
