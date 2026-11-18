@@ -651,9 +651,24 @@ public class ProfileFragment extends Fragment {
         startActivity(i);
     }
 
+    /** Rebind dashboard-managed profile icons and the independent profile banner. */
+    public void refreshDashboardIcons() {
+        bindDashboardProfileIcon(R.id.imgMeVipActionIcon, "vip", R.drawable.ic_me_vip_card);
+        bindDashboardProfileIcon(R.id.imgMeLevelActionIcon, "level", R.drawable.ic_me_level_card);
+        bindDashboardProfileIcon(R.id.imgMeStoreActionIcon, "store", R.drawable.me_mall);
+        bindDashboardProfileIcon(R.id.imgMeRoomActionIcon, "room", R.drawable.me_room);
+        bindDashboardProfileIcon(R.id.imgMeAgencyActionIcon, "agencyCenter", R.drawable.ic_me_agency);
+        bindDashboardProfileIcon(R.id.imgMeEventsActionIcon, "events", R.drawable.ic_me_living_record);
+        bindDashboardProfileIcon(R.id.imgMeOpenAgencyActionIcon, "agency", R.drawable.icon_agency);
+        bindDashboardProfileIcon(R.id.imgMeTasksActionIcon, "tasks", R.drawable.ic_me_task);
+        bindDashboardProfileIcon(R.id.imgMeRechargeActionIcon, "recharge", R.drawable.ic_recharge_agent);
+        loadProfileBanner();
+    }
+
     @Override
     public void onResume() {
         super.onResume();
+        refreshDashboardIcons();
         // Re-fetch feature flags so master tasks switch takes effect without reinstall.
         try {
             AppContainer c = ContainerProvider.from(requireActivity());
