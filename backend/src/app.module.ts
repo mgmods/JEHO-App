@@ -217,6 +217,8 @@ const entityList = Object.values(entities).filter(
             }),
           );
         } finally {
+          await customGiftGrantsRunner.query('RESET lock_timeout').catch(() => undefined);
+          await customGiftGrantsRunner.query('RESET statement_timeout').catch(() => undefined);
           await customGiftGrantsRunner.release().catch((error) => {
             console.error('[CustomGiftsBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
           });
@@ -281,6 +283,8 @@ const entityList = Object.values(entities).filter(
             console.error('[SupportChestExpiryBootstrap] Lock diagnostics unavailable:', diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError));
           }
         } finally {
+          await giftExpiryRunner.query('RESET lock_timeout').catch(() => undefined);
+          await giftExpiryRunner.query('RESET statement_timeout').catch(() => undefined);
           await giftExpiryRunner.release().catch((error) => {
             console.error('[SupportChestExpiryBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
           });
