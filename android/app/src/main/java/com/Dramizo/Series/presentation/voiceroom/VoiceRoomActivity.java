@@ -124,6 +124,7 @@ import com.Dramizo.Series.util.RewardBurstOverlay;
 import com.Dramizo.Series.util.RoomKenarHelper;
 import com.Dramizo.Series.util.RoomSoundFx;
 import com.Dramizo.Series.util.RoomUiHelper;
+import com.Dramizo.Series.util.RoomSeatCountPicker;
 import com.Dramizo.Series.util.RoomVisualEffects;
 import com.Dramizo.Series.util.SeatReactionEmojis;
 import com.Dramizo.Series.util.RemoteSeatStickers;
@@ -17906,7 +17907,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (row == null || choose == null) return;
         row.setVisibility(View.VISIBLE);
         choose.setText("تعديل عدد المقاعد · الحالي " + currentGuestSeatCount());
-        choose.setOnClickListener(v -> showRoomSeatCountPicker());
+        choose.setOnClickListener(v -> {
+            if (onPicked != null) onPicked.run();
+            choose.post(this::showRoomSeatCountPicker);
+        });
     }
 
     /** Mikoo grid: 5 columns, no scroll, compact scale for 15/20 mics. */
