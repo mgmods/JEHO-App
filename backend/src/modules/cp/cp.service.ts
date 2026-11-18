@@ -136,17 +136,29 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async migrateUnifiedRelationshipType() {
-    const rows = await this.dataSource.query(
-      `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%'`,
-    );
-    const settings = new Map<string, string>(rows.map((row: any) => [String(row.key), String(row.value ?? '')]));
-    const legacyTypes = ['love', 'engagement', 'friendship', 'brotherhood', 'marriage'];
-    const suffixes = ['gift', 'price', 'gift_points', 'points.gift_send', 'max_level', 'levels', 'enabled', 'rules'];
-    const sourceType = legacyTypes
-      .map(type => ({ type, score: suffixes.filter(suffix => settings.has(`cp.${suffix}.${type}`)).length }))
-      .sort((a, b) => b.score - a.score)[0]?.type;
-    if (sourceType) {
-      await this.dataSource.transaction(async manager => {
+    // Keep the settings copy and both data rewrites atomic. A transaction-scoped
+    // advisory lock prevents two application instances migrating CP together.
+    await this.dataSource.transaction(async manager => {
+      await manager.query("SET LOCAL lock_timeout = '3s'");
+      await manager.query("SET LOCAL statement_timeout = '30s'");
+      const [lock] = await manager.query(
+        'SELECT pg_try_advisory_xact_lock(741902611, 2) AS acquired',
+      );
+      if (!lock?.acquired) {
+        throw new Error('[CP migration] Another instance is applying the unified relationship migration; retry startup.');
+      }
+
+      const rows = await manager.query(
+        `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%'`,
+      );
+      const settings = new Map<string, string>(rows.map((row: any) => [String(row.key), String(row.value ?? '')]));
+      const legacyTypes = ['love', 'engagement', 'friendship', 'brotherhood', 'marriage'];
+      const suffixes = ['gift', 'price', 'gift_points', 'points.gift_send', 'max_level', 'levels', 'enabled', 'rules'];
+      const sourceType = legacyTypes
+        .map(type => ({ type, score: suffixes.filter(suffix => settings.has(`cp.${suffix}.${type}`)).length }))
+        .sort((a, b) => b.score - a.score)[0]?.type;
+
+      if (sourceType) {
         for (const suffix of suffixes) {
           const canonicalKey = `cp.${suffix}.relationship`;
           if (settings.has(canonicalKey)) continue;
@@ -159,19 +171,18 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
             [canonicalKey, legacyValue, 'Migrated from legacy CP relationship type'],
           );
         }
-      });
-    }
-    // Preserve all history, points and requests while removing user-visible subtypes.
-    await this.dataSource.query(
-      `UPDATE cp_relationships SET type=$1 WHERE type<>$1`,
-      [CpType.RELATIONSHIP],
-    );
-    await this.dataSource.query(
-      `UPDATE cp_requests SET type=$1 WHERE type<>$1`,
-      [CpType.RELATIONSHIP],
-    );
-    // Preserve existing earned CP levels. Multi-level progression is configured
-    // through cp.levels.relationship; never reset user progress on application boot.
+      }
+
+      // Preserve history, points and requests; update only legacy rows.
+      await manager.query(
+        `UPDATE cp_relationships SET type=$1 WHERE type<>$1`,
+        [CpType.RELATIONSHIP],
+      );
+      await manager.query(
+        `UPDATE cp_requests SET type=$1 WHERE type<>$1`,
+        [CpType.RELATIONSHIP],
+      );
+    });
   }
 
   private async enrichLevelRewards(levels: any[]) {
