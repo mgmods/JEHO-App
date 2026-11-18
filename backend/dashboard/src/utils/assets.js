@@ -3,7 +3,12 @@ const configuredOrigin = import.meta.env.VITE_API_ORIGIN || ''
 
 function apiOrigin() {
   const currentOrigin = window.location.origin.replace(/\/$/, '')
-  const isLegacyHost = (hostname) => String(hostname || '').toLowerCase() === 'api.adnova.bbs.tr'
+  const isLegacyHost = (hostname) => {
+    const host = String(hostname || '').toLowerCase()
+    return host === 'api.adnova.bbs.tr'
+      || host === 'jeho-own-backend.mgs.prod.page'
+      || host === 'jeho-own-backend.mgs.blitz.cloud'
+  }
 
   const explicit = String(configuredOrigin || '').trim()
   if (explicit) {
