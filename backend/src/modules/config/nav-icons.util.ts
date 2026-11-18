@@ -39,12 +39,16 @@ export type NavIconsConfig = {
 export const NAV_TAB_KEYS: NavTabKey[] = ['party', 'drama', 'games', 'chat', 'me'];
 
 const IMG_RE = /\.(png|jpe?g|webp|svg)(\?|$)/i;
-const CURRENT_JEHO_API_ORIGIN = 'https://jeho-own-backend.mgs.prod.page';
+const CURRENT_JEHO_API_ORIGIN = 'https://jeho-own-web-910481ae.hosted.cumin.dev';
 
 /** Public media is served at host root, not below Nest's /api/v1 prefix. */
 function publicOrigin(raw?: string): string {
   const configured = String(raw || '').trim().replace(/\/+$/, '').replace(/\/api\/v\d+$/i, '');
-  if (!configured || /jeho-own-backend\.mgs\.blitz\.cloud|jeho-own-web-910481ae\.hosted\.cumin\.dev/i.test(configured)) {
+  if (
+    !configured
+    || /jeho-own-backend\.mgs\.(?:blitz|prod)\.page/i.test(configured)
+    || /jeho-own-backend\.mgs\.blitz\.cloud/i.test(configured)
+  ) {
     return CURRENT_JEHO_API_ORIGIN;
   }
   return configured;
