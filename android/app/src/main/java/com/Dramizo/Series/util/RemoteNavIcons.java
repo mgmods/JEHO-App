@@ -51,6 +51,16 @@ public final class RemoteNavIcons {
         // Keep encrypted config; fresh paint uses MediaAssetSync.bust on load.
     }
 
+    /** Include the dashboard config version so replacing an asset at the same URL is visible. */
+    @Nullable
+    private static String versionedIconUrl(@Nullable String pathOrUrl) {
+        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(pathOrUrl));
+        if (url == null || url.isEmpty()) return url;
+        MiscDtos.NavIconsDto config = cached;
+        int version = config != null ? Math.max(1, config.version) : 1;
+        return url + (url.contains("?") ? "&" : "?") + "nav_v=" + version;
+    }
+
     @Nullable
     public static MiscDtos.NavIconsDto get() {
         return cached;
@@ -76,6 +86,8 @@ public final class RemoteNavIcons {
         try {
             Result<MiscDtos.NavIconsDto> r = ApiCall.execute(c.getConfigApi().navIcons(System.currentTimeMillis()));
             if (!r.success || r.data == null) return;
+            MiscDtos.NavIconsDto previous = cached;
+            if (previous == null || previous.version != r.data.version) SVG_CACHE.clear();
             cached = r.data;
             c.getFeatureCache().putJson(
                     EncryptedFeatureCache.UID_APP,
@@ -102,7 +114,7 @@ public final class RemoteNavIcons {
             return;
         }
         view.setVisibility(android.view.View.VISIBLE);
-        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(raw.trim()));
+        String url = versionedIconUrl(raw.trim());
         view.clearColorFilter();
         view.setImageTintList(null);
         if (isSvgUrl(url)) { view.setImageResource(fallbackRes); loadRemoteSvg(view, url, null, null, false); return; }
@@ -350,7 +362,7 @@ public final class RemoteNavIcons {
                 ? first(pair.selected, pair.normal, pair.icon)
                 : first(pair.normal, pair.icon, pair.selected);
         if (primary == null || primary.isEmpty()) return null;
-        return MediaAssetSync.bust(AssetCatalog.absoluteUrl(primary));
+        return versionedIconUrl(primary);
     }
 
     @Nullable
