@@ -211,7 +211,6 @@ export class ConfigController {
     };
     let parsed: any = {};
     try { parsed = row?.value ? JSON.parse(row.value) : {}; } catch { parsed = {}; }
-    const apiBase = publicApiBase();
     const normalize = (value: unknown): string => {
       const url = normalizePublicAssetUrl(value);
       if (!url || !/^https?:\/\//i.test(url)) return '';
