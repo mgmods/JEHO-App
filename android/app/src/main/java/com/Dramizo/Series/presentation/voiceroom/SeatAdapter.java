@@ -45,6 +45,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     public static final int SCALE_NORMAL = 0;
     public static final int SCALE_MEDIUM = 1;
     public static final int SCALE_COMPACT = 2;
+    /** Six-column 30-mic layout: compact enough to keep five rows on-screen. */
+    public static final int SCALE_MICRO = 3;
 
     public interface Listener {
         void onSeatClick(View anchor, RoomDtos.SeatDto seat);
@@ -93,7 +95,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     public void setScaleMode(int mode) {
-        int next = Math.max(SCALE_NORMAL, Math.min(SCALE_COMPACT, mode));
+        int next = Math.max(SCALE_NORMAL, Math.min(SCALE_MICRO, mode));
         if (scaleMode == next) return;
         scaleMode = next;
         notifyItemRangeChanged(0, getItemCount(), "scale");
@@ -815,6 +817,20 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         int padBottom;
         int hostMark;
         switch (scaleMode) {
+            case SCALE_MICRO -> {
+                // 30-mic six-column grid: keep the seat identity readable without
+                // consuming the vertical space reserved for chat/gifts/controls.
+                frame = 48;
+                avatar = 36;
+                ring = 38;
+                reaction = 38;
+                muted = 12;
+                nameMax = 50;
+                nameSp = 8.5f;
+                padTop = 0;
+                padBottom = 1;
+                hostMark = 10;
+            }
             case SCALE_COMPACT -> {
                 // Mikoo 20-mic: container 64dp, avatar 48dp
                 frame = 60;
@@ -890,7 +906,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             setSeatSize(holder.b.imgSeatHostMark, hostMark, ctx);
         }
         if (holder.b.tvGiftCount != null) {
-            holder.b.tvGiftCount.setTextSize(scaleMode == SCALE_COMPACT ? 9f : 10f);
+            holder.b.tvGiftCount.setTextSize(scaleMode == SCALE_MICRO ? 8f : scaleMode == SCALE_COMPACT ? 9f : 10f);
         }
     }
 
