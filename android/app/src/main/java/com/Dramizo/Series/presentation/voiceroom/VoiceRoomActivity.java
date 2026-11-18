@@ -16748,26 +16748,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         creditGiftCoinsOnSeat(occupiedId, perSeatSupport);
                     }
                 }
-                long luckyWon = Math.max(0L, memberLong(payload, "luckyCoinsWon", 0L));
-                if (luckyWon > 0L) {
-                    double multiplier = 0d;
-                    try {
-                        if (payload != null && payload.has("luckyMultiplier")
-                                && !payload.get("luckyMultiplier").isJsonNull()) {
-                            multiplier = payload.get("luckyMultiplier").getAsDouble();
-                        }
-                    } catch (Exception ignored) { }
-                    boolean partialReturn = multiplier > 0d && multiplier < 1d;
-                    String winBody = partialReturn
-                            ? ("مردود +" + luckyWon)
-                            : ("حظ ×" + Math.max(1, (int) Math.round(multiplier))
-                                    + " · +" + luckyWon);
-                    GlobalCelebrationToast.show(
-                            this, sender, winBody, senderAvatar, icon,
-                            giftEventKey, 28,
-                            partialReturn ? 0 : Math.max(1, (int) Math.round(multiplier)),
-                            luckyWon, sender, "lucky_hit", null);
-                }
+                // The separate lucky:hit room event owns the win toast, so it is never duplicated here.
                 playLuckyCannonEvent(icon, allReceivers, totalCoins, qtyRemote,
                         Math.max(1, personCount), localSenderEcho);
                 return;
