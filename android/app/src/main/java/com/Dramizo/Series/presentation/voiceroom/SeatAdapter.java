@@ -889,7 +889,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         setSeatSize(holder.b.imgAvatar, avatar, ctx);
         setSeatSize(holder.b.imgFrame, frame, ctx);
         setSeatSize(holder.b.imgHostBadge, frame, ctx);
-        if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, scaleMode == SCALE_MICRO ? 24 : 30, ctx);
+        if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, scaleMode == SCALE_MICRO ? 20 : 30, ctx);
         if (holder.b.seatHostSignal != null) {
             setSeatSize(holder.b.seatHostSignal, frame, ctx);
         }
@@ -916,7 +916,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 if (rankRow != null) {
                     ViewGroup.LayoutParams rankRaw = rankRow.getLayoutParams();
                     if (rankRaw instanceof ViewGroup.MarginLayoutParams rankLp) {
-                        rankLp.topMargin = Math.round(5 * d);
+                        rankLp.topMargin = Math.round(7 * d);
                         rankRow.setLayoutParams(rankLp);
                     }
                 }
@@ -963,7 +963,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         android.view.ViewGroup.LayoutParams raw = holder.b.imgRoomSupportMedal.getLayoutParams();
         if (raw instanceof android.widget.FrameLayout.LayoutParams lp) {
             float density = holder.b.imgRoomSupportMedal.getResources().getDisplayMetrics().density;
-            int size = Math.round(30f * density);
+            int size = Math.round((scaleMode == SCALE_MICRO ? 20f : 30f) * density);
             android.view.View anchor = holder.b.imgAvatar;
             if (holder.b.imgFrame != null && holder.b.imgFrame.getVisibility() == View.VISIBLE) {
                 anchor = holder.b.imgFrame;
@@ -993,8 +993,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 lp.width = size;
                 lp.height = size;
                 lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
-                lp.setMarginStart(anchorLeft - size / 2);
-                lp.topMargin = anchorTop - size / 2;
+                int inset = Math.round(size * 0.25f);
+                lp.setMarginStart(anchorLeft - inset);
+                lp.topMargin = anchorTop - inset;
                 lp.setMarginEnd(0);
                 lp.rightMargin = 0;
                 lp.bottomMargin = 0;
