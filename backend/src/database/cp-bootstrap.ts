@@ -74,6 +74,66 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
     await manager.query('ALTER TABLE "jeho_own"."cp_requests" ALTER COLUMN "roomId" DROP NOT NULL');
     await manager.query('ALTER TABLE "jeho_own"."cp_requests" ALTER COLUMN "priceCoins" DROP NOT NULL');
 
+    await manager.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "cpPoints" bigint NULL');
+    await manager.query('ALTER TABLE "jeho_own"."user_profiles" ADD COLUMN IF NOT EXISTS "cpBackgroundUrl" varchar(512)');
+    await manager.query('ALTER TABLE "jeho_own"."user_profiles" ADD COLUMN IF NOT EXISTS "cpLogoUrl" varchar(512)');
+
+    // CP-only cosmetic enum values are additive and safe to re-apply.
+    const cosmeticEnumRows = await manager.query(
+      `SELECT n.nspname, t.typname
+       FROM pg_type t
+       JOIN pg_attribute a ON a.atttypid=t.oid
+       JOIN pg_class c ON c.oid=a.attrelid
+       JOIN pg_namespace n ON n.oid=t.typnamespace
+       WHERE n.nspname='jeho_own' AND c.relname='cosmetics'
+         AND a.attname='type' AND t.typtype='e'
+       LIMIT 1`,
+    );
+    const enumSchema = String(cosmeticEnumRows?.[0]?.nspname || '').replace(/"/g, '""');
+    const enumName = String(cosmeticEnumRows?.[0]?.typname || '').replace(/"/g, '""');
+    if (enumSchema && enumName) {
+      await manager.query(`ALTER TYPE "${enumSchema}"."${enumName}" ADD VALUE IF NOT EXISTS 'cp_background'`);
+      await manager.query(`ALTER TYPE "${enumSchema}"."${enumName}" ADD VALUE IF NOT EXISTS 'cp_logo'`);
+    }
+
+    await manager.query(`
+      CREATE TABLE IF NOT EXISTS "jeho_own"."cp_memories" (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "relationshipId" uuid NOT NULL REFERENCES "jeho_own"."cp_relationships"(id) ON DELETE CASCADE,
+        "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
+        text varchar(500) NOT NULL DEFAULT '',
+        "imageUrl" varchar(2048),
+        "createdAt" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await manager.query(`
+      CREATE TABLE IF NOT EXISTS "jeho_own"."cp_level_reward_claims" (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "relationshipId" uuid NOT NULL REFERENCES "jeho_own"."cp_relationships"(id) ON DELETE CASCADE,
+        "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
+        level integer NOT NULL,
+        "cosmeticCode" varchar(64) NOT NULL,
+        status varchar(16) NOT NULL DEFAULT 'pending',
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "grantedAt" timestamptz,
+        UNIQUE ("relationshipId", level, "userId", "cosmeticCode")
+      )
+    `);
+    await manager.query(`
+      CREATE TABLE IF NOT EXISTS "jeho_own"."cp_level_gift_reward_claims" (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "relationshipId" uuid NOT NULL REFERENCES "jeho_own"."cp_relationships"(id) ON DELETE CASCADE,
+        "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
+        level integer NOT NULL,
+        "giftId" uuid NOT NULL REFERENCES "jeho_own"."gifts"(id) ON DELETE CASCADE,
+        status varchar(16) NOT NULL DEFAULT 'pending',
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "grantedAt" timestamptz,
+        UNIQUE ("relationshipId", level, "userId", "giftId")
+      )
+    `);
+    await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_memories_relationship_created ON "jeho_own"."cp_memories"("relationshipId", "createdAt" DESC)');
+
     await manager.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_audit_logs" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
