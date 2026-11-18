@@ -319,6 +319,11 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && Objects.equals(a.user.avatarUrl, b.user.avatarUrl)
                 && Objects.equals(a.user.hostBadgeUrl, b.user.hostBadgeUrl)
                 && Objects.equals(a.user.vipBadgeUrl, b.user.vipBadgeUrl)
+                && Objects.equals(a.user.vipFrameUrl, b.user.vipFrameUrl)
+                && Objects.equals(a.user.vipCardUrl, b.user.vipCardUrl)
+                && Objects.equals(a.user.profileCardUrl, b.user.profileCardUrl)
+                && Objects.equals(a.user.chatBubbleUrl, b.user.chatBubbleUrl)
+                && Objects.equals(a.user.nameplateUrl, b.user.nameplateUrl)
                 && Objects.equals(a.user.levelBadgeUrl, b.user.levelBadgeUrl)
                 && Objects.equals(a.user.nameStyle, b.user.nameStyle)
                 && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.label,
@@ -641,6 +646,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         boolean occupied = seat.user != null || (userId != null && !userId.isEmpty());
 
         if (seat.locked()) {
+            bindVipNameplate(holder, null);
             if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
             bindAgencyRoleSeatBadge(holder, null);
             bindEmptySeatShell(holder, true);
@@ -695,6 +701,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.tvAgencyClub.setVisibility(View.GONE);
             }
             if (seat.user != null) {
+                bindVipNameplate(holder, seat.user);
                 holder.b.tvName.setText(seat.user.displayName != null
                         ? seat.user.displayName
                         : String.valueOf(displaySeatNo(seat)));
@@ -707,6 +714,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     AvatarCosmetics.bindAvatar(holder.b.imgAvatar, seat.user.avatarUrl);
                 }
             } else if (selfUserId != null && selfUserId.equals(userId)) {
+                bindVipNameplate(holder, null);
                 // Seat hop race: userId set before nested user DTO arrives — keep self visible.
                 holder.b.tvName.setText(selfDisplayName != null && !selfDisplayName.isEmpty()
                         ? selfDisplayName : String.valueOf(displaySeatNo(seat)));
@@ -1168,7 +1176,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         // Keep VIP wearable/frame on the seat; role/agency/competition marks are not seat wear.
         String hostUrl = null;
-        String vipUrl = user.vipBadgeUrl;
+        // Dashboard VIP frame has priority for active VIP members; retain equipped wear as fallback.
+        String vipUrl = user.vipFrameUrl != null && !user.vipFrameUrl.trim().isEmpty()
+                ? user.vipFrameUrl : user.vipBadgeUrl;
         java.util.Map<String, Object> badgeMeta = null;
         boolean self = selfUserId != null && selfUserId.equals(normalizeUserId(user.id));
         if (self) {
@@ -1195,6 +1205,21 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && holder.b.seatHostSignal.getVisibility() == View.VISIBLE) {
             holder.b.seatHostSignal.resumeMotion();
         }
+    }
+
+    private void bindVipNameplate(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (holder.b.imgVipNameplate == null) return;
+        String url = user != null ? user.nameplateUrl : null;
+        if (url == null || url.trim().isEmpty()) {
+            Glide.with(holder.itemView).clear(holder.b.imgVipNameplate);
+            holder.b.imgVipNameplate.setVisibility(View.GONE);
+            return;
+        }
+        holder.b.imgVipNameplate.setVisibility(View.VISIBLE);
+        Glide.with(holder.itemView)
+                .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(url.trim()))
+                .centerCrop()
+                .into(holder.b.imgVipNameplate);
     }
 
     private void clearHostWear(VH holder) {
