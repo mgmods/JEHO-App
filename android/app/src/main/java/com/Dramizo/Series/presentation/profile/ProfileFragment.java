@@ -781,7 +781,7 @@ public class ProfileFragment extends Fragment {
             applyTasksFeatureVisibility();
         }
         // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
-        if (viewModel != null) viewModel.loadMe(false);
+        // Reconcile the latest equipped frame/medal/agency identity whenever returning to Me.\n        if (viewModel != null) viewModel.loadMe(true);
         loadAgencyAction();
         refreshWalletBalances(false);
     }
