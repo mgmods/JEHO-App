@@ -48,18 +48,29 @@ public final class MyRoomLauncher {
                 }
             }
 
-            RoomDtos.CreateRoomRequest req =
-                    RoomDtos.CreateRoomRequest.personalRoom(display.trim(), avatar);
-            Result<RoomDtos.JoinRoomResult> created = ApiCall.execute(c.getRoomApi().create(req));
             activity.runOnUiThread(() -> {
-                if (!created.success || created.data == null || created.data.room == null
-                        || created.data.room.id == null) {
-                    Toast.makeText(activity,
-                            created.error != null ? created.error : activity.getString(R.string.error_generic),
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
-                enter(activity, created.data.room, created.data);
+                if (activity.isFinishing()) return;
+                RoomSeatCountPicker.show(activity, 10, guestSeatCount -> {
+                    c.getIoExecutor().execute(() -> {
+                        RoomDtos.CreateRoomRequest req =
+                                RoomDtos.CreateRoomRequest.personalRoom(display.trim(), avatar);
+                        req.seatCount = Math.min(31, Math.max(2, guestSeatCount + 1));
+                        Result<RoomDtos.JoinRoomResult> created =
+                                ApiCall.execute(c.getRoomApi().create(req));
+                        activity.runOnUiThread(() -> {
+                            if (activity.isFinishing()) return;
+                            if (!created.success || created.data == null || created.data.room == null
+                                    || created.data.room.id == null) {
+                                Toast.makeText(activity,
+                                        created.error != null ? created.error
+                                                : activity.getString(R.string.error_generic),
+                                        Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            enter(activity, created.data.room, created.data);
+                        });
+                    });
+                });
             });
         });
     }
