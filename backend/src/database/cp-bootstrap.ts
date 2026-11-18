@@ -5,13 +5,21 @@ import { DataSource } from 'typeorm';
  * Creates missing CP tables/indexes only; never drops or rewrites relationship/request data.
  */
 export async function ensureCpTables(dataSource: DataSource): Promise<void> {
-  const [usersTable] = await dataSource.query(
-    `SELECT 1 FROM information_schema.tables
-     WHERE table_schema = 'jeho_own' AND table_name = 'users' LIMIT 1`,
+  // CP startup and the following CP service migration require these core tables.
+  // Never skip this bootstrap and then let the module fail later with an opaque SQL error.
+  const requiredTables = ['users', 'user_profiles', 'gifts', 'app_settings', 'cosmetics'];
+  const existingRows = await dataSource.query(
+    `SELECT table_name
+     FROM information_schema.tables
+     WHERE table_schema = 'jeho_own' AND table_name = ANY($1::text[])`,
+    [requiredTables],
   );
-  if (!usersTable) {
-    console.warn('[CpBootstrap] Skipped: jeho_own.users does not exist yet.');
-    return;
+  const existingTables = new Set(existingRows.map((row: { table_name: string }) => String(row.table_name)));
+  const missingTables = requiredTables.filter((tableName) => !existingTables.has(tableName));
+  if (missingTables.length) {
+    throw new Error(
+      `[CpBootstrap] Required core tables are missing in schema jeho_own: ${missingTables.join(', ')}. CP bootstrap was not skipped.`,
+    );
   }
 
   await dataSource.transaction(async (manager) => {
