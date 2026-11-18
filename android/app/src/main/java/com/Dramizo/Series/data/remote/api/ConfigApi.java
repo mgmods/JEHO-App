@@ -12,6 +12,7 @@ import retrofit2.http.POST;
 import retrofit2.http.Query;
 
 public interface ConfigApi {
+    @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
     @GET("config/banners")
     Call<ApiResponse<List<MiscDtos.BannerDto>>> banners();
 
