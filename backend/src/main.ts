@@ -16,9 +16,11 @@ import { UploadsService } from './modules/uploads/uploads.service';
 async function bootstrap() {
   // Plain diagnostics survive even when Nest logging is not ready yet.
   console.log('[JEHO-OWN boot] Starting Nest application initialization...');
+  console.log('[JEHO-OWN boot STEP] NestFactory.create: start');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
+  console.log('[JEHO-OWN boot STEP] NestFactory.create: complete');
   console.log('[JEHO-OWN boot] Nest application initialized; configuring HTTP and realtime services.');
 
   const configService = app.get(ConfigService);
@@ -36,6 +38,7 @@ async function bootstrap() {
   const redisIoAdapter = new RedisIoAdapter(app, configService);
   // Redis is optional for a single backend instance. Never let Redis DNS/network
   // issues prevent the HTTP API, profile, gifts, or dashboard from starting.
+  console.log('[JEHO-OWN boot STEP] Redis adapter connection: start');
   try {
     await new Promise<boolean>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -57,6 +60,7 @@ async function bootstrap() {
     console.warn('[JEHO-OWN boot] Redis setup failed; continuing without Redis adapter:',
       error instanceof Error ? error.message : String(error));
   }
+  console.log('[JEHO-OWN boot STEP] Redis adapter setup: complete');
   app.useWebSocketAdapter(redisIoAdapter);
 
   app.use(
@@ -125,7 +129,9 @@ async function bootstrap() {
   // upload service removes the ephemeral local copy, so /uploads/:filename must fall
   // through to Storage instead of returning the local static 404. This also keeps old
   // profile/room/splash URLs working without requiring an APK update.
+  console.log('[JEHO-OWN boot STEP] UploadsService resolution: start');
   const uploadsService = app.get(UploadsService);
+  console.log('[JEHO-OWN boot STEP] UploadsService resolution: complete');
   expressAppEarly.get('/uploads/:filename', async (req: { params: { filename?: string } }, res: {
     setHeader: (k: string, v: string) => void;
     status: (n: number) => { send: (body: string | Buffer) => void };
@@ -220,6 +226,7 @@ async function bootstrap() {
     },
   });
 
+  console.log('[JEHO-OWN boot STEP] Swagger document generation: start');
   const swaggerConfig = new DocumentBuilder()
     .setTitle('JEHO CHAT API')
     .setDescription('JEHO CHAT voice-room platform backend')
@@ -228,6 +235,7 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
+  console.log('[JEHO-OWN boot STEP] Swagger document generation: complete');
 
   // Invite deep links: if the app is not installed, send user to Play with referrer.
   // When installed, Android App Links open SplashActivity instead of hitting this.
@@ -367,8 +375,10 @@ const baishunModuleMap: Record<string, string> = {
     res.status(200).json({ ok: true, service: 'jeho-own-api', apiPrefix });
   });
 
+  console.log('[JEHO-OWN boot STEP] HTTP listener: start');
   console.log(`[JEHO-OWN boot] Opening HTTP listener on port ${port}...`);
   await app.listen(port, '0.0.0.0');
+  console.log('[JEHO-OWN boot STEP] HTTP listener: complete');
   console.log('[JEHO-OWN boot] HTTP listener is accepting requests.');
   const gateway = app.get(MikooGatewayService);
   gateway.attach(app.getHttpServer());
