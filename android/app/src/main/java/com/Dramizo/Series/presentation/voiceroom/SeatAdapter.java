@@ -820,16 +820,16 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             case SCALE_MICRO -> {
                 // 30-mic six-column grid: keep the seat identity readable without
                 // consuming the vertical space reserved for chat/gifts/controls.
-                frame = 48;
-                avatar = 36;
-                ring = 38;
-                reaction = 38;
-                muted = 12;
-                nameMax = 50;
-                nameSp = 8.5f;
+                frame = 58;
+                avatar = 48;
+                ring = 50;
+                reaction = 50;
+                muted = 14;
+                nameMax = 56;
+                nameSp = 9.5f;
                 padTop = 0;
-                padBottom = 1;
-                hostMark = 10;
+                padBottom = 0;
+                hostMark = 11;
             }
             case SCALE_COMPACT -> {
                 // Mikoo 20-mic: container 64dp, avatar 48dp
@@ -901,6 +901,17 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (holder.b.tvName != null) {
             holder.b.tvName.setTextSize(nameSp);
             holder.b.tvName.setMaxWidth(Math.round(nameMax * d));
+            if (scaleMode == SCALE_MICRO) {
+                View nameRow = (View) holder.b.tvName.getParent().getParent();
+                ViewGroup.LayoutParams nameRowRaw = nameRow.getLayoutParams();
+                if (nameRowRaw instanceof ViewGroup.MarginLayoutParams nameRowLp) {
+                    nameRowLp.topMargin = 0;
+                    nameRow.setLayoutParams(nameRowLp);
+                }
+                ViewGroup.LayoutParams nameRaw = holder.b.tvName.getLayoutParams();
+                nameRaw.height = Math.round(18 * d);
+                holder.b.tvName.setLayoutParams(nameRaw);
+            }
         }
         if (holder.b.imgSeatHostMark != null) {
             setSeatSize(holder.b.imgSeatHostMark, hostMark, ctx);
