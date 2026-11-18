@@ -1067,48 +1067,12 @@ public class HomeFragment extends Fragment {
 
     private void bindServerBanners(List<MiscDtos.BannerDto> all) {
         if (binding == null || homeBannerAdapter == null) return;
+        // Do not make banner visibility depend on a separate Glide preload pass.
+        // The old preload gate hid the entire carousel when the preload callback
+        // failed or was delayed, even though the adapter could load the same image.
+        // Bind the server list immediately; each slide loads independently in the adapter.
         List<MiscDtos.BannerDto> filtered = filterBannersForLocale(all);
-        if (filtered.isEmpty()) {
-            hideBannerSlider();
-            return;
-        }
-
-        final int[] pending = {filtered.size()};
-        final List<MiscDtos.BannerDto> ready = new ArrayList<>();
-
-        for (MiscDtos.BannerDto b : filtered) {
-            String url = AssetCatalog.absoluteUrl(b.imageUrl);
-            if (url == null || url.trim().isEmpty()) {
-                if (--pending[0] == 0) applyLoadedBanners(ready);
-                continue;
-            }
-            Glide.with(this)
-                    .load(url)
-                    .listener(new RequestListener<Drawable>() {
-                        @Override
-                        public boolean onLoadFailed(
-                                @Nullable GlideException e,
-                                Object model,
-                                @NonNull Target<Drawable> target,
-                                boolean isFirstResource) {
-                            if (--pending[0] == 0) applyLoadedBanners(ready);
-                            return false;
-                        }
-
-                        @Override
-                        public boolean onResourceReady(
-                                @NonNull Drawable resource,
-                                Object model,
-                                Target<Drawable> target,
-                                @NonNull DataSource dataSource,
-                                boolean isFirstResource) {
-                            ready.add(b);
-                            if (--pending[0] == 0) applyLoadedBanners(ready);
-                            return false;
-                        }
-                    })
-                    .preload();
-        }
+        applyLoadedBanners(filtered);
     }
 
     /** Hide carousel when dashboard has zero live banners — no local/default art. */
