@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -25,12 +27,58 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.util.LocaleHelper;
 import com.Dramizo.Series.util.RemoteTheme;
+import com.Dramizo.Series.util.GlobalCelebrationToast;
 
 /**
  * Base activity: clean white theme with light system bars.
  * Back from a cold-start (notification / deep link) returns to Main instead of leaving the app.
  */
 public abstract class ThemedActivity extends AppCompatActivity {
+
+    private final Handler dashboardVisualHandler = new Handler(Looper.getMainLooper());
+    private final Runnable dashboardThemeListener = () -> {
+        if (isFinishing() || isDestroyed() || !wantsRemoteThemeChrome()) return;
+        RemoteTheme.applyActivityBackground(this, inferScreenKey());
+        View content = findViewById(android.R.id.content);
+        RemoteTheme.applyMappedAssets(content != null ? content : getWindow().getDecorView());
+    };
+    private final Runnable dashboardVisualRefresh = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || isDestroyed()) return;
+            refreshDashboardVisuals();
+            dashboardVisualHandler.postDelayed(this, 60_000L);
+        }
+    };
+
+    private void refreshDashboardVisuals() {
+        try {
+            AppContainer container = ContainerProvider.from(this);
+            if (wantsRemoteThemeChrome()) {
+                container.getIoExecutor().execute(() ->
+                        RemoteTheme.refreshFromApi(getApplicationContext(), container.getConfigApi()));
+            }
+            // Toast appearance is shared across screens and is fetched without an APK update.
+            GlobalCelebrationToast.refreshStyleNow(this);
+        } catch (Throwable ignored) {
+            // Visual configuration must never block navigation or room entry.
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (wantsRemoteThemeChrome()) RemoteTheme.addRefreshListener(dashboardThemeListener);
+        refreshDashboardVisuals();
+        dashboardVisualHandler.removeCallbacks(dashboardVisualRefresh);
+        dashboardVisualHandler.postDelayed(dashboardVisualRefresh, 60_000L);
+    }
+
+    @Override
+    protected void onPause() {
+        dashboardVisualHandler.removeCallbacks(dashboardVisualRefresh);
+        RemoteTheme.removeRefreshListener(dashboardThemeListener);
+        super.onPause();
+    }
 
     @Override
     protected void attachBaseContext(Context newBase) {
