@@ -1,7 +1,6 @@
 package com.Dramizo.Series.util;
 
 import android.app.Activity;
-import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -46,7 +45,7 @@ public final class RoomSeatCountPicker {
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams(
                     GridLayout.spec(i / 2), GridLayout.spec(i % 2, 1f));
             lp.width = 0;
-            lp.height = dp(activity, 126);
+            lp.height = dp(activity, 138);
             lp.setMargins(dp(activity, 4), dp(activity, 4), dp(activity, 4), dp(activity, 4));
             card.setLayoutParams(lp);
             card.setOnClickListener(v -> {
@@ -78,7 +77,7 @@ public final class RoomSeatCountPicker {
         preview.setRowCount((count + preview.getColumnCount() - 1) / preview.getColumnCount());
         preview.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
         preview.setUseDefaultMargins(false);
-        int mini = count == 30 ? 14 : 16;
+        int mini = count == 30 ? 13 : 16;
         for (int i = 0; i < count; i++) {
             FrameLayout seat = new FrameLayout(activity);
             GridLayout.LayoutParams seatLp = new GridLayout.LayoutParams();
@@ -101,7 +100,7 @@ public final class RoomSeatCountPicker {
             preview.addView(seat);
         }
         card.addView(preview, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, dp(activity, 88)));
+                LinearLayout.LayoutParams.WRAP_CONTENT, dp(activity, 96)));
 
         TextView label = new TextView(activity);
         label.setText(String.valueOf(count));
