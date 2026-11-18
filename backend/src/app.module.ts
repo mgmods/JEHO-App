@@ -168,10 +168,12 @@ const entityList = Object.values(entities).filter(
         console.log(`[JEHO-OWN DB] Application DataSource initialized in ${Date.now() - appInitStartedAt}ms (synchronize=${String(options.synchronize)}).`);
 
         // Additive support-box video URL column; preserves all existing lucky-box rows.
+        console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: start');
         try {
           await appDataSource.query(
             'ALTER TABLE "jeho_own"."lucky_boxes" ADD COLUMN IF NOT EXISTS "videoUrl" varchar(1024)',
           );
+          console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: complete');
         } catch (error) {
           console.error('[LuckyBoxVideoBootstrap] Could not initialize video URL column.', error instanceof Error ? error.message : String(error));
         }
@@ -179,6 +181,7 @@ const entityList = Object.values(entities).filter(
         // Additive private custom-gift grants table. Keep this explicit because production
         // databases run with TypeORM synchronize disabled; the migration is also kept
         // in database/migrations for operators and fresh environments.
+        console.log('[JEHO-OWN DB STEP] custom_gift_grants: start');
         try {
           await appDataSource.query(`
             CREATE TABLE IF NOT EXISTS "jeho_own"."custom_gift_grants" (
@@ -202,6 +205,7 @@ const entityList = Object.values(entities).filter(
             'CREATE INDEX IF NOT EXISTS "idx_custom_gift_grants_gift_id" ON "jeho_own"."custom_gift_grants" ("giftId")',
           );
           console.log('[CustomGiftsBootstrap] Private custom-gift grants table is ready.');
+          console.log('[JEHO-OWN DB STEP] custom_gift_grants: complete');
         } catch (error) {
           console.error('[CustomGiftsBootstrap] Could not initialize custom gift grants table.', error instanceof Error ? error.message : String(error));
           throw error;
@@ -209,6 +213,7 @@ const entityList = Object.values(entities).filter(
 
         // Additive support-chest gift expiry column for existing JEHO databases.
         // Permanent gift history remains unchanged because expiresAt stays NULL.
+        console.log('[JEHO-OWN DB STEP] gift_sends expiry: start');
         try {
           await appDataSource.query(
             'ALTER TABLE "jeho_own"."gift_sends" ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz',
@@ -216,6 +221,7 @@ const entityList = Object.values(entities).filter(
           await appDataSource.query(
             'CREATE INDEX IF NOT EXISTS "IDX_gift_sends_expiresAt" ON "jeho_own"."gift_sends" ("expiresAt")',
           );
+          console.log('[JEHO-OWN DB STEP] gift_sends expiry: complete');
         } catch (error) {
           console.error('[SupportChestExpiryBootstrap] Could not initialize gift expiry column.', error instanceof Error ? error.message : String(error));
         }
@@ -223,8 +229,10 @@ const entityList = Object.values(entities).filter(
 
         // Create only the additive badge tables missing from older deployments.
         // This never touches voice, Redis, user records, or existing badge data.
+        console.log('[JEHO-OWN DB STEP] badges bootstrap: start');
         try {
           await ensureBadgeTables(appDataSource);
+          console.log('[JEHO-OWN DB STEP] badges bootstrap: complete');
         } catch (error) {
           console.error(
             '[BadgesBootstrap] Could not initialize badge tables; API startup continues.',
@@ -233,8 +241,10 @@ const entityList = Object.values(entities).filter(
         }
 
         // Create only missing CP tables/indexes for older deployments; preserve all existing rows.
+        console.log('[JEHO-OWN DB STEP] CP bootstrap: start');
         try {
           await ensureCpTables(appDataSource);
+          console.log('[JEHO-OWN DB STEP] CP bootstrap: complete');
         } catch (error) {
           console.error(
             '[CpBootstrap] Could not initialize CP tables; API startup continues.',
@@ -243,15 +253,19 @@ const entityList = Object.values(entities).filter(
         }
 
         // Additive vanity-ID style columns; existing IDs, purchases and leases are preserved.
+        console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: start');
         try {
           await ensureVanityIdStyleColumns(appDataSource);
+          console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: complete');
         } catch (error) {
           console.error('[VanityIdStyleBootstrap] Could not initialize style columns; API startup continues.', error instanceof Error ? error.message : String(error));
         }
 
         // Additive persistent moments tables; existing application data is preserved.
+        console.log('[JEHO-OWN DB STEP] moments bootstrap: start');
         try {
           await ensureMomentsTables(appDataSource);
+          console.log('[JEHO-OWN DB STEP] moments bootstrap: complete');
         } catch (error) {
           console.error(
             '[MomentsBootstrap] Could not initialize moments tables; API startup continues.',
@@ -260,8 +274,10 @@ const entityList = Object.values(entities).filter(
         }
 
         // Repair profile columns missing from older production schemas before serving requests.
+        console.log('[JEHO-OWN DB STEP] user profile bootstrap: start');
         try {
           await ensureUserProfileColumns(appDataSource);
+          console.log('[JEHO-OWN DB STEP] user profile bootstrap: complete');
         } catch (error) {
           console.error(
             '[UserProfileBootstrap] Could not initialize profile columns; API startup continues.',
@@ -270,6 +286,7 @@ const entityList = Object.values(entities).filter(
         }
 
         // Safe startup diagnostics: identify the connected database/schema without logging credentials.
+        console.log('[JEHO-OWN DB STEP] final database diagnostics: start');
         const [connectionInfo] = await appDataSource.query(
           'SELECT current_database() AS database_name, current_schema() AS schema_name, current_setting(\'search_path\') AS search_path',
         );
@@ -281,6 +298,7 @@ const entityList = Object.values(entities).filter(
           `[JEHO-OWN DB] database=${connectionInfo.database_name} schema=${connectionInfo.schema_name} search_path=${connectionInfo.search_path} tables=${tableCount}`,
         );
 
+        console.log('[JEHO-OWN DB STEP] all database bootstraps complete');
         return appDataSource;
       },
     }),
