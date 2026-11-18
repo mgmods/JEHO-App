@@ -10128,7 +10128,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 int total = Math.max(top.size(), all.size());
                 binding.tvSupportersCount.setText(total > 99 ? "99+" : String.valueOf(total));
                 binding.tvSupportersCount.setVisibility(View.VISIBLE);
+                // Tap the supporter count to open the room wealth/contribution ranking.
+                binding.tvSupportersCount.setOnClickListener(v -> showSupportersBoard());
+                binding.tvSupportersCount.setClickable(true);
             } else {
+                binding.tvSupportersCount.setOnClickListener(null);
+                binding.tvSupportersCount.setClickable(false);
                 binding.tvSupportersCount.setVisibility(View.GONE);
             }
         }
@@ -11224,13 +11229,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         View rowCounts = sheet.findViewById(R.id.rowSeatCounts);
         TextView chooseSeatCount = sheet.findViewById(R.id.btnChooseSeatCount);
-        if (canManageRoom && chooseSeatCount != null) {
+        boolean canAdjustSeatCount = canManageRoom || isHost || isOwner;
+        if (canAdjustSeatCount && chooseSeatCount != null) {
             if (rowCounts != null) rowCounts.setVisibility(View.VISIBLE);
             chooseSeatCount.setText("تعديل عدد المقاعد · الحالي " + currentGuestSeatCount());
             chooseSeatCount.setOnClickListener(v -> {
                 dialog.dismiss();
-                // Open the same visual card picker used by the other seat-count entry.
-                v.postDelayed(this::showRoomSeatCountPicker, 300);
+                // Do not post from the dismissed sheet view; open the shared visual picker
+                // from the activity after the settings sheet has finished closing.
+                handler.postDelayed(() -> {
+                    if (!isFinishing() && !isDestroyed()) showRoomSeatCountPicker();
+                }, 250);
             });
         } else if (rowCounts != null) {
             rowCounts.setVisibility(View.GONE);
@@ -17966,7 +17975,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.rowTopHosts != null) {
             ViewGroup.LayoutParams topRaw = binding.rowTopHosts.getLayoutParams();
             if (topRaw instanceof ViewGroup.MarginLayoutParams topLp) {
-                topLp.topMargin = dp(largeSeatGrid ? 8 : 28);
+                // On 30-seat rooms, give the supporter stack a little more clearance
+                // below the final seat row without moving the room bottom controls.
+                topLp.topMargin = dp(largeSeatGrid ? 14 : 28);
                 binding.rowTopHosts.setLayoutParams(topLp);
             }
         }
