@@ -1279,6 +1279,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       hostBadgeMeta: null,
       // Static VIP art is supplied through the fixed head/tou fields below.
       vipBadgeUrl: isStaticVipTouUrl(rawVip) ? null : rawVip,
+      vipHeadUrl: vipVisuals?.badgeUrl || fixedVipHeadUrl(level),
+      vipTouUrl: vipVisuals?.vipFrameUrl || fixedVipFrameUrl(level),
       levelBadgeUrl: profile.levelBadgeUrl ?? user.levelBadgeUrl ?? null,
       roomCardUrl: profile.roomCardUrl ?? user.roomCardUrl ?? null,
       vipLevel: level,
@@ -1328,13 +1330,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       vipLevel: level,
       nameStyle: vipVisuals?.nameStyle || null,
       vipFrameUrl: vipVisuals?.vipFrameUrl || null,
-      vipFrameUrl: vipVisuals?.vipFrameUrl || null,
       vipCardUrl: vipVisuals?.vipCardUrl || null,
       profileCardUrl: vipVisuals?.profileCardUrl || vipVisuals?.vipCardUrl || profile.profileCardUrl || user.profileCardUrl || null,
       chatBubbleUrl: vipVisuals?.chatBubbleUrl || profile.chatBubbleUrl || user.chatBubbleUrl || null,
       nameplateUrl: vipVisuals?.nameplateUrl || null,
-      vipHeadUrl: vipVisuals?.badgeUrl || fixedVipHeadUrl(level),
-      vipTouUrl: vipVisuals?.vipFrameUrl || fixedVipFrameUrl(level),
       ...(displayRank || {}),
       profile: undefined,
     };
