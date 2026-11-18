@@ -1428,6 +1428,7 @@ public class HomeFragment extends Fragment {
     /** Rebind dashboard-managed Home images after the shared visual config refreshes. */
     public void refreshDashboardVisuals() {
         if (binding == null) return;
+        applyRemoteHomeBackground();
         refreshHeaderShortcutIcons();
         if (viewModel != null) viewModel.loadBanners();
     }
