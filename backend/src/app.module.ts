@@ -182,8 +182,16 @@ const entityList = Object.values(entities).filter(
         // databases run with TypeORM synchronize disabled; the migration is also kept
         // in database/migrations for operators and fresh environments.
         console.log('[JEHO-OWN DB STEP] custom_gift_grants: start');
+        const customGiftGrantsRunner = appDataSource.createQueryRunner();
         try {
-          await appDataSource.query(`
+          // Keep this optional feature bootstrap isolated and bounded. A lock or
+          // OrioleDB-specific DDL issue here must not take the entire chat API offline.
+          await customGiftGrantsRunner.connect();
+          await customGiftGrantsRunner.startTransaction();
+          await customGiftGrantsRunner.query("SET LOCAL lock_timeout = '5s'");
+          await customGiftGrantsRunner.query("SET LOCAL statement_timeout = '15s'");
+          console.log('[JEHO-OWN DB STEP] custom_gift_grants table: start');
+          await customGiftGrantsRunner.query(`
             CREATE TABLE IF NOT EXISTS "jeho_own"."custom_gift_grants" (
               "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
               "userId" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE CASCADE,
@@ -198,17 +206,38 @@ const entityList = Object.values(entities).filter(
               "createdAt" timestamptz NOT NULL DEFAULT now()
             )
           `);
-          await appDataSource.query(
+          console.log('[JEHO-OWN DB STEP] custom_gift_grants table: complete');
+          console.log('[JEHO-OWN DB STEP] custom_gift_grants owner index: start');
+          await customGiftGrantsRunner.query(
             'CREATE INDEX IF NOT EXISTS "idx_custom_gift_grants_owner_expiry" ON "jeho_own"."custom_gift_grants" ("userId", "expiresAt")',
           );
-          await appDataSource.query(
+          console.log('[JEHO-OWN DB STEP] custom_gift_grants owner index: complete');
+          console.log('[JEHO-OWN DB STEP] custom_gift_grants gift index: start');
+          await customGiftGrantsRunner.query(
             'CREATE INDEX IF NOT EXISTS "idx_custom_gift_grants_gift_id" ON "jeho_own"."custom_gift_grants" ("giftId")',
           );
+          console.log('[JEHO-OWN DB STEP] custom_gift_grants gift index: complete');
+          await customGiftGrantsRunner.commitTransaction();
           console.log('[CustomGiftsBootstrap] Private custom-gift grants table is ready.');
           console.log('[JEHO-OWN DB STEP] custom_gift_grants: complete');
         } catch (error) {
-          console.error('[CustomGiftsBootstrap] Could not initialize custom gift grants table.', error instanceof Error ? error.message : String(error));
-          throw error;
+          if (customGiftGrantsRunner.isTransactionActive) {
+            await customGiftGrantsRunner.rollbackTransaction().catch(() => undefined);
+          }
+          const dbError = error as { code?: string; message?: string; detail?: string; constraint?: string };
+          console.error(
+            '[CustomGiftsBootstrap] Optional custom-gift grants bootstrap failed; API startup will continue.',
+            JSON.stringify({
+              code: dbError?.code || null,
+              message: dbError?.message || String(error),
+              detail: dbError?.detail || null,
+              constraint: dbError?.constraint || null,
+            }),
+          );
+        } finally {
+          await customGiftGrantsRunner.release().catch((error) => {
+            console.error('[CustomGiftsBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
+          });
         }
 
         // Additive support-chest gift expiry column for existing JEHO databases.
