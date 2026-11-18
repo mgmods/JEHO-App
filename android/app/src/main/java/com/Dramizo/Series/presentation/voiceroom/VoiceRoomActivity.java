@@ -17939,7 +17939,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Mikoo grid: 5 columns, no scroll, compact scale for 15/20 mics. */
     private void applyMikooSeatGrid(int guestCount) {
         if (binding == null || binding.recyclerSeats == null || seatAdapter == null) return;
-        int columns = roomPkSeatSplitApplied ? 2 : MIKOO_SEAT_COLUMNS;
+        int columns = roomPkSeatSplitApplied ? 2 : (guestCount > 20 ? 6 : MIKOO_SEAT_COLUMNS);
         int scale = roomPkSeatSplitApplied ? SeatAdapter.SCALE_COMPACT
                 : guestCount <= 10
                 ? SeatAdapter.SCALE_NORMAL
@@ -17957,13 +17957,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Match measured SeatAdapter cell height (avatar frame + name + vertical padding).
         // The old 64/74/84dp estimates were too short for the actual 76dp seat frame,
         // so the last row was clipped/overlapped by the supporter and relationship layers.
-        int rowHeightDp = scale == SeatAdapter.SCALE_COMPACT ? 82
+        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 56
+                : scale == SeatAdapter.SCALE_COMPACT ? 82
                 : scale == SeatAdapter.SCALE_MEDIUM ? 88 : 98;
-        int totalHeightPx = dp(rows * rowHeightDp + 8);
-        // 30-mic rooms keep all seats available in a bounded, vertically scrollable grid.
+        int totalHeightPx = dp(rows * rowHeightDp + 4);
+        // 30-mic rooms stay fully visible as a six-column/five-row grid.
         boolean largeSeatGrid = guestCount > 20;
-        if (largeSeatGrid) totalHeightPx = Math.min(totalHeightPx, dp(330));
-        binding.recyclerSeats.setNestedScrollingEnabled(largeSeatGrid);
+        binding.recyclerSeats.setNestedScrollingEnabled(false);
         // Skip requestLayout on mute-only room refreshes — that was blinking seats.
         int layoutKey = (guestCount << 16) ^ (scale << 8) ^ totalHeightPx;
         if (layoutKey == lastSeatGridLayoutKey) return;
