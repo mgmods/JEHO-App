@@ -10,15 +10,21 @@ import { ZegoSettingsService } from '../zego/zego-settings.service';
 import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 
-const CURRENT_JEHO_API_ORIGIN = 'https://jeho-own-backend.mgs.prod.page';
+const CURRENT_JEHO_API_ORIGIN = 'https://jeho-own-web-910481ae.hosted.cumin.dev';
 
 function publicApiBase(): string {
   const configured = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || '')
     .trim()
     .replace(/\/+$/, '')
     .replace(/\/api\/v\d+$/i, '');
-  // Some existing Cumin environments still carry the retired Blitz origin.
-  if (!configured || /jeho-own-backend\.mgs\.blitz\.cloud|jeho-own-web-910481ae\.hosted\.cumin\.dev/i.test(configured)) {
+
+  // Uploaded dashboard assets belong to the dedicated Ghaymah/Cumin service.
+  // Never rewrite its valid origin to the retired Blitz/legacy backend.
+  if (
+    !configured
+    || /jeho-own-backend\.mgs\.(?:blitz|prod)\.page/i.test(configured)
+    || /jeho-own-backend\.mgs\.blitz\.cloud/i.test(configured)
+  ) {
     return CURRENT_JEHO_API_ORIGIN;
   }
   return configured;
