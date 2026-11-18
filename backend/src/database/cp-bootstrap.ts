@@ -161,8 +161,7 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
 
     // Normalize legacy type constraints on existing installations. The unified
     // relationship migration writes 'relationship'; older constraints rejected it.
-    await manager.query(`DO $
-    DECLARE item record;
+    await manager.query(`DO $$    DECLARE item record;
     BEGIN
       FOR item IN
         SELECT c.conname, t.relname
@@ -184,7 +183,8 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
       LOOP
         EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I', 'jeho_own', item.relname, item.conname);
       END LOOP;
-    END $`);
+    END;
+    $$`);
     await manager.query(`ALTER TABLE "jeho_own"."cp_relationships"
       ADD CONSTRAINT chk_cp_relationship_type_unified
       CHECK (type IN ('relationship','friendship','brotherhood','love','engagement','marriage'))`);
