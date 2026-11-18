@@ -77,14 +77,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     // Keep the settings copy and both data rewrites atomic. A transaction-scoped
     // advisory lock prevents two application instances migrating CP together.
     await this.dataSource.transaction(async manager => {
-      await manager.query("SET LOCAL lock_timeout = '3s'");
+      // Wait briefly for another app instance doing the same migration rather
+      // than failing immediately during a rolling deployment.
+      await manager.query("SET LOCAL lock_timeout = '15s'");
       await manager.query("SET LOCAL statement_timeout = '30s'");
-      const [lock] = await manager.query(
-        'SELECT pg_try_advisory_xact_lock(741902611, 2) AS acquired',
-      );
-      if (!lock?.acquired) {
-        throw new Error('[CP migration] Another instance is applying the unified relationship migration; retry startup.');
-      }
+      await manager.query('SELECT pg_advisory_xact_lock(741902611, 2)');
+      await manager.query("SET LOCAL lock_timeout = '3s'");
 
       const rows = await manager.query(
         `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%'`,
@@ -111,14 +109,16 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      // Preserve history, points and requests; update only legacy rows.
+      // Rewrite only known legacy values. Once migrated, subsequent app
+      // restarts perform no table-wide UPDATE and do not rewrite current rows.
+      const legacyTypes = ['love', 'engagement', 'friendship', 'brotherhood', 'marriage'];
       await manager.query(
-        `UPDATE cp_relationships SET type=$1 WHERE type<>$1`,
-        [CpType.RELATIONSHIP],
+        `UPDATE cp_relationships SET type=$1 WHERE type = ANY($2::varchar[])`,
+        [CpType.RELATIONSHIP, legacyTypes],
       );
       await manager.query(
-        `UPDATE cp_requests SET type=$1 WHERE type<>$1`,
-        [CpType.RELATIONSHIP],
+        `UPDATE cp_requests SET type=$1 WHERE type = ANY($2::varchar[])`,
+        [CpType.RELATIONSHIP, legacyTypes],
       );
     });
   }
