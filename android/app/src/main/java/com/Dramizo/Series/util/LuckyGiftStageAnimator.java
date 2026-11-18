@@ -128,22 +128,43 @@ public final class LuckyGiftStageAnimator {
     private static void scatter(FrameLayout overlay, FrameLayout stage, ImageView hero,
             String iconUrl, float fromX, float fromY, @Nullable List<PointF> targets,
             float density, @Nullable Runnable onEnd) {
-        List<PointF> valid = new ArrayList<>();
-        if (targets != null) for (PointF p : targets) if (p != null) valid.add(p);
-        if (valid.isEmpty()) {
+        List<PointF> seats = new ArrayList<>();
+        if (targets != null) for (PointF p : targets) if (p != null) seats.add(p);
+        if (seats.isEmpty()) {
             fadeAndRemove(stage, onEnd);
             return;
         }
-        // Keep the main lucky gift visible at its center anchor while copies
-        // split out from underneath it toward the microphones.
+
+        // Keep one guaranteed flight for every occupied target seat, then add a small,
+        // bounded screen-filling burst for large quantities. This is visual-only:
+        // the server has already charged and recorded the gift exactly once.
         hero.animate().cancel();
         hero.setAlpha(1f);
         hero.setScaleX(1f);
         hero.setScaleY(1f);
-        final int[] remaining = {valid.size()};
-        int size = Math.round(46f * density);
-        for (int i = 0; i < valid.size(); i++) {
-            PointF target = valid.get(i);
+
+        int totalGiftUnits = Math.max(1, quantity) * Math.max(1, personCount);
+        int decorativeCopies = Math.min(8, Math.max(0, totalGiftUnits - seats.size()));
+        int flightCount = seats.size() + decorativeCopies;
+        final int[] remaining = {flightCount};
+        int size = Math.round(44f * density);
+        float width = Math.max(overlay.getWidth(), 1);
+        float height = Math.max(overlay.getHeight(), 1);
+
+        for (int i = 0; i < flightCount; i++) {
+            PointF target;
+            if (i < seats.size()) {
+                target = seats.get(i);
+            } else {
+                // Eight optional copies fan through a compact 4×2 pattern so the
+                // room feels filled without creating hundreds of heavyweight views.
+                int slot = i - seats.size();
+                int column = slot % 4;
+                int row = slot / 4;
+                target = new PointF(width * (0.14f + column * 0.24f),
+                        height * (0.28f + row * 0.34f));
+            }
+
             ImageView copy = new ImageView(overlay.getContext());
             copy.setScaleType(ImageView.ScaleType.FIT_CENTER);
             loadGift(copy, iconUrl);
@@ -153,25 +174,30 @@ public final class LuckyGiftStageAnimator {
             copy.setY(fromY - size / 2f);
             copy.setAlpha(0f);
             copy.setElevation(60f * density);
-            overlay.addView(copy);
-            final float endX = target.x - size / 2f;
-            final float endY = target.y - size / 2f;
+            stage.addView(copy);
+
+            final float endX = Math.max(0f, Math.min(width - size, target.x - size / 2f));
+            final float endY = Math.max(0f, Math.min(height - size, target.y - size / 2f));
             final float startX = fromX - size / 2f;
             final float startY = fromY - size / 2f;
             AnimatorSet flight = new AnimatorSet();
             flight.playTogether(
                     ObjectAnimator.ofFloat(copy, View.X, startX, endX),
                     ObjectAnimator.ofFloat(copy, View.Y, startY, endY),
-                    ObjectAnimator.ofFloat(copy, View.ALPHA, 0f, 1f, 1f, 0.25f),
-                    ObjectAnimator.ofFloat(copy, View.SCALE_X, 0.72f, 1.12f, 0.82f),
-                    ObjectAnimator.ofFloat(copy, View.SCALE_Y, 0.72f, 1.12f, 0.82f),
-                    ObjectAnimator.ofFloat(copy, View.ROTATION, -12f, 12f, 0f));
-            flight.setStartDelay((i % 4) * 24L);
-            flight.setDuration(640L);
+                    ObjectAnimator.ofFloat(copy, View.ALPHA, 0f, 1f, 1f, 0.2f),
+                    ObjectAnimator.ofFloat(copy, View.SCALE_X, 0.68f, 1.14f, 0.82f),
+                    ObjectAnimator.ofFloat(copy, View.SCALE_Y, 0.68f, 1.14f, 0.82f),
+                    ObjectAnimator.ofFloat(copy, View.ROTATION, -14f, 14f, 0f));
+            // Release copies in small waves instead of launching a wall of images
+            // in one frame; this keeps the room responsive with 30 occupied seats.
+            flight.setStartDelay((i / 4) * 65L);
+            flight.setDuration(660L);
             flight.setInterpolator(new DecelerateInterpolator(1.35f));
             flight.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
-                    if (copy.getParent() instanceof ViewGroup) ((ViewGroup) copy.getParent()).removeView(copy);
+                    if (copy.getParent() instanceof ViewGroup) {
+                        ((ViewGroup) copy.getParent()).removeView(copy);
+                    }
                     remaining[0]--;
                     if (remaining[0] == 0) fadeAndRemove(stage, onEnd);
                 }
