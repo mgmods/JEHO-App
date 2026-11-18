@@ -27,6 +27,7 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.util.LocaleHelper;
+import com.Dramizo.Series.util.AppFeatures;
 import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.GlobalCelebrationToast;
 
@@ -54,10 +55,12 @@ public abstract class ThemedActivity extends AppCompatActivity {
     private void refreshDashboardVisuals() {
         try {
             AppContainer container = ContainerProvider.from(this);
-            if (wantsRemoteThemeChrome()) {
-                container.getIoExecutor().execute(() ->
-                        RemoteTheme.refreshFromApi(getApplicationContext(), container.getConfigApi()));
-            }
+            container.getIoExecutor().execute(() -> {
+                if (wantsRemoteThemeChrome()) {
+                    RemoteTheme.refreshFromApi(getApplicationContext(), container.getConfigApi());
+                }
+                AppFeatures.refresh(container);
+            });
             // Toast appearance is shared across screens and is fetched without an APK update.
             GlobalCelebrationToast.refreshStyleNow(this);
         } catch (Throwable ignored) {
