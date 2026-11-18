@@ -322,6 +322,8 @@ async function save() {
     return
   }
   const payload = {
+    // Bump the public asset version so clients bypass image caches after every save.
+    version: Math.max(1, Number(form.version) || 1) + 1,
     highWinMinMultiplier,
     highWinMinCoins,
     giftSend: { ...form.giftSend },
