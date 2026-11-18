@@ -11229,7 +11229,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             chooseSeatCount.setText("تعديل عدد المقاعد · الحالي " + currentGuestSeatCount());
             chooseSeatCount.setOnClickListener(v -> {
                 dialog.dismiss();
-                v.postDelayed(this::showRoomSeatCountPicker, 180);
+                // Open the same visual card picker used by the other seat-count entry.
+                v.postDelayed(this::showRoomSeatCountPicker, 300);
             });
         } else if (rowCounts != null) {
             rowCounts.setVisibility(View.GONE);
