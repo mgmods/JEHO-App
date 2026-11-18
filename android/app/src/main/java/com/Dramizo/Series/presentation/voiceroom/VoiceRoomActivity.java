@@ -16738,6 +16738,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
             boolean cannonLaunch = memberBool(payload, "cannonLaunch", false);
             if (cannonLaunch) {
+                // The canonical room event starts the combo toast only after the release-time
+                // batch has been accepted by the server. X counts sent units, never lucky payout.
+                showGiftSendToastCountUp(sender, name, senderAvatar, icon, qtyRemote);
+                long luckyWon = Math.max(0L, memberLong(payload, "luckyCoinsWon", 0L));
+                if (luckyWon > 0L) {
+                    double multiplier = 0d;
+                    try {
+                        if (payload != null && payload.has("luckyMultiplier")
+                                && !payload.get("luckyMultiplier").isJsonNull()) {
+                            multiplier = payload.get("luckyMultiplier").getAsDouble();
+                        }
+                    } catch (Exception ignored) { }
+                    boolean partialReturn = multiplier > 0d && multiplier < 1d;
+                    String winBody = partialReturn
+                            ? ("مردود +" + luckyWon)
+                            : ("حظ ×" + Math.max(1, (int) Math.round(multiplier))
+                                    + " · +" + luckyWon);
+                    GlobalCelebrationToast.show(
+                            this, sender, winBody, senderAvatar, icon,
+                            giftEventKey, 28,
+                            partialReturn ? 0 : Math.max(1, (int) Math.round(multiplier)),
+                            luckyWon, sender, "lucky_hit", null);
+                }
                 playLuckyCannonEvent(icon, allReceivers, totalCoins, qtyRemote,
                         Math.max(1, personCount), localSenderEcho);
                 return;
