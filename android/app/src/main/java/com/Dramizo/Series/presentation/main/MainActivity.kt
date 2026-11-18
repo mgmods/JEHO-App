@@ -946,7 +946,6 @@ class MainActivity : ThemedActivity() {
             hasResumedOnce = true
         }
         loadAgencyAction(container)
-        container.ioExecutor.execute { AppFeatures.refresh(container) }
         bindActiveRoomMini()
         playInAppUpdateHelper?.onResume()
         dashboardIconRefreshHandler.removeCallbacks(dashboardIconRefreshRunnable)
