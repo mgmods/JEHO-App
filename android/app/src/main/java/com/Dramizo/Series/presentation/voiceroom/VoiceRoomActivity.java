@@ -12989,7 +12989,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Override
     protected void onStop() {
         // A backgrounded room must never keep a hold-to-fire gesture running.
-        stopLuckyCannonHold();
+        stopLuckyCannonHold(false);
         handler.removeCallbacks(luckyButtonStylePoll);
         handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
@@ -16741,6 +16741,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // The canonical room event starts the combo toast only after the release-time
                 // batch has been accepted by the server. X counts sent units, never lucky payout.
                 showGiftSendToastCountUp(sender, name, senderAvatar, icon, qtyRemote);
+                long perSeatSupport = allReceivers.isEmpty()
+                        ? 0L : Math.max(0L, totalCoins / allReceivers.size());
+                if (perSeatSupport > 0L) {
+                    for (String occupiedId : allReceivers) {
+                        creditGiftCoinsOnSeat(occupiedId, perSeatSupport);
+                    }
+                }
                 long luckyWon = Math.max(0L, memberLong(payload, "luckyCoinsWon", 0L));
                 if (luckyWon > 0L) {
                     double multiplier = 0d;
