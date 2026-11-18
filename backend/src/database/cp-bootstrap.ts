@@ -15,16 +15,12 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
   }
 
   await dataSource.transaction(async (manager) => {
-    // Serialize CP schema work across app instances and fail fast instead of
-    // allowing concurrent DDL to queue behind one another indefinitely.
-    await manager.query("SET LOCAL lock_timeout = '3s'");
+    // Serialize concurrent app instances. Give an in-flight deployment a bounded
+    // window to finish, then restore the shorter DDL lock timeout.
+    await manager.query("SET LOCAL lock_timeout = '15s'");
     await manager.query("SET LOCAL statement_timeout = '30s'");
-    const [bootstrapLock] = await manager.query(
-      'SELECT pg_try_advisory_xact_lock(741902611, 1) AS acquired',
-    );
-    if (!bootstrapLock?.acquired) {
-      throw new Error('[CpBootstrap] Another instance is applying CP schema changes; retry deployment after it finishes.');
-    }
+    await manager.query('SELECT pg_advisory_xact_lock(741902611, 1)');
+    await manager.query("SET LOCAL lock_timeout = '3s'");
 
     await manager.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_relationships" (
@@ -159,38 +155,73 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
       )
     `);
 
-    // Normalize legacy type constraints on existing installations. The unified
-    // relationship migration writes 'relationship'; older constraints rejected it.
-    await manager.query(`DO $$    DECLARE item record;
+    // Normalize only a single-column CHECK on the type column. Never drop
+    // compound or unrelated checks. Skip tables already accepting relationship.
+    await manager.query(`DO $$
+    DECLARE
+      target record;
+      item record;
+      type_attnum smallint;
     BEGIN
-      FOR item IN
-        SELECT c.conname, t.relname
-        FROM pg_constraint c
-        JOIN pg_class t ON t.oid = c.conrelid
+      FOR target IN
+        SELECT * FROM (VALUES
+          ('cp_relationships', 'chk_cp_relationship_type_unified'),
+          ('cp_requests', 'chk_cp_request_type_unified')
+        ) AS targets(table_name, constraint_name)
+      LOOP
+        SELECT a.attnum INTO type_attnum
+        FROM pg_attribute a
+        JOIN pg_class t ON t.oid = a.attrelid
         JOIN pg_namespace n ON n.oid = t.relnamespace
         WHERE n.nspname = 'jeho_own'
-          AND t.relname IN ('cp_relationships', 'cp_requests')
-          AND c.contype = 'c'
-          AND pg_get_constraintdef(c.oid) ILIKE '%type%'
-          AND (
-            pg_get_constraintdef(c.oid) ILIKE '%friendship%'
-            OR pg_get_constraintdef(c.oid) ILIKE '%brotherhood%'
-            OR pg_get_constraintdef(c.oid) ILIKE '%engagement%'
-            OR pg_get_constraintdef(c.oid) ILIKE '%marriage%'
-            OR pg_get_constraintdef(c.oid) ILIKE '%love%'
-            OR pg_get_constraintdef(c.oid) ILIKE '%relationship%'
-          )
-      LOOP
-        EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I', 'jeho_own', item.relname, item.conname);
+          AND t.relname = target.table_name
+          AND a.attname = 'type'
+          AND NOT a.attisdropped;
+
+        IF type_attnum IS NULL THEN
+          RAISE EXCEPTION '[CpBootstrap] Missing type column on %', target.table_name;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint c
+          JOIN pg_class t ON t.oid = c.conrelid
+          JOIN pg_namespace n ON n.oid = t.relnamespace
+          WHERE n.nspname = 'jeho_own'
+            AND t.relname = target.table_name
+            AND c.contype = 'c'
+            AND c.conkey = ARRAY[type_attnum]::smallint[]
+            AND pg_get_constraintdef(c.oid) ILIKE '%relationship%'
+        ) THEN
+          FOR item IN
+            SELECT c.conname
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            WHERE n.nspname = 'jeho_own'
+              AND t.relname = target.table_name
+              AND c.contype = 'c'
+              AND c.conkey = ARRAY[type_attnum]::smallint[]
+              AND (
+                pg_get_constraintdef(c.oid) ILIKE '%friendship%'
+                OR pg_get_constraintdef(c.oid) ILIKE '%brotherhood%'
+                OR pg_get_constraintdef(c.oid) ILIKE '%engagement%'
+                OR pg_get_constraintdef(c.oid) ILIKE '%marriage%'
+                OR pg_get_constraintdef(c.oid) ILIKE '%love%'
+              )
+          LOOP
+            EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I',
+              'jeho_own', target.table_name, item.conname);
+          END LOOP;
+
+          EXECUTE format(
+            'ALTER TABLE %I.%I ADD CONSTRAINT %I CHECK (type IN (''relationship'',''friendship'',''brotherhood'',''love'',''engagement'',''marriage''))',
+            'jeho_own', target.table_name, target.constraint_name
+          );
+        END IF;
       END LOOP;
     END;
     $$`);
-    await manager.query(`ALTER TABLE "jeho_own"."cp_relationships"
-      ADD CONSTRAINT chk_cp_relationship_type_unified
-      CHECK (type IN ('relationship','friendship','brotherhood','love','engagement','marriage'))`);
-    await manager.query(`ALTER TABLE "jeho_own"."cp_requests"
-      ADD CONSTRAINT chk_cp_request_type_unified
-      CHECK (type IN ('relationship','friendship','brotherhood','love','engagement','marriage'))`);
 
     await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_type_status_points ON "jeho_own"."cp_relationships"(type,status,points DESC)');
     await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_a_status ON "jeho_own"."cp_relationships"("userAId",status)');
