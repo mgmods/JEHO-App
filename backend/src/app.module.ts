@@ -107,7 +107,12 @@ const entityList = Object.values(entities).filter(
           keepAliveInitialDelayMillis: 10000,
         },
         entities: entityList,
-        synchronize: config.get<boolean>('app.database.synchronize'),
+        // Production schema changes are applied only by reviewed additive bootstraps/migrations.
+        // Never let TypeORM synchronize rewrite live OrioleDB relations on container startup.
+        synchronize:
+          config.get<string>('app.nodeEnv') === 'production'
+            ? false
+            : config.get<boolean>('app.database.synchronize'),
         logging: config.get<boolean>('app.database.logging'),
       }),
       dataSourceFactory: async (options) => {
