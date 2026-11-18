@@ -818,8 +818,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         int hostMark;
         switch (scaleMode) {
             case SCALE_MICRO -> {
-                // 30-mic six-column grid: keep the seat identity readable without
-                // consuming the vertical space reserved for chat/gifts/controls.
+                // 30-mic six-column grid: 58dp seat frame with the number/name directly below.
+                // Keep all five rows visible while preserving room chat and controls.
                 frame = 58;
                 avatar = 48;
                 ring = 50;
