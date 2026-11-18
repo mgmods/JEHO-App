@@ -1,14 +1,12 @@
 package com.Dramizo.Series.util;
 
 /**
- * JEHO CHAT connects only to its dedicated JEHO-OWN Cumin backend.
- * The admin dashboard is served by the same origin under /admin/.
- *
- * The API host is intentionally fixed so stale BuildConfig/local.properties
- * values cannot redirect the installed app to another JEHO copy or host.
+ * JEHO CHAT connects only to its dedicated Ghaymah/Cumin Cloud backend.
+ * The admin dashboard and Android API share the same service origin.
+ * Keep this canonical origin aligned with the Ghaymah deployment.
  */
 public final class ApiOrigin {
-    private static final String CANONICAL_API = "https://jeho-own-backend.mgs.prod.page";
+    private static final String CANONICAL_API = "https://jeho-own-web-910481ae.hosted.cumin.dev";
 
     private ApiOrigin() {}
 
