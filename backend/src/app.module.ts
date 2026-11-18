@@ -107,12 +107,9 @@ const entityList = Object.values(entities).filter(
           keepAliveInitialDelayMillis: 10000,
         },
         entities: entityList,
-        // Production schema changes are applied only by reviewed additive bootstraps/migrations.
-        // Never let TypeORM synchronize rewrite live OrioleDB relations on container startup.
-        synchronize:
-          config.get<string>('app.nodeEnv') === 'production'
-            ? false
-            : config.get<boolean>('app.database.synchronize'),
+        // JEHO production deployments must never run TypeORM synchronize, regardless of host NODE_ENV/DB_SYNCHRONIZE values.
+        // Schema changes are handled only by reviewed additive bootstraps/migrations; this protects live OrioleDB relations.
+        synchronize: false,
         logging: config.get<boolean>('app.database.logging'),
       }),
       dataSourceFactory: async (options) => {
