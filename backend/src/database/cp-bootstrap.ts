@@ -173,6 +173,14 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
           AND t.relname IN ('cp_relationships', 'cp_requests')
           AND c.contype = 'c'
           AND pg_get_constraintdef(c.oid) ILIKE '%type%'
+          AND (
+            pg_get_constraintdef(c.oid) ILIKE '%friendship%'
+            OR pg_get_constraintdef(c.oid) ILIKE '%brotherhood%'
+            OR pg_get_constraintdef(c.oid) ILIKE '%engagement%'
+            OR pg_get_constraintdef(c.oid) ILIKE '%marriage%'
+            OR pg_get_constraintdef(c.oid) ILIKE '%love%'
+            OR pg_get_constraintdef(c.oid) ILIKE '%relationship%'
+          )
       LOOP
         EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I', 'jeho_own', item.relname, item.conname);
       END LOOP;
