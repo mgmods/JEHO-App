@@ -43,20 +43,29 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   private static readonly MAX_VIP_LEVEL = 7;
   private mysteriousModeCleanupTimer?: ReturnType<typeof setInterval>;
 
-  /** Additive compatibility patch for deployments that do not run SQL files automatically. */
+  /** Best-effort compatibility work: a blocked optional VIP patch must never prevent API startup. */
   async onModuleInit() {
-    await this.dataSource.query(
-      'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
-    );
-    // Reconcile only opted-in accounts once a minute; this is a single bounded
-    // SQL update and guarantees expired VIP subscriptions lose anonymous mode.
+    try {
+      await this.dataSource.query(
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
+      );
+    } catch (error) {
+      // Do not hold the whole Nest application hostage on a legacy additive DDL lock.
+      // The column is only needed by the optional Mysterious Man feature.
+      this.logger.warn(`Mysterious Mode column check deferred: ${error?.message || error}`);
+    }
+    // Reconciliation is maintenance, not a prerequisite for serving the API.
     this.mysteriousModeCleanupTimer = setInterval(() => {
       void this.reconcileMysteriousModes().catch((error) => {
         this.logger.warn(`Mysterious Man reconciliation failed: ${error?.message || error}`);
       });
     }, 60_000);
     this.mysteriousModeCleanupTimer.unref?.();
-    await this.reconcileMysteriousModes();
+    try {
+      await this.reconcileMysteriousModes();
+    } catch (error) {
+      this.logger.warn(`Initial Mysterious Man reconciliation deferred: ${error?.message || error}`);
+    }
   }
 
   onModuleDestroy() {
