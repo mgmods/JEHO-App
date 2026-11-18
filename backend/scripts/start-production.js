@@ -17,6 +17,9 @@ function logDatabaseConfiguration() {
 // A marker inside the recreated schema prevents repeated resets on later restarts.
 async function resetSchemaOnceIfRequested() {
   if (process.env.JEHO_OWN_RESET_ONCE !== 'true') return false;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JEHO_OWN_RESET_ONCE is blocked in production to protect live data.');
+  }
   if (!process.env.DATABASE_URL) {
     throw new Error('JEHO_OWN_RESET_ONCE requires DATABASE_URL; refusing to guess which database to reset.');
   }
@@ -64,8 +67,8 @@ async function databaseIsReady() {
   // when only DB_* variables were configured, this returned false on every
   // cold start and re-ran the full seed before opening the API port.
   if (!databaseUrl && !(dbHost && dbUsername && dbPassword && dbDatabase)) {
-    console.log('[JEHO-OWN startup] Database connection settings are incomplete; seed will validate configuration.');
-    return false;
+    console.error('[JEHO-OWN startup] Database connection settings are incomplete; refusing automatic seed.');
+    return null;
   }
 
   let client;
@@ -94,7 +97,8 @@ async function databaseIsReady() {
       code: error?.code,
       message: error?.message,
     }));
-    return false;
+    // null means the DB is unreachable. Do not mistake an outage for an empty database.
+    return null;
   } finally {
     if (client) await client.end().catch(() => {});
   }
@@ -136,16 +140,26 @@ async function main() {
     }
     await markResetCompleted();
     console.log('[JEHO-OWN startup] Fresh seed completed successfully.');
-  } else if (await databaseIsReady()) {
-    console.log('[JEHO-OWN startup] Database ready — skipping seed.');
   } else {
-    console.log('[JEHO-OWN startup] Database not initialized or URL check unavailable — running seed.');
-    const seedCode = await runProcess('database seed', process.execPath, ['dist/database/seed.js']);
-    if (seedCode !== 0) {
-      console.error('[JEHO-OWN startup] Seed failed; API will not start.');
-      process.exit(seedCode);
+    const ready = await databaseIsReady();
+    if (ready === null) {
+      console.error('[JEHO-OWN startup] Database is unreachable; refusing to run seed or start against an unverified database.');
+      process.exit(1);
     }
-    console.log('[JEHO-OWN startup] Seed completed successfully.');
+    if (ready) {
+      console.log('[JEHO-OWN startup] Database ready — skipping seed.');
+    } else if (process.env.NODE_ENV === 'production') {
+      console.error('[JEHO-OWN startup] Production schema is not initialized; refusing automatic seed to protect existing data.');
+      process.exit(1);
+    } else {
+      console.log('[JEHO-OWN startup] Development database is not initialized — running seed.');
+      const seedCode = await runProcess('database seed', process.execPath, ['dist/database/seed.js']);
+      if (seedCode !== 0) {
+        console.error('[JEHO-OWN startup] Seed failed; API will not start.');
+        process.exit(seedCode);
+      }
+      console.log('[JEHO-OWN startup] Seed completed successfully.');
+    }
   }
 
 
