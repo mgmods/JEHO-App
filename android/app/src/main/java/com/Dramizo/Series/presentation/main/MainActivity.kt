@@ -22,6 +22,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -119,6 +121,25 @@ class MainActivity : ThemedActivity() {
     private var taskInviteListener: RealtimeClient.RoomListener? = null
     private var playInAppUpdateHelper: PlayInAppUpdateHelper? = null
     private var hasResumedOnce: Boolean = false
+    private val dashboardIconRefreshHandler = Handler(Looper.getMainLooper())
+    private val dashboardIconRefreshRunnable = object : Runnable {
+        override fun run() {
+            if (isFinishing || isDestroyed || binding == null) return
+            val container = ContainerProvider.from(this@MainActivity)
+            container.ioExecutor.execute {
+                RemoteNavIcons.refreshBlocking(container)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed || binding == null) return@runOnUiThread
+                    applyNavIcons()
+                    (supportFragmentManager.findFragmentByTag("f0") as? HomeFragment)
+                        ?.refreshDashboardVisuals()
+                    (supportFragmentManager.findFragmentByTag("f3") as? ProfileFragment)
+                        ?.refreshDashboardIcons()
+                }
+            }
+            dashboardIconRefreshHandler.postDelayed(this, 60_000L)
+        }
+    }
 
     /** First open of each tab may show a short loader; revisits stay stable. */
     private val pageWarmed = BooleanArray(4)
@@ -928,6 +949,13 @@ class MainActivity : ThemedActivity() {
         container.ioExecutor.execute { AppFeatures.refresh(container) }
         bindActiveRoomMini()
         playInAppUpdateHelper?.onResume()
+        dashboardIconRefreshHandler.removeCallbacks(dashboardIconRefreshRunnable)
+        dashboardIconRefreshHandler.postDelayed(dashboardIconRefreshRunnable, 60_000L)
+    }
+
+    override fun onPause() {
+        dashboardIconRefreshHandler.removeCallbacks(dashboardIconRefreshRunnable)
+        super.onPause()
     }
 
     private fun bindActiveRoomMini() {
