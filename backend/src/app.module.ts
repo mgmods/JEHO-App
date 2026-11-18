@@ -178,18 +178,15 @@ const entityList = Object.values(entities).filter(
           console.error('[LuckyBoxVideoBootstrap] Could not initialize video URL column.', error instanceof Error ? error.message : String(error));
         }
 
-        // Additive private custom-gift grants table. Keep this explicit because production
-        // databases run with TypeORM synchronize disabled; the migration is also kept
-        // in database/migrations for operators and fresh environments.
+        // Create the optional custom-gift grants table with a short lock bound.
+        // Index creation is deliberately not part of API startup: index DDL can wait
+        // behind unrelated transactions and must be handled by a reviewed migration.
         console.log('[JEHO-OWN DB STEP] custom_gift_grants: start');
         const customGiftGrantsRunner = appDataSource.createQueryRunner();
         try {
-          // Keep this optional feature bootstrap isolated and bounded. A lock or
-          // OrioleDB-specific DDL issue here must not take the entire chat API offline.
           await customGiftGrantsRunner.connect();
-          await customGiftGrantsRunner.startTransaction();
-          await customGiftGrantsRunner.query("SET LOCAL lock_timeout = '5s'");
-          await customGiftGrantsRunner.query("SET LOCAL statement_timeout = '15s'");
+          await customGiftGrantsRunner.query("SET lock_timeout = '3s'");
+          await customGiftGrantsRunner.query("SET statement_timeout = '8s'");
           console.log('[JEHO-OWN DB STEP] custom_gift_grants table: start');
           await customGiftGrantsRunner.query(`
             CREATE TABLE IF NOT EXISTS "jeho_own"."custom_gift_grants" (
@@ -206,27 +203,12 @@ const entityList = Object.values(entities).filter(
               "createdAt" timestamptz NOT NULL DEFAULT now()
             )
           `);
-          console.log('[JEHO-OWN DB STEP] custom_gift_grants table: complete');
-          console.log('[JEHO-OWN DB STEP] custom_gift_grants owner index: start');
-          await customGiftGrantsRunner.query(
-            'CREATE INDEX IF NOT EXISTS "idx_custom_gift_grants_owner_expiry" ON "jeho_own"."custom_gift_grants" ("userId", "expiresAt")',
-          );
-          console.log('[JEHO-OWN DB STEP] custom_gift_grants owner index: complete');
-          console.log('[JEHO-OWN DB STEP] custom_gift_grants gift index: start');
-          await customGiftGrantsRunner.query(
-            'CREATE INDEX IF NOT EXISTS "idx_custom_gift_grants_gift_id" ON "jeho_own"."custom_gift_grants" ("giftId")',
-          );
-          console.log('[JEHO-OWN DB STEP] custom_gift_grants gift index: complete');
-          await customGiftGrantsRunner.commitTransaction();
-          console.log('[CustomGiftsBootstrap] Private custom-gift grants table is ready.');
+          console.log('[CustomGiftsBootstrap] Private custom-gift grants table is ready; optional indexes deferred to migration.');
           console.log('[JEHO-OWN DB STEP] custom_gift_grants: complete');
         } catch (error) {
-          if (customGiftGrantsRunner.isTransactionActive) {
-            await customGiftGrantsRunner.rollbackTransaction().catch(() => undefined);
-          }
           const dbError = error as { code?: string; message?: string; detail?: string; constraint?: string };
           console.error(
-            '[CustomGiftsBootstrap] Optional custom-gift grants bootstrap failed; API startup will continue.',
+            '[CustomGiftsBootstrap] Optional table bootstrap failed; API startup will continue.',
             JSON.stringify({
               code: dbError?.code || null,
               message: dbError?.message || String(error),
@@ -240,19 +222,68 @@ const entityList = Object.values(entities).filter(
           });
         }
 
-        // Additive support-chest gift expiry column for existing JEHO databases.
-        // Permanent gift history remains unchanged because expiresAt stays NULL.
+        // Additive support-chest expiry bootstrap. Use one pinned connection and
+        // strict lock/statement bounds so DDL can never stall API startup indefinitely.
+        // The column and its optional index are separate autocommit statements: if index
+        // creation is blocked, the successfully-added nullable column is preserved.
         console.log('[JEHO-OWN DB STEP] gift_sends expiry: start');
+        const giftExpiryRunner = appDataSource.createQueryRunner();
         try {
-          await appDataSource.query(
+          await giftExpiryRunner.connect();
+          await giftExpiryRunner.query("SET lock_timeout = '3s'");
+          await giftExpiryRunner.query("SET statement_timeout = '8s'");
+          console.log('[JEHO-OWN DB STEP] gift_sends expiresAt column: start');
+          await giftExpiryRunner.query(
             'ALTER TABLE "jeho_own"."gift_sends" ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz',
           );
-          await appDataSource.query(
+          console.log('[JEHO-OWN DB STEP] gift_sends expiresAt column: complete');
+          console.log('[JEHO-OWN DB STEP] gift_sends expiry index: start');
+          await giftExpiryRunner.query(
             'CREATE INDEX IF NOT EXISTS "IDX_gift_sends_expiresAt" ON "jeho_own"."gift_sends" ("expiresAt")',
           );
-          console.log('[JEHO-OWN DB STEP] gift_sends expiry: complete');
+          console.log('[JEHO-OWN DB STEP] gift_sends expiry index: complete');
         } catch (error) {
-          console.error('[SupportChestExpiryBootstrap] Could not initialize gift expiry column.', error instanceof Error ? error.message : String(error));
+          const dbError = error as { code?: string; message?: string; detail?: string };
+          console.error(
+            '[SupportChestExpiryBootstrap] Bounded optional expiry DDL did not complete; continuing startup.',
+            JSON.stringify({
+              code: dbError?.code || null,
+              message: dbError?.message || String(error),
+              detail: dbError?.detail || null,
+            }),
+          );
+          try {
+            const blockers = await giftExpiryRunner.query(`
+              SELECT
+                blocked.pid AS blocked_pid,
+                blocked.usename AS blocked_user,
+                blocked.application_name AS blocked_application,
+                blocked.state AS blocked_state,
+                blocked.wait_event_type,
+                blocked.wait_event,
+                now() - blocked.query_start AS blocked_for,
+                left(blocked.query, 240) AS blocked_query,
+                blocker.pid AS blocker_pid,
+                blocker.usename AS blocker_user,
+                blocker.application_name AS blocker_application,
+                blocker.state AS blocker_state,
+                now() - blocker.query_start AS blocker_query_age,
+                left(blocker.query, 240) AS blocker_query
+              FROM pg_stat_activity AS blocked
+              CROSS JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS blocking(pid)
+              JOIN pg_stat_activity AS blocker ON blocker.pid = blocking.pid
+              WHERE blocked.datname = current_database()
+              ORDER BY blocked.query_start
+              LIMIT 20
+            `);
+            console.error('[SupportChestExpiryBootstrap] PostgreSQL lock blockers:', JSON.stringify(blockers));
+          } catch (diagnosticError) {
+            console.error('[SupportChestExpiryBootstrap] Lock diagnostics unavailable:', diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError));
+          }
+        } finally {
+          await giftExpiryRunner.release().catch((error) => {
+            console.error('[SupportChestExpiryBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
+          });
         }
 
 
