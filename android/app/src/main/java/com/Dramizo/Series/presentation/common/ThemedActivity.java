@@ -24,6 +24,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.Dramizo.Series.R;
+import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.util.LocaleHelper;
 import com.Dramizo.Series.util.RemoteTheme;
