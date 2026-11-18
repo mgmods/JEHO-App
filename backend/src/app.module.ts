@@ -98,7 +98,7 @@ const entityList = Object.values(entities).filter(
         // Keep the pool deliberately small for the 1 GB managed PostgreSQL
         // instance; reserve connections for maintenance/health checks.
         extra: {
-          options: '-c search_path=jeho_own,extensions,public',
+          options: '-c search_path=jeho_own,extensions,public -c lock_timeout=5s',
           max: 5,
           min: 0,
           idleTimeoutMillis: 30000,
@@ -126,6 +126,7 @@ const entityList = Object.values(entities).filter(
           synchronize: false,
           // Bootstrap is short-lived and must not open an oversized pool.
           extra: {
+            options: '-c lock_timeout=5s',
             max: 1,
             min: 0,
             idleTimeoutMillis: 10000,
