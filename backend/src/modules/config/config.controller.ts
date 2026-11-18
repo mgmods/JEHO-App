@@ -52,6 +52,14 @@ function normalizePublicAssetUrl(value: unknown): string {
   return raw;
 }
 
+function versionPublicUploadUrl(value: unknown, updatedAt: unknown, parameter: string): string {
+  const url = normalizePublicAssetUrl(value);
+  if (!url || !url.includes('/uploads/')) return url;
+  const parsedTime = updatedAt ? new Date(updatedAt as any).getTime() : 0;
+  const version = Number.isFinite(parsedTime) && parsedTime > 0 ? parsedTime : 1;
+  return url + (url.includes('?') ? '&' : '?') + parameter + '=' + version;
+}
+
 
 @ApiTags('Config')
 @Controller('config')
@@ -138,7 +146,7 @@ export class ConfigController {
       ...banner,
       // Older dashboard saves may contain an absolute upload URL from the
       // retired backend. Re-resolve only /uploads assets to this Ghaymah API.
-      imageUrl: normalizePublicAssetUrl(banner?.imageUrl),
+      imageUrl: versionPublicUploadUrl(banner?.imageUrl, row?.updatedAt, 'banner_v'),
     }));
     if (!q) {
       // Return all locale variants; the app filters by device language.
@@ -160,7 +168,7 @@ export class ConfigController {
     if (!row?.value) return [];
     try {
       const parsed = JSON.parse(row.value);
-      const imageUrl = normalizePublicAssetUrl(parsed?.imageUrl);
+      const imageUrl = versionPublicUploadUrl(parsed?.imageUrl, row?.updatedAt, 'profile_banner_v');
       if (!imageUrl) return [];
       return [{
         title: typeof parsed.title === 'string' ? parsed.title : '',
