@@ -148,8 +148,12 @@ const entityList = Object.values(entities).filter(
 
         console.log('[JEHO-OWN DB] Bootstrap connection ready; initializing application schema...');
         const appInitStartedAt = Date.now();
+        // Enforce this again at the final DataSource construction boundary.
+        // The Nest TypeORM factory must never inherit a host/env override here.
+        console.log(`[JEHO-OWN DB] Final DataSource options: synchronize=${String(options.synchronize)}; forcing false.`);
         const appDataSource = await new DataSource({
           ...options,
+          synchronize: false,
           extra: {
             ...((options as any).extra || {}),
             max: 5,
