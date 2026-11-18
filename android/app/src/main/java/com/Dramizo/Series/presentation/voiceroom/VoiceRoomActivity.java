@@ -343,7 +343,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     // every queued repeat, so a slow response cannot leave several already-submitted
     // gifts waiting to appear after ACTION_UP.
     private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 1;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 65L;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 40L;
     private int luckyCannonInFlight;
     private int luckyCannonPendingQuantity;
     private boolean luckyCannonHoldActive;
