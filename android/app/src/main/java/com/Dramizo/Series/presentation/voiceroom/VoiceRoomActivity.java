@@ -343,7 +343,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     // Restore the previously fast bounded cannon pipeline. The hold/release guard
     // still cancels every request that has not started; only already-started sends finish.
     private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 5;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 65L;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 45L;
     private int luckyCannonInFlight;
     private int luckyCannonPendingQuantity;
     private boolean luckyCannonHoldActive;
@@ -11222,11 +11222,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 dialog.dismiss();
             });
         }
-        if (canManageRoom) {
-            wireSeatCountButtons(sheet, dialog::dismiss);
-        } else {
-            View rowCounts = sheet.findViewById(R.id.rowSeatCounts);
-            if (rowCounts != null) rowCounts.setVisibility(View.GONE);
+        View rowCounts = sheet.findViewById(R.id.rowSeatCounts);
+        TextView chooseSeatCount = sheet.findViewById(R.id.btnChooseSeatCount);
+        if (canManageRoom && chooseSeatCount != null) {
+            if (rowCounts != null) rowCounts.setVisibility(View.VISIBLE);
+            chooseSeatCount.setText("تعديل عدد المقاعد · الحالي " + currentGuestSeatCount());
+            chooseSeatCount.setOnClickListener(v -> {
+                dialog.dismiss();
+                v.postDelayed(this::showRoomSeatCountPicker, 180);
+            });
+        } else if (rowCounts != null) {
+            rowCounts.setVisibility(View.GONE);
         }
 
         View pickBg = sheet.findViewById(R.id.btnPickRoomBackground);
