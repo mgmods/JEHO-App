@@ -15,12 +15,23 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
   }
 
   await dataSource.transaction(async (manager) => {
+    // Serialize CP schema work across app instances and fail fast instead of
+    // allowing concurrent DDL to queue behind one another indefinitely.
+    await manager.query("SET LOCAL lock_timeout = '3s'");
+    await manager.query("SET LOCAL statement_timeout = '30s'");
+    const [bootstrapLock] = await manager.query(
+      'SELECT pg_try_advisory_xact_lock(741902611, 1) AS acquired',
+    );
+    if (!bootstrapLock?.acquired) {
+      throw new Error('[CpBootstrap] Another instance is applying CP schema changes; retry deployment after it finishes.');
+    }
+
     await manager.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_relationships" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "userAId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
         "userBId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
-        type varchar(24) NOT NULL CHECK (type IN ('friendship','brotherhood','love','engagement','marriage')),
+        type varchar(24) NOT NULL CHECK (type IN ('relationship','friendship','brotherhood','love','engagement','marriage')),
         status varchar(16) NOT NULL DEFAULT 'active' CHECK (status IN ('active','ended')),
         points bigint NOT NULL DEFAULT 0 CHECK (points >= 0),
         level integer NOT NULL DEFAULT 1 CHECK (level >= 1),
@@ -87,6 +98,31 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
         CONSTRAINT uq_cp_point_event_reference UNIQUE ("referenceType","referenceId")
       )
     `);
+
+    // Normalize legacy type constraints on existing installations. The unified
+    // relationship migration writes 'relationship'; older constraints rejected it.
+    await manager.query(`DO $
+    DECLARE item record;
+    BEGIN
+      FOR item IN
+        SELECT c.conname, t.relname
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = 'jeho_own'
+          AND t.relname IN ('cp_relationships', 'cp_requests')
+          AND c.contype = 'c'
+          AND pg_get_constraintdef(c.oid) ILIKE '%type%'
+      LOOP
+        EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I', 'jeho_own', item.relname, item.conname);
+      END LOOP;
+    END $`);
+    await manager.query(`ALTER TABLE "jeho_own"."cp_relationships"
+      ADD CONSTRAINT chk_cp_relationship_type_unified
+      CHECK (type IN ('relationship','friendship','brotherhood','love','engagement','marriage'))`);
+    await manager.query(`ALTER TABLE "jeho_own"."cp_requests"
+      ADD CONSTRAINT chk_cp_request_type_unified
+      CHECK (type IN ('relationship','friendship','brotherhood','love','engagement','marriage'))`);
 
     await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_type_status_points ON "jeho_own"."cp_relationships"(type,status,points DESC)');
     await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_a_status ON "jeho_own"."cp_relationships"("userAId",status)');
