@@ -180,10 +180,11 @@
             android:visibility="gone" />
     </FrameLayout>
 
-    <!-- Name row: optional mic badge + nickname (Mikoo white 50%) -->
+    <!-- Name is deliberately below the avatar/frame, with a visible gap. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
         android:gravity="center"
         android:orientation="horizontal"
         android:paddingHorizontal="2dp">
@@ -197,16 +198,33 @@
             android:src="@drawable/mic_fz"
             android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/tvName"
+        <FrameLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:maxWidth="72dp"
-            android:maxLines="1"
-            android:textColor="#80FFFFFF"
-            android:textSize="11sp" />
+            android:layout_height="22dp"
+            android:minWidth="38dp"
+            android:clipChildren="true"
+            android:clipToPadding="true">
+
+            <ImageView
+                android:id="@+id/imgVipNameplate"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitXY"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:maxWidth="72dp"
+                android:maxLines="1"
+                android:paddingHorizontal="6dp"
+                android:textColor="#80FFFFFF"
+                android:textSize="11sp" />
+        </FrameLayout>
 
     </LinearLayout>
 
