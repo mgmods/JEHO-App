@@ -3438,7 +3438,7 @@ export class GiftsService implements OnModuleInit {
     }
     const receiverIds = [
       ...new Set(rawIds.map((id) => String(id || '').trim()).filter((id) => id.length > 0)),
-    ].slice(0, 20);
+    ].slice(0, 30);
     if (receiverIds.length === 0) {
       throw new BadRequestException(
         selfGiftBlocked
