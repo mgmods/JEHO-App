@@ -124,6 +124,22 @@
                             android:textSize="18sp"
                             android:textStyle="bold" />
                         <TextView
+                            android:id="@+id/tvMyAgencyRoleBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_agency_affiliation_badge"
+                            android:ellipsize="end"
+                            android:gravity="center"
+                            android:includeFontPadding="false"
+                            android:maxLines="1"
+                            android:paddingHorizontal="5dp"
+                            android:paddingVertical="2dp"
+                            android:textColor="#FFFFE4A6"
+                            android:textSize="8sp"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+                        <TextView
                             android:id="@+id/tvGenderIcon"
                             android:layout_width="20dp"
                             android:layout_height="20dp"
@@ -312,6 +328,16 @@
                         android:textColor="@color/white"
                         android:textSize="10sp"
                         android:textStyle="bold" />
+
+                    <!-- Compact earned medals beside popularity/rank, matching the same visual row. -->
+                    <LinearLayout
+                        android:id="@+id/rowMyMiniMedals"
+                        android:layout_width="wrap_content"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="5dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone" />
 
                     <TextView
                         android:id="@+id/tvLevelChip"
