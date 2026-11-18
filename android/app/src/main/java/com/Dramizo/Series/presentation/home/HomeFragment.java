@@ -1280,6 +1280,9 @@ public class HomeFragment extends Fragment {
     public void onResume() {
         super.onResume();
         refreshLocationTabChrome();
+        // Dashboard banner uploads/settings are remote config; reload them whenever
+        // the Home screen returns to the foreground instead of waiting for a reinstall.
+        if (viewModel != null) viewModel.loadBanners();
         AppContainer c = ContainerProvider.from(requireActivity());
             c.getIoExecutor().execute(() -> {
             AppFeatures.refresh(c);
