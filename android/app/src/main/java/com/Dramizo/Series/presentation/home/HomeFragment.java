@@ -1425,6 +1425,13 @@ public class HomeFragment extends Fragment {
         com.Dramizo.Series.util.RemoteNavIcons.bindHomeShortcut(binding.imgMyRoomShortcutIcon, "room");
     }
 
+    /** Rebind dashboard-managed Home images after the shared visual config refreshes. */
+    public void refreshDashboardVisuals() {
+        if (binding == null) return;
+        refreshHeaderShortcutIcons();
+        if (viewModel != null) viewModel.loadBanners();
+    }
+
     private void applyRemoteHomeAssets() {
         // Header shortcut icons are bound explicitly by refreshHeaderShortcutIcons().
     }
