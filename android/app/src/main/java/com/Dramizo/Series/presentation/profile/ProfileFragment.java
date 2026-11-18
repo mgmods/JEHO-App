@@ -233,6 +233,8 @@ public class ProfileFragment extends Fragment {
             bindMyCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
             binding.tvDisplayName.setText(user.displayName != null && !user.displayName.trim().isEmpty()
                     ? user.displayName : (user.username != null ? user.username : "مستخدم"));
+            bindMyAgencyRoleBadge(user);
+            bindMyMiniMedals(user);
             // Keep the purchased animated account-name style active on the Me/profile page.
             com.Dramizo.Series.util.VipNameStyle.bind(binding.tvDisplayName, user);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
@@ -343,6 +345,104 @@ public class ProfileFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.loadMe();
+    }
+
+    /** Agency owner identity follows the user; agency host identity remains visible on profile. */
+    private void bindMyAgencyRoleBadge(@Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (binding == null || binding.tvMyAgencyRoleBadge == null) return;
+        TextView badge = binding.tvMyAgencyRoleBadge;
+        badge.setText("");
+        badge.setVisibility(View.GONE);
+        if (user == null) return;
+        String role = "";
+        if (user.agency != null && user.agency.role != null) role = user.agency.role.trim();
+        if ((role.isEmpty() || "member".equalsIgnoreCase(role))
+                && user.agencyClub != null && user.agencyClub.role != null) {
+            role = user.agencyClub.role.trim();
+        }
+        role = role.toLowerCase(Locale.ROOT).replace('-', '_').replace("agency_", "");
+        String label = null;
+        if ("owner".equals(role) || "leader".equals(role)) label = "قائد وكالة";
+        else if ("host".equals(role)) label = "مضيف";
+        else if ("manager".equals(role) || "admin".equals(role) || "staff".equals(role)) label = "مشرف وكالة";
+        if (label == null) return;
+        badge.setText(StaffRoleHelper.genderizeLabel(label, user.gender));
+        badge.setVisibility(View.VISIBLE);
+    }
+
+    /** Loads up to five selected/earned medals as icon-only chips beside popularity. */
+    private void bindMyMiniMedals(@Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (binding == null || binding.rowMyMiniMedals == null) return;
+        android.widget.LinearLayout strip = binding.rowMyMiniMedals;
+        strip.removeAllViews();
+        strip.setVisibility(View.GONE);
+        if (user == null || user.id == null || user.id.trim().isEmpty()) return;
+        final String userId = user.id;
+        final java.util.List<String> pinned = user.displayedMedalIds == null
+                ? new java.util.ArrayList<>() : new java.util.ArrayList<>(user.displayedMedalIds);
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned = java.util.Collections.emptyList();
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
+                        c.getUserApi().earnedBadges(userId).execute();
+                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
+                    earned = response.body().data;
+                }
+            } catch (Exception ignored) { }
+            final java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> badges = earned;
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || binding.rowMyMiniMedals == null || !isAdded()
+                        || !userId.equals(myId)) return;
+                java.util.List<String> selected = pinned;
+                if (selected.isEmpty()) {
+                    selected = new java.util.ArrayList<>();
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto item : badges) {
+                        if (item != null && item.earned && item.id != null) selected.add(item.id);
+                    }
+                }
+                strip.removeAllViews();
+                int count = 0;
+                for (String key : selected) {
+                    if (key == null || count >= 5) break;
+                    String imageUrl = null;
+                    String description = "ميدالية";
+                    if (key.startsWith("vip:")) {
+                        int level = Math.max(0, user.vipLevel);
+                        if (level <= 0) {
+                            try { level = Integer.parseInt(key.substring(4)); } catch (Exception ignored) { }
+                        }
+                        if (level > 0 && level <= 7) {
+                            imageUrl = user.levelBadgeUrl != null && !user.levelBadgeUrl.trim().isEmpty()
+                                    ? user.levelBadgeUrl : "/assets/visual-system/vip/vip_medal_mikoo_" + level + ".png";
+                        }
+                    } else {
+                        for (com.Dramizo.Series.data.remote.dto.BadgeDto item : badges) {
+                            if (item != null && item.earned && key.equals(item.id)
+                                    && item.imageUrl != null && !item.imageUrl.trim().isEmpty()) {
+                                imageUrl = item.imageUrl;
+                                description = item.name == null ? "ميدالية" : item.name;
+                                break;
+                            }
+                        }
+                    }
+                    if (imageUrl == null) continue;
+                    ImageView icon = new ImageView(requireContext());
+                    int size = Math.round(18 * getResources().getDisplayMetrics().density);
+                    android.widget.LinearLayout.LayoutParams lp =
+                            new android.widget.LinearLayout.LayoutParams(size, size);
+                    lp.setMargins(0, 0, Math.round(3 * getResources().getDisplayMetrics().density), 0);
+                    icon.setLayoutParams(lp);
+                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    icon.setContentDescription(description);
+                    strip.addView(icon);
+                    ServerAssets.load(icon, imageUrl);
+                    count++;
+                }
+                strip.setVisibility(strip.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+            });
+        });
     }
 
     /** Load the per-level horizontal VIP badge from the public VIP plans API. */
