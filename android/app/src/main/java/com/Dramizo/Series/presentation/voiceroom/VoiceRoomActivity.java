@@ -343,14 +343,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     // Restore the previously fast bounded cannon pipeline. The hold/release guard
     // still cancels every request that has not started; only already-started sends finish.
     private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 8;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 30L;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 120L;
     private int luckyCannonInFlight;
     private int luckyCannonPendingQuantity;
     private boolean luckyCannonHoldActive;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
             if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
-            sendLuckyCannonGift(false);
+            // A held press increments the visual send quantity only. No wallet request
+            // is started until ACTION_UP submits the complete combo as one batch.
+            luckyCannonPendingQuantity = Math.min(
+                    LUCKY_CANNON_MAX_BATCH_QUANTITY, luckyCannonPendingQuantity + 1);
+            if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
+            handler.postDelayed(this, LUCKY_CANNON_REPEAT_INTERVAL_MS);
         }
     };
     @Nullable private String luckyCannonRequestId;
@@ -4750,7 +4755,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setElevation(luckyCannonDp(80));
         // INVISIBLE preserves measured bounds so the initial draggable position is stable.
         layer.setVisibility(View.INVISIBLE);
-        // Hold-to-fire: send once immediately, then repeat only while the finger remains down.
+        // Hold-to-combo: count while held, then submit one batch on ACTION_UP.
         // Touch is consumed here so ACTION_UP cannot trigger a second click send.
         layer.setOnTouchListener(new View.OnTouchListener() {
             private float downRawX, downRawY, startTx, startTy;
@@ -4771,7 +4776,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         float dy = event.getRawY() - downRawY;
                         if (!dragging && (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop)) {
                             dragging = true;
-                            stopLuckyCannonHold();
+                            stopLuckyCannonHold(false);
                             if (layer.getParent() != null) layer.getParent().requestDisallowInterceptTouchEvent(true);
                         }
                         if (dragging && root.getWidth() > 0 && root.getHeight() > 0) {
@@ -4785,8 +4790,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         return true;
                     }
                     case MotionEvent.ACTION_UP:
+                        stopLuckyCannonHold(true);
+                        if (dragging && layer.getParent() != null) {
+                            layer.getParent().requestDisallowInterceptTouchEvent(false);
+                        }
+                        return true;
                     case MotionEvent.ACTION_CANCEL:
-                        stopLuckyCannonHold();
+                        stopLuckyCannonHold(false);
                         if (dragging && layer.getParent() != null) {
                             layer.getParent().requestDisallowInterceptTouchEvent(false);
                         }
@@ -4903,115 +4913,77 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void startLuckyCannonHold() {
-        stopLuckyCannonHold();
-        if (!luckyCannonEnabled || luckyCannonGiftId == null || luckyCannonTargets.isEmpty()) return;
+        stopLuckyCannonHold(false);
+        if (!luckyCannonEnabled || luckyCannonGiftId == null || roomId == null || roomId.isEmpty()) return;
+        if (collectOccupiedMicUserIds().isEmpty()) {
+            Toast.makeText(this, "لا يوجد مستخدمون على المقاعد لإرسال الهدية", Toast.LENGTH_SHORT).show();
+            return;
+        }
         luckyCannonHoldActive = true;
-        sendLuckyCannonGift(true);
-    }
-
-    /** Releasing the cannon cancels every not-yet-started repeat immediately. */
-    private void stopLuckyCannonHold() {
-        luckyCannonHoldActive = false;
-        luckyCannonPendingQuantity = 0;
+        luckyCannonPendingQuantity = 1;
+        if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
         handler.removeCallbacks(luckyCannonRepeatRunnable);
+        handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
     }
 
     /**
-     * Each hold tick gives local feedback immediately. Economy calls stay sequential to avoid
-     * simultaneous charges; pending ticks are discarded as soon as the finger is released.
+     * ACTION_UP commits the complete held quantity in one all-mic request.
+     * ACTION_CANCEL / drag only discard the not-yet-sent combo.
      */
-    private void sendLuckyCannonGift(boolean animatePress) {
-        sendLuckyCannonGift(animatePress, 0);
+    private void stopLuckyCannonHold(boolean sendAccumulated) {
+        boolean wasHolding = luckyCannonHoldActive;
+        luckyCannonHoldActive = false;
+        handler.removeCallbacks(luckyCannonRepeatRunnable);
+        int batchQuantity = luckyCannonPendingQuantity;
+        luckyCannonPendingQuantity = 0;
+        if (sendAccumulated && wasHolding && batchQuantity > 0) {
+            sendLuckyCannonBatch(batchQuantity);
+        }
     }
 
-    private void sendLuckyCannonGift(boolean animatePress, int quantityOverride) {
-        // A repeat may have been posted just before ACTION_UP; never start it after release.
-        if (!animatePress && !luckyCannonHoldActive) return;
+    private void sendLuckyCannonBatch(int requestedQuantity) {
         if (!luckyCannonEnabled || luckyCannonGiftId == null
-                || luckyCannonTargets.isEmpty() || roomId == null || roomId.isEmpty()) return;
-        if (animatePress) {
-            if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
-            if (luckyCannonPulseEnabled && luckyCannonLayer != null) {
-                luckyCannonLayer.animate().cancel();
-                luckyCannonLayer.setScaleX(0.96f);
-                luckyCannonLayer.setScaleY(0.96f);
-                luckyCannonLayer.animate().scaleX(1.045f).scaleY(1.045f).setDuration(55L)
-                        .withEndAction(() -> {
-                            if (luckyCannonLayer != null) luckyCannonLayer.animate()
-                                    .scaleX(1f).scaleY(1f).setDuration(75L).start();
-                        }).start();
-            }
-        }
-
-        // A single request may be active at a time. While it is active, held repeats
-        // are coalesced into a bounded batch; ACTION_UP clears that batch immediately.
-        // This prevents a backlog of independently charged gifts from appearing later.
-        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) {
-            if (luckyCannonHoldActive && !animatePress) {
-                luckyCannonPendingQuantity = Math.min(
-                        LUCKY_CANNON_MAX_BATCH_QUANTITY,
-                        luckyCannonPendingQuantity + Math.max(1, luckyCannonGiftQuantity));
-                handler.removeCallbacks(luckyCannonRepeatRunnable);
-                handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
-            }
+                || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
+        // Resolve the live roster at release time; never fall back to stale selected IDs.
+        java.util.LinkedHashSet<String> liveTargets =
+                new java.util.LinkedHashSet<>(collectOccupiedMicUserIds());
+        if (liveTargets.isEmpty()) {
+            Toast.makeText(this, "لم يعد هناك مستخدمون على المقاعد", Toast.LENGTH_SHORT).show();
             return;
         }
-        final AppContainer container;
-        try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
-        final String giftId = luckyCannonGiftId;
-        final String requestId = java.util.UUID.randomUUID().toString();
-        final int quantity = Math.max(1, Math.min(LUCKY_CANNON_MAX_BATCH_QUANTITY,
-                quantityOverride > 0 ? quantityOverride : luckyCannonGiftQuantity));
-        java.util.LinkedHashSet<String> liveTargets = new java.util.LinkedHashSet<>(collectOccupiedMicUserIds());
-        if (liveTargets.isEmpty()) liveTargets.addAll(luckyCannonTargets);
         final List<String> targets = new ArrayList<>(liveTargets);
-        if (targets.isEmpty()) return;
+        final String giftId = luckyCannonGiftId;
         final String currentRoom = roomId;
+        final String requestId = java.util.UUID.randomUUID().toString();
+        final int quantity = Math.max(1, Math.min(
+                LUCKY_CANNON_MAX_BATCH_QUANTITY, requestedQuantity));
+        final AppContainer container;
+        try {
+            container = ContainerProvider.from(this);
+        } catch (Exception ignored) {
+            return;
+        }
+        luckyCannonRequestId = requestId;
         luckyCannonInFlight++;
         luckyCannonSending = true;
-        if (luckyCannonView != null) luckyCannonView.setEnabled(true);
-        // Schedule the next shot on a short fixed cadence. A bounded in-flight
-        // pipeline prevents a single slow response from throttling every subsequent shot.
-        if (luckyCannonHoldActive && !isFinishing() && !isDestroyed()) {
-            handler.removeCallbacks(luckyCannonRepeatRunnable);
-            handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
-        }
         container.getLuckyCannonExecutor().execute(() -> {
-            Result<GiftDtos.SendGiftResult> result;
-            if (targets.size() > 1) {
-                GiftDtos.SendAllMicRequest request =
-                        new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
-                request.cannonLaunch = true;
-                request.requestId = requestId;
-                result = ApiCall.execute(container.getGiftApi().sendAllMic(request));
-            } else {
-                GiftDtos.SendGiftRequest request =
-                        new GiftDtos.SendGiftRequest(giftId, targets.get(0), quantity, currentRoom, 1);
-                request.cannonLaunch = true;
-                request.requestId = requestId;
-                result = ApiCall.execute(container.getGiftApi().send(request));
-            }
+            GiftDtos.SendAllMicRequest request =
+                    new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
+            request.cannonLaunch = true;
+            request.requestId = requestId;
+            Result<GiftDtos.SendGiftResult> result =
+                    ApiCall.execute(container.getGiftApi().sendAllMic(request));
 
-            // Backward compatibility: the currently pinned JEHO-OWN server predates the
-            // cannonLaunch DTO field and rejects it at validation time. Retry only this exact
-            // schema mismatch, with the same idempotency key and without cannonLaunch. The
-            // first request is rejected before gift processing, so this fallback cannot double-charge.
+            // Keep compatibility with an older pinned API schema, reusing the same
+            // idempotency key so the rejected first attempt cannot be charged twice.
             if (!result.success && result.error != null) {
                 String errorText = result.error.toLowerCase(java.util.Locale.ROOT);
                 if (errorText.contains("cannonlaunch") && errorText.contains("should not exist")) {
-                    if (targets.size() > 1) {
-                        GiftDtos.SendAllMicRequest retry =
-                                new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
-                        retry.cannonLaunch = null;
-                        retry.requestId = requestId;
-                        result = ApiCall.execute(container.getGiftApi().sendAllMic(retry));
-                    } else {
-                        GiftDtos.SendGiftRequest retry =
-                                new GiftDtos.SendGiftRequest(giftId, targets.get(0), quantity, currentRoom, 1);
-                        retry.cannonLaunch = null;
-                        retry.requestId = requestId;
-                        result = ApiCall.execute(container.getGiftApi().send(retry));
-                    }
+                    GiftDtos.SendAllMicRequest retry =
+                            new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
+                    retry.cannonLaunch = null;
+                    retry.requestId = requestId;
+                    result = ApiCall.execute(container.getGiftApi().sendAllMic(retry));
                 }
             }
             final Result<GiftDtos.SendGiftResult> finalResult = result;
@@ -5021,24 +4993,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 luckyCannonSending = luckyCannonInFlight > 0;
                 if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
                 if (!finalResult.success || finalResult.data == null || !finalResult.data.success) {
-                    // Do not keep charging/retrying queued taps after a balance or server error.
-                    stopLuckyCannonHold();
                     BalanceRedirect.handle(VoiceRoomActivity.this,
-                            finalResult.error != null ? finalResult.error : "تعذر إرسال الهدية، حاول مجدداً");
+                            finalResult.error != null ? finalResult.error : "تعذر إرسال دفعة الهدية");
                     return;
                 }
-                // Server emits the canonical room gift event; animation is rendered locally by
-                // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                // Send all held repeats accumulated during the network round-trip as
-                // one quantity batch. No unsent shot survives ACTION_UP.
-                if (luckyCannonHoldActive && luckyCannonPendingQuantity > 0
-                        && !isFinishing() && !isDestroyed()) {
-                    int batchQuantity = luckyCannonPendingQuantity;
-                    luckyCannonPendingQuantity = 0;
-                    handler.removeCallbacks(luckyCannonRepeatRunnable);
-                    handler.post(() -> sendLuckyCannonGift(false, batchQuantity));
-                }
             });
         });
     }
