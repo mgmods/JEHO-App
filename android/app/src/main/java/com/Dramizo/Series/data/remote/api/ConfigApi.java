@@ -48,6 +48,7 @@ public interface ConfigApi {
     @GET("config/toast-style")
     Call<ApiResponse<Map<String, Object>>> toastStyle(@Query("_") long cacheBust);
 
+    @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
     @GET("config/features")
     Call<ApiResponse<MiscDtos.FeaturesDto>> features();
 
