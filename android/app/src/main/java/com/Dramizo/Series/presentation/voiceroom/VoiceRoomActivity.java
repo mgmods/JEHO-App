@@ -17945,6 +17945,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ? SeatAdapter.SCALE_NORMAL
                 : guestCount <= 15
                 ? SeatAdapter.SCALE_MEDIUM
+                : guestCount > 20
+                ? SeatAdapter.SCALE_MICRO
                 : SeatAdapter.SCALE_COMPACT;
         seatAdapter.setScaleMode(scale);
 
