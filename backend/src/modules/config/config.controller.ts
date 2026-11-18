@@ -30,6 +30,28 @@ function publicApiBase(): string {
   return configured;
 }
 
+function normalizePublicAssetUrl(value: unknown): string {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  const apiBase = publicApiBase();
+
+  if (raw.startsWith('/uploads/') && !raw.startsWith('//')) return apiBase + raw;
+  if (/^uploads\//i.test(raw)) return apiBase + '/' + raw;
+
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      if (/^\/uploads\//i.test(parsed.pathname)) {
+        return apiBase + parsed.pathname + parsed.search + parsed.hash;
+      }
+      return raw;
+    } catch {
+      return '';
+    }
+  }
+  return raw;
+}
+
 
 @ApiTags('Config')
 @Controller('config')
@@ -112,16 +134,22 @@ export class ConfigController {
     }
 
     const q = ((req.query?.lang as string) || '').trim().toLowerCase();
+    const normalized = list.map((banner: any) => ({
+      ...banner,
+      // Older dashboard saves may contain an absolute upload URL from the
+      // retired backend. Re-resolve only /uploads assets to this Ghaymah API.
+      imageUrl: normalizePublicAssetUrl(banner?.imageUrl),
+    }));
     if (!q) {
       // Return all locale variants; the app filters by device language.
-      return list.slice(0, 12);
+      return normalized.slice(0, 12);
     }
     const lang = q.startsWith('ar') ? 'ar' : 'en';
-    const filtered = list.filter((b: { lang?: string }) => {
+    const filtered = normalized.filter((b: { lang?: string }) => {
       const bl = (b.lang || 'all').toLowerCase();
       return bl === 'all' || bl === lang || !b.lang;
     });
-    return (filtered.length ? filtered : list).slice(0, 8);
+    return (filtered.length ? filtered : normalized).slice(0, 8);
   }
 
   @Public()
@@ -132,7 +160,7 @@ export class ConfigController {
     if (!row?.value) return [];
     try {
       const parsed = JSON.parse(row.value);
-      const imageUrl = typeof parsed?.imageUrl === 'string' ? parsed.imageUrl.trim() : '';
+      const imageUrl = normalizePublicAssetUrl(parsed?.imageUrl);
       if (!imageUrl) return [];
       return [{
         title: typeof parsed.title === 'string' ? parsed.title : '',
@@ -185,12 +213,8 @@ export class ConfigController {
     try { parsed = row?.value ? JSON.parse(row.value) : {}; } catch { parsed = {}; }
     const apiBase = publicApiBase();
     const normalize = (value: unknown): string => {
-      const raw = typeof value === 'string' ? value.trim() : '';
-      let url = raw;
-      if (raw.startsWith('/uploads/') && !raw.startsWith('//')) url = apiBase + raw;
-      else if (/^uploads\//i.test(raw)) url = apiBase + '/' + raw;
-      if (!url) return '';
-      if (!/^https?:\/\//i.test(url)) return '';
+      const url = normalizePublicAssetUrl(value);
+      if (!url || !/^https?:\/\//i.test(url)) return '';
       const separator = url.includes('?') ? '&' : '?';
       return url + separator + 'toast_v=' + Math.max(1, Number(parsed.version) || 1);
     };
