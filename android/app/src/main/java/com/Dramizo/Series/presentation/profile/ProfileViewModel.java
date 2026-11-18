@@ -90,7 +90,15 @@ public class ProfileViewModel extends ViewModel {
         // Refresh the visible profile when the dashboard changes the purchased animated name style.
         if (!java.util.Objects.equals(a.nameStyle, b.nameStyle)) return false;
         if (!eq(a.hostBadgeUrl, b.hostBadgeUrl)) return false;
+        if (!eq(a.vipBadgeUrl, b.vipBadgeUrl)) return false;
         if (!eq(a.staffRole, b.staffRole)) return false;
+        if (!java.util.Objects.equals(a.displayedMedalIds, b.displayedMedalIds)) return false;
+        if (!eq(a.agency == null ? null : a.agency.id, b.agency == null ? null : b.agency.id)) return false;
+        if (!eq(a.agency == null ? null : a.agency.role, b.agency == null ? null : b.agency.role)) return false;
+        if (!eq(a.agencyClub == null ? null : a.agencyClub.agencyId,
+                b.agencyClub == null ? null : b.agencyClub.agencyId)) return false;
+        if (!eq(a.agencyClub == null ? null : a.agencyClub.role,
+                b.agencyClub == null ? null : b.agencyClub.role)) return false;
         if (a.isAdmin != b.isAdmin) return false;
         if (a.level != b.level) return false;
         if (a.vipLevel != b.vipLevel) return false;
