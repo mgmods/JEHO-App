@@ -937,7 +937,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.recyclerSeats.setLayoutManager(new GridLayoutManager(this, MIKOO_SEAT_COLUMNS) {
             @Override
             public boolean canScrollVertically() {
-                return false;
+                return seatAdapter != null && seatAdapter.getItemCount() > 25;
             }
         });
         binding.recyclerSeats.setAdapter(seatAdapter);
@@ -17910,7 +17910,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private static final int MIKOO_SEAT_COLUMNS = 5;
 
-    /** UI guest mic presets (10/15/20) → backend total including host seat 0. */
+    /** UI guest mic presets (10/15/20/30) → backend total including host seat 0. */
     private static int totalSeatCountForGuestMics(int guestMics) {
         return Math.min(31, Math.max(2, guestMics + 1));
     }
@@ -17921,11 +17921,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int id = v.getId();
             if (id == R.id.btnSeats15) guestMics = 15;
             else if (id == R.id.btnSeats20) guestMics = 20;
+            else if (id == R.id.btnSeats30) guestMics = 30;
             viewModel.resizeSeats(roomId, totalSeatCountForGuestMics(guestMics));
             Toast.makeText(this, "تم ضبط المقاعد: " + guestMics, Toast.LENGTH_SHORT).show();
             if (onPicked != null) onPicked.run();
         };
-        int[] ids = {R.id.btnSeats10, R.id.btnSeats15, R.id.btnSeats20};
+        int[] ids = {R.id.btnSeats10, R.id.btnSeats15, R.id.btnSeats20, R.id.btnSeats30};
         for (int btnId : ids) {
             View button = sheet.findViewById(btnId);
             if (button != null) {
@@ -17959,6 +17960,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         int rowHeightDp = scale == SeatAdapter.SCALE_COMPACT ? 82
                 : scale == SeatAdapter.SCALE_MEDIUM ? 88 : 98;
         int totalHeightPx = dp(rows * rowHeightDp + 8);
+        // 30-mic rooms keep all seats available in a bounded, vertically scrollable grid.
+        boolean largeSeatGrid = guestCount > 20;
+        if (largeSeatGrid) totalHeightPx = Math.min(totalHeightPx, dp(330));
+        binding.recyclerSeats.setNestedScrollingEnabled(largeSeatGrid);
         // Skip requestLayout on mute-only room refreshes — that was blinking seats.
         int layoutKey = (guestCount << 16) ^ (scale << 8) ^ totalHeightPx;
         if (layoutKey == lastSeatGridLayoutKey) return;
