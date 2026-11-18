@@ -17909,7 +17909,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         choose.setText("تعديل عدد المقاعد · الحالي " + currentGuestSeatCount());
         choose.setOnClickListener(v -> {
             if (onPicked != null) onPicked.run();
-            choose.post(this::showRoomSeatCountPicker);
+            choose.postDelayed(this::showRoomSeatCountPicker, 180);
         });
     }
 
