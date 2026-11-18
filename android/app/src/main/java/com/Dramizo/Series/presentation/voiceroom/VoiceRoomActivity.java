@@ -10734,7 +10734,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         applyRoomBanner(false);
         binding.tvRoomRules.setVisibility(shortScreen ? View.GONE : View.VISIBLE);
         // Give chat more vertical room so bubbles stay readable while typing.
-        binding.chatPanel.setMinimumHeight(dp(shortScreen ? 180 : tablet ? 260 : 220));
+        boolean thirtySeatRoom = currentSeats != null && guestSeatsOnly(currentSeats).size() > 20;
+        binding.chatPanel.setMinimumHeight(dp(thirtySeatRoom
+                ? (shortScreen ? 132 : 158)
+                : shortScreen ? 180 : tablet ? 260 : 220));
         // Keep private-msg icon sync with host toggle (does not hide public chat).
         applyChatZone(roomChatZoneVisible);
 
@@ -11109,42 +11112,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void showSeatCountSheet() {
-        if (!canManageRoom && !isHost) {
-            // Guests: home/minimize shortcut instead of seat admin.
-            keepRoomInBackground();
+        if (!canManageRoom && !isHost && !isOwner) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
             return;
         }
-        BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
-        View sheet = getLayoutInflater().inflate(R.layout.dialog_room_settings, null);
-        AuraDialogHelper.applyContent(sheet);
-        dialog.setContentView(sheet);
+        showRoomSeatCountPicker();
+    }
 
-        TextView title = sheet.findViewById(R.id.tvDialogTitle);
-        if (title != null) title.setText("ضبط المقاعد");
+    private int currentGuestSeatCount() {
+        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
+        int total = room != null ? room.seatCount : 0;
+        int guests = total > 1 ? total - 1 : 10;
+        return guests;
+    }
 
-        // Hide non-seat admin rows for a focused seats sheet.
-        int[] hideIds = {
-                R.id.btnChangeRoomName,
-                R.id.btnChangeRoomPhoto,
-                R.id.btnSeatRequests,
-                R.id.btnToggleLock,
-                R.id.rowGiftSounds,
-                R.id.tvGiftSoundsHint,
-                R.id.btnPickRoomBackground,
-                R.id.btnManageSeats,
-                R.id.btnManageMods
-        };
-        for (int id : hideIds) {
-            View row = sheet.findViewById(id);
-            if (row != null) row.setVisibility(View.GONE);
-        }
-        View close = sheet.findViewById(R.id.btnDialogClose);
-        if (close != null) {
-            close.setOnClickListener(v -> dialog.dismiss());
-        }
-
-        wireSeatCountButtons(sheet, dialog::dismiss);
-        dialog.show();
+    private void showRoomSeatCountPicker() {
+        RoomSeatCountPicker.show(this, currentGuestSeatCount(), guestMics -> {
+            viewModel.resizeSeats(roomId, totalSeatCountForGuestMics(guestMics));
+            Toast.makeText(this, "تم ضبط المقاعد: " + guestMics, Toast.LENGTH_SHORT).show();
+        });
     }
 
     private void showHostTools() {
@@ -17915,24 +17901,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void wireSeatCountButtons(View sheet, @Nullable Runnable onPicked) {
-        View.OnClickListener seats = v -> {
-            int guestMics = 10;
-            int id = v.getId();
-            if (id == R.id.btnSeats15) guestMics = 15;
-            else if (id == R.id.btnSeats20) guestMics = 20;
-            else if (id == R.id.btnSeats30) guestMics = 30;
-            viewModel.resizeSeats(roomId, totalSeatCountForGuestMics(guestMics));
-            Toast.makeText(this, "تم ضبط المقاعد: " + guestMics, Toast.LENGTH_SHORT).show();
-            if (onPicked != null) onPicked.run();
-        };
-        int[] ids = {R.id.btnSeats10, R.id.btnSeats15, R.id.btnSeats20, R.id.btnSeats30};
-        for (int btnId : ids) {
-            View button = sheet.findViewById(btnId);
-            if (button != null) {
-                button.setVisibility(View.VISIBLE);
-                button.setOnClickListener(seats);
-            }
-        }
+        View row = sheet.findViewById(R.id.rowSeatCounts);
+        TextView choose = sheet.findViewById(R.id.btnChooseSeatCount);
+        if (row == null || choose == null) return;
+        row.setVisibility(View.VISIBLE);
+        choose.setText("تعديل عدد المقاعد · الحالي " + currentGuestSeatCount());
+        choose.setOnClickListener(v -> showRoomSeatCountPicker());
     }
 
     /** Mikoo grid: 5 columns, no scroll, compact scale for 15/20 mics. */
@@ -17958,7 +17932,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Match measured SeatAdapter cell height (avatar frame + name + vertical padding).
         // The old 64/74/84dp estimates were too short for the actual 76dp seat frame,
         // so the last row was clipped/overlapped by the supporter and relationship layers.
-        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 56
+        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 78
                 : scale == SeatAdapter.SCALE_COMPACT ? 82
                 : scale == SeatAdapter.SCALE_MEDIUM ? 88 : 98;
         int totalHeightPx = dp(rows * rowHeightDp + 4);
@@ -17978,6 +17952,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.recyclerSeats.setLayoutParams(clp);
         }
         binding.recyclerSeats.setNestedScrollingEnabled(false);
+        if (binding.rowTopHosts != null) {
+            ViewGroup.LayoutParams topRaw = binding.rowTopHosts.getLayoutParams();
+            if (topRaw instanceof ViewGroup.MarginLayoutParams topLp) {
+                topLp.topMargin = dp(largeSeatGrid ? 8 : 28);
+                binding.rowTopHosts.setLayoutParams(topLp);
+            }
+        }
+        binding.recyclerSeats.setPadding(dp(2), binding.recyclerSeats.getPaddingTop(),
+                dp(2), dp(2));
         binding.recyclerSeats.requestLayout();
     }
 
