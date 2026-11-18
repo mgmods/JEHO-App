@@ -86,7 +86,7 @@ public final class LuckyGiftStageAnimator {
         hero.setScaleY(0.18f);
 
         TextView count = new TextView(overlay.getContext());
-        int copies = Math.max(1, quantity) * Math.max(1, personCount);
+        int copies = Math.max(1, quantity);
         count.setText("×" + copies);
         count.setTextColor(0xFFFFFFFF);
         count.setTextSize(17f);
@@ -135,35 +135,19 @@ public final class LuckyGiftStageAnimator {
             return;
         }
 
-        // Keep one guaranteed flight for every occupied target seat, then add a small,
-        // bounded screen-filling burst for large quantities. This is visual-only:
-        // the server has already charged and recorded the gift exactly once.
+        // Every flight maps to a real occupied seat supplied by the room.
+        // Never create decorative targets over empty seats or arbitrary screen positions.
         hero.animate().cancel();
         hero.setAlpha(1f);
         hero.setScaleX(1f);
         hero.setScaleY(1f);
 
-        int totalGiftUnits = Math.max(1, quantity) * Math.max(1, personCount);
-        int decorativeCopies = Math.min(8, Math.max(0, totalGiftUnits - seats.size()));
-        int flightCount = seats.size() + decorativeCopies;
+        int flightCount = seats.size();
         final int[] remaining = {flightCount};
         int size = Math.round(44f * density);
-        float width = Math.max(overlay.getWidth(), 1);
-        float height = Math.max(overlay.getHeight(), 1);
 
         for (int i = 0; i < flightCount; i++) {
-            PointF target;
-            if (i < seats.size()) {
-                target = seats.get(i);
-            } else {
-                // Eight optional copies fan through a compact 4×2 pattern so the
-                // room feels filled without creating hundreds of heavyweight views.
-                int slot = i - seats.size();
-                int column = slot % 4;
-                int row = slot / 4;
-                target = new PointF(width * (0.14f + column * 0.24f),
-                        height * (0.28f + row * 0.34f));
-            }
+            PointF target = seats.get(i);
 
             ImageView copy = new ImageView(overlay.getContext());
             copy.setScaleType(ImageView.ScaleType.FIT_CENTER);
