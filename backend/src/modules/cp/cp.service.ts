@@ -111,7 +111,6 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
       // Rewrite only known legacy values. Once migrated, subsequent app
       // restarts perform no table-wide UPDATE and do not rewrite current rows.
-      const legacyTypes = ['love', 'engagement', 'friendship', 'brotherhood', 'marriage'];
       await manager.query(
         `UPDATE cp_relationships SET type=$1 WHERE type = ANY($2::varchar[])`,
         [CpType.RELATIONSHIP, legacyTypes],
