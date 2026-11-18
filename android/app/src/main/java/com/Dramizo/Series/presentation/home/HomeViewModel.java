@@ -316,7 +316,7 @@ public class HomeViewModel extends ViewModel {
 
     public void loadBanners() {
         c.getIoExecutor().execute(() -> {
-            Result<List<MiscDtos.BannerDto>> r = ApiCall.execute(c.getConfigApi().banners());
+            Result<List<MiscDtos.BannerDto>> r = ApiCall.execute(c.getConfigApi().banners(System.currentTimeMillis()));
             if (r.success && r.data != null) banners.postValue(r.data);
         });
     }
