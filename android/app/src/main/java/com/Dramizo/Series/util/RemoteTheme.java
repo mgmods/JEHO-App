@@ -28,7 +28,7 @@ import com.bumptech.glide.request.transition.Transition;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Applies APK-bundled visuals only. Dashboard remote theme is not used.
+ * Applies dashboard-managed remote visuals with APK-bundled fallbacks.
  */
 public final class RemoteTheme {
     private static volatile MiscDtos.ThemeDto cached;
@@ -80,9 +80,12 @@ public final class RemoteTheme {
             com.Dramizo.Series.domain.model.Result<MiscDtos.ThemeDto> result =
                     ApiCall.execute(api.theme());
             if (!result.success || result.data == null) return;
+            MiscDtos.ThemeDto previous = cached != null ? cached : readDisk(context);
+            boolean changed = previous == null
+                    || !GSON.toJson(previous).equals(GSON.toJson(result.data));
             cached = result.data;
             writeDisk(context, result.data);
-            notifyRefreshListeners();
+            if (changed) notifyRefreshListeners();
         } catch (Throwable ignored) {
             // Remote configuration must never prevent the app from opening.
         }
