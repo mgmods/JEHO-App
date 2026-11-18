@@ -342,8 +342,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
     // Restore the previously fast bounded cannon pipeline. The hold/release guard
     // still cancels every request that has not started; only already-started sends finish.
-    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 5;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 45L;
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 8;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 30L;
     private int luckyCannonInFlight;
     private int luckyCannonPendingQuantity;
     private boolean luckyCannonHoldActive;
