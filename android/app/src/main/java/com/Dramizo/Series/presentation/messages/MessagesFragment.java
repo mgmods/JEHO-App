@@ -330,6 +330,11 @@ public class MessagesFragment extends Fragment {
                 RemoteNavIcons.isChannelVerified("adminMessages") ? View.VISIBLE : View.GONE);
     }
 
+    /** Rebind dashboard-managed inbox channel icons after the shared config refreshes. */
+    public void refreshDashboardIcons() {
+        bindChannelBranding();
+    }
+
     private void runGlobalSearch(String query, int sequence) {
         if (!isAdded() || binding == null) return;
         AppContainer c = ContainerProvider.from(requireActivity());
