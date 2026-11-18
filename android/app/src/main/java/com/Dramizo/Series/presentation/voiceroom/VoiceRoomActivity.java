@@ -339,11 +339,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyCannonSending;
     /** One wallet request at a time; held shots are coalesced into a quantity batch. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
-    // Keep exactly one cannon charge request in flight. Releasing the finger clears
-    // every queued repeat, so a slow response cannot leave several already-submitted
-    // gifts waiting to appear after ACTION_UP.
-    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 1;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 40L;
+    // Restore the previously fast bounded cannon pipeline. The hold/release guard
+    // still cancels every request that has not started; only already-started sends finish.
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 5;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 65L;
     private int luckyCannonInFlight;
     private int luckyCannonPendingQuantity;
     private boolean luckyCannonHoldActive;
