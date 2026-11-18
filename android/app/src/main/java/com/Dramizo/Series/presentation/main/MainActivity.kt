@@ -135,6 +135,8 @@ class MainActivity : ThemedActivity() {
                         ?.refreshDashboardVisuals()
                     (supportFragmentManager.findFragmentByTag("f3") as? ProfileFragment)
                         ?.refreshDashboardIcons()
+                    (supportFragmentManager.findFragmentByTag("f2") as? MessagesFragment)
+                        ?.refreshDashboardIcons()
                 }
             }
             dashboardIconRefreshHandler.postDelayed(this, 60_000L)
