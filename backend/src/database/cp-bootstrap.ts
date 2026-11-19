@@ -230,13 +230,56 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
           END LOOP;
 
           EXECUTE format(
-            'ALTER TABLE %I.%I ADD CONSTRAINT %I CHECK (type IN (''relationship'',''friendship'',''brotherhood'',''love'',''engagement'',''marriage''))',
+            'ALTER TABLE %I.%I ADD CONSTRAINT %I CHECK (type IN (''relationship'',''friendship'',''brotherhood'',''love'',''engagement'',''marriage'')) NOT VALID',
             'jeho_own', target.table_name, target.constraint_name
           );
         END IF;
       END LOOP;
     END;
-    $$`);
+    $`);
+
+    // Validate separately from ADD CONSTRAINT. PostgreSQL uses a weaker
+    // ShareUpdateExclusive lock for VALIDATE CONSTRAINT, which permits normal
+    // SELECT/INSERT/UPDATE traffic; it avoids holding AccessExclusive during a scan.
+    await runner.query(`DO $
+    DECLARE
+      target record;
+      item record;
+      type_attnum smallint;
+    BEGIN
+      FOR target IN
+        SELECT * FROM (VALUES
+          ('cp_relationships'),
+          ('cp_requests')
+        ) AS targets(table_name)
+      LOOP
+        SELECT a.attnum INTO type_attnum
+        FROM pg_attribute a
+        JOIN pg_class t ON t.oid = a.attrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = 'jeho_own'
+          AND t.relname = target.table_name
+          AND a.attname = 'type'
+          AND NOT a.attisdropped;
+
+        FOR item IN
+          SELECT c.conname
+          FROM pg_constraint c
+          JOIN pg_class t ON t.oid = c.conrelid
+          JOIN pg_namespace n ON n.oid = t.relnamespace
+          WHERE n.nspname = 'jeho_own'
+            AND t.relname = target.table_name
+            AND c.contype = 'c'
+            AND c.conkey = ARRAY[type_attnum]::smallint[]
+            AND c.convalidated = false
+            AND pg_get_constraintdef(c.oid) ILIKE '%relationship%'
+        LOOP
+          EXECUTE format('ALTER TABLE %I.%I VALIDATE CONSTRAINT %I',
+            'jeho_own', target.table_name, item.conname);
+        END LOOP;
+      END LOOP;
+    END;
+    $`);
 
     await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_type_status_points ON "jeho_own"."cp_relationships"(type,status,points DESC)');
     await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_a_status ON "jeho_own"."cp_relationships"("userAId",status)');
