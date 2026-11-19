@@ -112,6 +112,55 @@ async function testLegacyUpgrade(ds) {
   assert.equal(preservedConstraint.length, 1, 'compound/unrelated CHECK constraint must remain intact');
 }
 
+async function testCpDdlLockTimeoutAndResume(ds) {
+  await resetSchema(ds);
+  await createCoreTables(ds);
+  await ds.query(`CREATE TABLE jeho_own.cp_requests (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "fromUserId" uuid NOT NULL,
+    "toUserId" uuid NOT NULL,
+    type varchar(24) NOT NULL,
+    status varchar(16) NOT NULL DEFAULT 'pending',
+    "roomId" uuid NOT NULL,
+    "priceCoins" bigint NOT NULL,
+    "idempotencyKey" varchar(128) NOT NULL UNIQUE,
+    "expiresAt" timestamptz NOT NULL,
+    "respondedAt" timestamptz NULL,
+    "relationshipId" uuid NULL,
+    "refundedAt" timestamptz NULL,
+    "createdAt" timestamptz NOT NULL DEFAULT now(),
+    "updatedAt" timestamptz NOT NULL DEFAULT now()
+  )`);
+
+  const blocker = ds.createQueryRunner();
+  await blocker.connect();
+  await blocker.startTransaction();
+  try {
+    // AccessShare is compatible with normal reads but conflicts with ALTER TABLE's
+    // AccessExclusive lock. The CP bootstrap must fail fast instead of queuing reads.
+    await blocker.query('SELECT * FROM jeho_own.cp_requests');
+    const startedAt = Date.now();
+    await assert.rejects(() => ensureCpTables(ds), /lock timeout/i);
+    const elapsedMs = Date.now() - startedAt;
+    assert.ok(elapsedMs < 2_000, `blocked CP DDL must fail fast (elapsed ${elapsedMs}ms)`);
+  } finally {
+    if (blocker.isTransactionActive) await blocker.rollbackTransaction().catch(() => undefined);
+    await blocker.release();
+  }
+
+  // The failed pass may have committed earlier additive steps; a retry must resume
+  // safely and finish without dropping or rewriting the existing request row.
+  await ensureCpTables(ds);
+  const columns = await ds.query(
+    `SELECT column_name, is_nullable FROM information_schema.columns
+     WHERE table_schema='jeho_own' AND table_name='cp_requests'
+       AND column_name IN ('giftId','roomId','priceCoins')`,
+  );
+  assert.equal(columns.length, 3, 'retry must complete the interrupted additive CP DDL');
+  assert.ok(columns.find((column) => column.column_name === 'roomId').is_nullable === 'YES');
+  assert.ok(columns.find((column) => column.column_name === 'priceCoins').is_nullable === 'YES');
+}
+
 async function testFirstInstallSchemaGuard(ds) {
   await resetSchema(ds);
   let state = await inspectJehoSchemaForProvisioning(ds);
@@ -182,10 +231,11 @@ async function main() {
   await ds.initialize();
   try {
     await testSharedSchemaMigrationLock(ds);
+    await testCpDdlLockTimeoutAndResume(ds);
     await testFirstInstallSchemaGuard(ds);
     await testFreshInstall(ds);
     await testLegacyUpgrade(ds);
-    console.log('PASS: shared migration-lock contention, empty/partial-schema provisioning guard, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
+    console.log('PASS: shared migration-lock contention, fail-fast CP DDL lock timeout and resume, empty/partial-schema provisioning guard, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
   } finally {
     await ds.query('DROP SCHEMA IF EXISTS jeho_own CASCADE');
     await ds.destroy();
