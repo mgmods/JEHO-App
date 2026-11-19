@@ -149,7 +149,8 @@ export class RechargeAgentsService implements OnModuleInit {
       await this.dataSource.transaction(async (manager) => {
         await manager.query("SET LOCAL lock_timeout = '250ms'");
         await manager.query("SET LOCAL statement_timeout = '8s'");
-        await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        if (lockRows?.[0]?.locked !== true) throw new Error('JEHO schema migration lock is busy; retrying later');
         await manager.query(`ALTER TABLE withdraw_requests ADD COLUMN IF NOT EXISTS "agentId" UUID`);
         await manager.query(`ALTER TABLE agency_members ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`);
         await manager.query(`CREATE INDEX IF NOT EXISTS "idx_withdraw_requests_agent" ON withdraw_requests("agentId")`);
