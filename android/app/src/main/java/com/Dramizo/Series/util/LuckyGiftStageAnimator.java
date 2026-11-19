@@ -160,8 +160,8 @@ public final class LuckyGiftStageAnimator {
             copy.setElevation(60f * density);
             stage.addView(copy);
 
-            final float endX = Math.max(0f, Math.min(width - size, target.x - size / 2f));
-            final float endY = Math.max(0f, Math.min(height - size, target.y - size / 2f));
+            final float endX = Math.max(0f, Math.min(overlay.getWidth() - size, target.x - size / 2f));
+            final float endY = Math.max(0f, Math.min(overlay.getHeight() - size, target.y - size / 2f));
             final float startX = fromX - size / 2f;
             final float startY = fromY - size / 2f;
             AnimatorSet flight = new AnimatorSet();

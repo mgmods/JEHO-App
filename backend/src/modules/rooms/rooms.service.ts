@@ -290,6 +290,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
                  AND "roomKind" = $1
                  AND status <> $2
                  AND "hostId" IS NOT NULL
+               AND (
+                 "isPersistent" IS DISTINCT FROM TRUE
+                 OR "emptySince" IS NOT NULL
+                 OR "activeHostId" IS NULL
+               )
             `, [RoomKind.STANDARD, RoomStatus.CLOSED]);
           } catch (err) {
             this.log.warn(`ensure persistent personal rooms deferred; retry will run: ${err instanceof Error ? err.message : String(err)}`);
@@ -2674,23 +2679,21 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
   /** Server-driven periodic wipe for rooms with chatAutoClearMinutes > 0. */
   private async sweepAutoChatClear() {
-    // This timer runs in every API replica. Use a dedicated PostgreSQL session
-    // lock so only one replica performs room-chat cleanup at a time.
+    if (!this.roomSchemaBootstrapReady) return;
+    // This timer runs in every API replica. Use the shared JEHO maintenance lock
+    // so room-chat cleanup cannot overlap schema changes on the same tables.
     const runner = this.dataSource.createQueryRunner();
     let locked = false;
     try {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '15s'");
-      const rows = await runner.query(
-        'SELECT pg_try_advisory_lock(741902611, 2001) AS locked',
-      );
-      locked = rows?.[0]?.locked === true;
+      locked = await tryAcquireJehoSchemaLock(runner);
       if (!locked) return;
       await this.sweepAutoChatClearOnce();
     } finally {
       if (locked) {
-        await runner.query('SELECT pg_advisory_unlock(741902611, 2001)').catch(() => undefined);
+        await releaseJehoSchemaLock(runner).catch(() => undefined);
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);

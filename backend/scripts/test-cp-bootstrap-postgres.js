@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 require('ts-node/register');
 const { DataSource } = require('typeorm');
 const { ensureCpTables } = require('../src/database/cp-bootstrap');
+const { tryAcquireJehoSchemaLock, releaseJehoSchemaLock, tryAcquireJehoSessionAdvisoryLock } = require('../src/database/schema-migration-lock');
 const { inspectJehoSchemaForProvisioning } = require('./jeho-empty-schema-guard');
 
 const databaseUrl = process.env.CP_TEST_DATABASE_URL;
@@ -110,6 +111,76 @@ async function testLegacyUpgrade(ds) {
      WHERE conrelid='jeho_own.cp_relationships'::regclass AND conname='preserve_pair_check'`,
   );
   assert.equal(preservedConstraint.length, 1, 'compound/unrelated CHECK constraint must remain intact');
+  const validatedTypeConstraints = await ds.query(
+    `SELECT conname, convalidated FROM pg_constraint
+     WHERE conrelid IN ('jeho_own.cp_relationships'::regclass, 'jeho_own.cp_requests'::regclass)
+       AND conname IN ('chk_cp_relationship_type_unified','chk_cp_request_type_unified')`,
+  );
+  assert.equal(validatedTypeConstraints.length, 2, 'both unified CP type constraints must exist');
+  assert.ok(validatedTypeConstraints.every((constraint) => constraint.convalidated === true),
+    'CP type constraints must be validated after their low-lock validation pass');
+}
+
+async function testCpDdlLockTimeoutAndResume(ds) {
+  await resetSchema(ds);
+  await createCoreTables(ds);
+  await ds.query(`CREATE TABLE jeho_own.cp_requests (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "fromUserId" uuid NOT NULL,
+    "toUserId" uuid NOT NULL,
+    type varchar(24) NOT NULL,
+    status varchar(16) NOT NULL DEFAULT 'pending',
+    "roomId" uuid NOT NULL,
+    "priceCoins" bigint NOT NULL,
+    "idempotencyKey" varchar(128) NOT NULL UNIQUE,
+    "expiresAt" timestamptz NOT NULL,
+    "respondedAt" timestamptz NULL,
+    "relationshipId" uuid NULL,
+    "refundedAt" timestamptz NULL,
+    "createdAt" timestamptz NOT NULL DEFAULT now(),
+    "updatedAt" timestamptz NOT NULL DEFAULT now()
+  )`);
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  await ds.query(
+    `INSERT INTO jeho_own.cp_requests
+      (id, "fromUserId", "toUserId", type, status, "roomId", "priceCoins", "idempotencyKey", "expiresAt")
+     VALUES ($1, $2, $3, 'love', 'pending', $4, 123, 'cp-lock-resume-test', NOW() + interval '1 hour')`,
+    [requestId, '22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333', '44444444-4444-4444-8444-444444444444'],
+  );
+
+  const blocker = ds.createQueryRunner();
+  await blocker.connect();
+  await blocker.startTransaction();
+  try {
+    // AccessShare is compatible with normal reads but conflicts with ALTER TABLE's
+    // AccessExclusive lock. The CP bootstrap must fail fast instead of queuing reads.
+    await blocker.query('SELECT * FROM jeho_own.cp_requests');
+    const startedAt = Date.now();
+    await assert.rejects(() => ensureCpTables(ds), /lock timeout/i);
+    const elapsedMs = Date.now() - startedAt;
+    assert.ok(elapsedMs < 2_000, `blocked CP DDL must fail fast (elapsed ${elapsedMs}ms)`);
+  } finally {
+    if (blocker.isTransactionActive) await blocker.rollbackTransaction().catch(() => undefined);
+    await blocker.release();
+  }
+
+  // The failed pass may have committed earlier additive steps; a retry must resume
+  // safely and finish without dropping or rewriting the existing request row.
+  await ensureCpTables(ds);
+  const columns = await ds.query(
+    `SELECT column_name, is_nullable FROM information_schema.columns
+     WHERE table_schema='jeho_own' AND table_name='cp_requests'
+       AND column_name IN ('giftId','roomId','priceCoins')`,
+  );
+  assert.equal(columns.length, 3, 'retry must complete the interrupted additive CP DDL');
+  assert.ok(columns.find((column) => column.column_name === 'roomId').is_nullable === 'YES');
+  assert.ok(columns.find((column) => column.column_name === 'priceCoins').is_nullable === 'YES');
+  const preserved = await ds.query(
+    'SELECT id, type, status FROM jeho_own.cp_requests WHERE id = $1',
+    [requestId],
+  );
+  assert.equal(preserved.length, 1, 'the pre-existing CP request row must survive interrupted bootstrap and retry');
+  assert.equal(preserved[0].type, 'love');
 }
 
 async function testFirstInstallSchemaGuard(ds) {
@@ -139,6 +210,46 @@ async function testFirstInstallSchemaGuard(ds) {
   state = await inspectJehoSchemaForProvisioning(ds);
   assert.equal(state.markerExists, true);
   assert.equal(state.status, 'running', 'interrupted first install must be recognized as resumable, not as a clean schema');
+}
+
+async function testSchemaLockReleaseFailureDiscardsConnection() {
+  let acquireDestroyed = false;
+  const uncertainAcquireRunner = {
+    async query() {
+      throw new Error('simulated acquire response loss');
+    },
+    async releasePostgresConnection() {
+      acquireDestroyed = true;
+    },
+  };
+  await assert.rejects(
+    () => tryAcquireJehoSessionAdvisoryLock(uncertainAcquireRunner, 2001),
+    /simulated acquire response loss/,
+  );
+  assert.equal(acquireDestroyed, true, 'a connection with an uncertain lock-acquire result must be discarded');
+
+  let destroyed = false;
+  const brokenRunner = {
+    async query(sql) {
+      if (sql.includes('pg_try_advisory_lock')) return [{ locked: true }];
+      throw new Error('simulated unlock failure');
+    },
+    async releasePostgresConnection() {
+      destroyed = true;
+    },
+  };
+  assert.equal(await tryAcquireJehoSchemaLock(brokenRunner), true);
+  await assert.rejects(() => releaseJehoSchemaLock(brokenRunner), /simulated unlock failure/);
+  assert.equal(destroyed, true, 'a session whose advisory unlock fails must be discarded, not pooled');
+
+  const nextRunner = {
+    async query(sql) {
+      if (sql.includes('pg_try_advisory_lock')) return [{ locked: true }];
+      return [{ unlocked: true }];
+    },
+  };
+  assert.equal(await tryAcquireJehoSchemaLock(nextRunner), true, 'local schema lock gate must recover after a failed unlock');
+  await releaseJehoSchemaLock(nextRunner);
 }
 
 async function testSharedSchemaMigrationLock(ds) {
@@ -181,11 +292,13 @@ async function main() {
   });
   await ds.initialize();
   try {
+    await testSchemaLockReleaseFailureDiscardsConnection();
     await testSharedSchemaMigrationLock(ds);
+    await testCpDdlLockTimeoutAndResume(ds);
     await testFirstInstallSchemaGuard(ds);
     await testFreshInstall(ds);
     await testLegacyUpgrade(ds);
-    console.log('PASS: shared migration-lock contention, empty/partial-schema provisioning guard, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
+    console.log('PASS: schema-lock session disposal after failed unlock, shared migration-lock contention, fail-fast CP DDL lock timeout and resume, empty/partial-schema provisioning guard, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
   } finally {
     await ds.query('DROP SCHEMA IF EXISTS jeho_own CASCADE');
     await ds.destroy();

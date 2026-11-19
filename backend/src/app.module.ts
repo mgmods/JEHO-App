@@ -59,6 +59,7 @@ import { ensureBadgeTables } from './database/badges-bootstrap';
 import { ensureVanityIdStyleColumns } from './database/vanity-id-style-bootstrap';
 import { ensureMomentsTables } from './database/moments-bootstrap';
 import { ensureUserProfileColumns } from './database/user-profile-bootstrap';
+import { PostgresLockMonitorService } from './database/postgres-lock-monitor.service';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -145,27 +146,45 @@ const entityList = Object.values(entities).filter(
         console.log(`[JEHO-OWN DB] Bootstrap connection opened in ${Date.now() - bootstrapStartedAt}ms.`);
         let bootstrapLockAcquired = false;
         try {
-          // Serialize even the pre-DataSource extension/schema DDL with every
-          // other JEHO migration. This uses the same key on this pinned session.
+          // Most restarts already have the schema and UUID extension. Check first
+          // so every API replica does not contend for the global migration lock
+          // when no bootstrap DDL is needed.
           await bootstrap.query("SET lock_timeout = '250ms'");
           await bootstrap.query("SET statement_timeout = '8s'");
-          for (let attempt = 0; attempt < 30 && !bootstrapLockAcquired; attempt += 1) {
-            const lockRows = await bootstrap.query(
-              'SELECT pg_try_advisory_lock($1, $2) AS locked',
-              [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-            );
-            bootstrapLockAcquired = lockRows?.[0]?.locked === true;
+          const readBootstrapState = async () => {
+            const [state] = await bootstrap.query(`
+              SELECT
+                EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'jeho_own') AS schema_exists,
+                EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'uuid-ossp') AS uuid_extension_exists
+            `);
+            return state;
+          };
+          let bootstrapState = await readBootstrapState();
+          if (!bootstrapState.schema_exists || !bootstrapState.uuid_extension_exists) {
+            // Only the first install/missing-extension path needs the shared lock.
+            for (let attempt = 0; attempt < 30 && !bootstrapLockAcquired; attempt += 1) {
+              const lockRows = await bootstrap.query(
+                'SELECT pg_try_advisory_lock($1, $2) AS locked',
+                [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+              );
+              bootstrapLockAcquired = lockRows?.[0]?.locked === true;
+              if (!bootstrapLockAcquired) {
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              }
+            }
             if (!bootstrapLockAcquired) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
+              throw new Error('[JEHO-OWN DB] Shared schema lock remained busy; refusing unsynchronized startup DDL.');
+            }
+            // Recheck after acquiring the lock; another replica may have finished
+            // the bootstrap between our first catalog check and lock acquisition.
+            bootstrapState = await readBootstrapState();
+            if (!bootstrapState.uuid_extension_exists) {
+              await bootstrap.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public');
+            }
+            if (!bootstrapState.schema_exists) {
+              await bootstrap.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
             }
           }
-          if (!bootstrapLockAcquired) {
-            throw new Error('[JEHO-OWN DB] Shared schema lock remained busy; refusing unsynchronized startup DDL.');
-          }
-          // TypeORM UUID defaults may call uuid_generate_v4(); keep the extension
-          // and app schema creation inside the shared lock and bounded session.
-          await bootstrap.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public');
-          await bootstrap.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
         } finally {
           if (bootstrapLockAcquired) {
             await bootstrap.query(
@@ -491,6 +510,7 @@ const entityList = Object.values(entities).filter(
     MomentsModule,
   ],
   providers: [
+    PostgresLockMonitorService,
     // JWT first so AppThrottlerGuard can key by user id (not shared carrier IP).
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: AppThrottlerGuard },

@@ -5,6 +5,7 @@ import {
   BadRequestException,
   Logger,
   OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -29,11 +30,12 @@ import {
   ChangePasswordDto,
 } from './dto/auth.dto';
 import { normalizeStaffRole } from '../../common/staff-role';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 @Injectable()
-export class AuthService implements OnModuleInit {
+export class AuthService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthService.name);
   private publicIdSchemaRetryTimer: ReturnType<typeof setInterval> | null = null;
+  private publicIdBackfillRunning = false;
 
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -496,20 +498,67 @@ export class AuthService implements OnModuleInit {
 
   /** Backfill numeric publicId for users who still use login/store name as ID. */
   async ensureAllPublicIds(): Promise<{ updated: number }> {
-    const missing = await this.usersRepo
-      .createQueryBuilder('u')
-      .where("u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ '^[0-9]{3,12}$'")
-      .getMany();
+    if (this.publicIdBackfillRunning) return { updated: 0 };
+    this.publicIdBackfillRunning = true;
+    const runner = this.dataSource.createQueryRunner();
+    let lockAcquired = false;
     let updated = 0;
-    for (const u of missing) {
-      u.publicId = await this.allocatePublicId();
-      await this.usersRepo.save(u);
-      updated += 1;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '30s'");
+      lockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!lockAcquired) {
+        // Another replica is handling the shared backfill. Retry later so a
+        // failed/terminated owner cannot leave missing IDs indefinitely.
+        if (!this.publicIdSchemaRetryTimer) {
+          this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
+          this.publicIdSchemaRetryTimer.unref?.();
+        }
+        return { updated: 0 };
+      }
+      // Page through missing IDs instead of loading the entire users table into memory.
+      while (true) {
+        const missing = await this.usersRepo.createQueryBuilder('u')
+          .where("u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ :pattern", { pattern: '^[0-9]{3,12}($)' })
+          .orderBy('u.id', 'ASC').take(250).getMany();
+        if (!missing.length) break;
+        for (const user of missing) {
+          const publicId = await this.allocatePublicId();
+          const result = await this.usersRepo.createQueryBuilder()
+            .update(User)
+            .set({ publicId })
+            .where('id = :id', { id: user.id })
+            .andWhere('("publicId" IS NULL OR "publicId" = :empty OR "publicId" !~ :pattern)', {
+              empty: '',
+              pattern: '^[0-9]{3,12}($)',
+            })
+            .execute();
+          updated += Number(result.affected || 0);
+        }
+      }
+      if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+      this.publicIdSchemaRetryTimer = null;
+      if (updated > 0) this.logger.log(`Allocated numeric public IDs for ${updated} existing user(s)`);
+      return { updated };
+    } catch (error) {
+      this.logger.warn(`Public ID backfill deferred: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.publicIdSchemaRetryTimer) {
+        this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
+        this.publicIdSchemaRetryTimer.unref?.();
+      }
+      return { updated };
+    } finally {
+      if (lockAcquired) await releaseJehoSchemaLock(runner).catch((unlockError) => this.logger.error(`Public-ID lock release failed; connection discarded: ${(unlockError as Error).message}`));
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+      this.publicIdBackfillRunning = false;
     }
-    if (updated > 0) {
-      this.logger.log(`Allocated six-digit publicId for ${updated} existing user(s)`);
-    }
-    return { updated };
+  }
+  onModuleDestroy(): void {
+    if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+    this.publicIdSchemaRetryTimer = null;
   }
   private async issueTokens(user: User) {
     if (user.status !== UserStatus.ACTIVE) {

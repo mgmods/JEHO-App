@@ -6,15 +6,16 @@ import {
   Inject,
   forwardRef,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, MoreThan, Repository, Or, IsNull } from 'typeorm';
+import { DataSource, MoreThan, QueryRunner, Repository, Or, IsNull } from 'typeorm';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomInt } from 'crypto';
 import { Gift, GiftType } from '../../database/entities/gift.entity';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { Cosmetic, CosmeticType } from '../../database/entities/cosmetic.entity';
@@ -85,11 +86,13 @@ const DEFAULT_LUCKY_ODDS_CONFIG: LuckyOddsConfig = {
 };
 
 @Injectable()
-export class GiftsService implements OnModuleInit {
+export class GiftsService implements OnModuleInit, OnModuleDestroy {
   private giftSchemaBootstrapTimer: ReturnType<typeof setInterval> | null = null;
   private giftSchemaBootstrapRunning = false;
   private giftSchemaBootstrapReady = false;
   private giftSchemaBootstrapFailed = false;
+  private giftInitializationRunning = false;
+  private giftInitializationComplete = false;
 
   private readonly log = new Logger(GiftsService.name);
   private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
@@ -150,29 +153,54 @@ export class GiftsService implements OnModuleInit {
   }
 
   private async initializeGifts(): Promise<void> {
-    // Schema-only fix is always safe. Catalog seeds never run against live DB.
-    await this.runGiftSchemaBootstrap();
-    if (!this.giftSchemaBootstrapReady && !this.giftSchemaBootstrapTimer) {
-      this.giftSchemaBootstrapTimer = setInterval(() => {
-        void this.runGiftSchemaBootstrap();
-      }, 30_000);
-      this.giftSchemaBootstrapTimer.unref?.();
+    if (this.giftInitializationRunning || this.giftInitializationComplete) return;
+    this.giftInitializationRunning = true;
+    try {
+      // Do not run catalog repair against a partially upgraded schema.
+      await this.runGiftSchemaBootstrap();
+      if (!this.giftSchemaBootstrapReady) {
+        this.scheduleGiftInitializationRetry();
+        return;
+      }
+
+      // Serialize shared gift data repairs with every other JEHO schema/data
+      // maintenance operation so no ALTER TABLE can overlap a catalog update.
+      await this.withJehoSchemaLock(async () => {
+        await this.ensureDefaultGiftCategories();
+        await this.healZeroDiamondCatalog();
+        await this.normalizeGiftEconomyCatalog();
+        await this.ensureJehoPublicBranding();
+        if (bootCatalogSeedEnabled()) {
+          await this.ensureDefaultLuckyGift();
+          await this.ensureMikooGiftTabs();
+        } else {
+          this.log.log('Gifts catalog: DB authoritative (economy normalize always runs)');
+        }
+      });
+
+      this.giftInitializationComplete = true;
+      if (this.giftSchemaBootstrapTimer) clearInterval(this.giftSchemaBootstrapTimer);
+      this.giftSchemaBootstrapTimer = null;
+    } catch (error) {
+      this.log.warn(`Gift startup maintenance deferred: ${error instanceof Error ? error.message : String(error)}`);
+      this.scheduleGiftInitializationRetry();
+    } finally {
+      this.giftInitializationRunning = false;
     }
-    await this.ensureDefaultGiftCategories();
-    // Critical: zero diamondValue + Math.min() previously awarded 0 diamonds on paid gifts.
-    await this.healZeroDiamondCatalog();
-    // Gift-first economy: diamondValue per gift, nice panel tabs, drop catalog junk.
-    await this.normalizeGiftEconomyCatalog();
-    // Always rewrite competitor brand text in gift titles/descriptions for app UI.
-    await this.ensureJehoPublicBranding();
-    if (!bootCatalogSeedEnabled()) {
-      this.log.log('Gifts catalog: DB authoritative (economy normalize always runs)');
-      return;
-    }
-    await this.ensureDefaultLuckyGift();
-    await this.ensureMikooGiftTabs();
   }
 
+  private scheduleGiftInitializationRetry(): void {
+    if (this.giftSchemaBootstrapTimer) return;
+    this.giftSchemaBootstrapTimer = setInterval(() => void this.initializeGifts(), 30_000);
+    this.giftSchemaBootstrapTimer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.giftSchemaBootstrapTimer) clearInterval(this.giftSchemaBootstrapTimer);
+    if (this.roomTopCardsRefreshTimer) clearTimeout(this.roomTopCardsRefreshTimer);
+    this.giftSchemaBootstrapTimer = null;
+    this.roomTopCardsRefreshTimer = null;
+  }
   private async runGiftSchemaBootstrap(): Promise<void> {
     if (this.giftSchemaBootstrapRunning || this.giftSchemaBootstrapReady) return;
     this.giftSchemaBootstrapRunning = true;
@@ -194,19 +222,51 @@ export class GiftsService implements OnModuleInit {
     }
   }
 
-  private async withJehoSchemaLock<T>(work: (manager: import('typeorm').EntityManager) => Promise<T>): Promise<T> {
-    return this.dataSource.transaction(async (manager) => {
-      await manager.query("SET LOCAL lock_timeout = '250ms'");
-      await manager.query("SET LOCAL statement_timeout = '8s'");
-      const lockRows = await manager.query(
-        'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
-        [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-      );
-      if (lockRows?.[0]?.locked !== true) {
+  private async withJehoSchemaLock<T>(work: (runner: QueryRunner) => Promise<T>): Promise<T> {
+    // Use a pinned session lock and autocommit each DDL statement. This prevents
+    // an ALTER TABLE lock from being retained while later data backfills or index
+    // builds run in the same long transaction.
+    const runner = this.dataSource.createQueryRunner();
+    let lockAcquired = false;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '120s'");
+      lockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!lockAcquired) {
         throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
       }
-      return work(manager);
-    });
+      return await work(runner);
+    } finally {
+      if (lockAcquired) {
+        await releaseJehoSchemaLock(runner).catch((error) =>
+          this.log.error(`Gift schema lock release failed; connection discarded: ${error instanceof Error ? error.message : String(error)}`),
+        );
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+    }
+  }
+
+  private async ensureConcurrentGiftIndex(
+    runner: QueryRunner,
+    indexName: string,
+    createSql: string,
+  ): Promise<void> {
+    const existing = await runner.query(
+      `SELECT i.indisvalid
+       FROM pg_index i
+       JOIN pg_class idx ON idx.oid = i.indexrelid
+       JOIN pg_namespace n ON n.oid = idx.relnamespace
+       WHERE n.nspname = current_schema() AND idx.relname = $1
+       LIMIT 1`,
+      [indexName],
+    );
+    if (existing.length && existing[0].indisvalid !== true) {
+      await runner.query(`DROP INDEX CONCURRENTLY IF EXISTS "jeho_own"."${indexName}"`);
+    }
+    await runner.query(createSql);
   }
 
   /** Replace Mikoo/Mego branding in gift names (and descriptions) visible in the app. */
@@ -300,7 +360,11 @@ export class GiftsService implements OnModuleInit {
     try {
       await this.withJehoSchemaLock(async (manager) => {
         await manager.query('ALTER TABLE gift_sends ADD COLUMN IF NOT EXISTS "requestId" uuid');
-        await manager.query('CREATE UNIQUE INDEX IF NOT EXISTS uq_gift_sends_request_receiver ON gift_sends ("requestId", "receiverId") WHERE "requestId" IS NOT NULL');
+        await this.ensureConcurrentGiftIndex(
+          manager,
+          'uq_gift_sends_request_receiver',
+          'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_gift_sends_request_receiver ON gift_sends ("requestId", "receiverId") WHERE "requestId" IS NOT NULL',
+        );
       });
     } catch (err) {
       this.giftSchemaBootstrapFailed = true;
@@ -323,7 +387,11 @@ export class GiftsService implements OnModuleInit {
     try {
       await this.withJehoSchemaLock(async (manager) => {
         await manager.query('ALTER TABLE gifts ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid NULL');
-        await manager.query('CREATE INDEX IF NOT EXISTS idx_gifts_brand_agency_id ON gifts ("brandAgencyId")');
+        await this.ensureConcurrentGiftIndex(
+          manager,
+          'idx_gifts_brand_agency_id',
+          'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_gifts_brand_agency_id ON gifts ("brandAgencyId")',
+        );
       });
     } catch (err) {
       this.giftSchemaBootstrapFailed = true;

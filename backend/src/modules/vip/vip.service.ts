@@ -44,6 +44,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   private static readonly MAX_VIP_LEVEL = 7;
   private mysteriousModeCleanupTimer?: ReturnType<typeof setInterval>;
   private mysteriousModeSchemaTimer?: ReturnType<typeof setInterval>;
+  private mysteriousModeColumnReady = false;
 
   /** Optional VIP maintenance is scheduled after Nest initialization; it never blocks HTTP startup. */
   onModuleInit() {
@@ -70,6 +71,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async ensureMysteriousModeColumn(): Promise<void> {
+    if (this.mysteriousModeColumnReady) return;
     const runner = this.dataSource.createQueryRunner();
     let locked = false;
     try {
@@ -81,6 +83,9 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       await runner.query(
         'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
       );
+      this.mysteriousModeColumnReady = true;
+      if (this.mysteriousModeSchemaTimer) clearInterval(this.mysteriousModeSchemaTimer);
+      this.mysteriousModeSchemaTimer = undefined;
     } catch (error) {
       this.logger.warn(`Mysterious Mode column check deferred: ${error?.message || error}`);
     } finally {
@@ -99,6 +104,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async reconcileMysteriousModes() {
+    if (!this.mysteriousModeColumnReady) return;
     // This scheduled reconciliation runs on every API replica. Serialize it
     // across the cluster to avoid concurrent bulk updates to the users table.
     const runner = this.dataSource.createQueryRunner();
@@ -107,15 +113,12 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '8s'");
-      const lockRows = await runner.query(
-        'SELECT pg_try_advisory_lock(741902611, 2002) AS locked',
-      );
-      locked = lockRows?.[0]?.locked === true;
+      locked = await tryAcquireJehoSchemaLock(runner);
       if (!locked) return;
       await this.reconcileMysteriousModesOnce(runner);
     } finally {
       if (locked) {
-        await runner.query('SELECT pg_advisory_unlock(741902611, 2002)').catch(() => undefined);
+        await releaseJehoSchemaLock(runner).catch(() => undefined);
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);

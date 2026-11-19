@@ -18,6 +18,7 @@ const DEFAULTS: StoriesConfig = {
 export class StoriesService implements OnModuleInit {
   private readonly logger = new Logger(StoriesService.name);
   private lastExpiryCleanupAt = 0;
+  private storiesSchemaReady = false;
   private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
   constructor(private readonly db: DataSource) {}
 
@@ -75,6 +76,7 @@ export class StoriesService implements OnModuleInit {
     }
     if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
     this.schemaRetryTimer = null;
+    this.storiesSchemaReady = true;
   }
 
   async getConfig(): Promise<StoriesConfig> {
@@ -115,6 +117,7 @@ export class StoriesService implements OnModuleInit {
   }
 
   async feed(viewerId: string) {
+    if (!this.storiesSchemaReady) return [];
     const c = await this.getConfig();
     if (!c.enabled || !c.viewingEnabled) return [];
     // Keep expiry cleanup off the hot path for every feed request. Each API
@@ -125,13 +128,18 @@ export class StoriesService implements OnModuleInit {
       try {
         await this.db.transaction(async (manager) => {
           const lockRows = await manager.query(
-            'SELECT pg_try_advisory_xact_lock(741902611, 2003) AS locked',
+            'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
+            [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
           );
-          if (lockRows?.[0]?.locked !== true) return;
+          if (lockRows?.[0]?.locked !== true) {
+            this.lastExpiryCleanupAt = 0;
+            return;
+          }
           await manager.query(`DELETE FROM "jeho_own"."stories" WHERE id IN
             (SELECT id FROM "jeho_own"."stories" WHERE "expiresAt" <= now() ORDER BY "expiresAt" LIMIT 250)`);
         });
       } catch (error) {
+        this.lastExpiryCleanupAt = 0;
         this.logger.warn('Expired story cleanup deferred: ' + (error instanceof Error ? error.message : 'unknown error'));
       }
     }

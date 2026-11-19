@@ -10,6 +10,15 @@ on:
       - "android/**"
       - "backend/src/modules/config/**"
       - "backend/src/modules/uploads/**"
+      - "backend/src/database/**"
+      - "backend/src/modules/auth/**"
+      - "backend/src/modules/cp/**"
+      - "backend/src/modules/gifts/**"
+      - "backend/src/modules/rooms/**"
+      - "backend/src/modules/users/**"
+      - "backend/src/modules/vip/**"
+      - "backend/src/modules/wallet/**"
+      - "backend/scripts/**"
       - "backend/public/mall/**"
   pull_request:
     branches: [MG-JEHO]
@@ -18,6 +27,14 @@ on:
       - "android/**"
       - "backend/src/modules/config/**"
       - "backend/src/modules/uploads/**"
+      - "backend/src/database/**"
+      - "backend/src/modules/auth/**"
+      - "backend/src/modules/cp/**"
+      - "backend/src/modules/gifts/**"
+      - "backend/src/modules/rooms/**"
+      - "backend/src/modules/users/**"
+      - "backend/src/modules/vip/**"
+      - "backend/src/modules/wallet/**"
       - "backend/public/mall/**"
   workflow_dispatch:
 
