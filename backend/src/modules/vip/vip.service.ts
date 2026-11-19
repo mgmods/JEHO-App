@@ -14,7 +14,7 @@ import { IsInt, Min, Max, IsOptional, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { vipMedalUrl } from '../../common/vip-assets';
-import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
+import { JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock, releaseJehoSessionAdvisoryLock, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import {
   VIP_ALLOWED_DAYS,
   VIP_DURATION_PACKS,
@@ -107,15 +107,12 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '8s'");
-      const lockRows = await runner.query(
-        'SELECT pg_try_advisory_lock(741902611, 2002) AS locked',
-      );
-      locked = lockRows?.[0]?.locked === true;
+      locked = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.vipReconciliation);
       if (!locked) return;
       await this.reconcileMysteriousModesOnce(runner);
     } finally {
       if (locked) {
-        await runner.query('SELECT pg_advisory_unlock(741902611, 2002)').catch(() => undefined);
+        await releaseJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.vipReconciliation).catch(() => undefined);
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
