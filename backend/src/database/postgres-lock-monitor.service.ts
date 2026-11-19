@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { DataSource } from 'typeorm';
 
 /**
- * Low-frequency, cluster-elected diagnostics for PostgreSQL lock queues.
+ * Lightweight, cluster-serialized diagnostics for PostgreSQL lock queues.
  * It does not terminate sessions or mutate application data. The output names
  * the blocked query and its actual blocker so production lock incidents can be
  * fixed from evidence instead of guessing from lock_timeout messages.
@@ -17,7 +17,7 @@ export class PostgresLockMonitorService implements OnModuleInit, OnModuleDestroy
   constructor(private readonly dataSource: DataSource) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => void this.inspect(), 15_000);
+    this.timer = setInterval(() => void this.inspect(), 1_000);
     this.timer.unref?.();
     void this.inspect();
   }
