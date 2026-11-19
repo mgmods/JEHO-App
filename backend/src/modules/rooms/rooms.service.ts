@@ -2679,8 +2679,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
   /** Server-driven periodic wipe for rooms with chatAutoClearMinutes > 0. */
   private async sweepAutoChatClear() {
-    // This timer runs in every API replica. Use a dedicated PostgreSQL session
-    // lock so only one replica performs room-chat cleanup at a time.
+    if (!this.roomSchemaBootstrapReady) return;
+    // This timer runs in every API replica. Use the shared JEHO maintenance lock
+    // so room-chat cleanup cannot overlap schema changes on the same tables.
     const runner = this.dataSource.createQueryRunner();
     let locked = false;
     try {
