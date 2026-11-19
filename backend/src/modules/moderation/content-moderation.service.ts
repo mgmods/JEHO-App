@@ -11,6 +11,7 @@ import { extname } from 'path';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { User, UserStatus } from '../../database/entities/user.entity';
 import { RoomChatPenalty } from '../../database/entities/room-chat-penalty.entity';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 
 export type ModerationHit = {
   ok: false;
@@ -101,21 +102,26 @@ export class ContentModerationService implements OnModuleInit {
 
   private async ensurePenaltyTable() {
     try {
-      await this.dataSource.query(`
-        CREATE TABLE IF NOT EXISTS room_chat_penalties (
-          id uuid PRIMARY KEY,
-          "roomId" uuid NOT NULL,
-          "userId" uuid NOT NULL,
-          "strikeCount" integer NOT NULL DEFAULT 0,
-          "chatMutedUntil" TIMESTAMPTZ NULL,
-          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-        )
-      `);
-      await this.dataSource.query(`
-        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_room_chat_penalties_room_user"
-        ON room_chat_penalties ("roomId", "userId")
-      `);
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        await manager.query(`
+          CREATE TABLE IF NOT EXISTS room_chat_penalties (
+            id uuid PRIMARY KEY,
+            "roomId" uuid NOT NULL,
+            "userId" uuid NOT NULL,
+            "strikeCount" integer NOT NULL DEFAULT 0,
+            "chatMutedUntil" TIMESTAMPTZ NULL,
+            "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+            "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+          )
+        `);
+        await manager.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS "IDX_room_chat_penalties_room_user"
+          ON room_chat_penalties ("roomId", "userId")
+        `);
+      });
     } catch (err) {
       this.log.warn(
         `room_chat_penalties ensure skipped: ${
