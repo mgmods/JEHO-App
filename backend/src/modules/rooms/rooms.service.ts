@@ -226,7 +226,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
               ON agency_moderation_audit ("agencyId", "createdAt" DESC)
             `);
           } catch (err) {
-            this.log.warn(`ensure agency moderation audit: ${(err as Error).message}`);
+            this.log.warn(`ensure agency moderation audit deferred; retry will run: ${(err as Error).message}`);
+            throw err;
           }
           try {
             await runner.query(
