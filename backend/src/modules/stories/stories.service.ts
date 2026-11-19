@@ -125,7 +125,8 @@ export class StoriesService implements OnModuleInit {
       try {
         await this.db.transaction(async (manager) => {
           const lockRows = await manager.query(
-            'SELECT pg_try_advisory_xact_lock(741902611, 2003) AS locked',
+            'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
+            [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
           );
           if (lockRows?.[0]?.locked !== true) return;
           await manager.query(`DELETE FROM "jeho_own"."stories" WHERE id IN
