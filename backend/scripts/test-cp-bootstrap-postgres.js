@@ -126,6 +126,11 @@ async function testFirstInstallSchemaGuard(ds) {
   assert.equal(state.relations, 1);
 
   await resetSchema(ds);
+  await ds.query('CREATE FUNCTION jeho_own.partial_routine() RETURNS integer LANGUAGE sql AS $ SELECT 1 $');
+  state = await inspectJehoSchemaForProvisioning(ds);
+  assert.equal(state.isEmpty, false, 'a schema containing an application routine must not be treated as empty');
+
+  await resetSchema(ds);
   await ds.query(`
     CREATE TABLE jeho_own.__jeho_provision_state (
       id integer PRIMARY KEY CHECK (id = 1),
