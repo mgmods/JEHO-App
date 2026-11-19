@@ -153,7 +153,7 @@ export class AgenciesService implements OnModuleInit, OnModuleDestroy {
     let advisoryLockAcquired = false;
     try {
       await runner.connect();
-      await runner.query("SET lock_timeout = '3s'");
+      await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '20s'");
 
       const lockRows = await runner.query(
