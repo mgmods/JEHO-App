@@ -15,8 +15,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomInt } from 'crypto';
 import { Gift, GiftType } from '../../database/entities/gift.entity';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
-import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { Cosmetic, CosmeticType } from '../../database/entities/cosmetic.entity';
@@ -156,35 +155,29 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
   private async initializeGifts(): Promise<void> {
     if (this.giftInitializationRunning || this.giftInitializationComplete) return;
     this.giftInitializationRunning = true;
-    const runner = this.dataSource.createQueryRunner();
-    let maintenanceLockAcquired = false;
     try {
-      await runner.connect();
-      await runner.query("SET lock_timeout = '250ms'");
-      await runner.query("SET statement_timeout = '60s'");
-      maintenanceLockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.giftStartup);
-      if (!maintenanceLockAcquired) {
-        // Another replica is doing the shared repair. Retry later so this process
-        // also verifies the completed schema before marking its local bootstrap ready.
-        this.scheduleGiftInitializationRetry();
-        return;
-      }
       // Do not run catalog repair against a partially upgraded schema.
       await this.runGiftSchemaBootstrap();
       if (!this.giftSchemaBootstrapReady) {
         this.scheduleGiftInitializationRetry();
         return;
       }
-      await this.ensureDefaultGiftCategories();
-      await this.healZeroDiamondCatalog();
-      await this.normalizeGiftEconomyCatalog();
-      await this.ensureJehoPublicBranding();
-      if (bootCatalogSeedEnabled()) {
-        await this.ensureDefaultLuckyGift();
-        await this.ensureMikooGiftTabs();
-      } else {
-        this.log.log('Gifts catalog: DB authoritative (economy normalize always runs)');
-      }
+
+      // Serialize shared gift data repairs with every other JEHO schema/data
+      // maintenance operation so no ALTER TABLE can overlap a catalog update.
+      await this.withJehoSchemaLock(async () => {
+        await this.ensureDefaultGiftCategories();
+        await this.healZeroDiamondCatalog();
+        await this.normalizeGiftEconomyCatalog();
+        await this.ensureJehoPublicBranding();
+        if (bootCatalogSeedEnabled()) {
+          await this.ensureDefaultLuckyGift();
+          await this.ensureMikooGiftTabs();
+        } else {
+          this.log.log('Gifts catalog: DB authoritative (economy normalize always runs)');
+        }
+      });
+
       this.giftInitializationComplete = true;
       if (this.giftSchemaBootstrapTimer) clearInterval(this.giftSchemaBootstrapTimer);
       this.giftSchemaBootstrapTimer = null;
@@ -192,12 +185,6 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       this.log.warn(`Gift startup maintenance deferred: ${error instanceof Error ? error.message : String(error)}`);
       this.scheduleGiftInitializationRetry();
     } finally {
-      if (maintenanceLockAcquired) {
-        if (maintenanceLockAcquired) await releaseJehoAdvisoryLock(runner, JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_ADVISORY_LOCKS.giftStartup).catch((unlockError) => this.log.error(`Gift maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
-      }
-      await runner.query('RESET lock_timeout').catch(() => undefined);
-      await runner.query('RESET statement_timeout').catch(() => undefined);
-      await runner.release().catch(() => undefined);
       this.giftInitializationRunning = false;
     }
   }
