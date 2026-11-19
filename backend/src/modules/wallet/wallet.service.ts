@@ -132,7 +132,7 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       }
 
       // Idempotent one-time balance conversion. Only one replica can execute it.
-      const result = await this.dataSource.query(`
+      const result = await runner.query(`
         UPDATE wallets
         SET coins = COALESCE(coins, 0) + COALESCE("silverCoins", 0),
             "silverCoins" = 0
