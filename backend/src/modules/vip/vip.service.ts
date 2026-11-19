@@ -99,11 +99,36 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async reconcileMysteriousModes() {
+    // This scheduled reconciliation runs on every API replica. Serialize it
+    // across the cluster to avoid concurrent bulk updates to the users table.
+    const runner = this.dataSource.createQueryRunner();
+    let locked = false;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '8s'");
+      const lockRows = await runner.query(
+        'SELECT pg_try_advisory_lock(741902611, 2002) AS locked',
+      );
+      locked = lockRows?.[0]?.locked === true;
+      if (!locked) return;
+      await this.reconcileMysteriousModesOnce(runner);
+    } finally {
+      if (locked) {
+        await runner.query('SELECT pg_advisory_unlock(741902611, 2002)').catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+    }
+  }
+
+  private async reconcileMysteriousModesOnce(runner: import('typeorm').QueryRunner) {
     // Settings are stored by AppSetting in app_settings (inside the
     // configured jeho_own schema). Never query a legacy/nonexistent settings table.
     let rows: Array<{ value?: string | Record<string, unknown> }> = [];
     try {
-      rows = await this.dataSource.query(
+      rows = await runner.query(
         'SELECT value FROM app_settings WHERE key = $1 LIMIT 1',
         ['mysterious_man_config'],
       );
@@ -131,12 +156,12 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       ? [...new Set(policy.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))]
       : [];
     if (policy.enabled !== true || allowedLevels.length === 0) {
-      await this.dataSource.query(
+      await runner.query(
         'UPDATE users SET "mysteriousMode" = false WHERE "mysteriousMode" = true',
       );
       return;
     }
-    await this.dataSource.query(
+    await runner.query(
       'UPDATE users u SET "mysteriousMode" = false WHERE u."mysteriousMode" = true AND NOT EXISTS (' +
       'SELECT 1 FROM user_vips uv WHERE uv."userId" = u.id AND uv."isActive" = true AND uv."expiresAt" > NOW() AND uv.level = ANY($1::int[])' +
       ')',
