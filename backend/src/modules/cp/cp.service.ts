@@ -56,69 +56,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    // Backward-compatible schema adjustment: profile-origin CP requests have no room/payment.
-    await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
-    await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "priceCoins" DROP NOT NULL').catch(() => undefined);
-    await this.dataSource.query('ALTER TABLE cp_requests ADD COLUMN IF NOT EXISTS "cpPoints" bigint NULL').catch(() => undefined);
-    await this.dataSource.query('ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "cpBackgroundUrl" varchar(512)').catch(() => undefined);
-    await this.dataSource.query('ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "cpLogoUrl" varchar(512)').catch(() => undefined);
-    // The cosmetics.type column is a PostgreSQL enum. Add CP-only cosmetic
-    // types at runtime so existing Cumin databases accept the new store items.
-    const cosmeticEnumRows = await this.dataSource.query(
-      `SELECT n.nspname, t.typname
-       FROM pg_type t
-       JOIN pg_attribute a ON a.atttypid=t.oid
-       JOIN pg_class c ON c.oid=a.attrelid
-       JOIN pg_namespace n ON n.oid=t.typnamespace
-       WHERE c.relname='cosmetics' AND a.attname='type' AND t.typtype='e'
-       LIMIT 1`,
-    ).catch(() => []);
-    const cosmeticEnumSchema = String(cosmeticEnumRows?.[0]?.nspname || '').replace(/"/g, '""');
-    const cosmeticEnumName = String(cosmeticEnumRows?.[0]?.typname || '').replace(/"/g, '""');
-    if (cosmeticEnumSchema && cosmeticEnumName) {
-      await this.dataSource.query(`ALTER TYPE "${cosmeticEnumSchema}"."${cosmeticEnumName}" ADD VALUE IF NOT EXISTS 'cp_background'`).catch(() => undefined);
-      await this.dataSource.query(`ALTER TYPE "${cosmeticEnumSchema}"."${cosmeticEnumName}" ADD VALUE IF NOT EXISTS 'cp_logo'`).catch(() => undefined);
-    }
-    await this.dataSource.query(`
-      CREATE TABLE IF NOT EXISTS cp_memories (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        "relationshipId" uuid NOT NULL REFERENCES cp_relationships(id) ON DELETE CASCADE,
-        "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        text varchar(500) NOT NULL DEFAULT '',
-        "imageUrl" varchar(2048),
-        "createdAt" timestamptz NOT NULL DEFAULT now()
-      )
-    `).catch(() => undefined);
-    await this.dataSource.query(`
-      CREATE TABLE IF NOT EXISTS cp_level_reward_claims (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        "relationshipId" uuid NOT NULL REFERENCES cp_relationships(id) ON DELETE CASCADE,
-        "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        level integer NOT NULL,
-        "cosmeticCode" varchar(64) NOT NULL,
-        status varchar(16) NOT NULL DEFAULT 'pending',
-        "createdAt" timestamptz NOT NULL DEFAULT now(),
-        "grantedAt" timestamptz,
-        UNIQUE ("relationshipId", level, "userId", "cosmeticCode")
-      )
-    `).catch(() => undefined);
-    await this.dataSource.query(`
-      CREATE TABLE IF NOT EXISTS cp_level_gift_reward_claims (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        "relationshipId" uuid NOT NULL REFERENCES cp_relationships(id) ON DELETE CASCADE,
-        "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        level integer NOT NULL,
-        "giftId" uuid NOT NULL REFERENCES gifts(id) ON DELETE CASCADE,
-        status varchar(16) NOT NULL DEFAULT 'pending',
-        "createdAt" timestamptz NOT NULL DEFAULT now(),
-        "grantedAt" timestamptz,
-        UNIQUE ("relationshipId", level, "userId", "giftId")
-      )
-    `).catch(() => undefined);
-    await this.dataSource.query(`
-      CREATE INDEX IF NOT EXISTS idx_cp_memories_relationship_created
-      ON cp_memories ("relationshipId", "createdAt" DESC)
-    `).catch(() => undefined);
+    // Schema is prepared once by the serialized CP bootstrap before Nest modules initialize.
     await this.migrateUnifiedRelationshipType();
     // Expiry processing only touches CP requests and their wallet ledger rows.
     this.expiryTimer = setInterval(() => {
@@ -136,17 +74,27 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async migrateUnifiedRelationshipType() {
-    const rows = await this.dataSource.query(
-      `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%'`,
-    );
-    const settings = new Map<string, string>(rows.map((row: any) => [String(row.key), String(row.value ?? '')]));
-    const legacyTypes = ['love', 'engagement', 'friendship', 'brotherhood', 'marriage'];
-    const suffixes = ['gift', 'price', 'gift_points', 'points.gift_send', 'max_level', 'levels', 'enabled', 'rules'];
-    const sourceType = legacyTypes
-      .map(type => ({ type, score: suffixes.filter(suffix => settings.has(`cp.${suffix}.${type}`)).length }))
-      .sort((a, b) => b.score - a.score)[0]?.type;
-    if (sourceType) {
-      await this.dataSource.transaction(async manager => {
+    // Keep the settings copy and both data rewrites atomic. A transaction-scoped
+    // advisory lock prevents two application instances migrating CP together.
+    await this.dataSource.transaction(async manager => {
+      // Wait briefly for another app instance doing the same migration rather
+      // than failing immediately during a rolling deployment.
+      await manager.query("SET LOCAL lock_timeout = '15s'");
+      await manager.query("SET LOCAL statement_timeout = '30s'");
+      await manager.query('SELECT pg_advisory_xact_lock(741902611, 2)');
+      await manager.query("SET LOCAL lock_timeout = '3s'");
+
+      const rows = await manager.query(
+        `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%'`,
+      );
+      const settings = new Map<string, string>(rows.map((row: any) => [String(row.key), String(row.value ?? '')]));
+      const legacyTypes = ['love', 'engagement', 'friendship', 'brotherhood', 'marriage'];
+      const suffixes = ['gift', 'price', 'gift_points', 'points.gift_send', 'max_level', 'levels', 'enabled', 'rules'];
+      const sourceType = legacyTypes
+        .map(type => ({ type, score: suffixes.filter(suffix => settings.has(`cp.${suffix}.${type}`)).length }))
+        .sort((a, b) => b.score - a.score)[0]?.type;
+
+      if (sourceType) {
         for (const suffix of suffixes) {
           const canonicalKey = `cp.${suffix}.relationship`;
           if (settings.has(canonicalKey)) continue;
@@ -159,19 +107,19 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
             [canonicalKey, legacyValue, 'Migrated from legacy CP relationship type'],
           );
         }
-      });
-    }
-    // Preserve all history, points and requests while removing user-visible subtypes.
-    await this.dataSource.query(
-      `UPDATE cp_relationships SET type=$1 WHERE type<>$1`,
-      [CpType.RELATIONSHIP],
-    );
-    await this.dataSource.query(
-      `UPDATE cp_requests SET type=$1 WHERE type<>$1`,
-      [CpType.RELATIONSHIP],
-    );
-    // Preserve existing earned CP levels. Multi-level progression is configured
-    // through cp.levels.relationship; never reset user progress on application boot.
+      }
+
+      // Rewrite only known legacy values. Once migrated, subsequent app
+      // restarts perform no table-wide UPDATE and do not rewrite current rows.
+      await manager.query(
+        `UPDATE cp_relationships SET type=$1 WHERE type = ANY($2::varchar[])`,
+        [CpType.RELATIONSHIP, legacyTypes],
+      );
+      await manager.query(
+        `UPDATE cp_requests SET type=$1 WHERE type = ANY($2::varchar[])`,
+        [CpType.RELATIONSHIP, legacyTypes],
+      );
+    });
   }
 
   private async enrichLevelRewards(levels: any[]) {

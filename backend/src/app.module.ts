@@ -307,15 +307,10 @@ const entityList = Object.values(entities).filter(
 
         // Create only missing CP tables/indexes for older deployments; preserve all existing rows.
         console.log('[JEHO-OWN DB STEP] CP bootstrap: start');
-        try {
-          await ensureCpTables(appDataSource);
-          console.log('[JEHO-OWN DB STEP] CP bootstrap: complete');
-        } catch (error) {
-          console.error(
-            '[CpBootstrap] Could not initialize CP tables; API startup continues.',
-            error instanceof Error ? error.message : String(error),
-          );
-        }
+        // CP schema is required by CP routes. Never report a healthy API while
+        // silently skipping its schema bootstrap; bounded locks make failure fast.
+        await ensureCpTables(appDataSource);
+        console.log('[JEHO-OWN DB STEP] CP bootstrap: complete');
 
         // Additive vanity-ID style columns; existing IDs, purchases and leases are preserved.
         console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: start');
