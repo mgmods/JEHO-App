@@ -25,11 +25,14 @@ async function inspectJehoSchemaForProvisioning(client) {
       (SELECT count(*)::int FROM pg_class c
          JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE n.nspname = 'jeho_own'
-           AND c.relkind IN ('r','p','v','m','S','f')) AS relations,
+           AND c.relkind IN ('r','p','v','m','S','f','c')) AS relations,
       (SELECT count(*)::int FROM pg_type t
          JOIN pg_namespace n ON n.oid = t.typnamespace
          WHERE n.nspname = 'jeho_own'
-           AND t.typtype IN ('e','d','r')) AS custom_types
+           AND t.typtype IN ('e','d','r','c')) AS custom_types,
+      (SELECT count(*)::int FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE n.nspname = 'jeho_own') AS routines
   `);
   const relations = Number(objects.rows[0]?.relations || 0);
   const customTypes = Number(objects.rows[0]?.custom_types || 0);
