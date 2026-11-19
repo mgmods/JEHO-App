@@ -240,7 +240,7 @@ const entityList = Object.values(entities).filter(
             // Additive support-box video URL column; preserves all existing lucky-box rows.
             console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: start');
             try {
-              await appDataSource.query(
+              await schemaLockRunner.query(
                 'ALTER TABLE "jeho_own"."lucky_boxes" ADD COLUMN IF NOT EXISTS "videoUrl" varchar(1024)',
               );
               console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: complete');
@@ -253,13 +253,9 @@ const entityList = Object.values(entities).filter(
             // Index creation is deliberately not part of API startup: index DDL can wait
             // behind unrelated transactions and must be handled by a reviewed migration.
             console.log('[JEHO-OWN DB STEP] custom_gift_grants: start');
-            const customGiftGrantsRunner = appDataSource.createQueryRunner();
             try {
-              await customGiftGrantsRunner.connect();
-              await customGiftGrantsRunner.query("SET lock_timeout = '250ms'");
-              await customGiftGrantsRunner.query("SET statement_timeout = '8s'");
               console.log('[JEHO-OWN DB STEP] custom_gift_grants table: start');
-              await customGiftGrantsRunner.query(`
+              await schemaLockRunner.query(`
                 CREATE TABLE IF NOT EXISTS "jeho_own"."custom_gift_grants" (
                   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                   "userId" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE CASCADE,
@@ -288,12 +284,6 @@ const entityList = Object.values(entities).filter(
                   constraint: dbError?.constraint || null,
                 }),
               );
-            } finally {
-              await customGiftGrantsRunner.query('RESET lock_timeout').catch(() => undefined);
-              await customGiftGrantsRunner.query('RESET statement_timeout').catch(() => undefined);
-              await customGiftGrantsRunner.release().catch((error) => {
-                console.error('[CustomGiftsBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
-              });
             }
     
             // Additive support-chest expiry bootstrap. Use one pinned connection and
@@ -301,18 +291,14 @@ const entityList = Object.values(entities).filter(
             // The column and its optional index are separate autocommit statements: if index
             // creation is blocked, the successfully-added nullable column is preserved.
             console.log('[JEHO-OWN DB STEP] gift_sends expiry: start');
-            const giftExpiryRunner = appDataSource.createQueryRunner();
             try {
-              await giftExpiryRunner.connect();
-              await giftExpiryRunner.query("SET lock_timeout = '250ms'");
-              await giftExpiryRunner.query("SET statement_timeout = '8s'");
               console.log('[JEHO-OWN DB STEP] gift_sends expiresAt column: start');
-              await giftExpiryRunner.query(
+              await schemaLockRunner.query(
                 'ALTER TABLE "jeho_own"."gift_sends" ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz',
               );
               console.log('[JEHO-OWN DB STEP] gift_sends expiresAt column: complete');
               console.log('[JEHO-OWN DB STEP] gift_sends expiry index: start');
-              await giftExpiryRunner.query(
+              await schemaLockRunner.query(
                 'CREATE INDEX IF NOT EXISTS "IDX_gift_sends_expiresAt" ON "jeho_own"."gift_sends" ("expiresAt")',
               );
               console.log('[JEHO-OWN DB STEP] gift_sends expiry index: complete');
@@ -328,7 +314,7 @@ const entityList = Object.values(entities).filter(
                 }),
               );
               try {
-                const blockers = await giftExpiryRunner.query(`
+                const blockers = await schemaLockRunner.query(`
                   SELECT
                     blocked.pid AS blocked_pid,
                     blocked.usename AS blocked_user,
@@ -361,12 +347,6 @@ const entityList = Object.values(entities).filter(
               } catch (diagnosticError) {
                 console.error('[SupportChestExpiryBootstrap] Lock diagnostics unavailable:', diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError));
               }
-            } finally {
-              await giftExpiryRunner.query('RESET lock_timeout').catch(() => undefined);
-              await giftExpiryRunner.query('RESET statement_timeout').catch(() => undefined);
-              await giftExpiryRunner.release().catch((error) => {
-                console.error('[SupportChestExpiryBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
-              });
             }
     
     
@@ -374,7 +354,7 @@ const entityList = Object.values(entities).filter(
             // This never touches voice, Redis, user records, or existing badge data.
             console.log('[JEHO-OWN DB STEP] badges bootstrap: start');
             try {
-              await ensureBadgeTables(appDataSource);
+              await ensureBadgeTables(schemaLockRunner);
               console.log('[JEHO-OWN DB STEP] badges bootstrap: complete');
             } catch (error) {
               schemaMaintenanceHadFailure = true;
@@ -392,7 +372,7 @@ const entityList = Object.values(entities).filter(
             // Additive vanity-ID style columns; existing IDs, purchases and leases are preserved.
             console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: start');
             try {
-              await ensureVanityIdStyleColumns(appDataSource);
+              await ensureVanityIdStyleColumns(schemaLockRunner);
               console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: complete');
             } catch (error) {
               schemaMaintenanceHadFailure = true;
@@ -402,7 +382,7 @@ const entityList = Object.values(entities).filter(
             // Additive persistent moments tables; existing application data is preserved.
             console.log('[JEHO-OWN DB STEP] moments bootstrap: start');
             try {
-              await ensureMomentsTables(appDataSource);
+              await ensureMomentsTables(schemaLockRunner);
               console.log('[JEHO-OWN DB STEP] moments bootstrap: complete');
             } catch (error) {
               schemaMaintenanceHadFailure = true;
@@ -415,7 +395,7 @@ const entityList = Object.values(entities).filter(
             // Repair profile columns missing from older production schemas before serving requests.
             console.log('[JEHO-OWN DB STEP] user profile bootstrap: start');
             try {
-              await ensureUserProfileColumns(appDataSource);
+              await ensureUserProfileColumns(schemaLockRunner);
               console.log('[JEHO-OWN DB STEP] user profile bootstrap: complete');
             } catch (error) {
               schemaMaintenanceHadFailure = true;
