@@ -9,7 +9,59 @@ import { QueryRunner } from 'typeorm';
  * allowing each bootstrap's existing bounded retry timer to try again later.
  */
 export const JEHO_SCHEMA_LOCK_NAMESPACE = 741902611;
-export const JEHO_SCHEMA_LOCK_ID = 99;
+export const JEHO_ADVISORY_LOCKS = {
+  schema: 99,
+  roomAutoClear: 2001,
+  vipReconciliation: 2002,
+  storyExpiry: 2003,
+  lockMonitor: 2004,
+  walletStartup: 2005,
+  publicIdBackfill: 2006,
+  giftStartup: 2007,
+} as const;
+export const JEHO_SCHEMA_LOCK_ID = JEHO_ADVISORY_LOCKS.schema;
+
+async function discardPostgresRunner(runner: QueryRunner, error: unknown): Promise<void> {
+  const postgresRunner = runner as QueryRunner & {
+    releasePostgresConnection?: (err?: Error) => Promise<void>;
+  };
+  if (typeof postgresRunner.releasePostgresConnection === 'function') {
+    await postgresRunner.releasePostgresConnection(
+      error instanceof Error ? error : new Error(String(error)),
+    ).catch(() => undefined);
+  }
+}
+
+export async function tryAcquireJehoSessionAdvisoryLock(
+  runner: QueryRunner,
+  lockId: number,
+): Promise<boolean> {
+  const rows = await runner.query(
+    'SELECT pg_try_advisory_lock($1, $2) AS locked',
+    [JEHO_SCHEMA_LOCK_NAMESPACE, lockId],
+  );
+  return rows?.[0]?.locked === true;
+}
+
+export async function releaseJehoSessionAdvisoryLock(
+  runner: QueryRunner,
+  lockId: number,
+): Promise<void> {
+  try {
+    const rows = await runner.query(
+      'SELECT pg_advisory_unlock($1, $2) AS unlocked',
+      [JEHO_SCHEMA_LOCK_NAMESPACE, lockId],
+    );
+    if (rows?.[0]?.unlocked !== true) {
+      throw new Error(`JEHO PostgreSQL advisory lock ${lockId} was not released by its owning session.`);
+    }
+  } catch (error) {
+    // Session advisory locks survive transactions. Never return a connection to
+    // the pool if it may still own a JEHO lock.
+    await discardPostgresRunner(runner, error);
+    throw error;
+  }
+}
 
 let localLockHeld = false;
 const localLockOwners = new WeakSet<QueryRunner>();
@@ -44,30 +96,9 @@ export async function tryAcquireJehoSchemaLock(
 export async function releaseJehoSchemaLock(runner: QueryRunner): Promise<void> {
   const ownsLocalLock = localLockOwners.has(runner);
   if (!ownsLocalLock) return;
-
   localLockOwners.delete(runner);
   try {
-    const rows = await runner.query(
-      'SELECT pg_advisory_unlock($1, $2) AS unlocked',
-      [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-    );
-    if (rows?.[0]?.unlocked !== true) {
-      throw new Error('JEHO schema advisory lock was not released by its owning PostgreSQL session.');
-    }
-  } catch (error) {
-    // A session advisory lock survives transactions and is returned with a pooled
-    // connection unless that connection is discarded. If UNLOCK fails, force the
-    // TypeORM Postgres runner to destroy (not recycle) this client so a stale lock
-    // can never remain attached to an idle pool connection.
-    const postgresRunner = runner as QueryRunner & {
-      releasePostgresConnection?: (err?: Error) => Promise<void>;
-    };
-    if (typeof postgresRunner.releasePostgresConnection === 'function') {
-      await postgresRunner.releasePostgresConnection(
-        error instanceof Error ? error : new Error(String(error)),
-      ).catch(() => undefined);
-    }
-    throw error;
+    await releaseJehoSessionAdvisoryLock(runner, JEHO_SCHEMA_LOCK_ID);
   } finally {
     localLockHeld = false;
   }
