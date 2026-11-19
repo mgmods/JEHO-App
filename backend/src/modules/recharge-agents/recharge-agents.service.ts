@@ -150,7 +150,7 @@ export class RechargeAgentsService implements OnModuleInit {
         await manager.query(`CREATE INDEX IF NOT EXISTS "idx_withdraw_requests_agent" ON withdraw_requests("agentId")`);
       });
     } catch (error) {
-      this.logger.warn(`Recharge-agent schema migration deferred: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(`[RechargeAgentsSchema] Migration deferred: ${error instanceof Error ? error.message : String(error)}`);
     }
     try {
       // Soft-upgrade legacy default agent wholesale ($0.009 / fee $20) → v3 defaults.
