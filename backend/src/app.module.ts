@@ -138,12 +138,38 @@ const entityList = Object.values(entities).filter(
         console.log('[JEHO-OWN DB] Opening bounded bootstrap connection...');
         await bootstrap.initialize();
         console.log(`[JEHO-OWN DB] Bootstrap connection opened in ${Date.now() - bootstrapStartedAt}ms.`);
+        let bootstrapLockAcquired = false;
         try {
-          // TypeORM UUID defaults call uuid_generate_v4(). Ensure uuid-ossp is
-          // available before synchronize runs; it may live in public or extensions.
+          // Serialize even the pre-DataSource extension/schema DDL with every
+          // other JEHO migration. This uses the same key on this pinned session.
+          await bootstrap.query("SET lock_timeout = '3s'");
+          await bootstrap.query("SET statement_timeout = '8s'");
+          for (let attempt = 0; attempt < 30 && !bootstrapLockAcquired; attempt += 1) {
+            const lockRows = await bootstrap.query(
+              'SELECT pg_try_advisory_lock($1, $2) AS locked',
+              [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+            );
+            bootstrapLockAcquired = lockRows?.[0]?.locked === true;
+            if (!bootstrapLockAcquired) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+          }
+          if (!bootstrapLockAcquired) {
+            throw new Error('[JEHO-OWN DB] Shared schema lock remained busy; refusing unsynchronized startup DDL.');
+          }
+          // TypeORM UUID defaults may call uuid_generate_v4(); keep the extension
+          // and app schema creation inside the shared lock and bounded session.
           await bootstrap.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public');
           await bootstrap.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
         } finally {
+          if (bootstrapLockAcquired) {
+            await bootstrap.query(
+              'SELECT pg_advisory_unlock($1, $2)',
+              [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+            ).catch(() => undefined);
+          }
+          await bootstrap.query('RESET lock_timeout').catch(() => undefined);
+          await bootstrap.query('RESET statement_timeout').catch(() => undefined);
           await bootstrap.destroy();
         }
 
