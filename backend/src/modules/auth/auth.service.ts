@@ -510,10 +510,8 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       const lockRows = await runner.query('SELECT pg_try_advisory_lock(741902611, 2006) AS locked');
       lockAcquired = lockRows?.[0]?.locked === true;
       if (!lockAcquired) {
-        if (!this.publicIdSchemaRetryTimer) {
-          this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
-          this.publicIdSchemaRetryTimer.unref?.();
-        }
+        // The replica holding this cluster lock owns the shared backfill.
+        // Avoid scheduling identical full-table backfills on every other replica.
         return { updated: 0 };
       }
       // Page through missing IDs instead of loading the entire users table into memory.
