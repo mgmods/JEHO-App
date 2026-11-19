@@ -167,201 +167,212 @@ const entityList = Object.values(entities).filter(
         } as any).initialize();
         console.log(`[JEHO-OWN DB] Application DataSource initialized in ${Date.now() - appInitStartedAt}ms (synchronize=${String(options.synchronize)}).`);
 
-        // Additive support-box video URL column; preserves all existing lucky-box rows.
-        console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: start');
-        try {
-          await appDataSource.query(
-            'ALTER TABLE "jeho_own"."lucky_boxes" ADD COLUMN IF NOT EXISTS "videoUrl" varchar(1024)',
-          );
-          console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: complete');
-        } catch (error) {
-          console.error('[LuckyBoxVideoBootstrap] Could not initialize video URL column.', error instanceof Error ? error.message : String(error));
-        }
-
-        // Create the optional custom-gift grants table with a short lock bound.
-        // Index creation is deliberately not part of API startup: index DDL can wait
-        // behind unrelated transactions and must be handled by a reviewed migration.
-        console.log('[JEHO-OWN DB STEP] custom_gift_grants: start');
-        const customGiftGrantsRunner = appDataSource.createQueryRunner();
-        try {
-          await customGiftGrantsRunner.connect();
-          await customGiftGrantsRunner.query("SET lock_timeout = '3s'");
-          await customGiftGrantsRunner.query("SET statement_timeout = '8s'");
-          console.log('[JEHO-OWN DB STEP] custom_gift_grants table: start');
-          await customGiftGrantsRunner.query(`
-            CREATE TABLE IF NOT EXISTS "jeho_own"."custom_gift_grants" (
-              "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-              "userId" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE CASCADE,
-              "giftId" uuid NOT NULL UNIQUE REFERENCES "jeho_own"."gifts"("id") ON DELETE CASCADE,
-              "grantedBy" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE RESTRICT,
-              "mediaType" varchar(16) NOT NULL CHECK ("mediaType" IN ('image','video','gif')),
-              "mediaUrl" varchar(512) NOT NULL,
-              "durationDays" integer NULL CHECK ("durationDays" IS NULL OR "durationDays" >= 1),
-              "startsAt" timestamptz NOT NULL DEFAULT now(),
-              "expiresAt" timestamptz NULL,
-              "revokedAt" timestamptz NULL,
-              "createdAt" timestamptz NOT NULL DEFAULT now()
-            )
-          `);
-          console.log('[CustomGiftsBootstrap] Private custom-gift grants table is ready; optional indexes deferred to migration.');
-          console.log('[JEHO-OWN DB STEP] custom_gift_grants: complete');
-        } catch (error) {
-          const dbError = error as { code?: string; message?: string; detail?: string; constraint?: string };
-          console.error(
-            '[CustomGiftsBootstrap] Optional table bootstrap failed; API startup will continue.',
-            JSON.stringify({
-              code: dbError?.code || null,
-              message: dbError?.message || String(error),
-              detail: dbError?.detail || null,
-              constraint: dbError?.constraint || null,
-            }),
-          );
-        } finally {
-          await customGiftGrantsRunner.query('RESET lock_timeout').catch(() => undefined);
-          await customGiftGrantsRunner.query('RESET statement_timeout').catch(() => undefined);
-          await customGiftGrantsRunner.release().catch((error) => {
-            console.error('[CustomGiftsBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
+        // Do not await schema maintenance from TypeORM's DataSource factory.
+        // The API must finish Nest initialization and bind HTTP even if an older
+        // PostgreSQL transaction holds a relation lock. Each migration below is
+        // idempotent/bounded and reports its own failure for a later deploy retry.
+        setTimeout(() => {
+          void (async () => {
+            // Additive support-box video URL column; preserves all existing lucky-box rows.
+            console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: start');
+            try {
+              await appDataSource.query(
+                'ALTER TABLE "jeho_own"."lucky_boxes" ADD COLUMN IF NOT EXISTS "videoUrl" varchar(1024)',
+              );
+              console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: complete');
+            } catch (error) {
+              console.error('[LuckyBoxVideoBootstrap] Could not initialize video URL column.', error instanceof Error ? error.message : String(error));
+            }
+    
+            // Create the optional custom-gift grants table with a short lock bound.
+            // Index creation is deliberately not part of API startup: index DDL can wait
+            // behind unrelated transactions and must be handled by a reviewed migration.
+            console.log('[JEHO-OWN DB STEP] custom_gift_grants: start');
+            const customGiftGrantsRunner = appDataSource.createQueryRunner();
+            try {
+              await customGiftGrantsRunner.connect();
+              await customGiftGrantsRunner.query("SET lock_timeout = '3s'");
+              await customGiftGrantsRunner.query("SET statement_timeout = '8s'");
+              console.log('[JEHO-OWN DB STEP] custom_gift_grants table: start');
+              await customGiftGrantsRunner.query(`
+                CREATE TABLE IF NOT EXISTS "jeho_own"."custom_gift_grants" (
+                  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                  "userId" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE CASCADE,
+                  "giftId" uuid NOT NULL UNIQUE REFERENCES "jeho_own"."gifts"("id") ON DELETE CASCADE,
+                  "grantedBy" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE RESTRICT,
+                  "mediaType" varchar(16) NOT NULL CHECK ("mediaType" IN ('image','video','gif')),
+                  "mediaUrl" varchar(512) NOT NULL,
+                  "durationDays" integer NULL CHECK ("durationDays" IS NULL OR "durationDays" >= 1),
+                  "startsAt" timestamptz NOT NULL DEFAULT now(),
+                  "expiresAt" timestamptz NULL,
+                  "revokedAt" timestamptz NULL,
+                  "createdAt" timestamptz NOT NULL DEFAULT now()
+                )
+              `);
+              console.log('[CustomGiftsBootstrap] Private custom-gift grants table is ready; optional indexes deferred to migration.');
+              console.log('[JEHO-OWN DB STEP] custom_gift_grants: complete');
+            } catch (error) {
+              const dbError = error as { code?: string; message?: string; detail?: string; constraint?: string };
+              console.error(
+                '[CustomGiftsBootstrap] Optional table bootstrap failed; API startup will continue.',
+                JSON.stringify({
+                  code: dbError?.code || null,
+                  message: dbError?.message || String(error),
+                  detail: dbError?.detail || null,
+                  constraint: dbError?.constraint || null,
+                }),
+              );
+            } finally {
+              await customGiftGrantsRunner.query('RESET lock_timeout').catch(() => undefined);
+              await customGiftGrantsRunner.query('RESET statement_timeout').catch(() => undefined);
+              await customGiftGrantsRunner.release().catch((error) => {
+                console.error('[CustomGiftsBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
+              });
+            }
+    
+            // Additive support-chest expiry bootstrap. Use one pinned connection and
+            // strict lock/statement bounds so DDL can never stall API startup indefinitely.
+            // The column and its optional index are separate autocommit statements: if index
+            // creation is blocked, the successfully-added nullable column is preserved.
+            console.log('[JEHO-OWN DB STEP] gift_sends expiry: start');
+            const giftExpiryRunner = appDataSource.createQueryRunner();
+            try {
+              await giftExpiryRunner.connect();
+              await giftExpiryRunner.query("SET lock_timeout = '3s'");
+              await giftExpiryRunner.query("SET statement_timeout = '8s'");
+              console.log('[JEHO-OWN DB STEP] gift_sends expiresAt column: start');
+              await giftExpiryRunner.query(
+                'ALTER TABLE "jeho_own"."gift_sends" ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz',
+              );
+              console.log('[JEHO-OWN DB STEP] gift_sends expiresAt column: complete');
+              console.log('[JEHO-OWN DB STEP] gift_sends expiry index: start');
+              await giftExpiryRunner.query(
+                'CREATE INDEX IF NOT EXISTS "IDX_gift_sends_expiresAt" ON "jeho_own"."gift_sends" ("expiresAt")',
+              );
+              console.log('[JEHO-OWN DB STEP] gift_sends expiry index: complete');
+            } catch (error) {
+              const dbError = error as { code?: string; message?: string; detail?: string };
+              console.error(
+                '[SupportChestExpiryBootstrap] Bounded optional expiry DDL did not complete; continuing startup.',
+                JSON.stringify({
+                  code: dbError?.code || null,
+                  message: dbError?.message || String(error),
+                  detail: dbError?.detail || null,
+                }),
+              );
+              try {
+                const blockers = await giftExpiryRunner.query(`
+                  SELECT
+                    blocked.pid AS blocked_pid,
+                    blocked.usename AS blocked_user,
+                    blocked.application_name AS blocked_application,
+                    blocked.state AS blocked_state,
+                    blocked.wait_event_type,
+                    blocked.wait_event,
+                    now() - blocked.query_start AS blocked_for,
+                    left(blocked.query, 240) AS blocked_query,
+                    blocker.pid AS blocker_pid,
+                    blocker.usename AS blocker_user,
+                    blocker.application_name AS blocker_application,
+                    blocker.state AS blocker_state,
+                    blocker.wait_event_type AS blocker_wait_event_type,
+                    blocker.wait_event AS blocker_wait_event,
+                    blocker.xact_start AS blocker_xact_start,
+                    now() - blocker.xact_start AS blocker_transaction_age,
+                    blocker.backend_xid AS blocker_backend_xid,
+                    pg_blocking_pids(blocker.pid) AS blocker_blocked_by,
+                    now() - blocker.query_start AS blocker_query_age,
+                    left(blocker.query, 240) AS blocker_query
+                  FROM pg_stat_activity AS blocked
+                  CROSS JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS blocking(pid)
+                  JOIN pg_stat_activity AS blocker ON blocker.pid = blocking.pid
+                  WHERE blocked.datname = current_database()
+                  ORDER BY blocked.query_start
+                  LIMIT 20
+                `);
+                console.error('[SupportChestExpiryBootstrap] PostgreSQL lock blockers:', JSON.stringify(blockers));
+              } catch (diagnosticError) {
+                console.error('[SupportChestExpiryBootstrap] Lock diagnostics unavailable:', diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError));
+              }
+            } finally {
+              await giftExpiryRunner.query('RESET lock_timeout').catch(() => undefined);
+              await giftExpiryRunner.query('RESET statement_timeout').catch(() => undefined);
+              await giftExpiryRunner.release().catch((error) => {
+                console.error('[SupportChestExpiryBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
+              });
+            }
+    
+    
+            // Create only the additive badge tables missing from older deployments.
+            // This never touches voice, Redis, user records, or existing badge data.
+            console.log('[JEHO-OWN DB STEP] badges bootstrap: start');
+            try {
+              await ensureBadgeTables(appDataSource);
+              console.log('[JEHO-OWN DB STEP] badges bootstrap: complete');
+            } catch (error) {
+              console.error(
+                '[BadgesBootstrap] Could not initialize badge tables; API startup continues.',
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+    
+            // CP schema bootstrap is deliberately owned by CpService after Nest has
+            // initialized. A PostgreSQL DDL lock must never prevent the HTTP API from
+            // binding its port; CP routes are guarded until the additive bootstrap and
+            // unified-relationship migration have both completed.
+    
+            // Additive vanity-ID style columns; existing IDs, purchases and leases are preserved.
+            console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: start');
+            try {
+              await ensureVanityIdStyleColumns(appDataSource);
+              console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: complete');
+            } catch (error) {
+              console.error('[VanityIdStyleBootstrap] Could not initialize style columns; API startup continues.', error instanceof Error ? error.message : String(error));
+            }
+    
+            // Additive persistent moments tables; existing application data is preserved.
+            console.log('[JEHO-OWN DB STEP] moments bootstrap: start');
+            try {
+              await ensureMomentsTables(appDataSource);
+              console.log('[JEHO-OWN DB STEP] moments bootstrap: complete');
+            } catch (error) {
+              console.error(
+                '[MomentsBootstrap] Could not initialize moments tables; API startup continues.',
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+    
+            // Repair profile columns missing from older production schemas before serving requests.
+            console.log('[JEHO-OWN DB STEP] user profile bootstrap: start');
+            try {
+              await ensureUserProfileColumns(appDataSource);
+              console.log('[JEHO-OWN DB STEP] user profile bootstrap: complete');
+            } catch (error) {
+              console.error(
+                '[UserProfileBootstrap] Could not initialize profile columns; API startup continues.',
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+    
+            // Safe startup diagnostics: identify the connected database/schema without logging credentials.
+            console.log('[JEHO-OWN DB STEP] final database diagnostics: start');
+            const [connectionInfo] = await appDataSource.query(
+              'SELECT current_database() AS database_name, current_schema() AS schema_name, current_setting(\'search_path\') AS search_path',
+            );
+            const [{ table_count: tableCount }] = await appDataSource.query(
+              'SELECT COUNT(*)::int AS table_count FROM information_schema.tables WHERE table_schema = $1',
+              ['jeho_own'],
+            );
+            console.log(
+              `[JEHO-OWN DB] database=${connectionInfo.database_name} schema=${connectionInfo.schema_name} search_path=${connectionInfo.search_path} tables=${tableCount}`,
+            );
+    
+            console.log('[JEHO-OWN DB STEP] all database bootstraps complete');
+    
+          })().catch((error) => {
+            console.error('[JEHO-OWN DB] Background additive schema maintenance failed.', error instanceof Error ? error.message : String(error));
           });
-        }
-
-        // Additive support-chest expiry bootstrap. Use one pinned connection and
-        // strict lock/statement bounds so DDL can never stall API startup indefinitely.
-        // The column and its optional index are separate autocommit statements: if index
-        // creation is blocked, the successfully-added nullable column is preserved.
-        console.log('[JEHO-OWN DB STEP] gift_sends expiry: start');
-        const giftExpiryRunner = appDataSource.createQueryRunner();
-        try {
-          await giftExpiryRunner.connect();
-          await giftExpiryRunner.query("SET lock_timeout = '3s'");
-          await giftExpiryRunner.query("SET statement_timeout = '8s'");
-          console.log('[JEHO-OWN DB STEP] gift_sends expiresAt column: start');
-          await giftExpiryRunner.query(
-            'ALTER TABLE "jeho_own"."gift_sends" ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz',
-          );
-          console.log('[JEHO-OWN DB STEP] gift_sends expiresAt column: complete');
-          console.log('[JEHO-OWN DB STEP] gift_sends expiry index: start');
-          await giftExpiryRunner.query(
-            'CREATE INDEX IF NOT EXISTS "IDX_gift_sends_expiresAt" ON "jeho_own"."gift_sends" ("expiresAt")',
-          );
-          console.log('[JEHO-OWN DB STEP] gift_sends expiry index: complete');
-        } catch (error) {
-          const dbError = error as { code?: string; message?: string; detail?: string };
-          console.error(
-            '[SupportChestExpiryBootstrap] Bounded optional expiry DDL did not complete; continuing startup.',
-            JSON.stringify({
-              code: dbError?.code || null,
-              message: dbError?.message || String(error),
-              detail: dbError?.detail || null,
-            }),
-          );
-          try {
-            const blockers = await giftExpiryRunner.query(`
-              SELECT
-                blocked.pid AS blocked_pid,
-                blocked.usename AS blocked_user,
-                blocked.application_name AS blocked_application,
-                blocked.state AS blocked_state,
-                blocked.wait_event_type,
-                blocked.wait_event,
-                now() - blocked.query_start AS blocked_for,
-                left(blocked.query, 240) AS blocked_query,
-                blocker.pid AS blocker_pid,
-                blocker.usename AS blocker_user,
-                blocker.application_name AS blocker_application,
-                blocker.state AS blocker_state,
-                blocker.wait_event_type AS blocker_wait_event_type,
-                blocker.wait_event AS blocker_wait_event,
-                blocker.xact_start AS blocker_xact_start,
-                now() - blocker.xact_start AS blocker_transaction_age,
-                blocker.backend_xid AS blocker_backend_xid,
-                pg_blocking_pids(blocker.pid) AS blocker_blocked_by,
-                now() - blocker.query_start AS blocker_query_age,
-                left(blocker.query, 240) AS blocker_query
-              FROM pg_stat_activity AS blocked
-              CROSS JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS blocking(pid)
-              JOIN pg_stat_activity AS blocker ON blocker.pid = blocking.pid
-              WHERE blocked.datname = current_database()
-              ORDER BY blocked.query_start
-              LIMIT 20
-            `);
-            console.error('[SupportChestExpiryBootstrap] PostgreSQL lock blockers:', JSON.stringify(blockers));
-          } catch (diagnosticError) {
-            console.error('[SupportChestExpiryBootstrap] Lock diagnostics unavailable:', diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError));
-          }
-        } finally {
-          await giftExpiryRunner.query('RESET lock_timeout').catch(() => undefined);
-          await giftExpiryRunner.query('RESET statement_timeout').catch(() => undefined);
-          await giftExpiryRunner.release().catch((error) => {
-            console.error('[SupportChestExpiryBootstrap] Query runner release failed.', error instanceof Error ? error.message : String(error));
-          });
-        }
-
-
-        // Create only the additive badge tables missing from older deployments.
-        // This never touches voice, Redis, user records, or existing badge data.
-        console.log('[JEHO-OWN DB STEP] badges bootstrap: start');
-        try {
-          await ensureBadgeTables(appDataSource);
-          console.log('[JEHO-OWN DB STEP] badges bootstrap: complete');
-        } catch (error) {
-          console.error(
-            '[BadgesBootstrap] Could not initialize badge tables; API startup continues.',
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-
-        // CP schema bootstrap is deliberately owned by CpService after Nest has
-        // initialized. A PostgreSQL DDL lock must never prevent the HTTP API from
-        // binding its port; CP routes are guarded until the additive bootstrap and
-        // unified-relationship migration have both completed.
-
-        // Additive vanity-ID style columns; existing IDs, purchases and leases are preserved.
-        console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: start');
-        try {
-          await ensureVanityIdStyleColumns(appDataSource);
-          console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: complete');
-        } catch (error) {
-          console.error('[VanityIdStyleBootstrap] Could not initialize style columns; API startup continues.', error instanceof Error ? error.message : String(error));
-        }
-
-        // Additive persistent moments tables; existing application data is preserved.
-        console.log('[JEHO-OWN DB STEP] moments bootstrap: start');
-        try {
-          await ensureMomentsTables(appDataSource);
-          console.log('[JEHO-OWN DB STEP] moments bootstrap: complete');
-        } catch (error) {
-          console.error(
-            '[MomentsBootstrap] Could not initialize moments tables; API startup continues.',
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-
-        // Repair profile columns missing from older production schemas before serving requests.
-        console.log('[JEHO-OWN DB STEP] user profile bootstrap: start');
-        try {
-          await ensureUserProfileColumns(appDataSource);
-          console.log('[JEHO-OWN DB STEP] user profile bootstrap: complete');
-        } catch (error) {
-          console.error(
-            '[UserProfileBootstrap] Could not initialize profile columns; API startup continues.',
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-
-        // Safe startup diagnostics: identify the connected database/schema without logging credentials.
-        console.log('[JEHO-OWN DB STEP] final database diagnostics: start');
-        const [connectionInfo] = await appDataSource.query(
-          'SELECT current_database() AS database_name, current_schema() AS schema_name, current_setting(\'search_path\') AS search_path',
-        );
-        const [{ table_count: tableCount }] = await appDataSource.query(
-          'SELECT COUNT(*)::int AS table_count FROM information_schema.tables WHERE table_schema = $1',
-          ['jeho_own'],
-        );
-        console.log(
-          `[JEHO-OWN DB] database=${connectionInfo.database_name} schema=${connectionInfo.schema_name} search_path=${connectionInfo.search_path} tables=${tableCount}`,
-        );
-
-        console.log('[JEHO-OWN DB STEP] all database bootstraps complete');
+        }, 0);
         return appDataSource;
       },
     }),
