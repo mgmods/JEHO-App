@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
   Optional,
 } from '@nestjs/common';
@@ -65,7 +66,7 @@ const MIN_WITHDRAW_USD = 10;
 const DEFAULT_PACKAGES = STANDARD_RECHARGE_PACKAGES.map((p) => ({ ...p }));
 
 @Injectable()
-export class WalletService implements OnModuleInit {
+export class WalletService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WalletService.name);
   private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -112,24 +113,53 @@ export class WalletService implements OnModuleInit {
       }
       return;
     }
+    // These startup data repairs previously ran independently on every API
+    // replica. In particular, the silverCoins UPDATE could make every replica
+    // contend for the same wallet rows during a rolling deployment. Elect one
+    // cluster-wide maintainer and keep the session pinned for the whole repair.
+    const runner = this.dataSource.createQueryRunner();
+    let maintenanceLockAcquired = false;
     try {
-      // Retire silver: fold any remaining balance into gold coins and zero the column.
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '30s'");
+      const lockRows = await runner.query(
+        'SELECT pg_try_advisory_lock(741902611, 2005) AS locked',
+      );
+      maintenanceLockAcquired = lockRows?.[0]?.locked === true;
+      if (!maintenanceLockAcquired) {
+        throw new Error('Wallet startup maintenance is already running on another JEHO replica.');
+      }
+
+      // Idempotent one-time balance conversion. Only one replica can execute it.
       const result = await this.dataSource.query(`
         UPDATE wallets
         SET coins = COALESCE(coins, 0) + COALESCE("silverCoins", 0),
             "silverCoins" = 0
         WHERE COALESCE("silverCoins", 0) <> 0
       `);
-      this.logger.log(`Silver coins retired into coins (affected rows logged by driver)`);
+      this.logger.log('Silver-coin retirement completed under the cluster maintenance lock.');
       void result;
-    } catch (err) {
-      this.logger.warn(`retire silverCoins: ${(err as Error).message}`);
-    }
-    try {
       await this.ensureCanonicalPackages();
+      if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+      this.schemaRetryTimer = null;
     } catch (err) {
-      this.logger.warn(`ensureCanonicalPackages: ${(err as Error).message}`);
+      this.logger.warn(`Wallet startup maintenance deferred: ${(err as Error).message}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndCatalog(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+    } finally {
+      if (maintenanceLockAcquired) {
+        await runner.query('SELECT pg_advisory_unlock(741902611, 2005)').catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
     }
+  }
+
+  onModuleDestroy(): void {
     if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
     this.schemaRetryTimer = null;
   }
