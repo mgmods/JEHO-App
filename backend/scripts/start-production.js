@@ -56,6 +56,111 @@ async function markResetCompleted() {
   }
 }
 
+
+// Explicit, non-destructive first-install provisioning.
+// It runs only when JEHO_OWN_PROVISION_EMPTY=true and only against a schema
+// proven empty while holding the same global lock used by all runtime migrations.
+async function provisionEmptyProductionSchemaIfRequested() {
+  if (process.env.JEHO_OWN_PROVISION_EMPTY !== 'true') return false;
+  if (process.env.NODE_ENV !== 'production') {
+    throw new Error('JEHO_OWN_PROVISION_EMPTY is reserved for an explicit production first install.');
+  }
+
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const connection = databaseUrl
+    ? { connectionString: databaseUrl, ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined }
+    : {
+        host: process.env.DB_HOST?.trim(),
+        port: Number(process.env.DB_PORT || 5432),
+        user: process.env.DB_USERNAME?.trim(),
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_DATABASE?.trim(),
+        ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+      };
+  if (!databaseUrl && !(connection.host && connection.user && connection.password && connection.database)) {
+    throw new Error('JEHO_OWN_PROVISION_EMPTY requires complete database connection settings.');
+  }
+
+  const client = new Client({ ...connection, connectionTimeoutMillis: 8000, query_timeout: 15000 });
+  let lockAcquired = false;
+  try {
+    await client.connect();
+    const lock = await client.query(
+      'SELECT pg_try_advisory_lock($1, $2) AS locked',
+      [741902611, 99],
+    );
+    lockAcquired = lock.rows[0]?.locked === true;
+    if (!lockAcquired) {
+      throw new Error('Another JEHO schema migration/provisioning task is active; first-install provisioning was not started.');
+    }
+
+    await client.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
+    const markerExists = await client.query(
+      "SELECT to_regclass('"jeho_own"."__jeho_provision_state"') IS NOT NULL AS exists",
+    );
+
+    if (!markerExists.rows[0]?.exists) {
+      const objects = await client.query(`
+        SELECT
+          (SELECT count(*)::int FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'jeho_own'
+               AND c.relkind IN ('r','p','v','m','S','f')) AS relations,
+          (SELECT count(*)::int FROM pg_type t
+             JOIN pg_namespace n ON n.oid = t.typnamespace
+             WHERE n.nspname = 'jeho_own'
+               AND t.typtype IN ('e','d','r')) AS custom_types
+      `);
+      const relations = Number(objects.rows[0]?.relations || 0);
+      const customTypes = Number(objects.rows[0]?.custom_types || 0);
+      if (relations !== 0 || customTypes !== 0) {
+        throw new Error(
+          `Refusing first-install provisioning: jeho_own is not empty (relations=${relations}, customTypes=${customTypes}) and has no JEHO provisioning marker. Existing/partial data is preserved.`,
+        );
+      }
+      await client.query(`
+        CREATE TABLE "jeho_own"."__jeho_provision_state" (
+          id integer PRIMARY KEY CHECK (id = 1),
+          status varchar(16) NOT NULL CHECK (status IN ('running','complete')),
+          started_at timestamptz NOT NULL DEFAULT now(),
+          completed_at timestamptz
+        )
+      `);
+      await client.query(
+        "INSERT INTO \"jeho_own\".\"__jeho_provision_state\" (id,status) VALUES (1,'running')",
+      );
+      console.log('[JEHO-OWN startup] Verified empty app schema; created first-install marker.');
+    } else {
+      const state = await client.query(
+        'SELECT status FROM "jeho_own"."__jeho_provision_state" WHERE id = 1',
+      );
+      if (state.rows[0]?.status === 'complete') {
+        console.log('[JEHO-OWN startup] First-install provisioning already complete; no schema changes requested.');
+        return false;
+      }
+      if (state.rows[0]?.status !== 'running') {
+        throw new Error('JEHO provisioning marker is invalid; refusing automatic schema changes.');
+      }
+      console.warn('[JEHO-OWN startup] Resuming an interrupted, explicitly marked first-install seed.');
+    }
+
+    const seedCode = await runProcess('explicit empty-schema provisioning seed', process.execPath, ['dist/database/seed.js']);
+    if (seedCode !== 0) {
+      throw new Error('First-install seed failed. The schema remains marked running; API startup is blocked and a retry can safely resume this initial seed.');
+    }
+    await client.query(
+      'UPDATE "jeho_own"."__jeho_provision_state" SET status = \'complete\', completed_at = now() WHERE id = 1',
+    );
+    console.log('[JEHO-OWN startup] First-install provisioning completed and marked complete.');
+    return true;
+  } finally {
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock($1, $2)', [741902611, 99]).catch(() => undefined);
+    }
+    await client.end().catch(() => {});
+  }
+}
+
 async function databaseIsReady() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const dbHost = process.env.DB_HOST?.trim();
@@ -85,6 +190,18 @@ async function databaseIsReady() {
         };
     client = new Client({ ...connection, connectionTimeoutMillis: 8000, query_timeout: 10000 });
     await client.connect();
+    const provisioningMarker = await client.query(
+      "SELECT to_regclass('"jeho_own"."__jeho_provision_state"') IS NOT NULL AS exists",
+    );
+    if (provisioningMarker.rows[0]?.exists) {
+      const state = await client.query(
+        'SELECT status FROM "jeho_own"."__jeho_provision_state" WHERE id = 1',
+      );
+      if (state.rows[0]?.status !== 'complete') {
+        console.error('[JEHO-OWN startup] First-install provisioning is incomplete; refusing to start API.');
+        return null;
+      }
+    }
     const result = await client.query(
       "select exists (select 1 from information_schema.tables where table_schema='jeho_own' and table_name='users') as ready",
     );
@@ -131,6 +248,7 @@ async function runProcess(label, command, args) {
 async function main() {
   logDatabaseConfiguration();
 
+  await provisionEmptyProductionSchemaIfRequested();
   const resetWasRequested = await resetSchemaOnceIfRequested();
   if (resetWasRequested) {
     const seedCode = await runProcess('fresh database seed', process.execPath, ['dist/database/seed.js']);
