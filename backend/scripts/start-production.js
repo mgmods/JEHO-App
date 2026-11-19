@@ -207,23 +207,27 @@ async function terminateStaleJehoSessions() {
             -- It is metadata-only DDL; if it survives 10 minutes, treat it as
             -- a stale migration session and cancel only that exact operation.
             -- Scope remains this database + this DB role; never kill other work.
-            activity.application_name = ''
+            COALESCE(BTRIM(activity.application_name), '') = ''
             AND activity.state = 'active'
-            AND activity.xact_start < now() - interval '10 minutes'
-            AND position('ALTER TABLE' in upper(activity.query)) = 1
-            AND position('agency_applications' in activity.query) > 0
-            AND position('documentUrls' in activity.query) > 0
-            AND position('SET DEFAULT' in upper(activity.query)) > 0
+            AND activity.xact_start <= now() - interval '10 minutes'
+            AND BTRIM(COALESCE(activity.query, '')) ~* '^ALTER[[:space:]]+TABLE[[:space:]]+"?agency_applications"?[[:space:]]+ALTER[[:space:]]+COLUMN[[:space:]]+"?documentUrls"?[[:space:]]+SET[[:space:]]+DEFAULT([[:space:]]|$)'
           )
         )
     `);
     const terminatedRows = result.rows.filter((row) => row.terminated === true);
+    const refusedRows = result.rows.filter((row) => row.terminated !== true);
     if (terminatedRows.length) {
-      console.warn('[JEHO-OWN startup] Terminated stale JEHO PostgreSQL session(s) before application startup:', JSON.stringify(
+      console.warn('[JEHO-OWN startup] Terminated exact stale JEHO PostgreSQL session(s) before application startup:', JSON.stringify(
         terminatedRows.map(({ pid, application_name, state, query, xact_start }) => ({ pid, application_name, state, xact_start, query: String(query || '').slice(0, 240) })),
       ));
-    } else {
-      console.log('[JEHO-OWN startup] No stale JEHO PostgreSQL sessions or JEHO advisory-lock holders found.');
+    }
+    if (refusedRows.length) {
+      console.error('[JEHO-OWN startup] PostgreSQL matched stale JEHO session(s) but did not confirm termination; manual DB-side recovery may be required:', JSON.stringify(
+        refusedRows.map(({ pid, application_name, state, query, xact_start }) => ({ pid, application_name, state, xact_start, query: String(query || '').slice(0, 240) })),
+      ));
+    }
+    if (!result.rows.length) {
+      console.log('[JEHO-OWN startup] No exact stale JEHO PostgreSQL sessions matched recovery rules.');
     }
   } finally {
     await client.end().catch(() => {});
