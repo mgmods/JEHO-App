@@ -45,9 +45,8 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   private mysteriousModeCleanupTimer?: ReturnType<typeof setInterval>;
   private mysteriousModeSchemaTimer?: ReturnType<typeof setInterval>;
 
-  /** Best-effort compatibility work: a blocked optional VIP patch must never prevent API startup. */
-  async onModuleInit() {
-    await this.ensureMysteriousModeColumn();
+  /** Optional VIP maintenance is scheduled after Nest initialization; it never blocks HTTP startup. */
+  onModuleInit() {
     this.mysteriousModeSchemaTimer = setInterval(() => {
       void this.ensureMysteriousModeColumn();
     }, 30_000);
@@ -58,11 +57,16 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       });
     }, 60_000);
     this.mysteriousModeCleanupTimer.unref?.();
-    try {
-      await this.reconcileMysteriousModes();
-    } catch (error) {
-      this.logger.warn(`Initial Mysterious Man reconciliation deferred: ${error?.message || error}`);
-    }
+
+    const initialMaintenance = setTimeout(() => {
+      void (async () => {
+        await this.ensureMysteriousModeColumn();
+        await this.reconcileMysteriousModes();
+      })().catch((error) => {
+        this.logger.warn(`Initial Mysterious Man maintenance deferred: ${error?.message || error}`);
+      });
+    }, 0);
+    initialMaintenance.unref?.();
   }
 
   private async ensureMysteriousModeColumn(): Promise<void> {
