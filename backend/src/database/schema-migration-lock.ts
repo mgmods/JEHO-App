@@ -11,13 +11,7 @@ import { QueryRunner } from 'typeorm';
 export const JEHO_SCHEMA_LOCK_NAMESPACE = 741902611;
 export const JEHO_ADVISORY_LOCKS = {
   schema: 99,
-  roomAutoClear: 2001,
-  vipReconciliation: 2002,
-  storyExpiry: 2003,
   lockMonitor: 2004,
-  walletStartup: 2005,
-  publicIdBackfill: 2006,
-  giftStartup: 2007,
 } as const;
 export const JEHO_SCHEMA_LOCK_ID = JEHO_ADVISORY_LOCKS.schema;
 
