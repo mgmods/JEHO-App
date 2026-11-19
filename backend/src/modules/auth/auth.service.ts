@@ -510,8 +510,12 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       await runner.query("SET statement_timeout = '30s'");
       lockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.publicIdBackfill);
       if (!lockAcquired) {
-        // The replica holding this cluster lock owns the shared backfill.
-        // Avoid scheduling identical full-table backfills on every other replica.
+        // Another replica is handling the shared backfill. Retry later so a
+        // failed/terminated owner cannot leave missing IDs indefinitely.
+        if (!this.publicIdSchemaRetryTimer) {
+          this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
+          this.publicIdSchemaRetryTimer.unref?.();
+        }
         return { updated: 0 };
       }
       // Page through missing IDs instead of loading the entire users table into memory.
