@@ -11,6 +11,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -155,7 +156,7 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       }
     } finally {
       if (maintenanceLockAcquired) {
-        await runner.query('SELECT pg_advisory_unlock(741902611, 2005)').catch(() => undefined);
+        if (maintenanceLockAcquired) await releaseJehoAdvisoryLock(runner, 741902611, 2005).catch((unlockError) => this.logger.error(`Wallet maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
