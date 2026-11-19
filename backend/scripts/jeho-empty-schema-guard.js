@@ -5,7 +5,7 @@
  */
 async function inspectJehoSchemaForProvisioning(client) {
   const marker = await client.query(
-    "SELECT to_regclass('"jeho_own"."__jeho_provision_state"') IS NOT NULL AS exists",
+    `SELECT to_regclass('"jeho_own"."__jeho_provision_state"') IS NOT NULL AS exists`,
   );
   if (marker.rows[0]?.exists) {
     const state = await client.query(
