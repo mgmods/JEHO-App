@@ -77,7 +77,7 @@ test('JEHO schema lock serializes FIFO and advances after failed acquire/unlock'
     ? [{ locked: true }] : [{ unlocked: true }], events, discarded);
   assert.equal(await tryAcquireJehoSchemaLock(unlockFailure), true);
   await assert.rejects(releaseJehoSchemaLock(unlockFailure), /was not released/);
-  assert.equal(discarded.count, 1);
+  assert.equal(discarded.count, 2, 'both an uncertain acquire and an unconfirmed unlock must discard their connections');
   assert.equal(await tryAcquireJehoSchemaLock(afterUnlockFailure), true);
   await releaseJehoSchemaLock(afterUnlockFailure);
 
