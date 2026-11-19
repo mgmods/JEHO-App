@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomInt } from 'crypto';
 import { Gift, GiftType } from '../../database/entities/gift.entity';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock } from '../../database/schema-migration-lock';
 import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
@@ -162,8 +162,7 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '60s'");
-      const lockRows = await runner.query('SELECT pg_try_advisory_lock(741902611, 2007) AS locked');
-      maintenanceLockAcquired = lockRows?.[0]?.locked === true;
+      maintenanceLockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.giftStartup);
       if (!maintenanceLockAcquired) {
         // Another replica owns the shared catalog repair; it will retry if needed.
         if (this.giftSchemaBootstrapTimer) clearInterval(this.giftSchemaBootstrapTimer);
