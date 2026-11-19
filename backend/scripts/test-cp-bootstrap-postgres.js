@@ -110,6 +110,14 @@ async function testLegacyUpgrade(ds) {
      WHERE conrelid='jeho_own.cp_relationships'::regclass AND conname='preserve_pair_check'`,
   );
   assert.equal(preservedConstraint.length, 1, 'compound/unrelated CHECK constraint must remain intact');
+  const validatedTypeConstraints = await ds.query(
+    `SELECT conname, convalidated FROM pg_constraint
+     WHERE conrelid IN ('jeho_own.cp_relationships'::regclass, 'jeho_own.cp_requests'::regclass)
+       AND conname IN ('chk_cp_relationship_type_unified','chk_cp_request_type_unified')`,
+  );
+  assert.equal(validatedTypeConstraints.length, 2, 'both unified CP type constraints must exist');
+  assert.ok(validatedTypeConstraints.every((constraint) => constraint.convalidated === true),
+    'CP type constraints must be validated after their low-lock validation pass');
 }
 
 async function testCpDdlLockTimeoutAndResume(ds) {
