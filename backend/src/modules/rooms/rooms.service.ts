@@ -205,8 +205,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         this.log.warn('Room schema bootstrap deferred: another JEHO migration owns the shared lock.');
         return;
       }
-      try {
-      
           try {
             await runner.query(`
               CREATE TABLE IF NOT EXISTS agency_moderation_audit (
@@ -301,7 +299,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
             this.log.warn(`ensure persistent personal rooms deferred; retry will run: ${err instanceof Error ? err.message : String(err)}`);
             throw err;
           }
-      }
       this.roomSchemaBootstrapReady = true;
       this.log.log('Room schema bootstrap completed under the shared JEHO migration lock.');
     } catch (err) {
