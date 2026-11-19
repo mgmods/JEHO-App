@@ -59,6 +59,7 @@ import { ensureBadgeTables } from './database/badges-bootstrap';
 import { ensureVanityIdStyleColumns } from './database/vanity-id-style-bootstrap';
 import { ensureMomentsTables } from './database/moments-bootstrap';
 import { ensureUserProfileColumns } from './database/user-profile-bootstrap';
+import { PostgresLockMonitorService } from './database/postgres-lock-monitor.service';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -491,6 +492,7 @@ const entityList = Object.values(entities).filter(
     MomentsModule,
   ],
   providers: [
+    PostgresLockMonitorService,
     // JWT first so AppThrottlerGuard can key by user id (not shared carrier IP).
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: AppThrottlerGuard },
