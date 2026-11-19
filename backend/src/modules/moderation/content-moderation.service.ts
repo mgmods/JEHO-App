@@ -66,7 +66,11 @@ export class ContentModerationService implements OnModuleInit {
     private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeModerationDefaults();
+  }
+
+  private async initializeModerationDefaults(): Promise<void> {
     const defaults: Array<[string, string, string]> = [
       ['auto_moderation', 'true', 'Enable automated chat/image moderation'],
       ['autoModeration', 'true', 'Enable automated chat/image moderation (dashboard key)'],
