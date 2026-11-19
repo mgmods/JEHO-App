@@ -140,6 +140,13 @@ async function testCpDdlLockTimeoutAndResume(ds) {
     "createdAt" timestamptz NOT NULL DEFAULT now(),
     "updatedAt" timestamptz NOT NULL DEFAULT now()
   )`);
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  await ds.query(
+    `INSERT INTO jeho_own.cp_requests
+      (id, "fromUserId", "toUserId", type, status, "roomId", "priceCoins", "idempotencyKey", "expiresAt")
+     VALUES ($1, $2, $3, 'love', 'pending', $4, 123, 'cp-lock-resume-test', NOW() + interval '1 hour')`,
+    [requestId, '22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333', '44444444-4444-4444-8444-444444444444'],
+  );
 
   const blocker = ds.createQueryRunner();
   await blocker.connect();
@@ -168,6 +175,12 @@ async function testCpDdlLockTimeoutAndResume(ds) {
   assert.equal(columns.length, 3, 'retry must complete the interrupted additive CP DDL');
   assert.ok(columns.find((column) => column.column_name === 'roomId').is_nullable === 'YES');
   assert.ok(columns.find((column) => column.column_name === 'priceCoins').is_nullable === 'YES');
+  const preserved = await ds.query(
+    'SELECT id, type, status FROM jeho_own.cp_requests WHERE id = $1',
+    [requestId],
+  );
+  assert.equal(preserved.length, 1, 'the pre-existing CP request row must survive interrupted bootstrap and retry');
+  assert.equal(preserved[0].type, 'love');
 }
 
 async function testFirstInstallSchemaGuard(ds) {
