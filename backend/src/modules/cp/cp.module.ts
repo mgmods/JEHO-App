@@ -20,11 +20,12 @@ import { CosmeticsModule } from '../cosmetics/cosmetics.module';
 import { AuthModule } from '../auth/auth.module';
 import { BadgesModule } from '../badges/badges.module';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CpSchemaReadyGuard } from './cp-schema-ready.guard';
 
 @Module({
   imports: [TypeOrmModule.forFeature([CpRequest, CpRelationship, CpAuditLog, CpPointEvent, Wallet, WalletTransaction, Room, RoomSeat, User, AppSetting]), RealtimeModule, NotificationsModule, CosmeticsModule, AuthModule, BadgesModule],
   controllers: [CpController, CpAdminController],
-  providers: [CpService, JwtAuthGuard],
+  providers: [CpService, JwtAuthGuard, CpSchemaReadyGuard],
   exports: [CpService],
 })
 export class CpModule {}
