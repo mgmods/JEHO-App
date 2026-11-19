@@ -175,9 +175,8 @@ async function databaseIsReady() {
     await client.connect();
     const schemaState = await inspectJehoSchemaForProvisioning(client);
     if (schemaState.markerExists && schemaState.status !== 'complete') {
-        console.error('[JEHO-OWN startup] First-install provisioning is incomplete; refusing to start API.');
-        return null;
-      }
+      console.error('[JEHO-OWN startup] First-install provisioning is incomplete; refusing to start API.');
+      return null;
     }
     const result = await client.query(
       "select exists (select 1 from information_schema.tables where table_schema='jeho_own' and table_name='users') as ready",
