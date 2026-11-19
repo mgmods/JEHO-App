@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 require('ts-node/register');
 const { DataSource } = require('typeorm');
 const { ensureCpTables } = require('../src/database/cp-bootstrap');
+const { inspectJehoSchemaForProvisioning } = require('./jeho-empty-schema-guard');
 
 const databaseUrl = process.env.CP_TEST_DATABASE_URL;
 if (!databaseUrl) throw new Error('CP_TEST_DATABASE_URL is required. Use only an isolated disposable PostgreSQL database.');
@@ -112,6 +113,31 @@ async function testLegacyUpgrade(ds) {
 }
 
 
+
+async function testFirstInstallSchemaGuard(ds) {
+  await resetSchema(ds);
+  let state = await inspectJehoSchemaForProvisioning(ds);
+  assert.equal(state.markerExists, false);
+  assert.equal(state.isEmpty, true, 'a truly empty app schema must be eligible for first-install provisioning');
+
+  await ds.query('CREATE TABLE jeho_own.partial_install (id integer PRIMARY KEY)');
+  state = await inspectJehoSchemaForProvisioning(ds);
+  assert.equal(state.isEmpty, false, 'a partially initialized schema without a JEHO marker must be refused');
+  assert.equal(state.relations, 1);
+
+  await resetSchema(ds);
+  await ds.query(`
+    CREATE TABLE jeho_own.__jeho_provision_state (
+      id integer PRIMARY KEY CHECK (id = 1),
+      status varchar(16) NOT NULL CHECK (status IN ('running','complete'))
+    )
+  `);
+  await ds.query("INSERT INTO jeho_own.__jeho_provision_state(id,status) VALUES (1,'running')");
+  state = await inspectJehoSchemaForProvisioning(ds);
+  assert.equal(state.markerExists, true);
+  assert.equal(state.status, 'running', 'interrupted first install must be recognized as resumable, not as a clean schema');
+}
+
 async function testSharedSchemaMigrationLock(ds) {
   const owner = ds.createQueryRunner();
   const contender = ds.createQueryRunner();
@@ -153,9 +179,10 @@ async function main() {
   await ds.initialize();
   try {
     await testSharedSchemaMigrationLock(ds);
+    await testFirstInstallSchemaGuard(ds);
     await testFreshInstall(ds);
     await testLegacyUpgrade(ds);
-    console.log('PASS: shared migration-lock contention, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
+    console.log('PASS: shared migration-lock contention, empty/partial-schema provisioning guard, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
   } finally {
     await ds.query('DROP SCHEMA IF EXISTS jeho_own CASCADE');
     await ds.destroy();
