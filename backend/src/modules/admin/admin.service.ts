@@ -90,6 +90,7 @@ import {
   normalizePermissions,
   type PermissionsMap,
 } from '../../common/dashboard-permissions';
+import { SecurityShieldService } from '../../common/security/security-shield.service';
 
 /** Reasonable monthly VIP coin prices (not explosion formula). */
 export function vipPriceForLevel(level: number): number {
@@ -264,6 +265,7 @@ export class AdminService {
     private readonly cosmeticsService: CosmeticsService,
     private readonly giftsService: GiftsService,
     private readonly dataSource: DataSource,
+    private readonly securityShield: SecurityShieldService,
   ) {}
 
   async getPublicAgencyRoleBadges() {
@@ -1131,6 +1133,7 @@ export class AdminService {
     if (!user) throw new NotFoundException('User not found');
     user.status = dto.status;
     await this.usersRepo.save(user);
+    this.securityShield.invalidateUserBanCache(userId);
     await this.abuseRepo.save(
       this.abuseRepo.create({
         userId,
@@ -1166,6 +1169,7 @@ export class AdminService {
     user.staffRole = null;
     user.refreshTokenHash = null;
     await this.usersRepo.save(user);
+    this.securityShield.invalidateUserBanCache(userId);
     await this.realtimeGateway.ejectUserEverywhere(userId, 'account_deleted');
     await this.abuseRepo.save(
       this.abuseRepo.create({
@@ -3593,6 +3597,7 @@ export class AdminService {
     }
 
     await this.usersRepo.save(user);
+    this.securityShield.invalidateUserBanCache(id);
     if (user.status !== UserStatus.ACTIVE) {
       await this.realtimeGateway.ejectUserEverywhere(
         id,
