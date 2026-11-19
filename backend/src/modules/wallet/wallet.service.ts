@@ -128,7 +128,11 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       );
       maintenanceLockAcquired = lockRows?.[0]?.locked === true;
       if (!maintenanceLockAcquired) {
-        throw new Error('Wallet startup maintenance is already running on another JEHO replica.');
+        // Another replica owns this one-time shared-data repair. It is responsible
+        // for completion/retry; do not let every replica queue a duplicate pass.
+        if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+        this.schemaRetryTimer = null;
+        return;
       }
 
       // Idempotent one-time balance conversion. Only one replica can execute it.
