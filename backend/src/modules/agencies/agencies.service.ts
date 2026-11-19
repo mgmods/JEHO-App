@@ -158,7 +158,8 @@ export class AgenciesService implements OnModuleInit, OnModuleDestroy {
 
       const lockRows = await runner.query(
         'SELECT pg_try_advisory_lock($1, $2) AS locked',
-      , [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+      );
       advisoryLockAcquired = lockRows?.[0]?.locked === true;
       if (!advisoryLockAcquired) {
         this.logger.warn('Agency schema bootstrap deferred: another instance owns the migration lock.');
