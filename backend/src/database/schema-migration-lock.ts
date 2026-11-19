@@ -3,39 +3,16 @@ import { QueryRunner } from 'typeorm';
 /**
  * One database-wide JEHO schema-migration mutex.
  *
- * Every application-owned DDL/bootstrap path must use this same advisory-lock
- * pair. Session locks are used for multi-statement, autocommit migrations;
- * transaction-scoped locks may use the same pair for atomic migrations.
+ * PostgreSQL advisory locks coordinate separate API replicas. The local
+ * non-blocking gate prevents Nest providers in the same process from polling
+ * PostgreSQL concurrently for the same lock. A busy local gate returns false,
+ * allowing each bootstrap's existing bounded retry timer to try again later.
  */
 export const JEHO_SCHEMA_LOCK_NAMESPACE = 741902611;
 export const JEHO_SCHEMA_LOCK_ID = 99;
 
-// PostgreSQL advisory locks coordinate separate processes/replicas. This
-// additional FIFO mutex prevents every Nest provider in one API process from
-// repeatedly polling PostgreSQL for the same lock at the same time.
-const localWaiters: Array<() => void> = [];
 let localLockHeld = false;
 const localLockOwners = new WeakSet<QueryRunner>();
-
-async function acquireLocalSchemaLock(): Promise<void> {
-  if (!localLockHeld) {
-    localLockHeld = true;
-    return;
-  }
-
-  await new Promise<void>((resolve) => {
-    localWaiters.push(resolve);
-  });
-}
-
-function releaseLocalSchemaLock(): void {
-  const next = localWaiters.shift();
-  if (next) {
-    next();
-  } else {
-    localLockHeld = false;
-  }
-}
 
 export async function tryAcquireJehoSchemaLock(
   runner: QueryRunner,
@@ -43,8 +20,9 @@ export async function tryAcquireJehoSchemaLock(
   // PostgreSQL session advisory locks are re-entrant; avoid incrementing the
   // lock count if a caller accidentally asks twice on the same QueryRunner.
   if (localLockOwners.has(runner)) return true;
+  if (localLockHeld) return false;
 
-  await acquireLocalSchemaLock();
+  localLockHeld = true;
   try {
     const rows = await runner.query(
       'SELECT pg_try_advisory_lock($1, $2) AS locked',
@@ -54,11 +32,11 @@ export async function tryAcquireJehoSchemaLock(
     if (locked) {
       localLockOwners.add(runner);
     } else {
-      releaseLocalSchemaLock();
+      localLockHeld = false;
     }
     return locked;
   } catch (error) {
-    releaseLocalSchemaLock();
+    localLockHeld = false;
     throw error;
   }
 }
@@ -72,7 +50,7 @@ export async function releaseJehoSchemaLock(runner: QueryRunner): Promise<void> 
     );
   } finally {
     if (ownsLocalLock) {
-      releaseLocalSchemaLock();
+      localLockHeld = false;
     }
   }
 }
