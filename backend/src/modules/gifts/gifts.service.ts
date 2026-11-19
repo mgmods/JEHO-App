@@ -10,12 +10,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, MoreThan, Repository, Or, IsNull } from 'typeorm';
+import { DataSource, MoreThan, QueryRunner, Repository, Or, IsNull } from 'typeorm';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomInt } from 'crypto';
 import { Gift, GiftType } from '../../database/entities/gift.entity';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock } from '../../database/schema-migration-lock';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
@@ -235,19 +235,51 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async withJehoSchemaLock<T>(work: (manager: import('typeorm').EntityManager) => Promise<T>): Promise<T> {
-    return this.dataSource.transaction(async (manager) => {
-      await manager.query("SET LOCAL lock_timeout = '250ms'");
-      await manager.query("SET LOCAL statement_timeout = '8s'");
-      const lockRows = await manager.query(
-        'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
-        [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-      );
-      if (lockRows?.[0]?.locked !== true) {
+  private async withJehoSchemaLock<T>(work: (runner: QueryRunner) => Promise<T>): Promise<T> {
+    // Use a pinned session lock and autocommit each DDL statement. This prevents
+    // an ALTER TABLE lock from being retained while later data backfills or index
+    // builds run in the same long transaction.
+    const runner = this.dataSource.createQueryRunner();
+    let lockAcquired = false;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '120s'");
+      lockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!lockAcquired) {
         throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
       }
-      return work(manager);
-    });
+      return await work(runner);
+    } finally {
+      if (lockAcquired) {
+        await releaseJehoSchemaLock(runner).catch((error) =>
+          this.log.error(`Gift schema lock release failed; connection discarded: ${error instanceof Error ? error.message : String(error)}`),
+        );
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+    }
+  }
+
+  private async ensureConcurrentGiftIndex(
+    runner: QueryRunner,
+    indexName: string,
+    createSql: string,
+  ): Promise<void> {
+    const existing = await runner.query(
+      `SELECT i.indisvalid
+       FROM pg_index i
+       JOIN pg_class idx ON idx.oid = i.indexrelid
+       JOIN pg_namespace n ON n.oid = idx.relnamespace
+       WHERE n.nspname = current_schema() AND idx.relname = $1
+       LIMIT 1`,
+      [indexName],
+    );
+    if (existing.length && existing[0].indisvalid !== true) {
+      await runner.query(`DROP INDEX CONCURRENTLY IF EXISTS "jeho_own"."${indexName}"`);
+    }
+    await runner.query(createSql);
   }
 
   /** Replace Mikoo/Mego branding in gift names (and descriptions) visible in the app. */
@@ -341,7 +373,11 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.withJehoSchemaLock(async (manager) => {
         await manager.query('ALTER TABLE gift_sends ADD COLUMN IF NOT EXISTS "requestId" uuid');
-        await manager.query('CREATE UNIQUE INDEX IF NOT EXISTS uq_gift_sends_request_receiver ON gift_sends ("requestId", "receiverId") WHERE "requestId" IS NOT NULL');
+        await this.ensureConcurrentGiftIndex(
+          manager,
+          'uq_gift_sends_request_receiver',
+          'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_gift_sends_request_receiver ON gift_sends ("requestId", "receiverId") WHERE "requestId" IS NOT NULL',
+        );
       });
     } catch (err) {
       this.giftSchemaBootstrapFailed = true;
@@ -364,7 +400,11 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.withJehoSchemaLock(async (manager) => {
         await manager.query('ALTER TABLE gifts ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid NULL');
-        await manager.query('CREATE INDEX IF NOT EXISTS idx_gifts_brand_agency_id ON gifts ("brandAgencyId")');
+        await this.ensureConcurrentGiftIndex(
+          manager,
+          'idx_gifts_brand_agency_id',
+          'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_gifts_brand_agency_id ON gifts ("brandAgencyId")',
+        );
       });
     } catch (err) {
       this.giftSchemaBootstrapFailed = true;
