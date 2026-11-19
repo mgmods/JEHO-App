@@ -14,7 +14,7 @@ import { IsInt, Min, Max, IsOptional, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { vipMedalUrl } from '../../common/vip-assets';
-import { JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock, releaseJehoSessionAdvisoryLock, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import {
   VIP_ALLOWED_DAYS,
   VIP_DURATION_PACKS,
