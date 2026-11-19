@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock } from '../../database/schema-migration-lock';
 import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
@@ -124,10 +124,7 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '30s'");
-      const lockRows = await runner.query(
-        'SELECT pg_try_advisory_lock(741902611, 2005) AS locked',
-      );
-      maintenanceLockAcquired = lockRows?.[0]?.locked === true;
+      maintenanceLockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.walletStartup);
       if (!maintenanceLockAcquired) {
         // Another replica owns this one-time shared-data repair. It is responsible
         // for completion/retry; do not let every replica queue a duplicate pass.
