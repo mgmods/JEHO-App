@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from '../../database/schema-migration-lock';
 import { v4 as uuidv4 } from 'uuid';
 import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
 import {
@@ -156,8 +157,8 @@ export class AgenciesService implements OnModuleInit, OnModuleDestroy {
       await runner.query("SET statement_timeout = '20s'");
 
       const lockRows = await runner.query(
-        'SELECT pg_try_advisory_lock(741902611, 3) AS locked',
-      );
+        'SELECT pg_try_advisory_lock($1, $2) AS locked',
+      , [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
       advisoryLockAcquired = lockRows?.[0]?.locked === true;
       if (!advisoryLockAcquired) {
         this.logger.warn('Agency schema bootstrap deferred: another instance owns the migration lock.');
@@ -310,7 +311,7 @@ export class AgenciesService implements OnModuleInit, OnModuleDestroy {
       );
     } finally {
       if (advisoryLockAcquired) {
-        await runner.query('SELECT pg_advisory_unlock(741902611, 3)').catch(() => undefined);
+        await runner.query('SELECT pg_advisory_unlock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]).catch(() => undefined);
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
