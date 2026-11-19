@@ -40,6 +40,10 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Test JEHO schema migration lock concurrency
+        working-directory: backend
+        run: npm run test:schema-lock
+
       - name: Backend dependency audit
         working-directory: backend
         run: npm audit --audit-level=high || true
