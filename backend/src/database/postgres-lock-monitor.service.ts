@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { releaseJehoAdvisoryLock } from './schema-migration-lock';
+import { JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock, releaseJehoAdvisoryLock } from './schema-migration-lock';
 
 /**
  * Lightweight, cluster-serialized diagnostics for PostgreSQL lock queues.
@@ -39,10 +39,7 @@ export class PostgresLockMonitorService implements OnModuleInit, OnModuleDestroy
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '3s'");
-      const lockRows = await runner.query(
-        'SELECT pg_try_advisory_lock(741902611, 2004) AS locked',
-      );
-      monitorLockAcquired = lockRows?.[0]?.locked === true;
+      monitorLockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.lockMonitor);
       if (!monitorLockAcquired) return;
 
       const blockers = await runner.query(`
