@@ -74,7 +74,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
     let locked = false;
     try {
       await runner.connect();
-      await runner.query("SET lock_timeout = '3s'");
+      await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '8s'");
       const rows = await runner.query(
         'SELECT pg_try_advisory_lock($1, $2) AS locked',
