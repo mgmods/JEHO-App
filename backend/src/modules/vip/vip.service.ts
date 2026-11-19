@@ -107,12 +107,12 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '8s'");
-      locked = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.vipReconciliation);
+      locked = await tryAcquireJehoSchemaLock(runner);
       if (!locked) return;
       await this.reconcileMysteriousModesOnce(runner);
     } finally {
       if (locked) {
-        await releaseJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.vipReconciliation).catch(() => undefined);
+        await releaseJehoSchemaLock(runner).catch(() => undefined);
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
