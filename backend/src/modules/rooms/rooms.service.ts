@@ -194,7 +194,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     let locked = false;
     try {
       await runner.connect();
-      await runner.query("SET lock_timeout = '3s'");
+      await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '20s'");
       const lockRows = await runner.query(
         'SELECT pg_try_advisory_lock($1, $2) AS locked',
