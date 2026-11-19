@@ -153,7 +153,7 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       }
     } finally {
       if (maintenanceLockAcquired) {
-        if (maintenanceLockAcquired) await releaseJehoAdvisoryLock(runner, 741902611, 2005).catch((unlockError) => this.logger.error(`Wallet maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
+        if (maintenanceLockAcquired) await releaseJehoAdvisoryLock(runner, JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_ADVISORY_LOCKS.walletStartup).catch((unlockError) => this.logger.error(`Wallet maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
