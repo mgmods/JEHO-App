@@ -20,7 +20,8 @@
     "migrate:cp-system": "node scripts/migrate-cp-system.js",
     "test:games": "node --test -r ts-node/register src/modules/games/mikoo-gateway/mikoo-house-edge.util.spec.ts src/modules/games/casual-bet-idempotency.util.spec.ts",
     "test:cp-bootstrap": "node scripts/test-cp-bootstrap-postgres.js",
-    "test:schema-lock": "node --test -r ts-node/register src/database/schema-migration-lock.spec.ts"
+    "test:schema-lock": "node --test -r ts-node/register src/database/schema-migration-lock.spec.ts",
+    "test:schema-lock-postgres": "node --test -r ts-node/register src/database/schema-migration-lock.postgres.spec.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
