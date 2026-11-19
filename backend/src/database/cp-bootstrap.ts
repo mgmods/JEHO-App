@@ -170,117 +170,53 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
       )
     `);
 
-    // Normalize only a single-column CHECK on the type column. Never drop
-    // compound or unrelated checks. Skip tables already accepting relationship.
-    await runner.query(`DO $$
-    DECLARE
-      target record;
-      item record;
-      type_attnum smallint;
-    BEGIN
-      FOR target IN
-        SELECT * FROM (VALUES
-          ('cp_relationships', 'chk_cp_relationship_type_unified'),
-          ('cp_requests', 'chk_cp_request_type_unified')
-        ) AS targets(table_name, constraint_name)
-      LOOP
-        SELECT a.attnum INTO type_attnum
-        FROM pg_attribute a
-        JOIN pg_class t ON t.oid = a.attrelid
-        JOIN pg_namespace n ON n.oid = t.relnamespace
-        WHERE n.nspname = 'jeho_own'
-          AND t.relname = target.table_name
-          AND a.attname = 'type'
-          AND NOT a.attisdropped;
+    // Normalize only single-column CHECK constraints on the type column. Keep
+    // compound/unrelated checks. Add the replacement as NOT VALID, then validate
+    // in a separate statement so the full scan uses PostgreSQL's weaker validation lock.
+    for (const target of [
+      { tableName: 'cp_relationships', constraintName: 'chk_cp_relationship_type_unified' },
+      { tableName: 'cp_requests', constraintName: 'chk_cp_request_type_unified' },
+    ]) {
+      const typeColumn = await runner.query(
+        'SELECT 1 FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = $3 LIMIT 1',
+        ['jeho_own', target.tableName, 'type'],
+      );
+      if (!typeColumn.length) throw new Error(`[CpBootstrap] Missing type column on ${target.tableName}.`);
 
-        IF type_attnum IS NULL THEN
-          RAISE EXCEPTION '[CpBootstrap] Missing type column on %', target.table_name;
-        END IF;
+      const loadTypeChecks = () => runner.query(
+        `SELECT c.conname, c.convalidated, pg_get_constraintdef(c.oid) AS definition,
+                (c.conkey = ARRAY[a.attnum]::smallint[]) AS only_type_column
+         FROM pg_constraint c
+         JOIN pg_class t ON t.oid = c.conrelid
+         JOIN pg_namespace n ON n.oid = t.relnamespace
+         JOIN pg_attribute a ON a.attrelid = t.oid AND a.attname = 'type' AND NOT a.attisdropped
+         WHERE n.nspname = $1 AND t.relname = $2 AND c.contype = 'c'` ,
+        ['jeho_own', target.tableName],
+      );
+      let checks = await loadTypeChecks();
+      const acceptsRelationship = (check: any) =>
+        check.only_type_column === true && String(check.definition || '').toLowerCase().includes('relationship');
+      if (!checks.some((check: any) => acceptsRelationship(check))) {
+        const legacyTypes = ['friendship', 'brotherhood', 'engagement', 'marriage', 'love'];
+        for (const check of checks) {
+          const definition = String(check.definition || '').toLowerCase();
+          if (check.only_type_column !== true || !legacyTypes.some((legacy) => definition.includes(legacy))) continue;
+          const quotedName = String(check.conname).replaceAll('"', '""');
+          await runner.query(`ALTER TABLE "jeho_own"."${target.tableName}" DROP CONSTRAINT "${quotedName}"`);
+        }
+        await runner.query(
+          `ALTER TABLE "jeho_own"."${target.tableName}" ADD CONSTRAINT "${target.constraintName}" CHECK (type IN ('relationship','friendship','brotherhood','love','engagement','marriage')) NOT VALID`,
+        );
+      }
 
-        IF NOT EXISTS (
-          SELECT 1
-          FROM pg_constraint c
-          JOIN pg_class t ON t.oid = c.conrelid
-          JOIN pg_namespace n ON n.oid = t.relnamespace
-          WHERE n.nspname = 'jeho_own'
-            AND t.relname = target.table_name
-            AND c.contype = 'c'
-            AND c.conkey = ARRAY[type_attnum]::smallint[]
-            AND pg_get_constraintdef(c.oid) ILIKE '%relationship%'
-        ) THEN
-          FOR item IN
-            SELECT c.conname
-            FROM pg_constraint c
-            JOIN pg_class t ON t.oid = c.conrelid
-            JOIN pg_namespace n ON n.oid = t.relnamespace
-            WHERE n.nspname = 'jeho_own'
-              AND t.relname = target.table_name
-              AND c.contype = 'c'
-              AND c.conkey = ARRAY[type_attnum]::smallint[]
-              AND (
-                pg_get_constraintdef(c.oid) ILIKE '%friendship%'
-                OR pg_get_constraintdef(c.oid) ILIKE '%brotherhood%'
-                OR pg_get_constraintdef(c.oid) ILIKE '%engagement%'
-                OR pg_get_constraintdef(c.oid) ILIKE '%marriage%'
-                OR pg_get_constraintdef(c.oid) ILIKE '%love%'
-              )
-          LOOP
-            EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I',
-              'jeho_own', target.table_name, item.conname);
-          END LOOP;
-
-          EXECUTE format(
-            'ALTER TABLE %I.%I ADD CONSTRAINT %I CHECK (type IN (''relationship'',''friendship'',''brotherhood'',''love'',''engagement'',''marriage'')) NOT VALID',
-            'jeho_own', target.table_name, target.constraint_name
-          );
-        END IF;
-      END LOOP;
-    END;
-    $`);
-
-    // Validate separately from ADD CONSTRAINT. PostgreSQL uses a weaker
-    // ShareUpdateExclusive lock for VALIDATE CONSTRAINT, which permits normal
-    // SELECT/INSERT/UPDATE traffic; it avoids holding AccessExclusive during a scan.
-    await runner.query(`DO $
-    DECLARE
-      target record;
-      item record;
-      type_attnum smallint;
-    BEGIN
-      FOR target IN
-        SELECT * FROM (VALUES
-          ('cp_relationships'),
-          ('cp_requests')
-        ) AS targets(table_name)
-      LOOP
-        SELECT a.attnum INTO type_attnum
-        FROM pg_attribute a
-        JOIN pg_class t ON t.oid = a.attrelid
-        JOIN pg_namespace n ON n.oid = t.relnamespace
-        WHERE n.nspname = 'jeho_own'
-          AND t.relname = target.table_name
-          AND a.attname = 'type'
-          AND NOT a.attisdropped;
-
-        FOR item IN
-          SELECT c.conname
-          FROM pg_constraint c
-          JOIN pg_class t ON t.oid = c.conrelid
-          JOIN pg_namespace n ON n.oid = t.relnamespace
-          WHERE n.nspname = 'jeho_own'
-            AND t.relname = target.table_name
-            AND c.contype = 'c'
-            AND c.conkey = ARRAY[type_attnum]::smallint[]
-            AND c.convalidated = false
-            AND pg_get_constraintdef(c.oid) ILIKE '%relationship%'
-        LOOP
-          EXECUTE format('ALTER TABLE %I.%I VALIDATE CONSTRAINT %I',
-            'jeho_own', target.table_name, item.conname);
-        END LOOP;
-      END LOOP;
-    END;
-    $`);
-
+      checks = await loadTypeChecks();
+      for (const check of checks) {
+        if (acceptsRelationship(check) && check.convalidated !== true) {
+          const quotedName = String(check.conname).replaceAll('"', '""');
+          await runner.query(`ALTER TABLE "jeho_own"."${target.tableName}" VALIDATE CONSTRAINT "${quotedName}"`);
+        }
+      }
+    }
     await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_type_status_points ON "jeho_own"."cp_relationships"(type,status,points DESC)');
     await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_a_status ON "jeho_own"."cp_relationships"("userAId",status)');
     await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_b_status ON "jeho_own"."cp_relationships"("userBId",status)');
