@@ -36,11 +36,18 @@ export async function tryAcquireJehoSessionAdvisoryLock(
   runner: QueryRunner,
   lockId: number,
 ): Promise<boolean> {
-  const rows = await runner.query(
-    'SELECT pg_try_advisory_lock($1, $2) AS locked',
-    [JEHO_SCHEMA_LOCK_NAMESPACE, lockId],
-  );
-  return rows?.[0]?.locked === true;
+  try {
+    const rows = await runner.query(
+      'SELECT pg_try_advisory_lock($1, $2) AS locked',
+      [JEHO_SCHEMA_LOCK_NAMESPACE, lockId],
+    );
+    return rows?.[0]?.locked === true;
+  } catch (error) {
+    // The server may have granted the session lock before the client lost the
+    // response. Discard this connection so an unconfirmed lock cannot be pooled.
+    await discardPostgresRunner(runner, error);
+    throw error;
+  }
 }
 
 export async function releaseJehoSessionAdvisoryLock(
