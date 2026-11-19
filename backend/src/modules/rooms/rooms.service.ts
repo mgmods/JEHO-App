@@ -290,6 +290,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
                  AND "roomKind" = $1
                  AND status <> $2
                  AND "hostId" IS NOT NULL
+               AND (
+                 "isPersistent" IS DISTINCT FROM TRUE
+                 OR "emptySince" IS NOT NULL
+                 OR "activeHostId" IS NULL
+               )
             `, [RoomKind.STANDARD, RoomStatus.CLOSED]);
           } catch (err) {
             this.log.warn(`ensure persistent personal rooms deferred; retry will run: ${err instanceof Error ? err.message : String(err)}`);
