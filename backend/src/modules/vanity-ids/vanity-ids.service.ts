@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 import { VanityId, VanityIdStatus } from '../../database/entities/vanity-id.entity';
 
 /** Six-digit numerical IDs with length-based coin prices. Seeded when catalog is empty. */
@@ -44,17 +45,18 @@ export class VanityIdsService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleIconUrl" VARCHAR(512)');
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleVipLevel" INTEGER NOT NULL DEFAULT 1');
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleIconUrl" VARCHAR(512)');
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleVipLevel" INTEGER NOT NULL DEFAULT 1');
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetType" VARCHAR(16)');
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetId" UUID');
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "previousTargetPublicId" VARCHAR(32)');
+      });
     } catch (e) {
-      this.log.warn(`vanity style VIP column ensure skipped: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    try {
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetType" VARCHAR(16)');
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetId" UUID');
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "previousTargetPublicId" VARCHAR(32)');
-    } catch (e) {
-      this.log.warn(`vanity target columns ensure skipped: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.warn(`Vanity ID schema migration deferred: ${e instanceof Error ? e.message : String(e)}`);
     }
     try {
       let added = 0;
