@@ -183,17 +183,26 @@ const entityList = Object.values(entities).filter(
               await schemaLockRunner.connect();
               await schemaLockRunner.query("SET lock_timeout = '3s'");
               await schemaLockRunner.query("SET statement_timeout = '90s'");
-              const lockRows = await schemaLockRunner.query(
-                'SELECT pg_try_advisory_lock($1, $2) AS locked',
-                [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-              );
-              schemaLockAcquired = lockRows?.[0]?.locked === true;
+              for (let attempt = 0; attempt < 15 && !schemaLockAcquired; attempt += 1) {
+                const lockRows = await schemaLockRunner.query(
+                  'SELECT pg_try_advisory_lock($1, $2) AS locked',
+                  [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+                );
+                schemaLockAcquired = lockRows?.[0]?.locked === true;
+                if (!schemaLockAcquired) {
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+              }
               if (!schemaLockAcquired) {
-                console.warn('[JEHO-OWN DB] Shared schema migration lock is busy; this pass is deferred.');
-                return;
+                console.warn('[JEHO-OWN DB] Shared schema migration lock remained busy; this pass is deferred.');
               }
             } catch (lockError) {
               console.error('[JEHO-OWN DB] Could not acquire shared schema migration lock.', lockError instanceof Error ? lockError.message : String(lockError));
+            }
+            if (!schemaLockAcquired) {
+              await schemaLockRunner.query('RESET lock_timeout').catch(() => undefined);
+              await schemaLockRunner.query('RESET statement_timeout').catch(() => undefined);
+              await schemaLockRunner.release().catch(() => undefined);
               return;
             }
             try {
