@@ -14,6 +14,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomInt } from 'crypto';
 import { Gift, GiftType } from '../../database/entities/gift.entity';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { Cosmetic, CosmeticType } from '../../database/entities/cosmetic.entity';
@@ -161,6 +162,15 @@ export class GiftsService implements OnModuleInit {
     await this.ensureMikooGiftTabs();
   }
 
+  private async withJehoSchemaLock<T>(work: (manager: import('typeorm').EntityManager) => Promise<T>): Promise<T> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query("SET LOCAL lock_timeout = '250ms'");
+      await manager.query("SET LOCAL statement_timeout = '8s'");
+      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+      return work(manager);
+    });
+  }
+
   /** Replace Mikoo/Mego branding in gift names (and descriptions) visible in the app. */
   private stripCompetitorBrand(text: string | null | undefined): string {
     return String(text || '')
@@ -250,101 +260,79 @@ export class GiftsService implements OnModuleInit {
    */
   private async ensureGiftSendIdempotencySchema() {
     try {
-      await this.dataSource.query(
-        'ALTER TABLE gift_sends ADD COLUMN IF NOT EXISTS "requestId" uuid',
-      );
-      await this.dataSource.query(
-        'CREATE UNIQUE INDEX IF NOT EXISTS uq_gift_sends_request_receiver ON gift_sends ("requestId", "receiverId") WHERE "requestId" IS NOT NULL',
-      );
+      await this.withJehoSchemaLock(async (manager) => {
+        await manager.query('ALTER TABLE gift_sends ADD COLUMN IF NOT EXISTS "requestId" uuid');
+        await manager.query('CREATE UNIQUE INDEX IF NOT EXISTS uq_gift_sends_request_receiver ON gift_sends ("requestId", "receiverId") WHERE "requestId" IS NOT NULL');
+      });
     } catch (err) {
-      this.log.warn(
-        'Gift-send idempotency schema setup skipped: ' +
-          (err instanceof Error ? err.message : String(err)),
-      );
+      this.log.warn('Gift-send idempotency schema setup deferred: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
-  /** Ensure optional Mikoo-style category column exists (prod may have synchronize=false). */
   private async ensureGiftCategoryColumn() {
     try {
-      await this.dataSource.query(
-        `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS category varchar(32) DEFAULT 'normal'`,
-      );
+      await this.withJehoSchemaLock(async (manager) => {
+        await manager.query(`ALTER TABLE gifts ADD COLUMN IF NOT EXISTS category varchar(32) DEFAULT 'normal'`);
+      });
     } catch (err) {
-      this.log.warn(
-        `ensureGiftCategoryColumn: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.log.warn(`ensureGiftCategoryColumn deferred: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  /** Keep the latest Gift entity column present on existing Cumin databases. */
   private async ensureGiftBrandAgencyColumn() {
     try {
-      await this.dataSource.query(
-        'ALTER TABLE gifts ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid NULL',
-      );
-      await this.dataSource.query(
-        'CREATE INDEX IF NOT EXISTS idx_gifts_brand_agency_id ON gifts ("brandAgencyId")',
-      );
+      await this.withJehoSchemaLock(async (manager) => {
+        await manager.query('ALTER TABLE gifts ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid NULL');
+        await manager.query('CREATE INDEX IF NOT EXISTS idx_gifts_brand_agency_id ON gifts ("brandAgencyId")');
+      });
     } catch (err) {
-      this.log.warn(
-        'ensureGiftBrandAgencyColumn: ' +
-          (err instanceof Error ? err.message : String(err)),
-      );
+      this.log.warn('ensureGiftBrandAgencyColumn deferred: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
-  /** Add CP gift configuration columns on DB-authoritative installations. */
   private async ensureCpGiftColumns() {
     try {
-      await this.dataSource.query(
-        `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS \"cpRelationshipType\" varchar(24) NOT NULL DEFAULT 'love'`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE gifts ADD COLUMN IF NOT EXISTS \"cpPoints\" integer NULL`,
-      );
-      await this.dataSource.query(
-        `UPDATE gifts SET \"cpRelationshipType\"='love' WHERE category='cp' AND COALESCE(\"cpRelationshipType\",'')=''`,
-      );
-      const migrationKey = 'cp.gift_relationship_type_migration_v1';
-      const migrated = await this.settingsRepo.findOne({ where: { key: migrationKey } });
-      if (!migrated) {
-        await this.dataSource.query(
-          `UPDATE gifts g SET \"cpRelationshipType\" = regexp_replace(s.key, '^cp\\.gift\\.', '')
-           FROM app_settings s WHERE s.key LIKE 'cp.gift.%' AND s.value = g.id::text`,
-        );
-        await this.settingsRepo.save(this.settingsRepo.create({
-          key: migrationKey,
-          value: '1',
-          description: 'One-time migration of legacy CP gift relationship types',
-        }));
-      }
+      await this.withJehoSchemaLock(async (manager) => {
+        await manager.query(`ALTER TABLE gifts ADD COLUMN IF NOT EXISTS "cpRelationshipType" varchar(24) NOT NULL DEFAULT 'love'`);
+        await manager.query(`ALTER TABLE gifts ADD COLUMN IF NOT EXISTS "cpPoints" integer NULL`);
+        await manager.query(`UPDATE gifts SET "cpRelationshipType"='love' WHERE category='cp' AND COALESCE("cpRelationshipType",'')=''`);
+        const migrationKey = 'cp.gift_relationship_type_migration_v1';
+        const migrated = await manager.query('SELECT 1 FROM app_settings WHERE key = $1 LIMIT 1', [migrationKey]);
+        if (!migrated.length) {
+          await manager.query(`UPDATE gifts g SET "cpRelationshipType" = regexp_replace(s.key, '^cp\\.gift\\.', '')
+            FROM app_settings s WHERE s.key LIKE 'cp.gift.%' AND s.value = g.id::text`);
+          await manager.query(`INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
+            VALUES (gen_random_uuid(),$1,'1','One-time migration of legacy CP gift relationship types',now(),now())
+            ON CONFLICT (key) DO NOTHING`, [migrationKey]);
+        }
+      });
     } catch (err) {
-      this.log.warn(`ensureCpGiftColumns: ${err instanceof Error ? err.message : String(err)}`);
+      this.log.warn(`ensureCpGiftColumns deferred: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
   private async ensureGiftCategoriesTable() {
     try {
-      await this.dataSource.query(`
-        CREATE TABLE IF NOT EXISTS gift_categories (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          key varchar(32) NOT NULL UNIQUE,
-          "labelAr" varchar(64) NOT NULL,
-          "labelEn" varchar(64) NULL,
-          "sortOrder" int NOT NULL DEFAULT 0,
-          "isActive" boolean NOT NULL DEFAULT true,
-          "iconUrl" varchar(512) NULL,
-          "createdAt" timestamptz NOT NULL DEFAULT now(),
-          "updatedAt" timestamptz NOT NULL DEFAULT now()
-        )
-      `);
+      await this.withJehoSchemaLock(async (manager) => {
+        await manager.query(`
+          CREATE TABLE IF NOT EXISTS gift_categories (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            key varchar(32) NOT NULL UNIQUE,
+            "labelAr" varchar(64) NOT NULL,
+            "labelEn" varchar(64) NULL,
+            "sortOrder" int NOT NULL DEFAULT 0,
+            "isActive" boolean NOT NULL DEFAULT true,
+            "iconUrl" varchar(512) NULL,
+            "createdAt" timestamptz NOT NULL DEFAULT now(),
+            "updatedAt" timestamptz NOT NULL DEFAULT now()
+          )
+        `);
+      });
     } catch (err) {
-      this.log.warn(
-        `ensureGiftCategoriesTable: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.log.warn(`ensureGiftCategoriesTable deferred: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
+
 
   /**
    * Categories are 100% owned by the dashboard. Nothing is auto-seeded here.
