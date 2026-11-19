@@ -205,7 +205,7 @@ async function terminateStaleJehoSessions() {
             -- A known production incident left this exact agency documentUrls
             -- default DDL active for ~27 hours with application_name unset.
             -- It is metadata-only DDL; if it survives 10 minutes, treat it as
-            -- a stale migration session and cancel only that exact operation.
+            -- a stale migration session and terminate only that exact operation.
             -- Scope remains this database + this DB role; never kill other work.
             COALESCE(BTRIM(activity.application_name), '') = ''
             AND activity.state = 'active'
