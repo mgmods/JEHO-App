@@ -519,7 +519,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       // Page through missing IDs instead of loading the entire users table into memory.
       while (true) {
         const missing = await this.usersRepo.createQueryBuilder('u')
-          .where("u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ '^[0-9]{3,12}$'")
+          .where("u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ :pattern", { pattern: '^[0-9]{3,12}($)' })
           .orderBy('u.id', 'ASC').take(250).getMany();
         if (!missing.length) break;
         for (const user of missing) {
@@ -530,7 +530,10 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
             .where('id = :id', { id: user.id })
             .andWhere('("publicId" IS NULL OR "publicId" = :empty OR "publicId" !~ :pattern)', {
               empty: '',
-              pattern: '^[0-9]{3,12}
+              pattern: '^[0-9]{3,12}($)',
+            })
+            .execute();
+          updated += Number(result.affected || 0);
         }
       }
       if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
