@@ -2,8 +2,6 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
-  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -17,9 +15,7 @@ import {
 import { AppSetting } from '../../database/entities/app-setting.entity';
 
 @Injectable()
-export class InvitesService implements OnModuleInit {
-  private readonly log = new Logger(InvitesService.name);
-
+export class InvitesService {
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
@@ -30,30 +26,9 @@ export class InvitesService implements OnModuleInit {
     private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
-    try {
-      const key = 'invite.rewards';
-      const row = await this.settingsRepo.findOne({ where: { key } });
-      if (!row) {
-        await this.settingsRepo.save(
-          this.settingsRepo.create({
-            key,
-            value: JSON.stringify({
-              inviterCoins: 100,
-              inviteeCoins: 50,
-            }),
-          }),
-        );
-        this.log.log('Seeded invite.rewards defaults');
-      }
-    } catch (err) {
-      this.log.warn(
-        `invite rewards seed skipped: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
-  }
+  // rewardConfig() supplies defaults when no admin setting exists. Avoid a
+  // nonessential database write during Nest startup so schema bootstraps have
+  // first access to the small PostgreSQL connection pool.
 
   private async rewardConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'invite.rewards' } });

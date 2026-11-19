@@ -3,10 +3,10 @@ import { QueryRunner } from 'typeorm';
 /**
  * One database-wide JEHO schema-migration mutex.
  *
- * PostgreSQL advisory locks coordinate separate API replicas. The local
- * non-blocking gate prevents Nest providers in the same process from polling
- * PostgreSQL concurrently for the same lock. A busy local gate returns false,
- * allowing each bootstrap's existing bounded retry timer to try again later.
+ * A fair process-local FIFO gate serializes Nest providers before they contend
+ * for PostgreSQL's session advisory lock. This avoids the 30-second retry
+ * convoy that occurs when every provider races the same non-blocking lock at
+ * startup. PostgreSQL still coordinates separate API replicas.
  */
 export const JEHO_SCHEMA_LOCK_NAMESPACE = 741902611;
 export const JEHO_ADVISORY_LOCKS = {
@@ -51,8 +51,9 @@ export async function releaseJehoSessionAdvisoryLock(
   await releaseJehoAdvisoryLock(runner, JEHO_SCHEMA_LOCK_NAMESPACE, lockId);
 }
 
-let localLockHeld = false;
 const localLockOwners = new WeakSet<QueryRunner>();
+const localLockReleaseTurns = new WeakMap<QueryRunner, () => void>();
+let localLockTail: Promise<void> = Promise.resolve();
 
 export async function tryAcquireJehoSchemaLock(
   runner: QueryRunner,
@@ -60,19 +61,29 @@ export async function tryAcquireJehoSchemaLock(
   // PostgreSQL session advisory locks are re-entrant; avoid incrementing the
   // lock count if a caller accidentally asks twice on the same QueryRunner.
   if (localLockOwners.has(runner)) return true;
-  if (localLockHeld) return false;
 
-  localLockHeld = true;
+  // Queue local providers fairly. Only the head of this queue contacts
+  // PostgreSQL, so a single API process doesn't make every bootstrap wait
+  // for its own 30-second retry timer.
+  const previousTurn = localLockTail;
+  let releaseTurn!: () => void;
+  const currentTurn = new Promise<void>((resolve) => {
+    releaseTurn = resolve;
+  });
+  localLockTail = previousTurn.then(() => currentTurn);
+  await previousTurn;
+
   try {
     const locked = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_SCHEMA_LOCK_ID);
     if (locked) {
       localLockOwners.add(runner);
-    } else {
-      localLockHeld = false;
+      localLockReleaseTurns.set(runner, releaseTurn);
+      return true;
     }
-    return locked;
+    releaseTurn();
+    return false;
   } catch (error) {
-    localLockHeld = false;
+    releaseTurn();
     throw error;
   }
 }
@@ -102,12 +113,15 @@ export async function releaseJehoAdvisoryLock(
 }
 
 export async function releaseJehoSchemaLock(runner: QueryRunner): Promise<void> {
-  const ownsLocalLock = localLockOwners.has(runner);
-  if (!ownsLocalLock) return;
+  if (!localLockOwners.has(runner)) return;
   localLockOwners.delete(runner);
+  const releaseTurn = localLockReleaseTurns.get(runner);
+  localLockReleaseTurns.delete(runner);
   try {
     await releaseJehoSessionAdvisoryLock(runner, JEHO_SCHEMA_LOCK_ID);
   } finally {
-    localLockHeld = false;
+    // Always advance the local queue, even if PostgreSQL required discarding
+    // the connection while confirming the unlock.
+    releaseTurn?.();
   }
 }

@@ -236,18 +236,24 @@ export class AgenciesService implements OnModuleInit, OnModuleDestroy {
       `);
 
       // Normalize existing agency display IDs without changing valid IDs.
-      const agencies = await this.agenciesRepo.find({ select: ['id', 'publicId'] });
-      for (const agency of agencies) {
+      const agencies = await runner.query('SELECT id, "publicId" FROM agencies');
+      for (const agency of agencies as Array<{ id: string; publicId: string | null }>) {
         if (agency.publicId && /^\d{6}$/.test(String(agency.publicId))) continue;
         let candidate = '';
         for (let attempt = 0; attempt < 40; attempt++) {
           const next = String(100000 + Math.floor(Math.random() * 900000));
-          if (!(await this.agenciesRepo.exist({ where: { publicId: next } }))) {
+          const existing = await runner.query(
+            'SELECT 1 FROM agencies WHERE "publicId" = $1 LIMIT 1',
+            [next],
+          );
+          if (existing.length === 0) {
             candidate = next;
             break;
           }
         }
-        if (candidate) await this.agenciesRepo.update({ id: agency.id }, { publicId: candidate });
+        if (candidate) {
+          await runner.query('UPDATE agencies SET "publicId" = $1 WHERE id = $2', [candidate, agency.id]);
+        }
       }
 
       // Mark catalog agency frames as admin-only exclusive when metadata permits.
@@ -272,28 +278,19 @@ export class AgenciesService implements OnModuleInit, OnModuleDestroy {
       }
 
       try {
-        const existing = await this.settingsRepo.findOne({
-          where: { key: AGENCY_CREATE.settingKey },
-        });
-        if (!existing) {
-          await this.settingsRepo.save(
-            this.settingsRepo.create({
-              key: AGENCY_CREATE.settingKey,
-              value: String(AGENCY_CREATE.defaultCoins),
-              description: 'سعر فتح الوكالة بالعملات (مدفوع — يحدده الأدمن)',
-            }),
+        // Reuse the pinned advisory-lock connection instead of borrowing extra
+        // TypeORM pool clients while schema maintenance is holding its lock.
+        const seedSetting = async (key: string, value: string, description: string) => {
+          await runner.query(
+            `INSERT INTO app_settings ("id", "key", "value", "description", "createdAt", "updatedAt")
+             VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
+             ON CONFLICT ("key") DO NOTHING`,
+            [key, value, description],
           );
-        }
-        await this.ensureSetting(
-          AGENCY_CREATE.freeSettingKey,
-          'false',
-          'فتح الوكالة مجاناً (true) — عند التعطيل لا يُقبل سعر 0 ويُطبَّق الحد الأدنى',
-        );
-        await this.ensureSetting(
-          'agency_auto_approve_after_payment',
-          'false',
-          'موافقة تلقائية على طلب الوكالة بعد الدفع (true/false)',
-        );
+        };
+        await seedSetting(AGENCY_CREATE.settingKey, String(AGENCY_CREATE.defaultCoins), 'سعر فتح الوكالة بالعملات (مدفوع — يحدده الأدمن)');
+        await seedSetting(AGENCY_CREATE.freeSettingKey, 'false', 'فتح الوكالة مجاناً (true) — عند التعطيل لا يُقبل سعر 0 ويُطبَّق الحد الأدنى');
+        await seedSetting('agency_auto_approve_after_payment', 'false', 'موافقة تلقائية على طلب الوكالة بعد الدفع (true/false)');
       } catch (err) {
         this.logger.warn(`ensure agency settings deferred: ${(err as Error).message}`);
       }
@@ -316,15 +313,6 @@ export class AgenciesService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(`Agency bootstrap connection release failed: ${(err as Error).message}`);
       });
       this.agencySchemaBootstrapRunning = false;
-    }
-  }
-
-  private async ensureSetting(key: string, value: string, description: string) {
-    const existing = await this.settingsRepo.findOne({ where: { key } });
-    if (!existing) {
-      await this.settingsRepo.save(
-        this.settingsRepo.create({ key, value, description }),
-      );
     }
   }
 

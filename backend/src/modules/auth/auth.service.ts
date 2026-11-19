@@ -30,7 +30,7 @@ import {
   ChangePasswordDto,
 } from './dto/auth.dto';
 import { normalizeStaffRole } from '../../common/staff-role';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 @Injectable()
 export class AuthService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthService.name);
@@ -54,22 +54,19 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async ensurePublicIdSchema(): Promise<void> {
+    const runner = this.dataSource.createQueryRunner();
+    let lockAcquired = false;
     try {
-      await this.dataSource.transaction(async (manager) => {
-        await manager.query("SET LOCAL lock_timeout = '250ms'");
-        await manager.query("SET LOCAL statement_timeout = '8s'");
-        const lockRows = await manager.query(
-          'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
-          [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-        );
-        if (lockRows?.[0]?.locked !== true) {
-          throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
-        }
-        await manager.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16)`);
-        await manager.query(`CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_public_id" ON users("publicId")`);
-      });
-      if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
-      this.publicIdSchemaRetryTimer = null;
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '8s'");
+      lockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!lockAcquired) {
+        throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
+      }
+      // Autocommit each additive DDL step while holding the shared session lock.
+      await runner.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16)`);
+      await runner.query(`CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_public_id" ON users("publicId")`);
     } catch (err) {
       this.logger.warn(`publicId column ensure deferred; will retry safely: ${(err as Error).message}`);
       if (!this.publicIdSchemaRetryTimer) {
@@ -77,7 +74,18 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         this.publicIdSchemaRetryTimer.unref?.();
       }
       return;
+    } finally {
+      if (lockAcquired) {
+        await releaseJehoSchemaLock(runner).catch((unlockError) =>
+          this.logger.error(`publicId schema lock release failed: ${(unlockError as Error).message}`),
+        );
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
     }
+    if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+    this.publicIdSchemaRetryTimer = null;
     try {
       await this.ensureAllPublicIds();
     } catch (err) {

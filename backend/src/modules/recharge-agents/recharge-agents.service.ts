@@ -222,6 +222,7 @@ export class RechargeAgentsService implements OnModuleInit, OnModuleDestroy {
     }
     if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
     this.schemaRetryTimer = null;
+    console.log('[RechargeAgentsSchema] Schema and config bootstrap completed.');
   }
 
   /**
