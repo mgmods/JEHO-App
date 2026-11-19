@@ -193,7 +193,7 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       this.scheduleGiftInitializationRetry();
     } finally {
       if (maintenanceLockAcquired) {
-        if (maintenanceLockAcquired) await releaseJehoAdvisoryLock(runner, 741902611, 2007).catch((unlockError) => this.log.error(`Gift maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
+        if (maintenanceLockAcquired) await releaseJehoAdvisoryLock(runner, JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_ADVISORY_LOCKS.giftStartup).catch((unlockError) => this.log.error(`Gift maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
