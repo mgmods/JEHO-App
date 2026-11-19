@@ -546,7 +546,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       }
       return { updated };
     } finally {
-      if (lockAcquired) await releaseJehoAdvisoryLock(runner, 741902611, 2006).catch((unlockError) => this.logger.error(`Public-ID lock release failed; connection discarded: ${(unlockError as Error).message}`));
+      if (lockAcquired) await releaseJehoAdvisoryLock(runner, JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_ADVISORY_LOCKS.publicIdBackfill).catch((unlockError) => this.logger.error(`Public-ID lock release failed; connection discarded: ${(unlockError as Error).message}`));
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
       await runner.release().catch(() => undefined);
