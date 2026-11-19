@@ -18,6 +18,7 @@ on:
       - "backend/src/modules/users/**"
       - "backend/src/modules/vip/**"
       - "backend/src/modules/wallet/**"
+      - "backend/scripts/**"
       - "backend/public/mall/**"
   pull_request:
     branches: [MG-JEHO]
