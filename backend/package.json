@@ -19,7 +19,8 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "migrate:cp-system": "node scripts/migrate-cp-system.js",
     "test:games": "node --test -r ts-node/register src/modules/games/mikoo-gateway/mikoo-house-edge.util.spec.ts src/modules/games/casual-bet-idempotency.util.spec.ts",
-    "test:cp-bootstrap": "node scripts/test-cp-bootstrap-postgres.js"
+    "test:cp-bootstrap": "node scripts/test-cp-bootstrap-postgres.js",
+    "test:schema-lock": "node --test -r ts-node/register src/database/schema-migration-lock.spec.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
@@ -32,7 +33,7 @@
     "@nestjs/swagger": "^8.1.0",
     "@nestjs/throttler": "^6.3.0",
     "@nestjs/typeorm": "^10.0.2",
-    "@nestjs/websockets": "^10.4.15",
+    "@nestjs/websockets": "^10.4.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "@types/ws": "^8.18.1",
     "bcrypt": "^6.0.0",
