@@ -144,6 +144,58 @@ async function provisionEmptyProductionSchemaIfRequested() {
   }
 }
 
+async function terminateStaleJehoSessions() {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const connection = databaseUrl
+    ? { connectionString: databaseUrl, ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined }
+    : {
+        host: process.env.DB_HOST?.trim(),
+        port: Number(process.env.DB_PORT || 5432),
+        user: process.env.DB_USERNAME?.trim(),
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_DATABASE?.trim(),
+        ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+      };
+  if (!databaseUrl && !(connection.host && connection.user && connection.password && connection.database)) {
+    throw new Error('JEHO startup cannot clean stale sessions: incomplete database connection settings.');
+  }
+
+  const client = new Client({
+    ...connection,
+    connectionTimeoutMillis: 8000,
+    query_timeout: 5000,
+    application_name: 'jeho-own-session-recovery',
+  });
+  try {
+    await client.connect();
+    // Recover only JEHO's own abandoned application/bootstrap sessions. This is
+    // intentionally scoped by application_name and current database/user; it
+    // never touches unrelated PostgreSQL services.
+    const result = await client.query(`
+      SELECT pg_terminate_backend(pid) AS terminated
+      FROM pg_stat_activity
+      WHERE pid <> pg_backend_pid()
+        AND datname = current_database()
+        AND usename = current_user
+        AND application_name IN ('jeho-own-api', 'jeho-own-bootstrap')
+        AND state <> 'idle'
+        AND (
+          xact_start IS NOT NULL
+          OR wait_event_type = 'Lock'
+          OR state IN ('active','idle in transaction','idle in transaction (aborted)')
+        )
+    `);
+    const terminated = result.rows.filter((row) => row.terminated === true).length;
+    if (terminated) {
+      console.warn(`[JEHO-OWN startup] Terminated ${terminated} stale JEHO PostgreSQL session(s) before application startup.`);
+    } else {
+      console.log('[JEHO-OWN startup] No stale JEHO PostgreSQL sessions found.');
+    }
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
 async function databaseIsReady() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const dbHost = process.env.DB_HOST?.trim();
@@ -224,6 +276,7 @@ async function runProcess(label, command, args) {
 async function main() {
   logDatabaseConfiguration();
 
+  await terminateStaleJehoSessions();
   await provisionEmptyProductionSchemaIfRequested();
   const resetWasRequested = await resetSchemaOnceIfRequested();
   if (resetWasRequested) {
