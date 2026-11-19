@@ -33,6 +33,7 @@ import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
+  private publicIdSchemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -55,8 +56,15 @@ export class AuthService implements OnModuleInit {
         await manager.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16)`);
         await manager.query(`CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_public_id" ON users("publicId")`);
       });
+      if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+      this.publicIdSchemaRetryTimer = null;
     } catch (err) {
-      this.logger.warn(`publicId column ensure deferred; retry on next deployment: ${(err as Error).message}`);
+      this.logger.warn(`publicId column ensure deferred; will retry safely: ${(err as Error).message}`);
+      if (!this.publicIdSchemaRetryTimer) {
+        this.publicIdSchemaRetryTimer = setInterval(() => void this.onModuleInit(), 30_000);
+        this.publicIdSchemaRetryTimer.unref?.();
+      }
+      return;
     }
     try {
       await this.ensureAllPublicIds();
