@@ -30,7 +30,7 @@ import {
   ChangePasswordDto,
 } from './dto/auth.dto';
 import { normalizeStaffRole } from '../../common/staff-role';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock } from '../../database/schema-migration-lock';
 import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
 @Injectable()
 export class AuthService implements OnModuleInit, OnModuleDestroy {
@@ -508,8 +508,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '30s'");
-      const lockRows = await runner.query('SELECT pg_try_advisory_lock(741902611, 2006) AS locked');
-      lockAcquired = lockRows?.[0]?.locked === true;
+      lockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.publicIdBackfill);
       if (!lockAcquired) {
         // The replica holding this cluster lock owns the shared backfill.
         // Avoid scheduling identical full-table backfills on every other replica.
