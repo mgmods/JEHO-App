@@ -2,7 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from './database/schema-migration-lock';
+import {
+  JEHO_SCHEMA_LOCK_ID,
+  JEHO_SCHEMA_LOCK_NAMESPACE,
+  tryAcquireJehoSchemaLock,
+  releaseJehoSchemaLock,
+} from './database/schema-migration-lock';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import configuration from './config/configuration';
@@ -215,11 +220,7 @@ const entityList = Object.values(entities).filter(
               await schemaLockRunner.query("SET lock_timeout = '250ms'");
               await schemaLockRunner.query("SET statement_timeout = '90s'");
               for (let attempt = 0; attempt < 60 && !schemaLockAcquired; attempt += 1) {
-                const lockRows = await schemaLockRunner.query(
-                  'SELECT pg_try_advisory_lock($1, $2) AS locked',
-                  [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-                );
-                schemaLockAcquired = lockRows?.[0]?.locked === true;
+                schemaLockAcquired = await tryAcquireJehoSchemaLock(schemaLockRunner);
                 if (!schemaLockAcquired) {
                   await new Promise((resolve) => setTimeout(resolve, 1000));
                 }
@@ -426,10 +427,7 @@ const entityList = Object.values(entities).filter(
             }
             } finally {
               if (schemaLockAcquired) {
-                await schemaLockRunner.query(
-                  'SELECT pg_advisory_unlock($1, $2)',
-                  [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-                ).catch(() => undefined);
+                await releaseJehoSchemaLock(schemaLockRunner).catch(() => undefined);
               }
               await schemaLockRunner.query('RESET lock_timeout').catch(() => undefined);
               await schemaLockRunner.query('RESET statement_timeout').catch(() => undefined);
