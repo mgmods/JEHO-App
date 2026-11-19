@@ -18,9 +18,14 @@ const DEFAULTS: StoriesConfig = {
 export class StoriesService implements OnModuleInit {
   private readonly logger = new Logger(StoriesService.name);
   private lastExpiryCleanupAt = 0;
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
   constructor(private readonly db: DataSource) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeSchema();
+  }
+
+  private async initializeSchema(): Promise<void> {
     try {
       await this.db.transaction(async (manager) => {
         await manager.query("SET LOCAL lock_timeout = '250ms'");
@@ -61,7 +66,14 @@ export class StoriesService implements OnModuleInit {
       });
     } catch (error) {
       this.logger.warn(`Stories schema bootstrap deferred until the shared JEHO migration lock is available: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchema(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   async getConfig(): Promise<StoriesConfig> {
