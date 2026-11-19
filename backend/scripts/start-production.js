@@ -101,7 +101,7 @@ async function provisionEmptyProductionSchemaIfRequested() {
     if (!schemaState.markerExists) {
       if (!schemaState.isEmpty) {
         throw new Error(
-          `Refusing first-install provisioning: jeho_own is not empty (relations=${schemaState.relations}, customTypes=${schemaState.customTypes}) and has no JEHO provisioning marker. Existing/partial data is preserved.`,
+          `Refusing first-install provisioning: jeho_own is not empty (relations=${schemaState.relations}, customTypes=${schemaState.customTypes}, routines=${schemaState.routines}) and has no JEHO provisioning marker. Existing/partial data is preserved.`,
         );
       }
       await client.query(`
