@@ -16,6 +16,7 @@ import { join } from 'path';
 import { randomInt } from 'crypto';
 import { Gift, GiftType } from '../../database/entities/gift.entity';
 import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { Cosmetic, CosmeticType } from '../../database/entities/cosmetic.entity';
@@ -193,7 +194,7 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       this.scheduleGiftInitializationRetry();
     } finally {
       if (maintenanceLockAcquired) {
-        await runner.query('SELECT pg_advisory_unlock(741902611, 2007)').catch(() => undefined);
+        if (maintenanceLockAcquired) await releaseJehoAdvisoryLock(runner, 741902611, 2007).catch((unlockError) => this.log.error(`Gift maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
