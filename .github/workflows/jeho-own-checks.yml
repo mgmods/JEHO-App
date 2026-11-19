@@ -44,6 +44,13 @@ jobs:
         working-directory: backend
         run: npm audit --audit-level=high || true
 
+      - name: Validate production startup scripts
+        working-directory: backend
+        run: |
+          node --check scripts/start-production.js
+          node --check scripts/jeho-empty-schema-guard.js
+          node --check scripts/test-cp-bootstrap-postgres.js
+
       - name: Backend TypeScript check
         working-directory: backend
         run: npm run lint
