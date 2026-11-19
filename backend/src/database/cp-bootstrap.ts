@@ -217,13 +217,30 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
         }
       }
     }
-    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_type_status_points ON "jeho_own"."cp_relationships"(type,status,points DESC)');
-    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_a_status ON "jeho_own"."cp_relationships"("userAId",status)');
-    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_b_status ON "jeho_own"."cp_relationships"("userBId",status)');
-    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_request_recipient_status_expiry ON "jeho_own"."cp_requests"("toUserId",status,"expiresAt")');
-    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_request_sender_status ON "jeho_own"."cp_requests"("fromUserId",status)');
-    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_audit_created_at ON "jeho_own"."cp_audit_logs"("createdAt" DESC)');
-    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_point_events_relationship_created ON "jeho_own"."cp_point_events"("relationshipId","createdAt" DESC)');
+    // Build indexes concurrently so the CP upgrade does not block normal writes.
+    // If a prior interrupted concurrent build left an invalid index, remove it first.
+    const ensureCpIndex = async (indexName: string, tableName: string, columns: string) => {
+      const existing = await runner.query(
+        `SELECT i.indisvalid FROM pg_index i
+         JOIN pg_class idx ON idx.oid = i.indexrelid
+         JOIN pg_namespace n ON n.oid = idx.relnamespace
+         WHERE n.nspname = $1 AND idx.relname = $2 LIMIT 1`,
+        ['jeho_own', indexName],
+      );
+      if (existing.length && existing[0].indisvalid !== true) {
+        await runner.query(`DROP INDEX CONCURRENTLY IF EXISTS "jeho_own"."${indexName}"`);
+      }
+      await runner.query(`CREATE INDEX CONCURRENTLY IF NOT EXISTS "${indexName}" ON "jeho_own"."${tableName}"(${columns})`);
+    };
+    await runner.query("SET statement_timeout = '120s'");
+    await ensureCpIndex('idx_cp_relationship_type_status_points', 'cp_relationships', 'type,status,points DESC');
+    await ensureCpIndex('idx_cp_relationship_user_a_status', 'cp_relationships', '"userAId",status');
+    await ensureCpIndex('idx_cp_relationship_user_b_status', 'cp_relationships', '"userBId",status');
+    await ensureCpIndex('idx_cp_request_recipient_status_expiry', 'cp_requests', '"toUserId",status,"expiresAt"');
+    await ensureCpIndex('idx_cp_request_sender_status', 'cp_requests', '"fromUserId",status');
+    await ensureCpIndex('idx_cp_audit_created_at', 'cp_audit_logs', '"createdAt" DESC');
+    await ensureCpIndex('idx_cp_point_events_relationship_created', 'cp_point_events', '"relationshipId","createdAt" DESC');
+    await runner.query("SET statement_timeout = '30s'");
   } finally {
     if (lockAcquired) {
       await releaseJehoSchemaLock(runner).catch(() => undefined);
