@@ -18,6 +18,7 @@ const DEFAULTS: StoriesConfig = {
 export class StoriesService implements OnModuleInit {
   private readonly logger = new Logger(StoriesService.name);
   private lastExpiryCleanupAt = 0;
+  private storiesSchemaReady = false;
   private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
   constructor(private readonly db: DataSource) {}
 
@@ -75,6 +76,7 @@ export class StoriesService implements OnModuleInit {
     }
     if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
     this.schemaRetryTimer = null;
+    this.storiesSchemaReady = true;
   }
 
   async getConfig(): Promise<StoriesConfig> {
@@ -115,6 +117,7 @@ export class StoriesService implements OnModuleInit {
   }
 
   async feed(viewerId: string) {
+    if (!this.storiesSchemaReady) return [];
     const c = await this.getConfig();
     if (!c.enabled || !c.viewingEnabled) return [];
     // Keep expiry cleanup off the hot path for every feed request. Each API
