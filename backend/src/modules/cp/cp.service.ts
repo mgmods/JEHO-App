@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
+import { ensureCpTables } from '../../database/cp-bootstrap';
 import { DataSource } from 'typeorm';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CpType } from '../../database/entities/cp-relationship.entity';
@@ -24,6 +25,10 @@ function parseJsonSetting(raw: unknown, fallback: any): any {
 @Injectable()
 export class CpService implements OnModuleInit, OnModuleDestroy {
   private expiryTimer: ReturnType<typeof setInterval> | null = null;
+  private cpBootstrapTimer: ReturnType<typeof setInterval> | null = null;
+  private cpBootstrapRunning = false;
+  private cpTablesReady = false;
+  private cpSchemaReady = false;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -55,22 +60,60 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     return this.cosmetics.unequipCpStoreItem(userId, cosmeticId);
   }
 
-  async onModuleInit() {
-    // Schema is prepared once by the serialized CP bootstrap before Nest modules initialize.
-    await this.migrateUnifiedRelationshipType();
-    // Expiry processing only touches CP requests and their wallet ledger rows.
-    this.expiryTimer = setInterval(() => {
+  onModuleInit() {
+    // Never await PostgreSQL DDL during Nest initialization. A stale database
+    // lock must not prevent the main API/admin from starting. CP endpoints return
+    // 503 until both additive schema bootstrap and the data migration are ready.
+    this.cpBootstrapTimer = setInterval(() => {
+      void this.initializeCpSchema();
+    }, 30_000);
+    this.cpBootstrapTimer.unref?.();
+    void this.initializeCpSchema();
+  }
+
+  private async initializeCpSchema(): Promise<void> {
+    if (this.cpBootstrapRunning || this.cpSchemaReady) return;
+    this.cpBootstrapRunning = true;
+    try {
+      if (!this.cpTablesReady) {
+        await ensureCpTables(this.dataSource);
+        this.cpTablesReady = true;
+      }
+      await this.migrateUnifiedRelationshipType();
+      this.cpSchemaReady = true;
+      if (this.cpBootstrapTimer) clearInterval(this.cpBootstrapTimer);
+      this.cpBootstrapTimer = null;
+
+      // Expiry processing starts only after the CP schema is fully ready.
+      this.expiryTimer = setInterval(() => {
+        void this.expireDueRequests().catch(() => undefined);
+        void this.cosmetics.expireCpStoreCosmetics().catch(() => undefined);
+      }, 60_000);
+      this.expiryTimer.unref?.();
       void this.expireDueRequests().catch(() => undefined);
       void this.cosmetics.expireCpStoreCosmetics().catch(() => undefined);
-    }, 60_000);
-    this.expiryTimer.unref?.();
-    void this.expireDueRequests().catch(() => undefined);
-    void this.cosmetics.expireCpStoreCosmetics().catch(() => undefined);
+      console.log('[CpBootstrap] CP schema and unified relationship migration are ready.');
+    } catch (error) {
+      console.warn(
+        '[CpBootstrap] CP initialization is waiting for PostgreSQL locks; the main API remains available and CP endpoints stay guarded.',
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      this.cpBootstrapRunning = false;
+    }
+  }
+
+  assertSchemaReady(): void {
+    if (!this.cpSchemaReady) {
+      throw new ServiceUnavailableException('ميزة CP قيد التهيئة مؤقتاً. يرجى المحاولة بعد قليل.');
+    }
   }
 
   onModuleDestroy() {
     if (this.expiryTimer) clearInterval(this.expiryTimer);
+    if (this.cpBootstrapTimer) clearInterval(this.cpBootstrapTimer);
     this.expiryTimer = null;
+    this.cpBootstrapTimer = null;
   }
 
   private async migrateUnifiedRelationshipType() {
