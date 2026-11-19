@@ -42,37 +42,34 @@ export class PostgresLockMonitorService implements OnModuleInit, OnModuleDestroy
       monitorLockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.lockMonitor);
       if (!monitorLockAcquired) return;
 
-      // Recover only orphaned legacy JEHO schema DDL sessions. This is deliberately
-      // narrower than a generic blocker killer: normal business transactions and
-      // pg_dump sessions are never terminated. The production incident exposed a
-      // 27-hour ALTER TABLE session with an empty application_name; once the query
-      // is older than 15 minutes it cannot be a normal short startup probe.
-      const staleSchemaSessions = await runner.query(\`
-        SELECT pid::int AS pid, LEFT(COALESCE(query, ''), 500) AS query,
-               GREATEST(0, EXTRACT(EPOCH FROM (clock_timestamp() - xact_start)))::int AS xact_age_seconds,
-               COALESCE(application_name, '') AS application_name
-        FROM pg_stat_activity
-        WHERE datname = current_database()
-          AND pid <> pg_backend_pid()
-          AND state = 'active'
-          AND xact_start IS NOT NULL
-          AND clock_timestamp() - xact_start > interval '15 minutes'
-          AND (COALESCE(application_name, '') IN ('', 'jeho-own-api', 'jeho-own-bootstrap'))
-          AND query ~* '^\\\\s*ALTER\\\\s+TABLE\\\\s+(?:"?jeho_own"?\\\\.)?"?[A-Za-z_][A-Za-z0-9_]*"?'
-        ORDER BY xact_start ASC
-        LIMIT 10
-      \`);
+      // Recover only orphaned legacy JEHO schema DDL sessions.
+      // Normal business transactions and pg_dump sessions are never terminated.
+      const staleSchemaSql = [
+        "SELECT pid::int AS pid, LEFT(COALESCE(query, ''), 500) AS query,",
+        "GREATEST(0, EXTRACT(EPOCH FROM (clock_timestamp() - xact_start)))::int AS xact_age_seconds,",
+        "COALESCE(application_name, '') AS application_name",
+        "FROM pg_stat_activity",
+        "WHERE datname = current_database()",
+        "  AND pid <> pg_backend_pid()",
+        "  AND state = 'active'",
+        "  AND xact_start IS NOT NULL",
+        "  AND clock_timestamp() - xact_start > interval '15 minutes'",
+        "  AND COALESCE(application_name, '') IN ('', 'jeho-own-api', 'jeho-own-bootstrap')",
+        "  AND query ~* '^\\s*ALTER\\s+TABLE\\s+(?:\"?jeho_own\"?\\.)?\"?[A-Za-z_][A-Za-z0-9_]*\"?'",
+        "ORDER BY xact_start ASC",
+        "LIMIT 10",
+      ].join('\\n');
+      const staleSchemaSessions = await runner.query(staleSchemaSql);
       for (const session of staleSchemaSessions) {
         try {
           const terminated = await runner.query('SELECT pg_terminate_backend($1) AS terminated', [session.pid]);
           if (terminated?.[0]?.terminated === true) {
-            this.logger.warn(\`[JEHO DB LOCK RECOVERY] Terminated stale schema DDL session pid=\${session.pid}, age=\${session.xact_age_seconds}s, query=\${session.query}\`);
+            this.logger.warn(`[JEHO DB LOCK RECOVERY] Terminated stale schema DDL session pid=${session.pid}, age=${session.xact_age_seconds}s, query=${session.query}`);
           }
         } catch (error) {
-          this.logger.warn(\`[JEHO DB LOCK RECOVERY] Could not terminate stale schema DDL pid=\${session.pid}: \${error instanceof Error ? error.message : String(error)}\`);
+          this.logger.warn(`[JEHO DB LOCK RECOVERY] Could not terminate stale schema DDL pid=${session.pid}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
-
       const blockers = await runner.query(`
         SELECT
           blocked.pid::int AS blocked_pid,
