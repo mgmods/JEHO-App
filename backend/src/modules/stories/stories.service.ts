@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 
@@ -15,7 +15,7 @@ const DEFAULTS: StoriesConfig = {
 };
 
 @Injectable()
-export class StoriesService implements OnModuleInit {
+export class StoriesService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(StoriesService.name);
   private lastExpiryCleanupAt = 0;
   private storiesSchemaReady = false;
@@ -24,6 +24,11 @@ export class StoriesService implements OnModuleInit {
 
   onModuleInit(): void {
     void this.initializeSchema();
+  }
+
+  onModuleDestroy(): void {
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   private async initializeSchema(): Promise<void> {
@@ -77,6 +82,7 @@ export class StoriesService implements OnModuleInit {
     if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
     this.schemaRetryTimer = null;
     this.storiesSchemaReady = true;
+    this.logger.log('Stories schema bootstrap completed; stories API is ready.');
   }
 
   async getConfig(): Promise<StoriesConfig> {
