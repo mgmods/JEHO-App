@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { releaseJehoAdvisoryLock } from './schema-migration-lock';
 
 /**
  * Lightweight, cluster-serialized diagnostics for PostgreSQL lock queues.
@@ -99,7 +100,7 @@ export class PostgresLockMonitorService implements OnModuleInit, OnModuleDestroy
       }
     } finally {
       if (monitorLockAcquired) {
-        await runner.query('SELECT pg_advisory_unlock(741902611, 2004)').catch(() => undefined);
+        await releaseJehoAdvisoryLock(runner, 741902611, 2004).catch((unlockError) => this.logger.warn(`Lock monitor advisory unlock failed; connection discarded: ${(unlockError as Error).message}`));
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
