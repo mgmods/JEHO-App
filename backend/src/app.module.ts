@@ -198,8 +198,13 @@ const entityList = Object.values(entities).filter(
         // The API must finish Nest initialization and bind HTTP even if an older
         // PostgreSQL transaction holds a relation lock. Each migration below is
         // idempotent/bounded and reports its own failure for a later deploy retry.
-        setTimeout(() => {
-          void (async () => {
+        let schemaMaintenanceRunning = false;
+        let schemaMaintenanceComplete = false;
+        const runSchemaMaintenance = async (): Promise<void> => {
+          if (schemaMaintenanceRunning || schemaMaintenanceComplete) return;
+          schemaMaintenanceRunning = true;
+          let schemaMaintenanceHadFailure = false;
+          try {
             // All application-owned additive schema work shares one database-wide
             // advisory lock with CP, agency and VIP migrations. The lock is held on
             // this pinned connection while the individual idempotent DDL runs.
@@ -240,6 +245,7 @@ const entityList = Object.values(entities).filter(
               );
               console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: complete');
             } catch (error) {
+              schemaMaintenanceHadFailure = true;
               console.error('[LuckyBoxVideoBootstrap] Could not initialize video URL column.', error instanceof Error ? error.message : String(error));
             }
     
@@ -271,6 +277,7 @@ const entityList = Object.values(entities).filter(
               console.log('[CustomGiftsBootstrap] Private custom-gift grants table is ready; optional indexes deferred to migration.');
               console.log('[JEHO-OWN DB STEP] custom_gift_grants: complete');
             } catch (error) {
+              schemaMaintenanceHadFailure = true;
               const dbError = error as { code?: string; message?: string; detail?: string; constraint?: string };
               console.error(
                 '[CustomGiftsBootstrap] Optional table bootstrap failed; API startup will continue.',
@@ -310,6 +317,7 @@ const entityList = Object.values(entities).filter(
               );
               console.log('[JEHO-OWN DB STEP] gift_sends expiry index: complete');
             } catch (error) {
+              schemaMaintenanceHadFailure = true;
               const dbError = error as { code?: string; message?: string; detail?: string };
               console.error(
                 '[SupportChestExpiryBootstrap] Bounded optional expiry DDL did not complete; continuing startup.',
@@ -369,6 +377,7 @@ const entityList = Object.values(entities).filter(
               await ensureBadgeTables(appDataSource);
               console.log('[JEHO-OWN DB STEP] badges bootstrap: complete');
             } catch (error) {
+              schemaMaintenanceHadFailure = true;
               console.error(
                 '[BadgesBootstrap] Could not initialize badge tables; API startup continues.',
                 error instanceof Error ? error.message : String(error),
@@ -386,6 +395,7 @@ const entityList = Object.values(entities).filter(
               await ensureVanityIdStyleColumns(appDataSource);
               console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: complete');
             } catch (error) {
+              schemaMaintenanceHadFailure = true;
               console.error('[VanityIdStyleBootstrap] Could not initialize style columns; API startup continues.', error instanceof Error ? error.message : String(error));
             }
     
@@ -395,6 +405,7 @@ const entityList = Object.values(entities).filter(
               await ensureMomentsTables(appDataSource);
               console.log('[JEHO-OWN DB STEP] moments bootstrap: complete');
             } catch (error) {
+              schemaMaintenanceHadFailure = true;
               console.error(
                 '[MomentsBootstrap] Could not initialize moments tables; API startup continues.',
                 error instanceof Error ? error.message : String(error),
@@ -407,6 +418,7 @@ const entityList = Object.values(entities).filter(
               await ensureUserProfileColumns(appDataSource);
               console.log('[JEHO-OWN DB STEP] user profile bootstrap: complete');
             } catch (error) {
+              schemaMaintenanceHadFailure = true;
               console.error(
                 '[UserProfileBootstrap] Could not initialize profile columns; API startup continues.',
                 error instanceof Error ? error.message : String(error),
@@ -426,7 +438,12 @@ const entityList = Object.values(entities).filter(
               `[JEHO-OWN DB] database=${connectionInfo.database_name} schema=${connectionInfo.schema_name} search_path=${connectionInfo.search_path} tables=${tableCount}`,
             );
     
-            console.log('[JEHO-OWN DB STEP] all database bootstraps complete');
+            if (schemaMaintenanceHadFailure) {
+              console.warn('[JEHO-OWN DB] One or more additive schema steps failed; the safe migration pass will retry in 30 seconds.');
+            } else {
+              schemaMaintenanceComplete = true;
+              console.log('[JEHO-OWN DB STEP] all database bootstraps complete');
+            }
             } finally {
               if (schemaLockAcquired) {
                 await schemaLockRunner.query(
@@ -439,10 +456,18 @@ const entityList = Object.values(entities).filter(
               await schemaLockRunner.release().catch(() => undefined);
             }
     
-          })().catch((error) => {
+          } catch (error) {
             console.error('[JEHO-OWN DB] Background additive schema maintenance failed.', error instanceof Error ? error.message : String(error));
-          });
-        }, 0);
+          } finally {
+            schemaMaintenanceRunning = false;
+            if (!schemaMaintenanceComplete) {
+              const retry = setTimeout(() => void runSchemaMaintenance(), 30_000);
+              retry.unref?.();
+            }
+          }
+        };
+        const initialMaintenance = setTimeout(() => void runSchemaMaintenance(), 0);
+        initialMaintenance.unref?.();
         return appDataSource;
       },
     }),
