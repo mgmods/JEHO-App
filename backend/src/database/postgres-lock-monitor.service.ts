@@ -13,6 +13,8 @@ export class PostgresLockMonitorService implements OnModuleInit, OnModuleDestroy
   private timer: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private warnedUnavailable = false;
+  private lastBlockerSignature = '';
+  private lastBlockerLogAt = 0;
 
   constructor(private readonly dataSource: DataSource) {}
 
@@ -73,9 +75,19 @@ export class PostgresLockMonitorService implements OnModuleInit, OnModuleDestroy
       `);
 
       if (blockers.length) {
-        this.logger.error(
-          `[JEHO DB LOCK MONITOR] Active PostgreSQL blockers: ${JSON.stringify(blockers)}`,
-        );
+        const signature = blockers
+          .map((row: any) => `${row.blocked_pid}:${row.blocker_pid}:${row.blocked_query}`)
+          .join('|');
+        const now = Date.now();
+        if (signature !== this.lastBlockerSignature || now - this.lastBlockerLogAt >= 10_000) {
+          this.logger.error(
+            `[JEHO DB LOCK MONITOR] Active PostgreSQL blockers: ${JSON.stringify(blockers)}`,
+          );
+          this.lastBlockerSignature = signature;
+          this.lastBlockerLogAt = now;
+        }
+      } else {
+        this.lastBlockerSignature = '';
       }
       this.warnedUnavailable = false;
     } catch (error) {
