@@ -164,9 +164,9 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       await runner.query("SET statement_timeout = '60s'");
       maintenanceLockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.giftStartup);
       if (!maintenanceLockAcquired) {
-        // Another replica owns the shared catalog repair; it will retry if needed.
-        if (this.giftSchemaBootstrapTimer) clearInterval(this.giftSchemaBootstrapTimer);
-        this.giftSchemaBootstrapTimer = null;
+        // Another replica is doing the shared repair. Retry later so this process
+        // also verifies the completed schema before marking its local bootstrap ready.
+        this.scheduleGiftInitializationRetry();
         return;
       }
       // Do not run catalog repair against a partially upgraded schema.
