@@ -145,7 +145,11 @@ export class GiftsService implements OnModuleInit {
     }, 250);
   }
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeGifts();
+  }
+
+  private async initializeGifts(): Promise<void> {
     // Schema-only fix is always safe. Catalog seeds never run against live DB.
     await this.runGiftSchemaBootstrap();
     if (!this.giftSchemaBootstrapReady && !this.giftSchemaBootstrapTimer) {
