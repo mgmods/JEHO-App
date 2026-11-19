@@ -126,10 +126,12 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       await runner.query("SET statement_timeout = '30s'");
       maintenanceLockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.walletStartup);
       if (!maintenanceLockAcquired) {
-        // Another replica owns this one-time shared-data repair. It is responsible
-        // for completion/retry; do not let every replica queue a duplicate pass.
-        if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
-        this.schemaRetryTimer = null;
+        // Another replica is performing the shared repair. Retry later in case
+        // that process exits before completing the idempotent conversion.
+        if (!this.schemaRetryTimer) {
+          this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndCatalog(), 30_000);
+          this.schemaRetryTimer.unref?.();
+        }
         return;
       }
 
