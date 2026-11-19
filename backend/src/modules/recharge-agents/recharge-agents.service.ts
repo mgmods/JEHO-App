@@ -117,6 +117,7 @@ export const DEFAULT_RECHARGE_AGENT_CONFIG: RechargeAgentPricingConfig = {
 
 @Injectable()
 export class RechargeAgentsService implements OnModuleInit {
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
   constructor(
     @InjectRepository(RechargeAgent)
     private readonly agentsRepo: Repository<RechargeAgent>,
@@ -139,7 +140,11 @@ export class RechargeAgentsService implements OnModuleInit {
     @Optional() private readonly promotions?: PromotionsService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeSchemaAndConfig();
+  }
+
+  private async initializeSchemaAndConfig(): Promise<void> {
     try {
       await this.dataSource.transaction(async (manager) => {
         await manager.query("SET LOCAL lock_timeout = '250ms'");
@@ -151,6 +156,11 @@ export class RechargeAgentsService implements OnModuleInit {
       });
     } catch (error) {
       console.warn(`[RechargeAgentsSchema] Migration deferred: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndConfig(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
     }
     try {
       // Soft-upgrade legacy default agent wholesale ($0.009 / fee $20) → v3 defaults.
@@ -178,6 +188,8 @@ export class RechargeAgentsService implements OnModuleInit {
     } catch {
       /* ignore seed race */
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   /**
