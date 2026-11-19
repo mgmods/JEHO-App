@@ -128,11 +128,15 @@ export class StoriesService implements OnModuleInit {
             'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
             [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
           );
-          if (lockRows?.[0]?.locked !== true) return;
+          if (lockRows?.[0]?.locked !== true) {
+            this.lastExpiryCleanupAt = 0;
+            return;
+          }
           await manager.query(`DELETE FROM "jeho_own"."stories" WHERE id IN
             (SELECT id FROM "jeho_own"."stories" WHERE "expiresAt" <= now() ORDER BY "expiresAt" LIMIT 250)`);
         });
       } catch (error) {
+        this.lastExpiryCleanupAt = 0;
         this.logger.warn('Expired story cleanup deferred: ' + (error instanceof Error ? error.message : 'unknown error'));
       }
     }
