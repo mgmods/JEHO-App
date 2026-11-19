@@ -11,7 +11,7 @@ import { extname } from 'path';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { User, UserStatus } from '../../database/entities/user.entity';
 import { RoomChatPenalty } from '../../database/entities/room-chat-penalty.entity';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 
 export type ModerationHit = {
   ok: false;
@@ -106,46 +106,52 @@ export class ContentModerationService implements OnModuleInit {
   }
 
   private async ensurePenaltyTable() {
+    const runner = this.dataSource.createQueryRunner();
+    let lockAcquired = false;
     try {
-      await this.dataSource.transaction(async (manager) => {
-        await manager.query("SET LOCAL lock_timeout = '250ms'");
-        await manager.query("SET LOCAL statement_timeout = '8s'");
-        const lockRows = await manager.query(
-          'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
-          [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-        );
-        if (lockRows?.[0]?.locked !== true) {
-          throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
-        }
-        await manager.query(`
-          CREATE TABLE IF NOT EXISTS room_chat_penalties (
-            id uuid PRIMARY KEY,
-            "roomId" uuid NOT NULL,
-            "userId" uuid NOT NULL,
-            "strikeCount" integer NOT NULL DEFAULT 0,
-            "chatMutedUntil" TIMESTAMPTZ NULL,
-            "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-            "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-          )
-        `);
-        await manager.query(`
-          CREATE UNIQUE INDEX IF NOT EXISTS "IDX_room_chat_penalties_room_user"
-          ON room_chat_penalties ("roomId", "userId")
-        `);
-      });
-      if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
-      this.schemaRetryTimer = null;
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '8s'");
+      lockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!lockAcquired) {
+        throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
+      }
+      await runner.query(`
+        CREATE TABLE IF NOT EXISTS room_chat_penalties (
+          id uuid PRIMARY KEY,
+          "roomId" uuid NOT NULL,
+          "userId" uuid NOT NULL,
+          "strikeCount" integer NOT NULL DEFAULT 0,
+          "chatMutedUntil" TIMESTAMPTZ NULL,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+      await runner.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_room_chat_penalties_room_user"
+        ON room_chat_penalties ("roomId", "userId")
+      `);
     } catch (err) {
       this.log.warn(
-        `room_chat_penalties ensure deferred; retrying safely: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        `room_chat_penalties ensure deferred; retrying safely: ${err instanceof Error ? err.message : String(err)}`,
       );
       if (!this.schemaRetryTimer) {
         this.schemaRetryTimer = setInterval(() => void this.ensurePenaltyTable(), 30_000);
         this.schemaRetryTimer.unref?.();
       }
+      return;
+    } finally {
+      if (lockAcquired) {
+        await releaseJehoSchemaLock(runner).catch((unlockError) =>
+          this.log.error(`room_chat_penalties schema lock release failed: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`),
+        );
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   async isAutoModerationOn(): Promise<boolean> {
