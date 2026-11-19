@@ -123,9 +123,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     await this.dataSource.transaction(async manager => {
       // Wait briefly for another app instance doing the same migration rather
       // than failing immediately during a rolling deployment.
-      await manager.query("SET LOCAL lock_timeout = '15s'");
+      await manager.query("SET LOCAL lock_timeout = '250ms'");
       await manager.query("SET LOCAL statement_timeout = '30s'");
-      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+      const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+      if (lockRows?.[0]?.locked !== true) {
+        throw new Error('JEHO schema migration lock is busy; CP migration will retry without waiting.');
+      }
       await manager.query("SET LOCAL lock_timeout = '250ms'");
 
       const rows = await manager.query(

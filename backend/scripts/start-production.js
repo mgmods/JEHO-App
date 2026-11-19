@@ -292,7 +292,19 @@ async function runProcess(label, command, args) {
 async function main() {
   logDatabaseConfiguration();
 
-  await terminateStaleJehoSessions();
+  // Session recovery is best-effort on managed PostgreSQL. Some providers do not
+  // grant pg_signal_backend to the application role; that must not prevent an
+  // otherwise healthy API from starting. Database connectivity is still checked
+  // immediately below, and runtime migrations retain their advisory-lock guard.
+  try {
+    await terminateStaleJehoSessions();
+  } catch (error) {
+    console.warn('[JEHO-OWN startup] Stale-session cleanup was unavailable; continuing with guarded startup:', JSON.stringify({
+      name: error?.name,
+      code: error?.code,
+      message: error?.message,
+    }));
+  }
   await provisionEmptyProductionSchemaIfRequested();
   const resetWasRequested = await resetSchemaOnceIfRequested();
   if (resetWasRequested) {
