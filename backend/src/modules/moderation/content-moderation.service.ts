@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -34,7 +35,7 @@ export type ChatStrikeResolution = {
 };
 
 @Injectable()
-export class ContentModerationService implements OnModuleInit {
+export class ContentModerationService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(ContentModerationService.name);
   private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -546,6 +547,11 @@ export class ContentModerationService implements OnModuleInit {
     const raw = await this.stringSetting(key, String(fallback));
     const n = Number(raw);
     return Number.isFinite(n) ? n : fallback;
+  }
+
+  onModuleDestroy(): void {
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   private async stringSetting(key: string, fallback: string): Promise<string> {
