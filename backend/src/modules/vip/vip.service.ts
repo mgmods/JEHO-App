@@ -44,6 +44,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   private static readonly MAX_VIP_LEVEL = 7;
   private mysteriousModeCleanupTimer?: ReturnType<typeof setInterval>;
   private mysteriousModeSchemaTimer?: ReturnType<typeof setInterval>;
+  private mysteriousModeColumnReady = false;
 
   /** Optional VIP maintenance is scheduled after Nest initialization; it never blocks HTTP startup. */
   onModuleInit() {
@@ -81,6 +82,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       await runner.query(
         'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
       );
+      this.mysteriousModeColumnReady = true;
     } catch (error) {
       this.logger.warn(`Mysterious Mode column check deferred: ${error?.message || error}`);
     } finally {
@@ -99,6 +101,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async reconcileMysteriousModes() {
+    if (!this.mysteriousModeColumnReady) return;
     // This scheduled reconciliation runs on every API replica. Serialize it
     // across the cluster to avoid concurrent bulk updates to the users table.
     const runner = this.dataSource.createQueryRunner();
