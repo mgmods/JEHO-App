@@ -102,14 +102,7 @@ export async function releaseJehoAdvisoryLock(
       throw new Error(`PostgreSQL advisory lock ${namespace}/${lockId} was not released by its owning session.`);
     }
   } catch (error) {
-    const postgresRunner = runner as QueryRunner & {
-      releasePostgresConnection?: (err?: Error) => Promise<void>;
-    };
-    if (typeof postgresRunner.releasePostgresConnection === 'function') {
-      await postgresRunner.releasePostgresConnection(
-        error instanceof Error ? error : new Error(String(error)),
-      ).catch(() => undefined);
-    }
+    await discardPostgresRunner(runner, error);
     throw error;
   }
 }
