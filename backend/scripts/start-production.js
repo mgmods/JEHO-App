@@ -183,10 +183,11 @@ async function terminateStaleJehoSessions() {
         AND activity.usename = current_user
         AND activity.application_name IN ('jeho-own-api', 'jeho-own-bootstrap')
         AND (
-          -- A session-level advisory migration lock can remain held while its
-          -- connection is merely "idle". The previous state <> 'idle' filter
-          -- missed exactly that failure mode and left every later migration
-          -- waiting forever. Only target JEHO's exact shared lock pair.
+          -- A leaked session-level advisory lock can remain held while its
+          -- connection is idle. Never terminate active sessions here: during
+          -- rolling deploys another healthy JEHO replica may still be serving
+          -- requests or applying a migration. Recover only a long-idle holder
+          -- of JEHO's exact shared migration lock.
           EXISTS (
             SELECT 1
             FROM pg_locks AS held_lock
@@ -197,13 +198,9 @@ async function terminateStaleJehoSessions() {
               AND held_lock.objid = 99
               AND held_lock.objsubid = 2
           )
-          OR (
-            activity.state <> 'idle'
-            AND (
-              activity.xact_start IS NOT NULL
-              OR activity.wait_event_type = 'Lock'
-              OR activity.state IN ('active','idle in transaction','idle in transaction (aborted)')
-            )
+          AND activity.state = 'idle'
+          AND activity.xact_start IS NULL
+          AND activity.state_change < now() - interval '2 minutes'
           )
         )
     `);
