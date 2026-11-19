@@ -1,7 +1,7 @@
 /**
  * Classify the JEHO-owned schema before any first-install seed is allowed.
  * A schema without the JEHO marker is eligible only when it contains no
- * relations (including sequences/views) and no user-defined enum/domain/range.
+ * relations (including sequences/views), routines, or user-defined enum/domain/range.
  */
 async function inspectJehoSchemaForProvisioning(client) {
   const marker = await client.query(
@@ -33,12 +33,14 @@ async function inspectJehoSchemaForProvisioning(client) {
   `);
   const relations = Number(objects.rows[0]?.relations || 0);
   const customTypes = Number(objects.rows[0]?.custom_types || 0);
+  const routines = Number(objects.rows[0]?.routines || 0);
   return {
     markerExists: false,
     status: null,
-    isEmpty: relations === 0 && customTypes === 0,
+    isEmpty: relations === 0 && customTypes === 0 && routines === 0,
     relations,
     customTypes,
+    routines,
   };
 }
 
