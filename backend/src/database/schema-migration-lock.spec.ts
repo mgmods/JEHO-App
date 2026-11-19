@@ -39,6 +39,28 @@ test('JEHO schema lock serializes FIFO and advances after failed acquire/unlock'
   assert.deepEqual(events, ['a:acquire', 'a:unlock', 'b:acquire']);
   await releaseJehoSchemaLock(b);
 
+  const queued = Array.from({ length: 12 }, (_, index) =>
+    fakeRunner(`q${index}`, async (sql) => sql.includes('pg_try_advisory_lock')
+      ? [{ locked: true }] : [{ unlocked: true }], events, discarded),
+  );
+  const queuedAcquisitions = queued.map((runner) => tryAcquireJehoSchemaLock(runner));
+  for (let index = 0; index < queued.length; index += 1) {
+    assert.equal(await queuedAcquisitions[index], true);
+    await releaseJehoSchemaLock(queued[index]);
+  }
+  const queuedOrder = events
+    .filter((event) => /^q\\d+:acquire$/.test(event))
+    .map((event) => Number(event.slice(1, event.indexOf(':'))));
+  assert.deepEqual(queuedOrder, Array.from({ length: 12 }, (_, index) => index));
+
+  const busy = fakeRunner('busy', async (sql) => sql.includes('pg_try_advisory_lock')
+    ? [{ locked: false }] : [{ unlocked: true }], events, discarded);
+  const afterBusy = fakeRunner('after-busy', async (sql) => sql.includes('pg_try_advisory_lock')
+    ? [{ locked: true }] : [{ unlocked: true }], events, discarded);
+  assert.equal(await tryAcquireJehoSchemaLock(busy), false);
+  assert.equal(await tryAcquireJehoSchemaLock(afterBusy), true);
+  await releaseJehoSchemaLock(afterBusy);
+
   const failing = fakeRunner('failing', async (sql) => {
     if (sql.includes('pg_try_advisory_lock')) throw new Error('simulated connection failure');
     return [{ unlocked: true }];
