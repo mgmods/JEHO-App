@@ -182,26 +182,21 @@ async function terminateStaleJehoSessions() {
         AND activity.datname = current_database()
         AND activity.usename = current_user
         AND activity.application_name IN ('jeho-own-api', 'jeho-own-bootstrap')
-        AND (
-          -- A leaked session-level advisory lock can remain held while its
-          -- connection is idle. Never terminate active sessions here: during
-          -- rolling deploys another healthy JEHO replica may still be serving
-          -- requests or applying a migration. Recover only a long-idle holder
-          -- of JEHO's exact shared migration lock.
-          EXISTS (
-            SELECT 1
-            FROM pg_locks AS held_lock
-            WHERE held_lock.pid = activity.pid
-              AND held_lock.locktype = 'advisory'
-              AND held_lock.granted
-              AND held_lock.classid = 741902611
-              AND held_lock.objid = 99
-              AND held_lock.objsubid = 2
-          )
-          AND activity.state = 'idle'
-          AND activity.xact_start IS NULL
-          AND activity.state_change < now() - interval '2 minutes'
-          )
+        -- Never terminate active sessions: during rolling deploys another
+        -- healthy JEHO replica may still serve requests or apply a migration.
+        -- Recover only a long-idle holder of JEHO's exact shared migration lock.
+        AND activity.state = 'idle'
+        AND activity.xact_start IS NULL
+        AND activity.state_change < now() - interval '2 minutes'
+        AND EXISTS (
+          SELECT 1
+          FROM pg_locks AS held_lock
+          WHERE held_lock.pid = activity.pid
+            AND held_lock.locktype = 'advisory'
+            AND held_lock.granted
+            AND held_lock.classid = 741902611
+            AND held_lock.objid = 99
+            AND held_lock.objsubid = 2
         )
     `);
     const terminatedRows = result.rows.filter((row) => row.terminated === true);
