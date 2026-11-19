@@ -164,7 +164,9 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       const lockRows = await runner.query('SELECT pg_try_advisory_lock(741902611, 2007) AS locked');
       maintenanceLockAcquired = lockRows?.[0]?.locked === true;
       if (!maintenanceLockAcquired) {
-        this.scheduleGiftInitializationRetry();
+        // Another replica owns the shared catalog repair; it will retry if needed.
+        if (this.giftSchemaBootstrapTimer) clearInterval(this.giftSchemaBootstrapTimer);
+        this.giftSchemaBootstrapTimer = null;
         return;
       }
       // Do not run catalog repair against a partially upgraded schema.
