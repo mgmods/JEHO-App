@@ -26,9 +26,12 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
   await dataSource.transaction(async (manager) => {
     // Serialize concurrent app instances. Give an in-flight deployment a bounded
     // window to finish, then restore the shorter DDL lock timeout.
-    await manager.query("SET LOCAL lock_timeout = '15s'");
+    await manager.query("SET LOCAL lock_timeout = '250ms'");
     await manager.query("SET LOCAL statement_timeout = '30s'");
-    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+    const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+    if (lockRows?.[0]?.locked !== true) {
+      throw new Error('[CpBootstrap] JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
+    }
     await manager.query("SET LOCAL lock_timeout = '3s'");
 
     await manager.query(`
