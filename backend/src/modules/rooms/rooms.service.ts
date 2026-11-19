@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
-import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from '../../database/schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
@@ -196,11 +196,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '20s'");
-      const lockRows = await runner.query(
-        'SELECT pg_try_advisory_lock($1, $2) AS locked',
-        [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-      );
-      locked = lockRows?.[0]?.locked === true;
+      locked = await tryAcquireJehoSchemaLock(runner);
       if (!locked) {
         this.log.warn('Room schema bootstrap deferred: another JEHO migration owns the shared lock.');
         return;
@@ -305,10 +301,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       this.log.warn(`Room schema bootstrap deferred; retry will run: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       if (locked) {
-        await runner.query(
-          'SELECT pg_advisory_unlock($1, $2)',
-          [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-        ).catch(() => undefined);
+        await releaseJehoSchemaLock(runner).catch(() => undefined);
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);

@@ -74,10 +74,23 @@ export class SecurityShieldService {
 
     const epoch = this.userBanCacheEpoch.get(userId) || 0;
     const lookup = (async () => {
-      const user = await this.users.findOne({
-        where: { id: userId },
-        select: ['id', 'status'],
-      });
+      let user: Pick<User, 'id' | 'status'> | null = null;
+      try {
+        user = await this.users.findOne({
+          where: { id: userId },
+          select: ['id', 'status'],
+        });
+      } catch (error) {
+        // A transient PostgreSQL lock must never turn the global security guard
+        // into a 5xx for every authenticated request. Security has Redis as the
+        // authoritative short-lived ban store; when the durable status lookup
+        // is temporarily unavailable, fail open here and let the actual API
+        // operation report its own database health instead of blanking the app.
+        this.logger.warn(
+          `Durable user ban lookup deferred for ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return false;
+      }
       const banned = !!user && (
         user.status === UserStatus.BANNED || user.status === UserStatus.SUSPENDED
       );

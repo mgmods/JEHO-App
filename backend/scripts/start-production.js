@@ -144,6 +144,74 @@ async function provisionEmptyProductionSchemaIfRequested() {
   }
 }
 
+async function terminateStaleJehoSessions() {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const connection = databaseUrl
+    ? { connectionString: databaseUrl, ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined }
+    : {
+        host: process.env.DB_HOST?.trim(),
+        port: Number(process.env.DB_PORT || 5432),
+        user: process.env.DB_USERNAME?.trim(),
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_DATABASE?.trim(),
+        ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+      };
+  if (!databaseUrl && !(connection.host && connection.user && connection.password && connection.database)) {
+    throw new Error('JEHO startup cannot clean stale sessions: incomplete database connection settings.');
+  }
+
+  const client = new Client({
+    ...connection,
+    connectionTimeoutMillis: 8000,
+    query_timeout: 5000,
+    application_name: 'jeho-own-session-recovery',
+  });
+  try {
+    await client.connect();
+    // Recover only JEHO's own abandoned application/bootstrap sessions. This is
+    // intentionally scoped by application_name and current database/user; it
+    // never touches unrelated PostgreSQL services.
+    const result = await client.query(`
+      SELECT
+        activity.pid,
+        activity.application_name,
+        activity.state,
+        pg_terminate_backend(activity.pid) AS terminated
+      FROM pg_stat_activity AS activity
+      WHERE activity.pid <> pg_backend_pid()
+        AND activity.datname = current_database()
+        AND activity.usename = current_user
+        AND activity.application_name IN ('jeho-own-api', 'jeho-own-bootstrap')
+        -- Never terminate active sessions: during rolling deploys another
+        -- healthy JEHO replica may still serve requests or apply a migration.
+        -- Recover only a long-idle holder of JEHO's exact shared migration lock.
+        AND activity.state = 'idle'
+        AND activity.xact_start IS NULL
+        AND activity.state_change < now() - interval '2 minutes'
+        AND EXISTS (
+          SELECT 1
+          FROM pg_locks AS held_lock
+          WHERE held_lock.pid = activity.pid
+            AND held_lock.locktype = 'advisory'
+            AND held_lock.granted
+            AND held_lock.classid = 741902611
+            AND held_lock.objid = 99
+            AND held_lock.objsubid = 2
+        )
+    `);
+    const terminatedRows = result.rows.filter((row) => row.terminated === true);
+    if (terminatedRows.length) {
+      console.warn('[JEHO-OWN startup] Terminated stale JEHO PostgreSQL session(s) before application startup:', JSON.stringify(
+        terminatedRows.map(({ pid, application_name, state }) => ({ pid, application_name, state })),
+      ));
+    } else {
+      console.log('[JEHO-OWN startup] No stale JEHO PostgreSQL sessions or JEHO advisory-lock holders found.');
+    }
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
 async function databaseIsReady() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const dbHost = process.env.DB_HOST?.trim();
@@ -224,6 +292,7 @@ async function runProcess(label, command, args) {
 async function main() {
   logDatabaseConfiguration();
 
+  await terminateStaleJehoSessions();
   await provisionEmptyProductionSchemaIfRequested();
   const resetWasRequested = await resetSchemaOnceIfRequested();
   if (resetWasRequested) {
