@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from './database/schema-migration-lock';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import configuration from './config/configuration';
@@ -173,6 +174,29 @@ const entityList = Object.values(entities).filter(
         // idempotent/bounded and reports its own failure for a later deploy retry.
         setTimeout(() => {
           void (async () => {
+            // All application-owned additive schema work shares one database-wide
+            // advisory lock with CP, agency and VIP migrations. The lock is held on
+            // this pinned connection while the individual idempotent DDL runs.
+            const schemaLockRunner = appDataSource.createQueryRunner();
+            let schemaLockAcquired = false;
+            try {
+              await schemaLockRunner.connect();
+              await schemaLockRunner.query("SET lock_timeout = '3s'");
+              await schemaLockRunner.query("SET statement_timeout = '90s'");
+              const lockRows = await schemaLockRunner.query(
+                'SELECT pg_try_advisory_lock($1, $2) AS locked',
+                [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+              );
+              schemaLockAcquired = lockRows?.[0]?.locked === true;
+              if (!schemaLockAcquired) {
+                console.warn('[JEHO-OWN DB] Shared schema migration lock is busy; this pass is deferred.');
+                return;
+              }
+            } catch (lockError) {
+              console.error('[JEHO-OWN DB] Could not acquire shared schema migration lock.', lockError instanceof Error ? lockError.message : String(lockError));
+              return;
+            }
+            try {
             // Additive support-box video URL column; preserves all existing lucky-box rows.
             console.log('[JEHO-OWN DB STEP] lucky_boxes videoUrl: start');
             try {
@@ -368,6 +392,17 @@ const entityList = Object.values(entities).filter(
             );
     
             console.log('[JEHO-OWN DB STEP] all database bootstraps complete');
+            } finally {
+              if (schemaLockAcquired) {
+                await schemaLockRunner.query(
+                  'SELECT pg_advisory_unlock($1, $2)',
+                  [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+                ).catch(() => undefined);
+              }
+              await schemaLockRunner.query('RESET lock_timeout').catch(() => undefined);
+              await schemaLockRunner.query('RESET statement_timeout').catch(() => undefined);
+              await schemaLockRunner.release().catch(() => undefined);
+            }
     
           })().catch((error) => {
             console.error('[JEHO-OWN DB] Background additive schema maintenance failed.', error instanceof Error ? error.message : String(error));
