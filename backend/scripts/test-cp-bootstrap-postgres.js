@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 require('ts-node/register');
 const { DataSource } = require('typeorm');
 const { ensureCpTables } = require('../src/database/cp-bootstrap');
-const { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } = require('../src/database/schema-migration-lock');
+const { tryAcquireJehoSchemaLock, releaseJehoSchemaLock, tryAcquireJehoSessionAdvisoryLock } = require('../src/database/schema-migration-lock');
 const { inspectJehoSchemaForProvisioning } = require('./jeho-empty-schema-guard');
 
 const databaseUrl = process.env.CP_TEST_DATABASE_URL;
@@ -200,6 +200,21 @@ async function testFirstInstallSchemaGuard(ds) {
 }
 
 async function testSchemaLockReleaseFailureDiscardsConnection() {
+  let acquireDestroyed = false;
+  const uncertainAcquireRunner = {
+    async query() {
+      throw new Error('simulated acquire response loss');
+    },
+    async releasePostgresConnection() {
+      acquireDestroyed = true;
+    },
+  };
+  await assert.rejects(
+    () => tryAcquireJehoSessionAdvisoryLock(uncertainAcquireRunner, 2001),
+    /simulated acquire response loss/,
+  );
+  assert.equal(acquireDestroyed, true, 'a connection with an uncertain lock-acquire result must be discarded');
+
   let destroyed = false;
   const brokenRunner = {
     async query(sql) {
