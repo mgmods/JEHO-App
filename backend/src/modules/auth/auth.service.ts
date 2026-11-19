@@ -7,7 +7,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -29,9 +29,11 @@ import {
   ChangePasswordDto,
 } from './dto/auth.dto';
 import { normalizeStaffRole } from '../../common/staff-role';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
+  private publicIdSchemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -42,18 +44,31 @@ export class AuthService implements OnModuleInit {
     @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.ensurePublicIdSchema();
+  }
+
+  private async ensurePublicIdSchema(): Promise<void> {
     try {
-      await this.usersRepo.query(
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16)`,
-      );
-      await this.usersRepo.query(
-        `CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_public_id" ON users("publicId")`,
-      );
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        await manager.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16)`);
+        await manager.query(`CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_public_id" ON users("publicId")`);
+      });
+      if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+      this.publicIdSchemaRetryTimer = null;
     } catch (err) {
-      this.logger.warn(`publicId column ensure failed: ${(err as Error).message}`);
+      this.logger.warn(`publicId column ensure deferred; will retry safely: ${(err as Error).message}`);
+      if (!this.publicIdSchemaRetryTimer) {
+        this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
+        this.publicIdSchemaRetryTimer.unref?.();
+      }
+      return;
     }
     try {
       await this.ensureAllPublicIds();

@@ -44,6 +44,13 @@ jobs:
         working-directory: backend
         run: npm audit --audit-level=high || true
 
+      - name: Validate production startup scripts
+        working-directory: backend
+        run: |
+          node --check scripts/start-production.js
+          node --check scripts/jeho-empty-schema-guard.js
+          node --check scripts/test-cp-bootstrap-postgres.js
+
       - name: Backend TypeScript check
         working-directory: backend
         run: npm run lint
@@ -71,7 +78,7 @@ jobs:
         run: docker build --tag jeho-own-api:ci ./backend
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -79,13 +86,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish JEHO-OWN image
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
           tags: |
-            ghcr.io/mgmods/jeho-own-backend:${{ github.sha }}
+            ghcr.io/mgmods/jeho-own-backend:${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+            ghcr.io/mgmods/jeho-own-backend:ghaymah-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
             ${{ github.event_name == 'push' && 'ghcr.io/mgmods/jeho-own-backend:latest' || '' }}
 
 

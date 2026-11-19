@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 
 export type StoriesConfig = {
   enabled: boolean; publishingEnabled: boolean; viewingEnabled: boolean;
@@ -17,42 +18,63 @@ const DEFAULTS: StoriesConfig = {
 export class StoriesService implements OnModuleInit {
   private readonly logger = new Logger(StoriesService.name);
   private lastExpiryCleanupAt = 0;
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
   constructor(private readonly db: DataSource) {}
 
-  async onModuleInit() {
-    await this.db.query(`
-      CREATE TABLE IF NOT EXISTS "jeho_own"."stories" (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
-        "mediaType" varchar(8) NOT NULL CHECK ("mediaType" IN ('image','video')),
-        "mediaUrl" varchar(1024) NOT NULL, caption varchar(300) NOT NULL DEFAULT '',
-        visibility varchar(16) NOT NULL DEFAULT 'public' CHECK (visibility IN ('public','followers','private')),
-        "viewCount" integer NOT NULL DEFAULT 0, "isActive" boolean NOT NULL DEFAULT true,
-        "createdAt" timestamptz NOT NULL DEFAULT now(), "expiresAt" timestamptz NOT NULL
-      )`);
-    await this.db.query(`
-      CREATE TABLE IF NOT EXISTS "jeho_own"."story_reactions" (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        "storyId" uuid NOT NULL REFERENCES "jeho_own"."stories"(id) ON DELETE CASCADE,
-        "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
-        emoji varchar(16) NOT NULL,
-        "createdAt" timestamptz NOT NULL DEFAULT now(),
-        CONSTRAINT "UQ_story_reactions_story_user" UNIQUE ("storyId","userId")
-      )`);
-    await this.db.query(`
-      CREATE TABLE IF NOT EXISTS "jeho_own"."story_views" (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        "storyId" uuid NOT NULL REFERENCES "jeho_own"."stories"(id) ON DELETE CASCADE,
-        "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
-        "viewedAt" timestamptz NOT NULL DEFAULT now(),
-        CONSTRAINT "UQ_story_views_story_user" UNIQUE ("storyId","userId")
-      )`);
-    await this.db.query('CREATE INDEX IF NOT EXISTS "IDX_stories_expiry" ON "jeho_own"."stories" ("expiresAt" DESC) WHERE "isActive" = true');
-    await this.db.query('CREATE INDEX IF NOT EXISTS "IDX_stories_user_expiry" ON "jeho_own"."stories" ("userId","expiresAt" DESC)');
-    await this.db.query('CREATE INDEX IF NOT EXISTS "IDX_story_views_story" ON "jeho_own"."story_views" ("storyId")');
-    await this.db.query('CREATE INDEX IF NOT EXISTS "IDX_story_reactions_story" ON "jeho_own"."story_reactions" ("storyId")');
-    await this.db.query('INSERT INTO "jeho_own"."app_settings" (key,value,description) VALUES ($1,$2,$3) ON CONFLICT (key) DO NOTHING',
-      [KEY, JSON.stringify(DEFAULTS), 'Stories feature controls']);
+  onModuleInit(): void {
+    void this.initializeSchema();
+  }
+
+  private async initializeSchema(): Promise<void> {
+    try {
+      await this.db.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        if (lockRows?.[0]?.locked !== true) throw new Error('JEHO schema migration lock is busy; retrying later');
+        await manager.query(`
+          CREATE TABLE IF NOT EXISTS "jeho_own"."stories" (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
+            "mediaType" varchar(8) NOT NULL CHECK ("mediaType" IN ('image','video')),
+            "mediaUrl" varchar(1024) NOT NULL, caption varchar(300) NOT NULL DEFAULT '',
+            visibility varchar(16) NOT NULL DEFAULT 'public' CHECK (visibility IN ('public','followers','private')),
+            "viewCount" integer NOT NULL DEFAULT 0, "isActive" boolean NOT NULL DEFAULT true,
+            "createdAt" timestamptz NOT NULL DEFAULT now(), "expiresAt" timestamptz NOT NULL
+          )`);
+        await manager.query(`
+          CREATE TABLE IF NOT EXISTS "jeho_own"."story_reactions" (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "storyId" uuid NOT NULL REFERENCES "jeho_own"."stories"(id) ON DELETE CASCADE,
+            "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
+            emoji varchar(16) NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now(),
+            CONSTRAINT "UQ_story_reactions_story_user" UNIQUE ("storyId","userId")
+          )`);
+        await manager.query(`
+          CREATE TABLE IF NOT EXISTS "jeho_own"."story_views" (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "storyId" uuid NOT NULL REFERENCES "jeho_own"."stories"(id) ON DELETE CASCADE,
+            "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
+            "viewedAt" timestamptz NOT NULL DEFAULT now(),
+            CONSTRAINT "UQ_story_views_story_user" UNIQUE ("storyId","userId")
+          )`);
+        await manager.query('CREATE INDEX IF NOT EXISTS "IDX_stories_expiry" ON "jeho_own"."stories" ("expiresAt" DESC) WHERE "isActive" = true');
+        await manager.query('CREATE INDEX IF NOT EXISTS "IDX_stories_user_expiry" ON "jeho_own"."stories" ("userId","expiresAt" DESC)');
+        await manager.query('CREATE INDEX IF NOT EXISTS "IDX_story_views_story" ON "jeho_own"."story_views" ("storyId")');
+        await manager.query('CREATE INDEX IF NOT EXISTS "IDX_story_reactions_story" ON "jeho_own"."story_reactions" ("storyId")');
+        await manager.query('INSERT INTO "jeho_own"."app_settings" (key,value,description) VALUES ($1,$2,$3) ON CONFLICT (key) DO NOTHING',
+          [KEY, JSON.stringify(DEFAULTS), 'Stories feature controls']);
+      });
+    } catch (error) {
+      this.logger.warn(`Stories schema bootstrap deferred until the shared JEHO migration lock is available: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchema(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
+    }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   async getConfig(): Promise<StoriesConfig> {

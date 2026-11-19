@@ -8,10 +8,12 @@ import {
   Inject,
   forwardRef,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from '../../database/schema-migration-lock';
 import { v4 as uuidv4 } from 'uuid';
 import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
 import {
@@ -78,7 +80,10 @@ const DEFAULT_AGENCY_SEAT_COUNT = 11;
 const DEFAULT_DIAMOND_USD_RATE = 0.00005;
 
 @Injectable()
-export class AgenciesService implements OnModuleInit {
+export class AgenciesService implements OnModuleInit, OnModuleDestroy {
+  private agencySchemaBootstrapTimer: ReturnType<typeof setInterval> | null = null;
+  private agencySchemaBootstrapRunning = false;
+  private agencySchemaBootstrapReady = false;
   private readonly logger = new Logger(AgenciesService.name);
   constructor(
     @InjectRepository(Agency) private readonly agenciesRepo: Repository<Agency>,
@@ -124,19 +129,53 @@ export class AgenciesService implements OnModuleInit {
     };
   }
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    // Schema maintenance must never hold Nest's HTTP startup behind a PostgreSQL
+    // relation lock. Run it in the background with a pinned connection, a
+    // non-blocking advisory lock, and strict per-statement timeouts.
+    void this.initializeAgencySchema();
+    this.agencySchemaBootstrapTimer = setInterval(() => {
+      void this.initializeAgencySchema();
+    }, 30_000);
+    this.agencySchemaBootstrapTimer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.agencySchemaBootstrapTimer) clearInterval(this.agencySchemaBootstrapTimer);
+    this.agencySchemaBootstrapTimer = null;
+  }
+
+  private async initializeAgencySchema(): Promise<void> {
+    if (this.agencySchemaBootstrapRunning || this.agencySchemaBootstrapReady) return;
+    this.agencySchemaBootstrapRunning = true;
+
+    const runner = this.dataSource.createQueryRunner();
+    let advisoryLockAcquired = false;
     try {
-      await this.dataSource.query(`
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '20s'");
+
+      const lockRows = await runner.query(
+        'SELECT pg_try_advisory_lock($1, $2) AS locked',
+        [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+      );
+      advisoryLockAcquired = lockRows?.[0]?.locked === true;
+      if (!advisoryLockAcquired) {
+        this.logger.warn('Agency schema bootstrap deferred: another instance owns the migration lock.');
+        return;
+      }
+
+      // Each additive DDL statement commits independently. If a later statement
+      // encounters a lock, earlier changes remain safe and the next retry resumes
+      // through IF NOT EXISTS without rewriting or deleting user/agency data.
+      await runner.query(`
         ALTER TABLE agency_applications
           ADD COLUMN IF NOT EXISTS "paidCoins" BIGINT NOT NULL DEFAULT 0,
           ADD COLUMN IF NOT EXISTS "paymentReferenceId" VARCHAR(128),
           ADD COLUMN IF NOT EXISTS "paymentRefunded" BOOLEAN NOT NULL DEFAULT false
       `);
-    } catch (err) {
-      this.logger.warn(`ensure agency application payment columns: ${(err as Error).message}`);
-    }
-    try {
-      await this.dataSource.query(`
+      await runner.query(`
         ALTER TABLE agencies
           ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16),
           ADD COLUMN IF NOT EXISTS "isVerified" BOOLEAN NOT NULL DEFAULT false,
@@ -145,11 +184,62 @@ export class AgenciesService implements OnModuleInit {
           ADD COLUMN IF NOT EXISTS "exclusiveRoomCardCode" VARCHAR(64),
           ADD COLUMN IF NOT EXISTS "exclusiveFrameUrl" VARCHAR(512)
       `);
-      await this.dataSource.query(`
+      await runner.query(`
         CREATE UNIQUE INDEX IF NOT EXISTS "IDX_agencies_publicId"
         ON agencies ("publicId") WHERE "publicId" IS NOT NULL
       `);
-      // Normalize existing agency display IDs to six digits without deleting agency data.
+      await runner.query(`
+        ALTER TABLE gifts
+          ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid
+      `);
+      await runner.query(`
+        CREATE INDEX IF NOT EXISTS "IDX_gifts_brandAgencyId"
+        ON gifts ("brandAgencyId") WHERE "brandAgencyId" IS NOT NULL
+      `);
+      await runner.query(`
+        CREATE TABLE IF NOT EXISTS agency_membership_periods (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
+          "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          "joinedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "leftAt" TIMESTAMPTZ,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await runner.query(`
+        CREATE INDEX IF NOT EXISTS "IDX_agency_membership_periods_lookup"
+        ON agency_membership_periods ("agencyId", "userId", "joinedAt")
+      `);
+      await runner.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_agency_membership_periods_active"
+        ON agency_membership_periods ("agencyId", "userId") WHERE "leftAt" IS NULL
+      `);
+      await runner.query(`
+        INSERT INTO agency_membership_periods ("agencyId", "userId", "joinedAt")
+        SELECT m."agencyId", m."userId", COALESCE(m."joinedAt", NOW())
+        FROM agency_members m
+        WHERE m."status" = 'active' AND m."isActive" = true
+        ON CONFLICT ("agencyId", "userId") WHERE "leftAt" IS NULL DO NOTHING
+      `);
+      await runner.query(`
+        CREATE TABLE IF NOT EXISTS agency_follows (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
+          "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE ("agencyId", "userId")
+        )
+      `);
+      await runner.query(`
+        CREATE INDEX IF NOT EXISTS "IDX_agency_follows_agencyId"
+        ON agency_follows ("agencyId")
+      `);
+      await runner.query(`
+        CREATE INDEX IF NOT EXISTS "IDX_agency_follows_userId"
+        ON agency_follows ("userId")
+      `);
+
+      // Normalize existing agency display IDs without changing valid IDs.
       const agencies = await this.agenciesRepo.find({ select: ['id', 'publicId'] });
       for (const agency of agencies) {
         if (agency.publicId && /^\d{6}$/.test(String(agency.publicId))) continue;
@@ -163,130 +253,73 @@ export class AgenciesService implements OnModuleInit {
         }
         if (candidate) await this.agenciesRepo.update({ id: agency.id }, { publicId: candidate });
       }
-    } catch (err) {
-      this.logger.warn(`ensure agency exclusive columns: ${(err as Error).message}`);
-    }
-    try {
-      await this.dataSource.query(`
-        ALTER TABLE gifts
-          ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid
-      `);
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS "IDX_gifts_brandAgencyId"
-        ON gifts ("brandAgencyId") WHERE "brandAgencyId" IS NOT NULL
-      `);
-    } catch (err) {
-      this.logger.warn(`ensure gift brandAgencyId: ${(err as Error).message}`);
-    }
-    try {
-      // Preserve each membership period separately so rejoining starts fresh
-      // for agency statistics without deleting financial history.
-      await this.dataSource.query(`
-        CREATE TABLE IF NOT EXISTS agency_membership_periods (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
-          "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          "joinedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          "leftAt" TIMESTAMPTZ,
-          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS "IDX_agency_membership_periods_lookup"
-        ON agency_membership_periods ("agencyId", "userId", "joinedAt")
-      `);
-      await this.dataSource.query(`
-        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_agency_membership_periods_active"
-        ON agency_membership_periods ("agencyId", "userId") WHERE "leftAt" IS NULL
-      `);
-      await this.dataSource.query(`
-        INSERT INTO agency_membership_periods ("agencyId", "userId", "joinedAt")
-        SELECT m."agencyId", m."userId", COALESCE(m."joinedAt", NOW())
-        FROM agency_members m
-        WHERE m."status" = 'active' AND m."isActive" = true
-        ON CONFLICT ("agencyId", "userId") WHERE "leftAt" IS NULL DO NOTHING
-      `);
-    } catch (err) {
-      this.logger.warn(`ensure agency membership periods: ${(err as Error).message}`);
-    }
-    try {
-      // Family-card follows (Mikoo guild attention) — independent of membership.
-      await this.dataSource.query(`
-        CREATE TABLE IF NOT EXISTS agency_follows (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
-          "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          UNIQUE ("agencyId", "userId")
-        )
-      `);
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS "IDX_agency_follows_agencyId"
-        ON agency_follows ("agencyId")
-      `);
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS "IDX_agency_follows_userId"
-        ON agency_follows ("userId")
-      `);
-    } catch (err) {
-      this.logger.warn(`ensure agency_follows: ${(err as Error).message}`);
-    }
-    // Keep the legacy club table untouched during rollout. Older app/API
-    // instances may still reference it; dropping it here causes PostgreSQL
-    // "relation agency_club_members does not exist" errors for active clients.
-    try {
-      // Mark catalog agency frames as admin-only exclusive when meta missing.
-      await this.dataSource.query(`
-        UPDATE cosmetics
-        SET meta = COALESCE(meta, '{}'::jsonb) || '{"agencyExclusive":true}'::jsonb
-        WHERE (code ILIKE '%agency%' OR code ILIKE '%_agency%')
-          AND (meta IS NULL OR meta->>'agencyExclusive' IS NULL OR meta->>'agencyExclusive' = 'false')
-      `);
-    } catch {
-      // meta may be json not jsonb on some DBs — best effort
+
+      // Mark catalog agency frames as admin-only exclusive when metadata permits.
       try {
-        await this.dataSource.query(`
+        await runner.query(`
           UPDATE cosmetics
-          SET meta = json_build_object('agencyExclusive', true)
+          SET meta = COALESCE(meta, '{}'::jsonb) || '{"agencyExclusive":true}'::jsonb
           WHERE (code ILIKE '%agency%' OR code ILIKE '%_agency%')
-            AND meta IS NULL
+            AND (meta IS NULL OR meta->>'agencyExclusive' IS NULL OR meta->>'agencyExclusive' = 'false')
         `);
       } catch {
-        /* ignore */
+        try {
+          await runner.query(`
+            UPDATE cosmetics
+            SET meta = json_build_object('agencyExclusive', true)
+            WHERE (code ILIKE '%agency%' OR code ILIKE '%_agency%')
+              AND meta IS NULL
+          `);
+        } catch {
+          // Older installations may use a metadata type unsupported by either update.
+        }
       }
-    }
-    try {
-      const existing = await this.settingsRepo.findOne({
-        where: { key: AGENCY_CREATE.settingKey },
-      });
-      if (!existing) {
-        await this.settingsRepo.save(
-          this.settingsRepo.create({
-            key: AGENCY_CREATE.settingKey,
-            value: String(AGENCY_CREATE.defaultCoins),
-            description: 'سعر فتح الوكالة بالعملات (مدفوع — يحدده الأدمن)',
-          }),
+
+      try {
+        const existing = await this.settingsRepo.findOne({
+          where: { key: AGENCY_CREATE.settingKey },
+        });
+        if (!existing) {
+          await this.settingsRepo.save(
+            this.settingsRepo.create({
+              key: AGENCY_CREATE.settingKey,
+              value: String(AGENCY_CREATE.defaultCoins),
+              description: 'سعر فتح الوكالة بالعملات (مدفوع — يحدده الأدمن)',
+            }),
+          );
+        }
+        await this.ensureSetting(
+          AGENCY_CREATE.freeSettingKey,
+          'false',
+          'فتح الوكالة مجاناً (true) — عند التعطيل لا يُقبل سعر 0 ويُطبَّق الحد الأدنى',
         );
+        await this.ensureSetting(
+          'agency_auto_approve_after_payment',
+          'false',
+          'موافقة تلقائية على طلب الوكالة بعد الدفع (true/false)',
+        );
+      } catch (err) {
+        this.logger.warn(`ensure agency settings deferred: ${(err as Error).message}`);
       }
-      await this.ensureSetting(
-        AGENCY_CREATE.freeSettingKey,
-        'false',
-        'فتح الوكالة مجاناً (true) — عند التعطيل لا يُقبل سعر 0 ويُطبَّق الحد الأدنى',
-      );
+
+      this.agencySchemaBootstrapReady = true;
+      if (this.agencySchemaBootstrapTimer) clearInterval(this.agencySchemaBootstrapTimer);
+      this.agencySchemaBootstrapTimer = null;
+      this.logger.log('Agency schema bootstrap completed with bounded, serialized DDL.');
     } catch (err) {
-      this.logger.warn(`ensure agency create price setting: ${(err as Error).message}`);
-    }
-    try {
-      // The gift split (owner commission vs host share) is owned entirely by the
-      // live ECONOMY config (dashboard → Economy panel). No per-share app_settings
-      // rows are seeded here anymore — that old system was fully removed.
-      await this.ensureSetting(
-        'agency_auto_approve_after_payment',
-        'false',
-        'موافقة تلقائية على طلب الوكالة بعد الدفع (true/false)',
+      this.logger.warn(
+        `Agency schema bootstrap deferred; API remains available and the migration will retry: ${(err as Error).message}`,
       );
-    } catch (err) {
-      this.logger.warn(`ensure agency settings: ${(err as Error).message}`);
+    } finally {
+      if (advisoryLockAcquired) {
+        await runner.query('SELECT pg_advisory_unlock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]).catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch((err) => {
+        this.logger.warn(`Agency bootstrap connection release failed: ${(err as Error).message}`);
+      });
+      this.agencySchemaBootstrapRunning = false;
     }
   }
 

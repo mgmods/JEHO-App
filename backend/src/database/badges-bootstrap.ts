@@ -1,11 +1,11 @@
-import { DataSource } from 'typeorm';
+import { QueryRunner } from 'typeorm';
 
 /**
  * Idempotently create the additive badge tables expected by the current MG-JEHO
  * entities. Existing rows are never dropped, rewritten, or reset.
  */
-export async function ensureBadgeTables(dataSource: DataSource): Promise<void> {
-  const [state] = await dataSource.query(
+export async function ensureBadgeTables(runner: QueryRunner): Promise<void> {
+  const [state] = await runner.query(
     'SELECT to_regclass($1) IS NOT NULL AS users_exists',
     ['"jeho_own"."users"'],
   );
@@ -15,8 +15,8 @@ export async function ensureBadgeTables(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  await dataSource.transaction(async (manager) => {
-    await manager.query(`
+  // Run each idempotent DDL statement in autocommit on the lock-owning connection.
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."badges" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         name varchar(80) NOT NULL,
@@ -33,11 +33,11 @@ export async function ensureBadgeTables(dataSource: DataSource): Promise<void> {
         "updatedAt" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await manager.query(`
+    await runner.query(`
       CREATE INDEX IF NOT EXISTS "IDX_badges_active_sort"
       ON "jeho_own"."badges" ("isActive", "sortOrder")
     `);
-    await manager.query(`
+    await runner.query(`
       ALTER TABLE "jeho_own"."badges"
       ADD COLUMN IF NOT EXISTS "hiddenTaskEnabled" boolean NOT NULL DEFAULT false,
       ADD COLUMN IF NOT EXISTS "hiddenTaskEvent" varchar(32),
@@ -49,7 +49,7 @@ export async function ensureBadgeTables(dataSource: DataSource): Promise<void> {
       ADD COLUMN IF NOT EXISTS "manualTaskDescription" varchar(500) NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS "manualTaskDays" integer NOT NULL DEFAULT 0
     `);
-    await manager.query(`
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."user_badges" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
@@ -60,19 +60,18 @@ export async function ensureBadgeTables(dataSource: DataSource): Promise<void> {
         CONSTRAINT "UQ_user_badges_user_badge" UNIQUE ("userId", "badgeId")
       )
     `);
-    await manager.query(`
+    await runner.query(`
       ALTER TABLE "jeho_own"."user_badges"
       ADD COLUMN IF NOT EXISTS "expiresAt" timestamptz
     `);
-    await manager.query(`
+    await runner.query(`
       CREATE INDEX IF NOT EXISTS "IDX_user_badges_user_expiry"
       ON "jeho_own"."user_badges" ("userId", "expiresAt")
     `);
-    await manager.query(`
+    await runner.query(`
       CREATE INDEX IF NOT EXISTS "IDX_user_badges_user"
       ON "jeho_own"."user_badges" ("userId")
     `);
-  });
 
   console.log('[BadgesBootstrap] Verified current MG-JEHO badge tables in schema jeho_own.');
 }

@@ -1,12 +1,12 @@
-import { DataSource } from 'typeorm';
+import { QueryRunner } from 'typeorm';
 
 /**
  * Additive compatibility migration for profile columns used by newer JEHO
  * builds. Older production databases may predate medal display and DM privacy
  * settings. Add only missing columns; never rewrite or delete profile data.
  */
-export async function ensureUserProfileColumns(dataSource: DataSource): Promise<void> {
-  const rows = await dataSource.query(
+export async function ensureUserProfileColumns(runner: QueryRunner): Promise<void> {
+  const rows = await runner.query(
     `SELECT 1 FROM information_schema.tables
      WHERE table_schema = 'jeho_own' AND table_name = 'user_profiles'
      LIMIT 1`,
@@ -16,7 +16,7 @@ export async function ensureUserProfileColumns(dataSource: DataSource): Promise<
     return;
   }
 
-  await dataSource.query(`
+  await runner.query(`
     ALTER TABLE "jeho_own"."user_profiles"
       ADD COLUMN IF NOT EXISTS "profileCoverUrls" text,
       ADD COLUMN IF NOT EXISTS "displayedMedalIds" text,

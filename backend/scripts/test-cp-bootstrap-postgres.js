@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 require('ts-node/register');
 const { DataSource } = require('typeorm');
 const { ensureCpTables } = require('../src/database/cp-bootstrap');
+const { inspectJehoSchemaForProvisioning } = require('./jeho-empty-schema-guard');
 
 const databaseUrl = process.env.CP_TEST_DATABASE_URL;
 if (!databaseUrl) throw new Error('CP_TEST_DATABASE_URL is required. Use only an isolated disposable PostgreSQL database.');
@@ -111,6 +112,66 @@ async function testLegacyUpgrade(ds) {
   assert.equal(preservedConstraint.length, 1, 'compound/unrelated CHECK constraint must remain intact');
 }
 
+async function testFirstInstallSchemaGuard(ds) {
+  await resetSchema(ds);
+  let state = await inspectJehoSchemaForProvisioning(ds);
+  assert.equal(state.markerExists, false);
+  assert.equal(state.isEmpty, true, 'a truly empty app schema must be eligible for first-install provisioning');
+
+  await ds.query('CREATE TABLE jeho_own.partial_install (id integer PRIMARY KEY)');
+  state = await inspectJehoSchemaForProvisioning(ds);
+  assert.equal(state.isEmpty, false, 'a partially initialized schema without a JEHO marker must be refused');
+  assert.equal(state.relations, 1);
+
+  await resetSchema(ds);
+  await ds.query('CREATE FUNCTION jeho_own.partial_routine() RETURNS integer LANGUAGE sql AS $$ SELECT 1 $$');
+  state = await inspectJehoSchemaForProvisioning(ds);
+  assert.equal(state.isEmpty, false, 'a schema containing an application routine must not be treated as empty');
+
+  await resetSchema(ds);
+  await ds.query(`
+    CREATE TABLE jeho_own.__jeho_provision_state (
+      id integer PRIMARY KEY CHECK (id = 1),
+      status varchar(16) NOT NULL CHECK (status IN ('running','complete'))
+    )
+  `);
+  await ds.query("INSERT INTO jeho_own.__jeho_provision_state(id,status) VALUES (1,'running')");
+  state = await inspectJehoSchemaForProvisioning(ds);
+  assert.equal(state.markerExists, true);
+  assert.equal(state.status, 'running', 'interrupted first install must be recognized as resumable, not as a clean schema');
+}
+
+async function testSharedSchemaMigrationLock(ds) {
+  const owner = ds.createQueryRunner();
+  const contender = ds.createQueryRunner();
+  await owner.connect();
+  await contender.connect();
+  try {
+    const ownerLock = await owner.query(
+      'SELECT pg_try_advisory_lock(741902611, 99) AS locked',
+    );
+    assert.equal(ownerLock[0]?.locked, true, 'first schema migrator must acquire the global lock');
+
+    await contender.startTransaction();
+    const blocked = await contender.query(
+      'SELECT pg_try_advisory_xact_lock(741902611, 99) AS locked',
+    );
+    assert.equal(blocked[0]?.locked, false, 'transaction-scoped CP migrations must conflict with session-scoped schema migrations');
+
+    await owner.query('SELECT pg_advisory_unlock(741902611, 99)');
+    const acquired = await contender.query(
+      'SELECT pg_try_advisory_xact_lock(741902611, 99) AS locked',
+    );
+    assert.equal(acquired[0]?.locked, true, 'a waiting migrator must acquire the same global lock after release');
+    await contender.commitTransaction();
+  } finally {
+    if (contender.isTransactionActive) await contender.rollbackTransaction().catch(() => undefined);
+    await owner.query('SELECT pg_advisory_unlock(741902611, 99)').catch(() => undefined);
+    await contender.release();
+    await owner.release();
+  }
+}
+
 async function main() {
   const ds = new DataSource({
     type: 'postgres',
@@ -120,9 +181,11 @@ async function main() {
   });
   await ds.initialize();
   try {
+    await testSharedSchemaMigrationLock(ds);
+    await testFirstInstallSchemaGuard(ds);
     await testFreshInstall(ds);
     await testLegacyUpgrade(ds);
-    console.log('PASS: CP bootstrap fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
+    console.log('PASS: shared migration-lock contention, empty/partial-schema provisioning guard, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
   } finally {
     await ds.query('DROP SCHEMA IF EXISTS jeho_own CASCADE');
     await ds.destroy();

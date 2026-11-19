@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 import {
   AgentLedgerType,
   AgentRecharge,
@@ -116,6 +117,7 @@ export const DEFAULT_RECHARGE_AGENT_CONFIG: RechargeAgentPricingConfig = {
 
 @Injectable()
 export class RechargeAgentsService implements OnModuleInit {
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
   constructor(
     @InjectRepository(RechargeAgent)
     private readonly agentsRepo: Repository<RechargeAgent>,
@@ -138,19 +140,28 @@ export class RechargeAgentsService implements OnModuleInit {
     @Optional() private readonly promotions?: PromotionsService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeSchemaAndConfig();
+  }
+
+  private async initializeSchemaAndConfig(): Promise<void> {
     try {
-      await this.dataSource.query(
-        `ALTER TABLE withdraw_requests ADD COLUMN IF NOT EXISTS "agentId" UUID`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE agency_members ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`,
-      );
-      await this.dataSource.query(
-        `CREATE INDEX IF NOT EXISTS "idx_withdraw_requests_agent" ON withdraw_requests("agentId")`,
-      );
-    } catch {
-      /* column may already exist */
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        if (lockRows?.[0]?.locked !== true) throw new Error('JEHO schema migration lock is busy; retrying later');
+        await manager.query(`ALTER TABLE withdraw_requests ADD COLUMN IF NOT EXISTS "agentId" UUID`);
+        await manager.query(`ALTER TABLE agency_members ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`);
+        await manager.query(`CREATE INDEX IF NOT EXISTS "idx_withdraw_requests_agent" ON withdraw_requests("agentId")`);
+      });
+    } catch (error) {
+      console.warn(`[RechargeAgentsSchema] Migration deferred: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndConfig(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
     }
     try {
       // Soft-upgrade legacy default agent wholesale ($0.009 / fee $20) → v3 defaults.
@@ -178,6 +189,8 @@ export class RechargeAgentsService implements OnModuleInit {
     } catch {
       /* ignore seed race */
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   /**

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -66,6 +67,7 @@ const DEFAULT_PACKAGES = STANDARD_RECHARGE_PACKAGES.map((p) => ({ ...p }));
 @Injectable()
 export class WalletService implements OnModuleInit {
   private readonly logger = new Logger(WalletService.name);
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
@@ -88,20 +90,27 @@ export class WalletService implements OnModuleInit {
     @Optional() private readonly hostTarget?: HostTargetService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeSchemaAndCatalog();
+  }
+
+  private async initializeSchemaAndCatalog(): Promise<void> {
     try {
-      await this.dataSource.query(
-        `ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "traderDiamonds" BIGINT NOT NULL DEFAULT 0`,
-      );
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        if (lockRows?.[0]?.locked !== true) throw new Error('JEHO schema migration lock is busy; retrying later');
+        await manager.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "traderDiamonds" BIGINT NOT NULL DEFAULT 0`);
+        await manager.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "agencyDiamonds" BIGINT NOT NULL DEFAULT 0`);
+      });
     } catch (err) {
-      this.logger.warn(`ensure traderDiamonds: ${(err as Error).message}`);
-    }
-    try {
-      await this.dataSource.query(
-        `ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "agencyDiamonds" BIGINT NOT NULL DEFAULT 0`,
-      );
-    } catch (err) {
-      this.logger.warn(`ensure agencyDiamonds: ${(err as Error).message}`);
+      this.logger.warn(`Wallet schema migration deferred: ${(err as Error).message}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndCatalog(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
     }
     try {
       // Retire silver: fold any remaining balance into gold coins and zero the column.
@@ -121,6 +130,8 @@ export class WalletService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`ensureCanonicalPackages: ${(err as Error).message}`);
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   /** Force-safe packages if missing, outdated version, or fat density (owner-risk). */

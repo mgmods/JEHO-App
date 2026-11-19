@@ -1,8 +1,8 @@
-import { DataSource } from 'typeorm';
+import { QueryRunner } from 'typeorm';
 
 /** Additive, idempotent schema for persistent user moments. */
-export async function ensureMomentsTables(dataSource: DataSource): Promise<void> {
-  const [state] = await dataSource.query(
+export async function ensureMomentsTables(runner: QueryRunner): Promise<void> {
+  const [state] = await runner.query(
     'SELECT to_regclass($1) IS NOT NULL AS users_exists',
     ['"jeho_own"."users"'],
   );
@@ -11,7 +11,7 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
     return;
   }
   // Extend the existing shared reports enum additively so moment reports appear in the admin Reports page.
-  await dataSource.query(`
+  await runner.query(`
     DO $$
     DECLARE enum_name text;
     BEGIN
@@ -28,8 +28,8 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
       END IF;
     END $$;
   `);
-  await dataSource.transaction(async (manager) => {
-    await manager.query(`
+  // All DDL remains autocommit and uses the same pinned connection as the global schema lock.
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."moments" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "userId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
@@ -42,10 +42,10 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
         CHECK (length(trim(body)) > 0 OR "imageUrl" IS NOT NULL)
       )
     `);
-    await manager.query(`ALTER TABLE "jeho_own"."moments" ADD COLUMN IF NOT EXISTS "updatedAt" timestamptz NOT NULL DEFAULT now()`);
-    await manager.query(`CREATE INDEX IF NOT EXISTS "IDX_moments_created" ON "jeho_own"."moments" ("createdAt" DESC)`);
-    await manager.query(`CREATE INDEX IF NOT EXISTS "IDX_moments_user_created" ON "jeho_own"."moments" ("userId", "createdAt" DESC)`);
-    await manager.query(`
+    await runner.query(`ALTER TABLE "jeho_own"."moments" ADD COLUMN IF NOT EXISTS "updatedAt" timestamptz NOT NULL DEFAULT now()`);
+    await runner.query(`CREATE INDEX IF NOT EXISTS "IDX_moments_created" ON "jeho_own"."moments" ("createdAt" DESC)`);
+    await runner.query(`CREATE INDEX IF NOT EXISTS "IDX_moments_user_created" ON "jeho_own"."moments" ("userId", "createdAt" DESC)`);
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."moment_likes" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "momentId" uuid NOT NULL REFERENCES "jeho_own"."moments"(id) ON DELETE CASCADE,
@@ -54,7 +54,7 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
         CONSTRAINT "UQ_moment_likes_moment_user" UNIQUE ("momentId", "userId")
       )
     `);
-    await manager.query(`
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."moment_comments" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "momentId" uuid NOT NULL REFERENCES "jeho_own"."moments"(id) ON DELETE CASCADE,
@@ -63,8 +63,8 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
         "createdAt" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await manager.query(`ALTER TABLE "jeho_own"."moment_comments" ADD COLUMN IF NOT EXISTS "parentCommentId" uuid`);
-    await manager.query(`
+    await runner.query(`ALTER TABLE "jeho_own"."moment_comments" ADD COLUMN IF NOT EXISTS "parentCommentId" uuid`);
+    await runner.query(`
       DO $$
       BEGIN
         IF NOT EXISTS (
@@ -78,8 +78,8 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
         END IF;
       END $$;
     `);
-    await manager.query(`CREATE INDEX IF NOT EXISTS "IDX_moment_comments_parent" ON "jeho_own"."moment_comments" ("parentCommentId")`);
-    await manager.query(`CREATE INDEX IF NOT EXISTS "IDX_moment_comments_moment_created" ON "jeho_own"."moment_comments" ("momentId", "createdAt" ASC)`);
-  });
+    await runner.query(`CREATE INDEX IF NOT EXISTS "IDX_moment_comments_parent" ON "jeho_own"."moment_comments" ("parentCommentId")`);
+    await runner.query(`CREATE INDEX IF NOT EXISTS "IDX_moment_comments_moment_created" ON "jeho_own"."moment_comments" ("momentId", "createdAt" ASC)`);
+
   console.log('[MomentsBootstrap] Persistent moments tables are ready.');
 }

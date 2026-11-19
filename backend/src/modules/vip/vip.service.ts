@@ -14,6 +14,7 @@ import { IsInt, Min, Max, IsOptional, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { vipMedalUrl } from '../../common/vip-assets';
+import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from '../../database/schema-migration-lock';
 import {
   VIP_ALLOWED_DAYS,
   VIP_DURATION_PACKS,
@@ -42,34 +43,66 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VipService.name);
   private static readonly MAX_VIP_LEVEL = 7;
   private mysteriousModeCleanupTimer?: ReturnType<typeof setInterval>;
+  private mysteriousModeSchemaTimer?: ReturnType<typeof setInterval>;
 
-  /** Best-effort compatibility work: a blocked optional VIP patch must never prevent API startup. */
-  async onModuleInit() {
-    try {
-      await this.dataSource.query(
-        'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
-      );
-    } catch (error) {
-      // Do not hold the whole Nest application hostage on a legacy additive DDL lock.
-      // The column is only needed by the optional Mysterious Man feature.
-      this.logger.warn(`Mysterious Mode column check deferred: ${error?.message || error}`);
-    }
-    // Reconciliation is maintenance, not a prerequisite for serving the API.
+  /** Optional VIP maintenance is scheduled after Nest initialization; it never blocks HTTP startup. */
+  onModuleInit() {
+    this.mysteriousModeSchemaTimer = setInterval(() => {
+      void this.ensureMysteriousModeColumn();
+    }, 30_000);
+    this.mysteriousModeSchemaTimer.unref?.();
     this.mysteriousModeCleanupTimer = setInterval(() => {
       void this.reconcileMysteriousModes().catch((error) => {
         this.logger.warn(`Mysterious Man reconciliation failed: ${error?.message || error}`);
       });
     }, 60_000);
     this.mysteriousModeCleanupTimer.unref?.();
+
+    const initialMaintenance = setTimeout(() => {
+      void (async () => {
+        await this.ensureMysteriousModeColumn();
+        await this.reconcileMysteriousModes();
+      })().catch((error) => {
+        this.logger.warn(`Initial Mysterious Man maintenance deferred: ${error?.message || error}`);
+      });
+    }, 0);
+    initialMaintenance.unref?.();
+  }
+
+  private async ensureMysteriousModeColumn(): Promise<void> {
+    const runner = this.dataSource.createQueryRunner();
+    let locked = false;
     try {
-      await this.reconcileMysteriousModes();
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '8s'");
+      const rows = await runner.query(
+        'SELECT pg_try_advisory_lock($1, $2) AS locked',
+        [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+      );
+      locked = rows?.[0]?.locked === true;
+      if (!locked) return;
+      await runner.query(
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
+      );
     } catch (error) {
-      this.logger.warn(`Initial Mysterious Man reconciliation deferred: ${error?.message || error}`);
+      this.logger.warn(`Mysterious Mode column check deferred: ${error?.message || error}`);
+    } finally {
+      if (locked) {
+        await runner.query(
+          'SELECT pg_advisory_unlock($1, $2)',
+          [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+        ).catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
     }
   }
 
   onModuleDestroy() {
     if (this.mysteriousModeCleanupTimer) clearInterval(this.mysteriousModeCleanupTimer);
+    if (this.mysteriousModeSchemaTimer) clearInterval(this.mysteriousModeSchemaTimer);
   }
 
   private async reconcileMysteriousModes() {

@@ -12,6 +12,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 import { MikooGatewayService } from './modules/games/mikoo-gateway/mikoo-gateway.service';
 import { UploadsService } from './modules/uploads/uploads.service';
+import { DataSource } from 'typeorm';
 
 async function bootstrap() {
   // Plain diagnostics survive even when Nest logging is not ready yet.
@@ -368,11 +369,48 @@ const baishunModuleMap: Record<string, string> = {
     }
   }
 
-  // Simple deployment health probe (does not expose configuration or secrets).
+  // Liveness only: confirms that the Node process and HTTP listener are alive.
+  // Deployment readiness is checked separately and must not be inferred from this.
   expressApp.get('/healthz', (_req: unknown, res: {
     status: (n: number) => { json: (body: unknown) => void };
   }) => {
     res.status(200).json({ ok: true, service: 'jeho-own-api', apiPrefix });
+  });
+
+  // Readiness verifies the database and the minimum schema required by the app
+  // and CP feature before a platform sends user traffic to this instance.
+  expressApp.get('/readyz', async (_req: unknown, res: {
+    status: (n: number) => { json: (body: unknown) => void };
+  }) => {
+    try {
+      const dataSource = app.get(DataSource);
+      const rows = await dataSource.query(`
+        SELECT
+          to_regclass('"jeho_own"."users"') IS NOT NULL AS users,
+          to_regclass('"jeho_own"."user_profiles"') IS NOT NULL AS user_profiles,
+          to_regclass('"jeho_own"."gifts"') IS NOT NULL AS gifts,
+          to_regclass('"jeho_own"."app_settings"') IS NOT NULL AS app_settings,
+          to_regclass('"jeho_own"."cosmetics"') IS NOT NULL AS cosmetics,
+          to_regclass('"jeho_own"."cp_relationships"') IS NOT NULL AS cp_relationships,
+          to_regclass('"jeho_own"."cp_requests"') IS NOT NULL AS cp_requests,
+          to_regclass('"jeho_own"."cp_level_reward_claims"') IS NOT NULL AS cp_level_reward_claims,
+          to_regclass('"jeho_own"."cp_level_gift_reward_claims"') IS NOT NULL AS cp_level_gift_reward_claims
+      `);
+      const state = rows?.[0] || {};
+      const missing = Object.entries(state).filter(([, ready]) => ready !== true).map(([name]) => name);
+      if (missing.length) {
+        res.status(503).json({ ok: false, service: 'jeho-own-api', ready: false, missing });
+        return;
+      }
+      res.status(200).json({ ok: true, service: 'jeho-own-api', ready: true });
+    } catch (error) {
+      res.status(503).json({
+        ok: false,
+        service: 'jeho-own-api',
+        ready: false,
+        message: error instanceof Error ? error.message : 'Database readiness check failed',
+      });
+    }
   });
 
   console.log('[JEHO-OWN boot STEP] HTTP listener: start');

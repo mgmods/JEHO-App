@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Delete, Param, Query, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Delete, Param, Query, BadRequestException, UseGuards } from '@nestjs/common';
+import { CpSchemaReadyGuard } from './cp-schema-ready.guard';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Public } from '../../common/decorators';
 import { ParseUUIDPipe } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { CpType } from '../../database/entities/cp-relationship.entity';
 @ApiTags('CP')
 @ApiBearerAuth()
 @Controller('cp')
+@UseGuards(CpSchemaReadyGuard)
 export class CpController {
   constructor(private readonly cp: CpService) {}
 

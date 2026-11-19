@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from '../../database/schema-migration-lock';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
@@ -162,111 +163,163 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async onModuleInit() {
-    try {
-      await this.dataSource.query(`
-        CREATE TABLE IF NOT EXISTS agency_moderation_audit (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
-          "roomId" uuid NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-          "actorId" uuid REFERENCES users(id) ON DELETE SET NULL,
-          "targetUserId" uuid REFERENCES users(id) ON DELETE SET NULL,
-          action varchar(24) NOT NULL,
-          reason text,
-          metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-          "createdAt" timestamptz NOT NULL DEFAULT NOW()
-        )
-      `);
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS "IDX_agency_moderation_audit_agency_created"
-        ON agency_moderation_audit ("agencyId", "createdAt" DESC)
-      `);
-    } catch (err) {
-      this.log.warn(`ensure agency moderation audit: ${(err as Error).message}`);
-    }
-    try {
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(6)`,
-      );
-      await this.dataSource.query(
-        `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_rooms_publicId" ON rooms ("publicId") WHERE "publicId" IS NOT NULL`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "liveSessionStartedAt" TIMESTAMPTZ`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "emptySince" TIMESTAMPTZ`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "chatZoneEnabled" boolean NOT NULL DEFAULT true`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "charmEnabled" boolean NOT NULL DEFAULT true`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "bannerEnabled" boolean NOT NULL DEFAULT true`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "micInteractEnabled" boolean NOT NULL DEFAULT true`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "micRequestEnabled" boolean NOT NULL DEFAULT false`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "entryEffectsEnabled" boolean NOT NULL DEFAULT true`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "lowGiftEffectsEnabled" boolean NOT NULL DEFAULT true`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "chatClearedAt" TIMESTAMPTZ`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "chatAutoClearMinutes" integer NOT NULL DEFAULT 0`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS "staffRole" varchar(16) DEFAULT NULL`,
-      );
-      // Platform-owned support rooms have no user owner; preserve all existing room rows.
-      await this.dataSource.query(`ALTER TABLE rooms ALTER COLUMN "hostId" DROP NOT NULL`);
-      await this.dataSource.query(`ALTER TABLE room_moderators ALTER COLUMN "appointedById" DROP NOT NULL`);
-    } catch (err) {
-      this.log.warn(
-        `rooms column ensure skipped: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
-    // Personal rooms are durable room identities, not temporary live-session records.
-    // Repair older active personal rooms once at boot so a stale idle marker or a legacy
-    // non-persistent flag can never make them disappear after the host disconnects.
-    try {
-      await this.dataSource.query(`
-        UPDATE rooms
-           SET "isPersistent" = TRUE,
-               "emptySince" = NULL,
-               "activeHostId" = COALESCE("activeHostId", "hostId")
-         WHERE "agencyId" IS NULL
-           AND "roomKind" = $1
-           AND status <> $2
-           AND "hostId" IS NOT NULL
-      `, [RoomKind.STANDARD, RoomStatus.CLOSED]);
-    } catch (err) {
-      this.log.warn(`ensure persistent personal rooms: ${err instanceof Error ? err.message : String(err)}`);
-    }
+  onModuleInit(): void {
+    // Never run room/user DDL on the request pool during Nest startup.
+    // The entire additive migration uses one pinned connection and the global
+    // JEHO schema lock shared with CP, agency, VIP and app bootstraps.
+    void this.initializeRoomSchema();
+    this.roomSchemaBootstrapTimer = setInterval(() => {
+      void this.initializeRoomSchema();
+    }, 30_000);
+    this.roomSchemaBootstrapTimer.unref?.();
 
     // Personal live rooms remain open until the host or authorized staff explicitly ends them.
     // Auto-clear public chat for rooms with chatAutoClearMinutes > 0.
     this.chatAutoClearTimer = setInterval(() => {
       void this.sweepAutoChatClear().catch((err) =>
-        this.log.warn(
-          `chat auto-clear: ${err instanceof Error ? err.message : String(err)}`,
-        ),
+        this.log.warn(`chat auto-clear: ${err instanceof Error ? err.message : String(err)}`),
       );
     }, 20_000);
+    this.chatAutoClearTimer.unref?.();
+  }
+
+  private roomSchemaBootstrapTimer: ReturnType<typeof setInterval> | null = null;
+  private roomSchemaBootstrapRunning = false;
+  private roomSchemaBootstrapReady = false;
+
+  private async initializeRoomSchema(): Promise<void> {
+    if (this.roomSchemaBootstrapRunning || this.roomSchemaBootstrapReady) return;
+    this.roomSchemaBootstrapRunning = true;
+    const runner = this.dataSource.createQueryRunner();
+    let locked = false;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '20s'");
+      const lockRows = await runner.query(
+        'SELECT pg_try_advisory_lock($1, $2) AS locked',
+        [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+      );
+      locked = lockRows?.[0]?.locked === true;
+      if (!locked) {
+        this.log.warn('Room schema bootstrap deferred: another JEHO migration owns the shared lock.');
+        return;
+      }
+          try {
+            await runner.query(`
+              CREATE TABLE IF NOT EXISTS agency_moderation_audit (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
+                "roomId" uuid NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+                "actorId" uuid REFERENCES users(id) ON DELETE SET NULL,
+                "targetUserId" uuid REFERENCES users(id) ON DELETE SET NULL,
+                action varchar(24) NOT NULL,
+                reason text,
+                metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+                "createdAt" timestamptz NOT NULL DEFAULT NOW()
+              )
+            `);
+            await runner.query(`
+              CREATE INDEX IF NOT EXISTS "IDX_agency_moderation_audit_agency_created"
+              ON agency_moderation_audit ("agencyId", "createdAt" DESC)
+            `);
+          } catch (err) {
+            this.log.warn(`ensure agency moderation audit deferred; retry will run: ${(err as Error).message}`);
+            throw err;
+          }
+          try {
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(6)`,
+            );
+            await runner.query(
+              `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_rooms_publicId" ON rooms ("publicId") WHERE "publicId" IS NOT NULL`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "liveSessionStartedAt" TIMESTAMPTZ`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "emptySince" TIMESTAMPTZ`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "chatZoneEnabled" boolean NOT NULL DEFAULT true`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "charmEnabled" boolean NOT NULL DEFAULT true`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "bannerEnabled" boolean NOT NULL DEFAULT true`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "micInteractEnabled" boolean NOT NULL DEFAULT true`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "micRequestEnabled" boolean NOT NULL DEFAULT false`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "entryEffectsEnabled" boolean NOT NULL DEFAULT true`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "lowGiftEffectsEnabled" boolean NOT NULL DEFAULT true`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "chatClearedAt" TIMESTAMPTZ`,
+            );
+            await runner.query(
+              `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "chatAutoClearMinutes" integer NOT NULL DEFAULT 0`,
+            );
+            await runner.query(
+              `ALTER TABLE users ADD COLUMN IF NOT EXISTS "staffRole" varchar(16) DEFAULT NULL`,
+            );
+            // Platform-owned support rooms have no user owner; preserve all existing room rows.
+            await runner.query(`ALTER TABLE rooms ALTER COLUMN "hostId" DROP NOT NULL`);
+            await runner.query(`ALTER TABLE room_moderators ALTER COLUMN "appointedById" DROP NOT NULL`);
+          } catch (err) {
+            this.log.warn(
+              `rooms column ensure deferred; retry will run: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+            throw err;
+          }
+          // Personal rooms are durable room identities, not temporary live-session records.
+          // Repair older active personal rooms once at boot so a stale idle marker or a legacy
+          // non-persistent flag can never make them disappear after the host disconnects.
+          try {
+            await runner.query(`
+              UPDATE rooms
+                 SET "isPersistent" = TRUE,
+                     "emptySince" = NULL,
+                     "activeHostId" = COALESCE("activeHostId", "hostId")
+               WHERE "agencyId" IS NULL
+                 AND "roomKind" = $1
+                 AND status <> $2
+                 AND "hostId" IS NOT NULL
+            `, [RoomKind.STANDARD, RoomStatus.CLOSED]);
+          } catch (err) {
+            this.log.warn(`ensure persistent personal rooms deferred; retry will run: ${err instanceof Error ? err.message : String(err)}`);
+            throw err;
+          }
+      this.roomSchemaBootstrapReady = true;
+      this.log.log('Room schema bootstrap completed under the shared JEHO migration lock.');
+    } catch (err) {
+      this.log.warn(`Room schema bootstrap deferred; retry will run: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      if (locked) {
+        await runner.query(
+          'SELECT pg_advisory_unlock($1, $2)',
+          [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+        ).catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+      this.roomSchemaBootstrapRunning = false;
+    }
   }
 
   onModuleDestroy() {
+    if (this.roomSchemaBootstrapTimer) clearInterval(this.roomSchemaBootstrapTimer);
+    this.roomSchemaBootstrapTimer = null;
     if (this.chatAutoClearTimer) {
       clearInterval(this.chatAutoClearTimer);
       this.chatAutoClearTimer = null;

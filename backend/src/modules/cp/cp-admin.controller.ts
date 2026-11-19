@@ -10,6 +10,7 @@ import { CpType } from '../../database/entities/cp-relationship.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { CosmeticType } from '../../database/entities/cosmetic.entity';
+import { CpSchemaReadyGuard } from './cp-schema-ready.guard';
 
 class CpTypeConfigDto {
   type?: CpType;
@@ -26,7 +27,7 @@ class CpTypeConfigDto {
 @ApiTags('Admin CP')
 @ApiBearerAuth()
 @Controller('admin/cp')
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtAuthGuard, AdminGuard, CpSchemaReadyGuard)
 export class CpAdminController {
   constructor(
     private readonly dataSource: DataSource,

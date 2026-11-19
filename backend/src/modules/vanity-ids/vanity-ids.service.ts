@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 import { VanityId, VanityIdStatus } from '../../database/entities/vanity-id.entity';
 
 /** Six-digit numerical IDs with length-based coin prices. Seeded when catalog is empty. */
@@ -35,6 +36,7 @@ const SEED_CATALOG: Array<{ publicId: string; priceCoins: number }> = [
 @Injectable()
 export class VanityIdsService implements OnModuleInit {
   private readonly log = new Logger(VanityIdsService.name);
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(VanityId)
@@ -42,19 +44,30 @@ export class VanityIdsService implements OnModuleInit {
     private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeSchemaAndCatalog();
+  }
+
+  private async initializeSchemaAndCatalog(): Promise<void> {
     try {
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleIconUrl" VARCHAR(512)');
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleVipLevel" INTEGER NOT NULL DEFAULT 1');
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        if (lockRows?.[0]?.locked !== true) throw new Error('JEHO schema migration lock is busy; retrying later');
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleIconUrl" VARCHAR(512)');
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleVipLevel" INTEGER NOT NULL DEFAULT 1');
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetType" VARCHAR(16)');
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetId" UUID');
+        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "previousTargetPublicId" VARCHAR(32)');
+      });
     } catch (e) {
-      this.log.warn(`vanity style VIP column ensure skipped: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    try {
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetType" VARCHAR(16)');
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetId" UUID');
-      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "previousTargetPublicId" VARCHAR(32)');
-    } catch (e) {
-      this.log.warn(`vanity target columns ensure skipped: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.warn(`Vanity ID schema migration deferred: ${e instanceof Error ? e.message : String(e)}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndCatalog(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
     }
     try {
       let added = 0;
@@ -87,5 +100,7 @@ export class VanityIdsService implements OnModuleInit {
         `vanity seed skipped: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 }

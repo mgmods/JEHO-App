@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from './schema-migration-lock';
 
 /**
  * Additive CP schema bootstrap for older deployments.
@@ -27,7 +28,7 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
     // window to finish, then restore the shorter DDL lock timeout.
     await manager.query("SET LOCAL lock_timeout = '15s'");
     await manager.query("SET LOCAL statement_timeout = '30s'");
-    await manager.query('SELECT pg_advisory_xact_lock(741902611, 1)');
+    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
     await manager.query("SET LOCAL lock_timeout = '3s'");
 
     await manager.query(`
