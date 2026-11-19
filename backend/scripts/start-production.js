@@ -176,6 +176,8 @@ async function terminateStaleJehoSessions() {
         activity.pid,
         activity.application_name,
         activity.state,
+        activity.xact_start,
+        LEFT(COALESCE(activity.query, ''), 240) AS query,
         pg_terminate_backend(activity.pid) AS terminated
       FROM pg_stat_activity AS activity
       WHERE activity.pid <> pg_backend_pid()
