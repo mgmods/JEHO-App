@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
 import { ensureCpTables } from '../../database/cp-bootstrap';
+import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from '../../database/schema-migration-lock';
 import { DataSource } from 'typeorm';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CpType } from '../../database/entities/cp-relationship.entity';
@@ -124,7 +125,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       // than failing immediately during a rolling deployment.
       await manager.query("SET LOCAL lock_timeout = '15s'");
       await manager.query("SET LOCAL statement_timeout = '30s'");
-      await manager.query('SELECT pg_advisory_xact_lock(741902611, 2)');
+      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
       await manager.query("SET LOCAL lock_timeout = '3s'");
 
       const rows = await manager.query(
