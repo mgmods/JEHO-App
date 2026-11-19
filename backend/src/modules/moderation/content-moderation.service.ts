@@ -36,6 +36,7 @@ export type ChatStrikeResolution = {
 @Injectable()
 export class ContentModerationService implements OnModuleInit {
   private readonly log = new Logger(ContentModerationService.name);
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Built-in promo / link / adult text patterns (Arabic + Latin). */
   private readonly defaultBlocked = [
@@ -122,12 +123,18 @@ export class ContentModerationService implements OnModuleInit {
           ON room_chat_penalties ("roomId", "userId")
         `);
       });
+      if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+      this.schemaRetryTimer = null;
     } catch (err) {
       this.log.warn(
-        `room_chat_penalties ensure skipped: ${
+        `room_chat_penalties ensure deferred; retrying safely: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.ensurePenaltyTable(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
     }
   }
 
