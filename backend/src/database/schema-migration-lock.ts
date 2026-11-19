@@ -63,11 +63,7 @@ export async function tryAcquireJehoSchemaLock(
 
   localLockHeld = true;
   try {
-    const rows = await runner.query(
-      'SELECT pg_try_advisory_lock($1, $2) AS locked',
-      [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-    );
-    const locked = rows?.[0]?.locked === true;
+    const locked = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_SCHEMA_LOCK_ID);
     if (locked) {
       localLockOwners.add(runner);
     } else {
