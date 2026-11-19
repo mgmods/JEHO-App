@@ -49,7 +49,7 @@ test('JEHO schema lock serializes FIFO and advances after failed acquire/unlock'
     await releaseJehoSchemaLock(queued[index]);
   }
   const queuedOrder = events
-    .filter((event) => /^q\\d+:acquire$/.test(event))
+    .filter((event) => /^q\d+:acquire$/.test(event))
     .map((event) => Number(event.slice(1, event.indexOf(':'))));
   assert.deepEqual(queuedOrder, Array.from({ length: 12 }, (_, index) => index));
 
