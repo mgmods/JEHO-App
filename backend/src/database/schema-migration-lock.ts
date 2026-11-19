@@ -47,20 +47,7 @@ export async function releaseJehoSessionAdvisoryLock(
   runner: QueryRunner,
   lockId: number,
 ): Promise<void> {
-  try {
-    const rows = await runner.query(
-      'SELECT pg_advisory_unlock($1, $2) AS unlocked',
-      [JEHO_SCHEMA_LOCK_NAMESPACE, lockId],
-    );
-    if (rows?.[0]?.unlocked !== true) {
-      throw new Error(`JEHO PostgreSQL advisory lock ${lockId} was not released by its owning session.`);
-    }
-  } catch (error) {
-    // Session advisory locks survive transactions. Never return a connection to
-    // the pool if it may still own a JEHO lock.
-    await discardPostgresRunner(runner, error);
-    throw error;
-  }
+  await releaseJehoAdvisoryLock(runner, JEHO_SCHEMA_LOCK_NAMESPACE, lockId);
 }
 
 let localLockHeld = false;
