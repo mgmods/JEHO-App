@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 import {
   AgentLedgerType,
   AgentRecharge,
@@ -140,17 +141,16 @@ export class RechargeAgentsService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      await this.dataSource.query(
-        `ALTER TABLE withdraw_requests ADD COLUMN IF NOT EXISTS "agentId" UUID`,
-      );
-      await this.dataSource.query(
-        `ALTER TABLE agency_members ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`,
-      );
-      await this.dataSource.query(
-        `CREATE INDEX IF NOT EXISTS "idx_withdraw_requests_agent" ON withdraw_requests("agentId")`,
-      );
-    } catch {
-      /* column may already exist */
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        await manager.query(`ALTER TABLE withdraw_requests ADD COLUMN IF NOT EXISTS "agentId" UUID`);
+        await manager.query(`ALTER TABLE agency_members ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`);
+        await manager.query(`CREATE INDEX IF NOT EXISTS "idx_withdraw_requests_agent" ON withdraw_requests("agentId")`);
+      });
+    } catch (error) {
+      this.logger.warn(`Recharge-agent schema migration deferred: ${error instanceof Error ? error.message : String(error)}`);
     }
     try {
       // Soft-upgrade legacy default agent wholesale ($0.009 / fee $20) → v3 defaults.
