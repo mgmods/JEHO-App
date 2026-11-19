@@ -71,6 +71,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async ensureMysteriousModeColumn(): Promise<void> {
+    if (this.mysteriousModeColumnReady) return;
     const runner = this.dataSource.createQueryRunner();
     let locked = false;
     try {
@@ -83,6 +84,8 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
         'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
       );
       this.mysteriousModeColumnReady = true;
+      if (this.mysteriousModeSchemaTimer) clearInterval(this.mysteriousModeSchemaTimer);
+      this.mysteriousModeSchemaTimer = undefined;
     } catch (error) {
       this.logger.warn(`Mysterious Mode column check deferred: ${error?.message || error}`);
     } finally {
