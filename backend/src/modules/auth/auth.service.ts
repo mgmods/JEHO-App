@@ -524,8 +524,135 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         if (!missing.length) break;
         for (const user of missing) {
           const publicId = await this.allocatePublicId();
-          await this.usersRepo.update(user.id, { publicId });
-          updated += 1;
+          const result = await this.usersRepo.createQueryBuilder()
+            .update(User)
+            .set({ publicId })
+            .where('id = :id', { id: user.id })
+            .andWhere('("publicId" IS NULL OR "publicId" = :empty OR "publicId" !~ :pattern)', {
+              empty: '',
+              pattern: '^[0-9]{3,12}
+        }
+      }
+      if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+      this.publicIdSchemaRetryTimer = null;
+      if (updated > 0) this.logger.log(`Allocated numeric public IDs for ${updated} existing user(s)`);
+      return { updated };
+    } catch (error) {
+      this.logger.warn(`Public ID backfill deferred: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.publicIdSchemaRetryTimer) {
+        this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
+        this.publicIdSchemaRetryTimer.unref?.();
+      }
+      return { updated };
+    } finally {
+      if (lockAcquired) await runner.query('SELECT pg_advisory_unlock(741902611, 2006)').catch(() => undefined);
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+      this.publicIdBackfillRunning = false;
+    }
+  }
+  onModuleDestroy(): void {
+    if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+    this.publicIdSchemaRetryTimer = null;
+  }
+  private async issueTokens(user: User) {
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Account is restricted');
+    }
+    if (!user.publicId) {
+      user.publicId = await this.allocatePublicId();
+      await this.usersRepo.update(user.id, { publicId: user.publicId });
+    }
+    const staffRole = normalizeStaffRole(user);
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      publicId: user.publicId,
+      isAdmin: staffRole === 'super',
+      staffRole,
+      role: staffRole === 'super' ? 'admin' : 'user',
+      isGuest: user.isGuest,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('app.jwt.secret'),
+      expiresIn: this.configService.get<string>('app.jwt.expiresIn'),
+    });
+
+    const refreshToken = await this.jwtService.signAsync(
+      { sub: user.id },
+      {
+        secret: this.configService.get<string>('app.jwt.refreshSecret'),
+        expiresIn: this.configService.get<string>('app.jwt.refreshExpiresIn'),
+      },
+    );
+
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    await this.usersRepo.update(user.id, { refreshTokenHash });
+
+    const now = new Date();
+    // Include the persisted profile snapshot in the login response. The app must
+    // not mistake a returning account for a new account when /users/me is briefly
+    // unavailable immediately after authentication.
+    let profile = await this.profilesRepo.findOne({ where: { userId: user.id } });
+    if (!profile) {
+      profile = await this.profilesRepo.save(
+        this.profilesRepo.create({ userId: user.id }),
+      );
+    }
+    const vip = await this.userVipsRepo.findOne({
+      where: { userId: user.id, isActive: true },
+      order: { level: 'DESC' },
+    });
+    const vipLevel =
+      vip && (!vip.expiresAt || vip.expiresAt > now) ? Number(vip.level || 0) : 0;
+
+    return {
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer',
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        username: user.username,
+        publicId: user.publicId,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        coverUrl: profile.coverUrl,
+        bio: profile.bio,
+        gender: user.gender,
+        birthday: user.birthday,
+        country: profile.country,
+        countryChangedAt: profile.countryChangedAt,
+        city: profile.city,
+        language: profile.language,
+        interests: profile.interests || [],
+        albumUrls: profile.albumUrls || [],
+        showOnlineStatus: profile.showOnlineStatus,
+        allowDmFromStrangers: profile.allowDmFromStrangers,
+        dmGiftGateEnabled: profile.dmGiftGateEnabled,
+        dmRequiredGiftId: profile.dmRequiredGiftId,
+        level: user.level,
+        vipLevel,
+        isGuest: user.isGuest,
+        isAdmin: user.isAdmin || staffRole === 'super',
+        staffRole,
+        dashboardPermissions: user.dashboardPermissions || null,
+      },
+    };
+  }
+
+  private hashOtp(code: string): string {
+    return createHash('sha256').update(code).digest('hex');
+  }
+}
+
+,
+            })
+            .execute();
+          updated += Number(result.affected || 0);
         }
       }
       if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
