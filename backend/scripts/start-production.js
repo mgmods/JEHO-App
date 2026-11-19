@@ -1,5 +1,6 @@
 const { Client } = require('pg');
 const { spawn } = require('child_process');
+const { inspectJehoSchemaForProvisioning } = require('./jeho-empty-schema-guard');
 
 function logDatabaseConfiguration() {
   console.log('[JEHO-OWN startup] Database configuration:', JSON.stringify({
@@ -95,27 +96,12 @@ async function provisionEmptyProductionSchemaIfRequested() {
     }
 
     await client.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
-    const markerExists = await client.query(
-      "SELECT to_regclass('"jeho_own"."__jeho_provision_state"') IS NOT NULL AS exists",
-    );
+    const schemaState = await inspectJehoSchemaForProvisioning(client);
 
-    if (!markerExists.rows[0]?.exists) {
-      const objects = await client.query(`
-        SELECT
-          (SELECT count(*)::int FROM pg_class c
-             JOIN pg_namespace n ON n.oid = c.relnamespace
-             WHERE n.nspname = 'jeho_own'
-               AND c.relkind IN ('r','p','v','m','S','f')) AS relations,
-          (SELECT count(*)::int FROM pg_type t
-             JOIN pg_namespace n ON n.oid = t.typnamespace
-             WHERE n.nspname = 'jeho_own'
-               AND t.typtype IN ('e','d','r')) AS custom_types
-      `);
-      const relations = Number(objects.rows[0]?.relations || 0);
-      const customTypes = Number(objects.rows[0]?.custom_types || 0);
-      if (relations !== 0 || customTypes !== 0) {
+    if (!schemaState.markerExists) {
+      if (!schemaState.isEmpty) {
         throw new Error(
-          `Refusing first-install provisioning: jeho_own is not empty (relations=${relations}, customTypes=${customTypes}) and has no JEHO provisioning marker. Existing/partial data is preserved.`,
+          `Refusing first-install provisioning: jeho_own is not empty (relations=${schemaState.relations}, customTypes=${schemaState.customTypes}) and has no JEHO provisioning marker. Existing/partial data is preserved.`,
         );
       }
       await client.query(`
@@ -131,14 +117,11 @@ async function provisionEmptyProductionSchemaIfRequested() {
       );
       console.log('[JEHO-OWN startup] Verified empty app schema; created first-install marker.');
     } else {
-      const state = await client.query(
-        'SELECT status FROM "jeho_own"."__jeho_provision_state" WHERE id = 1',
-      );
-      if (state.rows[0]?.status === 'complete') {
+      if (schemaState.status === 'complete') {
         console.log('[JEHO-OWN startup] First-install provisioning already complete; no schema changes requested.');
         return false;
       }
-      if (state.rows[0]?.status !== 'running') {
+      if (schemaState.status !== 'running') {
         throw new Error('JEHO provisioning marker is invalid; refusing automatic schema changes.');
       }
       console.warn('[JEHO-OWN startup] Resuming an interrupted, explicitly marked first-install seed.');
@@ -190,14 +173,8 @@ async function databaseIsReady() {
         };
     client = new Client({ ...connection, connectionTimeoutMillis: 8000, query_timeout: 10000 });
     await client.connect();
-    const provisioningMarker = await client.query(
-      "SELECT to_regclass('"jeho_own"."__jeho_provision_state"') IS NOT NULL AS exists",
-    );
-    if (provisioningMarker.rows[0]?.exists) {
-      const state = await client.query(
-        'SELECT status FROM "jeho_own"."__jeho_provision_state" WHERE id = 1',
-      );
-      if (state.rows[0]?.status !== 'complete') {
+    const schemaState = await inspectJehoSchemaForProvisioning(client);
+    if (schemaState.markerExists && schemaState.status !== 'complete') {
         console.error('[JEHO-OWN startup] First-install provisioning is incomplete; refusing to start API.');
         return null;
       }
