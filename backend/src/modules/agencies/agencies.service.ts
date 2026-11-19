@@ -238,7 +238,7 @@ export class AgenciesService implements OnModuleInit, OnModuleDestroy {
       // Normalize existing agency display IDs without changing valid IDs.
       const agencies = await runner.query('SELECT id, "publicId" FROM agencies');
       for (const agency of agencies as Array<{ id: string; publicId: string | null }>) {
-        if (agency.publicId && /^\\d{6}$/.test(String(agency.publicId))) continue;
+        if (agency.publicId && /^\d{6}$/.test(String(agency.publicId))) continue;
         let candidate = '';
         for (let attempt = 0; attempt < 40; attempt++) {
           const next = String(100000 + Math.floor(Math.random() * 900000));
