@@ -183,7 +183,7 @@ const entityList = Object.values(entities).filter(
               await schemaLockRunner.connect();
               await schemaLockRunner.query("SET lock_timeout = '3s'");
               await schemaLockRunner.query("SET statement_timeout = '90s'");
-              for (let attempt = 0; attempt < 15 && !schemaLockAcquired; attempt += 1) {
+              for (let attempt = 0; attempt < 60 && !schemaLockAcquired; attempt += 1) {
                 const lockRows = await schemaLockRunner.query(
                   'SELECT pg_try_advisory_lock($1, $2) AS locked',
                   [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
