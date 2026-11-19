@@ -276,10 +276,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
             await runner.query(`ALTER TABLE room_moderators ALTER COLUMN "appointedById" DROP NOT NULL`);
           } catch (err) {
             this.log.warn(
-              `rooms column ensure skipped: ${
+              `rooms column ensure deferred; retry will run: ${
                 err instanceof Error ? err.message : String(err)
               }`,
             );
+            throw err;
           }
           // Personal rooms are durable room identities, not temporary live-session records.
           // Repair older active personal rooms once at boot so a stale idle marker or a legacy
@@ -296,7 +297,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
                  AND "hostId" IS NOT NULL
             `, [RoomKind.STANDARD, RoomStatus.CLOSED]);
           } catch (err) {
-            this.log.warn(`ensure persistent personal rooms: ${err instanceof Error ? err.message : String(err)}`);
+            this.log.warn(`ensure persistent personal rooms deferred; retry will run: ${err instanceof Error ? err.message : String(err)}`);
+            throw err;
           }
       }
       this.roomSchemaBootstrapReady = true;
