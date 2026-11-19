@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
@@ -34,7 +34,7 @@ const SEED_CATALOG: Array<{ publicId: string; priceCoins: number }> = [
 ];
 
 @Injectable()
-export class VanityIdsService implements OnModuleInit {
+export class VanityIdsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(VanityIdsService.name);
   private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -102,6 +102,10 @@ export class VanityIdsService implements OnModuleInit {
     } catch (e) {
       this.log.warn(`vanity seed skipped: ${e instanceof Error ? e.message : String(e)}`);
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
+  }
+  onModuleDestroy(): void {
     if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
     this.schemaRetryTimer = null;
   }
