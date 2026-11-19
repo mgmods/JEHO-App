@@ -36,6 +36,7 @@ const SEED_CATALOG: Array<{ publicId: string; priceCoins: number }> = [
 @Injectable()
 export class VanityIdsService implements OnModuleInit {
   private readonly log = new Logger(VanityIdsService.name);
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(VanityId)
@@ -43,7 +44,11 @@ export class VanityIdsService implements OnModuleInit {
     private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeSchemaAndCatalog();
+  }
+
+  private async initializeSchemaAndCatalog(): Promise<void> {
     try {
       await this.dataSource.transaction(async (manager) => {
         await manager.query("SET LOCAL lock_timeout = '250ms'");
@@ -57,6 +62,11 @@ export class VanityIdsService implements OnModuleInit {
       });
     } catch (e) {
       this.log.warn(`Vanity ID schema migration deferred: ${e instanceof Error ? e.message : String(e)}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndCatalog(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
     }
     try {
       let added = 0;
@@ -89,5 +99,7 @@ export class VanityIdsService implements OnModuleInit {
         `vanity seed skipped: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 }
