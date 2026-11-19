@@ -50,7 +50,6 @@ import { EconomyModule } from './modules/economy/economy.module';
 import { User } from './database/entities/user.entity';
 import { AdminUser } from './database/entities/admin-user.entity';
 import { ensureBadgeTables } from './database/badges-bootstrap';
-import { ensureCpTables } from './database/cp-bootstrap';
 import { ensureVanityIdStyleColumns } from './database/vanity-id-style-bootstrap';
 import { ensureMomentsTables } from './database/moments-bootstrap';
 import { ensureUserProfileColumns } from './database/user-profile-bootstrap';
@@ -270,6 +269,12 @@ const entityList = Object.values(entities).filter(
                 blocker.usename AS blocker_user,
                 blocker.application_name AS blocker_application,
                 blocker.state AS blocker_state,
+                blocker.wait_event_type AS blocker_wait_event_type,
+                blocker.wait_event AS blocker_wait_event,
+                blocker.xact_start AS blocker_xact_start,
+                now() - blocker.xact_start AS blocker_transaction_age,
+                blocker.backend_xid AS blocker_backend_xid,
+                pg_blocking_pids(blocker.pid) AS blocker_blocked_by,
                 now() - blocker.query_start AS blocker_query_age,
                 left(blocker.query, 240) AS blocker_query
               FROM pg_stat_activity AS blocked
@@ -305,12 +310,10 @@ const entityList = Object.values(entities).filter(
           );
         }
 
-        // Create only missing CP tables/indexes for older deployments; preserve all existing rows.
-        console.log('[JEHO-OWN DB STEP] CP bootstrap: start');
-        // CP schema is required by CP routes. Never report a healthy API while
-        // silently skipping its schema bootstrap; bounded locks make failure fast.
-        await ensureCpTables(appDataSource);
-        console.log('[JEHO-OWN DB STEP] CP bootstrap: complete');
+        // CP schema bootstrap is deliberately owned by CpService after Nest has
+        // initialized. A PostgreSQL DDL lock must never prevent the HTTP API from
+        // binding its port; CP routes are guarded until the additive bootstrap and
+        // unified-relationship migration have both completed.
 
         // Additive vanity-ID style columns; existing IDs, purchases and leases are preserved.
         console.log('[JEHO-OWN DB STEP] vanity ID bootstrap: start');
