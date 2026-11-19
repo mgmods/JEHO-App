@@ -142,7 +142,7 @@ const entityList = Object.values(entities).filter(
         try {
           // Serialize even the pre-DataSource extension/schema DDL with every
           // other JEHO migration. This uses the same key on this pinned session.
-          await bootstrap.query("SET lock_timeout = '3s'");
+          await bootstrap.query("SET lock_timeout = '250ms'");
           await bootstrap.query("SET statement_timeout = '8s'");
           for (let attempt = 0; attempt < 30 && !bootstrapLockAcquired; attempt += 1) {
             const lockRows = await bootstrap.query(
@@ -207,7 +207,7 @@ const entityList = Object.values(entities).filter(
             let schemaLockAcquired = false;
             try {
               await schemaLockRunner.connect();
-              await schemaLockRunner.query("SET lock_timeout = '3s'");
+              await schemaLockRunner.query("SET lock_timeout = '250ms'");
               await schemaLockRunner.query("SET statement_timeout = '90s'");
               for (let attempt = 0; attempt < 60 && !schemaLockAcquired; attempt += 1) {
                 const lockRows = await schemaLockRunner.query(
@@ -250,7 +250,7 @@ const entityList = Object.values(entities).filter(
             const customGiftGrantsRunner = appDataSource.createQueryRunner();
             try {
               await customGiftGrantsRunner.connect();
-              await customGiftGrantsRunner.query("SET lock_timeout = '3s'");
+              await customGiftGrantsRunner.query("SET lock_timeout = '250ms'");
               await customGiftGrantsRunner.query("SET statement_timeout = '8s'");
               console.log('[JEHO-OWN DB STEP] custom_gift_grants table: start');
               await customGiftGrantsRunner.query(`
@@ -297,7 +297,7 @@ const entityList = Object.values(entities).filter(
             const giftExpiryRunner = appDataSource.createQueryRunner();
             try {
               await giftExpiryRunner.connect();
-              await giftExpiryRunner.query("SET lock_timeout = '3s'");
+              await giftExpiryRunner.query("SET lock_timeout = '250ms'");
               await giftExpiryRunner.query("SET statement_timeout = '8s'");
               console.log('[JEHO-OWN DB STEP] gift_sends expiresAt column: start');
               await giftExpiryRunner.query(
