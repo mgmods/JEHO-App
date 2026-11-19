@@ -126,7 +126,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       await manager.query("SET LOCAL lock_timeout = '15s'");
       await manager.query("SET LOCAL statement_timeout = '30s'");
       await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
-      await manager.query("SET LOCAL lock_timeout = '3s'");
+      await manager.query("SET LOCAL lock_timeout = '250ms'");
 
       const rows = await manager.query(
         `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%'`,
