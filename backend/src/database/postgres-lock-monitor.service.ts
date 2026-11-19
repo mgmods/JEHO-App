@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock, releaseJehoAdvisoryLock } from './schema-migration-lock';
 
 /**
- * Lightweight, cluster-serialized diagnostics for PostgreSQL lock queues.
+ * Lightweight, cluster-serialized diagnostics for PostgreSQL lock queues (sampled every 10 seconds).
  * It does not terminate sessions or mutate application data. The output names
  * the blocked query and its actual blocker so production lock incidents can be
  * fixed from evidence instead of guessing from lock_timeout messages.
