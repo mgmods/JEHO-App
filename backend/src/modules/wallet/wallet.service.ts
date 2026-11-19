@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -90,18 +91,15 @@ export class WalletService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      await this.dataSource.query(
-        `ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "traderDiamonds" BIGINT NOT NULL DEFAULT 0`,
-      );
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        await manager.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "traderDiamonds" BIGINT NOT NULL DEFAULT 0`);
+        await manager.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "agencyDiamonds" BIGINT NOT NULL DEFAULT 0`);
+      });
     } catch (err) {
-      this.logger.warn(`ensure traderDiamonds: ${(err as Error).message}`);
-    }
-    try {
-      await this.dataSource.query(
-        `ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "agencyDiamonds" BIGINT NOT NULL DEFAULT 0`,
-      );
-    } catch (err) {
-      this.logger.warn(`ensure agencyDiamonds: ${(err as Error).message}`);
+      this.logger.warn(`Wallet schema migration deferred: ${(err as Error).message}`);
     }
     try {
       // Retire silver: fold any remaining balance into gold coins and zero the column.
