@@ -6,6 +6,7 @@ import {
   Inject,
   forwardRef,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -85,11 +86,13 @@ const DEFAULT_LUCKY_ODDS_CONFIG: LuckyOddsConfig = {
 };
 
 @Injectable()
-export class GiftsService implements OnModuleInit {
+export class GiftsService implements OnModuleInit, OnModuleDestroy {
   private giftSchemaBootstrapTimer: ReturnType<typeof setInterval> | null = null;
   private giftSchemaBootstrapRunning = false;
   private giftSchemaBootstrapReady = false;
   private giftSchemaBootstrapFailed = false;
+  private giftInitializationRunning = false;
+  private giftInitializationComplete = false;
 
   private readonly log = new Logger(GiftsService.name);
   private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
@@ -150,29 +153,65 @@ export class GiftsService implements OnModuleInit {
   }
 
   private async initializeGifts(): Promise<void> {
-    // Schema-only fix is always safe. Catalog seeds never run against live DB.
-    await this.runGiftSchemaBootstrap();
-    if (!this.giftSchemaBootstrapReady && !this.giftSchemaBootstrapTimer) {
-      this.giftSchemaBootstrapTimer = setInterval(() => {
-        void this.runGiftSchemaBootstrap();
-      }, 30_000);
-      this.giftSchemaBootstrapTimer.unref?.();
+    if (this.giftInitializationRunning || this.giftInitializationComplete) return;
+    this.giftInitializationRunning = true;
+    const runner = this.dataSource.createQueryRunner();
+    let maintenanceLockAcquired = false;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '60s'");
+      const lockRows = await runner.query('SELECT pg_try_advisory_lock(741902611, 2007) AS locked');
+      maintenanceLockAcquired = lockRows?.[0]?.locked === true;
+      if (!maintenanceLockAcquired) {
+        this.scheduleGiftInitializationRetry();
+        return;
+      }
+      // Do not run catalog repair against a partially upgraded schema.
+      await this.runGiftSchemaBootstrap();
+      if (!this.giftSchemaBootstrapReady) {
+        this.scheduleGiftInitializationRetry();
+        return;
+      }
+      await this.ensureDefaultGiftCategories();
+      await this.healZeroDiamondCatalog();
+      await this.normalizeGiftEconomyCatalog();
+      await this.ensureJehoPublicBranding();
+      if (bootCatalogSeedEnabled()) {
+        await this.ensureDefaultLuckyGift();
+        await this.ensureMikooGiftTabs();
+      } else {
+        this.log.log('Gifts catalog: DB authoritative (economy normalize always runs)');
+      }
+      this.giftInitializationComplete = true;
+      if (this.giftSchemaBootstrapTimer) clearInterval(this.giftSchemaBootstrapTimer);
+      this.giftSchemaBootstrapTimer = null;
+    } catch (error) {
+      this.log.warn(`Gift startup maintenance deferred: ${error instanceof Error ? error.message : String(error)}`);
+      this.scheduleGiftInitializationRetry();
+    } finally {
+      if (maintenanceLockAcquired) {
+        await runner.query('SELECT pg_advisory_unlock(741902611, 2007)').catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+      this.giftInitializationRunning = false;
     }
-    await this.ensureDefaultGiftCategories();
-    // Critical: zero diamondValue + Math.min() previously awarded 0 diamonds on paid gifts.
-    await this.healZeroDiamondCatalog();
-    // Gift-first economy: diamondValue per gift, nice panel tabs, drop catalog junk.
-    await this.normalizeGiftEconomyCatalog();
-    // Always rewrite competitor brand text in gift titles/descriptions for app UI.
-    await this.ensureJehoPublicBranding();
-    if (!bootCatalogSeedEnabled()) {
-      this.log.log('Gifts catalog: DB authoritative (economy normalize always runs)');
-      return;
-    }
-    await this.ensureDefaultLuckyGift();
-    await this.ensureMikooGiftTabs();
   }
 
+  private scheduleGiftInitializationRetry(): void {
+    if (this.giftSchemaBootstrapTimer) return;
+    this.giftSchemaBootstrapTimer = setInterval(() => void this.initializeGifts(), 30_000);
+    this.giftSchemaBootstrapTimer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.giftSchemaBootstrapTimer) clearInterval(this.giftSchemaBootstrapTimer);
+    if (this.roomTopCardsRefreshTimer) clearTimeout(this.roomTopCardsRefreshTimer);
+    this.giftSchemaBootstrapTimer = null;
+    this.roomTopCardsRefreshTimer = null;
+  }
   private async runGiftSchemaBootstrap(): Promise<void> {
     if (this.giftSchemaBootstrapRunning || this.giftSchemaBootstrapReady) return;
     this.giftSchemaBootstrapRunning = true;
