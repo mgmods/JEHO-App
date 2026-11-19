@@ -10,8 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock } from '../../database/schema-migration-lock';
-import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -124,7 +123,7 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '30s'");
-      maintenanceLockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.walletStartup);
+      maintenanceLockAcquired = await tryAcquireJehoSchemaLock(runner);
       if (!maintenanceLockAcquired) {
         // Another replica is performing the shared repair. Retry later in case
         // that process exits before completing the idempotent conversion.
@@ -155,7 +154,7 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       }
     } finally {
       if (maintenanceLockAcquired) {
-        if (maintenanceLockAcquired) await releaseJehoAdvisoryLock(runner, JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_ADVISORY_LOCKS.walletStartup).catch((unlockError) => this.logger.error(`Wallet maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
+        if (maintenanceLockAcquired) await releaseJehoSchemaLock(runner).catch((unlockError) => this.logger.error(`Wallet maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
