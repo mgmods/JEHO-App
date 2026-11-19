@@ -67,6 +67,7 @@ const DEFAULT_PACKAGES = STANDARD_RECHARGE_PACKAGES.map((p) => ({ ...p }));
 @Injectable()
 export class WalletService implements OnModuleInit {
   private readonly logger = new Logger(WalletService.name);
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
@@ -89,7 +90,11 @@ export class WalletService implements OnModuleInit {
     @Optional() private readonly hostTarget?: HostTargetService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeSchemaAndCatalog();
+  }
+
+  private async initializeSchemaAndCatalog(): Promise<void> {
     try {
       await this.dataSource.transaction(async (manager) => {
         await manager.query("SET LOCAL lock_timeout = '250ms'");
@@ -100,6 +105,11 @@ export class WalletService implements OnModuleInit {
       });
     } catch (err) {
       this.logger.warn(`Wallet schema migration deferred: ${(err as Error).message}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndCatalog(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
     }
     try {
       // Retire silver: fold any remaining balance into gold coins and zero the column.
@@ -119,6 +129,8 @@ export class WalletService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`ensureCanonicalPackages: ${(err as Error).message}`);
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   /** Force-safe packages if missing, outdated version, or fat density (owner-risk). */
