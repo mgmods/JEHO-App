@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from './schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from './schema-migration-lock';
 
 /**
  * Additive CP schema bootstrap for older deployments.
@@ -23,18 +23,21 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
     );
   }
 
-  await dataSource.transaction(async (manager) => {
-    // Serialize concurrent app instances. Give an in-flight deployment a bounded
-    // window to finish, then restore the shorter DDL lock timeout.
-    await manager.query("SET LOCAL lock_timeout = '250ms'");
-    await manager.query("SET LOCAL statement_timeout = '30s'");
-    const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
-    if (lockRows?.[0]?.locked !== true) {
+  // Run additive DDL as separate autocommit statements. A single large transaction
+  // retains AccessExclusive table locks until every CP table/index step completes,
+  // which can queue ordinary API SELECTs behind a waiting ALTER TABLE.
+  const runner = dataSource.createQueryRunner();
+  let lockAcquired = false;
+  try {
+    await runner.connect();
+    await runner.query("SET lock_timeout = '250ms'");
+    await runner.query("SET statement_timeout = '30s'");
+    lockAcquired = await tryAcquireJehoSchemaLock(runner);
+    if (!lockAcquired) {
       throw new Error('[CpBootstrap] JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
     }
-    await manager.query("SET LOCAL lock_timeout = '3s'");
 
-    await manager.query(`
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_relationships" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "userAId" uuid NOT NULL REFERENCES "jeho_own"."users"(id) ON DELETE CASCADE,
@@ -51,7 +54,7 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
         CHECK ("userAId" <> "userBId")
       )
     `);
-    await manager.query(`
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_requests" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "fromUserId" uuid NOT NULL,
@@ -75,19 +78,19 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
       )
     `);
     // Bring forward older CP request tables without touching existing rows.
-    await manager.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "giftId" uuid NULL');
-    await manager.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "giftName" varchar(160) NULL');
-    await manager.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "giftIconUrl" varchar(512) NULL');
-    await manager.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "giftAnimationUrl" varchar(512) NULL');
-    await manager.query('ALTER TABLE "jeho_own"."cp_requests" ALTER COLUMN "roomId" DROP NOT NULL');
-    await manager.query('ALTER TABLE "jeho_own"."cp_requests" ALTER COLUMN "priceCoins" DROP NOT NULL');
+    await runner.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "giftId" uuid NULL');
+    await runner.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "giftName" varchar(160) NULL');
+    await runner.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "giftIconUrl" varchar(512) NULL');
+    await runner.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "giftAnimationUrl" varchar(512) NULL');
+    await runner.query('ALTER TABLE "jeho_own"."cp_requests" ALTER COLUMN "roomId" DROP NOT NULL');
+    await runner.query('ALTER TABLE "jeho_own"."cp_requests" ALTER COLUMN "priceCoins" DROP NOT NULL');
 
-    await manager.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "cpPoints" bigint NULL');
-    await manager.query('ALTER TABLE "jeho_own"."user_profiles" ADD COLUMN IF NOT EXISTS "cpBackgroundUrl" varchar(512)');
-    await manager.query('ALTER TABLE "jeho_own"."user_profiles" ADD COLUMN IF NOT EXISTS "cpLogoUrl" varchar(512)');
+    await runner.query('ALTER TABLE "jeho_own"."cp_requests" ADD COLUMN IF NOT EXISTS "cpPoints" bigint NULL');
+    await runner.query('ALTER TABLE "jeho_own"."user_profiles" ADD COLUMN IF NOT EXISTS "cpBackgroundUrl" varchar(512)');
+    await runner.query('ALTER TABLE "jeho_own"."user_profiles" ADD COLUMN IF NOT EXISTS "cpLogoUrl" varchar(512)');
 
     // CP-only cosmetic enum values are additive and safe to re-apply.
-    const cosmeticEnumRows = await manager.query(
+    const cosmeticEnumRows = await runner.query(
       `SELECT n.nspname, t.typname
        FROM pg_type t
        JOIN pg_attribute a ON a.atttypid=t.oid
@@ -100,11 +103,11 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
     const enumSchema = String(cosmeticEnumRows?.[0]?.nspname || '').replace(/"/g, '""');
     const enumName = String(cosmeticEnumRows?.[0]?.typname || '').replace(/"/g, '""');
     if (enumSchema && enumName) {
-      await manager.query(`ALTER TYPE "${enumSchema}"."${enumName}" ADD VALUE IF NOT EXISTS 'cp_background'`);
-      await manager.query(`ALTER TYPE "${enumSchema}"."${enumName}" ADD VALUE IF NOT EXISTS 'cp_logo'`);
+      await runner.query(`ALTER TYPE "${enumSchema}"."${enumName}" ADD VALUE IF NOT EXISTS 'cp_background'`);
+      await runner.query(`ALTER TYPE "${enumSchema}"."${enumName}" ADD VALUE IF NOT EXISTS 'cp_logo'`);
     }
 
-    await manager.query(`
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_memories" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "relationshipId" uuid NOT NULL REFERENCES "jeho_own"."cp_relationships"(id) ON DELETE CASCADE,
@@ -114,7 +117,7 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
         "createdAt" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await manager.query(`
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_level_reward_claims" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "relationshipId" uuid NOT NULL REFERENCES "jeho_own"."cp_relationships"(id) ON DELETE CASCADE,
@@ -127,7 +130,7 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
         UNIQUE ("relationshipId", level, "userId", "cosmeticCode")
       )
     `);
-    await manager.query(`
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_level_gift_reward_claims" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "relationshipId" uuid NOT NULL REFERENCES "jeho_own"."cp_relationships"(id) ON DELETE CASCADE,
@@ -140,9 +143,9 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
         UNIQUE ("relationshipId", level, "userId", "giftId")
       )
     `);
-    await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_memories_relationship_created ON "jeho_own"."cp_memories"("relationshipId", "createdAt" DESC)');
+    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_memories_relationship_created ON "jeho_own"."cp_memories"("relationshipId", "createdAt" DESC)');
 
-    await manager.query(`
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_audit_logs" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "adminUserId" uuid NULL REFERENCES "jeho_own"."users"(id) ON DELETE SET NULL,
@@ -153,7 +156,7 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
         "createdAt" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await manager.query(`
+    await runner.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."cp_point_events" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "relationshipId" uuid NOT NULL REFERENCES "jeho_own"."cp_relationships"(id) ON DELETE CASCADE,
@@ -169,7 +172,7 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
 
     // Normalize only a single-column CHECK on the type column. Never drop
     // compound or unrelated checks. Skip tables already accepting relationship.
-    await manager.query(`DO $$
+    await runner.query(`DO $$
     DECLARE
       target record;
       item record;
@@ -235,14 +238,21 @@ export async function ensureCpTables(dataSource: DataSource): Promise<void> {
     END;
     $$`);
 
-    await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_type_status_points ON "jeho_own"."cp_relationships"(type,status,points DESC)');
-    await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_a_status ON "jeho_own"."cp_relationships"("userAId",status)');
-    await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_b_status ON "jeho_own"."cp_relationships"("userBId",status)');
-    await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_request_recipient_status_expiry ON "jeho_own"."cp_requests"("toUserId",status,"expiresAt")');
-    await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_request_sender_status ON "jeho_own"."cp_requests"("fromUserId",status)');
-    await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_audit_created_at ON "jeho_own"."cp_audit_logs"("createdAt" DESC)');
-    await manager.query('CREATE INDEX IF NOT EXISTS idx_cp_point_events_relationship_created ON "jeho_own"."cp_point_events"("relationshipId","createdAt" DESC)');
-  });
+    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_type_status_points ON "jeho_own"."cp_relationships"(type,status,points DESC)');
+    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_a_status ON "jeho_own"."cp_relationships"("userAId",status)');
+    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_b_status ON "jeho_own"."cp_relationships"("userBId",status)');
+    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_request_recipient_status_expiry ON "jeho_own"."cp_requests"("toUserId",status,"expiresAt")');
+    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_request_sender_status ON "jeho_own"."cp_requests"("fromUserId",status)');
+    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_audit_created_at ON "jeho_own"."cp_audit_logs"("createdAt" DESC)');
+    await runner.query('CREATE INDEX IF NOT EXISTS idx_cp_point_events_relationship_created ON "jeho_own"."cp_point_events"("relationshipId","createdAt" DESC)');
+  } finally {
+    if (lockAcquired) {
+      await releaseJehoSchemaLock(runner).catch(() => undefined);
+    }
+    await runner.query('RESET lock_timeout').catch(() => undefined);
+    await runner.query('RESET statement_timeout').catch(() => undefined);
+    await runner.release().catch(() => undefined);
+  }
 
-  console.log('[CpBootstrap] CP tables/indexes verified (additive only).');
+  console.log('[CpBootstrap] CP tables/indexes verified (additive, independently committed steps).');
 }
