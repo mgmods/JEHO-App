@@ -47,7 +47,11 @@ export class AuthService implements OnModuleInit {
     private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.ensurePublicIdSchema();
+  }
+
+  private async ensurePublicIdSchema(): Promise<void> {
     try {
       await this.dataSource.transaction(async (manager) => {
         await manager.query("SET LOCAL lock_timeout = '250ms'");
@@ -61,7 +65,7 @@ export class AuthService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`publicId column ensure deferred; will retry safely: ${(err as Error).message}`);
       if (!this.publicIdSchemaRetryTimer) {
-        this.publicIdSchemaRetryTimer = setInterval(() => void this.onModuleInit(), 30_000);
+        this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
         this.publicIdSchemaRetryTimer.unref?.();
       }
       return;
