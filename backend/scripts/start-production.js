@@ -172,24 +172,48 @@ async function terminateStaleJehoSessions() {
     // intentionally scoped by application_name and current database/user; it
     // never touches unrelated PostgreSQL services.
     const result = await client.query(`
-      SELECT pg_terminate_backend(pid) AS terminated
-      FROM pg_stat_activity
-      WHERE pid <> pg_backend_pid()
-        AND datname = current_database()
-        AND usename = current_user
-        AND application_name IN ('jeho-own-api', 'jeho-own-bootstrap')
-        AND state <> 'idle'
+      SELECT
+        activity.pid,
+        activity.application_name,
+        activity.state,
+        pg_terminate_backend(activity.pid) AS terminated
+      FROM pg_stat_activity AS activity
+      WHERE activity.pid <> pg_backend_pid()
+        AND activity.datname = current_database()
+        AND activity.usename = current_user
+        AND activity.application_name IN ('jeho-own-api', 'jeho-own-bootstrap')
         AND (
-          xact_start IS NOT NULL
-          OR wait_event_type = 'Lock'
-          OR state IN ('active','idle in transaction','idle in transaction (aborted)')
+          -- A session-level advisory migration lock can remain held while its
+          -- connection is merely "idle". The previous state <> 'idle' filter
+          -- missed exactly that failure mode and left every later migration
+          -- waiting forever. Only target JEHO's exact shared lock pair.
+          EXISTS (
+            SELECT 1
+            FROM pg_locks AS held_lock
+            WHERE held_lock.pid = activity.pid
+              AND held_lock.locktype = 'advisory'
+              AND held_lock.granted
+              AND held_lock.classid = 741902611
+              AND held_lock.objid = 99
+              AND held_lock.objsubid = 2
+          )
+          OR (
+            activity.state <> 'idle'
+            AND (
+              activity.xact_start IS NOT NULL
+              OR activity.wait_event_type = 'Lock'
+              OR activity.state IN ('active','idle in transaction','idle in transaction (aborted)')
+            )
+          )
         )
     `);
-    const terminated = result.rows.filter((row) => row.terminated === true).length;
-    if (terminated) {
-      console.warn(`[JEHO-OWN startup] Terminated ${terminated} stale JEHO PostgreSQL session(s) before application startup.`);
+    const terminatedRows = result.rows.filter((row) => row.terminated === true);
+    if (terminatedRows.length) {
+      console.warn('[JEHO-OWN startup] Terminated stale JEHO PostgreSQL session(s) before application startup:', JSON.stringify(
+        terminatedRows.map(({ pid, application_name, state }) => ({ pid, application_name, state })),
+      ));
     } else {
-      console.log('[JEHO-OWN startup] No stale JEHO PostgreSQL sessions found.');
+      console.log('[JEHO-OWN startup] No stale JEHO PostgreSQL sessions or JEHO advisory-lock holders found.');
     }
   } finally {
     await client.end().catch(() => {});
