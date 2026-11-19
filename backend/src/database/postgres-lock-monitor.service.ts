@@ -19,7 +19,7 @@ export class PostgresLockMonitorService implements OnModuleInit, OnModuleDestroy
   constructor(private readonly dataSource: DataSource) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => void this.inspect(), 1_000);
+    this.timer = setInterval(() => void this.inspect(), 10_000);
     this.timer.unref?.();
     void this.inspect();
   }
