@@ -40,6 +40,10 @@ function releaseLocalSchemaLock(): void {
 export async function tryAcquireJehoSchemaLock(
   runner: QueryRunner,
 ): Promise<boolean> {
+  // PostgreSQL session advisory locks are re-entrant; avoid incrementing the
+  // lock count if a caller accidentally asks twice on the same QueryRunner.
+  if (localLockOwners.has(runner)) return true;
+
   await acquireLocalSchemaLock();
   try {
     const rows = await runner.query(
