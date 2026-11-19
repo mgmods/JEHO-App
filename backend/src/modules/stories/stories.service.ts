@@ -123,8 +123,14 @@ export class StoriesService implements OnModuleInit {
     if (now - this.lastExpiryCleanupAt >= 15 * 60 * 1000) {
       this.lastExpiryCleanupAt = now;
       try {
-        await this.db.query(`DELETE FROM "jeho_own"."stories" WHERE id IN
-          (SELECT id FROM "jeho_own"."stories" WHERE "expiresAt" <= now() ORDER BY "expiresAt" LIMIT 250)`);
+        await this.db.transaction(async (manager) => {
+          const lockRows = await manager.query(
+            'SELECT pg_try_advisory_xact_lock(741902611, 2003) AS locked',
+          );
+          if (lockRows?.[0]?.locked !== true) return;
+          await manager.query(`DELETE FROM "jeho_own"."stories" WHERE id IN
+            (SELECT id FROM "jeho_own"."stories" WHERE "expiresAt" <= now() ORDER BY "expiresAt" LIMIT 250)`);
+        });
       } catch (error) {
         this.logger.warn('Expired story cleanup deferred: ' + (error instanceof Error ? error.message : 'unknown error'));
       }

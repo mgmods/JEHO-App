@@ -198,7 +198,13 @@ export class GiftsService implements OnModuleInit {
     return this.dataSource.transaction(async (manager) => {
       await manager.query("SET LOCAL lock_timeout = '250ms'");
       await manager.query("SET LOCAL statement_timeout = '8s'");
-      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+      const lockRows = await manager.query(
+        'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
+        [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+      );
+      if (lockRows?.[0]?.locked !== true) {
+        throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
+      }
       return work(manager);
     });
   }

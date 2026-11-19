@@ -2674,6 +2674,31 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
   /** Server-driven periodic wipe for rooms with chatAutoClearMinutes > 0. */
   private async sweepAutoChatClear() {
+    // This timer runs in every API replica. Use a dedicated PostgreSQL session
+    // lock so only one replica performs room-chat cleanup at a time.
+    const runner = this.dataSource.createQueryRunner();
+    let locked = false;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '15s'");
+      const rows = await runner.query(
+        'SELECT pg_try_advisory_lock(741902611, 2001) AS locked',
+      );
+      locked = rows?.[0]?.locked === true;
+      if (!locked) return;
+      await this.sweepAutoChatClearOnce();
+    } finally {
+      if (locked) {
+        await runner.query('SELECT pg_advisory_unlock(741902611, 2001)').catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+    }
+  }
+
+  private async sweepAutoChatClearOnce() {
     const rooms = await this.roomsRepo
       .createQueryBuilder('room')
       .select([
