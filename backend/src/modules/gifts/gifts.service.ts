@@ -86,6 +86,11 @@ const DEFAULT_LUCKY_ODDS_CONFIG: LuckyOddsConfig = {
 
 @Injectable()
 export class GiftsService implements OnModuleInit {
+  private giftSchemaBootstrapTimer: ReturnType<typeof setInterval> | null = null;
+  private giftSchemaBootstrapRunning = false;
+  private giftSchemaBootstrapReady = false;
+  private giftSchemaBootstrapFailed = false;
+
   private readonly log = new Logger(GiftsService.name);
   private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
   private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
@@ -142,11 +147,13 @@ export class GiftsService implements OnModuleInit {
 
   async onModuleInit() {
     // Schema-only fix is always safe. Catalog seeds never run against live DB.
-    await this.ensureGiftCategoryColumn();
-    await this.ensureGiftBrandAgencyColumn();
-    await this.ensureCpGiftColumns();
-    await this.ensureGiftCategoriesTable();
-    await this.ensureGiftSendIdempotencySchema();
+    await this.runGiftSchemaBootstrap();
+    if (!this.giftSchemaBootstrapReady && !this.giftSchemaBootstrapTimer) {
+      this.giftSchemaBootstrapTimer = setInterval(() => {
+        void this.runGiftSchemaBootstrap();
+      }, 30_000);
+      this.giftSchemaBootstrapTimer.unref?.();
+    }
     await this.ensureDefaultGiftCategories();
     // Critical: zero diamondValue + Math.min() previously awarded 0 diamonds on paid gifts.
     await this.healZeroDiamondCatalog();
@@ -160,6 +167,27 @@ export class GiftsService implements OnModuleInit {
     }
     await this.ensureDefaultLuckyGift();
     await this.ensureMikooGiftTabs();
+  }
+
+  private async runGiftSchemaBootstrap(): Promise<void> {
+    if (this.giftSchemaBootstrapRunning || this.giftSchemaBootstrapReady) return;
+    this.giftSchemaBootstrapRunning = true;
+    this.giftSchemaBootstrapFailed = false;
+    try {
+      await this.ensureGiftCategoryColumn();
+      await this.ensureGiftBrandAgencyColumn();
+      await this.ensureCpGiftColumns();
+      await this.ensureGiftCategoriesTable();
+      await this.ensureGiftSendIdempotencySchema();
+      if (!this.giftSchemaBootstrapFailed) {
+        this.giftSchemaBootstrapReady = true;
+        if (this.giftSchemaBootstrapTimer) clearInterval(this.giftSchemaBootstrapTimer);
+        this.giftSchemaBootstrapTimer = null;
+        this.log.log('Gift schema bootstrap completed under the shared JEHO migration lock.');
+      }
+    } finally {
+      this.giftSchemaBootstrapRunning = false;
+    }
   }
 
   private async withJehoSchemaLock<T>(work: (manager: import('typeorm').EntityManager) => Promise<T>): Promise<T> {
@@ -265,6 +293,7 @@ export class GiftsService implements OnModuleInit {
         await manager.query('CREATE UNIQUE INDEX IF NOT EXISTS uq_gift_sends_request_receiver ON gift_sends ("requestId", "receiverId") WHERE "requestId" IS NOT NULL');
       });
     } catch (err) {
+      this.giftSchemaBootstrapFailed = true;
       this.log.warn('Gift-send idempotency schema setup deferred: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
@@ -275,6 +304,7 @@ export class GiftsService implements OnModuleInit {
         await manager.query(`ALTER TABLE gifts ADD COLUMN IF NOT EXISTS category varchar(32) DEFAULT 'normal'`);
       });
     } catch (err) {
+      this.giftSchemaBootstrapFailed = true;
       this.log.warn(`ensureGiftCategoryColumn deferred: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
@@ -286,6 +316,7 @@ export class GiftsService implements OnModuleInit {
         await manager.query('CREATE INDEX IF NOT EXISTS idx_gifts_brand_agency_id ON gifts ("brandAgencyId")');
       });
     } catch (err) {
+      this.giftSchemaBootstrapFailed = true;
       this.log.warn('ensureGiftBrandAgencyColumn deferred: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
@@ -307,6 +338,7 @@ export class GiftsService implements OnModuleInit {
         }
       });
     } catch (err) {
+      this.giftSchemaBootstrapFailed = true;
       this.log.warn(`ensureCpGiftColumns deferred: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
@@ -329,6 +361,7 @@ export class GiftsService implements OnModuleInit {
         `);
       });
     } catch (err) {
+      this.giftSchemaBootstrapFailed = true;
       this.log.warn(`ensureGiftCategoriesTable deferred: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
