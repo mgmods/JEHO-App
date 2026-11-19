@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 require('ts-node/register');
 const { DataSource } = require('typeorm');
 const { ensureCpTables } = require('../src/database/cp-bootstrap');
+const { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } = require('../src/database/schema-migration-lock');
 const { inspectJehoSchemaForProvisioning } = require('./jeho-empty-schema-guard');
 
 const databaseUrl = process.env.CP_TEST_DATABASE_URL;
@@ -198,6 +199,31 @@ async function testFirstInstallSchemaGuard(ds) {
   assert.equal(state.status, 'running', 'interrupted first install must be recognized as resumable, not as a clean schema');
 }
 
+async function testSchemaLockReleaseFailureDiscardsConnection() {
+  let destroyed = false;
+  const brokenRunner = {
+    async query(sql) {
+      if (sql.includes('pg_try_advisory_lock')) return [{ locked: true }];
+      throw new Error('simulated unlock failure');
+    },
+    async releasePostgresConnection() {
+      destroyed = true;
+    },
+  };
+  assert.equal(await tryAcquireJehoSchemaLock(brokenRunner), true);
+  await assert.rejects(() => releaseJehoSchemaLock(brokenRunner), /simulated unlock failure/);
+  assert.equal(destroyed, true, 'a session whose advisory unlock fails must be discarded, not pooled');
+
+  const nextRunner = {
+    async query(sql) {
+      if (sql.includes('pg_try_advisory_lock')) return [{ locked: true }];
+      return [{ unlocked: true }];
+    },
+  };
+  assert.equal(await tryAcquireJehoSchemaLock(nextRunner), true, 'local schema lock gate must recover after a failed unlock');
+  await releaseJehoSchemaLock(nextRunner);
+}
+
 async function testSharedSchemaMigrationLock(ds) {
   const owner = ds.createQueryRunner();
   const contender = ds.createQueryRunner();
@@ -238,12 +264,13 @@ async function main() {
   });
   await ds.initialize();
   try {
+    await testSchemaLockReleaseFailureDiscardsConnection();
     await testSharedSchemaMigrationLock(ds);
     await testCpDdlLockTimeoutAndResume(ds);
     await testFirstInstallSchemaGuard(ds);
     await testFreshInstall(ds);
     await testLegacyUpgrade(ds);
-    console.log('PASS: shared migration-lock contention, fail-fast CP DDL lock timeout and resume, empty/partial-schema provisioning guard, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
+    console.log('PASS: schema-lock session disposal after failed unlock, shared migration-lock contention, fail-fast CP DDL lock timeout and resume, empty/partial-schema provisioning guard, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
   } finally {
     await ds.query('DROP SCHEMA IF EXISTS jeho_own CASCADE');
     await ds.destroy();
