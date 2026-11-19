@@ -31,6 +31,7 @@ import {
 } from './dto/auth.dto';
 import { normalizeStaffRole } from '../../common/staff-role';
 import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
 @Injectable()
 export class AuthService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthService.name);
@@ -546,7 +547,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       }
       return { updated };
     } finally {
-      if (lockAcquired) await runner.query('SELECT pg_advisory_unlock(741902611, 2006)').catch(() => undefined);
+      if (lockAcquired) await releaseJehoAdvisoryLock(runner, 741902611, 2006).catch((unlockError) => this.logger.error(`Public-ID lock release failed; connection discarded: ${(unlockError as Error).message}`));
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
       await runner.release().catch(() => undefined);
