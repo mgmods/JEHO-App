@@ -111,6 +111,38 @@ async function testLegacyUpgrade(ds) {
   assert.equal(preservedConstraint.length, 1, 'compound/unrelated CHECK constraint must remain intact');
 }
 
+
+async function testSharedSchemaMigrationLock(ds) {
+  const owner = ds.createQueryRunner();
+  const contender = ds.createQueryRunner();
+  await owner.connect();
+  await contender.connect();
+  try {
+    const ownerLock = await owner.query(
+      'SELECT pg_try_advisory_lock(741902611, 99) AS locked',
+    );
+    assert.equal(ownerLock[0]?.locked, true, 'first schema migrator must acquire the global lock');
+
+    await contender.startTransaction();
+    const blocked = await contender.query(
+      'SELECT pg_try_advisory_xact_lock(741902611, 99) AS locked',
+    );
+    assert.equal(blocked[0]?.locked, false, 'transaction-scoped CP migrations must conflict with session-scoped schema migrations');
+
+    await owner.query('SELECT pg_advisory_unlock(741902611, 99)');
+    const acquired = await contender.query(
+      'SELECT pg_try_advisory_xact_lock(741902611, 99) AS locked',
+    );
+    assert.equal(acquired[0]?.locked, true, 'a waiting migrator must acquire the same global lock after release');
+    await contender.commitTransaction();
+  } finally {
+    if (contender.isTransactionActive) await contender.rollbackTransaction().catch(() => undefined);
+    await owner.query('SELECT pg_advisory_unlock(741902611, 99)').catch(() => undefined);
+    await contender.release();
+    await owner.release();
+  }
+}
+
 async function main() {
   const ds = new DataSource({
     type: 'postgres',
@@ -120,9 +152,10 @@ async function main() {
   });
   await ds.initialize();
   try {
+    await testSharedSchemaMigrationLock(ds);
     await testFreshInstall(ds);
     await testLegacyUpgrade(ds);
-    console.log('PASS: CP bootstrap fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
+    console.log('PASS: shared migration-lock contention, CP fresh-install, legacy-upgrade, idempotency, and data-preservation checks.');
   } finally {
     await ds.query('DROP SCHEMA IF EXISTS jeho_own CASCADE');
     await ds.destroy();
