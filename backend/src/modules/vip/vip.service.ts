@@ -14,7 +14,7 @@ import { IsInt, Min, Max, IsOptional, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { vipMedalUrl } from '../../common/vip-assets';
-import { JEHO_SCHEMA_LOCK_ID, JEHO_SCHEMA_LOCK_NAMESPACE } from '../../database/schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import {
   VIP_ALLOWED_DAYS,
   VIP_DURATION_PACKS,
@@ -76,11 +76,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '8s'");
-      const rows = await runner.query(
-        'SELECT pg_try_advisory_lock($1, $2) AS locked',
-        [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-      );
-      locked = rows?.[0]?.locked === true;
+      locked = await tryAcquireJehoSchemaLock(runner);
       if (!locked) return;
       await runner.query(
         'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
@@ -89,10 +85,7 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Mysterious Mode column check deferred: ${error?.message || error}`);
     } finally {
       if (locked) {
-        await runner.query(
-          'SELECT pg_advisory_unlock($1, $2)',
-          [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-        ).catch(() => undefined);
+        await releaseJehoSchemaLock(runner).catch(() => undefined);
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
