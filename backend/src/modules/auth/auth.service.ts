@@ -30,8 +30,7 @@ import {
   ChangePasswordDto,
 } from './dto/auth.dto';
 import { normalizeStaffRole } from '../../common/staff-role';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock } from '../../database/schema-migration-lock';
-import { releaseJehoAdvisoryLock } from '../../database/schema-migration-lock';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 @Injectable()
 export class AuthService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthService.name);
@@ -508,7 +507,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '30s'");
-      lockAcquired = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.publicIdBackfill);
+      lockAcquired = await tryAcquireJehoSchemaLock(runner);
       if (!lockAcquired) {
         // Another replica is handling the shared backfill. Retry later so a
         // failed/terminated owner cannot leave missing IDs indefinitely.
@@ -550,7 +549,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       }
       return { updated };
     } finally {
-      if (lockAcquired) await releaseJehoAdvisoryLock(runner, JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_ADVISORY_LOCKS.publicIdBackfill).catch((unlockError) => this.logger.error(`Public-ID lock release failed; connection discarded: ${(unlockError as Error).message}`));
+      if (lockAcquired) await releaseJehoSchemaLock(runner).catch((unlockError) => this.logger.error(`Public-ID lock release failed; connection discarded: ${(unlockError as Error).message}`));
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
       await runner.release().catch(() => undefined);
