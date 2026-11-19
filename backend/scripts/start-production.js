@@ -181,28 +181,44 @@ async function terminateStaleJehoSessions() {
       WHERE activity.pid <> pg_backend_pid()
         AND activity.datname = current_database()
         AND activity.usename = current_user
-        AND activity.application_name IN ('jeho-own-api', 'jeho-own-bootstrap')
-        -- Never terminate active sessions: during rolling deploys another
-        -- healthy JEHO replica may still serve requests or apply a migration.
-        -- Recover only a long-idle holder of JEHO's exact shared migration lock.
-        AND activity.state = 'idle'
-        AND activity.xact_start IS NULL
-        AND activity.state_change < now() - interval '2 minutes'
-        AND EXISTS (
-          SELECT 1
-          FROM pg_locks AS held_lock
-          WHERE held_lock.pid = activity.pid
-            AND held_lock.locktype = 'advisory'
-            AND held_lock.granted
-            AND held_lock.classid = 741902611
-            AND held_lock.objid = 99
-            AND held_lock.objsubid = 2
+        AND (
+          (
+            activity.application_name IN ('jeho-own-api', 'jeho-own-bootstrap')
+            AND activity.state = 'idle'
+            AND activity.xact_start IS NULL
+            AND activity.state_change < now() - interval '2 minutes'
+            AND EXISTS (
+              SELECT 1
+              FROM pg_locks AS held_lock
+              WHERE held_lock.pid = activity.pid
+                AND held_lock.locktype = 'advisory'
+                AND held_lock.granted
+                AND held_lock.classid = 741902611
+                AND held_lock.objid = 99
+                AND held_lock.objsubid = 2
+            )
+          )
+          OR
+          (
+            -- A known production incident left this exact agency documentUrls
+            -- default DDL active for ~27 hours with application_name unset.
+            -- It is metadata-only DDL; if it survives 10 minutes, treat it as
+            -- a stale migration session and cancel only that exact operation.
+            -- Scope remains this database + this DB role; never kill other work.
+            activity.application_name = ''
+            AND activity.state = 'active'
+            AND activity.xact_start < now() - interval '10 minutes'
+            AND position('ALTER TABLE' in upper(activity.query)) = 1
+            AND position('agency_applications' in activity.query) > 0
+            AND position('documentUrls' in activity.query) > 0
+            AND position('SET DEFAULT' in upper(activity.query)) > 0
+          )
         )
     `);
     const terminatedRows = result.rows.filter((row) => row.terminated === true);
     if (terminatedRows.length) {
       console.warn('[JEHO-OWN startup] Terminated stale JEHO PostgreSQL session(s) before application startup:', JSON.stringify(
-        terminatedRows.map(({ pid, application_name, state }) => ({ pid, application_name, state })),
+        terminatedRows.map(({ pid, application_name, state, query, xact_start }) => ({ pid, application_name, state, xact_start, query: String(query || '').slice(0, 240) })),
       ));
     } else {
       console.log('[JEHO-OWN startup] No stale JEHO PostgreSQL sessions or JEHO advisory-lock holders found.');
