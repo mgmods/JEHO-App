@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
-import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
+import { JEHO_ADVISORY_LOCKS, tryAcquireJehoSessionAdvisoryLock, releaseJehoSessionAdvisoryLock, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
@@ -2687,15 +2687,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await runner.connect();
       await runner.query("SET lock_timeout = '250ms'");
       await runner.query("SET statement_timeout = '15s'");
-      const rows = await runner.query(
-        'SELECT pg_try_advisory_lock(741902611, 2001) AS locked',
-      );
-      locked = rows?.[0]?.locked === true;
+      locked = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.roomAutoClear);
       if (!locked) return;
       await this.sweepAutoChatClearOnce();
     } finally {
       if (locked) {
-        await runner.query('SELECT pg_advisory_unlock(741902611, 2001)').catch(() => undefined);
+        await releaseJehoSessionAdvisoryLock(runner, JEHO_ADVISORY_LOCKS.roomAutoClear).catch(() => undefined);
       }
       await runner.query('RESET lock_timeout').catch(() => undefined);
       await runner.query('RESET statement_timeout').catch(() => undefined);
