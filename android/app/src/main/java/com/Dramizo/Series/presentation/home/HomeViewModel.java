@@ -288,42 +288,56 @@ public class HomeViewModel extends ViewModel {
             loadingMore.postValue(true);
         }
         final int page = reset ? 1 : roomsPage + 1;
-        c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
-                    c.listRoomsUseCase.execute(page, PAGE_SIZE);
+        try {
+            c.getIoExecutor().execute(() -> {
+                Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r = null;
+                try {
+                    r = c.listRoomsUseCase.execute(page, PAGE_SIZE);
+                } catch (RuntimeException ignored) {
+                    // A transient transport failure must not strand the loading state.
+                } finally {
+                    roomsLoadingMore = false;
+                    loadingMore.postValue(false);
+                    if (!quiet && reset) loading.postValue(false);
+                }
+                if (r != null && r.success && r.data != null && r.data.items != null) {
+                    List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
+                    roomsHasMore = pageItems.size() >= PAGE_SIZE;
+                    roomsPage = page;
+                    if (reset) {
+                        rooms.postValue(pageItems);
+                    } else {
+                        List<RoomDtos.RoomDto> merged = new ArrayList<>();
+                        List<RoomDtos.RoomDto> cur = rooms.getValue();
+                        if (cur != null) merged.addAll(cur);
+                        HashSet<String> seen = new HashSet<>();
+                        for (RoomDtos.RoomDto x : merged) {
+                            if (x != null && x.id != null) seen.add(x.id);
+                        }
+                        for (RoomDtos.RoomDto x : pageItems) {
+                            if (x == null || x.id == null || seen.contains(x.id)) continue;
+                            seen.add(x.id);
+                            merged.add(x);
+                        }
+                        rooms.postValue(merged);
+                    }
+                } else if (!quiet && reset) {
+                    if (r == null || !ApiCall.isRateLimited(r.error)) {
+                        error.postValue(r != null && r.error != null ? r.error
+                                : c.getAppContext().getString(R.string.load_rooms_failed));
+                    }
+                }
+                // On a failed "load more", keep roomsHasMore and roomsPage unchanged so
+                // the next user retry requests the same page instead of disabling pagination.
+            });
+        } catch (RuntimeException rejected) {
             roomsLoadingMore = false;
             loadingMore.postValue(false);
-            if (!quiet && reset) loading.postValue(false);
-            if (r.success && r.data != null && r.data.items != null) {
-                List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
-                roomsHasMore = pageItems.size() >= PAGE_SIZE;
-                roomsPage = page;
-                if (reset) {
-                    rooms.postValue(pageItems);
-                } else {
-                    List<RoomDtos.RoomDto> merged = new ArrayList<>();
-                    List<RoomDtos.RoomDto> cur = rooms.getValue();
-                    if (cur != null) merged.addAll(cur);
-                    HashSet<String> seen = new HashSet<>();
-                    for (RoomDtos.RoomDto x : merged) {
-                        if (x != null && x.id != null) seen.add(x.id);
-                    }
-                    for (RoomDtos.RoomDto x : pageItems) {
-                        if (x == null || x.id == null || seen.contains(x.id)) continue;
-                        seen.add(x.id);
-                        merged.add(x);
-                    }
-                    rooms.postValue(merged);
-                }
-            } else if (!quiet && reset) {
-                if (!ApiCall.isRateLimited(r.error)) {
-                    error.postValue(r.error != null ? r.error
-                            : c.getAppContext().getString(R.string.load_rooms_failed));
-                }
-            } else if (!reset) {
-                roomsHasMore = false;
+            if (!quiet && reset) {
+                loading.postValue(false);
+                error.postValue(c.getAppContext().getString(R.string.load_rooms_failed));
             }
-        });
+        }
     }
 
     public void loadBanners() {
