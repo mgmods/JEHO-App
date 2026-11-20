@@ -134,8 +134,12 @@ public class ComboGiftView extends FrameLayout {
         // A live count-up must never be cut off by the original toast timeout.
         // Restart the parked hold from the latest counter update.
         if (showing && hideRunnable != null) {
+            // A new X update during the exit phase must bring the toast back to
+            // its centered resting position and restart the full readable hold.
             removeCallbacks(hideRunnable);
-            postDelayed(hideRunnable, 1900L);
+            animate().cancel();
+            setTranslationX(0f);
+            postDelayed(hideRunnable, 4400L);
         }
     }
 
@@ -193,8 +197,10 @@ public class ComboGiftView extends FrameLayout {
 
             // Arabic/LTR rooms: enter from left, exit to the right (crawl across chat).
             final float enterFrom = -w - dp(28);
-            // Park the complete gift strip at the horizontal center of the room.
-            final float park = Math.max(0f, (parentW - w) / 2f);
+            // This view is already constrained to both horizontal edges by
+            // activity_voice_room.xml, so its un-translated origin is screen center.
+            // Applying another half-width offset pushes the toast toward the edge.
+            final float park = 0f;
             final float exitTo = parentW + dp(24);
 
             setTranslationX(enterFrom);

@@ -281,6 +281,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (isBlank(seat.user.displayName) && !isBlank(prev.displayName)) {
                 seat.user.displayName = prev.displayName;
             }
+            if (seat.user.roomSupportMedal == null && prev.roomSupportMedal != null) {
+                seat.user.roomSupportMedal = prev.roomSupportMedal;
+            }
         }
     }
 
@@ -339,6 +342,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && Objects.equals(a.user.agency == null ? null : a.user.agency.id,
                         b.user.agency == null ? null : b.user.agency.id)
                 && Objects.equals(a.user.hostBadgeMeta, b.user.hostBadgeMeta)
+                && Objects.equals(a.user.roomSupportMedal == null ? null : a.user.roomSupportMedal.id,
+                        b.user.roomSupportMedal == null ? null : b.user.roomSupportMedal.id)
+                && Objects.equals(a.user.roomSupportMedal == null ? null : a.user.roomSupportMedal.imageUrl,
+                        b.user.roomSupportMedal == null ? null : b.user.roomSupportMedal.imageUrl)
                 && a.user.level == b.user.level
                 && a.user.vipLevel == b.user.vipLevel;
     }

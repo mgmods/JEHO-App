@@ -320,6 +320,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private FrameLayout luckyCannonLayer;
     @Nullable private com.Dramizo.Series.util.LuckyCannonView luckyCannonView;
     @Nullable private ImageView luckyCannonIconView;
+    @Nullable private TextView luckyCannonCountView;
     private int luckyCannonComboCount;
     @Nullable private String luckyCannonRemoteIconUrl;
     @Nullable private Runnable hideLuckyCannonRunnable;
@@ -4736,7 +4737,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         root.addView(layer, lp);
         // Nudge the launcher slightly toward the physical right side without changing its
         // vertical placement or drag bounds. Positive translationX is screen-right in LTR/RTL.
-        layer.setTranslationX(luckyCannonDp(14));
         com.Dramizo.Series.util.LuckyCannonView cannon =
                 new com.Dramizo.Series.util.LuckyCannonView(this);
         // The enclosing layer owns touch/click so the uploaded icon overlay and drag gesture
@@ -4755,6 +4755,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         uploadedIcon.setFocusable(false);
         uploadedIcon.setVisibility(View.GONE);
         layer.addView(uploadedIcon, iconLp);
+        TextView countView = new TextView(this);
+        countView.setGravity(Gravity.CENTER);
+        countView.setTextColor(Color.WHITE);
+        countView.setTextSize(11f);
+        countView.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        countView.setPadding(luckyCannonDp(10), 0, luckyCannonDp(10), 0);
+        GradientDrawable countBackground = new GradientDrawable();
+        countBackground.setColor(0xE61A2233);
+        countBackground.setCornerRadius(luckyCannonDp(14));
+        countBackground.setStroke(luckyCannonDp(1), 0xFFFFD978);
+        countView.setBackground(countBackground);
+        countView.setVisibility(View.GONE);
+        FrameLayout.LayoutParams countLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, luckyCannonDp(22), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        countLp.bottomMargin = luckyCannonDp(1);
+        layer.addView(countView, countLp);
         layer.setElevation(luckyCannonDp(80));
         // INVISIBLE preserves measured bounds so the initial draggable position is stable.
         layer.setVisibility(View.INVISIBLE);
@@ -4794,12 +4810,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                     case MotionEvent.ACTION_UP:
                         stopLuckyCannonHold(true);
+                        showLuckyCannonAndScheduleHide();
                         if (dragging && layer.getParent() != null) {
                             layer.getParent().requestDisallowInterceptTouchEvent(false);
                         }
                         return true;
                     case MotionEvent.ACTION_CANCEL:
                         stopLuckyCannonHold(false);
+                        showLuckyCannonAndScheduleHide();
                         if (dragging && layer.getParent() != null) {
                             layer.getParent().requestDisallowInterceptTouchEvent(false);
                         }
@@ -4812,6 +4830,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         luckyCannonLayer = layer;
         luckyCannonView = cannon;
         luckyCannonIconView = uploadedIcon;
+        luckyCannonCountView = countView;
+        updateLuckyCannonCounter();
         refreshLuckyToastButtonStyle();
     }
 
@@ -4890,6 +4910,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         showLuckyCannonAndScheduleHide();
     }
 
+    private void updateLuckyCannonCounter() {
+        if (luckyCannonCountView == null) return;
+        if (luckyCannonComboCount <= 0) {
+            luckyCannonCountView.setVisibility(View.GONE);
+            return;
+        }
+        luckyCannonCountView.setText("× " + luckyCannonComboCount);
+        luckyCannonCountView.setVisibility(View.VISIBLE);
+        luckyCannonCountView.bringToFront();
+    }
+
     private void showLuckyCannonAndScheduleHide() {
         if (!luckyCannonEnabled || luckyCannonLayer == null || luckyCannonTargets.isEmpty()) return;
         if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
@@ -4916,6 +4947,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (luckyCannonLayer != null) luckyCannonLayer.setVisibility(View.GONE);
         luckyCannonComboCount = 0;
+        updateLuckyCannonCounter();
         if (!luckyCannonSending) {
             luckyCannonGiftId = null;
             luckyCannonTargets.clear();
@@ -4931,6 +4963,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         luckyCannonHoldActive = true;
         luckyCannonComboCount = 0;
+        updateLuckyCannonCounter();
 
         // First send happens on ACTION_DOWN. This removes the old "release then press
         // again" feeling and makes every new press an independent lucky-gift start.
@@ -5025,7 +5058,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // for network latency; ACTION_UP prevents any later increments.
             if (luckyCannonHoldActive) {
                 luckyCannonComboCount++;
-
+                updateLuckyCannonCounter();
             }
         } catch (RuntimeException rejected) {
             // Executor saturation must not strand the in-flight counter or leave a
@@ -5083,7 +5116,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
                     binding.giftOverlay, icon, destinations, totalCoins,
                     Math.max(1, quantity), Math.max(1, recipients.size()),
-                    (PointF) null, null, null);
+                    resolveLuckyGiftRevealCenter(), null, null);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
@@ -12761,12 +12794,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (comboCount >= 2 && binding.giftOverlay != null) {
             binding.giftOverlay.setVisibility(View.VISIBLE);
             float d = getResources().getDisplayMetrics().density;
+            int w = Math.max(binding.giftOverlay.getWidth(),
+                    getResources().getDisplayMetrics().widthPixels);
             int h = Math.max(binding.giftOverlay.getHeight(),
                     getResources().getDisplayMetrics().heightPixels);
             GiftFlyAnimator.showComboBurst(
                     binding.giftOverlay,
                     comboCount,
-                    new android.graphics.PointF(56f * d, h * 0.60f),
+                    new android.graphics.PointF(w * 0.50f, h * 0.60f),
                     null);
             // Short overlay hold for gift combo only — do not mark as lucky/mardood.
             try {
