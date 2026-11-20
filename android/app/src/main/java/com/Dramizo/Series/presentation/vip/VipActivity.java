@@ -105,7 +105,7 @@ public class VipActivity extends ThemedActivity {
             if (e == null || e.trim().isEmpty()) return;
             String normalized = e.trim().toLowerCase(java.util.Locale.ROOT);
             // Empty catalogue state is shown inline; it is not a transient error toast.
-            if (normalized.contains("لا خطط متاحة الآن")
+            if (normalized.contains("خطط متاحة")
                     || normalized.contains("no plans available")) return;
             com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
         });
