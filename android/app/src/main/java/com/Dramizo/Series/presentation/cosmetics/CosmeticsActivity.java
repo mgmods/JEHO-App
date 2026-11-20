@@ -222,7 +222,7 @@ public class CosmeticsActivity extends ThemedActivity {
         VanityIdStyle.bind(storeUserPublicId, ContainerProvider.from(this).getVanityApi(),
                 publicId, me.vipLevel);
         if (storeUserFrame != null) {
-            String equippedFrame = AvatarCosmetics.avatarFrameUrl(me);
+            String equippedFrame = me.vipFrameUrl;
             storeUserFrame.bind(equippedFrame, me.avatarUrl, null, 1);
         }
     }
