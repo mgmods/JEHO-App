@@ -84,9 +84,8 @@ public class StoreHubActivity extends ThemedActivity {
         String pid = user.displayPublicId();
         binding.tvUserId.setText(pid.isEmpty() ? "—" : pid);
         VanityIdStyle.bind(binding.tvUserId, c.getVanityApi(), pid, user.vipLevel);
-        String nobilityFrame = VipStyle.profileNobilityFrameUrl(
-                Math.max(0, user.vipLevel), user.vipTouUrl);
-        String profileFrame = nobilityFrame != null ? nobilityFrame : user.vipBadgeUrl;
+        String profileFrame = user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()
+                ? user.vipBadgeUrl.trim() : null;
         HostSignalView.prefetchWear(this, profileFrame);
         AvatarCosmetics.bindProfileWear(
                 binding.webHostSignal,
