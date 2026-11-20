@@ -32,6 +32,7 @@ public class ComboGiftView extends FrameLayout {
     private TextView recvDesc;
     private TextView comboNum;
     private boolean showing;
+    private int lastDisplayedCount = 1;
     @Nullable private Runnable hideRunnable;
     @Nullable private Runnable crawlRunnable;
 
@@ -85,6 +86,7 @@ public class ComboGiftView extends FrameLayout {
             recvDesc.setSelected(true);
         }
         int combo = Math.max(1, comboCount);
+        lastDisplayedCount = combo;
         if (comboNum != null) {
             // Mikoo: "x" + count to the right of gift strip digits.
             comboNum.setText("X" + combo);
@@ -119,9 +121,22 @@ public class ComboGiftView extends FrameLayout {
     public void updateCountUp(int count) {
         if (comboNum == null) return;
         int value = Math.max(1, count);
+        if (value != lastDisplayedCount) {
+            lastDisplayedCount = value;
+            comboNum.animate().cancel();
+            comboNum.setScaleX(0.88f);
+            comboNum.setScaleY(0.88f);
+            comboNum.animate().scaleX(1f).scaleY(1f).setDuration(110L).start();
+        }
         comboNum.setText("X" + value);
         comboNum.setTextSize(value >= 10 ? 20f : 22f);
         comboNum.setVisibility(VISIBLE);
+        // A live count-up must never be cut off by the original toast timeout.
+        // Restart the parked hold from the latest counter update.
+        if (showing && hideRunnable != null) {
+            removeCallbacks(hideRunnable);
+            postDelayed(hideRunnable, 1900L);
+        }
     }
 
     private void bindGiftIcon(@Nullable String giftIconUrl) {
