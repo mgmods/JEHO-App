@@ -98,6 +98,14 @@ public class VipAdapter {
         TextView tvBubble = root.findViewById(R.id.tvIncludeBubble);
         TextView tvMallLabel = root.findViewById(R.id.tvIncludeMallLabel);
         LinearLayout layoutPrivileges = root.findViewById(R.id.layoutPrivileges);
+        TextView tvTogglePrivileges = root.findViewById(R.id.tvTogglePrivileges);
+        layoutPrivileges.setVisibility(View.GONE);
+        tvTogglePrivileges.setText("عرض جميع المزايا  ↓");
+        tvTogglePrivileges.setOnClickListener(v -> {
+            boolean expanded = layoutPrivileges.getVisibility() != View.VISIBLE;
+            layoutPrivileges.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            tvTogglePrivileges.setText(expanded ? "إخفاء المزايا  ↑" : "عرض جميع المزايا  ↓");
+        });
         MaterialButton btnBuy = root.findViewById(R.id.btnBuy);
 
         tvName.setText(VipCatalog.headlineAr(level));
