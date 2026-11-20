@@ -1896,6 +1896,7 @@ public class ProfileActivity extends ThemedActivity {
         if (imageUrl == null || imageUrl.trim().isEmpty() || isFinishing() || isDestroyed()) return;
         Intent secureImage = new Intent(ProfileActivity.this, SecureProfileImageActivity.class);
         secureImage.putExtra(SecureProfileImageActivity.EXTRA_IMAGE_URL, imageUrl.trim());
+        secureImage.putExtra(SecureProfileImageActivity.EXTRA_IMAGE_IS_COVER, true);
         startActivity(secureImage);
     }
 
