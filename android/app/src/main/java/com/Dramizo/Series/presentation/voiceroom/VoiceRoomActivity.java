@@ -18000,7 +18000,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (topRaw instanceof ViewGroup.MarginLayoutParams topLp) {
                 // On 30-seat rooms, give the supporter stack a little more clearance
                 // below the final seat row without moving the room bottom controls.
-                topLp.topMargin = dp(largeSeatGrid ? 14 : 28);
+                topLp.topMargin = dp(largeSeatGrid ? 22 : 28);
                 binding.rowTopHosts.setLayoutParams(topLp);
             }
         }
