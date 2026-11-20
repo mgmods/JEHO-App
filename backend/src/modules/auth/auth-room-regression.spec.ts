@@ -14,9 +14,10 @@ test('Google social login verifies the ID token and links the verified subject',
   const user: any = {
     id: 'user-1',
     username: 'member',
+    email: 'member@example.test',
     publicId: '123456',
     status: UserStatus.ACTIVE,
-    displayName: 'Old name',
+    displayName: 'guest_old',
     avatarUrl: null,
   };
   const saved: any[] = [];
