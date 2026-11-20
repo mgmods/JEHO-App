@@ -7,7 +7,7 @@
     android:layout_marginHorizontal="12dp"
     android:layout_marginTop="5dp"
     android:layout_marginBottom="5dp"
-    android:background="@drawable/bg_wallet_section"
+    android:background="@drawable/bg_social_user_card"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:foreground="?attr/selectableItemBackground"
