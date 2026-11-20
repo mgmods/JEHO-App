@@ -4968,7 +4968,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         luckyCannonRequestId = requestId;
         luckyCannonInFlight++;
         luckyCannonSending = true;
-        container.getLuckyCannonExecutor().execute(() -> {
+        Runnable sendTask = () -> {
             GiftDtos.SendAllMicRequest request =
                     new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
             request.cannonLaunch = true;
@@ -4978,7 +4978,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
             // Keep compatibility with an older pinned API schema, reusing the same
             // idempotency key so the rejected first attempt cannot be charged twice.
-            if (!result.success && result.error != null) {
+            if (result != null && !result.success && result.error != null) {
                 String errorText = result.error.toLowerCase(java.util.Locale.ROOT);
                 if (errorText.contains("cannonlaunch") && errorText.contains("should not exist")) {
                     GiftDtos.SendAllMicRequest retry =
@@ -4994,14 +4994,28 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
                 luckyCannonSending = luckyCannonInFlight > 0;
                 if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
-                if (!finalResult.success || finalResult.data == null || !finalResult.data.success) {
+                if (finalResult == null || !finalResult.success
+                        || finalResult.data == null || !finalResult.data.success) {
+                    if (luckyCannonHoldActive) stopLuckyCannonHold(false);
                     BalanceRedirect.handle(VoiceRoomActivity.this,
-                            finalResult.error != null ? finalResult.error : "تعذر إرسال دفعة الهدية");
+                            finalResult != null && finalResult.error != null
+                                    ? finalResult.error : "تعذر إرسال دفعة الهدية");
                     return;
                 }
                 showLuckyCannonAndScheduleHide();
             });
-        });
+        };
+        try {
+            container.getLuckyCannonExecutor().execute(sendTask);
+        } catch (RuntimeException rejected) {
+            // Executor saturation must not strand the in-flight counter or leave a
+            // press-and-hold loop repeatedly enqueueing work that cannot run.
+            luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
+            luckyCannonSending = luckyCannonInFlight > 0;
+            if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
+            stopLuckyCannonHold(false);
+            Toast.makeText(this, "تعذر إرسال الهدية الآن، حاول مجددًا", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void playLuckyCannonEvent(@Nullable String icon, @NonNull List<String> targets,
