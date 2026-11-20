@@ -22,7 +22,7 @@ import com.bumptech.glide.Glide;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Large lucky-gift reveal below the room midpoint, followed by simultaneous flights to seats. */
+/** Large lucky-gift reveal locked to the exact center of the room screen, followed by flights to seats. */
 public final class LuckyGiftStageAnimator {
     private LuckyGiftStageAnimator() {}
 
@@ -42,14 +42,15 @@ public final class LuckyGiftStageAnimator {
             finish(onEnd);
             return;
         }
+
         final float density = overlay.getResources().getDisplayMetrics().density;
-        final float centerX = revealCenter != null
-                ? Math.max(56f * density, Math.min(overlay.getWidth() - 56f * density, revealCenter.x))
-                : overlay.getWidth() * 0.5f;
-        // The room caller can anchor the reveal directly below seat 18.
-        final float centerY = revealCenter != null
-                ? Math.max(56f * density, Math.min(overlay.getHeight() - 90f * density, revealCenter.y))
-                : overlay.getHeight() * 0.5f;
+
+        // Lucky-cannon reveal is deliberately screen-centered. Do not allow a seat,
+        // caller offset, RTL/LTR direction, or a stale revealCenter to push the hero
+        // toward the side of the room.
+        final float centerX = overlay.getWidth() * 0.5f;
+        final float centerY = overlay.getHeight() * 0.5f;
+
         final FrameLayout stage = new FrameLayout(overlay.getContext());
         stage.setClipChildren(false);
         stage.setClipToPadding(false);
@@ -172,8 +173,6 @@ public final class LuckyGiftStageAnimator {
                     ObjectAnimator.ofFloat(copy, View.SCALE_X, 0.68f, 1.14f, 0.82f),
                     ObjectAnimator.ofFloat(copy, View.SCALE_Y, 0.68f, 1.14f, 0.82f),
                     ObjectAnimator.ofFloat(copy, View.ROTATION, -14f, 14f, 0f));
-            // Release copies in small waves instead of launching a wall of images
-            // in one frame; this keeps the room responsive with 30 occupied seats.
             flight.setStartDelay((i / 4) * 65L);
             flight.setDuration(660L);
             flight.setInterpolator(new DecelerateInterpolator(1.35f));
@@ -210,7 +209,6 @@ public final class LuckyGiftStageAnimator {
 
     public static void showWinBurst(@Nullable FrameLayout overlay, int multiplier,
             long coinsWon, @Nullable List<PointF> micTargets, @Nullable Runnable onEnd) {
-        // Do not render the old center-screen coin burst.
         finish(onEnd);
     }
 
