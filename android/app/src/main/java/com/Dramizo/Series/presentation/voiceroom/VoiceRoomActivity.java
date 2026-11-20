@@ -940,10 +940,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.recyclerSeats.getParent() instanceof ViewGroup) {
             ((ViewGroup) binding.recyclerSeats.getParent()).setClipChildren(false);
         }
+        // Seat positions are a fixed room stage, not a scrollable list.
+        // All configured seats (including the 30-seat / six-column layout) remain
+        // anchored in place while seat occupancy refreshes.
         binding.recyclerSeats.setLayoutManager(new GridLayoutManager(this, MIKOO_SEAT_COLUMNS) {
             @Override
             public boolean canScrollVertically() {
-                return seatAdapter != null && seatAdapter.getItemCount() > 25;
+                return false;
             }
         });
         binding.recyclerSeats.setAdapter(seatAdapter);
@@ -17955,7 +17958,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Match measured SeatAdapter cell height (avatar frame + name + vertical padding).
         // The old 64/74/84dp estimates were too short for the actual 76dp seat frame,
         // so the last row was clipped/overlapped by the supporter and relationship layers.
-        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 78
+        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 76
                 : scale == SeatAdapter.SCALE_COMPACT ? 82
                 : scale == SeatAdapter.SCALE_MEDIUM ? 88 : 98;
         int totalHeightPx = dp(rows * rowHeightDp + 4);
