@@ -74,7 +74,7 @@ public class ComboGiftView extends FrameLayout {
                      @Nullable String senderAvatarUrl,
                      @Nullable String giftIconUrl,
                      int comboCount,
-                     long totalCoins) {
+                     int totalCoins) {
         if (sender != null) {
             sender.setText(senderName != null && !senderName.isEmpty() ? senderName : "مستخدم");
         }
