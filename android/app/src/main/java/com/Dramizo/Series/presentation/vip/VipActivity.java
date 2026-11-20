@@ -97,9 +97,6 @@ public class VipActivity extends ThemedActivity {
             if (tvVipEmpty != null) {
                 tvVipEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
             }
-            if (empty) {
-                Toast.makeText(this, R.string.vip_empty_retry, Toast.LENGTH_SHORT).show();
-            }
         });
         vm.getMessage().observe(this, m -> {
             if (m != null) Toast.makeText(this, m, Toast.LENGTH_LONG).show();
