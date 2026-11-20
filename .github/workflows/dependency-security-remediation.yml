@@ -73,6 +73,10 @@ jobs:
           echo "Dashboard npm audit fix exit code: $status"
           exit 0
 
+      - name: Synchronize backend lockfile after security fixes
+        working-directory: backend
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
       - name: Install and validate backend lockfile
         working-directory: backend
         run: npm ci
@@ -94,6 +98,10 @@ jobs:
       - name: Backend production build
         working-directory: backend
         run: npm run build
+
+      - name: Synchronize dashboard lockfile after security fixes
+        working-directory: backend/dashboard
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Install and validate dashboard lockfile
         working-directory: backend/dashboard
