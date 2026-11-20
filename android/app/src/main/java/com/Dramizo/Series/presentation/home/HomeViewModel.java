@@ -44,6 +44,8 @@ public class HomeViewModel extends ViewModel {
     private int roomsPage = 1;
     private boolean roomsHasMore = true;
     private boolean roomsLoadingMore;
+    private final java.util.concurrent.atomic.AtomicBoolean roomsQuietRefreshInFlight =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
     // Avoid duplicate following-room scans when the user switches tabs or resumes the app.
     private volatile boolean followingLoading;
     private volatile boolean followingLoaded;
@@ -108,57 +110,70 @@ public class HomeViewModel extends ViewModel {
 
     public void loadRooms() {
         loadRooms(false, true);
+     public void refreshRoomsQuietly() {
+        // A slow room-list response must not stack another poll behind it.
+        if (!roomsQuietRefreshInFlight.compareAndSet(false, true)) return;
+        try {
+            c.getIoExecutor().execute(() -> {
+                try {
+                Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
+                        c.listRoomsUseCase.execute(1, PAGE_SIZE);
+                if (!r.success || r.data == null || r.data.items == null) return;
+                List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
+                List<RoomDtos.RoomDto> cur = rooms.getValue();
+                if (cur == null || cur.isEmpty()) {
+                    rooms.postValue(pageItems);
+                    roomsPage = 1;
+                    roomsHasMore = pageItems.size() >= PAGE_SIZE;
+                    return;
+                }
+                Map<String, RoomDtos.RoomDto> oldById = new HashMap<>();
+                for (RoomDtos.RoomDto x : cur) {
+                    if (x != null && x.id != null) oldById.put(x.id, x);
+                }
+                HashSet<String> onHot = new HashSet<>();
+                List<RoomDtos.RoomDto> next = new ArrayList<>(cur.size() + 4);
+                boolean changed = false;
+                // Page-1 slots follow server explore/heat order.
+                for (int i = 0; i < pageItems.size(); i++) {
+                    RoomDtos.RoomDto neu = pageItems.get(i);
+                    if (neu == null || neu.id == null) continue;
+                    onHot.add(neu.id);
+                    RoomDtos.RoomDto old = oldById.get(neu.id);
+                    RoomDtos.RoomDto row = old != null ? copyRoomVolatile(old, neu) : neu;
+                    next.add(row);
+                    if (old == null
+                            || (i < cur.size() && cur.get(i) != null && !neu.id.equals(cur.get(i).id))
+                            || (old != null && (old.viewerCount != neu.viewerCount
+                            || old.roomLevel != neu.roomLevel
+                            || old.exploreRank != neu.exploreRank
+                            || !Objects.equals(old.roomTopRank, neu.roomTopRank)
+                            || !eq(old.roomTopFrameUrl, neu.roomTopFrameUrl)
+                            || !eq(old.roomTopPeriod, neu.roomTopPeriod)
+                            || !eq(old.coverUrl, neu.coverUrl)
+                            || !eq(old.title, neu.title)))) {
+                        changed = true;
+                    }
+                }
+                // Append remaining loaded pages that are not on Hot page 1.
+                for (RoomDtos.RoomDto old : cur) {
+                    if (old == null || old.id == null || onHot.contains(old.id)) continue;
+                    next.add(old);
+                }
+                if (changed || next.size() != cur.size()) {
+                    rooms.postValue(next);
+                }
+    
+                } finally {
+                    roomsQuietRefreshInFlight.set(false);
+                }
+            });
+        } catch (RuntimeException rejected) {
+            roomsQuietRefreshInFlight.set(false);
+        }
     }
 
-    /**
-     * Quiet poll: refresh Hot order from server (live viewers / gifts move rooms up)
-     * while keeping pages beyond 1 in place.
-     */
-    public void refreshRoomsQuietly() {
-        c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
-                    c.listRoomsUseCase.execute(1, PAGE_SIZE);
-            if (!r.success || r.data == null || r.data.items == null) return;
-            List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
-            List<RoomDtos.RoomDto> cur = rooms.getValue();
-            if (cur == null || cur.isEmpty()) {
-                rooms.postValue(pageItems);
-                roomsPage = 1;
-                roomsHasMore = pageItems.size() >= PAGE_SIZE;
-                return;
-            }
-            Map<String, RoomDtos.RoomDto> oldById = new HashMap<>();
-            for (RoomDtos.RoomDto x : cur) {
-                if (x != null && x.id != null) oldById.put(x.id, x);
-            }
-            HashSet<String> onHot = new HashSet<>();
-            List<RoomDtos.RoomDto> next = new ArrayList<>(cur.size() + 4);
-            boolean changed = false;
-            // Page-1 slots follow server explore/heat order.
-            for (int i = 0; i < pageItems.size(); i++) {
-                RoomDtos.RoomDto neu = pageItems.get(i);
-                if (neu == null || neu.id == null) continue;
-                onHot.add(neu.id);
-                RoomDtos.RoomDto old = oldById.get(neu.id);
-                RoomDtos.RoomDto row = old != null ? copyRoomVolatile(old, neu) : neu;
-                next.add(row);
-                if (old == null
-                        || (i < cur.size() && cur.get(i) != null && !neu.id.equals(cur.get(i).id))
-                        || (old != null && (old.viewerCount != neu.viewerCount
-                        || old.roomLevel != neu.roomLevel
-                        || old.exploreRank != neu.exploreRank
-                        || !Objects.equals(old.roomTopRank, neu.roomTopRank)
-                        || !eq(old.roomTopFrameUrl, neu.roomTopFrameUrl)
-                        || !eq(old.roomTopPeriod, neu.roomTopPeriod)
-                        || !eq(old.coverUrl, neu.coverUrl)
-                        || !eq(old.title, neu.title)))) {
-                    changed = true;
-                }
-            }
-            // Append remaining loaded pages that are not on Hot page 1.
-            for (RoomDtos.RoomDto old : cur) {
-                if (old == null || old.id == null || onHot.contains(old.id)) continue;
-                next.add(old);
+t.add(old);
             }
             if (changed || next.size() != cur.size()) {
                 rooms.postValue(next);
