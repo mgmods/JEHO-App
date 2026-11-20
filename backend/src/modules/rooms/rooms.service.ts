@@ -2850,11 +2850,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         userId: seat.userId!,
         isMuted: seat.isMuted,
         isModeratorMuted: seat.isModeratorMuted,
-        wasHost: seat.userId === room.hostId || seat.isHostSeat,
         status: seat.status,
       }));
 
-      const byIndex = new Map(existing.map((seat) => [seat.seatIndex, seat]));
       const requiredCount = Math.max(existing.length, target);
       for (let i = existing.length; i < requiredCount; i++) {
         existing.push(seatsRepo.create({
@@ -2885,7 +2883,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           seat.userId = occupant.userId;
           seat.isMuted = occupant.isMuted;
           seat.isModeratorMuted = occupant.isModeratorMuted;
-          seat.isHostSeat = i === 0 || occupant.wasHost;
+          seat.isHostSeat = i === 0;
           seat.status = occupant.status === SeatStatus.MUTED
             ? SeatStatus.MUTED
             : SeatStatus.OCCUPIED;
