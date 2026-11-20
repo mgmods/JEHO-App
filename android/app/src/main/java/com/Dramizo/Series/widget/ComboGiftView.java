@@ -152,8 +152,15 @@ public class ComboGiftView extends FrameLayout {
             avatar.setVisibility(VISIBLE);
         }
         bindGiftIcon(giftIconUrl);
-        if (hideRunnable != null) removeCallbacks(hideRunnable);
-        if (crawlRunnable != null) removeCallbacks(crawlRunnable);
+        if (hideRunnable != null) {
+            removeCallbacks(hideRunnable);
+            hideRunnable = null;
+        }
+        if (crawlRunnable != null) {
+            removeCallbacks(crawlRunnable);
+            crawlRunnable = null;
+        }
+        animate().setListener(null);
         animate().cancel();
         setVisibility(VISIBLE);
         setAlpha(1f);
