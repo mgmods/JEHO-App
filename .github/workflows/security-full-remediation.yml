@@ -1,0 +1,167 @@
+name: JEHO isolated full dependency remediation
+
+on:
+  push:
+    branches:
+      - security/full-remediation-20261120
+    paths:
+      - ".github/workflows/security-full-remediation.yml"
+      - "backend/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jeho-security-full-remediation
+  cancel-in-progress: false
+
+jobs:
+  upgrade-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: jeho_test
+          POSTGRES_PASSWORD: jeho_test_password
+          POSTGRES_DB: jeho_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jeho_test -d jeho_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout isolated security branch
+        uses: actions/checkout@v4
+        with:
+          ref: security/full-remediation-20261120
+          persist-credentials: true
+
+      - name: Set up production Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Update Firebase Admin and safe transitive overrides
+        working-directory: backend
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          p.overrides = p.overrides || {};
+          p.overrides.glob = '14.0.2';
+          p.overrides.minimatch = '11.0.1';
+          p.overrides.uuid = '$uuid';
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          NODE
+          npm install --save-exact firebase-admin@13.10.0 --no-fund --no-progress
+
+      - name: Verify dependency versions
+        working-directory: backend
+        run: |
+          npm ls @nestjs/common @nestjs/core @nestjs/platform-express @nestjs/platform-socket.io @nestjs/websockets @nestjs/typeorm @nestjs/cli @nestjs/swagger firebase-admin typeorm glob minimatch uuid file-type
+          node -e "const a=require('firebase-admin'); if(!a.auth || !a.app) process.exit(1); console.log('Firebase Admin module import OK')"
+
+      - name: Clean install from generated lockfile
+        working-directory: backend
+        run: |
+          rm -rf node_modules
+          npm ci
+
+      - name: TypeScript validation
+        working-directory: backend
+        run: npm run lint
+
+      - name: Backend production build
+        working-directory: backend
+        run: npm run build
+
+      - name: Games regression tests
+        working-directory: backend
+        run: npm run test:games
+
+      - name: CP PostgreSQL fresh-install and upgrade tests
+        working-directory: backend
+        env:
+          CP_TEST_DATABASE_URL: postgresql://jeho_test:jeho_test_password@localhost:5432/jeho_test
+        run: npm run test:cp-bootstrap
+
+      - name: Verify Node.js 22 compatibility
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Clean install and validate on Node.js 22
+        working-directory: backend
+        env:
+          CP_TEST_DATABASE_URL: postgresql://jeho_test:jeho_test_password@localhost:5432/jeho_test
+        run: |
+          rm -rf node_modules
+          npm ci
+          npm run lint
+          npm run build
+          npm run test:games
+          npm run test:cp-bootstrap
+
+      - name: Run final backend and dashboard audits
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p security-audit-results
+          (cd backend && npm audit --json > ../security-audit-results/backend-audit.json) || true
+          (cd backend/dashboard && npm audit --json > ../../security-audit-results/dashboard-audit.json) || true
+          node <<'NODE'
+          const fs = require('fs');
+          let failed = false;
+          for (const name of ['backend', 'dashboard']) {
+            const file = `security-audit-results/${name}-audit.json`;
+            let report = {};
+            try { report = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+            const v = report.metadata?.vulnerabilities || {};
+            const line = `| ${name} | ${v.total ?? 'unknown'} | ${v.low ?? 0} | ${v.moderate ?? 0} | ${v.high ?? 0} | ${v.critical ?? 0} |`;
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\n');
+            if (v.total !== 0) failed = true;
+          }
+          if (failed) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\nAudit findings remain; proposed changes are retained as an artifact only.\n');
+            process.exitCode = 1;
+          }
+          NODE
+        env:
+          GITHUB_STEP_SUMMARY: ${{ github.step_summary }}
+
+      - name: Capture dependency diff
+        if: always()
+        run: |
+          git diff -- backend/package.json backend/package-lock.json > security-audit-results/dependency-diff.patch || true
+          cp backend/package.json security-audit-results/backend-package.json
+          cp backend/package-lock.json security-audit-results/backend-package-lock.json
+
+      - name: Upload security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jeho-full-remediation-evidence
+          path: security-audit-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Commit only fully verified zero-finding dependency changes
+        if: success()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+mgmods@users.noreply.github.com"
+          git add backend/package.json backend/package-lock.json
+          if git diff --cached --quiet; then
+            echo "No dependency changes to commit."
+          else
+            git commit -m "fix(security): upgrade Firebase and patched transitive dependencies"
+            git push origin HEAD:security/full-remediation-20261120
+          fi
