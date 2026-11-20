@@ -307,7 +307,7 @@ public final class GlobalCelebrationToast {
     /** Force a fresh dashboard style after the server announces a config change. */
     public static void refreshStyleNow(@Nullable Activity activity) {
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
-        lastStyleFetchAt = 0L;
+        // Respect the shared one-minute throttle; screen resumes are not config-change events.
         refreshToastStyle(activity);
     }
 
