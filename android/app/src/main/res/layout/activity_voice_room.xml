@@ -769,20 +769,20 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
 
-    <!-- Top supporters under seats — Mikoo cascade: count + overlapping circles.
-         Extra top margin so avatars clear seat 9/10 number badges. -->
+    <!-- Top supporters moved into the room header, directly below the clock/date. -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/rowTopHosts"
         android:layout_width="wrap_content"
         android:layout_height="26dp"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="28dp"
+        android:layout_marginStart="42dp"
+        android:layout_marginTop="2dp"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:layoutDirection="ltr"
+        android:elevation="12dp"
         android:visibility="gone"
-        app:layout_constraintStart_toStartOf="@id/recyclerSeats"
-        app:layout_constraintTop_toBottomOf="@id/recyclerSeats">
+        app:layout_constraintStart_toStartOf="@id/headerLeadingTools"
+        app:layout_constraintTop_toBottomOf="@id/headerRoom">
 
         <!-- Count badge (left of stack, like Mikoo "5") -->
         <TextView
