@@ -538,8 +538,7 @@ public class ProfileActivity extends ThemedActivity {
             // Only the actually equipped personal frame is shown here.
             // An empty vipBadgeUrl means the user unequipped their frame; do not
             // silently replace it with a VIP-tier fallback frame.
-            String profileFrame = user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()
-                    ? user.vipBadgeUrl.trim() : null;
+            String profileFrame = AvatarCosmetics.avatarFrameUrl(user);
             AvatarCosmetics.bindProfileWear(
                     binding.webProfileHostSignal,
                     binding.imgAvatar,
