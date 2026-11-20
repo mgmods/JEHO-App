@@ -61,6 +61,9 @@ public class RequestListFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         if (getArguments() != null) type = getArguments().getString(ARG_TYPE, "friend");
+        // Only friend and follow requests are supported in the social hub.
+        // Legacy relation/guardian routes are intentionally normalized away.
+        if (!"friend".equals(type) && !"follow".equals(type)) type = "friend";
         c = ContainerProvider.from(requireActivity());
         String token = c.getSessionManager().getAccessToken();
         RealtimeClient.getInstance().connect(token);
@@ -198,16 +201,9 @@ public class RequestListFragment extends Fragment {
         }
 
         private String typeLabel() {
-            switch (type) {
-                case "follow": return getString(R.string.request_follow);
-                case "relation": return getString(R.string.request_relation);
-                case "guardian": return getString(R.string.guardian);
-                case "sibling": return "أخوة";
-                case "fans": return "معجبين";
-                case "love": return "حب";
-                case "couple": return "أزواج";
-                default: return getString(R.string.request_friendship);
-            }
+            return "follow".equals(type)
+                    ? getString(R.string.request_follow)
+                    : getString(R.string.request_friendship);
         }
 
         private void decide(String id, boolean accept) {
