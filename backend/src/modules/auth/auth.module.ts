@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -22,7 +22,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('app.jwt.secret'),
         signOptions: {
-          expiresIn: config.get<string>('app.jwt.expiresIn'),
+          expiresIn: config.get<string>('app.jwt.expiresIn') as NonNullable<JwtModuleOptions['signOptions']>['expiresIn'],
         },
       }),
     }),
