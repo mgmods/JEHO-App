@@ -338,6 +338,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private String luckyCannonGiftName;
     private int luckyCannonGiftPrice;
     private final List<String> luckyCannonTargets = new ArrayList<>();
+    private final Map<String, Integer> luckyCannonRemoteComboCounts = new HashMap<>();
     private boolean luckyCannonSending;
     /** Lucky cannon sends one server-authoritative unit immediately on press, then repeats while held. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
@@ -4911,14 +4912,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void updateLuckyCannonCounter() {
-        if (luckyCannonCountView == null) return;
-        if (luckyCannonComboCount <= 0) {
-            luckyCannonCountView.setVisibility(View.GONE);
-            return;
-        }
-        luckyCannonCountView.setText("× " + luckyCannonComboCount);
-        luckyCannonCountView.setVisibility(View.VISIBLE);
-        luckyCannonCountView.bringToFront();
+        // The multiplier belongs to the centered gift-send toast, never on the cannon.
+        if (luckyCannonCountView != null) luckyCannonCountView.setVisibility(View.GONE);
+    }
+
+    private void showLuckyCannonSendToast(int count, boolean live) {
+        if (binding == null || binding.comboGiftView == null) return;
+        String giftName = luckyCannonGiftName != null && !luckyCannonGiftName.isEmpty()
+                ? luckyCannonGiftName : "هدية حظ";
+        binding.comboGiftView.showCannonLive("أنت", giftName, null,
+                luckyCannonGiftIcon, Math.max(1, count), 0);
+        if (!live) binding.comboGiftView.finishCannonLive(2200L);
     }
 
     private void showLuckyCannonAndScheduleHide() {
@@ -4938,7 +4942,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void hideLuckyCannon() {
         if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
         hideLuckyCannonRunnable = null;
-        // The cannon and its X counter must remain visible for the entire press-and-hold.
+        // The cannon remains visible during the hold; the X counter is shown in the centered toast.
         if (luckyCannonHoldActive) {
             hideLuckyCannonRunnable = this::hideLuckyCannon;
             handler.postDelayed(hideLuckyCannonRunnable,
@@ -4979,8 +4983,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * no additional gift is scheduled after the finger is released.
      */
     private void stopLuckyCannonHold(boolean sendAccumulated) {
+        boolean wasHolding = luckyCannonHoldActive;
         luckyCannonHoldActive = false;
         handler.removeCallbacks(luckyCannonRepeatRunnable);
+        if (wasHolding && binding != null && binding.comboGiftView != null) {
+            binding.comboGiftView.finishCannonLive(2200L);
+        }
     }
 
     private void sendLuckyCannonBatch(int requestedQuantity) {
@@ -5059,6 +5067,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (luckyCannonHoldActive) {
                 luckyCannonComboCount++;
                 updateLuckyCannonCounter();
+                showLuckyCannonSendToast(luckyCannonComboCount, true);
             }
         } catch (RuntimeException rejected) {
             // Executor saturation must not strand the in-flight counter or leave a
@@ -16811,7 +16820,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (cannonLaunch) {
                 // The canonical room event starts the combo toast only after the release-time
                 // batch has been accepted by the server. X counts sent units, never lucky payout.
-                showGiftSendToastCountUp(sender, name, senderAvatar, icon, qtyRemote);
+                if (!localSenderEcho && binding != null && binding.comboGiftView != null) {
+                    final String comboKey = sender != null && !sender.isEmpty() ? sender : "unknown";
+                    final int liveCount = Math.max(1,
+                            luckyCannonRemoteComboCounts.containsKey(comboKey)
+                                    ? luckyCannonRemoteComboCounts.get(comboKey) + Math.max(1, qtyRemote)
+                                    : Math.max(1, qtyRemote));
+                    luckyCannonRemoteComboCounts.put(comboKey, liveCount);
+                    binding.comboGiftView.showCannonLive(sender, name, senderAvatar,
+                            icon, liveCount, totalCoins);
+                    handler.postDelayed(() -> {
+                        Integer current = luckyCannonRemoteComboCounts.get(comboKey);
+                        if (current != null && current == liveCount) {
+                            luckyCannonRemoteComboCounts.remove(comboKey);
+                            if (binding != null && binding.comboGiftView != null) {
+                                binding.comboGiftView.finishCannonLive(2200L);
+                            }
+                        }
+                    }, 350L);
+                }
                 long perSeatSupport = allReceivers.isEmpty()
                         ? 0L : Math.max(0L, totalCoins / allReceivers.size());
                 if (perSeatSupport > 0L) {

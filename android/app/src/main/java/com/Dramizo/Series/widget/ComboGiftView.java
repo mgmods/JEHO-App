@@ -115,6 +115,77 @@ public class ComboGiftView extends FrameLayout {
         playCrawl();
     }
 
+
+    /**
+     * Lucky-cannon toast: fixed horizontally at the room center. Unlike ordinary gift
+     * combo strips it never crawls in from the edge; the live X value is updated in place.
+     */
+    public void showCannonLive(@Nullable String senderName,
+                               @Nullable String giftName,
+                               @Nullable String senderAvatarUrl,
+                               @Nullable String giftIconUrl,
+                               int comboCount,
+                               int totalCoins) {
+        if (sender != null) sender.setText(senderName != null && !senderName.isEmpty()
+                ? senderName : "مستخدم");
+        if (recvDesc != null) {
+            recvDesc.setText(giftName != null && !giftName.isEmpty()
+                    ? ("أرسل " + giftName) : "أرسل هدية حظ");
+            recvDesc.setSelected(true);
+        }
+        int combo = Math.max(1, comboCount);
+        lastDisplayedCount = combo;
+        if (comboNum != null) {
+            comboNum.setText("X" + combo);
+            comboNum.setTextSize(combo >= 10 ? 20f : 22f);
+            comboNum.setVisibility(VISIBLE);
+            comboNum.animate().cancel();
+            comboNum.setScaleX(0.88f);
+            comboNum.setScaleY(0.88f);
+            comboNum.animate().scaleX(1f).scaleY(1f).setDuration(110L).start();
+        }
+        View xMark = findViewById(R.id.vComboX);
+        if (xMark != null) xMark.setVisibility(GONE);
+        if (bg != null) bg.setImageResource(comboBgForCombo(combo, totalCoins));
+        if (avatar != null) {
+            AvatarCosmetics.bindAvatar(avatar, senderAvatarUrl);
+            avatar.setVisibility(VISIBLE);
+        }
+        bindGiftIcon(giftIconUrl);
+        if (hideRunnable != null) {
+            removeCallbacks(hideRunnable);
+            hideRunnable = null;
+        }
+        if (crawlRunnable != null) {
+            removeCallbacks(crawlRunnable);
+            crawlRunnable = null;
+        }
+        animate().setListener(null);
+        animate().cancel();
+        setVisibility(VISIBLE);
+        setAlpha(1f);
+        setTranslationX(0f);
+        setTranslationY(0f);
+        setScaleX(1f);
+        setScaleY(1f);
+        bringToFront();
+        showing = true;
+        hideRunnable = null;
+    }
+
+    /** Keep the centered cannon toast readable briefly after the finger is released. */
+    public void finishCannonLive(long delayMs) {
+        if (!showing) return;
+        if (hideRunnable != null) removeCallbacks(hideRunnable);
+        hideRunnable = () -> {
+            showing = false;
+            setVisibility(GONE);
+            setTranslationX(0f);
+            hideRunnable = null;
+        };
+        postDelayed(hideRunnable, Math.max(300L, delayMs));
+    }
+
     /**
      * Update the quantity number without restarting the toast's entrance/hold/exit animation.
      */
