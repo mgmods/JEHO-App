@@ -781,7 +781,7 @@
         android:layoutDirection="ltr"
         android:elevation="12dp"
         android:visibility="gone"
-        app:layout_constraintStart_toStartOf="@id/headerLeadingTools"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/headerRoom">
 
         <!-- Count badge (left of stack, like Mikoo "5") -->
