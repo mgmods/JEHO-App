@@ -14,7 +14,7 @@ import com.Dramizo.Series.realtime.RealtimeClient;
 import com.google.android.material.tabs.TabLayoutMediator;
 
 /**
- * One hub: friends / following / fans + friend / follow / relation requests.
+ * One hub: friends / following / fans + friend and follow requests.
  */
 public class FriendsActivity extends ThemedActivity {
     public static final String EXTRA_TAB = "tab";
