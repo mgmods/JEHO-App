@@ -57,6 +57,9 @@ jobs:
       - name: Verify Firebase Admin module compatibility
         working-directory: backend
         run: node -e "const a=require('firebase-admin'); if(!a.auth || !a.app) process.exit(1); console.log('Firebase Admin import OK')"
+      - name: Run authentication and realtime room regression tests
+        working-directory: backend
+        run: npm run test:auth-room
       - name: Run games regression tests
         working-directory: backend
         run: npm run test:games
