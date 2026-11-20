@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - security/dependency-audit-remediation-20261120
+  pull_request:
+    branches:
+      - MG-JEHO
 
 permissions:
   contents: write
@@ -116,9 +119,9 @@ jobs:
             try { report = JSON.parse(fs.readFileSync(p, 'utf8')); } catch {}
             const v = report.metadata?.vulnerabilities || {};
             const line = `| ${name} | ${v.total ?? 'unknown'} | ${v.low ?? 0} | ${v.moderate ?? 0} | ${v.high ?? 0} | ${v.critical ?? 0} |`;
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\\n');
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\n');
           }
-          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\\nAudit JSON reports are attached as workflow artifacts. Remaining high/critical findings require manual compatible remediation; no --force upgrades are applied.\\n');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\nAudit JSON reports are attached as workflow artifacts. Remaining high/critical findings require manual compatible remediation; no --force upgrades are applied.\n');
           NODE
         env:
           GITHUB_STEP_SUMMARY: ${{ github.step_summary }}
@@ -133,7 +136,7 @@ jobs:
           retention-days: 14
 
       - name: Commit verified lockfile changes
-        if: success()
+        if: success() && github.event_name == 'push'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
