@@ -2822,35 +2822,88 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     if (!room) throw new NotFoundException('Room not found');
     // Client sends total seats including host (seat 0). Clamp 2..31.
     const target = Math.min(31, Math.max(2, Math.floor(Number(seatCount) || DEFAULT_ROOM_SEAT_COUNT)));
-    const existing = await this.seatsRepo.find({ where: { roomId }, order: { seatIndex: 'ASC' } });
-    if (target > existing.length) {
-      const extra: RoomSeat[] = [];
-      for (let i = existing.length; i < target; i++) {
-        extra.push(
-          this.seatsRepo.create({
-            roomId,
-            seatIndex: i,
-            isHostSeat: false,
-            status: SeatStatus.EMPTY,
-            userId: null,
-          }),
-        );
-      }
-      await this.seatsRepo.save(extra);
-    } else if (target < existing.length) {
-      const occupiedOutOfRange = existing.some(
-        (seat) => seat.seatIndex >= target && !!seat.userId,
-      );
-      if (occupiedOutOfRange) {
+
+    await this.dataSource.transaction(async (manager) => {
+      const seatsRepo = manager.getRepository(RoomSeat);
+      const roomsRepo = manager.getRepository(Room);
+      const existing = await seatsRepo.find({
+        where: { roomId },
+        order: { seatIndex: 'ASC' },
+      });
+      const occupied = existing
+        .filter((seat) => !!seat.userId)
+        .sort((a, b) => {
+          if (a.userId === room.hostId) return -1;
+          if (b.userId === room.hostId) return 1;
+          return a.seatIndex - b.seatIndex;
+        });
+
+      if (occupied.length > target) {
         throw new ConflictException(
-          'Move users from seats outside the new size before shrinking',
+          'The new room size is smaller than the number of users currently seated',
         );
       }
-      const removable = existing.filter((s) => s.seatIndex >= target && !s.userId);
-      if (removable.length) await this.seatsRepo.remove(removable);
-    }
-    room.seatCount = target;
-    await this.roomsRepo.save(room);
+
+      // Keep every seated user. Compact occupied seats from left to right so
+      // reducing 30 to 10 does not strand or evict users sitting in seats 11–30.
+      const occupantState = occupied.map((seat) => ({
+        userId: seat.userId!,
+        isMuted: seat.isMuted,
+        isModeratorMuted: seat.isModeratorMuted,
+        wasHost: seat.userId === room.hostId || seat.isHostSeat,
+        status: seat.status,
+      }));
+
+      const byIndex = new Map(existing.map((seat) => [seat.seatIndex, seat]));
+      const requiredCount = Math.max(existing.length, target);
+      for (let i = existing.length; i < requiredCount; i++) {
+        existing.push(seatsRepo.create({
+          roomId,
+          seatIndex: i,
+          isHostSeat: false,
+          status: SeatStatus.EMPTY,
+          userId: null,
+        }));
+      }
+      existing.sort((a, b) => a.seatIndex - b.seatIndex);
+
+      // Clear user IDs first to respect the room/user unique index while moving.
+      for (const seat of existing) {
+        seat.userId = null;
+        seat.isMuted = false;
+        seat.isModeratorMuted = false;
+        seat.isHostSeat = seat.seatIndex === 0;
+        if (seat.status !== SeatStatus.LOCKED) seat.status = SeatStatus.EMPTY;
+      }
+      await seatsRepo.save(existing);
+
+      for (let i = 0; i < target; i++) {
+        const seat = existing[i];
+        const occupant = occupantState[i];
+        seat.isHostSeat = i === 0;
+        if (occupant) {
+          seat.userId = occupant.userId;
+          seat.isMuted = occupant.isMuted;
+          seat.isModeratorMuted = occupant.isModeratorMuted;
+          seat.isHostSeat = i === 0 || occupant.wasHost;
+          seat.status = occupant.status === SeatStatus.MUTED
+            ? SeatStatus.MUTED
+            : SeatStatus.OCCUPIED;
+        } else if (seat.status !== SeatStatus.LOCKED) {
+          seat.status = SeatStatus.EMPTY;
+        }
+      }
+      await seatsRepo.save(existing.slice(0, target));
+      if (existing.length > target) {
+        await seatsRepo.remove(existing.slice(target));
+      }
+
+      const managedRoom = await roomsRepo.findOne({ where: { id: roomId } });
+      if (!managedRoom) throw new NotFoundException('Room not found');
+      managedRoom.seatCount = target;
+      await roomsRepo.save(managedRoom);
+    });
+
     this.emitRoomEvent(roomId, 'room:seats_resized', {
       seatCount: target,
     });
