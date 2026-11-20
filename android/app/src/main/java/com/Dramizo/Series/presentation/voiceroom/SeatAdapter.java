@@ -900,7 +900,19 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
         if (holder.b.tvName != null) {
             holder.b.tvName.setTextSize(nameSp);
-            holder.b.tvName.setMaxWidth(Math.round(nameMax * d));
+            int nameWidthPx = Math.round(nameMax * d);
+            holder.b.tvName.setMaxWidth(nameWidthPx);
+            View nameContainer = (View) holder.b.tvName.getParent();
+            ViewGroup.LayoutParams containerLp = nameContainer.getLayoutParams();
+            containerLp.width = nameWidthPx;
+            nameContainer.setLayoutParams(containerLp);
+            ViewGroup.LayoutParams textLp = holder.b.tvName.getLayoutParams();
+            textLp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            holder.b.tvName.setLayoutParams(textLp);
+            // Marquee activates only when the full name exceeds its viewport.
+            holder.b.tvName.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            holder.b.tvName.setMarqueeRepeatLimit(-1);
+            holder.b.tvName.setSelected(true);
             if (scaleMode == SCALE_MICRO) {
                 View nameRow = (View) holder.b.tvName.getParent().getParent();
                 ViewGroup.LayoutParams nameRowRaw = nameRow.getLayoutParams();
