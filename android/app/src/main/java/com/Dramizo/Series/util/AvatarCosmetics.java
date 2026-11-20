@@ -543,6 +543,23 @@ public final class AvatarCosmetics {
         return signal;
     }
 
+    /**
+     * Resolve the one frame that should be rendered everywhere. A specifically equipped
+     * store frame wins; otherwise an active VIP membership may supply its configured frame.
+     */
+    @Nullable
+    public static String avatarFrameUrl(
+            @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (user == null) return null;
+        if (user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()) {
+            return user.vipBadgeUrl.trim();
+        }
+        if (user.vipFrameUrl != null && !user.vipFrameUrl.trim().isEmpty()) {
+            return user.vipFrameUrl.trim();
+        }
+        return null;
+    }
+
     /** Prefer this for lists / profile — VIP frame only (host signal is agency-room wear). */
     public static void bindWear(
             @Nullable ImageView avatarView,
@@ -557,7 +574,7 @@ public final class AvatarCosmetics {
                 avatarView,
                 frameView,
                 user.avatarUrl,
-                user.vipBadgeUrl,
+                avatarFrameUrl(user),
                 null,
                 null,
                 null);
