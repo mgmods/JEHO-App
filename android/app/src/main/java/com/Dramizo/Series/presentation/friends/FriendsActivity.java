@@ -24,17 +24,15 @@ public class FriendsActivity extends ThemedActivity {
     public static final int TAB_FANS = 2;
     public static final int TAB_REQ_FRIEND = 3;
     public static final int TAB_REQ_FOLLOW = 4;
-    public static final int TAB_REQ_RELATION = 5;
-    private static final int TAB_COUNT = 6;
+    private static final int TAB_COUNT = 5;
 
-    private static final String[] REQ_TYPES = {"friend", "follow", "relation"};
+    private static final String[] REQ_TYPES = {"friend", "follow"};
     private static final int[] TAB_TITLES = {
             R.string.friends,
             R.string.following,
             R.string.fans,
             R.string.request_friendship,
-            R.string.request_follow,
-            R.string.request_relation
+            R.string.request_follow
     };
 
     private ActivityFriendsBinding binding;
