@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { UserStatus } from '../../database/entities/user.entity';
 import { AuthService } from './auth.service';
-import { RealtimeGateway } from './realtime/realtime.gateway';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 test('Google social login verifies the ID token and links the verified subject', async () => {
   const verified = {
