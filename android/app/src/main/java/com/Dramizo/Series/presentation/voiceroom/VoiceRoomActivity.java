@@ -337,21 +337,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int luckyCannonGiftPrice;
     private final List<String> luckyCannonTargets = new ArrayList<>();
     private boolean luckyCannonSending;
-    /** One released hold is charged as a single lucky-gift quantity batch. */
+    /** Lucky cannon sends one server-authoritative unit immediately on press, then repeats while held. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
     private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 120L;
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
     private int luckyCannonInFlight;
-    private int luckyCannonPendingQuantity;
     private boolean luckyCannonHoldActive;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
             if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
-            // A held press increments the visual send quantity only. No wallet request
-            // is started until ACTION_UP submits the complete combo as one batch.
-            luckyCannonPendingQuantity = Math.min(
-                    LUCKY_CANNON_MAX_BATCH_QUANTITY, luckyCannonPendingQuantity + 1);
+            // Do not wait for ACTION_UP. Each repeat is a real lucky-gift send, so
+            // releasing the finger stops scheduling new sends immediately.
+            if (luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT) {
+                sendLuckyCannonBatch(1);
+            }
             if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
-            handler.postDelayed(this, LUCKY_CANNON_REPEAT_INTERVAL_MS);
+            if (luckyCannonHoldActive) {
+                handler.postDelayed(this, LUCKY_CANNON_REPEAT_INTERVAL_MS);
+            }
         }
     };
     @Nullable private String luckyCannonRequestId;
@@ -4915,35 +4918,39 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         luckyCannonHoldActive = true;
-        luckyCannonPendingQuantity = 1;
+        // First send happens on ACTION_DOWN. This removes the old "release then press
+        // again" feeling and makes every new press an independent lucky-gift start.
+        sendLuckyCannonBatch(1);
         if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
         handler.removeCallbacks(luckyCannonRepeatRunnable);
         handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
     }
 
     /**
-     * ACTION_UP commits the complete held quantity in one all-mic request.
-     * ACTION_CANCEL / drag only discard the not-yet-sent combo.
+     * ACTION_UP / ACTION_CANCEL stop the repeat loop immediately.
+     * Any request already accepted by the executor is allowed to finish safely;
+     * no additional gift is scheduled after the finger is released.
      */
     private void stopLuckyCannonHold(boolean sendAccumulated) {
-        boolean wasHolding = luckyCannonHoldActive;
         luckyCannonHoldActive = false;
         handler.removeCallbacks(luckyCannonRepeatRunnable);
-        int batchQuantity = luckyCannonPendingQuantity;
-        luckyCannonPendingQuantity = 0;
-        if (sendAccumulated && wasHolding && batchQuantity > 0) {
-            sendLuckyCannonBatch(batchQuantity);
-        }
     }
 
     private void sendLuckyCannonBatch(int requestedQuantity) {
         if (!luckyCannonEnabled || luckyCannonGiftId == null
                 || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
-        // Resolve the live roster at release time; never fall back to stale selected IDs.
-        java.util.LinkedHashSet<String> liveTargets =
+        // Resolve only the recipients selected when the lucky gift was armed.
+        // Their current seat positions are resolved later for the center-to-seat flight.
+        java.util.LinkedHashSet<String> occupiedNow =
                 new java.util.LinkedHashSet<>(collectOccupiedMicUserIds());
+        java.util.LinkedHashSet<String> liveTargets = new java.util.LinkedHashSet<>();
+        for (String selectedId : luckyCannonTargets) {
+            if (selectedId != null && occupiedNow.contains(selectedId)) {
+                liveTargets.add(selectedId);
+            }
+        }
         if (liveTargets.isEmpty()) {
-            Toast.makeText(this, "لم يعد هناك مستخدمون على المقاعد", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "لم يعد هناك مستخدمون على المقاعد المحددة", Toast.LENGTH_SHORT).show();
             return;
         }
         final List<String> targets = new ArrayList<>(liveTargets);
