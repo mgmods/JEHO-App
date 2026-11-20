@@ -5042,15 +5042,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                     ? finalResult.error : "تعذر إرسال دفعة الهدية");
                     return;
                 }
-                if (luckyCannonHoldActive) {
-                    luckyCannonComboCount++;
-                    updateLuckyCannonComboCount();
-                }
                 showLuckyCannonAndScheduleHide();
             });
         };
         try {
             container.getLuckyCannonExecutor().execute(sendTask);
+            // Reflect each accepted one-unit shot immediately, rather than waiting
+            // for network latency; ACTION_UP prevents any later increments.
+            if (luckyCannonHoldActive) {
+                luckyCannonComboCount++;
+                updateLuckyCannonComboCount();
+            }
         } catch (RuntimeException rejected) {
             // Executor saturation must not strand the in-flight counter or leave a
             // press-and-hold loop repeatedly enqueueing work that cannot run.
