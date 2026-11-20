@@ -1,0 +1,161 @@
+name: JEHO dependency security remediation
+
+on:
+  push:
+    branches:
+      - security/dependency-audit-remediation-20261120
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jeho-security-remediation
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: jeho_test
+          POSTGRES_PASSWORD: jeho_test_password
+          POSTGRES_DB: jeho_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jeho_test -d jeho_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout security branch
+        uses: actions/checkout@v4
+        with:
+          ref: security/dependency-audit-remediation-20261120
+          persist-credentials: true
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Apply compatible backend dependency security fixes
+        working-directory: backend
+        shell: bash
+        run: |
+          set +e
+          npm audit fix --no-fund
+          status=$?
+          echo "Backend npm audit fix exit code: $status"
+          exit 0
+
+      - name: Apply compatible dashboard dependency security fixes
+        working-directory: backend/dashboard
+        shell: bash
+        run: |
+          set +e
+          npm audit fix --no-fund
+          status=$?
+          echo "Dashboard npm audit fix exit code: $status"
+          exit 0
+
+      - name: Install and validate backend lockfile
+        working-directory: backend
+        run: npm ci
+
+      - name: Backend schema lock unit tests
+        working-directory: backend
+        run: npm run test:schema-lock
+
+      - name: Backend PostgreSQL schema lock integration
+        working-directory: backend
+        env:
+          SCHEMA_LOCK_TEST_DATABASE_URL: postgresql://jeho_test:jeho_test_password@localhost:5432/jeho_test
+        run: npm run test:schema-lock-postgres
+
+      - name: Backend CP bootstrap PostgreSQL integration
+        working-directory: backend
+        env:
+          CP_TEST_DATABASE_URL: postgresql://jeho_test:jeho_test_password@localhost:5432/jeho_test
+        run: npm run test:cp-bootstrap
+
+      - name: Backend TypeScript validation
+        working-directory: backend
+        run: npm run lint
+
+      - name: Backend production build
+        working-directory: backend
+        run: npm run build
+
+      - name: Install and validate dashboard lockfile
+        working-directory: backend/dashboard
+        run: npm ci
+
+      - name: Dashboard production build
+        working-directory: backend/dashboard
+        env:
+          VITE_API_URL: /api/v1
+          VITE_BASE: /admin/
+        run: npm run build
+
+      - name: Generate backend and dashboard audit reports
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p security-audit-results
+          (cd backend && npm audit --json > ../security-audit-results/backend-audit.json) || true
+          (cd backend/dashboard && npm audit --json > ../../security-audit-results/dashboard-audit.json) || true
+          node - <<'NODE'
+          const fs = require('fs');
+          for (const name of ['backend', 'dashboard']) {
+            const p = `security-audit-results/${name}-audit.json`;
+            let report = {};
+            try { report = JSON.parse(fs.readFileSync(p, 'utf8')); } catch {}
+            const v = report.metadata?.vulnerabilities || {};
+            const line = `| ${name} | ${v.total ?? 'unknown'} | ${v.low ?? 0} | ${v.moderate ?? 0} | ${v.high ?? 0} | ${v.critical ?? 0} |`;
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\\n');
+          }
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\\nAudit JSON reports are attached as workflow artifacts. Remaining high/critical findings require manual compatible remediation; no --force upgrades are applied.\\n');
+          NODE
+        env:
+          GITHUB_STEP_SUMMARY: ${{ github.step_summary }}
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jeho-dependency-audit-reports
+          path: security-audit-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Commit verified lockfile changes
+        if: success()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/package.json backend/package-lock.json backend/dashboard/package.json backend/dashboard/package-lock.json
+          if git diff --cached --quiet; then
+            echo "No dependency manifest or lockfile changes were needed."
+          else
+            git commit -m "Fix compatible backend and dashboard dependency advisories"
+            git push origin HEAD:security/dependency-audit-remediation-20261120
+          fi
+
+      - name: Fail if high or critical vulnerabilities remain
+        if: success()
+        shell: bash
+        run: |
+          set +e
+          (cd backend && npm audit --audit-level=high)
+          backend_status=$?
+          (cd backend/dashboard && npm audit --audit-level=high)
+          dashboard_status=$?
+          if [ "$backend_status" -ne 0 ] || [ "$dashboard_status" -ne 0 ]; then
+            echo "High or critical vulnerabilities remain; manual version-aligned remediation is required."
+            exit 1
+          fi
