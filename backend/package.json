@@ -81,6 +81,9 @@
     "picomatch": "4.0.7",
     "tmp": "0.2.7",
     "qs": "6.17.1",
-    "webpack": "5.105.0"
+    "webpack": "5.105.0",
+    "@angular-devkit/core": {
+      "ajv": "8.18.0"
+    }
   }
 }
