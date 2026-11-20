@@ -2525,7 +2525,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String avatar = u != null ? u.avatarUrl : null;
         long wealth = u != null ? Math.max(u.wealthScore, u.totalSentCoins) : 0L;
         long charm = u != null ? Math.max(0L, u.charmScore) : 0L;
-        String vipFrame = u != null ? u.vipBadgeUrl : null;
+        String vipFrame = u != null ? com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(u) : null;
         String hostFrame = u != null ? u.hostBadgeUrl : null;
         // Chat avatar always carries the user's equipped personal frame in every room.
         String frame = vipFrame;
@@ -2904,7 +2904,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (avatarUrl == null) avatarUrl = session.getAvatarUrl();
                 AuthDtos.UserDto selfUser = session.getUser();
                 if ((frameUrl == null || frameUrl.isEmpty()) && selfUser != null) {
-                    frameUrl = selfUser.vipBadgeUrl;
+                    frameUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(selfUser);
                 }
                 if (selfUser != null) {
                     if (wealthScore <= 0) wealthScore = Math.max(selfUser.wealthScore, selfUser.totalSentCoins);
@@ -2920,7 +2920,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (avatarUrl == null || avatarUrl.isEmpty()) avatarUrl = selfUser.avatarUrl;
                 // The signed-in user's currently equipped frame is authoritative,
                 // even when an older room event carries a legacy hostBadge frameUrl.
-                frameUrl = selfUser.vipBadgeUrl;
+                frameUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(selfUser);
             }
         }
         // The message payload's legacy frameUrl may contain an agency host badge.
@@ -3198,7 +3198,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     decoration.agencyRole = user.agency.role;
                 }
                 decoration.gender = user.gender;
-                decoration.vipBadgeUrl = user.vipBadgeUrl;
+                decoration.vipBadgeUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(user);
                 decoration.vipLevel = Math.max(0, user.vipLevel);
                 List<String> displayedIds = user.displayedMedalIds == null
                         ? java.util.Collections.emptyList() : user.displayedMedalIds;
@@ -17827,7 +17827,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             AuthDtos.UserDto me = ContainerProvider.from(this).getSessionManager().getUser();
             if (me != null) {
                 hostBadge = me.hostBadgeUrl;
-                vipBadge = me.vipBadgeUrl;
+                vipBadge = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(me);
                 meta = me.hostBadgeMeta;
                 displayName = me.displayName != null && !me.displayName.isEmpty()
                         ? me.displayName : me.username;
@@ -17860,7 +17860,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     || avatar == null || frame == null) continue;
             String avatarUrl = avatar.getTag() instanceof String
                     ? (String) avatar.getTag() : me.avatarUrl;
-            AvatarCosmetics.bindStacked(avatar, frame, signal, avatarUrl, me.vipBadgeUrl, null);
+            AvatarCosmetics.bindStacked(avatar, frame, signal, avatarUrl,
+                    com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(me), null);
         }
     }
 
