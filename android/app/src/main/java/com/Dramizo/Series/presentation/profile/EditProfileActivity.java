@@ -96,6 +96,10 @@ public class EditProfileActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityEditProfileBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        // Bio is no longer editable here; keep the bound field hidden for API compatibility.
+        if (binding.etBio != null && binding.etBio.getParent() instanceof View) {
+            ((View) binding.etBio.getParent()).setVisibility(View.GONE);
+        }
         // Explicit system padding on contentRoot (layout id) — avoids toolbar-only pad
         // which caused overlapping status/fields on edge-to-edge Android 14+.
         EdgeToEdgeHelper.apply(this);
