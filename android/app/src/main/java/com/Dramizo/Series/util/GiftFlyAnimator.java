@@ -320,7 +320,13 @@ public final class GiftFlyAnimator {
                 overlay.getResources().getDisplayMetrics().widthPixels);
         int h = Math.max(overlay.getHeight(),
                 overlay.getResources().getDisplayMetrics().heightPixels);
-        PointF mid = center != null ? center : new PointF(w / 2f, h * 0.40f);
+        // The cannon/all-mic hero must be anchored to the actual overlay bounds.
+        // A caller-provided point may be in screen, seat, or parent coordinates and
+        // was shifting the rose + X badge toward the right-hand seats.
+        // Use overlay-local center for the hero, glow, multiplier, banner and scatter origin.
+        PointF mid = new PointF(
+                overlay.getWidth() > 0 ? overlay.getWidth() * 0.5f : w * 0.5f,
+                overlay.getHeight() > 0 ? overlay.getHeight() * 0.5f : h * 0.5f);
         List<PointF> targets = seats != null ? new ArrayList<>(seats) : new ArrayList<>();
 
         overlay.setVisibility(View.VISIBLE);
