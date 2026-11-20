@@ -16,11 +16,15 @@ public final class AppFeatures {
 
     public static void refresh(AppContainer container) {
         if (container == null) return;
+        // Acquire first so concurrent callers cannot move the throttle timestamp.
+        if (!REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
         long now = android.os.SystemClock.elapsedRealtime();
         long previous = LAST_REFRESH_AT.get();
-        if (previous >= 0L && now - previous < REFRESH_INTERVAL_MS) return;
-        if (!LAST_REFRESH_AT.compareAndSet(previous, now)) return;
-        if (!REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        if (previous >= 0L && now - previous < REFRESH_INTERVAL_MS) {
+            REFRESH_IN_FLIGHT.set(false);
+            return;
+        }
+        boolean completed = false;
         try {
             Result<MiscDtos.FeaturesDto> r = ApiCall.execute(container.getConfigApi().features());
             if (!r.success || r.data == null) return;
@@ -41,7 +45,10 @@ public final class AppFeatures {
             }
             // Silent media cache sync (game covers / static icons).
             MediaAssetSync.applyServerEpoch(container.getAppContext(), r.data.mediaAssetEpoch);
+            completed = true;
         } finally {
+            // Only successful refreshes start the one-minute cooldown.
+            if (completed) LAST_REFRESH_AT.set(android.os.SystemClock.elapsedRealtime());
             REFRESH_IN_FLIGHT.set(false);
         }
     }
