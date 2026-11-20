@@ -59,6 +59,13 @@ jobs:
         working-directory: backend
         run: npm run build
 
+      - name: Set up Node.js 22 for dashboard build
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/dashboard/package-lock.json
+
       - name: Install dashboard dependencies
         working-directory: backend/dashboard
         run: npm ci

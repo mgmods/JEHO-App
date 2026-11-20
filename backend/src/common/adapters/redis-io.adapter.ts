@@ -6,7 +6,7 @@ import Redis from 'ioredis';
 import { ServerOptions } from 'socket.io';
 
 export class RedisIoAdapter extends IoAdapter {
-  private readonly logger = new Logger(RedisIoAdapter.name);
+  private readonly redisLogger = new Logger(RedisIoAdapter.name);
   private pubClient: Redis | null = null;
   private subClient: Redis | null = null;
   private adapterConstructor: ReturnType<typeof createAdapter> | null = null;
@@ -22,7 +22,7 @@ export class RedisIoAdapter extends IoAdapter {
     // Redis is optional for the single-instance Render deployment. Do not
     // probe localhost when no Redis service was explicitly configured.
     if (!process.env.REDIS_HOST) {
-      this.logger.log('Socket.IO Redis not configured; using single-process adapter');
+      this.redisLogger.log('Socket.IO Redis not configured; using single-process adapter');
       return false;
     }
 
@@ -40,7 +40,7 @@ export class RedisIoAdapter extends IoAdapter {
     const onRedisError = (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       if (!message.includes('ECONNREFUSED')) {
-        this.logger.warn(`Socket.IO Redis error: ${message}`);
+        this.redisLogger.warn(`Socket.IO Redis error: ${message}`);
       }
     };
     this.pubClient.on('error', onRedisError);
@@ -48,10 +48,10 @@ export class RedisIoAdapter extends IoAdapter {
     try {
       await Promise.all([this.pubClient.connect(), this.subClient.connect()]);
       this.adapterConstructor = createAdapter(this.pubClient, this.subClient);
-      this.logger.log('Socket.IO Redis adapter connected');
+      this.redisLogger.log('Socket.IO Redis adapter connected');
       return true;
     } catch (error) {
-      this.logger.warn(
+      this.redisLogger.warn(
         `Redis adapter unavailable; using single-process Socket.IO: ${(error as Error).message}`,
       );
       this.pubClient.disconnect();
