@@ -703,7 +703,7 @@ public final class AvatarCosmetics {
                 frameView,
                 null,
                 avatarView,
-                user.vipBadgeUrl,
+                avatarFrameUrl(user),
                 null,
                 null,
                 null);
