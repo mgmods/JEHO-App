@@ -1,0 +1,121 @@
+name: Experimental NestJS 11 Compatibility Check v2
+
+on:
+  push:
+    branches:
+      - experiment/major-dependency-upgrades-20261120
+    paths:
+      - ".github/workflows/experimental-nestjs-11-v2.yml"
+      - "backend/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeho-nest11-experiment-v2
+  cancel-in-progress: true
+
+jobs:
+  nestjs-11-check:
+    if: github.ref == 'refs/heads/experiment/major-dependency-upgrades-20261120'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: cp_test
+          POSTGRES_PASSWORD: cp_test_password
+          POSTGRES_DB: cp_bootstrap_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cp_test -d cp_bootstrap_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout isolated experiment branch
+        uses: actions/checkout@v4
+        with:
+          ref: experiment/major-dependency-upgrades-20261120
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Upgrade Nest framework and companion packages in disposable workspace
+        working-directory: backend
+        run: |
+          npm install --save-exact \
+            @nestjs/common@11 \
+            @nestjs/core@11 \
+            @nestjs/platform-express@11 \
+            @nestjs/platform-socket.io@11 \
+            @nestjs/websockets@11 \
+            @nestjs/typeorm@11 \
+            @nestjs/cli@11 \
+            @nestjs/schematics@11 \
+            @nestjs/config@4 \
+            @nestjs/jwt@11 \
+            @nestjs/passport@11.0.5 \
+            @nestjs/swagger@11
+
+      - name: Verify complete Nest dependency tree
+        working-directory: backend
+        run: npm ls @nestjs/common @nestjs/core @nestjs/platform-express @nestjs/platform-socket.io @nestjs/websockets @nestjs/typeorm @nestjs/cli @nestjs/schematics @nestjs/config @nestjs/jwt @nestjs/passport @nestjs/swagger @nestjs/throttler
+
+      - name: Reinstall from generated lockfile
+        working-directory: backend
+        run: |
+          rm -rf node_modules
+          npm ci
+
+      - name: TypeScript validation
+        working-directory: backend
+        run: npm run lint
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Games regression tests
+        working-directory: backend
+        run: npm run test:games
+
+      - name: CP PostgreSQL fresh-install and upgrade tests
+        working-directory: backend
+        env:
+          CP_TEST_DATABASE_URL: postgresql://cp_test:cp_test_password@localhost:5432/cp_bootstrap_test
+        run: npm run test:cp-bootstrap
+
+      - name: Verify production Node.js 20 runtime compatibility
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Reinstall and validate on production Node.js 20
+        working-directory: backend
+        env:
+          CP_TEST_DATABASE_URL: postgresql://cp_test:cp_test_password@localhost:5432/cp_bootstrap_test
+        run: |
+          rm -rf node_modules
+          npm ci
+          npm run lint
+          npm run build
+          npm run test:games
+          npm run test:cp-bootstrap
+
+      - name: Upload experimental lockfile and package manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jeho-nestjs-11-v2-experiment
+          path: |
+            backend/package.json
+            backend/package-lock.json
+          if-no-files-found: error
+          retention-days: 7
