@@ -31,6 +31,7 @@ public class ChatViewModel extends ViewModel {
     private int currentPage = 1;
     private int totalPages = 1;
     private boolean loadingMore;
+    private volatile long loadGeneration;
     private final RealtimeClient.ChatListener chatListener = new RealtimeClient.ChatListener() {
         @Override
         public void onChatMessage(String cid, ChatDtos.MessageDto message) {
@@ -171,58 +172,88 @@ public class ChatViewModel extends ViewModel {
         attach(conversationId);
         currentPage = 1;
         totalPages = 1;
-        c.getIoExecutor().execute(() -> {
-            // Paint Room cache immediately so conversation opens without blank wait.
-            if (switched) {
+        final String requestedConversation = conversationId;
+        final long requestGeneration = ++loadGeneration;
+        try {
+            c.getIoExecutor().execute(() -> {
                 try {
-                    List<ChatDtos.MessageDto> cached =
-                            c.getChatRepository().getCachedMessages(conversationId);
-                    if (cached != null && !cached.isEmpty()) {
-                        List<ChatDtos.MessageDto> painted = new ArrayList<>();
-                        for (ChatDtos.MessageDto m : cached) {
-                            if (m == null || m.id == null) continue;
-                            if (isDismissed(m.id)) continue;
-                            normalizeMine(m);
-                            m.localPending = false;
-                            painted.add(m);
+                    // Paint the local cache first, but never let an old conversation overwrite
+                    // the screen after the user has already switched to another chat.
+                    if (switched) {
+                        try {
+                            List<ChatDtos.MessageDto> cached =
+                                    c.getChatRepository().getCachedMessages(requestedConversation);
+                            if (requestGeneration != loadGeneration
+                                    || !requestedConversation.equals(this.conversationId)) return;
+                            if (cached != null && !cached.isEmpty()) {
+                                List<ChatDtos.MessageDto> painted = new ArrayList<>();
+                                for (ChatDtos.MessageDto m : cached) {
+                                    if (m == null || m.id == null) continue;
+                                    if (isDismissed(m.id)) continue;
+                                    normalizeMine(m);
+                                    m.localPending = false;
+                                    painted.add(m);
+                                }
+                                if (!painted.isEmpty()) messages.postValue(painted);
+                            } else {
+                                messages.postValue(Collections.emptyList());
+                            }
+                        } catch (Exception cacheFailure) {
+                            if (requestGeneration == loadGeneration
+                                    && requestedConversation.equals(this.conversationId)) {
+                                messages.postValue(Collections.emptyList());
+                            }
                         }
-                        if (!painted.isEmpty()) messages.postValue(painted);
+                    }
+                    Result<ChatDtos.MessageList> r =
+                            c.getMessagesUseCase.execute(requestedConversation, 1);
+                    if (requestGeneration != loadGeneration
+                            || !requestedConversation.equals(this.conversationId)) return;
+                    if (r != null && r.success && r.data != null && r.data.items != null) {
+                        if (r.data.meta != null) {
+                            currentPage = r.data.meta.page > 0 ? r.data.meta.page : 1;
+                            totalPages = r.data.meta.totalPages > 0 ? r.data.meta.totalPages : 1;
+                        }
+                        if (r.data.peerLastReadAt != null) {
+                            peerLastReadAt.postValue(r.data.peerLastReadAt);
+                        }
+                        if (switched) {
+                            List<ChatDtos.MessageDto> items = new ArrayList<>();
+                            for (ChatDtos.MessageDto m : r.data.items) {
+                                if (m == null || m.id == null) continue;
+                                if (isDismissed(m.id)) continue;
+                                normalizeMine(m);
+                                m.localPending = false;
+                                items.add(m);
+                            }
+                            messages.postValue(items);
+                        } else {
+                            mergeLoadedMessages(r.data.items);
+                        }
                     } else {
-                        messages.postValue(Collections.emptyList());
+                        String message = r != null && r.error != null
+                                ? r.error : "تعذر تحميل المحادثة";
+                        if (switched) {
+                            List<ChatDtos.MessageDto> cur = messages.getValue();
+                            if (cur == null || cur.isEmpty()) error.postValue(message);
+                        } else {
+                            error.postValue(message);
+                        }
                     }
-                } catch (Exception ignored) {
-                    messages.postValue(Collections.emptyList());
-                }
-            }
-            Result<ChatDtos.MessageList> r = c.getMessagesUseCase.execute(conversationId, 1);
-            if (r.success && r.data != null && r.data.items != null) {
-                if (r.data.meta != null) {
-                    currentPage = r.data.meta.page > 0 ? r.data.meta.page : 1;
-                    totalPages = r.data.meta.totalPages > 0 ? r.data.meta.totalPages : 1;
-                }
-                if (r.data.peerLastReadAt != null) {
-                    peerLastReadAt.postValue(r.data.peerLastReadAt);
-                }
-                if (switched) {
-                    List<ChatDtos.MessageDto> items = new ArrayList<>();
-                    for (ChatDtos.MessageDto m : r.data.items) {
-                        if (m == null || m.id == null) continue;
-                        if (isDismissed(m.id)) continue;
-                        normalizeMine(m);
-                        m.localPending = false;
-                        items.add(m);
+                } catch (RuntimeException failure) {
+                    android.util.Log.w("ChatViewModel", "Conversation load failed", failure);
+                    if (requestGeneration == loadGeneration
+                            && requestedConversation.equals(this.conversationId)) {
+                        error.postValue("تعذر تحميل المحادثة، حاول مجددًا");
                     }
-                    messages.postValue(items);
-                } else {
-                    mergeLoadedMessages(r.data.items);
                 }
-            } else if (switched) {
-                List<ChatDtos.MessageDto> cur = messages.getValue();
-                if (cur == null || cur.isEmpty()) error.postValue(r.error);
-            } else {
-                error.postValue(r.error);
+            });
+        } catch (RuntimeException rejected) {
+            if (requestGeneration == loadGeneration
+                    && requestedConversation.equals(this.conversationId)) {
+                error.postValue("تعذر تحميل المحادثة، حاول مجددًا");
             }
-        });
+        }
     }
 
     public void loadOlder() {
