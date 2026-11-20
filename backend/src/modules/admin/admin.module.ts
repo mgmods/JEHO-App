@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
@@ -97,7 +97,7 @@ import { GiftsModule } from '../gifts/gifts.module';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('app.jwt.secret'),
         signOptions: {
-          expiresIn: config.get<string>('app.jwt.expiresIn') || '15m',
+          expiresIn: (config.get<string>('app.jwt.expiresIn') || '15m') as NonNullable<JwtModuleOptions['signOptions']>['expiresIn'],
         },
       }),
     }),
