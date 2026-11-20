@@ -544,20 +544,16 @@ public final class AvatarCosmetics {
     }
 
     /**
-     * Resolve the one frame that should be rendered everywhere. A specifically equipped
-     * store frame wins; otherwise an active VIP membership may supply its configured frame.
+     * Resolve only the user's explicitly equipped avatar frame. An empty value means
+     * the user has unequipped it; never stack or silently restore a VIP-tier fallback.
      */
     @Nullable
     public static String avatarFrameUrl(
             @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
-        if (user == null) return null;
-        if (user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()) {
-            return user.vipBadgeUrl.trim();
+        if (user == null || user.vipBadgeUrl == null || user.vipBadgeUrl.trim().isEmpty()) {
+            return null;
         }
-        if (user.vipFrameUrl != null && !user.vipFrameUrl.trim().isEmpty()) {
-            return user.vipFrameUrl.trim();
-        }
-        return null;
+        return user.vipBadgeUrl.trim();
     }
 
     /** Prefer this for lists / profile — VIP frame only (host signal is agency-room wear). */
