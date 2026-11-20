@@ -4926,6 +4926,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void hideLuckyCannon() {
         if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
         hideLuckyCannonRunnable = null;
+        // The cannon and its X counter must remain visible for the entire press-and-hold.
+        if (luckyCannonHoldActive) {
+            hideLuckyCannonRunnable = this::hideLuckyCannon;
+            handler.postDelayed(hideLuckyCannonRunnable,
+                    Math.max(1, luckyCannonDurationSeconds) * 1000L);
+            return;
+        }
         if (luckyCannonLayer != null) luckyCannonLayer.setVisibility(View.GONE);
         luckyCannonComboCount = 0;
         if (luckyCannonComboCountView != null) luckyCannonComboCountView.setVisibility(View.GONE);
