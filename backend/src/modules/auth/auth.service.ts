@@ -55,23 +55,63 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
   private async ensurePublicIdSchema(): Promise<void> {
     try {
-      await this.dataSource.transaction(async (manager) => {
-        await manager.query("SET LOCAL lock_timeout = '250ms'");
-        await manager.query("SET LOCAL statement_timeout = '8s'");
-        const lockRows = await manager.query(
-          'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
-          [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
-        );
-        if (lockRows?.[0]?.locked !== true) {
-          throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
-        }
-        await manager.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16)`);
-        await manager.query(`CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_public_id" ON users("publicId")`);
-      });
+      // Avoid taking the cluster-wide DDL lock on every normal restart. The
+      // previous path attempted the lock even when both the column and index
+      // already existed, creating harmless but noisy contention with the other
+      // idempotent JEHO startup bootstraps.
+      const [schemaState] = await this.dataSource.query(`
+        SELECT
+          EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'users'
+              AND column_name = 'publicId'
+          ) AS has_public_id,
+          EXISTS (
+            SELECT 1 FROM pg_indexes
+            WHERE schemaname = current_schema()
+              AND indexname = 'idx_users_public_id'
+          ) AS has_public_id_index
+      `);
+      const schemaReady =
+        schemaState?.has_public_id === true &&
+        schemaState?.has_public_id_index === true;
+
+      if (!schemaReady) {
+        await this.dataSource.transaction(async (manager) => {
+          await manager.query("SET LOCAL lock_timeout = '250ms'");
+          await manager.query("SET LOCAL statement_timeout = '8s'");
+          const lockRows = await manager.query(
+            'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
+            [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+          );
+          if (lockRows?.[0]?.locked !== true) {
+            throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
+          }
+          await manager.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16)`);
+          await manager.query(`CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_public_id" ON users("publicId")`);
+        });
+      }
+
+      // Backfill only when there are actually legacy/missing IDs. This keeps
+      // healthy restarts entirely outside the migration lock path.
+      const [backfillState] = await this.dataSource.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM users
+          WHERE "publicId" IS NULL
+             OR "publicId" = ''
+             OR "publicId" !~ '^[0-9]{3,12}$'
+        ) AS needs_backfill
+      `);
+      if (backfillState?.needs_backfill !== true) {
+        if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+        this.publicIdSchemaRetryTimer = null;
+        return;
+      }
       if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
       this.publicIdSchemaRetryTimer = null;
     } catch (err) {
-      this.logger.warn(`publicId column ensure deferred; will retry safely: ${(err as Error).message}`);
+      this.logger.warn(`publicId schema ensure deferred; will retry safely: ${(err as Error).message}`);
       if (!this.publicIdSchemaRetryTimer) {
         this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
         this.publicIdSchemaRetryTimer.unref?.();
