@@ -304,7 +304,7 @@ public final class GlobalCelebrationToast {
         catch (Exception ignored) { return fallback; }
     }
 
-    /** Force a fresh dashboard style after the server announces a config change. */
+    /** Refresh dashboard style when the shared fetch throttle allows it. */
     public static void refreshStyleNow(@Nullable Activity activity) {
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
         // Respect the shared one-minute throttle; screen resumes are not config-change events.
