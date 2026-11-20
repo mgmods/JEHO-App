@@ -320,7 +320,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private FrameLayout luckyCannonLayer;
     @Nullable private com.Dramizo.Series.util.LuckyCannonView luckyCannonView;
     @Nullable private ImageView luckyCannonIconView;
-    @Nullable private TextView luckyCannonComboCountView;
     private int luckyCannonComboCount;
     @Nullable private String luckyCannonRemoteIconUrl;
     @Nullable private Runnable hideLuckyCannonRunnable;
@@ -4753,26 +4752,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         uploadedIcon.setFocusable(false);
         uploadedIcon.setVisibility(View.GONE);
         layer.addView(uploadedIcon, iconLp);
-        TextView comboCount = new TextView(this);
-        comboCount.setText("X0");
-        comboCount.setTextColor(Color.WHITE);
-        comboCount.setTextSize(14f);
-        comboCount.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
-        comboCount.setGravity(Gravity.CENTER);
-        comboCount.setPadding(luckyCannonDp(9), luckyCannonDp(3), luckyCannonDp(9), luckyCannonDp(3));
-        GradientDrawable comboBackground = new GradientDrawable();
-        comboBackground.setShape(GradientDrawable.RECTANGLE);
-        comboBackground.setCornerRadius(luckyCannonDp(14));
-        comboBackground.setColor(0xE61A1530);
-        comboBackground.setStroke(luckyCannonDp(1), 0xFFFFD982);
-        comboCount.setBackground(comboBackground);
-        comboCount.setVisibility(View.GONE);
-        comboCount.setElevation(luckyCannonDp(4));
-        FrameLayout.LayoutParams comboLp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        comboLp.topMargin = luckyCannonDp(1);
-        layer.addView(comboCount, comboLp);
         layer.setElevation(luckyCannonDp(80));
         // INVISIBLE preserves measured bounds so the initial draggable position is stable.
         layer.setVisibility(View.INVISIBLE);
@@ -4830,7 +4809,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         luckyCannonLayer = layer;
         luckyCannonView = cannon;
         luckyCannonIconView = uploadedIcon;
-        luckyCannonComboCountView = comboCount;
         refreshLuckyToastButtonStyle();
     }
 
@@ -4935,17 +4913,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (luckyCannonLayer != null) luckyCannonLayer.setVisibility(View.GONE);
         luckyCannonComboCount = 0;
-        if (luckyCannonComboCountView != null) luckyCannonComboCountView.setVisibility(View.GONE);
         if (!luckyCannonSending) {
             luckyCannonGiftId = null;
             luckyCannonTargets.clear();
         }
-    }
-
-    private void updateLuckyCannonComboCount() {
-        if (luckyCannonComboCountView == null) return;
-        luckyCannonComboCountView.setText("X" + Math.max(0, luckyCannonComboCount));
-        luckyCannonComboCountView.setVisibility(View.VISIBLE);
     }
 
     private void startLuckyCannonHold() {
@@ -4957,7 +4928,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         luckyCannonHoldActive = true;
         luckyCannonComboCount = 0;
-        updateLuckyCannonComboCount();
+
         // First send happens on ACTION_DOWN. This removes the old "release then press
         // again" feeling and makes every new press an independent lucky-gift start.
         sendLuckyCannonBatch(1);
@@ -5051,7 +5022,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // for network latency; ACTION_UP prevents any later increments.
             if (luckyCannonHoldActive) {
                 luckyCannonComboCount++;
-                updateLuckyCannonComboCount();
+
             }
         } catch (RuntimeException rejected) {
             // Executor saturation must not strand the in-flight counter or leave a
