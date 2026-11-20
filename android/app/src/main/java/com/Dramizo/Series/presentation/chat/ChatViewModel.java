@@ -188,23 +188,40 @@ public class ChatViewModel extends ViewModel {
         if (conversationId == null || loadingMore || currentPage >= totalPages) return;
         loadingMore = true;
         loadingOlder.postValue(true);
+        final String requestedConversation = conversationId;
         int nextPage = currentPage + 1;
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageList> r = c.getMessagesUseCase.execute(conversationId, nextPage);
+        try {
+            c.getIoExecutor().execute(() -> {
+                try {
+                    Result<ChatDtos.MessageList> r =
+                            c.getMessagesUseCase.execute(requestedConversation, nextPage);
+                    if (!requestedConversation.equals(conversationId)) return;
+                    if (r.success && r.data != null && r.data.items != null && !r.data.items.isEmpty()) {
+                        if (r.data.meta != null) {
+                            currentPage = r.data.meta.page > 0 ? r.data.meta.page : nextPage;
+                            totalPages = r.data.meta.totalPages > 0 ? r.data.meta.totalPages : totalPages;
+                        } else {
+                            currentPage = nextPage;
+                        }
+                        prependOlderMessages(r.data.items);
+                    } else if (!r.success) {
+                        error.postValue(r.error != null ? r.error : "تعذر تحميل الرسائل القديمة");
+                    }
+                } catch (RuntimeException failure) {
+                    android.util.Log.w("ChatViewModel", "Older-message request failed", failure);
+                    if (requestedConversation.equals(conversationId)) {
+                        error.postValue("تعذر تحميل الرسائل القديمة، حاول مجددًا");
+                    }
+                } finally {
+                    loadingMore = false;
+                    loadingOlder.postValue(false);
+                }
+            });
+        } catch (RuntimeException rejected) {
             loadingMore = false;
             loadingOlder.postValue(false);
-            if (r.success && r.data != null && r.data.items != null && !r.data.items.isEmpty()) {
-                if (r.data.meta != null) {
-                    currentPage = r.data.meta.page > 0 ? r.data.meta.page : nextPage;
-                    totalPages = r.data.meta.totalPages > 0 ? r.data.meta.totalPages : totalPages;
-                } else {
-                    currentPage = nextPage;
-                }
-                prependOlderMessages(r.data.items);
-            } else if (!r.success) {
-                error.postValue(r.error);
-            }
-        });
+            error.postValue("تعذر تحميل الرسائل القديمة، حاول مجددًا");
+        }
     }
 
     public void send(String conversationId, String content) {
@@ -216,15 +233,25 @@ public class ChatViewModel extends ViewModel {
         ChatDtos.MessageDto pending = newOptimistic("text", localId, conversationId, reply);
         pending.content = content;
         appendMessage(pending);
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r = c.sendMessageUseCase.execute(conversationId, content, reply);
-            if (r.success && r.data != null) {
-                replaceLocalWithServer(localId, r.data);
-            } else {
-                // Keep bubble visible with error — do not vanish like a glitch.
-                error.postValue(r.error != null ? r.error : "تعذر إرسال الرسالة");
-            }
-        });
+        try {
+            c.getIoExecutor().execute(() -> {
+                try {
+                    Result<ChatDtos.MessageDto> r =
+                            c.sendMessageUseCase.execute(conversationId, content, reply);
+                    if (r.success && r.data != null) {
+                        replaceLocalWithServer(localId, r.data);
+                    } else {
+                        // Keep bubble visible with error — do not vanish like a glitch.
+                        error.postValue(r.error != null ? r.error : "تعذر إرسال الرسالة");
+                    }
+                } catch (RuntimeException failure) {
+                    android.util.Log.w("ChatViewModel", "Message send failed", failure);
+                    error.postValue("تعذر إرسال الرسالة، حاول مجددًا");
+                }
+            });
+        } catch (RuntimeException rejected) {
+            error.postValue("تعذر إرسال الرسالة، حاول مجددًا");
+        }
     }
 
     public void sendImage(String conversationId, String imageUrl) {
