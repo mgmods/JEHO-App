@@ -320,7 +320,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private FrameLayout luckyCannonLayer;
     @Nullable private com.Dramizo.Series.util.LuckyCannonView luckyCannonView;
     @Nullable private ImageView luckyCannonIconView;
-    @Nullable private TextView luckyCannonComboCountView;
     private int luckyCannonComboCount;
     @Nullable private String luckyCannonRemoteIconUrl;
     @Nullable private Runnable hideLuckyCannonRunnable;
@@ -941,10 +940,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.recyclerSeats.getParent() instanceof ViewGroup) {
             ((ViewGroup) binding.recyclerSeats.getParent()).setClipChildren(false);
         }
+        // Seat positions are a fixed room stage, not a scrollable list.
+        // All configured seats (including the 30-seat / six-column layout) remain
+        // anchored in place while seat occupancy refreshes.
         binding.recyclerSeats.setLayoutManager(new GridLayoutManager(this, MIKOO_SEAT_COLUMNS) {
             @Override
             public boolean canScrollVertically() {
-                return seatAdapter != null && seatAdapter.getItemCount() > 25;
+                return false;
             }
         });
         binding.recyclerSeats.setAdapter(seatAdapter);
@@ -2523,7 +2525,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String avatar = u != null ? u.avatarUrl : null;
         long wealth = u != null ? Math.max(u.wealthScore, u.totalSentCoins) : 0L;
         long charm = u != null ? Math.max(0L, u.charmScore) : 0L;
-        String vipFrame = u != null ? u.vipBadgeUrl : null;
+        String vipFrame = u != null ? com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(u) : null;
         String hostFrame = u != null ? u.hostBadgeUrl : null;
         // Chat avatar always carries the user's equipped personal frame in every room.
         String frame = vipFrame;
@@ -2902,7 +2904,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (avatarUrl == null) avatarUrl = session.getAvatarUrl();
                 AuthDtos.UserDto selfUser = session.getUser();
                 if ((frameUrl == null || frameUrl.isEmpty()) && selfUser != null) {
-                    frameUrl = selfUser.vipBadgeUrl;
+                    frameUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(selfUser);
                 }
                 if (selfUser != null) {
                     if (wealthScore <= 0) wealthScore = Math.max(selfUser.wealthScore, selfUser.totalSentCoins);
@@ -2918,7 +2920,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (avatarUrl == null || avatarUrl.isEmpty()) avatarUrl = selfUser.avatarUrl;
                 // The signed-in user's currently equipped frame is authoritative,
                 // even when an older room event carries a legacy hostBadge frameUrl.
-                frameUrl = selfUser.vipBadgeUrl;
+                frameUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(selfUser);
             }
         }
         // The message payload's legacy frameUrl may contain an agency host badge.
@@ -3196,7 +3198,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     decoration.agencyRole = user.agency.role;
                 }
                 decoration.gender = user.gender;
-                decoration.vipBadgeUrl = user.vipBadgeUrl;
+                decoration.vipBadgeUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(user);
                 decoration.vipLevel = Math.max(0, user.vipLevel);
                 List<String> displayedIds = user.displayedMedalIds == null
                         ? java.util.Collections.emptyList() : user.displayedMedalIds;
@@ -4753,26 +4755,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         uploadedIcon.setFocusable(false);
         uploadedIcon.setVisibility(View.GONE);
         layer.addView(uploadedIcon, iconLp);
-        TextView comboCount = new TextView(this);
-        comboCount.setText("X0");
-        comboCount.setTextColor(Color.WHITE);
-        comboCount.setTextSize(14f);
-        comboCount.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
-        comboCount.setGravity(Gravity.CENTER);
-        comboCount.setPadding(luckyCannonDp(9), luckyCannonDp(3), luckyCannonDp(9), luckyCannonDp(3));
-        GradientDrawable comboBackground = new GradientDrawable();
-        comboBackground.setShape(GradientDrawable.RECTANGLE);
-        comboBackground.setCornerRadius(luckyCannonDp(14));
-        comboBackground.setColor(0xE61A1530);
-        comboBackground.setStroke(luckyCannonDp(1), 0xFFFFD982);
-        comboCount.setBackground(comboBackground);
-        comboCount.setVisibility(View.GONE);
-        comboCount.setElevation(luckyCannonDp(4));
-        FrameLayout.LayoutParams comboLp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        comboLp.topMargin = luckyCannonDp(1);
-        layer.addView(comboCount, comboLp);
         layer.setElevation(luckyCannonDp(80));
         // INVISIBLE preserves measured bounds so the initial draggable position is stable.
         layer.setVisibility(View.INVISIBLE);
@@ -4830,7 +4812,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         luckyCannonLayer = layer;
         luckyCannonView = cannon;
         luckyCannonIconView = uploadedIcon;
-        luckyCannonComboCountView = comboCount;
         refreshLuckyToastButtonStyle();
     }
 
@@ -4935,17 +4916,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (luckyCannonLayer != null) luckyCannonLayer.setVisibility(View.GONE);
         luckyCannonComboCount = 0;
-        if (luckyCannonComboCountView != null) luckyCannonComboCountView.setVisibility(View.GONE);
         if (!luckyCannonSending) {
             luckyCannonGiftId = null;
             luckyCannonTargets.clear();
         }
-    }
-
-    private void updateLuckyCannonComboCount() {
-        if (luckyCannonComboCountView == null) return;
-        luckyCannonComboCountView.setText("X" + Math.max(0, luckyCannonComboCount));
-        luckyCannonComboCountView.setVisibility(View.VISIBLE);
     }
 
     private void startLuckyCannonHold() {
@@ -4957,7 +4931,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         luckyCannonHoldActive = true;
         luckyCannonComboCount = 0;
-        updateLuckyCannonComboCount();
+
         // First send happens on ACTION_DOWN. This removes the old "release then press
         // again" feeling and makes every new press an independent lucky-gift start.
         sendLuckyCannonBatch(1);
@@ -5051,7 +5025,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // for network latency; ACTION_UP prevents any later increments.
             if (luckyCannonHoldActive) {
                 luckyCannonComboCount++;
-                updateLuckyCannonComboCount();
+
             }
         } catch (RuntimeException rejected) {
             // Executor saturation must not strand the in-flight counter or leave a
@@ -17853,7 +17827,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             AuthDtos.UserDto me = ContainerProvider.from(this).getSessionManager().getUser();
             if (me != null) {
                 hostBadge = me.hostBadgeUrl;
-                vipBadge = me.vipBadgeUrl;
+                vipBadge = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(me);
                 meta = me.hostBadgeMeta;
                 displayName = me.displayName != null && !me.displayName.isEmpty()
                         ? me.displayName : me.username;
@@ -17886,7 +17860,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     || avatar == null || frame == null) continue;
             String avatarUrl = avatar.getTag() instanceof String
                     ? (String) avatar.getTag() : me.avatarUrl;
-            AvatarCosmetics.bindStacked(avatar, frame, signal, avatarUrl, me.vipBadgeUrl, null);
+            AvatarCosmetics.bindStacked(avatar, frame, signal, avatarUrl,
+                    com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(me), null);
         }
     }
 
@@ -17984,7 +17959,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Match measured SeatAdapter cell height (avatar frame + name + vertical padding).
         // The old 64/74/84dp estimates were too short for the actual 76dp seat frame,
         // so the last row was clipped/overlapped by the supporter and relationship layers.
-        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 78
+        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 76
                 : scale == SeatAdapter.SCALE_COMPACT ? 82
                 : scale == SeatAdapter.SCALE_MEDIUM ? 88 : 98;
         int totalHeightPx = dp(rows * rowHeightDp + 4);

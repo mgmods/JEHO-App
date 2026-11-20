@@ -97,15 +97,17 @@ public class VipActivity extends ThemedActivity {
             if (tvVipEmpty != null) {
                 tvVipEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
             }
-            if (empty) {
-                Toast.makeText(this, R.string.vip_empty_retry, Toast.LENGTH_SHORT).show();
-            }
         });
         vm.getMessage().observe(this, m -> {
             if (m != null) Toast.makeText(this, m, Toast.LENGTH_LONG).show();
         });
         vm.getError().observe(this, e -> {
-            if (e != null) com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
+            if (e == null || e.trim().isEmpty()) return;
+            String normalized = e.trim().toLowerCase(java.util.Locale.ROOT);
+            // Empty catalogue state is shown inline; it is not a transient error toast.
+            if (normalized.contains("خطط متاحة")
+                    || normalized.contains("no plans available")) return;
+            com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
         });
         vm.getPurchasing().observe(this, busy -> {
             if (adapter != null && layoutVipPlans != null) {

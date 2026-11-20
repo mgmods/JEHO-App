@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="16dp"
+    android:layout_marginBottom="7dp"
     android:background="@drawable/bg_vip_plan_card_premium"
     android:elevation="4dp"
     android:orientation="vertical">
@@ -11,14 +11,14 @@
     <View
         android:id="@+id/vipAccentBar"
         android:layout_width="match_parent"
-        android:layout_height="5dp"
+        android:layout_height="3dp"
         android:background="#E8C26A" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="15dp">
+        android:padding="7dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -27,8 +27,8 @@
             android:orientation="horizontal">
 
             <FrameLayout
-                android:layout_width="82dp"
-                android:layout_height="82dp">
+                android:layout_width="56dp"
+                android:layout_height="56dp">
 
                 <View
                     android:layout_width="match_parent"
@@ -37,8 +37,8 @@
 
                 <ImageView
                     android:id="@+id/imgVipDefault"
-                    android:layout_width="76dp"
-                    android:layout_height="76dp"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/vip"
                     android:scaleType="fitCenter"
@@ -48,7 +48,7 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="13dp"
+                android:layout_marginStart="10dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -67,7 +67,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:textColor="#FFFFE7B0"
-                    android:textSize="19sp"
+                    android:textSize="17sp"
                     android:textStyle="bold"
                     tools:text="VIP 3 · زمردي" />
 
@@ -95,7 +95,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="15dp"
+            android:layout_marginTop="6dp"
             android:text="@string/vip_includes_title"
             android:textColor="#FFF6F2FF"
             android:textSize="13sp"
@@ -104,7 +104,7 @@
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="5dp"
             android:scrollbars="none">
 
             <LinearLayout
@@ -116,14 +116,14 @@
                 android:padding="10dp">
 
                 <LinearLayout
-                    android:layout_width="72dp"
+                    android:layout_width="64dp"
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
                     <ImageView
                         android:id="@+id/imgIncludeMedal"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
                         android:contentDescription="@null"
                         android:scaleType="fitCenter" />
                     <TextView
@@ -132,7 +132,7 @@
                         android:layout_marginTop="4dp"
                         android:text="ميدالية"
                         android:textColor="@color/text_secondary"
-                        android:textSize="10sp" />
+                        android:textSize="9sp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -280,8 +280,21 @@
             android:id="@+id/layoutPrivileges"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:orientation="vertical" />
+            android:layout_marginTop="4dp"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvTogglePrivileges"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="5dp"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:text="عرض جميع المزايا  ↓"
+            android:textColor="#FFE8C26A"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvBenefits"

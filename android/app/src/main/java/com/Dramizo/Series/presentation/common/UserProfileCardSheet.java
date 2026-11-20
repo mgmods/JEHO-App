@@ -336,10 +336,8 @@ public final class UserProfileCardSheet {
             activity.runOnUiThread(() -> {
                 if (!dialog.isShowing()) return;
                 int liveVip = Math.max(0, u.vipLevel);
-                // An explicitly equipped mall frame takes precedence over the fixed VIP fallback.
-                vipFrameHold[0] = u.vipBadgeUrl != null && !u.vipBadgeUrl.trim().isEmpty()
-                        ? u.vipBadgeUrl
-                        : VipStyle.profileNobilityFrameUrl(liveVip, u.vipTouUrl);
+                // Use the same single equipped/VIP-tier frame as seats, profile and chat.
+                vipFrameHold[0] = AvatarCosmetics.avatarFrameUrl(u);
                 if (u.avatarUrl != null && !u.avatarUrl.isEmpty()) avatarHold[0] = u.avatarUrl;
                 if (u.displayName != null && !u.displayName.isEmpty()) {
                     displayNameHold[0] = u.displayName;

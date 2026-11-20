@@ -139,7 +139,6 @@ public class EditProfileActivity extends ThemedActivity {
         vm.getUser().observe(this, user -> {
             if (user == null) return;
             binding.etDisplayName.setText(user.displayName);
-            binding.etBio.setText(user.bio);
             binding.etAvatar.setText(user.avatarUrl != null ? user.avatarUrl : "");
             binding.etCover.setText(user.coverUrl != null ? user.coverUrl : "");
             profileCoverUrls.clear();
@@ -334,9 +333,7 @@ public class EditProfileActivity extends ThemedActivity {
             Toast.makeText(this, "أدخل الاسم الظاهر", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(name)
-                || com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(
-                        text(binding.etBio))) {
+        if (com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(name)) {
             Toast.makeText(this,
                     com.Dramizo.Series.util.ChatContentFilter.AGENCY_WORD_REASON,
                     Toast.LENGTH_LONG).show();
@@ -354,7 +351,6 @@ public class EditProfileActivity extends ThemedActivity {
 
         MiscDtos.UpdateProfileRequest req = new MiscDtos.UpdateProfileRequest();
         req.displayName = name;
-        req.bio = emptyToNull(text(binding.etBio));
         req.avatarUrl = emptyToNull(text(binding.etAvatar));
         req.coverUrl = emptyToNull(text(binding.etCover));
         req.profileCoverUrls = new ArrayList<>(profileCoverUrls);

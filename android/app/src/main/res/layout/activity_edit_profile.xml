@@ -5,7 +5,7 @@
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFF0D1"
+    android:background="#FFF5F6FA"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:fitsSystemWindows="false"
@@ -63,8 +63,7 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:background="@color/white"
-
+        android:background="#FFF5F6FA"
         android:layout_weight="1">
 
         <ScrollView
@@ -83,89 +82,15 @@
                 android:orientation="vertical"
                 android:paddingBottom="16dp">
 
-                <!-- Avatar hero -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@color/white"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingTop="22dp"
-                    android:paddingBottom="18dp">
-
-                    <FrameLayout
-                        android:id="@+id/rowAvatar"
-                        android:layout_width="104dp"
-                        android:layout_height="104dp"
-                        android:foreground="?attr/selectableItemBackgroundBorderless">
-
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/imgAvatarPreview"
-                            android:layout_width="96dp"
-                            android:layout_height="96dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@string/edit_profile"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/ic_default_avatar"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
-                            app:strokeColor="#14000000"
-                            app:strokeWidth="1dp" />
-
-                        <ImageView
-                            android:layout_width="30dp"
-                            android:layout_height="30dp"
-                            android:layout_gravity="bottom|end"
-                            android:layout_marginEnd="2dp"
-                            android:layout_marginBottom="2dp"
-                            android:background="@drawable/bg_edit_avatar_badge"
-                            android:contentDescription="@string/edit_profile"
-                            android:padding="6dp"
-                            android:src="@drawable/ic_event_edit"
-                            app:tint="@color/white" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/change_profile_photo"
-                        android:textColor="@color/aurora_teal"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:gravity="center"
-                        android:paddingHorizontal="28dp"
-                        android:text="@string/edit_profile_hint"
-                        android:textColor="@color/text_hint"
-                        android:textSize="12sp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:gravity="center"
-                        android:paddingHorizontal="22dp"
-                        android:text="يمكنك اختيار صورة متحركة GIF أو WebP (حتى 6 ميغابايت)، وستبقى متحركة في الملف الشخصي والغرف."
-                        android:textColor="@color/text_hint"
-                        android:textSize="11sp" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="10dp" />
-
                 <!-- Cover -->
                 <LinearLayout
                     android:id="@+id/rowCover"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@color/white"
+                    android:background="@drawable/bg_wallet_section"
                     android:foreground="?attr/selectableItemBackground"
                     android:orientation="vertical"
+                    android:layout_marginHorizontal="12dp"
                     android:paddingHorizontal="16dp"
                     android:paddingTop="14dp"
                     android:paddingBottom="14dp">
@@ -211,6 +136,69 @@
                     </HorizontalScrollView>
                 </LinearLayout>
 
+                <!-- Avatar hero -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:layout_marginHorizontal="12dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_wallet_section"
+                    android:paddingTop="18dp"
+                    android:paddingBottom="16dp">
+
+                    <FrameLayout
+                        android:id="@+id/rowAvatar"
+                        android:layout_width="104dp"
+                        android:layout_height="104dp"
+                        android:foreground="?attr/selectableItemBackgroundBorderless">
+
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/imgAvatarPreview"
+                            android:layout_width="96dp"
+                            android:layout_height="96dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@string/edit_profile"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/ic_default_avatar"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
+                            app:strokeColor="#14000000"
+                            app:strokeWidth="1dp" />
+
+                        <ImageView
+                            android:layout_width="30dp"
+                            android:layout_height="30dp"
+                            android:layout_gravity="bottom|end"
+                            android:layout_marginEnd="2dp"
+                            android:layout_marginBottom="2dp"
+                            android:background="@drawable/bg_edit_avatar_badge"
+                            android:contentDescription="@string/edit_profile"
+                            android:padding="6dp"
+                            android:src="@drawable/ic_event_edit"
+                            app:tint="@color/white" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/change_profile_photo"
+                        android:textColor="@color/aurora_teal"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    
+
+                    
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="10dp" />
+
+
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnPickAvatar"
                     android:layout_width="0dp"
@@ -243,7 +231,8 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@color/white"
+                    android:background="@drawable/bg_wallet_section"
+                    android:layout_marginHorizontal="12dp"
                     android:orientation="vertical"
                     android:paddingHorizontal="16dp"
                     android:paddingTop="6dp"
@@ -270,30 +259,9 @@
                         android:textColorHint="@color/text_hint"
                         android:textSize="15sp" />
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:paddingBottom="4dp"
-                        android:text="@string/bio"
-                        android:textColor="@color/text_hint"
-                        android:textSize="12sp" />
+                    
 
-                    <EditText
-                        android:id="@+id/etBio"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_edit_profile_field"
-                        android:gravity="top|start"
-                        android:hint="@string/bio"
-                        android:inputType="textMultiLine"
-                        android:minHeight="88dp"
-                        android:minLines="3"
-                        android:paddingHorizontal="14dp"
-                        android:paddingVertical="12dp"
-                        android:textColor="@color/text_primary"
-                        android:textColorHint="@color/text_hint"
-                        android:textSize="15sp" />
+                    
                 </LinearLayout>
 
                 <View
@@ -304,7 +272,8 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@color/white"
+                    android:background="@drawable/bg_wallet_section"
+                    android:layout_marginHorizontal="12dp"
                     android:orientation="vertical"
                     android:paddingHorizontal="16dp"
                     android:paddingTop="6dp"
