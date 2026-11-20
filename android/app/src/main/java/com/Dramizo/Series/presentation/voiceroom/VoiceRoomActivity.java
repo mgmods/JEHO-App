@@ -12794,12 +12794,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (comboCount >= 2 && binding.giftOverlay != null) {
             binding.giftOverlay.setVisibility(View.VISIBLE);
             float d = getResources().getDisplayMetrics().density;
+            int w = Math.max(binding.giftOverlay.getWidth(),
+                    getResources().getDisplayMetrics().widthPixels);
             int h = Math.max(binding.giftOverlay.getHeight(),
                     getResources().getDisplayMetrics().heightPixels);
             GiftFlyAnimator.showComboBurst(
                     binding.giftOverlay,
                     comboCount,
-                    new android.graphics.PointF(56f * d, h * 0.60f),
+                    new android.graphics.PointF(w * 0.50f, h * 0.60f),
                     null);
             // Short overlay hold for gift combo only — do not mark as lucky/mardood.
             try {
