@@ -213,7 +213,8 @@ public class ComboGiftView extends FrameLayout {
                                     })
                                     .start();
                         };
-                        postDelayed(hideRunnable, 2600L);
+                        // Keep the strip parked until the X1→Xn count-up has fully completed.
+                        postDelayed(hideRunnable, 4400L);
                     })
                     .start();
         };
