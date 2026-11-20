@@ -125,7 +125,7 @@ public class ComboGiftView extends FrameLayout {
                                @Nullable String senderAvatarUrl,
                                @Nullable String giftIconUrl,
                                int comboCount,
-                               int totalCoins) {
+                               long totalCoins) {
         if (sender != null) sender.setText(senderName != null && !senderName.isEmpty()
                 ? senderName : "مستخدم");
         if (recvDesc != null) {
@@ -333,7 +333,7 @@ public class ComboGiftView extends FrameLayout {
     }
 
     @DrawableRes
-    private static int comboBgForCombo(int combo, int coins) {
+    private static int comboBgForCombo(int combo, long coins) {
         // Styling follows gift COMBO streak only — never total coins (that confused users
         // into thinking price/mardood was combo).
         int score = Math.max(1, combo);
