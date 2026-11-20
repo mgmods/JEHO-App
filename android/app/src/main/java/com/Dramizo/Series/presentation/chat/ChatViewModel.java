@@ -31,6 +31,7 @@ public class ChatViewModel extends ViewModel {
     private int currentPage = 1;
     private int totalPages = 1;
     private boolean loadingMore;
+    private volatile long loadGeneration;
     private final RealtimeClient.ChatListener chatListener = new RealtimeClient.ChatListener() {
         @Override
         public void onChatMessage(String cid, ChatDtos.MessageDto message) {
@@ -117,6 +118,47 @@ public class ChatViewModel extends ViewModel {
         replyTarget.setValue(null);
     }
 
+    private void dispatchMessageSend(
+            String localId,
+            String failureMessage,
+            java.util.concurrent.Callable<Result<ChatDtos.MessageDto>> request) {
+        Runnable sendTask = () -> {
+            try {
+                Result<ChatDtos.MessageDto> result = request.call();
+                if (result != null && result.success && result.data != null) {
+                    replaceLocalWithServer(localId, result.data);
+                } else {
+                    markLocalSendFailed(localId);
+                    error.postValue(result != null && result.error != null
+                            ? result.error : failureMessage);
+                }
+            } catch (Exception failure) {
+                android.util.Log.w("ChatViewModel", "Message send failed", failure);
+                markLocalSendFailed(localId);
+                error.postValue(failureMessage);
+            }
+        };
+        try {
+            c.getIoExecutor().execute(sendTask);
+        } catch (RuntimeException rejected) {
+            markLocalSendFailed(localId);
+            error.postValue(failureMessage);
+        }
+    }
+
+    private void markLocalSendFailed(String localId) {
+        List<ChatDtos.MessageDto> current = messages.getValue();
+        if (current == null || localId == null) return;
+        List<ChatDtos.MessageDto> updated = new ArrayList<>(current);
+        for (ChatDtos.MessageDto message : updated) {
+            if (message != null && localId.equals(message.id)) {
+                message.localPending = false;
+                break;
+            }
+        }
+        messages.postValue(updated);
+    }
+
     public void attach(String conversationId) {
         this.conversationId = conversationId;
         String token = c.getSessionManager().getAccessToken();
@@ -130,81 +172,128 @@ public class ChatViewModel extends ViewModel {
         attach(conversationId);
         currentPage = 1;
         totalPages = 1;
-        c.getIoExecutor().execute(() -> {
-            // Paint Room cache immediately so conversation opens without blank wait.
-            if (switched) {
+        final String requestedConversation = conversationId;
+        final long requestGeneration = ++loadGeneration;
+        try {
+            c.getIoExecutor().execute(() -> {
                 try {
-                    List<ChatDtos.MessageDto> cached =
-                            c.getChatRepository().getCachedMessages(conversationId);
-                    if (cached != null && !cached.isEmpty()) {
-                        List<ChatDtos.MessageDto> painted = new ArrayList<>();
-                        for (ChatDtos.MessageDto m : cached) {
-                            if (m == null || m.id == null) continue;
-                            if (isDismissed(m.id)) continue;
-                            normalizeMine(m);
-                            m.localPending = false;
-                            painted.add(m);
+                    // Paint the local cache first, but never let an old conversation overwrite
+                    // the screen after the user has already switched to another chat.
+                    if (switched) {
+                        try {
+                            List<ChatDtos.MessageDto> cached =
+                                    c.getChatRepository().getCachedMessages(requestedConversation);
+                            if (requestGeneration != loadGeneration
+                                    || !requestedConversation.equals(this.conversationId)) return;
+                            if (cached != null && !cached.isEmpty()) {
+                                List<ChatDtos.MessageDto> painted = new ArrayList<>();
+                                for (ChatDtos.MessageDto m : cached) {
+                                    if (m == null || m.id == null) continue;
+                                    if (isDismissed(m.id)) continue;
+                                    normalizeMine(m);
+                                    m.localPending = false;
+                                    painted.add(m);
+                                }
+                                if (!painted.isEmpty()) messages.postValue(painted);
+                            } else {
+                                messages.postValue(Collections.emptyList());
+                            }
+                        } catch (Exception cacheFailure) {
+                            if (requestGeneration == loadGeneration
+                                    && requestedConversation.equals(this.conversationId)) {
+                                messages.postValue(Collections.emptyList());
+                            }
                         }
-                        if (!painted.isEmpty()) messages.postValue(painted);
+                    }
+                    Result<ChatDtos.MessageList> r =
+                            c.getMessagesUseCase.execute(requestedConversation, 1);
+                    if (requestGeneration != loadGeneration
+                            || !requestedConversation.equals(this.conversationId)) return;
+                    if (r != null && r.success && r.data != null && r.data.items != null) {
+                        if (r.data.meta != null) {
+                            currentPage = r.data.meta.page > 0 ? r.data.meta.page : 1;
+                            totalPages = r.data.meta.totalPages > 0 ? r.data.meta.totalPages : 1;
+                        }
+                        if (r.data.peerLastReadAt != null) {
+                            peerLastReadAt.postValue(r.data.peerLastReadAt);
+                        }
+                        if (switched) {
+                            List<ChatDtos.MessageDto> items = new ArrayList<>();
+                            for (ChatDtos.MessageDto m : r.data.items) {
+                                if (m == null || m.id == null) continue;
+                                if (isDismissed(m.id)) continue;
+                                normalizeMine(m);
+                                m.localPending = false;
+                                items.add(m);
+                            }
+                            messages.postValue(items);
+                        } else {
+                            mergeLoadedMessages(r.data.items);
+                        }
                     } else {
-                        messages.postValue(Collections.emptyList());
+                        String message = r != null && r.error != null
+                                ? r.error : "تعذر تحميل المحادثة";
+                        if (switched) {
+                            List<ChatDtos.MessageDto> cur = messages.getValue();
+                            if (cur == null || cur.isEmpty()) error.postValue(message);
+                        } else {
+                            error.postValue(message);
+                        }
                     }
-                } catch (Exception ignored) {
-                    messages.postValue(Collections.emptyList());
-                }
-            }
-            Result<ChatDtos.MessageList> r = c.getMessagesUseCase.execute(conversationId, 1);
-            if (r.success && r.data != null && r.data.items != null) {
-                if (r.data.meta != null) {
-                    currentPage = r.data.meta.page > 0 ? r.data.meta.page : 1;
-                    totalPages = r.data.meta.totalPages > 0 ? r.data.meta.totalPages : 1;
-                }
-                if (r.data.peerLastReadAt != null) {
-                    peerLastReadAt.postValue(r.data.peerLastReadAt);
-                }
-                if (switched) {
-                    List<ChatDtos.MessageDto> items = new ArrayList<>();
-                    for (ChatDtos.MessageDto m : r.data.items) {
-                        if (m == null || m.id == null) continue;
-                        if (isDismissed(m.id)) continue;
-                        normalizeMine(m);
-                        m.localPending = false;
-                        items.add(m);
+                } catch (RuntimeException failure) {
+                    android.util.Log.w("ChatViewModel", "Conversation load failed", failure);
+                    if (requestGeneration == loadGeneration
+                            && requestedConversation.equals(this.conversationId)) {
+                        error.postValue("تعذر تحميل المحادثة، حاول مجددًا");
                     }
-                    messages.postValue(items);
-                } else {
-                    mergeLoadedMessages(r.data.items);
                 }
-            } else if (switched) {
-                List<ChatDtos.MessageDto> cur = messages.getValue();
-                if (cur == null || cur.isEmpty()) error.postValue(r.error);
-            } else {
-                error.postValue(r.error);
+            });
+        } catch (RuntimeException rejected) {
+            if (requestGeneration == loadGeneration
+                    && requestedConversation.equals(this.conversationId)) {
+                error.postValue("تعذر تحميل المحادثة، حاول مجددًا");
             }
-        });
+        }
     }
 
     public void loadOlder() {
         if (conversationId == null || loadingMore || currentPage >= totalPages) return;
         loadingMore = true;
         loadingOlder.postValue(true);
+        final String requestedConversation = conversationId;
         int nextPage = currentPage + 1;
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageList> r = c.getMessagesUseCase.execute(conversationId, nextPage);
+        try {
+            c.getIoExecutor().execute(() -> {
+                try {
+                    Result<ChatDtos.MessageList> r =
+                            c.getMessagesUseCase.execute(requestedConversation, nextPage);
+                    if (!requestedConversation.equals(conversationId)) return;
+                    if (r.success && r.data != null && r.data.items != null && !r.data.items.isEmpty()) {
+                        if (r.data.meta != null) {
+                            currentPage = r.data.meta.page > 0 ? r.data.meta.page : nextPage;
+                            totalPages = r.data.meta.totalPages > 0 ? r.data.meta.totalPages : totalPages;
+                        } else {
+                            currentPage = nextPage;
+                        }
+                        prependOlderMessages(r.data.items);
+                    } else if (!r.success) {
+                        error.postValue(r.error != null ? r.error : "تعذر تحميل الرسائل القديمة");
+                    }
+                } catch (RuntimeException failure) {
+                    android.util.Log.w("ChatViewModel", "Older-message request failed", failure);
+                    if (requestedConversation.equals(conversationId)) {
+                        error.postValue("تعذر تحميل الرسائل القديمة، حاول مجددًا");
+                    }
+                } finally {
+                    loadingMore = false;
+                    loadingOlder.postValue(false);
+                }
+            });
+        } catch (RuntimeException rejected) {
             loadingMore = false;
             loadingOlder.postValue(false);
-            if (r.success && r.data != null && r.data.items != null && !r.data.items.isEmpty()) {
-                if (r.data.meta != null) {
-                    currentPage = r.data.meta.page > 0 ? r.data.meta.page : nextPage;
-                    totalPages = r.data.meta.totalPages > 0 ? r.data.meta.totalPages : totalPages;
-                } else {
-                    currentPage = nextPage;
-                }
-                prependOlderMessages(r.data.items);
-            } else if (!r.success) {
-                error.postValue(r.error);
-            }
-        });
+            error.postValue("تعذر تحميل الرسائل القديمة، حاول مجددًا");
+        }
     }
 
     public void send(String conversationId, String content) {
@@ -216,15 +305,8 @@ public class ChatViewModel extends ViewModel {
         ChatDtos.MessageDto pending = newOptimistic("text", localId, conversationId, reply);
         pending.content = content;
         appendMessage(pending);
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r = c.sendMessageUseCase.execute(conversationId, content, reply);
-            if (r.success && r.data != null) {
-                replaceLocalWithServer(localId, r.data);
-            } else {
-                // Keep bubble visible with error — do not vanish like a glitch.
-                error.postValue(r.error != null ? r.error : "تعذر إرسال الرسالة");
-            }
-        });
+        dispatchMessageSend(localId, "تعذر إرسال الرسالة، حاول مجددًا",
+                () -> c.sendMessageUseCase.execute(conversationId, content, reply));
     }
 
     public void sendImage(String conversationId, String imageUrl) {
@@ -237,12 +319,8 @@ public class ChatViewModel extends ViewModel {
         pending.media = new ChatDtos.MediaDto();
         pending.media.url = imageUrl;
         appendMessage(pending);
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r =
-                    c.sendMessageUseCase.executeImage(conversationId, imageUrl, reply);
-            if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
-            else error.postValue(r.error != null ? r.error : "تعذر إرسال الصورة");
-        });
+        dispatchMessageSend(localId, "تعذر إرسال الصورة، حاول مجددًا",
+                () -> c.sendMessageUseCase.executeImage(conversationId, imageUrl, reply));
     }
 
     public void sendAudio(String conversationId, String audioUrl, int durationSec) {
@@ -256,12 +334,8 @@ public class ChatViewModel extends ViewModel {
         pending.media.url = audioUrl;
         pending.media.duration = durationSec;
         appendMessage(pending);
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r =
-                    c.sendMessageUseCase.executeAudio(conversationId, audioUrl, durationSec, reply);
-            if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
-            else error.postValue(r.error != null ? r.error : "تعذر إرسال الصوت");
-        });
+        dispatchMessageSend(localId, "تعذر إرسال الصوت، حاول مجددًا",
+                () -> c.sendMessageUseCase.executeAudio(conversationId, audioUrl, durationSec, reply));
     }
 
     public void sendVideo(String conversationId, String videoUrl, String thumbnailUrl, String mimeType, long size, int durationSec) {
@@ -278,12 +352,9 @@ public class ChatViewModel extends ViewModel {
         pending.media.size = Math.max(0, size);
         pending.media.duration = Math.max(0, durationSec);
         appendMessage(pending);
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r =
-                    c.sendMessageUseCase.executeVideo(conversationId, videoUrl, thumbnailUrl, mimeType, size, durationSec, reply);
-            if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
-            else error.postValue(r.error != null ? r.error : "تعذر إرسال الفيديو");
-        });
+        dispatchMessageSend(localId, "تعذر إرسال الفيديو، حاول مجددًا",
+                () -> c.sendMessageUseCase.executeVideo(
+                        conversationId, videoUrl, thumbnailUrl, mimeType, size, durationSec, reply));
     }
 
     public void sendGiftMessage(String conversationId, String giftName, String iconUrl) {
@@ -309,12 +380,9 @@ public class ChatViewModel extends ViewModel {
         }
         appendMessage(pending);
         final String iconFinal = safeIcon;
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r =
-                    c.sendMessageUseCase.executeGift(conversationId, pending.content, iconFinal, reply);
-            if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
-            else error.postValue(r.error != null ? r.error : "تعذر إرسال الهدية");
-        });
+        dispatchMessageSend(localId, "تعذر إرسال الهدية، حاول مجددًا",
+                () -> c.sendMessageUseCase.executeGift(
+                        conversationId, pending.content, iconFinal, reply));
     }
 
     private ChatDtos.MessageDto newOptimistic(String type, String localId, String conversationId, String reply) {

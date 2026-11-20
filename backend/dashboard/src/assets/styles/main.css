@@ -1096,3 +1096,61 @@ body.route-loading::before {
   }
 }
 
+
+
+/* Consistent interaction polish: clearer focus, immediate press feedback and reduced motion. */
+:where(button, [role="button"], a, input, select, textarea, .form-check-input) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(button, [role="button"], a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--al-teal-bright, #2dd4bf);
+  outline-offset: 3px;
+}
+
+:where(.btn, .sidebar-link, .settings-rail-item, .settings-link, .theme-toggle) {
+  touch-action: manipulation;
+}
+
+:where(.btn, .theme-toggle, .settings-rail-item) {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 120ms ease;
+}
+
+:where(.btn:not(:disabled), .theme-toggle, .settings-rail-item):active {
+  transform: translateY(1px) scale(0.985);
+}
+
+:where(button, .btn, input, select, textarea):disabled,
+:where([aria-disabled="true"]) {
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .glass,
+  .settings-card,
+  .widget-card {
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .glass:hover,
+  .settings-card:hover,
+  .widget-card:hover {
+    border-color: color-mix(in srgb, var(--al-teal-bright, #2dd4bf) 22%, var(--border-color));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

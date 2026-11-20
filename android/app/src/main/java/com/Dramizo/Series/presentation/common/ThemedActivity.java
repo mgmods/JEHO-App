@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -37,6 +38,14 @@ import com.Dramizo.Series.util.GlobalCelebrationToast;
  */
 public abstract class ThemedActivity extends AppCompatActivity {
 
+    // Dashboard-controlled visuals are shared across activities. Avoid refetching the same
+    // flags/theme/toast config on every screen resume and creating avoidable API bursts.
+    private static final java.util.concurrent.atomic.AtomicLong LAST_VISUAL_REFRESH_AT =
+            new java.util.concurrent.atomic.AtomicLong(-1L);
+    private static final java.util.concurrent.atomic.AtomicBoolean VISUAL_REFRESH_IN_FLIGHT =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final long VISUAL_REFRESH_INTERVAL_MS = 60_000L;
+
     private final Handler dashboardVisualHandler = new Handler(Looper.getMainLooper());
     private final Runnable dashboardThemeListener = () -> {
         if (isFinishing() || isDestroyed() || !wantsRemoteThemeChrome()) return;
@@ -53,18 +62,36 @@ public abstract class ThemedActivity extends AppCompatActivity {
     };
 
     private void refreshDashboardVisuals() {
+        // Claim the single-flight gate before checking the throttle. A competing resume
+        // must not advance the timestamp and suppress the request that is already running.
+        if (!VISUAL_REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        long now = SystemClock.elapsedRealtime();
+        long previous = LAST_VISUAL_REFRESH_AT.get();
+        if (previous >= 0L && now - previous < VISUAL_REFRESH_INTERVAL_MS) {
+            VISUAL_REFRESH_IN_FLIGHT.set(false);
+            return;
+        }
         try {
             AppContainer container = ContainerProvider.from(this);
             container.getIoExecutor().execute(() -> {
-                if (wantsRemoteThemeChrome()) {
-                    RemoteTheme.refreshFromApi(getApplicationContext(), container.getConfigApi());
+                boolean completed = false;
+                try {
+                    if (wantsRemoteThemeChrome()) {
+                        RemoteTheme.refreshFromApi(getApplicationContext(), container.getConfigApi());
+                    }
+                    AppFeatures.refresh(container);
+                    completed = true;
+                } finally {
+                    // Failed/saturated requests remain eligible for a prompt retry.
+                    if (completed) LAST_VISUAL_REFRESH_AT.set(SystemClock.elapsedRealtime());
+                    VISUAL_REFRESH_IN_FLIGHT.set(false);
                 }
-                AppFeatures.refresh(container);
             });
-            // Toast appearance is shared across screens and is fetched without an APK update.
+            // The toast helper applies its own one-minute throttle; do not force a fetch per screen.
             GlobalCelebrationToast.refreshStyleNow(this);
         } catch (Throwable ignored) {
-            // Visual configuration must never block navigation or room entry.
+            VISUAL_REFRESH_IN_FLIGHT.set(false);
+            // Visual configuration must never prevent navigation or room entry.
         }
     }
 

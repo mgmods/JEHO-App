@@ -44,6 +44,8 @@ public class HomeViewModel extends ViewModel {
     private int roomsPage = 1;
     private boolean roomsHasMore = true;
     private boolean roomsLoadingMore;
+    private final java.util.concurrent.atomic.AtomicBoolean roomsQuietRefreshInFlight =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
     // Avoid duplicate following-room scans when the user switches tabs or resumes the app.
     private volatile boolean followingLoading;
     private volatile boolean followingLoaded;
@@ -115,55 +117,65 @@ public class HomeViewModel extends ViewModel {
      * while keeping pages beyond 1 in place.
      */
     public void refreshRoomsQuietly() {
-        c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
-                    c.listRoomsUseCase.execute(1, PAGE_SIZE);
-            if (!r.success || r.data == null || r.data.items == null) return;
-            List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
-            List<RoomDtos.RoomDto> cur = rooms.getValue();
-            if (cur == null || cur.isEmpty()) {
-                rooms.postValue(pageItems);
-                roomsPage = 1;
-                roomsHasMore = pageItems.size() >= PAGE_SIZE;
-                return;
-            }
-            Map<String, RoomDtos.RoomDto> oldById = new HashMap<>();
-            for (RoomDtos.RoomDto x : cur) {
-                if (x != null && x.id != null) oldById.put(x.id, x);
-            }
-            HashSet<String> onHot = new HashSet<>();
-            List<RoomDtos.RoomDto> next = new ArrayList<>(cur.size() + 4);
-            boolean changed = false;
-            // Page-1 slots follow server explore/heat order.
-            for (int i = 0; i < pageItems.size(); i++) {
-                RoomDtos.RoomDto neu = pageItems.get(i);
-                if (neu == null || neu.id == null) continue;
-                onHot.add(neu.id);
-                RoomDtos.RoomDto old = oldById.get(neu.id);
-                RoomDtos.RoomDto row = old != null ? copyRoomVolatile(old, neu) : neu;
-                next.add(row);
-                if (old == null
-                        || (i < cur.size() && cur.get(i) != null && !neu.id.equals(cur.get(i).id))
-                        || (old != null && (old.viewerCount != neu.viewerCount
-                        || old.roomLevel != neu.roomLevel
-                        || old.exploreRank != neu.exploreRank
-                        || !Objects.equals(old.roomTopRank, neu.roomTopRank)
-                        || !eq(old.roomTopFrameUrl, neu.roomTopFrameUrl)
-                        || !eq(old.roomTopPeriod, neu.roomTopPeriod)
-                        || !eq(old.coverUrl, neu.coverUrl)
-                        || !eq(old.title, neu.title)))) {
-                    changed = true;
+        // A slow room-list response must not stack another poll behind it.
+        if (!roomsQuietRefreshInFlight.compareAndSet(false, true)) return;
+        try {
+            c.getIoExecutor().execute(() -> {
+                try {
+                    Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
+                            c.listRoomsUseCase.execute(1, PAGE_SIZE);
+                    if (!r.success || r.data == null || r.data.items == null) return;
+                    List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
+                    List<RoomDtos.RoomDto> cur = rooms.getValue();
+                    if (cur == null || cur.isEmpty()) {
+                        rooms.postValue(pageItems);
+                        roomsPage = 1;
+                        roomsHasMore = pageItems.size() >= PAGE_SIZE;
+                        return;
+                    }
+                    Map<String, RoomDtos.RoomDto> oldById = new HashMap<>();
+                    for (RoomDtos.RoomDto x : cur) {
+                        if (x != null && x.id != null) oldById.put(x.id, x);
+                    }
+                    HashSet<String> onHot = new HashSet<>();
+                    List<RoomDtos.RoomDto> next = new ArrayList<>(cur.size() + 4);
+                    boolean changed = false;
+                    // Page-1 slots follow server explore/heat order.
+                    for (int i = 0; i < pageItems.size(); i++) {
+                        RoomDtos.RoomDto neu = pageItems.get(i);
+                        if (neu == null || neu.id == null) continue;
+                        onHot.add(neu.id);
+                        RoomDtos.RoomDto old = oldById.get(neu.id);
+                        RoomDtos.RoomDto row = old != null ? copyRoomVolatile(old, neu) : neu;
+                        next.add(row);
+                        if (old == null
+                                || (i < cur.size() && cur.get(i) != null && !neu.id.equals(cur.get(i).id))
+                                || (old != null && (old.viewerCount != neu.viewerCount
+                                || old.roomLevel != neu.roomLevel
+                                || old.exploreRank != neu.exploreRank
+                                || !Objects.equals(old.roomTopRank, neu.roomTopRank)
+                                || !eq(old.roomTopFrameUrl, neu.roomTopFrameUrl)
+                                || !eq(old.roomTopPeriod, neu.roomTopPeriod)
+                                || !eq(old.coverUrl, neu.coverUrl)
+                                || !eq(old.title, neu.title)))) {
+                            changed = true;
+                        }
+                    }
+                    // Append remaining loaded pages that are not on Hot page 1.
+                    for (RoomDtos.RoomDto old : cur) {
+                        if (old == null || old.id == null || onHot.contains(old.id)) continue;
+                        next.add(old);
+                    }
+                    if (changed || next.size() != cur.size()) {
+                        rooms.postValue(next);
+                    }
+                } finally {
+                    roomsQuietRefreshInFlight.set(false);
                 }
-            }
-            // Append remaining loaded pages that are not on Hot page 1.
-            for (RoomDtos.RoomDto old : cur) {
-                if (old == null || old.id == null || onHot.contains(old.id)) continue;
-                next.add(old);
-            }
-            if (changed || next.size() != cur.size()) {
-                rooms.postValue(next);
-            }
-        });
+            });
+        } catch (RuntimeException rejected) {
+            roomsQuietRefreshInFlight.set(false);
+        }
     }
 
     /** Append next page (Mikoo load more). */
@@ -276,42 +288,56 @@ public class HomeViewModel extends ViewModel {
             loadingMore.postValue(true);
         }
         final int page = reset ? 1 : roomsPage + 1;
-        c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
-                    c.listRoomsUseCase.execute(page, PAGE_SIZE);
+        try {
+            c.getIoExecutor().execute(() -> {
+                Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r = null;
+                try {
+                    r = c.listRoomsUseCase.execute(page, PAGE_SIZE);
+                } catch (RuntimeException ignored) {
+                    // A transient transport failure must not strand the loading state.
+                } finally {
+                    roomsLoadingMore = false;
+                    loadingMore.postValue(false);
+                    if (!quiet && reset) loading.postValue(false);
+                }
+                if (r != null && r.success && r.data != null && r.data.items != null) {
+                    List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
+                    roomsHasMore = pageItems.size() >= PAGE_SIZE;
+                    roomsPage = page;
+                    if (reset) {
+                        rooms.postValue(pageItems);
+                    } else {
+                        List<RoomDtos.RoomDto> merged = new ArrayList<>();
+                        List<RoomDtos.RoomDto> cur = rooms.getValue();
+                        if (cur != null) merged.addAll(cur);
+                        HashSet<String> seen = new HashSet<>();
+                        for (RoomDtos.RoomDto x : merged) {
+                            if (x != null && x.id != null) seen.add(x.id);
+                        }
+                        for (RoomDtos.RoomDto x : pageItems) {
+                            if (x == null || x.id == null || seen.contains(x.id)) continue;
+                            seen.add(x.id);
+                            merged.add(x);
+                        }
+                        rooms.postValue(merged);
+                    }
+                } else if (!quiet && reset) {
+                    if (r == null || !ApiCall.isRateLimited(r.error)) {
+                        error.postValue(r != null && r.error != null ? r.error
+                                : c.getAppContext().getString(R.string.load_rooms_failed));
+                    }
+                }
+                // On a failed "load more", keep roomsHasMore and roomsPage unchanged so
+                // the next user retry requests the same page instead of disabling pagination.
+            });
+        } catch (RuntimeException rejected) {
             roomsLoadingMore = false;
             loadingMore.postValue(false);
-            if (!quiet && reset) loading.postValue(false);
-            if (r.success && r.data != null && r.data.items != null) {
-                List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
-                roomsHasMore = pageItems.size() >= PAGE_SIZE;
-                roomsPage = page;
-                if (reset) {
-                    rooms.postValue(pageItems);
-                } else {
-                    List<RoomDtos.RoomDto> merged = new ArrayList<>();
-                    List<RoomDtos.RoomDto> cur = rooms.getValue();
-                    if (cur != null) merged.addAll(cur);
-                    HashSet<String> seen = new HashSet<>();
-                    for (RoomDtos.RoomDto x : merged) {
-                        if (x != null && x.id != null) seen.add(x.id);
-                    }
-                    for (RoomDtos.RoomDto x : pageItems) {
-                        if (x == null || x.id == null || seen.contains(x.id)) continue;
-                        seen.add(x.id);
-                        merged.add(x);
-                    }
-                    rooms.postValue(merged);
-                }
-            } else if (!quiet && reset) {
-                if (!ApiCall.isRateLimited(r.error)) {
-                    error.postValue(r.error != null ? r.error
-                            : c.getAppContext().getString(R.string.load_rooms_failed));
-                }
-            } else if (!reset) {
-                roomsHasMore = false;
+            if (!quiet && reset) {
+                loading.postValue(false);
+                error.postValue(c.getAppContext().getString(R.string.load_rooms_failed));
             }
-        });
+        }
     }
 
     public void loadBanners() {
