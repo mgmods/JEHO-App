@@ -49,7 +49,9 @@ test('Google social login verifies the ID token and links the verified subject',
   assert.equal(user.displayName, verified.name);
   assert.equal(user.avatarUrl, verified.picture);
   assert.equal(user.emailVerified, true);
-  assert.equal(saved.length, 1);
+  assert.equal(saved.length, 2);
+  assert.equal(saved[0].googleId, verified.sub);
+  assert.ok(saved[1].lastOnlineAt instanceof Date);
 });
 
 test('Google social login rejects a failed token verification before account lookup', async () => {
