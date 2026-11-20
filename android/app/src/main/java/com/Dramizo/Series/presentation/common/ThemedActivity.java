@@ -62,20 +62,28 @@ public abstract class ThemedActivity extends AppCompatActivity {
     };
 
     private void refreshDashboardVisuals() {
+        // Claim the single-flight gate before checking the throttle. A competing resume
+        // must not advance the timestamp and suppress the request that is already running.
+        if (!VISUAL_REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
         long now = SystemClock.elapsedRealtime();
         long previous = LAST_VISUAL_REFRESH_AT.get();
-        if (previous >= 0L && now - previous < VISUAL_REFRESH_INTERVAL_MS) return;
-        if (!LAST_VISUAL_REFRESH_AT.compareAndSet(previous, now)) return;
-        if (!VISUAL_REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        if (previous >= 0L && now - previous < VISUAL_REFRESH_INTERVAL_MS) {
+            VISUAL_REFRESH_IN_FLIGHT.set(false);
+            return;
+        }
         try {
             AppContainer container = ContainerProvider.from(this);
             container.getIoExecutor().execute(() -> {
+                boolean completed = false;
                 try {
                     if (wantsRemoteThemeChrome()) {
                         RemoteTheme.refreshFromApi(getApplicationContext(), container.getConfigApi());
                     }
                     AppFeatures.refresh(container);
+                    completed = true;
                 } finally {
+                    // Failed/saturated requests remain eligible for a prompt retry.
+                    if (completed) LAST_VISUAL_REFRESH_AT.set(SystemClock.elapsedRealtime());
                     VISUAL_REFRESH_IN_FLIGHT.set(false);
                 }
             });
