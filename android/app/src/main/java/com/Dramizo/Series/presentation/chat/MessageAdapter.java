@@ -591,7 +591,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             } catch (Exception ignored) {
             }
             avatarUrl = liveMe != null ? liveMe.avatarUrl : null;
-            frameUrl = liveMe != null ? liveMe.vipBadgeUrl : null;
+            frameUrl = liveMe != null ? AvatarCosmetics.avatarFrameUrl(liveMe) : null;
             hostBadgeUrl = null;
             name = firstNonEmpty(
                     liveMe != null ? liveMe.displayName : null,
@@ -604,7 +604,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             // Prefer the sender's equipped frame; peer profile is the fallback when
             // an individual message payload omits cosmetic fields.
             frameUrl = firstNonEmpty(
-                    sender != null ? sender.vipBadgeUrl : null,
+                    sender != null ? AvatarCosmetics.avatarFrameUrl(sender) : null,
                     peerHostBadgeUrl);
             hostBadgeUrl = null;
             name = firstNonEmpty(
