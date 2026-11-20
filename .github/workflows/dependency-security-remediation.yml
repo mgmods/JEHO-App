@@ -146,7 +146,7 @@ jobs:
           retention-days: 14
 
       - name: Commit verified lockfile changes
-        if: success() && github.event_name == 'push'
+        if: success()
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
