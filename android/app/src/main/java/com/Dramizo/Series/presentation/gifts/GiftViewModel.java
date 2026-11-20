@@ -89,7 +89,8 @@ public class GiftViewModel extends ViewModel {
         if (loadInFlight) return;
         final boolean hadUsableCatalog = hasGiftsNow() || (local != null && !local.isEmpty());
         loadInFlight = true;
-        c.getIoExecutor().execute(() -> {
+        try {
+            c.getIoExecutor().execute(() -> {
             try {
                 Result<List<GiftDtos.GiftCategoryDto>> cats =
                         c.getGiftRepository().refreshCategories();
@@ -186,7 +187,14 @@ public class GiftViewModel extends ViewModel {
             } finally {
                 loadInFlight = false;
             }
-        });
+            });
+        } catch (RuntimeException rejected) {
+            loadInFlight = false;
+            android.util.Log.w("GiftViewModel", "Gift catalog executor rejected refresh", rejected);
+            if (!hadUsableCatalog) {
+                error.postValue("تعذر تحميل الهدايا حالياً، حاول مجددًا");
+            }
+        }
     }
 
     public void loadWallet() {
@@ -232,7 +240,8 @@ public class GiftViewModel extends ViewModel {
         lastReceiverId = first;
         lastSendAt = now;
         final int comboCount = combo;
-        c.getIoExecutor().execute(() -> {
+        try {
+            c.getIoExecutor().execute(() -> {
             Result<GiftDtos.SendGiftResult> r;
             try {
                 if (targets.size() > 1 && roomId != null && !roomId.isEmpty()) {
@@ -268,7 +277,11 @@ public class GiftViewModel extends ViewModel {
                 if (w.success && w.data != null) coinsBalance.postValue(w.data.coins);
             }
             sent.postValue(data);
-        });
+            });
+        } catch (RuntimeException rejected) {
+            android.util.Log.w("GiftViewModel", "Gift send executor rejected request", rejected);
+            error.postValue("تعذر إرسال الهدية حالياً، حاول مرة أخرى");
+        }
     }
 
     private boolean isLuckyGift(String giftId) {
