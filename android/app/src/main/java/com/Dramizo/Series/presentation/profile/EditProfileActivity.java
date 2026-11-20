@@ -96,16 +96,6 @@ public class EditProfileActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityEditProfileBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        // Hide only the bio label and editor. The parent also contains the display-name
-        // field, so hiding the whole container would incorrectly hide the name editor.
-        if (binding.etBio != null) {
-            binding.etBio.setVisibility(View.GONE);
-            if (binding.etBio.getParent() instanceof ViewGroup) {
-                ViewGroup bioRow = (ViewGroup) binding.etBio.getParent();
-                int bioIndex = bioRow.indexOfChild(binding.etBio);
-                if (bioIndex > 0) bioRow.getChildAt(bioIndex - 1).setVisibility(View.GONE);
-            }
-        }
         // Explicit system padding on contentRoot (layout id) — avoids toolbar-only pad
         // which caused overlapping status/fields on edge-to-edge Android 14+.
         EdgeToEdgeHelper.apply(this);
@@ -149,7 +139,6 @@ public class EditProfileActivity extends ThemedActivity {
         vm.getUser().observe(this, user -> {
             if (user == null) return;
             binding.etDisplayName.setText(user.displayName);
-            binding.etBio.setText(user.bio);
             binding.etAvatar.setText(user.avatarUrl != null ? user.avatarUrl : "");
             binding.etCover.setText(user.coverUrl != null ? user.coverUrl : "");
             profileCoverUrls.clear();
@@ -344,9 +333,7 @@ public class EditProfileActivity extends ThemedActivity {
             Toast.makeText(this, "أدخل الاسم الظاهر", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(name)
-                || com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(
-                        text(binding.etBio))) {
+        if (com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(name)) {
             Toast.makeText(this,
                     com.Dramizo.Series.util.ChatContentFilter.AGENCY_WORD_REASON,
                     Toast.LENGTH_LONG).show();
@@ -364,7 +351,6 @@ public class EditProfileActivity extends ThemedActivity {
 
         MiscDtos.UpdateProfileRequest req = new MiscDtos.UpdateProfileRequest();
         req.displayName = name;
-        req.bio = emptyToNull(text(binding.etBio));
         req.avatarUrl = emptyToNull(text(binding.etAvatar));
         req.coverUrl = emptyToNull(text(binding.etCover));
         req.profileCoverUrls = new ArrayList<>(profileCoverUrls);
