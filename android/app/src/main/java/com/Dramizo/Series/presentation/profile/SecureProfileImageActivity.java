@@ -56,7 +56,10 @@ public class SecureProfileImageActivity extends ThemedActivity {
         root.setOnClickListener(v -> finish());
         image.setOnClickListener(v -> finish());
         setContentView(root);
-        AvatarImageLoader.loadMedia(image, url.trim(), 0);
+        com.bumptech.glide.Glide.with(this)
+                .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(url.trim()))
+                .fitCenter()
+                .into(image);
     }
 
     @Override
