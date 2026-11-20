@@ -58,7 +58,7 @@ jobs:
           p.overrides.glob = '14.0.2';
           p.overrides.minimatch = '11.0.1';
           p.overrides.uuid = '$uuid';
-          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\\n');
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2));
           NODE
           npm install --save-exact \
             @nestjs/common@11.2.11 \
