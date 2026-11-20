@@ -27,7 +27,8 @@ test('Google social login verifies the ID token and links the verified subject',
   };
   service.usersRepo = {
     findOne: async (options: any) => {
-      if (options.where.googleId) return user;
+      if (options.where.googleId) return null;
+      if (options.where.email) return user;
       return null;
     },
     save: async (value: any) => { saved.push({ ...value }); return value; },
@@ -54,7 +55,7 @@ test('Google social login rejects a failed token verification before account loo
   const service: any = Object.create(AuthService.prototype);
   let accountLookups = 0;
   service.verifyGoogleIdToken = async () => {
-    throw new Error('signature rejected');
+    throw { status: 401, message: 'signature rejected' };
   };
   service.usersRepo = {
     findOne: async () => { accountLookups += 1; return null; },
