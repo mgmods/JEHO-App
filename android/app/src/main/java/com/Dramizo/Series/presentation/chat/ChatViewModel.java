@@ -117,6 +117,47 @@ public class ChatViewModel extends ViewModel {
         replyTarget.setValue(null);
     }
 
+    private void dispatchMessageSend(
+            String localId,
+            String failureMessage,
+            java.util.concurrent.Callable<Result<ChatDtos.MessageDto>> request) {
+        Runnable sendTask = () -> {
+            try {
+                Result<ChatDtos.MessageDto> result = request.call();
+                if (result != null && result.success && result.data != null) {
+                    replaceLocalWithServer(localId, result.data);
+                } else {
+                    markLocalSendFailed(localId);
+                    error.postValue(result != null && result.error != null
+                            ? result.error : failureMessage);
+                }
+            } catch (Exception failure) {
+                android.util.Log.w("ChatViewModel", "Message send failed", failure);
+                markLocalSendFailed(localId);
+                error.postValue(failureMessage);
+            }
+        };
+        try {
+            c.getIoExecutor().execute(sendTask);
+        } catch (RuntimeException rejected) {
+            markLocalSendFailed(localId);
+            error.postValue(failureMessage);
+        }
+    }
+
+    private void markLocalSendFailed(String localId) {
+        List<ChatDtos.MessageDto> current = messages.getValue();
+        if (current == null || localId == null) return;
+        List<ChatDtos.MessageDto> updated = new ArrayList<>(current);
+        for (ChatDtos.MessageDto message : updated) {
+            if (message != null && localId.equals(message.id)) {
+                message.localPending = false;
+                break;
+            }
+        }
+        messages.postValue(updated);
+    }
+
     public void attach(String conversationId) {
         this.conversationId = conversationId;
         String token = c.getSessionManager().getAccessToken();
@@ -233,25 +274,8 @@ public class ChatViewModel extends ViewModel {
         ChatDtos.MessageDto pending = newOptimistic("text", localId, conversationId, reply);
         pending.content = content;
         appendMessage(pending);
-        try {
-            c.getIoExecutor().execute(() -> {
-                try {
-                    Result<ChatDtos.MessageDto> r =
-                            c.sendMessageUseCase.execute(conversationId, content, reply);
-                    if (r.success && r.data != null) {
-                        replaceLocalWithServer(localId, r.data);
-                    } else {
-                        // Keep bubble visible with error — do not vanish like a glitch.
-                        error.postValue(r.error != null ? r.error : "تعذر إرسال الرسالة");
-                    }
-                } catch (RuntimeException failure) {
-                    android.util.Log.w("ChatViewModel", "Message send failed", failure);
-                    error.postValue("تعذر إرسال الرسالة، حاول مجددًا");
-                }
-            });
-        } catch (RuntimeException rejected) {
-            error.postValue("تعذر إرسال الرسالة، حاول مجددًا");
-        }
+        dispatchMessageSend(localId, "تعذر إرسال الرسالة، حاول مجددًا",
+                () -> c.sendMessageUseCase.execute(conversationId, content, reply));
     }
 
     public void sendImage(String conversationId, String imageUrl) {
@@ -264,12 +288,8 @@ public class ChatViewModel extends ViewModel {
         pending.media = new ChatDtos.MediaDto();
         pending.media.url = imageUrl;
         appendMessage(pending);
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r =
-                    c.sendMessageUseCase.executeImage(conversationId, imageUrl, reply);
-            if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
-            else error.postValue(r.error != null ? r.error : "تعذر إرسال الصورة");
-        });
+        dispatchMessageSend(localId, "تعذر إرسال الصورة، حاول مجددًا",
+                () -> c.sendMessageUseCase.executeImage(conversationId, imageUrl, reply));
     }
 
     public void sendAudio(String conversationId, String audioUrl, int durationSec) {
@@ -283,12 +303,8 @@ public class ChatViewModel extends ViewModel {
         pending.media.url = audioUrl;
         pending.media.duration = durationSec;
         appendMessage(pending);
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r =
-                    c.sendMessageUseCase.executeAudio(conversationId, audioUrl, durationSec, reply);
-            if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
-            else error.postValue(r.error != null ? r.error : "تعذر إرسال الصوت");
-        });
+        dispatchMessageSend(localId, "تعذر إرسال الصوت، حاول مجددًا",
+                () -> c.sendMessageUseCase.executeAudio(conversationId, audioUrl, durationSec, reply));
     }
 
     public void sendVideo(String conversationId, String videoUrl, String thumbnailUrl, String mimeType, long size, int durationSec) {
@@ -305,12 +321,9 @@ public class ChatViewModel extends ViewModel {
         pending.media.size = Math.max(0, size);
         pending.media.duration = Math.max(0, durationSec);
         appendMessage(pending);
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r =
-                    c.sendMessageUseCase.executeVideo(conversationId, videoUrl, thumbnailUrl, mimeType, size, durationSec, reply);
-            if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
-            else error.postValue(r.error != null ? r.error : "تعذر إرسال الفيديو");
-        });
+        dispatchMessageSend(localId, "تعذر إرسال الفيديو، حاول مجددًا",
+                () -> c.sendMessageUseCase.executeVideo(
+                        conversationId, videoUrl, thumbnailUrl, mimeType, size, durationSec, reply));
     }
 
     public void sendGiftMessage(String conversationId, String giftName, String iconUrl) {
@@ -336,12 +349,9 @@ public class ChatViewModel extends ViewModel {
         }
         appendMessage(pending);
         final String iconFinal = safeIcon;
-        c.getIoExecutor().execute(() -> {
-            Result<ChatDtos.MessageDto> r =
-                    c.sendMessageUseCase.executeGift(conversationId, pending.content, iconFinal, reply);
-            if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
-            else error.postValue(r.error != null ? r.error : "تعذر إرسال الهدية");
-        });
+        dispatchMessageSend(localId, "تعذر إرسال الهدية، حاول مجددًا",
+                () -> c.sendMessageUseCase.executeGift(
+                        conversationId, pending.content, iconFinal, reply));
     }
 
     private ChatDtos.MessageDto newOptimistic(String type, String localId, String conversationId, String reply) {
