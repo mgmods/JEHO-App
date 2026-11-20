@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomInt } from 'crypto';
@@ -581,14 +581,14 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('app.jwt.secret'),
-      expiresIn: this.configService.get<string>('app.jwt.expiresIn'),
+      expiresIn: this.configService.get<string>('app.jwt.expiresIn') as JwtSignOptions['expiresIn'],
     });
 
     const refreshToken = await this.jwtService.signAsync(
       { sub: user.id },
       {
         secret: this.configService.get<string>('app.jwt.refreshSecret'),
-        expiresIn: this.configService.get<string>('app.jwt.refreshExpiresIn'),
+        expiresIn: this.configService.get<string>('app.jwt.refreshExpiresIn') as JwtSignOptions['expiresIn'],
       },
     );
 
