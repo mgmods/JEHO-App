@@ -102,7 +102,12 @@ public class VipActivity extends ThemedActivity {
             if (m != null) Toast.makeText(this, m, Toast.LENGTH_LONG).show();
         });
         vm.getError().observe(this, e -> {
-            if (e != null) com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
+            if (e == null || e.trim().isEmpty()) return;
+            String normalized = e.trim().toLowerCase(java.util.Locale.ROOT);
+            // Empty catalogue state is shown inline; it is not a transient error toast.
+            if (normalized.contains("لا خطط متاحة الآن")
+                    || normalized.contains("no plans available")) return;
+            com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
         });
         vm.getPurchasing().observe(this, busy -> {
             if (adapter != null && layoutVipPlans != null) {
