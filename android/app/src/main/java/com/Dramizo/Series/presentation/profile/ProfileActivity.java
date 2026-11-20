@@ -1850,6 +1850,12 @@ public class ProfileActivity extends ThemedActivity {
         }
         profileCoverIndex = 0;
         showProfileCover(0);
+        binding.imgCover.setClickable(true);
+        binding.imgCover.setOnClickListener(v -> {
+            if (profileCoverGallery.size() == 1) {
+                openSecureProfileImage(profileCoverGallery.get(profileCoverIndex));
+            }
+        });
         binding.imgCover.setOnTouchListener((view, event) -> {
             if (profileCoverGallery.size() < 2) return false;
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -1865,6 +1871,8 @@ public class ProfileActivity extends ThemedActivity {
                     showProfileCover(next);
                     profileHandler.removeCallbacks(profileCoverAdvance);
                     profileHandler.postDelayed(profileCoverAdvance, 3000L);
+                } else if (profileCoverIndex >= 0 && profileCoverIndex < profileCoverGallery.size()) {
+                    openSecureProfileImage(profileCoverGallery.get(profileCoverIndex));
                 }
                 return true;
             }
@@ -1882,6 +1890,13 @@ public class ProfileActivity extends ThemedActivity {
         profileCoverIndex = Math.max(0, Math.min(index, profileCoverGallery.size() - 1));
         com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
                 binding.imgCover, profileCoverGallery.get(profileCoverIndex), ImagePlaceholder.cover());
+    }
+
+    private void openSecureProfileImage(@Nullable String imageUrl) {
+        if (imageUrl == null || imageUrl.trim().isEmpty() || isFinishing() || isDestroyed()) return;
+        Intent secureImage = new Intent(ProfileActivity.this, SecureProfileImageActivity.class);
+        secureImage.putExtra(SecureProfileImageActivity.EXTRA_IMAGE_URL, imageUrl.trim());
+        startActivity(secureImage);
     }
 
     @Override
