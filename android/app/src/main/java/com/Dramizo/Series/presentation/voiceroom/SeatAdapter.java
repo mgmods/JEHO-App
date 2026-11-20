@@ -1226,8 +1226,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         // Keep VIP wearable/frame on the seat; role/agency/competition marks are not seat wear.
         String hostUrl = null;
         // Dashboard VIP frame has priority for active VIP members; retain equipped wear as fallback.
-        String vipUrl = user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()
-                ? user.vipBadgeUrl.trim() : null;
+        String vipUrl = AvatarCosmetics.avatarFrameUrl(user);
         java.util.Map<String, Object> badgeMeta = null;
         boolean self = selfUserId != null && selfUserId.equals(normalizeUserId(user.id));
         if (self) {
