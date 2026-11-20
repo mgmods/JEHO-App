@@ -5,7 +5,7 @@
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFF0D1"
+    android:background="#FFF4F6FA"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:fitsSystemWindows="false"
@@ -90,8 +90,11 @@
                     android:background="@color/white"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingTop="22dp"
-                    android:paddingBottom="18dp">
+                    android:layout_marginHorizontal="12dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_wallet_section"
+                    android:paddingTop="18dp"
+                    android:paddingBottom="16dp">
 
                     <FrameLayout
                         android:id="@+id/rowAvatar"
@@ -166,6 +169,7 @@
                     android:background="@color/white"
                     android:foreground="?attr/selectableItemBackground"
                     android:orientation="vertical"
+                    android:layout_marginHorizontal="12dp"
                     android:paddingHorizontal="16dp"
                     android:paddingTop="14dp"
                     android:paddingBottom="14dp">
