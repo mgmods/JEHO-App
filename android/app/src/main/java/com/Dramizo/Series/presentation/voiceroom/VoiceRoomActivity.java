@@ -5136,7 +5136,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void playLuckyCannonEvent(@Nullable String icon, @NonNull List<String> targets,
                                       long totalCoins, int quantity, int personCount,
-                                      boolean localSender) {
+                                      boolean localSender, @Nullable String senderId) {
         if (!luckyCannonEnabled || binding == null || binding.giftOverlay == null) return;
         // Keep the existing cannon control exactly as-is; only its gift-flight path is shared.
         boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
@@ -5147,7 +5147,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             luckyCannonView.fire();
         }
         if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
-        playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount);
+        playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount, senderId);
         if (!keepVisible && luckyCannonLayer != null) {
             handler.postDelayed(() -> {
                 if (luckyCannonLayer != null && luckyCannonTargets.isEmpty()) {
@@ -5158,7 +5158,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void playLuckyCannonFlights(@Nullable String icon, @NonNull List<String> targets,
-                                        long totalCoins, int quantity, int personCount) {
+                                        long totalCoins, int quantity, int personCount,
+                                        @Nullable String senderId) {
         if (binding == null || binding.giftOverlay == null || targets.isEmpty()) return;
         java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
         for (String id : targets) {
@@ -5176,10 +5177,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Cannon gift reveal must be centered in the actual gift overlay,
             // never anchored to a seat or pushed toward a screen edge.
             // The stage animator's null revealCenter resolves to overlay width/2, height/2.
+            PointF cannonSource = resolveLuckyCannonSource(senderId);
             com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
                     binding.giftOverlay, icon, destinations, totalCoins,
                     Math.max(1, quantity), Math.max(1, recipients.size()),
-                    resolveLuckyGiftRevealCenter(), null, null);
+                    resolveLuckyGiftRevealCenter(), cannonSource, true, null, null);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
@@ -12329,6 +12331,32 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    /** Start the hero at the sender's occupied mic, or at the bottom when the sender is off-seat. */
+    @Nullable
+    private PointF resolveLuckyGiftSource(@Nullable String senderId) {
+        if (binding == null || binding.giftOverlay == null) return null;
+        View senderSeat = findSeatViewForUser(senderId);
+        if (senderSeat != null && senderSeat.getWidth() > 0 && senderSeat.getHeight() > 0) {
+            PointF seatPoint = GiftFlyAnimator.centerInOverlay(binding.giftOverlay, senderSeat);
+            if (seatPoint != null) return seatPoint;
+        }
+        int width = Math.max(1, binding.giftOverlay.getWidth());
+        int height = Math.max(1, binding.giftOverlay.getHeight());
+        return new PointF(width * 0.5f, height - luckyCannonDp(84));
+    }
+
+    /** Cannon launches originate at the visible launcher; fall back to bottom-center if unavailable. */
+    @Nullable
+    private PointF resolveLuckyCannonSource(@Nullable String senderId) {
+        if (binding == null || binding.giftOverlay == null) return null;
+        if (luckyCannonView != null && luckyCannonView.getVisibility() == View.VISIBLE
+                && luckyCannonView.getWidth() > 0 && luckyCannonView.getHeight() > 0) {
+            PointF cannonPoint = GiftFlyAnimator.centerInOverlay(binding.giftOverlay, luckyCannonView);
+            if (cannonPoint != null) return cannonPoint;
+        }
+        return resolveLuckyGiftSource(senderId);
+    }
+
     @NonNull
     private List<android.graphics.PointF> resolveMicCenters(@Nullable List<String> userIds) {
         List<android.graphics.PointF> targets = new ArrayList<>();
@@ -12398,6 +12426,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String senderName,
             @Nullable Runnable onScatterStart
     ) {
+        playLuckyGiftStage(giftIconUrl, targetIds, coinsSpent, quantity, personCount,
+                senderName, null, onScatterStart);
+    }
+
+    public void playLuckyGiftStage(
+            @Nullable String giftIconUrl,
+            @Nullable List<String> targetIds,
+            long coinsSpent,
+            int quantity,
+            int personCount,
+            @Nullable String senderName,
+            @Nullable String senderId,
+            @Nullable Runnable onScatterStart
+    ) {
         if (binding == null || binding.giftOverlay == null) {
             if (onScatterStart != null) {
                 try { onScatterStart.run(); } catch (Exception ignored) {}
@@ -12430,10 +12472,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Lucky gifts must first appear as one hero exactly at the room center.
             // The old flyTogether path immediately created seat-bound copies, making
             // the gift look as if it spawned at the edge when a target seat was there.
+            PointF source = resolveLuckyGiftSource(senderId);
             com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
                     binding.giftOverlay, giftIconUrl, destinations, coinsSpent,
                     Math.max(1, quantity), Math.max(1, personCount),
-                    from, onScatterStart, null);
+                    from, source, false, onScatterStart, null);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
@@ -16918,7 +16961,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 // The separate lucky:hit room event owns the win toast, so it is never duplicated here.
                 playLuckyCannonEvent(icon, allReceivers, totalCoins, qtyRemote,
-                        Math.max(1, personCount), localSenderEcho);
+                        Math.max(1, personCount), localSenderEcho, senderId);
                 return;
             }
             if (localSenderEcho) {
@@ -16942,6 +16985,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         qtyRemote,
                         Math.max(1, rainTargets.isEmpty() ? personCount : rainTargets.size()),
                         sender,
+                        senderId,
                         null);
                 int senderVipChat = Math.max(0, memberInt(payload, "senderVipLevel", 0));
                 int senderLevelChat = Math.max(1, memberInt(payload, "senderUserLevel", 1));

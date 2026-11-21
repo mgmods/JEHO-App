@@ -37,6 +37,15 @@ public final class LuckyGiftStageAnimator {
             @Nullable List<PointF> micTargets, long coinsSpent, int quantity, int personCount,
             @Nullable PointF revealCenter, @Nullable Runnable onScatterStart,
             @Nullable Runnable onEnd) {
+        play(overlay, giftIconUrl, micTargets, coinsSpent, quantity, personCount,
+                revealCenter, null, false, onScatterStart, onEnd);
+    }
+
+    /** Source-aware reveal; cannon mode sends balanced visual waves to the same target seats. */
+    public static void play(@Nullable FrameLayout overlay, @Nullable String giftIconUrl,
+            @Nullable List<PointF> micTargets, long coinsSpent, int quantity, int personCount,
+            @Nullable PointF revealCenter, @Nullable PointF sourcePoint, boolean cannonMode,
+            @Nullable Runnable onScatterStart, @Nullable Runnable onEnd) {
         if (overlay == null || overlay.getWidth() <= 0 || overlay.getHeight() <= 0
                 || giftIconUrl == null || giftIconUrl.trim().isEmpty()) {
             finish(onEnd);
@@ -93,6 +102,12 @@ public final class LuckyGiftStageAnimator {
         heroLp.leftMargin = Math.round(centerX - 56f * density);
         heroLp.topMargin = Math.round(centerY - 56f * density);
         stage.addView(hero, heroLp);
+        final float heroStartX = sourcePoint != null ? sourcePoint.x - 56f * density
+                : centerX - 56f * density;
+        final float heroStartY = sourcePoint != null ? sourcePoint.y - 56f * density
+                : centerY - 56f * density;
+        hero.setX(heroStartX);
+        hero.setY(heroStartY);
         hero.setAlpha(0f);
         hero.setScaleX(0.18f);
         hero.setScaleY(0.18f);
@@ -115,6 +130,8 @@ public final class LuckyGiftStageAnimator {
 
         AnimatorSet reveal = new AnimatorSet();
         reveal.playTogether(
+                ObjectAnimator.ofFloat(hero, View.X, heroStartX, centerX - 56f * density),
+                ObjectAnimator.ofFloat(hero, View.Y, heroStartY, centerY - 56f * density),
                 ObjectAnimator.ofFloat(hero, View.ALPHA, 0f, 1f),
                 ObjectAnimator.ofFloat(hero, View.SCALE_X, 0.18f, 1.18f, 1f),
                 ObjectAnimator.ofFloat(hero, View.SCALE_Y, 0.18f, 1.18f, 1f),
@@ -134,7 +151,7 @@ public final class LuckyGiftStageAnimator {
                 // launch one clone along a real path to each requested seat.
                 // The center hero remains visible throughout the seat flights.
                 scatter(overlay, stage, hero, giftIconUrl, centerX, centerY,
-                        micTargets, quantity, personCount, density, onEnd);
+                        micTargets, quantity, personCount, density, cannonMode, onEnd);
             }
         });
         reveal.start();
@@ -142,7 +159,8 @@ public final class LuckyGiftStageAnimator {
 
     private static void scatter(FrameLayout overlay, FrameLayout stage, ImageView hero,
             String iconUrl, float fromX, float fromY, @Nullable List<PointF> targets,
-            int quantity, int personCount, float density, @Nullable Runnable onEnd) {
+            int quantity, int personCount, float density, boolean cannonMode,
+            @Nullable Runnable onEnd) {
         List<PointF> seats = new ArrayList<>();
         if (targets != null) for (PointF p : targets) if (p != null) seats.add(p);
         if (seats.isEmpty()) {
@@ -157,12 +175,17 @@ public final class LuckyGiftStageAnimator {
         hero.setScaleX(1f);
         hero.setScaleY(1f);
 
-        int flightCount = seats.size();
+        // Cannon visuals are emitted as balanced waves: every wave reaches each selected mic.
+        int waves = cannonMode
+                ? Math.max(1, Math.min(5, (Math.max(1, quantity) + seats.size() - 1) / seats.size()))
+                : 1;
+        int flightCount = seats.size() * waves;
         final int[] remaining = {flightCount};
         int size = Math.round(44f * density);
 
         for (int i = 0; i < flightCount; i++) {
-            PointF target = seats.get(i);
+            int wave = i / seats.size();
+            PointF target = seats.get(i % seats.size());
 
             ImageView copy = new ImageView(overlay.getContext());
             copy.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -187,7 +210,7 @@ public final class LuckyGiftStageAnimator {
                     ObjectAnimator.ofFloat(copy, View.SCALE_X, 0.68f, 1.14f, 0.82f),
                     ObjectAnimator.ofFloat(copy, View.SCALE_Y, 0.68f, 1.14f, 0.82f),
                     ObjectAnimator.ofFloat(copy, View.ROTATION, -14f, 14f, 0f));
-            flight.setStartDelay((i / 4) * 65L);
+            flight.setStartDelay(wave * 280L + ((i % seats.size()) / 4) * 65L);
             flight.setDuration(660L);
             flight.setInterpolator(new DecelerateInterpolator(1.35f));
             flight.addListener(new AnimatorListenerAdapter() {
