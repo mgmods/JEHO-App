@@ -72,7 +72,10 @@ public class VoiceRoomForegroundService extends Service {
     private static volatile ExoPlayer offeredMusicPlayer;
     private static volatile String offeredRoomId;
     private static volatile String offeredMusicUrl;
+    private static volatile String offeredPlayableUrl;
     private static volatile String offeredMusicStatus;
+    private static volatile String returnedMusicSourceUrl;
+    private static volatile String returnedMusicPlayableUrl;
     private final Player.Listener musicStateListener = new Player.Listener() {
         @Override public void onPlaybackStateChanged(int playbackState) {
             if (playbackState == Player.STATE_READY
@@ -89,6 +92,7 @@ public class VoiceRoomForegroundService extends Service {
         }
     };
     private String activeMusicUrl;
+    private String activeMusicPlayableUrl;
     private String activeMusicStatus;
     private boolean musicResolveInProgress;
     private static volatile String handoffRoomId;
@@ -417,11 +421,12 @@ public class VoiceRoomForegroundService extends Service {
 
     /** Offer the room's existing decoder to the foreground service without preparing a second player. */
     public static void offerMusicPlayer(@Nullable ExoPlayer player, @Nullable String targetRoomId,
-            @Nullable String targetMusicUrl, @Nullable String targetStatus) {
+            @Nullable String sourceMusicUrl, @Nullable String playableMusicUrl, @Nullable String targetStatus) {
         if (player == null) return;
         offeredMusicPlayer = player;
         offeredRoomId = targetRoomId;
-        offeredMusicUrl = targetMusicUrl;
+        offeredMusicUrl = sourceMusicUrl;
+        offeredPlayableUrl = playableMusicUrl;
         offeredMusicStatus = targetStatus;
     }
 
@@ -430,19 +435,22 @@ public class VoiceRoomForegroundService extends Service {
             offeredMusicPlayer = null;
             offeredRoomId = null;
             offeredMusicUrl = null;
+            offeredPlayableUrl = null;
             offeredMusicStatus = null;
         }
     }
 
-    private void adoptOfferedMusicPlayer() {
+    private boolean adoptOfferedMusicPlayer() {
         ExoPlayer offered = offeredMusicPlayer;
-        if (offered == null) return;
+        if (offered == null) return false;
         String targetRoom = offeredRoomId;
         String targetUrl = offeredMusicUrl;
+        String playableUrl = offeredPlayableUrl;
         String targetStatus = offeredMusicStatus;
         offeredMusicPlayer = null;
         offeredRoomId = null;
         offeredMusicUrl = null;
+        offeredPlayableUrl = null;
         offeredMusicStatus = null;
         if (musicPlayer != null && musicPlayer != offered) {
             try { musicPlayer.removeListener(musicStateListener); } catch (Exception ignored) {}
@@ -451,11 +459,13 @@ public class VoiceRoomForegroundService extends Service {
         musicPlayer = offered;
         musicPlayer.addListener(musicStateListener);
         activeMusicUrl = targetUrl;
+        activeMusicPlayableUrl = playableUrl;
         activeMusicStatus = targetStatus;
         handoffRoomId = targetRoom;
-        handoffMusicUrl = targetUrl;
+        handoffMusicUrl = playableUrl;
         handoffMusicReady = musicPlayer.getPlaybackState() == Player.STATE_READY;
         handoffMusicPlaying = musicPlayer.isPlaying();
+        return true;
     }
 
     /** Return the exact same decoder to the room Activity when the user reopens the room. */
@@ -464,11 +474,25 @@ public class VoiceRoomForegroundService extends Service {
         VoiceRoomForegroundService service = activeInstance;
         if (service == null || service.musicPlayer == null) return null;
         ExoPlayer player = service.musicPlayer;
+        returnedMusicSourceUrl = service.activeMusicUrl;
+        returnedMusicPlayableUrl = service.activeMusicPlayableUrl;
         try { player.removeListener(service.musicStateListener); } catch (Exception ignored) {}
         service.musicPlayer = null;
         handoffMusicReady = false;
         handoffMusicPlaying = false;
         return player;
+    }
+
+    @Nullable public static String consumeReturnedMusicSourceUrl() {
+        String value = returnedMusicSourceUrl;
+        returnedMusicSourceUrl = null;
+        return value;
+    }
+
+    @Nullable public static String consumeReturnedMusicPlayableUrl() {
+        String value = returnedMusicPlayableUrl;
+        returnedMusicPlayableUrl = null;
+        return value;
     }
     /** True only after the background ExoPlayer has prepared the exact requested track. */
     public static boolean isMusicHandoffReady(String requestedRoomId, String requestedMusicUrl) {
@@ -528,7 +552,7 @@ public class VoiceRoomForegroundService extends Service {
             return START_NOT_STICKY;
         }
         stopping = false;
-        adoptOfferedMusicPlayer();
+        boolean adoptedMusicPlayer = adoptOfferedMusicPlayer();
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString(EXTRA_ROOM_ID, roomId)
                 .putString(EXTRA_TITLE, roomTitle)
@@ -546,11 +570,13 @@ public class VoiceRoomForegroundService extends Service {
         RealtimeClient.getInstance().addRoomListener(realtimeListener);
         main.removeCallbacks(renewToken);
         main.post(renewToken);
-        applyMusic(
-                intent.getStringExtra(EXTRA_MUSIC_URL),
-                intent.getStringExtra(EXTRA_MUSIC_STATUS),
-                intent.getLongExtra(EXTRA_MUSIC_POSITION, 0L),
-                intent.getStringExtra(EXTRA_MUSIC_STARTED_AT));
+        if (!adoptedMusicPlayer) {
+            applyMusic(
+                    intent.getStringExtra(EXTRA_MUSIC_URL),
+                    intent.getStringExtra(EXTRA_MUSIC_STATUS),
+                    intent.getLongExtra(EXTRA_MUSIC_POSITION, 0L),
+                    intent.getStringExtra(EXTRA_MUSIC_STARTED_AT));
+        }
         return START_STICKY;
     }
 
@@ -829,6 +855,7 @@ public class VoiceRoomForegroundService extends Service {
                 && url.regionMatches(true, 0, "local://", 0, 8);
         if (url == null || url.isEmpty() || "stopped".equalsIgnoreCase(playStatus) || localMix) {
             activeMusicUrl = url;
+            activeMusicPlayableUrl = null;
             activeMusicStatus = playStatus;
             musicResolveInProgress = false;
             handoffRoomId = roomId;
@@ -850,6 +877,32 @@ public class VoiceRoomForegroundService extends Service {
             } catch (Exception ignored) {
             }
             return;
+        }
+
+        // Same source track: apply pause/resume/seek to the existing decoder instead
+        // of replacing its MediaItem (which would restart audio during minimize).
+        boolean sameSourceTrack = url.equals(activeMusicUrl) && musicPlayer.getMediaItemCount() > 0;
+        if (sameSourceTrack) {
+            activeMusicStatus = playStatus;
+            if ("paused".equalsIgnoreCase(playStatus)) {
+                musicPlayer.pause();
+                handoffMusicPlaying = false;
+                return;
+            }
+            if ("playing".equalsIgnoreCase(playStatus)) {
+                long target = Math.max(0L, positionMs);
+                if (startedAt != null) {
+                    try {
+                        target += Math.max(0L, System.currentTimeMillis()
+                                - java.time.Instant.parse(startedAt).toEpochMilli());
+                    } catch (Exception ignored) { }
+                }
+                if (target > 0L && Math.abs(musicPlayer.getCurrentPosition() - target) > 2500L) {
+                    musicPlayer.seekTo(target);
+                }
+                musicPlayer.play();
+                return;
+            }
         }
 
         // onUserLeaveHint, the minimize click and onStop can all request the same
@@ -912,6 +965,7 @@ public class VoiceRoomForegroundService extends Service {
         try {
             handoffMusicReady = false;
             handoffMusicPlaying = false;
+            activeMusicPlayableUrl = absolute;
             musicPlayer.setMediaItem(MediaItem.fromUri(absolute));
             musicPlayer.prepare();
             long target = Math.max(0L, positionMs);
