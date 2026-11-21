@@ -186,9 +186,11 @@ public final class LiveKitEngineManager {
                     if (micEnabled && (publishing || pendingPublishStreamId != null)) {
                         applyMicOnEngine(true);
                     }
-                } else {
-                    trySetRemotePlaybackGain(newRoom, speakerMuted ? 0f : 1f);
                 }
+                // The room-wide local speaker mute applies to every remote audio
+                // participant, regardless of whether this user is publishing a mic.
+                // Reapply after each connection so LiveKit reconnects cannot leak audio.
+                trySetRemotePlaybackGain(newRoom, speakerMuted ? 0f : 1f);
                 seedRemoteAudioTracks(newRoom);
                 startPolling();
                 notifyRoomState(roomF, 1, 0);
@@ -694,6 +696,13 @@ public final class LiveKitEngineManager {
     public void setSpeakerMuted(boolean muted) {
         speakerMuted = muted;
         applyAudioRoute();
+        // LiveKit auto-subscribes remote tracks. Changing the Android speaker route
+        // alone does not mute those tracks, so apply a listener-local gain to every
+        // remote participant. This never changes their published audio or our mic.
+        Room activeRoom = room;
+        if (activeRoom != null && connected.get()) {
+            io.execute(() -> trySetRemotePlaybackGain(activeRoom, muted ? 0f : 1f));
+        }
     }
 
     public boolean isSpeakerMuted() {
