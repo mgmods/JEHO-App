@@ -193,6 +193,12 @@ export class CosmeticsService implements OnModuleInit {
       this.logger.warn(`nameplate cosmetic enum ensure: ${(err as Error).message}`);
     }
     try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'voice_wave'`);
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "voiceWaveUrl" varchar(512)`);
+    } catch (err) {
+      this.logger.warn(`voice wave cosmetic schema ensure: ${(err as Error).message}`);
+    }
+    try {
       await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "profileCardUrl" varchar(512)`);
       await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "chatBubbleUrl" varchar(512)`);
       await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "nameplateUrl" varchar(512)`);
@@ -1149,6 +1155,7 @@ export class CosmeticsService implements OnModuleInit {
       if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.VOICE_WAVE) profile.voiceWaveUrl = owned.cosmetic.previewUrl || this.cosmeticAnimationUrl(owned.cosmetic) || null;
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
       if (type === CosmeticType.HOST_BADGE) {
         // VIP and host frames share one avatar-frame slot; never layer them.
@@ -1255,6 +1262,7 @@ export class CosmeticsService implements OnModuleInit {
       if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = null;
       if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = null;
       if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = null;
+      if (type === CosmeticType.VOICE_WAVE) profile.voiceWaveUrl = null;
       if (type === CosmeticType.HOST_BADGE || type === CosmeticType.VIP_BADGE) {
         // Both cosmetic types represent the same avatar-frame slot.
         profile.hostBadgeUrl = null;
