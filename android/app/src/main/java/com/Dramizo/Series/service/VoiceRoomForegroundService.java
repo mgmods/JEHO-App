@@ -638,9 +638,10 @@ public class VoiceRoomForegroundService extends Service {
                 main.post(() -> {
                     if (stopping || roomId == null) return;
                     try {
+                        // Updating the artwork must not re-declare FGS types from
+                        // background; that can drop the microphone type on Android 14+.
                         NotificationManagerCompat.from(this)
                                 .notify(NOTIFICATION_ID, buildForegroundNotification());
-                        enterForegroundSafe(resolveForegroundTypes());
                     } catch (Exception ignored) {
                     }
                 });
