@@ -74,6 +74,7 @@ public class VoiceRoomForegroundService extends Service {
     private static volatile String handoffRoomId;
     private static volatile String handoffMusicUrl;
     private static volatile boolean handoffMusicReady;
+    private static volatile boolean handoffMusicPlaying;
     private boolean stopping;
     private android.graphics.Bitmap coverBitmap;
 
@@ -387,8 +388,14 @@ public class VoiceRoomForegroundService extends Service {
                 }
             }
 
+            @Override public void onIsPlayingChanged(boolean isPlaying) {
+                handoffMusicPlaying = isPlaying;
+                if (isPlaying) handoffMusicReady = true;
+            }
+
             @Override public void onPlayerError(androidx.media3.common.PlaybackException error) {
                 handoffMusicReady = false;
+                handoffMusicPlaying = false;
             }
         });
     }
@@ -397,7 +404,9 @@ public class VoiceRoomForegroundService extends Service {
     public static boolean isMusicHandoffReady(String requestedRoomId, String requestedMusicUrl) {
         return requestedRoomId != null && requestedRoomId.equals(handoffRoomId)
                 && requestedMusicUrl != null && requestedMusicUrl.equals(handoffMusicUrl)
-                && handoffMusicReady;
+                // READY alone is not enough: do not fade the Activity player until
+                // the foreground decoder is actually producing audio.
+                && handoffMusicReady && handoffMusicPlaying;
     }
 
     @Override
@@ -754,6 +763,7 @@ public class VoiceRoomForegroundService extends Service {
             handoffRoomId = roomId;
             handoffMusicUrl = url;
             handoffMusicReady = true;
+            handoffMusicPlaying = false;
             // Local phone music is mixed by the host into Zego — keep Zego, stop Exo.
             try {
                 musicPlayer.stop();
@@ -789,6 +799,7 @@ public class VoiceRoomForegroundService extends Service {
         handoffRoomId = roomId;
         handoffMusicUrl = url;
         handoffMusicReady = false;
+        handoffMusicPlaying = false;
         final long targetBase = Math.max(0L, positionMs);
         final String started = startedAt;
 
@@ -829,6 +840,7 @@ public class VoiceRoomForegroundService extends Service {
         if (musicPlayer == null || absolute == null || absolute.isEmpty()) return;
         try {
             handoffMusicReady = false;
+            handoffMusicPlaying = false;
             musicPlayer.setMediaItem(MediaItem.fromUri(absolute));
             musicPlayer.prepare();
             long target = Math.max(0L, positionMs);
@@ -915,6 +927,7 @@ public class VoiceRoomForegroundService extends Service {
 
     private void detachBackgroundOwner() {
         handoffMusicReady = false;
+        handoffMusicPlaying = false;
         main.removeCallbacks(renewToken);
         RealtimeClient.getInstance().removeRoomListener(realtimeListener);
         RoomRtcEngine.getInstance().removeRoomListener(rtcListener);
