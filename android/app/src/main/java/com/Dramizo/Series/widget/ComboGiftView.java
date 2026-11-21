@@ -32,6 +32,10 @@ public class ComboGiftView extends FrameLayout {
     private TextView comboNum;
     private boolean showing;
     private int lastDisplayedCount = 1;
+    // Keep the first valid avatar for the same live cannon sender when later X
+    // updates omit the avatar URL; otherwise the profile image can blink away.
+    @Nullable private String lastCannonSenderName;
+    @Nullable private String lastCannonAvatarUrl;
     @Nullable private Runnable hideRunnable;
     @Nullable private Runnable crawlRunnable;
 
@@ -173,7 +177,15 @@ public class ComboGiftView extends FrameLayout {
         if (xMark != null) xMark.setVisibility(GONE);
         if (bg != null) bg.setImageResource(comboBgForCombo(combo, totalCoins));
         if (avatar != null) {
-            bindSenderAvatar(senderAvatarUrl);
+            String currentSender = senderName != null ? senderName.trim() : "";
+            if (senderAvatarUrl != null && !senderAvatarUrl.trim().isEmpty()) {
+                lastCannonAvatarUrl = senderAvatarUrl;
+            } else if (lastCannonSenderName == null
+                    || !lastCannonSenderName.equals(currentSender)) {
+                lastCannonAvatarUrl = null;
+            }
+            lastCannonSenderName = currentSender;
+            bindSenderAvatar(lastCannonAvatarUrl);
             avatar.setVisibility(VISIBLE);
         }
         bindGiftIcon(giftIconUrl);
@@ -191,8 +203,9 @@ public class ComboGiftView extends FrameLayout {
         setAlpha(1f);
         setTranslationX(0f);
         setTranslationY(0f);
-        setScaleX(1f);
-        setScaleY(1f);
+        // Compact the live X toast and keep it visually secondary to the gift.
+        setScaleX(0.90f);
+        setScaleY(0.90f);
         bringToFront();
         showing = true;
         hideRunnable = null;
