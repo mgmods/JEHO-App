@@ -64,6 +64,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     @Nullable private java.util.Map<String, Object> selfHostBadgeMeta;
     @Nullable private String selfDisplayName;
     @Nullable private String selfAvatarUrl;
+    @Nullable private String selfVoiceWaveUrl;
     private boolean agencyRoom;
     @Nullable private String roomAgencyId;
     private final Set<String> roomAgencyModeratorIds = new HashSet<>();
@@ -80,6 +81,18 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int scaleMode = SCALE_NORMAL;
     private boolean selfMicMuted;
+
+    public void setSelfVoiceWaveUrl(@Nullable String userId, @Nullable String url) {
+        String nextId = normalizeUserId(userId);
+        if (nextId.isEmpty() || !nextId.equals(selfUserId)) return;
+        selfVoiceWaveUrl = url == null || url.trim().isEmpty() ? null : url.trim();
+        for (int i = 0; i < items.size(); i++) {
+            RoomDtos.SeatDto seat = items.get(i);
+            if (seat == null || !nextId.equals(seatUserId(seat))) continue;
+            if (seat.user != null) seat.user.voiceWaveUrl = selfVoiceWaveUrl;
+            notifyItemChanged(i, "voice_wave");
+        }
+    }
 
     public void setSelfMicMuted(boolean muted) {
         if (selfMicMuted == muted) return;
@@ -278,6 +291,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (isBlank(seat.user.levelBadgeUrl) && !isBlank(prev.levelBadgeUrl)) {
                 seat.user.levelBadgeUrl = prev.levelBadgeUrl;
             }
+            if (isBlank(seat.user.voiceWaveUrl) && !isBlank(prev.voiceWaveUrl)) {
+                seat.user.voiceWaveUrl = prev.voiceWaveUrl;
+            }
             if (isBlank(seat.user.displayName) && !isBlank(prev.displayName)) {
                 seat.user.displayName = prev.displayName;
             }
@@ -329,6 +345,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && Objects.equals(a.user.profileCardUrl, b.user.profileCardUrl)
                 && Objects.equals(a.user.chatBubbleUrl, b.user.chatBubbleUrl)
                 && Objects.equals(a.user.nameplateUrl, b.user.nameplateUrl)
+                && Objects.equals(a.user.voiceWaveUrl, b.user.voiceWaveUrl)
                 && Objects.equals(a.user.levelBadgeUrl, b.user.levelBadgeUrl)
                 && Objects.equals(a.user.nameStyle, b.user.nameStyle)
                 && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.label,
@@ -653,8 +670,23 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
         boolean isCreator = userId != null && hostUserId != null && hostUserId.equals(userId);
         boolean occupied = seat.user != null || (userId != null && !userId.isEmpty());
+        if (occupied && seat.user != null) {
+            if (selfUserId != null && selfUserId.equals(userId)) {
+                seat.user.voiceWaveUrl = selfVoiceWaveUrl;
+            }
+            bindVoiceWave(holder, seat.user);
+        } else if (occupied && selfUserId != null && selfUserId.equals(userId)
+                && selfVoiceWaveUrl != null) {
+            com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto waveStub =
+                    new com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto();
+            waveStub.voiceWaveUrl = selfVoiceWaveUrl;
+            bindVoiceWave(holder, waveStub);
+        } else {
+            clearVoiceWave(holder);
+        }
 
         if (seat.locked()) {
+            clearVoiceWave(holder);
             bindVipNameplate(holder, null);
             if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
             bindAgencyRoleSeatBadge(holder, null);
@@ -1262,6 +1294,39 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
     }
 
+    private void bindVoiceWave(VH holder,
+            @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (holder.b.imgVoiceWave == null) return;
+        String url = user != null ? user.voiceWaveUrl : null;
+        if (url == null || url.trim().isEmpty()) {
+            clearVoiceWave(holder);
+            return;
+        }
+        holder.b.imgVoiceWave.clearAnimation();
+        holder.b.imgVoiceWave.setVisibility(View.VISIBLE);
+        Glide.with(holder.itemView)
+                .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(url.trim()))
+                .centerInside()
+                .into(holder.b.imgVoiceWave);
+        AnimationSet pulse = new AnimationSet(true);
+        pulse.addAnimation(new ScaleAnimation(
+                0.92f, 1.08f, 0.92f, 1.08f,
+                Animation.RELATIVE_TO_SELF, 0.5f,
+                Animation.RELATIVE_TO_SELF, 0.5f));
+        pulse.addAnimation(new AlphaAnimation(0.72f, 1f));
+        pulse.setDuration(850L);
+        pulse.setRepeatMode(Animation.REVERSE);
+        pulse.setRepeatCount(Animation.INFINITE);
+        holder.b.imgVoiceWave.startAnimation(pulse);
+    }
+
+    private void clearVoiceWave(VH holder) {
+        if (holder.b.imgVoiceWave == null) return;
+        holder.b.imgVoiceWave.clearAnimation();
+        Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+        holder.b.imgVoiceWave.setVisibility(View.GONE);
+    }
+
     private void bindVipNameplate(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (holder.b.imgVipNameplate == null) return;
         String url = user != null ? user.nameplateUrl : null;
@@ -1476,6 +1541,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         holder.lastGiftCoins = Long.MIN_VALUE;
         // Do NOT pause HostSignalView here — grid refresh recycles often and left frames frozen.
         stopSpeakingRipples(holder);
+        clearVoiceWave(holder);
         clearReactionView(holder);
         super.onViewRecycled(holder);
     }

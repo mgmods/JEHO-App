@@ -87,6 +87,33 @@
       </div>
     </div>
 
+    <section v-if="isWithdrawals" class="glass p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+          <h6 class="mb-1">نافذة إتاحة السحب</h6>
+          <div class="small text-muted">لن يظهر خيار السحب ولن تُقبل طلبات جديدة خارج الفترة المحددة. الطلبات السابقة تبقى قيد المعالجة.</div>
+        </div>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="savingWindow" @click="saveWithdrawalWindow">
+          {{ savingWindow ? 'جارٍ الحفظ…' : 'حفظ موعد السحب' }}
+        </button>
+      </div>
+      <div class="form-check form-switch mb-3">
+        <input id="withdrawWindowEnabled" v-model="withdrawWindow.enabled" class="form-check-input" type="checkbox" />
+        <label class="form-check-label" for="withdrawWindowEnabled">تفعيل السحب ضمن النافذة الزمنية فقط</label>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">بداية السماح بالسحب</label>
+          <input v-model="withdrawWindow.startAt" type="datetime-local" class="form-control" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">نهاية السماح بالسحب</label>
+          <input v-model="withdrawWindow.endAt" type="datetime-local" class="form-control" />
+        </div>
+      </div>
+      <div class="form-text mt-2">تُحفظ الأوقات كوقت عالمي موحّد، ويُطبّق القرار من الخادم تلقائياً.</div>
+    </section>
+
     <ul class="nav nav-pills gap-2 mb-3">
       <li class="nav-item" v-for="tabItem in tabs" :key="tabItem.id">
         <button class="btn" :class="tab === tabItem.id ? 'btn-aurora' : 'btn-ghost'" type="button" @click="switchTab(tabItem.id)">
@@ -473,6 +500,8 @@ const error = ref('')
 const success = ref('')
 const showAdjust = ref(false)
 const savingEconomy = ref(false)
+const savingWindow = ref(false)
+const withdrawWindow = reactive({ enabled: false, startAt: "", endAt: "" })
 const economy = reactive({
   diamondUsdRate: 0.00005,
   diamondCoinRate: 0.55,
@@ -718,6 +747,48 @@ async function loadEconomy() {
   economy.silverToCoinRate = num('economy.silverToCoinRate', economy.silverToCoinRate)
   economy.minSilverExchange = num('economy.minSilverExchange', economy.minSilverExchange)
   economy.coinToSilverRate = num('economy.coinToSilverRate', economy.coinToSilverRate)
+  withdrawWindow.enabled = ['true', '1', 'yes', 'on'].includes(String(map['withdrawal.window_enabled'] || '').toLowerCase())
+  withdrawWindow.startAt = toLocalDateTime(map['withdrawal.window_start_at'])
+  withdrawWindow.endAt = toLocalDateTime(map['withdrawal.window_end_at'])
+}
+
+function toLocalDateTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return ''
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
+async function saveWithdrawalWindow() {
+  if (withdrawWindow.enabled) {
+    if (!withdrawWindow.startAt || !withdrawWindow.endAt) {
+      error.value = 'حدد تاريخ ووقت البداية والنهاية أولاً'
+      return
+    }
+    const start = new Date(withdrawWindow.startAt).getTime()
+    const end = new Date(withdrawWindow.endAt).getTime()
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) {
+      error.value = 'تاريخ نهاية السحب يجب أن يكون بعد تاريخ البداية'
+      return
+    }
+  }
+  savingWindow.value = true
+  error.value = ''
+  const result = await settingsApi.update({
+    'withdrawal.window_enabled': String(!!withdrawWindow.enabled),
+    'withdrawal.window_start_at': withdrawWindow.startAt ? new Date(withdrawWindow.startAt).toISOString() : '',
+    'withdrawal.window_end_at': withdrawWindow.endAt ? new Date(withdrawWindow.endAt).toISOString() : '',
+  })
+  savingWindow.value = false
+  if (result.error) {
+    error.value = result.error.message
+    toast().danger(error.value)
+  } else {
+    success.value = 'تم حفظ نافذة السحب'
+    toast().success(success.value)
+    await loadEconomy()
+  }
 }
 
 async function saveEconomy() {

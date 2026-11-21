@@ -76,6 +76,10 @@ export class UserProfile {
   @Column({ type: 'varchar', length: 512, nullable: true })
   nameplateUrl: string | null;
 
+  /** User-equipped static image animated as a pulse around the room seat. */
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  voiceWaveUrl: string | null;
+
   @Column({ type: 'varchar', length: 512, nullable: true })
   vipBadgeUrl: string | null;
 

@@ -250,12 +250,12 @@
                   <input
                     type="file"
                     class="form-control"
-                    accept="image/*,video/mp4,video/webm,video/quicktime,.gif,.webp,.mp4,.webm,.mov"
+                    :accept="form.type === 'voice_wave' ? 'image/png,image/jpeg' : 'image/*,video/mp4,video/webm,video/quicktime,.gif,.webp,.mp4,.webm,.mov'"
                     @change="onPreviewFile"
                   />
                   <div class="form-text">اختر ملف المعاينة — بدون رابط</div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-6" v-if="form.type !== 'voice_wave'">
                   <label class="form-label">{{ t('cosmetics.uploadAnimation') }}</label>
                   <input
                     type="file"
@@ -372,6 +372,7 @@ const tabs = computed(() => [
   { key: 'profile_card', label: 'بطاقة الملف الشخصي' },
   { key: 'chat_bubble', label: 'فقاعة الدردشة' },
   { key: 'nameplate', label: 'لوحة الاسم' },
+  { key: 'voice_wave', label: 'موجات الصوت' },
   { key: 'room_background', label: t('cosmetics.roomBackgrounds') },
   { key: 'level_badge', label: t('cosmetics.levels') },
 ])
@@ -421,6 +422,7 @@ function cosmeticTypeLabel(type) {
     profile_card: 'بطاقة ملف شخصي',
     chat_bubble: 'فقاعة دردشة',
     nameplate: 'بطاقة اسم / رتبة',
+    voice_wave: 'موجة صوتية',
     room_background: 'خلفية غرفة',
     level_badge: 'شارة مستوى',
     name_card: 'بطاقة اسم',
@@ -649,6 +651,11 @@ function openEdit(item) {
 async function onPreviewFile(event) {
   const file = event.target.files?.[0]
   if (!file) return
+  if (form.value.type === 'voice_wave' && !['image/png', 'image/jpeg'].includes(String(file.type || '').toLowerCase())) {
+    error.value = 'الموجة الصوتية تقبل صورة PNG أو JPG فقط'
+    event.target.value = ''
+    return
+  }
   uploading.value = true
   error.value = ''
   try {
@@ -726,6 +733,9 @@ async function save() {
       }
     }
     if (!meta || typeof meta !== 'object' || Array.isArray(meta)) meta = {}
+    if (form.value.type === 'voice_wave' && !String(form.value.previewUrl || '').trim()) {
+      throw new Error('ارفع صورة PNG أو JPG للموجة الصوتية أولاً')
+    }
     const leaseDays = Math.floor(Number(form.value.leaseDays) || 30)
     if (leaseDays < 1 || leaseDays > 3650) throw new Error('مدة الصلاحية يجب أن تكون بين يوم واحد و3650 يوماً')
     meta.leaseDays = leaseDays
@@ -741,7 +751,7 @@ async function save() {
         : Number(form.value.minUserLevel || 0),
       sortOrder: Number(form.value.sortOrder || 0),
       previewUrl: form.value.previewUrl,
-      animationUrl: form.value.animationUrl || null,
+      animationUrl: form.value.type === 'voice_wave' ? null : (form.value.animationUrl || null),
       meta,
       isActive: !!form.value.isActive,
     }

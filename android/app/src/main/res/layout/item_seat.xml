@@ -36,6 +36,16 @@
             android:background="@drawable/bg_seat_avatar_ring"
             android:visibility="gone" />
 
+        <!-- User-equipped static PNG/JPG animated as a soft repeating room waveform. -->
+        <ImageView
+            android:id="@+id/imgVoiceWave"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
         <!-- Legacy ids kept for binding; unused -->
         <View
             android:id="@+id/seatRippleOuter"

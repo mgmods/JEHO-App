@@ -387,6 +387,7 @@ export class UsersService {
       profileCardUrl: p?.profileCardUrl ?? null,
       chatBubbleUrl: p?.chatBubbleUrl ?? null,
       nameplateUrl: p?.nameplateUrl ?? null,
+      voiceWaveUrl: p?.voiceWaveUrl ?? null,
       vipBadgeUrl: wearVip,
       levelBadgeUrl: p?.levelBadgeUrl ?? null,
       hostBadgeUrl: p?.hostBadgeUrl ?? null,
@@ -912,6 +913,7 @@ export class UsersService {
       profileCardUrl: user.profile?.profileCardUrl ?? null,
       chatBubbleUrl: user.profile?.chatBubbleUrl ?? null,
       nameplateUrl: user.profile?.nameplateUrl ?? null,
+      voiceWaveUrl: user.profile?.voiceWaveUrl ?? null,
       // Equipped mall / animated frame only — never force static VIP art.
       vipBadgeUrl: isStaticVipTouUrl(user.profile?.vipBadgeUrl)
         ? null
