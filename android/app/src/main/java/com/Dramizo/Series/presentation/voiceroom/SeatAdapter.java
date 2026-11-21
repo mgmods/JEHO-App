@@ -559,15 +559,13 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                             && speakingUsers.contains(userId)
                             && !activeReactions.containsKey(userId);
                     bindSpeaking(holder, match);
-                    if (match) {
+                    if (match && (holder.voiceWaveUrl == null || holder.voiceWaveUrl.trim().isEmpty())) {
+                        // Only drive the legacy speaking animation when no purchased wave is equipped.
+                        // bindSpeaking() already owns the equipped-wave visibility and loading state.
                         float lv = speakingLevels.containsKey(userId)
                                 ? speakingLevels.get(userId) : 48f;
                         if (holder.b.seatSpeakAura != null) {
                             holder.b.seatSpeakAura.setIntensity(lv);
-                        }
-                        if (holder.b.seatVoiceWaveBars != null) {
-                            holder.b.seatVoiceWaveBars.setSpeaking(
-                                    holder.voiceWaveUrl != null && !holder.voiceWaveUrl.trim().isEmpty(), lv);
                         }
                     }
                 } else if ("speak_level".equals(p)) {
