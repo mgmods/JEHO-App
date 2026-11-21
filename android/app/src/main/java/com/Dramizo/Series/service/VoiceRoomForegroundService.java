@@ -525,8 +525,10 @@ public class VoiceRoomForegroundService extends Service {
         boolean micOk = ContextCompat.checkSelfPermission(
                 this, android.Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED;
-        if (micOk && RoomRtcEngine.getInstance().isPublishing()
-                && RoomRtcEngine.getInstance().isMicEnabled()) {
+        // Start with microphone capability while the room Activity is still visible,
+        // even if the user currently muted. This allows the notification's explicit
+        // "turn mic on" action to work later without starting a new mic FGS in background.
+        if (micOk) {
             types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
         }
         return types;
