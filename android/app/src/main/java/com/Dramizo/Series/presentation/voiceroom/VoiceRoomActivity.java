@@ -4285,7 +4285,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && !isLocalMusicUrl(currentMusicUrl);
         if (needsMediaHandoff
                 && !VoiceRoomForegroundService.isMusicHandoffReady(roomId, currentMusicUrl)) {
-            if (System.currentTimeMillis() - startedAtMs < 1_600L) {
+            if (System.currentTimeMillis() - startedAtMs < 700L) {
                 handler.postDelayed(() -> completeRoomMinimizeWhenMusicReady(startedAtMs), 30L);
                 return;
             }
@@ -4364,10 +4364,28 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ActiveRoomSession.get().setMinimized(true);
         }
         long musicPosition = 0L;
+        String handoffMusicUrl = currentMusicUrl;
         if (isLocalMusicUrl(currentMusicUrl) || isYoutubeMusicUrl(currentMusicUrl)) {
             musicPosition = isLocalMusicUrl(currentMusicUrl)
                     ? RoomRtcEngine.getInstance().getLocalMusicPositionMs()
                     : (roomMusicPlayer != null ? roomMusicPlayer.getCurrentPosition() : 0L);
+            // For YouTube the Activity has already resolved the yt:// reference into the
+            // exact playable CDN stream. Pass that stream to the foreground service so the
+            // minimize handoff never performs a second resolver/network lookup.
+            if (isYoutubeMusicUrl(currentMusicUrl) && roomMusicPlayer != null) {
+                try {
+                    if (roomMusicPlayer.getMediaItemCount() > 0
+                            && roomMusicPlayer.getCurrentMediaItem() != null
+                            && roomMusicPlayer.getCurrentMediaItem().localConfiguration != null) {
+                        String preparedStream = roomMusicPlayer.getCurrentMediaItem()
+                                .localConfiguration.uri.toString();
+                        if (preparedStream != null && !preparedStream.isEmpty()) {
+                            handoffMusicUrl = preparedStream;
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
         } else if (roomMusicPlayer != null) {
             musicPosition = roomMusicPlayer.getCurrentPosition();
         }
@@ -4381,7 +4399,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             roomId,
                             roomTitle != null ? roomTitle.toString() : "الغرفة الصوتية",
                             currentRoomCoverUrl,
-                            currentMusicUrl,
+                            handoffMusicUrl,
                             currentMusicStatus,
                             musicPosition,
                             currentMusicStartedAt));
