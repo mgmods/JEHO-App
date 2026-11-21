@@ -6279,25 +6279,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         broadcastSharedMusicVolume(requestedVolume, previousVolume);
     }
 
-    /** Shared music gain; local room mute only affects this listener's playback. */
+    /** Shared music gain; the room speaker mute is local to this listener. */
     private void applySharedMusicVolume() {
+        // Apply one effective gain to every playback path. In particular, music mixed
+        // through the ZEGO local media player must also become silent; muting only the
+        // ExoPlayer left that source audible for the local host/publisher.
+        final float effectiveVolume = roomSpeakerMuted
+                ? 0f : Math.max(0f, Math.min(1f, sharedMusicVolume));
         if (roomMusicPlayer != null) {
-            roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : sharedMusicVolume);
+            roomMusicPlayer.setVolume(effectiveVolume);
         }
         if (youtubeUsingEmbed && musicYoutubeWebView != null) {
-            int percent = Math.round(sharedMusicVolume * 100f);
+            int percent = Math.round(effectiveVolume * 100f);
             String js = "if(window.musicYtPlayer&&window.musicYtPlayer.setVolume){"
                     + "if(" + percent + "===0){window.musicYtPlayer.mute();}"
                     + "else{window.musicYtPlayer.unMute();window.musicYtPlayer.setVolume("
                     + percent + ");}}";
             musicYoutubeWebView.evaluateJavascript(js, null);
         }
-        // For device music mixed into the host's published audio, adjust only the
-        // dedicated ZEGO media player; microphone capture gain remains untouched.
-        // Room metadata/role flags can arrive late, so also recognize the active publisher.
+        // This changes playback gain only. It never changes the microphone capture
+        // gain or the music stream being published to other room members.
         if (canManageMusic || isHost || isOwner || isRoomStaff()
                 || sameUser(myUserId, currentMusicPublisherId)) {
-            RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
+            RoomRtcEngine.getInstance().setLocalMusicVolume(effectiveVolume);
         }
         if (binding != null && binding.seekMusicVolume != null
                 && !binding.seekMusicVolume.isPressed()) {
@@ -10105,11 +10109,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void applyRoomSpeakerMute(boolean muted) {
         RoomSoundFx.setMuted(muted);
         RoomRtcEngine.getInstance().setSpeakerMuted(muted);
-        // Preserve the selected music gain on every track type. This does not touch
-        // microphone capture gain; only the dedicated music player is adjusted.
-        if (roomMusicPlayer != null) {
-            applySharedMusicVolume();
-        }
+        // Reapply local playback mute to every active music source (ExoPlayer,
+        // YouTube and the ZEGO local media player), while preserving its saved slider
+        // value and leaving microphone capture/published audio unchanged.
+        applySharedMusicVolume();
         if (!muted) {
             // Resume pulling seat streams after mute (minutes billing resumes only now).
             activateSeatAudio(currentSeats);
