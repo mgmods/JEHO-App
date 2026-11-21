@@ -163,6 +163,21 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
 
         holder.b.imgPreview.setVisibility(View.VISIBLE);
         holder.b.imgPreview.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        ViewGroup.LayoutParams wavePreviewLp = holder.b.imgPreview.getLayoutParams();
+        if (voiceWave) {
+            int waveSize = dp(holder, 76);
+            wavePreviewLp.width = waveSize;
+            wavePreviewLp.height = waveSize;
+            if (wavePreviewLp instanceof ViewGroup.MarginLayoutParams) {
+                ((ViewGroup.MarginLayoutParams) wavePreviewLp).leftMargin = 0;
+                ((ViewGroup.MarginLayoutParams) wavePreviewLp).rightMargin = 0;
+            }
+            holder.b.imgPreview.setLayoutParams(wavePreviewLp);
+        } else {
+            wavePreviewLp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            wavePreviewLp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+            holder.b.imgPreview.setLayoutParams(wavePreviewLp);
+        }
         holder.b.imgPreview.setPadding(dp(holder, headwear ? 4 : 4), dp(holder, headwear ? 4 : 4),
                 dp(holder, headwear ? 4 : 4), dp(holder, headwear ? 4 : 4));
 
