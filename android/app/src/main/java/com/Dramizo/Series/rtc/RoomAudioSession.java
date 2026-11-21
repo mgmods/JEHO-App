@@ -4,7 +4,13 @@ import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
+import android.media.AudioRecordingConfiguration;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Process;
+
+import java.util.List;
 
 import androidx.annotation.Nullable;
 
@@ -17,13 +23,82 @@ public final class RoomAudioSession {
     private static WeakReference<Context> appContext = new WeakReference<>(null);
     private static AudioFocusRequest focusRequest;
     private static boolean focusHeld;
+    private static AudioManager recordingAudioManager;
+    private static AudioManager.AudioRecordingCallback recordingCallback;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     private RoomAudioSession() {}
+
+    /**
+     * Android 10+ reports active microphone clients by UID. When another app records,
+     * temporarily mute JEHO's uplink AND room playback so the voice note cannot pick up
+     * the room acoustically. Restore the user's exact mic/speaker choices afterwards.
+     */
+    private static synchronized void startExternalRecordingMonitor(Context app) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+        AudioManager manager = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+        if (manager == null) return;
+        if (recordingAudioManager == manager && recordingCallback != null) {
+            refreshExternalRecordingState(manager);
+            return;
+        }
+        stopExternalRecordingMonitor();
+        recordingAudioManager = manager;
+        recordingCallback = new AudioManager.AudioRecordingCallback() {
+            @Override
+            public void onRecordingConfigChanged(List<AudioRecordingConfiguration> configs) {
+                refreshExternalRecordingState(manager, configs);
+            }
+        };
+        try {
+            manager.registerAudioRecordingCallback(recordingCallback, MAIN);
+            refreshExternalRecordingState(manager);
+        } catch (Throwable error) {
+            recordingCallback = null;
+            recordingAudioManager = null;
+        }
+    }
+
+    private static void refreshExternalRecordingState(AudioManager manager) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+        try {
+            refreshExternalRecordingState(manager, manager.getActiveRecordingConfigurations());
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void refreshExternalRecordingState(
+            AudioManager manager, List<AudioRecordingConfiguration> configs) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || manager != recordingAudioManager) return;
+        boolean external = false;
+        if (configs != null) {
+            int ownUid = Process.myUid();
+            for (AudioRecordingConfiguration config : configs) {
+                if (config != null && config.getClientUid() != ownUid) {
+                    external = true;
+                    break;
+                }
+            }
+        }
+        RoomRtcEngine.getInstance().setExternalCaptureActive(external);
+    }
+
+    private static synchronized void stopExternalRecordingMonitor() {
+        AudioManager manager = recordingAudioManager;
+        AudioManager.AudioRecordingCallback callback = recordingCallback;
+        recordingAudioManager = null;
+        recordingCallback = null;
+        if (manager != null && callback != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try { manager.unregisterAudioRecordingCallback(callback); } catch (Throwable ignored) {}
+        }
+        RoomRtcEngine.getInstance().setExternalCaptureActive(false);
+    }
 
     public static void acquire(@Nullable Context context) {
         if (context == null) return;
         Context app = context.getApplicationContext();
         appContext = new WeakReference<>(app);
+        startExternalRecordingMonitor(app);
         AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) return;
         try {
@@ -55,6 +130,7 @@ public final class RoomAudioSession {
                 ? context.getApplicationContext()
                 : appContext.get();
         if (app == null) return;
+        stopExternalRecordingMonitor();
         AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) return;
         try {
