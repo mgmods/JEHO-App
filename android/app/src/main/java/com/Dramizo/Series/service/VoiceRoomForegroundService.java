@@ -776,9 +776,10 @@ public class VoiceRoomForegroundService extends Service {
         // or playing this exact track: doing so restarts the decoder and creates silence.
         boolean sameRequest = url.equals(activeMusicUrl)
                 && playStatus.equalsIgnoreCase(activeMusicStatus);
+        int playerState = musicPlayer.getPlaybackState();
         if (sameRequest && (musicResolveInProgress
                 || (musicPlayer.getMediaItemCount() > 0
-                && musicPlayer.getPlaybackState() != Player.STATE_IDLE))) {
+                && (playerState == Player.STATE_BUFFERING || playerState == Player.STATE_READY))) {
             return;
         }
 
