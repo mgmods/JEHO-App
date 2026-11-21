@@ -157,26 +157,53 @@ public final class RoomRtcEngine {
         this.sessionCanPublish = canPublish;
     }
 
-    public void setMicEnabled(boolean enabled) {
+    // Preserve the user's choices separately from temporary external-recorder isolation.
+    private volatile boolean userMicEnabled;
+    private volatile boolean userSpeakerMuted;
+    private volatile boolean externalCaptureActive;
+
+    public synchronized void setMicEnabled(boolean enabled) {
+        userMicEnabled = enabled;
+        applyEffectiveMicState();
+    }
+
+    public boolean isMicEnabled() {
+        return userMicEnabled;
+    }
+
+    public synchronized void setSpeakerMuted(boolean muted) {
+        userSpeakerMuted = muted;
+        applyEffectiveSpeakerState();
+    }
+
+    public boolean isSpeakerMuted() {
+        return userSpeakerMuted;
+    }
+
+    /**
+     * Temporarily isolate a third-party recorder from JEHO's room microphone and playback.
+     * User preferences are retained and restored when the external recording ends.
+     */
+    public synchronized void setExternalCaptureActive(boolean active) {
+        if (externalCaptureActive == active) return;
+        externalCaptureActive = active;
+        applyEffectiveMicState();
+        applyEffectiveSpeakerState();
+        Log.i(TAG, "external audio capture=" + active
+                + " restoreMic=" + userMicEnabled
+                + " restoreSpeakerMuted=" + userSpeakerMuted);
+    }
+
+    private void applyEffectiveMicState() {
+        boolean enabled = userMicEnabled && !externalCaptureActive;
         if (isLiveKit()) LiveKitEngineManager.getInstance().setMicEnabled(enabled);
         else ZegoEngineManager.getInstance().setMicEnabled(enabled);
     }
 
-    public boolean isMicEnabled() {
-        return isLiveKit()
-                ? LiveKitEngineManager.getInstance().isMicEnabled()
-                : ZegoEngineManager.getInstance().isMicEnabled();
-    }
-
-    public void setSpeakerMuted(boolean muted) {
+    private void applyEffectiveSpeakerState() {
+        boolean muted = userSpeakerMuted || externalCaptureActive;
         if (isLiveKit()) LiveKitEngineManager.getInstance().setSpeakerMuted(muted);
         else ZegoEngineManager.getInstance().setSpeakerMuted(muted);
-    }
-
-    public boolean isSpeakerMuted() {
-        return isLiveKit()
-                ? LiveKitEngineManager.getInstance().isSpeakerMuted()
-                : ZegoEngineManager.getInstance().isSpeakerMuted();
     }
 
     public void startPublishingAudio(String streamId) {
