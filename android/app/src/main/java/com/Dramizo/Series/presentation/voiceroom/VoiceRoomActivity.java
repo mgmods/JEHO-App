@@ -4368,6 +4368,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         long musicPosition = 0L;
         String handoffMusicUrl = currentMusicUrl;
+        String handoffStartedAt = currentMusicStartedAt;
+        // musicPosition is sampled from the live ExoPlayer below. Do not add the
+        // original start-time delta again, or the background player jumps ahead.
+        if (!isLocalMusicUrl(currentMusicUrl) && roomMusicPlayer != null
+                && roomMusicPlayer.getMediaItemCount() > 0) {
+            handoffStartedAt = null;
+        }
         if (isLocalMusicUrl(currentMusicUrl) || isYoutubeMusicUrl(currentMusicUrl)) {
             musicPosition = isLocalMusicUrl(currentMusicUrl)
                     ? RoomRtcEngine.getInstance().getLocalMusicPositionMs()
@@ -4406,7 +4413,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             handoffMusicUrl,
                             currentMusicStatus,
                             musicPosition,
-                            currentMusicStartedAt));
+                            handoffStartedAt));
         } catch (RuntimeException ignored) {
         }
     }
