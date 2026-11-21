@@ -472,6 +472,7 @@ public class CosmeticsViewModel extends ViewModel {
         cached.profileCardUrl = profile.profileCardUrl;
         cached.chatBubbleUrl = profile.chatBubbleUrl;
         cached.nameplateUrl = profile.nameplateUrl;
+        cached.voiceWaveUrl = profile.voiceWaveUrl;
         cached.levelBadgeUrl = profile.levelBadgeUrl;
         cached.vipBadgeUrl = profile.vipBadgeUrl;
         cached.hostBadgeUrl = profile.hostBadgeUrl;
