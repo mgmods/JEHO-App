@@ -386,6 +386,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean exiting;
     /** True when user minimized to Main — keep Zego/realtime, don't tear room down. */
     private boolean minimizing;
+    private boolean roomMusicHandoffReceiverRegistered;
+    private final BroadcastReceiver roomMusicHandoffReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (intent == null || !minimizing || exiting) return;
+            handler.removeCallbacks(roomMusicHandoffTimeout);
+            String action = intent.getAction();
+            unregisterRoomMusicHandoffReceiver();
+            if (VoiceRoomForegroundService.ACTION_MUSIC_HANDOFF_READY.equals(action)) {
+                navigateHomeAndFinish();
+            } else if (VoiceRoomForegroundService.ACTION_MUSIC_HANDOFF_FAILED.equals(action)) {
+                minimizing = false;
+                ActiveRoomSession.get().setMinimized(false);
+                applySharedMusicVolume();
+                notifyRoomMusicUiReady();
+                Toast.makeText(VoiceRoomActivity.this,
+                        "تعذر تجهيز الموسيقى بالخلفية؛ بقيت الغرفة مفتوحة حتى لا ينقطع الصوت",
+                        Toast.LENGTH_LONG).show();
+            }
+        }
+    };
+    private final Runnable roomMusicHandoffTimeout = () -> {
+        if (!minimizing || exiting || isFinishing()) return;
+        minimizing = false;
+        ActiveRoomSession.get().setMinimized(false);
+        unregisterRoomMusicHandoffReceiver();
+        applySharedMusicVolume();
+        notifyRoomMusicUiReady();
+        Toast.makeText(this,
+                "الموسيقى لم تصبح جاهزة بالخلفية؛ بقيت الغرفة مفتوحة حفاظاً على الصوت",
+                Toast.LENGTH_LONG).show();
+    };
+
     /** Mikoo-style: leave/logout runs once; onDestroy must not repeat it. */
     private boolean roomTeardownDone;
     /** Speaker was muted by us because the app went to background (WhatsApp / Home). */
@@ -4243,8 +4275,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * Mikoo-style minimize: mark minimize → keep FGS/Zego/realtime → close UI only.
      * Music must hand off to FGS before Activity Exo dies (no cutouts).
      */
+    private void registerRoomMusicHandoffReceiver() {
+        if (roomMusicHandoffReceiverRegistered) return;
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(VoiceRoomForegroundService.ACTION_MUSIC_HANDOFF_READY);
+        filter.addAction(VoiceRoomForegroundService.ACTION_MUSIC_HANDOFF_FAILED);
+        ContextCompat.registerReceiver(this, roomMusicHandoffReceiver, filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED);
+        roomMusicHandoffReceiverRegistered = true;
+    }
+
+    private void unregisterRoomMusicHandoffReceiver() {
+        if (!roomMusicHandoffReceiverRegistered) return;
+        try { unregisterReceiver(roomMusicHandoffReceiver); } catch (Exception ignored) {}
+        roomMusicHandoffReceiverRegistered = false;
+    }
+
     private void keepRoomInBackground() {
         if (roomId == null || roomId.isEmpty() || minimizing || exiting || isFinishing()) return;
+        registerRoomMusicHandoffReceiver();
         captureActiveRoomSession();
         ActiveRoomSession.get().setMinimized(true);
         ensuringRoomKeepAlive(true);
@@ -4282,11 +4331,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         Toast.makeText(getApplicationContext(), R.string.room_minimized_audio_continues,
                 Toast.LENGTH_SHORT).show();
-        // Small delay so FGS can start mediaPlayback before Activity releases Exo.
-        handler.postDelayed(() -> {
-            if (isFinishing() || exiting) return;
-            navigateHomeAndFinish();
-        }, 280L);
+        // Keep this Activity/player alive until the service confirms the new player is READY.
+        handler.removeCallbacks(roomMusicHandoffTimeout);
+        handler.postDelayed(roomMusicHandoffTimeout, 12_000L);
     }
 
     /**
@@ -5404,6 +5451,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         clearRoomChatSession(0L);
     }
 
+    private void notifyRoomMusicUiReady() {
+        try {
+            if (!minimizing && !exiting && roomId != null && !roomId.isEmpty()) {
+                VoiceRoomForegroundService.notifyUiMusicReady(this);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     private void setupMusicUi() {
         if (roomMusicPlayer != null) return;
         roomMusicPlayer = new ExoPlayer.Builder(this)
@@ -5433,7 +5489,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
         roomMusicPlayer.addListener(new Player.Listener() {
             @Override
+            public void onIsPlayingChanged(boolean isPlaying) {
+                if (isPlaying && !minimizing && !exiting) notifyRoomMusicUiReady();
+            }
+
+            @Override
             public void onPlaybackStateChanged(int playbackState) {
+                if (playbackState == Player.STATE_READY
+                        && !"playing".equalsIgnoreCase(currentMusicStatus)
+                        && !minimizing && !exiting) {
+                    notifyRoomMusicUiReady();
+                }
                 if (playbackState == Player.STATE_ENDED
                         && canManageMusic
                         && !musicEndReported
@@ -5842,6 +5908,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (artist != null && binding != null && binding.tvMusicArtist != null) {
                 binding.tvMusicArtist.setText(artist);
             }
+            notifyRoomMusicUiReady();
             return;
         }
         if (stopped) {
@@ -5860,6 +5927,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (canManageMusic && !isOnSeat(currentSeats)) {
                 try { RoomRtcEngine.getInstance().stopPublishing(); } catch (Exception ignored) {}
             }
+            notifyRoomMusicUiReady();
             return;
         }
 
@@ -5951,6 +6019,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             // Everyone (incl. DJ off-mic peers): subscribe to music publisher stream.
             ensurePlayingSeatedAudio(currentSeats);
+            notifyRoomMusicUiReady();
             return;
         }
 
@@ -5991,6 +6060,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.pause();
                 roomMusicPlayer.seekTo(0);
             }
+            if (!playing) notifyRoomMusicUiReady();
         }
     }
 
@@ -6212,7 +6282,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Shared music gain; local room mute only affects this listener's playback. */
     private void applySharedMusicVolume() {
-        float effectiveMusicVolume = roomSpeakerMuted ? 0f : sharedMusicVolume;
+        float safeSharedVolume = Math.max(0f, Math.min(1f, sharedMusicVolume));
+        if (roomId != null && !roomId.isEmpty()) {
+            getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
+                    .putFloat("shared_music_volume_" + roomId, safeSharedVolume)
+                    .apply();
+        }
+        float effectiveMusicVolume = roomSpeakerMuted ? 0f : safeSharedVolume;
         if (roomMusicPlayer != null) {
             roomMusicPlayer.setVolume(effectiveMusicVolume);
         }
@@ -13634,6 +13710,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onDestroy() {
+        handler.removeCallbacks(roomMusicHandoffTimeout);
+        unregisterRoomMusicHandoffReceiver();
         stopLuckySupportVideo();
         if (luckyVideoPlayer != null) {
             try { luckyVideoPlayer.release(); } catch (Exception ignored) {}
@@ -17905,6 +17983,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         java.util.Map<String, Object> meta = null;
         String displayName = null;
         String avatarUrl = null;
+        String voiceWaveUrl = null;
         try {
             AuthDtos.UserDto me = ContainerProvider.from(this).getSessionManager().getUser();
             if (me != null) {
@@ -17914,6 +17993,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 displayName = me.displayName != null && !me.displayName.isEmpty()
                         ? me.displayName : me.username;
                 avatarUrl = me.avatarUrl;
+                voiceWaveUrl = me.voiceWaveUrl;
             }
             if (hostBadge == null || hostBadge.isEmpty()) {
                 hostBadge = ContainerProvider.from(this).getSessionManager().getHostBadgeUrl();
@@ -17921,6 +18001,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } catch (Exception ignored) {
         }
         seatAdapter.setSelfHostWear(myUserId, hostBadge, vipBadge, meta, displayName, avatarUrl);
+        seatAdapter.setSelfVoiceWaveUrl(myUserId, voiceWaveUrl);
     }
 
     /** Refresh already-rendered self chat bubbles after equipping/unequipping in the store. */

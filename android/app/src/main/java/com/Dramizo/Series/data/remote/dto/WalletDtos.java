@@ -37,6 +37,15 @@ public final class WalletDtos {
         @SerializedName("minSilverExchange") public long minSilverExchange;
         @SerializedName("currency") public String currency;
         @SerializedName("managedByAdmin") public boolean managedByAdmin;
+        @SerializedName("withdrawalWindow") public WithdrawalWindowDto withdrawalWindow;
+    }
+
+    public static class WithdrawalWindowDto {
+        @SerializedName("enabled") public boolean enabled;
+        @SerializedName("allowed") public boolean allowed;
+        @SerializedName("startAt") public String startAt;
+        @SerializedName("endAt") public String endAt;
+        @SerializedName("serverNow") public String serverNow;
     }
 
     public static class RechargePackageDto {

@@ -152,6 +152,7 @@ public final class AuthDtos {
         @SerializedName("profileCardUrl") public String profileCardUrl;
         @SerializedName("chatBubbleUrl") public String chatBubbleUrl;
         @SerializedName("nameplateUrl") public String nameplateUrl;
+        @SerializedName("voiceWaveUrl") public String voiceWaveUrl;
         /** Public VIP account-name style configured by the dashboard. */
         @SerializedName("nameStyle") public java.util.Map<String, Object> nameStyle;
         @SerializedName("bio") public String bio;

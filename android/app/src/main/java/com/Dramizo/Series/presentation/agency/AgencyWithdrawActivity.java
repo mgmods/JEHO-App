@@ -149,7 +149,40 @@ public class AgencyWithdrawActivity extends ThemedActivity {
             btnSubmit.setOnClickListener(v -> submit());
         }
 
-        loadPackages();
+        loadWithdrawalWindow();
+    }
+
+    /** Gate every agency/host withdrawal screen with the server-owned global schedule. */
+    private void loadWithdrawalWindow() {
+        // Fail closed while the server policy is loading; never flash an active withdraw button.
+        if (btnSubmit != null) btnSubmit.setVisibility(View.GONE);
+        if (rowMethodPicker != null) rowMethodPicker.setVisibility(View.GONE);
+        if (recycler != null) recycler.setVisibility(View.GONE);
+        if (tvEmptyPackages != null) tvEmptyPackages.setVisibility(View.GONE);
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<WalletDtos.EconomyConfig> result = ApiCall.execute(
+                    ContainerProvider.from(this).getWalletApi().economyConfig());
+            boolean allowed = result != null && result.success && result.data != null
+                    && result.data.withdrawalWindow != null
+                    && result.data.withdrawalWindow.allowed;
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (!allowed) {
+                    if (btnSubmit != null) btnSubmit.setVisibility(View.GONE);
+                    if (rowMethodPicker != null) rowMethodPicker.setVisibility(View.GONE);
+                    if (recycler != null) recycler.setVisibility(View.GONE);
+                    if (tvEmptyPackages != null) {
+                        tvEmptyPackages.setVisibility(View.VISIBLE);
+                        tvEmptyPackages.setText("السحب غير متاح حالياً؛ لم تُفتح نافذة السحب من الإدارة أو انتهت مدتها.");
+                    }
+                    return;
+                }
+                if (btnSubmit != null) btnSubmit.setVisibility(View.VISIBLE);
+                if (rowMethodPicker != null) rowMethodPicker.setVisibility(View.VISIBLE);
+                if (recycler != null) recycler.setVisibility(View.VISIBLE);
+                loadPackages();
+            });
+        });
     }
 
     private void paintBalance(@Nullable TextView tvBalance, @Nullable TextView tvMin) {

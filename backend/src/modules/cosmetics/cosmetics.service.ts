@@ -189,13 +189,15 @@ export class CosmeticsService implements OnModuleInit {
     }
     try {
       await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'nameplate'`);
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'voice_wave'`);
     } catch (err) {
-      this.logger.warn(`nameplate cosmetic enum ensure: ${(err as Error).message}`);
+      this.logger.warn(`voice_wave cosmetic enum ensure: ${(err as Error).message}`);
     }
     try {
       await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "profileCardUrl" varchar(512)`);
       await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "chatBubbleUrl" varchar(512)`);
       await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "nameplateUrl" varchar(512)`);
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "voiceWaveUrl" varchar(512)`);
     } catch (err) {
       this.logger.warn(`visual cosmetic profile columns ensure: ${(err as Error).message}`);
     }
@@ -997,6 +999,8 @@ export class CosmeticsService implements OnModuleInit {
     if (isCpStoreItem && cosmetic.type === CosmeticType.ROOM_BACKGROUND) {
       throw new BadRequestException('هذا النوع لا يُركّب تلقائياً؛ اختر بطاقة الملف الشخصي لخلفيات CP.');
     }
+    const permanent = cosmetic.type === CosmeticType.VOICE_WAVE
+      || (cosmetic.meta as any)?.permanent === true;
     const leaseDays = this.mallLeaseDays(cosmetic);
     const now = new Date();
 
@@ -1042,7 +1046,7 @@ export class CosmeticsService implements OnModuleInit {
             referenceId: cosmeticId,
             description: renew
               ? `تجديد ${cosmetic.name || cosmetic.code} (${leaseDays} يوم · نصف السعر)`
-              : `شراء ${cosmetic.name || cosmetic.code} (${leaseDays} يوم)`,
+              : `شراء ${cosmetic.name || cosmetic.code} (${permanent ? 'دائم' : String(leaseDays) + ' يوم'})`,
           }),
         );
       }
@@ -1052,18 +1056,18 @@ export class CosmeticsService implements OnModuleInit {
           userId,
           cosmeticId,
           equipped: false,
-          expiresAt: new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000),
+          expiresAt: permanent ? null : new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000),
         });
       } else {
         // An expired lease starts a fresh term from now; never stack days.
-        owned.expiresAt = new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000);
+        owned.expiresAt = permanent ? null : new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000);
       }
       owned = await manager.save(UserCosmetic, owned);
       return { owned, renew, price, fullPrice, leaseDays, expiresAt: owned.expiresAt };
     });
 
-    // Purchase adds ownership only. Wearing is an explicit action from the CP bag.
-    return result;
+    // Purchase adds ownership only. Wearing is an explicit action from the bag.
+    return { ...result, permanent };
   }
 
   private cosmeticSlotTypes(type: CosmeticType): CosmeticType[] {
@@ -1149,6 +1153,7 @@ export class CosmeticsService implements OnModuleInit {
       if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.VOICE_WAVE) profile.voiceWaveUrl = owned.cosmetic.previewUrl || null;
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
       if (type === CosmeticType.HOST_BADGE) {
         // VIP and host frames share one avatar-frame slot; never layer them.
@@ -1255,6 +1260,7 @@ export class CosmeticsService implements OnModuleInit {
       if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = null;
       if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = null;
       if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = null;
+      if (type === CosmeticType.VOICE_WAVE) profile.voiceWaveUrl = null;
       if (type === CosmeticType.HOST_BADGE || type === CosmeticType.VIP_BADGE) {
         // Both cosmetic types represent the same avatar-frame slot.
         profile.hostBadgeUrl = null;

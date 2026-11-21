@@ -283,8 +283,9 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       gamePoints: 0,
       withdrawTargetDiamonds: target,
       withdrawProgress: target > 0 ? Math.min(1, diamonds / target) : 1,
-      canWithdraw: diamonds >= target,
-      canWithdrawAgency: diamonds >= target,
+      canWithdraw: diamonds >= target && economy.withdrawalWindow?.allowed === true,
+      canWithdrawAgency: diamonds >= target && economy.withdrawalWindow?.allowed === true,
+      withdrawalWindow: economy.withdrawalWindow,
       diamondUsdRate: fiatRate,
       withdrawalNetUsdRate: netFiatRate,
       withdrawalMarginPercent: economy.withdrawalMarginPercent,
@@ -309,6 +310,7 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
     );
     const withdrawalNetUsdRate =
       rate * (1 - withdrawalMarginPercent / 100);
+    const withdrawalWindow = await this.getWithdrawalWindow();
     const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / rate));
     const target = Math.max(minFromUsd, Math.floor(ECONOMY.minWithdrawDiamonds || 200000));
     return {
@@ -322,6 +324,32 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
       minWithdrawUsd: MIN_WITHDRAW_USD,
       currency: 'USD',
       managedByAdmin: true,
+      withdrawalWindow,
+    };
+  }
+
+  private async getWithdrawalWindow() {
+    const read = async (key: string) => {
+      const row = await this.settingsRepo.findOne({ where: { key } });
+      return row?.value == null ? "" : String(row.value).trim();
+    };
+    const [enabledRaw, startAt, endAt] = await Promise.all([
+      read("withdrawal.window_enabled"),
+      read("withdrawal.window_start_at"),
+      read("withdrawal.window_end_at"),
+    ]);
+    const enabled = ["true", "1", "yes", "on"].includes(enabledRaw.toLowerCase());
+    const start = startAt ? new Date(startAt) : null;
+    const end = endAt ? new Date(endAt) : null;
+    const valid = !!start && !!end && Number.isFinite(start.getTime())
+      && Number.isFinite(end.getTime()) && start.getTime() < end.getTime();
+    const now = Date.now();
+    return {
+      enabled,
+      startAt: valid ? start!.toISOString() : startAt || null,
+      endAt: valid ? end!.toISOString() : endAt || null,
+      allowed: enabled && valid && now >= start!.getTime() && now <= end!.getTime(),
+      serverNow: new Date(now).toISOString(),
     };
   }
 
@@ -842,6 +870,10 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
   }
 
   async requestWithdraw(userId: string, dto: WithdrawDto) {
+    const withdrawalWindow = await this.getWithdrawalWindow();
+    if (!withdrawalWindow.allowed) {
+      throw new ForbiddenException("السحب غير متاح حالياً؛ راجع موعد فتح السحب في التطبيق");
+    }
     const fiatRate = Number(ECONOMY.diamondUsd) || DIAMOND_TO_FIAT;
     const withdrawalMarginPercent = await this.numberSetting(
       'economy.withdrawal_margin_percent',

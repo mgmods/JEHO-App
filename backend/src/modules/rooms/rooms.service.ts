@@ -1341,6 +1341,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       profileCardUrl: vipVisuals?.profileCardUrl || vipVisuals?.vipCardUrl || profile.profileCardUrl || user.profileCardUrl || null,
       chatBubbleUrl: vipVisuals?.chatBubbleUrl || profile.chatBubbleUrl || user.chatBubbleUrl || null,
       nameplateUrl: vipVisuals?.nameplateUrl || null,
+      voiceWaveUrl: profile.voiceWaveUrl ?? user.voiceWaveUrl ?? null,
       ...(displayRank || {}),
       profile: undefined,
     };
@@ -1385,6 +1386,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       profileCardUrl: vipVisuals?.profileCardUrl || vipVisuals?.vipCardUrl || profile.profileCardUrl || user.profileCardUrl || null,
       chatBubbleUrl: vipVisuals?.chatBubbleUrl || profile.chatBubbleUrl || user.chatBubbleUrl || null,
       nameplateUrl: vipVisuals?.nameplateUrl || null,
+      voiceWaveUrl: profile.voiceWaveUrl ?? user.voiceWaveUrl ?? null,
       ...(displayRank || {}),
       profile: undefined,
     };
@@ -1889,13 +1891,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async memberIdentity(userId: string) {
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    const user = await this.usersRepo.findOne({ where: { id: userId }, relations: ['profile'] });
     const anonymous = await this.mysteriousRoomIdentity(userId);
     return {
       userId,
       displayName: anonymous ? 'الرجل الغامض' : (user?.displayName || user?.username || 'مستخدم'),
       username: anonymous ? 'mysterious_man' : (user?.username || null),
       avatarUrl: anonymous ? null : (user?.avatarUrl || null),
+      voiceWaveUrl: anonymous ? null : ((user as any)?.profile?.voiceWaveUrl || null),
       publicId: anonymous ? null : (user?.publicId || null),
       mysteriousMan: !!anonymous,
       ...(anonymous || {}),

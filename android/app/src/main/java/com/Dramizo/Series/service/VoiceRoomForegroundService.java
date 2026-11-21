@@ -23,6 +23,8 @@ import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.IconCompat;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.common.PlaybackException;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.annotation.OptIn;
@@ -54,7 +56,10 @@ public class VoiceRoomForegroundService extends Service {
     private static final String ACTION_TOGGLE_SPEAKER = "room.service.TOGGLE_SPEAKER";
     private static final String ACTION_SET_SPEAKER_MUTE = "room.service.SET_SPEAKER_MUTE";
     private static final String ACTION_UI_ATTACHED = "room.service.UI_ATTACHED";
+    private static final String ACTION_UI_MUSIC_READY = "room.service.UI_MUSIC_READY";
     private static final String ACTION_UI_EXIT = "room.service.UI_EXIT";
+    public static final String ACTION_MUSIC_HANDOFF_READY = "room.service.MUSIC_HANDOFF_READY";
+    public static final String ACTION_MUSIC_HANDOFF_FAILED = "room.service.MUSIC_HANDOFF_FAILED";
     private static final String EXTRA_ROOM_ID = "roomId";
     private static final String EXTRA_TITLE = "title";
     private static final String EXTRA_COVER = "cover";
@@ -69,6 +74,29 @@ public class VoiceRoomForegroundService extends Service {
     private String roomCoverUrl;
     private ExoPlayer musicPlayer;
     private boolean stopping;
+    private boolean musicHandoffPending;
+    private boolean uiAttachedWaitingForMusic;
+    private final Player.Listener musicHandoffListener = new Player.Listener() {
+        @Override public void onPlaybackStateChanged(int playbackState) {
+            if (playbackState == Player.STATE_READY && musicHandoffPending
+                    && musicPlayer != null && !musicPlayer.getPlayWhenReady()) {
+                musicHandoffPending = false;
+                notifyMusicHandoff(true);
+            }
+        }
+        @Override public void onIsPlayingChanged(boolean isPlaying) {
+            if (isPlaying && musicHandoffPending) {
+                musicHandoffPending = false;
+                notifyMusicHandoff(true);
+            }
+        }
+        @Override public void onPlayerError(PlaybackException error) {
+            if (musicHandoffPending) {
+                musicHandoffPending = false;
+                notifyMusicHandoff(false);
+            }
+        }
+    };
     private android.graphics.Bitmap coverBitmap;
 
     private final ZegoEngineManager.RoomListener rtcListener =
@@ -302,11 +330,18 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     public static void attachUi(Context context) {
-        // UI is visible again — drop FGS notification/listeners, but KEEP active-room prefs
-        // so Splash / mini-player can restore after process death.
+        // Keep background music alive until the Activity's player confirms it is audible.
         try {
             context.startService(new Intent(context, VoiceRoomForegroundService.class)
                     .setAction(ACTION_UI_ATTACHED));
+        } catch (IllegalStateException ignored) {
+        }
+    }
+
+    public static void notifyUiMusicReady(Context context) {
+        try {
+            context.startService(new Intent(context, VoiceRoomForegroundService.class)
+                    .setAction(ACTION_UI_MUSIC_READY));
         } catch (IllegalStateException ignored) {
         }
     }
@@ -373,6 +408,14 @@ public class VoiceRoomForegroundService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         musicPlayer = new ExoPlayer.Builder(this).build();
+        musicPlayer.addListener(musicHandoffListener);
+    }
+
+    private void notifyMusicHandoff(boolean ready) {
+        Intent event = new Intent(ready ? ACTION_MUSIC_HANDOFF_READY : ACTION_MUSIC_HANDOFF_FAILED)
+                .setPackage(getPackageName())
+                .putExtra(EXTRA_ROOM_ID, roomId);
+        sendBroadcast(event);
     }
 
     @Override
@@ -414,7 +457,14 @@ public class VoiceRoomForegroundService extends Service {
             return START_NOT_STICKY;
         }
         if (ACTION_UI_ATTACHED.equals(action)) {
-            // Activity visible — hide notification, keep prefs for cold-start resume.
+            // Activity is rebuilding its own player. Keep this player's audio alive
+            // and detach only background listeners until the UI confirms playback.
+            uiAttachedWaitingForMusic = true;
+            detachBackgroundListenersOnly();
+            return START_STICKY;
+        }
+        if (ACTION_UI_MUSIC_READY.equals(action)) {
+            uiAttachedWaitingForMusic = false;
             stopBackgroundOwner(false);
             return START_NOT_STICKY;
         }
@@ -520,11 +570,22 @@ public class VoiceRoomForegroundService extends Service {
                         .putBoolean("speaker_muted_" + roomId, muted).apply();
             }
             RoomRtcEngine.getInstance().setSpeakerMuted(muted);
-            RoomRtcEngine.getInstance().setLocalMusicVolume(muted ? 0f : 1f);
-            if (musicPlayer != null) musicPlayer.setVolume(muted ? 0f : 1f);
+            float sharedVolume = getSharedMusicVolume();
+            RoomRtcEngine.getInstance().setLocalMusicVolume(muted ? 0f : sharedVolume);
+            if (musicPlayer != null) musicPlayer.setVolume(muted ? 0f : sharedVolume);
         } catch (Exception ignored) {
         }
         refreshNotificationUi();
+    }
+
+    private float getSharedMusicVolume() {
+        try {
+            float value = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
+                    .getFloat("shared_music_volume_" + roomId, 1f);
+            return Math.max(0f, Math.min(1f, value));
+        } catch (Exception ignored) {
+            return 1f;
+        }
     }
 
     private void refreshNotificationUi() {
@@ -734,6 +795,7 @@ public class VoiceRoomForegroundService extends Service {
 
     private void applyMusic(String url, String status, long positionMs, String startedAt) {
         if (musicPlayer == null) return;
+        musicHandoffPending = false;
         if (url == null || url.isEmpty() || "stopped".equalsIgnoreCase(status)
                 || url.regionMatches(true, 0, "local://", 0, 8)) {
             // Local phone music is mixed by the host into Zego — keep Zego, stop Exo.
@@ -750,8 +812,12 @@ public class VoiceRoomForegroundService extends Service {
                 }
             } catch (Exception ignored) {
             }
+            // Local-phone music is already mixed into the persistent RTC session.
+            // Do not wait for the Activity player; confirm the RTC handoff instead.
+            notifyMusicHandoff(true);
             return;
         }
+        musicHandoffPending = true;
         final long targetBase = Math.max(0L, positionMs);
         final String started = startedAt;
         final String playStatus = status != null ? status : "stopped";
@@ -767,9 +833,13 @@ public class VoiceRoomForegroundService extends Service {
                             ? (resolved.mixUrl != null && !resolved.mixUrl.isEmpty()
                             ? resolved.mixUrl : resolved.audioUrl)
                             : null;
-                    if (stream == null || stream.isEmpty()) return;
+                    if (stream == null || stream.isEmpty()) {
+                        main.post(() -> { musicHandoffPending = false; notifyMusicHandoff(false); });
+                        return;
+                    }
                     main.post(() -> playMusicUrl(stream, playStatus, targetBase, started));
                 } catch (Exception ignored) {
+                    main.post(() -> { musicHandoffPending = false; notifyMusicHandoff(false); });
                 }
             }, "fgs-yt-music").start();
             return;
@@ -797,8 +867,12 @@ public class VoiceRoomForegroundService extends Service {
             musicPlayer.setPlayWhenReady("playing".equalsIgnoreCase(status));
             boolean muted = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
                     .getBoolean("speaker_muted_" + roomId, false);
-            musicPlayer.setVolume(muted ? 0f : 1f);
+            musicPlayer.setVolume(muted ? 0f : getSharedMusicVolume());
         } catch (Exception ignored) {
+            if (musicHandoffPending) {
+                musicHandoffPending = false;
+                notifyMusicHandoff(false);
+            }
         }
     }
 
@@ -867,10 +941,14 @@ public class VoiceRoomForegroundService extends Service {
         stopSelf();
     }
 
-    private void detachBackgroundOwner() {
+    private void detachBackgroundListenersOnly() {
         main.removeCallbacks(renewToken);
         RealtimeClient.getInstance().removeRoomListener(realtimeListener);
         RoomRtcEngine.getInstance().removeRoomListener(rtcListener);
+    }
+
+    private void detachBackgroundOwner() {
+        detachBackgroundListenersOnly();
         if (musicPlayer != null) {
             try {
                 musicPlayer.stop();
