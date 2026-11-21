@@ -12342,18 +12342,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         int width = Math.max(1, binding.giftOverlay.getWidth());
         int height = Math.max(1, binding.giftOverlay.getHeight());
-        return new PointF(width * 0.5f, height - luckyCannonDp(84));
+        // Align the sender-off-seat launch point to the bottom-center edge.
+        return new PointF(width * 0.5f, height - luckyCannonDp(56));
     }
 
-    /** Cannon launches originate at the visible launcher; fall back to bottom-center if unavailable. */
+    /** Both lucky and cannon launches follow the sender: occupied mic, otherwise bottom-center. */
     @Nullable
     private PointF resolveLuckyCannonSource(@Nullable String senderId) {
-        if (binding == null || binding.giftOverlay == null) return null;
-        if (luckyCannonView != null && luckyCannonView.getVisibility() == View.VISIBLE
-                && luckyCannonView.getWidth() > 0 && luckyCannonView.getHeight() > 0) {
-            PointF cannonPoint = GiftFlyAnimator.centerInOverlay(binding.giftOverlay, luckyCannonView);
-            if (cannonPoint != null) return cannonPoint;
-        }
         return resolveLuckyGiftSource(senderId);
     }
 
@@ -12361,13 +12356,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private List<android.graphics.PointF> resolveMicCenters(@Nullable List<String> userIds) {
         List<android.graphics.PointF> targets = new ArrayList<>();
         if (binding == null || binding.giftOverlay == null || userIds == null) return targets;
+        // A recipient must still occupy a real mic at animation time. Never fall back
+        // to all room seats, hidden seat placeholders, or guessed screen coordinates.
+        Set<String> occupiedNow = new HashSet<>(collectOccupiedMicUserIds());
+        Set<String> resolvedUsers = new HashSet<>();
         for (String uid : userIds) {
-            if (uid == null || uid.isEmpty()) continue;
+            if (uid == null || uid.isEmpty() || !occupiedNow.contains(uid)
+                    || !resolvedUsers.add(uid)) continue;
             View seat = findSeatViewForUser(uid);
-            if (seat == null) continue;
+            if (seat == null || !seat.isShown()
+                    || seat.getWidth() <= 0 || seat.getHeight() <= 0) continue;
             android.graphics.PointF p =
                     GiftFlyAnimator.centerInOverlay(binding.giftOverlay, seat);
-            if (p != null) targets.add(p);
+            if (p == null || p.x < 0f || p.y < 0f
+                    || p.x > binding.giftOverlay.getWidth()
+                    || p.y > binding.giftOverlay.getHeight()) continue;
+            targets.add(p);
         }
         return targets;
     }
@@ -12452,7 +12456,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (id != null && !id.isEmpty()) unique.add(id);
             }
         }
-        if (unique.isEmpty()) unique.addAll(collectOccupiedMicUserIds());
+        if (unique.isEmpty()) return;
         final List<String> ids = new ArrayList<>(unique);
         if (ids.isEmpty()) return;
 
@@ -12509,7 +12513,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (id != null && !id.isEmpty()) unique.add(id);
             }
         }
-        if (unique.isEmpty()) unique.addAll(collectOccupiedMicUserIds());
+        if (unique.isEmpty()) return;
         final List<String> ids = new ArrayList<>(unique);
         if (ids.isEmpty()) return;
 
