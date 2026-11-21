@@ -4073,6 +4073,7 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
   /**
    * Global toast for OUR lucky gifts only (catalog lucky_* rolls) — not invented Mikoo packs.
    */
+  /** Lucky-win results are intentionally room-local; never broadcast global or push celebrations. */
   private async broadcastLuckyCelebration(opts: {
     roomId?: string;
     senderId: string;
@@ -4087,57 +4088,10 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
     luckyCoinsWon: number;
     eventId?: string;
   }) {
-    const stake = Math.max(0, Math.floor(Number(opts.coinPrice) || 0))
-      * Math.max(1, Math.floor(Number(opts.quantity) || 1))
-      * Math.max(1, Math.floor(Number(opts.personCount) || 1));
-    const mul = Number(opts.luckyMultiplier) || 0;
-    const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
-    // Read the same thresholds saved by the Toast Manager dashboard. A zero value
-    // disables that criterion; either enabled threshold may classify the result as high.
-    let minMultiplier = 10;
-    let minCoins = 1000;
-    try {
-      const setting = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
-      const config = setting?.value ? JSON.parse(setting.value) : {};
-      const parsedMultiplier = Number(config?.highWinMinMultiplier);
-      const parsedCoins = Number(config?.highWinMinCoins);
-      if (Number.isFinite(parsedMultiplier)) minMultiplier = Math.max(0, parsedMultiplier);
-      if (Number.isFinite(parsedCoins)) minCoins = Math.max(0, Math.floor(parsedCoins));
-    } catch {
-      // Preserve current safe defaults if dashboard settings cannot be read.
-    }
-    const isHighWin = (minMultiplier > 0 && mul >= minMultiplier)
-      || (minCoins > 0 && won >= minCoins);
-    if (!this.realtime || !isHighWin) return;
-    const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
-    const soft = mul > 0 && mul < 1;
-    const times = Math.max(1, Math.round(mul));
-    const giftLabel = (opts.giftName || '').trim();
-    // This method exits before formatting if there is no payout; only wins/returns
-    // are eligible for a user-facing celebration.
-    const noPayout = won <= 0;
-    const title = soft ? 'مردود جزئي' : noPayout ? 'حظ أوفر' : 'حظ سعيد!';
-    const body = noPayout
-      ? `حظ أوفر ${name} في المحاولة القادمة`
-      : soft
-        ? `مبروك ${name} حصل على ${won} · مردود جزئي`
-        : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
-    this.realtime.emitToAll('celebration:toast', {
-      kind: 'lucky_hit',
-      id: opts.eventId || `lucky:${opts.senderId}:${Date.now()}`,
-      userId: opts.senderId,
-      displayName: name,
-      avatarUrl: opts.avatarUrl || '',
-      giftName: giftLabel,
-      giftIconUrl: opts.giftIconUrl || '',
-      multiplier: mul,
-      coinsWon: won,
-      stake,
-      roomId: opts.roomId || null,
-      title,
-      body,
-      at: new Date().toISOString(),
-    });
+    // Keep the call sites backward-compatible while preventing the old global
+    // celebration:toast event that appeared as an external "فلان ربح" alert.
+    void opts;
+    return;
   }
 
   async history(userId: string, query: PaginationDto) {
