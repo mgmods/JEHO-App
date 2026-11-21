@@ -571,15 +571,24 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                         }
                     }
                 } else if ("speak_level".equals(p)) {
-                    if (userId != null && speakingUsers.contains(userId)
-                            && holder.b.seatSpeakAura != null) {
+                    if (userId != null && speakingUsers.contains(userId)) {
                         float lv = speakingLevels.containsKey(userId)
                                 ? speakingLevels.get(userId) : 48f;
-                        holder.b.seatSpeakAura.setSpeaking(true);
-                        holder.b.seatSpeakAura.setIntensity(lv);
-                        if (holder.b.seatVoiceWaveBars != null) {
-                            holder.b.seatVoiceWaveBars.setSpeaking(
-                                    holder.voiceWaveUrl != null && !holder.voiceWaveUrl.trim().isEmpty(), lv);
+                        boolean hasEquippedWave = holder.voiceWaveUrl != null
+                                && !holder.voiceWaveUrl.trim().isEmpty();
+                        if (hasEquippedWave) {
+                            if (holder.b.seatSpeakAura != null) {
+                                holder.b.seatSpeakAura.setSpeaking(false);
+                                holder.b.seatSpeakAura.setVisibility(View.GONE);
+                            }
+                            if (holder.b.seatVoiceWaveBars != null) {
+                                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+                            }
+                        } else if (holder.b.seatSpeakAura != null) {
+                            holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
+                            holder.b.seatSpeakAura.setSpeaking(true);
+                            holder.b.seatSpeakAura.setIntensity(lv);
                         }
                         holder.speaking = true;
                     }
