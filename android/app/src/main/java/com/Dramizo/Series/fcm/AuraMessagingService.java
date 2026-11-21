@@ -76,12 +76,28 @@ public class AuraMessagingService extends FirebaseMessagingService {
         if (type != null) markers.append(type).append(' ');
         if (title != null) markers.append(title).append(' ');
         if (body != null) markers.append(body).append(' ');
+        boolean luckyPayout = false;
         if (data != null) {
             for (Map.Entry<String, String> entry : data.entrySet()) {
-                if (entry.getKey() != null) markers.append(entry.getKey()).append(' ');
+                if (entry.getKey() != null) {
+                    markers.append(entry.getKey()).append(' ');
+                    String key = entry.getKey().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
+                    String raw = entry.getValue();
+                    if (("luckymultiplier".equals(key) || "luckycoinswon".equals(key)
+                            || "luckyreturn".equals(key) || "luckypayout".equals(key))
+                            && raw != null) {
+                        try { luckyPayout |= Double.parseDouble(raw) > 0d; }
+                        catch (NumberFormatException ignored) { /* non-numeric metadata */ }
+                    }
+                    if (("luckywin".equals(key) || "isluckywin".equals(key))
+                            && "true".equalsIgnoreCase(raw)) {
+                        luckyPayout = true;
+                    }
+                }
                 if (entry.getValue() != null) markers.append(entry.getValue()).append(' ');
             }
         }
+        if (luckyPayout) return true;
         String value = markers.toString().toLowerCase(java.util.Locale.ROOT);
         boolean roomGameGiftContext = value.matches("(?s).*(room|roomid|game|gameid|slot|gift|giftid|gifttype|lucky|luckygift|room:|غرفة|روم|هدية|محظوظ|الحظ|لعبة|كوين|عملة).*");
         boolean winSignal = value.matches("(?s).*(win|won|winner|winning|game_win|slot_win|lucky_win|reward|payout|coinswon|wincoins|profit|hit|فوز|فاز|فازت|فازوا|ربح|ربحت|ربحوا|مردود|مكسب).*");

@@ -34,10 +34,18 @@ function isDirectMessageNotification(notification: Notification): boolean {
 function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, body?: string): boolean {
   const values: string[] = [];
   const keys: string[] = [];
+  let hasLuckyPayout = false;
   const collect = (value: unknown, depth = 0) => {
     if (depth > 6 || value == null) return;
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       values.push(String(value).toLowerCase());
+      // Some legacy producers serialize nested event data as JSON strings.
+      if (typeof value === 'string' && depth < 6) {
+        const raw = value.trim();
+        if ((raw.startsWith('{') && raw.endsWith('}')) || (raw.startsWith('[') && raw.endsWith(']'))) {
+          try { collect(JSON.parse(raw), depth + 1); } catch { /* keep the original string only */ }
+        }
+      }
       return;
     }
     if (Array.isArray(value)) {
@@ -46,7 +54,18 @@ function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, 
     }
     if (typeof value === 'object') {
       Object.entries(value as Record<string, unknown>).forEach(([key, item]) => {
+        const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
         keys.push(key.toLowerCase());
+        // A positive multiplier/return is authoritative evidence of a lucky-gift win.
+        // Non-winning sends carry null/zero values, so ordinary lucky gifts stay unaffected.
+        if ((normalizedKey === 'luckymultiplier' || normalizedKey === 'luckycoinswon' ||
+             normalizedKey === 'luckyreturn' || normalizedKey === 'luckypayout') &&
+            Number(item) > 0) {
+          hasLuckyPayout = true;
+        }
+        if ((normalizedKey === 'luckywin' || normalizedKey === 'isluckywin') && item === true) {
+          hasLuckyPayout = true;
+        }
         collect(item, depth + 1);
       });
     }
@@ -65,7 +84,7 @@ function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, 
   const explicitWinAnnouncement =
     /(ربح|ربحت|ربحوا|فاز|فازت|فازوا|مردود|مكسب)/i.test(copy) ||
     /\b(won|winner|winning|payout|profit)\b/i.test(copy);
-  return winSignal && (roomGameGiftContext || explicitGameEvent || explicitWinAnnouncement);
+  return hasLuckyPayout || (winSignal && (roomGameGiftContext || explicitGameEvent || explicitWinAnnouncement));
 }
 
 export class CreateNotificationDto {
