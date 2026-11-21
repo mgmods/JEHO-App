@@ -12360,7 +12360,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 int h = Math.max(binding.giftOverlay.getHeight(), 1);
                 from = new PointF(w / 2f, h * 0.40f);
             }
-            GiftFlyAnimator.flyTogether(binding.giftOverlay, giftIconUrl, from, destinations, 620L, Math.max(1, quantity));
+            // Lucky gifts must first appear as one hero exactly at the room center.
+            // The old flyTogether path immediately created seat-bound copies, making
+            // the gift look as if it spawned at the edge when a target seat was there.
+            com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
+                    binding.giftOverlay, giftIconUrl, destinations, coinsSpent,
+                    Math.max(1, quantity), Math.max(1, personCount),
+                    from, onScatterStart, null);
             if (onScatterStart != null) {
                 try { onScatterStart.run(); } catch (Exception ignored) {}
             }
