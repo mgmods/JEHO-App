@@ -359,6 +359,17 @@ public class VoiceRoomForegroundService extends Service {
         return roomId != null && roomId.equals(active);
     }
 
+    /** Update the Android FGS type when local microphone capture is suspended/restored. */
+    public static void refreshAudioForegroundType() {
+        VoiceRoomForegroundService service = activeInstance;
+        if (service == null) return;
+        service.main.post(() -> {
+            if (service.stopping || service.roomId == null || service.roomId.isEmpty()) return;
+            service.enterForegroundSafe(service.resolveForegroundTypes());
+            service.refreshNotificationUi();
+        });
+    }
+
     public static String activeRoomId(Context context) {
         return context.getSharedPreferences(PREFS, MODE_PRIVATE)
                 .getString(EXTRA_ROOM_ID, null);
@@ -622,8 +633,13 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void toggleMicFromNotification() {
-        // Must use isMicEnabled — isPublishing stays true while mic is soft-muted.
+        // Do not reopen the microphone from a background notification: Android must
+        // leave the recorder available to the foreground app chosen by the user.
         boolean nextOn = !RoomRtcEngine.getInstance().isMicEnabled();
+        if (nextOn && !com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
+            refreshNotificationUi();
+            return;
+        }
         RoomRtcEngine.getInstance().setMicEnabled(nextOn);
         final String rid = roomId;
         if (rid != null && !rid.isEmpty()) {
@@ -636,6 +652,7 @@ public class VoiceRoomForegroundService extends Service {
             }
         }
         refreshNotificationUi();
+        enterForegroundSafe(resolveForegroundTypes());
     }
 
     private void toggleSpeakerFromNotification() {
