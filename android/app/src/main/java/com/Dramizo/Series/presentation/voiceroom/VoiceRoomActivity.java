@@ -10509,6 +10509,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         String leavingRoomId = roomId;
+        if (leavingRoomId != null && !leavingRoomId.isEmpty()) {
+            try {
+                getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
+                        .remove("user_chose_mute_" + leavingRoomId)
+                        .remove("speaker_muted_" + leavingRoomId)
+                        .remove("shared_music_volume_" + leavingRoomId)
+                        .apply();
+            } catch (Exception ignored) {
+            }
+        }
         try {
             micOn = false;
             RoomRtcEngine.getInstance().setMicEnabled(false);
