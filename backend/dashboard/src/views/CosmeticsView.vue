@@ -267,6 +267,9 @@
                 </div>
                 <div class="col-12">
                   <div class="form-text">{{ t('cosmetics.acceptHint') }}</div>
+                  <div v-if="form.type === 'voice_wave'" class="alert alert-info py-2 mb-0 mt-2">
+                    ارفع صورة PNG شفافة أو GIF / WebP متحرك. تُعرض حول مقعد المالك أثناء كلامه فقط، وتختفي عند توقفه عن الكلام. يشتريها المستخدم بالكوينز ويرتديها من الحقيبة.
+                  </div>
                 </div>
                 <div class="col-12">
                   <label class="form-label">{{ t('cosmetics.metaJson') }}</label>
@@ -372,6 +375,8 @@ const tabs = computed(() => [
   { key: 'profile_card', label: 'بطاقة الملف الشخصي' },
   { key: 'chat_bubble', label: 'فقاعة الدردشة' },
   { key: 'nameplate', label: 'لوحة الاسم' },
+  { key: 'voice_wave', label: 'الموجات الصوتية' },
+
   { key: 'room_background', label: t('cosmetics.roomBackgrounds') },
   { key: 'level_badge', label: t('cosmetics.levels') },
 ])
@@ -421,6 +426,7 @@ function cosmeticTypeLabel(type) {
     profile_card: 'بطاقة ملف شخصي',
     chat_bubble: 'فقاعة دردشة',
     nameplate: 'بطاقة اسم / رتبة',
+    voice_wave: 'موجة صوتية للمقعد',
     room_background: 'خلفية غرفة',
     level_badge: 'شارة مستوى',
     name_card: 'بطاقة اسم',
