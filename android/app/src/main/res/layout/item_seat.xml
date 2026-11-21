@@ -97,6 +97,16 @@
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
+        <com.Dramizo.Series.widget.SeatVoiceWaveBarsView
+            android:id="@+id/seatVoiceWaveBars"
+            android:layout_width="86dp"
+            android:layout_height="86dp"
+            android:layout_gravity="center"
+            android:elevation="5dp"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone" />
+
         <ImageView
             android:id="@+id/imgHostBadge"
             android:layout_width="76dp"

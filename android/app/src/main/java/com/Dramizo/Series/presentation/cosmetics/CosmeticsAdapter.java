@@ -228,51 +228,27 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
             holder.b.imgFace.setVisibility(View.GONE);
         }
 
-        if (voiceWave && holder.b.imgPreview.getVisibility() == View.VISIBLE
-                && abs != null && !abs.isEmpty()) {
-            holder.b.imgPreview.setClipToOutline(true);
-            holder.b.imgPreview.setOutlineProvider(new ViewOutlineProvider() {
-                @Override public void getOutline(View v, android.graphics.Outline outline) {
-                    outline.setOval(0, 0, Math.max(1, v.getWidth()), Math.max(1, v.getHeight()));
-                }
-            });
-            holder.b.imgPreview.setTag(R.id.imgPreview, startVoiceWavePreviewMotion(holder.b.imgPreview));
-        } else {
-            Object oldAnimator = holder.b.imgPreview.getTag(R.id.imgPreview);
-            if (oldAnimator instanceof android.animation.ValueAnimator) {
-                ((android.animation.ValueAnimator) oldAnimator).cancel();
-            }
-            holder.b.imgPreview.setTag(R.id.imgPreview, null);
-            holder.b.imgPreview.setScaleX(1f);
-            holder.b.imgPreview.setScaleY(1f);
-            holder.b.imgPreview.setAlpha(1f);
+        Object oldAnimator = holder.b.imgPreview.getTag(R.id.imgPreview);
+        if (oldAnimator instanceof android.animation.ValueAnimator) {
+            ((android.animation.ValueAnimator) oldAnimator).cancel();
         }
-    }
-
-    private static android.animation.ValueAnimator startVoiceWavePreviewMotion(View view) {
-        Object old = view.getTag(R.id.imgPreview);
-        if (old instanceof android.animation.ValueAnimator) {
-            ((android.animation.ValueAnimator) old).cancel();
+        holder.b.imgPreview.setTag(R.id.imgPreview, null);
+        holder.b.imgPreview.setClipToOutline(false);
+        holder.b.imgPreview.setOutlineProvider(null);
+        holder.b.imgPreview.setScaleX(1f);
+        holder.b.imgPreview.setScaleY(1f);
+        holder.b.imgPreview.setAlpha(1f);
+        if (holder.b.seatVoiceWaveBars != null) {
+            holder.b.seatVoiceWaveBars.setBarCount(40);
+            holder.b.seatVoiceWaveBars.setSpeaking(
+                    voiceWave && abs != null && !abs.isEmpty(), 58f);
         }
-        android.animation.ValueAnimator animator =
-                android.animation.ValueAnimator.ofFloat(0f, 1f);
-        animator.setDuration(760L);
-        animator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-        animator.setRepeatMode(android.animation.ValueAnimator.REVERSE);
-        animator.addUpdateListener(a -> {
-            float t = (Float) a.getAnimatedValue();
-            float scale = 0.95f + (0.06f * t);
-            view.setScaleX(scale);
-            view.setScaleY(scale);
-            view.setAlpha(0.9f + (0.1f * t));
-        });
-        animator.start();
-        return animator;
     }
 
     @Override
     public void onViewRecycled(@NonNull VH holder) {
         try {
+            if (holder.b.seatVoiceWaveBars != null) holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
             Glide.with(holder.b.imgPreview.getContext().getApplicationContext()).clear(holder.b.imgPreview);
             Glide.with(holder.b.imgFace.getContext().getApplicationContext()).clear(holder.b.imgFace);
         } catch (Exception ignored) {

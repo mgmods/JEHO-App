@@ -531,6 +531,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Prefetch completed before observers existed — publish after wires. */
     @Nullable private RoomDtos.JoinRoomResult pendingPrefetchSession;
     private String currentMusicUrl;
+    /** Exact URL handed to the foreground player; YouTube may be a resolved CDN stream. */
+    @Nullable private String currentMusicHandoffUrl;
     private String dismissedMusicUrl;
     private String preparedMusicUrl;
     private String currentMusicStatus = "stopped";
@@ -4284,8 +4286,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && currentMusicUrl != null && !currentMusicUrl.isEmpty()
                 && !isLocalMusicUrl(currentMusicUrl);
         if (needsMediaHandoff
-                && !VoiceRoomForegroundService.isMusicHandoffReady(roomId, currentMusicUrl)) {
-            if (System.currentTimeMillis() - startedAtMs < 700L) {
+                && !VoiceRoomForegroundService.isMusicHandoffReady(roomId,
+                        currentMusicHandoffUrl != null ? currentMusicHandoffUrl : currentMusicUrl)) {
+            if (System.currentTimeMillis() - startedAtMs < 4000L) {
                 handler.postDelayed(() -> completeRoomMinimizeWhenMusicReady(startedAtMs), 30L);
                 return;
             }
@@ -4392,6 +4395,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         CharSequence roomTitle = binding != null && binding.tvRoomTitle != null
                 ? binding.tvRoomTitle.getText() : null;
         try {
+            currentMusicHandoffUrl = handoffMusicUrl;
             ContextCompat.startForegroundService(
                     this,
                     VoiceRoomForegroundService.startIntent(
@@ -5846,6 +5850,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         boolean urlEmpty = incomingMusicUrl == null || incomingMusicUrl.isEmpty();
         String prevStatus = currentMusicStatus;
         String prevUrl = currentMusicUrl != null ? currentMusicUrl.trim() : null;
+        if (!java.util.Objects.equals(prevUrl, incomingMusicUrl)) currentMusicHandoffUrl = null;
         // Never treat a missing status as "stopped" during room refresh (lock/settings).
         // That was killing YouTube mid-song when getRoom omitted or nulled musicStatus.
         if (urlEmpty) {

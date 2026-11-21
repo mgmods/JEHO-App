@@ -278,9 +278,6 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (isBlank(seat.user.levelBadgeUrl) && !isBlank(prev.levelBadgeUrl)) {
                 seat.user.levelBadgeUrl = prev.levelBadgeUrl;
             }
-            if (isBlank(seat.user.voiceWaveUrl) && !isBlank(prev.voiceWaveUrl)) {
-                seat.user.voiceWaveUrl = prev.voiceWaveUrl;
-            }
             if (isBlank(seat.user.displayName) && !isBlank(prev.displayName)) {
                 seat.user.displayName = prev.displayName;
             }
@@ -568,6 +565,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                         if (holder.b.seatSpeakAura != null) {
                             holder.b.seatSpeakAura.setIntensity(lv);
                         }
+                        if (holder.b.seatVoiceWaveBars != null) {
+                            holder.b.seatVoiceWaveBars.setSpeaking(
+                                    holder.voiceWaveUrl != null && !holder.voiceWaveUrl.trim().isEmpty(), lv);
+                        }
                     }
                 } else if ("speak_level".equals(p)) {
                     if (userId != null && speakingUsers.contains(userId)
@@ -576,6 +577,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                                 ? speakingLevels.get(userId) : 48f;
                         holder.b.seatSpeakAura.setSpeaking(true);
                         holder.b.seatSpeakAura.setIntensity(lv);
+                        if (holder.b.seatVoiceWaveBars != null) {
+                            holder.b.seatVoiceWaveBars.setSpeaking(
+                                    holder.voiceWaveUrl != null && !holder.voiceWaveUrl.trim().isEmpty(), lv);
+                        }
                         holder.speaking = true;
                     }
                 } else if ("scale".equals(p)) {
@@ -900,7 +905,13 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         setSeatSize(holder.b.imgSeatShell, avatar, ctx);
         setSeatSize(holder.b.imgAvatar, avatar, ctx);
-        setSeatSize(holder.b.imgVoiceWave, avatar, ctx);
+        setSeatSize(holder.b.imgVoiceWave, frame + 4, ctx);
+        if (holder.b.seatVoiceWaveBars != null) {
+            setSeatSize(holder.b.seatVoiceWaveBars, frame + 10, ctx);
+            holder.b.seatVoiceWaveBars.setBarCount(
+                    scaleMode == SCALE_MICRO ? 24 : scaleMode == SCALE_COMPACT ? 28
+                            : scaleMode == SCALE_MEDIUM ? 34 : 40);
+        }
         setSeatSize(holder.b.imgFrame, frame, ctx);
         setSeatSize(holder.b.imgHostBadge, frame, ctx);
         if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, scaleMode == SCALE_MICRO ? 20 : 30, ctx);
@@ -1405,21 +1416,22 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (waveUrl != null && !waveUrl.trim().isEmpty()) {
                 holder.b.imgVoiceWave.setVisibility(View.VISIBLE);
                 holder.b.imgVoiceWave.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-                holder.b.imgVoiceWave.setClipToOutline(true);
-                holder.b.imgVoiceWave.setOutlineProvider(new android.view.ViewOutlineProvider() {
-                    @Override public void getOutline(View v, android.graphics.Outline outline) {
-                        outline.setOval(0, 0, Math.max(1, v.getWidth()), Math.max(1, v.getHeight()));
-                    }
-                });
+                holder.b.imgVoiceWave.setClipToOutline(false);
+                holder.b.imgVoiceWave.setOutlineProvider(null);
                 Glide.with(holder.itemView)
                         .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim()))
                         .fitCenter()
                         .into(holder.b.imgVoiceWave);
-                startVoiceWaveMotion(holder.b.imgVoiceWave);
             } else {
                 holder.b.imgVoiceWave.setVisibility(View.GONE);
                 Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
             }
+        }
+        if (holder.b.seatVoiceWaveBars != null) {
+            float level = holder.boundUserId != null && speakingLevels.containsKey(holder.boundUserId)
+                    ? speakingLevels.get(holder.boundUserId) : 48f;
+            holder.b.seatVoiceWaveBars.setSpeaking(
+                    waveUrl != null && !waveUrl.trim().isEmpty(), level);
         }
         // Only while this bind is actually speaking (sound-level driven).
         holder.speaking = true;
@@ -1444,36 +1456,13 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
     }
 
-    private void startVoiceWaveMotion(@Nullable View wave) {
-        if (wave == null) return;
-        Object old = wave.getTag(R.id.imgVoiceWave);
-        if (old instanceof android.animation.ValueAnimator) {
-            ((android.animation.ValueAnimator) old).cancel();
-        }
-        wave.animate().cancel();
-        wave.setScaleX(1f);
-        wave.setScaleY(1f);
-        wave.setAlpha(0.94f);
-        android.animation.ValueAnimator animator =
-                android.animation.ValueAnimator.ofFloat(0f, 1f);
-        animator.setDuration(720L);
-        animator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-        animator.setRepeatMode(android.animation.ValueAnimator.REVERSE);
-        animator.addUpdateListener(a -> {
-            float t = (Float) a.getAnimatedValue();
-            float scale = 0.96f + (0.07f * t);
-            wave.setScaleX(scale);
-            wave.setScaleY(scale);
-            wave.setAlpha(0.88f + (0.12f * t));
-        });
-        wave.setTag(R.id.imgVoiceWave, animator);
-        animator.start();
-    }
-
     private void stopSpeakingRipples(VH holder) {
         holder.speaking = false;
         if (holder.b.seatSpeakAura != null) {
             holder.b.seatSpeakAura.setSpeaking(false);
+        }
+        if (holder.b.seatVoiceWaveBars != null) {
+            holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
         }
         if (holder.b.imgVoiceWave != null) {
             Object waveAnimator = holder.b.imgVoiceWave.getTag(R.id.imgVoiceWave);

@@ -383,7 +383,8 @@ public class VoiceRoomForegroundService extends Service {
         musicPlayer.addListener(new Player.Listener() {
             @Override public void onPlaybackStateChanged(int playbackState) {
                 if (playbackState == Player.STATE_READY
-                        && "playing".equalsIgnoreCase(activeMusicStatus)) {
+                        && "playing".equalsIgnoreCase(activeMusicStatus)
+                        && musicPlayer != null && musicPlayer.getPlayWhenReady()) {
                     handoffMusicReady = true;
                 }
             }
