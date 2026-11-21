@@ -789,7 +789,7 @@ public class VoiceRoomForegroundService extends Service {
         int playerState = musicPlayer.getPlaybackState();
         if (sameRequest && (musicResolveInProgress
                 || (musicPlayer.getMediaItemCount() > 0
-                && (playerState == Player.STATE_BUFFERING || playerState == Player.STATE_READY))) {
+                && (playerState == Player.STATE_BUFFERING || playerState == Player.STATE_READY)))) {
             return;
         }
 
