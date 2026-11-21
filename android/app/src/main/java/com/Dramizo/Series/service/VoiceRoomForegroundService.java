@@ -960,6 +960,7 @@ public class VoiceRoomForegroundService extends Service {
                     container.getRoomRepository().leave(leavingRoom));
         }
         RoomRtcEngine.getInstance().logoutRoom();
+        com.Dramizo.Series.util.ActiveRoomSession.get().clear();
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().clear().apply();
         if (leavingRoom != null) {
             getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
