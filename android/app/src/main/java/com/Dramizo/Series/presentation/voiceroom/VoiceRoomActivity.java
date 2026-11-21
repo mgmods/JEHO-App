@@ -1651,11 +1651,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         RoomRtcEngine.getInstance().setMicEnabled(micOn);
-        roomSpeakerMuted = false;
+        roomSpeakerMuted = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
+                .getBoolean("speaker_muted_" + roomId, false);
         try {
             RoomRtcEngine.getInstance().clearPausedPlayStreams();
-            RoomRtcEngine.getInstance().setSpeakerMuted(false);
-            RoomSoundFx.setMuted(false);
+            RoomRtcEngine.getInstance().setSpeakerMuted(roomSpeakerMuted);
+            RoomSoundFx.setMuted(roomSpeakerMuted);
         } catch (Exception ignored) {
         }
         final int audioEpoch = roomAudioEpoch;
@@ -4295,11 +4296,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      */
     private void ensureMinimizedListeningState() {
         try {
+            // Minimize is a presentation change, never an audio preference change.
+            // Preserve the explicit speaker mute across the Activity → foreground service handoff.
             mutedForBackground = false;
-            roomSpeakerMuted = false;
-            speakerMutedBeforeBackground = false;
-            RoomSoundFx.setMuted(false);
-            RoomRtcEngine.getInstance().setSpeakerMuted(false);
+            speakerMutedBeforeBackground = roomSpeakerMuted;
+            RoomSoundFx.setMuted(roomSpeakerMuted);
+            RoomRtcEngine.getInstance().setSpeakerMuted(roomSpeakerMuted);
+            applySharedMusicVolume();
             // Deliberately preserve micOn and RTC microphone state. Only an explicit user
             // mute, room moderation, or actual room exit may change it.
         } catch (Exception ignored) {
@@ -6209,11 +6212,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Shared music gain; local room mute only affects this listener's playback. */
     private void applySharedMusicVolume() {
+        float effectiveMusicVolume = roomSpeakerMuted ? 0f : sharedMusicVolume;
         if (roomMusicPlayer != null) {
-            roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : sharedMusicVolume);
+            roomMusicPlayer.setVolume(effectiveMusicVolume);
         }
         if (youtubeUsingEmbed && musicYoutubeWebView != null) {
-            int percent = Math.round(sharedMusicVolume * 100f);
+            int percent = Math.round(effectiveMusicVolume * 100f);
             String js = "if(window.musicYtPlayer&&window.musicYtPlayer.setVolume){"
                     + "if(" + percent + "===0){window.musicYtPlayer.mute();}"
                     + "else{window.musicYtPlayer.unMute();window.musicYtPlayer.setVolume("
@@ -6225,7 +6229,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Room metadata/role flags can arrive late, so also recognize the active publisher.
         if (canManageMusic || isHost || isOwner || isRoomStaff()
                 || sameUser(myUserId, currentMusicPublisherId)) {
-            RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
+            RoomRtcEngine.getInstance().setLocalMusicVolume(effectiveMusicVolume);
         }
         if (binding != null && binding.seekMusicVolume != null
                 && !binding.seekMusicVolume.isPressed()) {
@@ -10021,7 +10025,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void toggleRoomSpeakerMute() {
         roomSpeakerMuted = !roomSpeakerMuted;
+        getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
+                .putBoolean("speaker_muted_" + roomId, roomSpeakerMuted).apply();
         applyRoomSpeakerMute(roomSpeakerMuted);
+        try {
+            Intent muteIntent = new Intent(this, VoiceRoomForegroundService.class)
+                    .setAction("room.service.SET_SPEAKER_MUTE")
+                    .putExtra("muted", roomSpeakerMuted);
+            startService(muteIntent);
+        } catch (Exception ignored) {
+        }
         syncRoomSpeakerUi();
         Toast.makeText(this,
                 roomSpeakerMuted
@@ -10033,11 +10046,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void applyRoomSpeakerMute(boolean muted) {
         RoomSoundFx.setMuted(muted);
         RoomRtcEngine.getInstance().setSpeakerMuted(muted);
-        // Preserve the selected music gain on every track type. This does not touch
-        // microphone capture gain; only the dedicated music player is adjusted.
-        if (roomMusicPlayer != null) {
-            applySharedMusicVolume();
-        }
+        // Apply mute to every local music path as well as remote RTC streams.
+        // The media players remain alive; changing gain never tears down or seeks them.
+        applySharedMusicVolume();
         if (!muted) {
             // Resume pulling seat streams after mute (minutes billing resumes only now).
             activateSeatAudio(currentSeats);
@@ -13660,12 +13671,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } catch (Exception ignored) {
             }
         } else {
+            // The foreground service inherits the user's speaker state. Do not force-unmute
+            // during Activity destruction, otherwise a muted room becomes audible when minimized.
             mutedForBackground = false;
-            roomSpeakerMuted = false;
-            RoomSoundFx.setMuted(false);
+            RoomSoundFx.setMuted(roomSpeakerMuted);
             GiftAudioFx.resetRoomGiftSounds();
             try {
-                RoomRtcEngine.getInstance().setSpeakerMuted(false);
+                RoomRtcEngine.getInstance().setSpeakerMuted(roomSpeakerMuted);
+                applySharedMusicVolume();
             } catch (Exception ignored) {
             }
         }

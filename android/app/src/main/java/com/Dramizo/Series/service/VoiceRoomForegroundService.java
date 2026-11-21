@@ -52,6 +52,7 @@ public class VoiceRoomForegroundService extends Service {
     private static final String ACTION_LEAVE = "room.service.LEAVE";
     private static final String ACTION_TOGGLE_MIC = "room.service.TOGGLE_MIC";
     private static final String ACTION_TOGGLE_SPEAKER = "room.service.TOGGLE_SPEAKER";
+    private static final String ACTION_SET_SPEAKER_MUTE = "room.service.SET_SPEAKER_MUTE";
     private static final String ACTION_UI_ATTACHED = "room.service.UI_ATTACHED";
     private static final String ACTION_UI_EXIT = "room.service.UI_EXIT";
     private static final String EXTRA_ROOM_ID = "roomId";
@@ -404,6 +405,10 @@ public class VoiceRoomForegroundService extends Service {
             toggleSpeakerFromNotification();
             return START_STICKY;
         }
+        if (ACTION_SET_SPEAKER_MUTE.equals(action)) {
+            applySpeakerMute(intent.getBooleanExtra("muted", false));
+            return START_STICKY;
+        }
         if (ACTION_UI_EXIT.equals(action)) {
             stopBackgroundOwner(true);
             return START_NOT_STICKY;
@@ -428,11 +433,9 @@ public class VoiceRoomForegroundService extends Service {
                 .putString(EXTRA_TITLE, roomTitle)
                 .putString(EXTRA_COVER, roomCoverUrl)
                 .apply();
-        // Keep hearing the room while minimized (never leave speaker muted from Activity onStop).
-        try {
-            RoomRtcEngine.getInstance().setSpeakerMuted(false);
-        } catch (Exception ignored) {
-        }
+        // Keep the exact speaker-mute preference selected in the room UI.
+        applySpeakerMute(getSharedPreferences("voice_room_audio", MODE_PRIVATE)
+                .getBoolean("speaker_muted_" + roomId, false));
         enterForegroundSafe(resolveForegroundTypes());
         loadCoverAsync();
         postRoomBubble();
@@ -507,7 +510,20 @@ public class VoiceRoomForegroundService extends Service {
 
     private void toggleSpeakerFromNotification() {
         boolean nextMuted = !RoomRtcEngine.getInstance().isSpeakerMuted();
-        RoomRtcEngine.getInstance().setSpeakerMuted(nextMuted);
+        applySpeakerMute(nextMuted);
+    }
+
+    private void applySpeakerMute(boolean muted) {
+        try {
+            if (roomId != null && !roomId.isEmpty()) {
+                getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
+                        .putBoolean("speaker_muted_" + roomId, muted).apply();
+            }
+            RoomRtcEngine.getInstance().setSpeakerMuted(muted);
+            RoomRtcEngine.getInstance().setLocalMusicVolume(muted ? 0f : 1f);
+            if (musicPlayer != null) musicPlayer.setVolume(muted ? 0f : 1f);
+        } catch (Exception ignored) {
+        }
         refreshNotificationUi();
     }
 
@@ -779,7 +795,9 @@ public class VoiceRoomForegroundService extends Service {
             }
             musicPlayer.seekTo(target);
             musicPlayer.setPlayWhenReady("playing".equalsIgnoreCase(status));
-            musicPlayer.setVolume(1f);
+            boolean muted = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
+                    .getBoolean("speaker_muted_" + roomId, false);
+            musicPlayer.setVolume(muted ? 0f : 1f);
         } catch (Exception ignored) {
         }
     }
