@@ -431,6 +431,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
         }
         if (seatPos < 0) {
+            Runnable pending = speakingStopRunnables.remove(key);
+            if (pending != null) handler.removeCallbacks(pending);
             speakingUsers.remove(key);
             speakingLevels.remove(key);
             lastPaintedSpeakLevel.remove(key);
@@ -1543,6 +1545,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.imgVoiceWave.setAlpha(1f);
             holder.b.imgVoiceWave.setVisibility(View.GONE);
             Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+            holder.loadedVoiceWaveUrl = null;
         }
         stopRipple(holder.b.seatRippleOuter);
         stopRipple(holder.b.seatRippleMid);
