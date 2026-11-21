@@ -4365,6 +4365,36 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     /**
+     * Transfer the exact stream already playing in ExoPlayer instead of resolving a
+     * YouTube page URL a second time in the background service. Re-resolving can fail
+     * because signed stream URLs rotate or the resolver is rate-limited.
+     */
+    @Nullable
+    private String resolveMusicHandoffUrl() {
+        if (isLocalMusicUrl(currentMusicUrl)) return currentMusicUrl;
+        if (isYoutubeMusicUrl(currentMusicUrl) && !youtubeUsingEmbed
+                && currentMusicUrl != null && currentMusicUrl.equals(preparedMusicUrl)
+                && roomMusicPlayer != null) {
+            try {
+                MediaItem activeItem = roomMusicPlayer.getCurrentMediaItem();
+                if (activeItem != null && activeItem.localConfiguration != null
+                        && activeItem.localConfiguration.uri != null) {
+                    String activeStream = activeItem.localConfiguration.uri.toString();
+                    if (!activeStream.trim().isEmpty()) return activeStream;
+                }
+            } catch (Exception e) {
+                android.util.Log.w("VoiceRoomMusic", "Could not read active stream for background handoff", e);
+            }
+        }
+        // YouTube iframe fallback has no Exo media item; pass its video id for the
+        // foreground service resolver rather than handing it a dead WebView instance.
+        if (youtubeUsingEmbed && preparedMusicUrl != null && !preparedMusicUrl.trim().isEmpty()) {
+            return preparedMusicUrl;
+        }
+        return currentMusicUrl;
+    }
+
+    /**
      * Keep Zego + realtime alive when UI goes away (WhatsApp, Home, DM chat, etc.).
      * Without this, onDestroy leaves the room and looks like "room closed".
      */
@@ -4375,6 +4405,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             captureActiveRoomSession();
             ActiveRoomSession.get().setMinimized(true);
         }
+        String musicHandoffUrl = resolveMusicHandoffUrl();
         long musicPosition = 0L;
         if (isLocalMusicUrl(currentMusicUrl) || isYoutubeMusicUrl(currentMusicUrl)) {
             musicPosition = isLocalMusicUrl(currentMusicUrl)
@@ -4393,7 +4424,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             roomId,
                             roomTitle != null ? roomTitle.toString() : "الغرفة الصوتية",
                             currentRoomCoverUrl,
-                            currentMusicUrl,
+                            musicHandoffUrl,
                             currentMusicStatus,
                             musicPosition,
                             currentMusicStartedAt));
