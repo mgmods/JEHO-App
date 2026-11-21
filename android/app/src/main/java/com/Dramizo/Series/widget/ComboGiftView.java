@@ -17,7 +17,6 @@ import androidx.annotation.Nullable;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.util.AssetCatalog;
-import com.Dramizo.Series.util.AvatarCosmetics;
 import com.bumptech.glide.Glide;
 
 /**
