@@ -13233,11 +13233,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             VoiceRoomForegroundService.attachUi(this);
         } catch (RuntimeException ignored) {
         }
+        // Read notification changes before restoring any temporary background mute.
+        android.content.SharedPreferences roomAudioPrefs =
+                getSharedPreferences("voice_room_audio", MODE_PRIVATE);
+        roomSpeakerMuted = roomAudioPrefs.getBoolean("speaker_muted_" + roomId, roomSpeakerMuted);
+        if (mutedForBackground) speakerMutedBeforeBackground = roomSpeakerMuted;
         unmuteAudioAfterBackground();
         try {
+            RoomSoundFx.setMuted(roomSpeakerMuted);
+            RoomRtcEngine.getInstance().setSpeakerMuted(roomSpeakerMuted);
+            applySharedMusicVolume();
+            syncRoomSpeakerUi();
+        } catch (Exception ignored) {
+        }
+        try {
             // Prefer live Zego mic state (may have been toggled from notification / mini).
-            userChoseMute = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
-                    .getBoolean("user_chose_mute_" + roomId, userChoseMute);
+            userChoseMute = roomAudioPrefs.getBoolean("user_chose_mute_" + roomId, userChoseMute);
             micOn = !userChoseMute && RoomRtcEngine.getInstance().isMicEnabled();
             RoomRtcEngine.getInstance().setMicEnabled(micOn);
             syncMicUi();
@@ -13405,6 +13416,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         clearSeatRequestsUi();
         clearTopSupportersUi();
 
+        // Audio preferences are scoped to a room session; never carry notification mute
+        // state into a later rejoin after an explicit leave.
+        try {
+            getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
+                    .remove("user_chose_mute_" + roomId)
+                    .remove("speaker_muted_" + roomId)
+                    .remove("shared_music_volume_" + roomId)
+                    .apply();
+        } catch (Exception ignored) {
+        }
         // Force leave even if a prior teardown flag was stuck.
         teardownRoomSession(true, true);
         ActiveRoomSession.get().clear();
