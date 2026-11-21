@@ -5,15 +5,12 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.graphics.PointF;
-import android.graphics.drawable.GradientDrawable;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
@@ -78,21 +75,6 @@ public final class LuckyGiftStageAnimator {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         overlay.addView(stage);
 
-        View glow = new View(overlay.getContext());
-        GradientDrawable glowBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0x00FFE8A3, 0xAAFFD66B, 0x00A66CFF});
-        glowBg.setShape(GradientDrawable.OVAL);
-        glow.setBackground(glowBg);
-        FrameLayout.LayoutParams glowLp = new FrameLayout.LayoutParams(
-                Math.round(164f * density), Math.round(164f * density),
-                Gravity.TOP | Gravity.LEFT);
-        glowLp.leftMargin = Math.round(centerX - 82f * density);
-        glowLp.topMargin = Math.round(centerY - 82f * density);
-        stage.addView(glow, glowLp);
-        glow.setAlpha(0f);
-        glow.setScaleX(0.45f);
-        glow.setScaleY(0.45f);
-
         ImageView hero = new ImageView(overlay.getContext());
         hero.setScaleType(ImageView.ScaleType.FIT_CENTER);
         loadGift(hero, giftIconUrl);
@@ -112,35 +94,14 @@ public final class LuckyGiftStageAnimator {
         hero.setScaleX(0.18f);
         hero.setScaleY(0.18f);
 
-        TextView count = new TextView(overlay.getContext());
-        int copies = Math.max(1, quantity);
-        count.setText("×" + copies);
-        count.setTextColor(0xFFFFFFFF);
-        count.setTextSize(17f);
-        count.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        count.setGravity(Gravity.CENTER);
-        count.setShadowLayer(5f * density, 0f, 2f * density, 0xCC000000);
-        FrameLayout.LayoutParams countLp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        countLp.topMargin = Math.round(centerY + 54f * density);
-        stage.addView(count, countLp);
-        count.setAlpha(0f);
-        count.setTranslationY(10f * density);
-
         AnimatorSet reveal = new AnimatorSet();
         reveal.playTogether(
                 ObjectAnimator.ofFloat(hero, View.X, heroStartX, centerX - 56f * density),
                 ObjectAnimator.ofFloat(hero, View.Y, heroStartY, centerY - 56f * density),
                 ObjectAnimator.ofFloat(hero, View.ALPHA, 0f, 1f),
-                ObjectAnimator.ofFloat(hero, View.SCALE_X, 0.18f, 1.18f, 1f),
-                ObjectAnimator.ofFloat(hero, View.SCALE_Y, 0.18f, 1.18f, 1f),
-                ObjectAnimator.ofFloat(glow, View.ALPHA, 0f, 0.85f, 0.5f),
-                ObjectAnimator.ofFloat(glow, View.SCALE_X, 0.45f, 1.1f),
-                ObjectAnimator.ofFloat(glow, View.SCALE_Y, 0.45f, 1.1f),
-                ObjectAnimator.ofFloat(count, View.ALPHA, 0f, 1f),
-                ObjectAnimator.ofFloat(count, View.TRANSLATION_Y, 10f * density, 0f));
-        reveal.setDuration(520L);
+                ObjectAnimator.ofFloat(hero, View.SCALE_X, 0.72f, 1.06f, 1f),
+                ObjectAnimator.ofFloat(hero, View.SCALE_Y, 0.72f, 1.06f, 1f));
+        reveal.setDuration(440L);
         reveal.setInterpolator(new OvershootInterpolator(1.15f));
         reveal.addListener(new AnimatorListenerAdapter() {
             @Override public void onAnimationEnd(Animator animation) {
@@ -162,7 +123,20 @@ public final class LuckyGiftStageAnimator {
             int quantity, int personCount, float density, boolean cannonMode,
             @Nullable Runnable onEnd) {
         List<PointF> seats = new ArrayList<>();
-        if (targets != null) for (PointF p : targets) if (p != null) seats.add(p);
+        if (targets != null) {
+            for (PointF p : targets) {
+                if (p == null || p.x < 0f || p.y < 0f
+                        || p.x > overlay.getWidth() || p.y > overlay.getHeight()) continue;
+                boolean duplicate = false;
+                for (PointF existing : seats) {
+                    if (Math.abs(existing.x - p.x) < 2f && Math.abs(existing.y - p.y) < 2f) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate) seats.add(p);
+            }
+        }
         if (seats.isEmpty()) {
             fadeAndRemove(stage, onEnd);
             return;
@@ -198,8 +172,9 @@ public final class LuckyGiftStageAnimator {
             copy.setElevation(60f * density);
             stage.addView(copy);
 
-            final float endX = Math.max(0f, Math.min(overlay.getWidth() - size, target.x - size / 2f));
-            final float endY = Math.max(0f, Math.min(overlay.getHeight() - size, target.y - size / 2f));
+            // Preserve the exact occupied-seat center; never clamp a target to a fake edge seat.
+            final float endX = target.x - size / 2f;
+            final float endY = target.y - size / 2f;
             final float startX = fromX - size / 2f;
             final float startY = fromY - size / 2f;
             AnimatorSet flight = new AnimatorSet();
@@ -207,9 +182,8 @@ public final class LuckyGiftStageAnimator {
                     ObjectAnimator.ofFloat(copy, View.X, startX, endX),
                     ObjectAnimator.ofFloat(copy, View.Y, startY, endY),
                     ObjectAnimator.ofFloat(copy, View.ALPHA, 0f, 1f, 1f, 0.2f),
-                    ObjectAnimator.ofFloat(copy, View.SCALE_X, 0.68f, 1.14f, 0.82f),
-                    ObjectAnimator.ofFloat(copy, View.SCALE_Y, 0.68f, 1.14f, 0.82f),
-                    ObjectAnimator.ofFloat(copy, View.ROTATION, -14f, 14f, 0f));
+                    ObjectAnimator.ofFloat(copy, View.SCALE_X, 0.88f, 1f, 0.9f),
+                    ObjectAnimator.ofFloat(copy, View.SCALE_Y, 0.88f, 1f, 0.9f));
             flight.setStartDelay(wave * 280L + ((i % seats.size()) / 4) * 65L);
             flight.setDuration(660L);
             flight.setInterpolator(new DecelerateInterpolator(1.35f));
