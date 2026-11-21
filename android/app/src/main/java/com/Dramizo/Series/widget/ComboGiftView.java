@@ -17,7 +17,6 @@ import androidx.annotation.Nullable;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.util.AssetCatalog;
-import com.Dramizo.Series.util.AvatarCosmetics;
 import com.bumptech.glide.Glide;
 
 /**
@@ -69,6 +68,32 @@ public class ComboGiftView extends FrameLayout {
         setClipToPadding(false);
     }
 
+    private void bindSenderAvatar(@Nullable String avatarUrl) {
+        if (avatar == null) return;
+        final int fallback = com.Dramizo.Series.util.ImagePlaceholder.avatar();
+        String raw = avatarUrl != null ? avatarUrl.trim() : "";
+        if (raw.isEmpty()) {
+            try { Glide.with(avatar).clear(avatar); } catch (Exception ignored) {}
+            avatar.setImageResource(fallback);
+            return;
+        }
+        String resolved = AssetCatalog.absoluteUrl(raw);
+        if (resolved == null || resolved.trim().isEmpty()) resolved = raw;
+        avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        avatar.setImageResource(fallback);
+        try {
+            Glide.with(avatar)
+                    .load(resolved)
+                    .placeholder(fallback)
+                    .error(fallback)
+                    .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                    .dontTransform()
+                    .into(avatar);
+        } catch (Exception ignored) {
+            avatar.setImageResource(fallback);
+        }
+    }
+
     public void show(@Nullable String senderName,
                      @Nullable String receiverLabel,
                      @Nullable String senderAvatarUrl,
@@ -108,7 +133,7 @@ public class ComboGiftView extends FrameLayout {
             bg.setImageResource(comboBgForCombo(combo, totalCoins));
         }
         if (avatar != null) {
-            AvatarCosmetics.bindAvatar(avatar, senderAvatarUrl);
+            bindSenderAvatar(senderAvatarUrl);
             avatar.setVisibility(VISIBLE);
         }
         bindGiftIcon(giftIconUrl);
@@ -148,7 +173,7 @@ public class ComboGiftView extends FrameLayout {
         if (xMark != null) xMark.setVisibility(GONE);
         if (bg != null) bg.setImageResource(comboBgForCombo(combo, totalCoins));
         if (avatar != null) {
-            AvatarCosmetics.bindAvatar(avatar, senderAvatarUrl);
+            bindSenderAvatar(senderAvatarUrl);
             avatar.setVisibility(VISIBLE);
         }
         bindGiftIcon(giftIconUrl);
