@@ -1056,6 +1056,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 return;
             }
             micOn = !micOn;
+            // Remember an explicit local mute across seat changes and room UI recreation.
             userChoseMute = !micOn;
             if (roomId != null) viewModel.setMic(roomId, !micOn);
             RoomRtcEngine.getInstance().setMicEnabled(micOn);
@@ -1512,7 +1513,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Toast.makeText(this, isHost ? "أنت المبدع على المايك" : "أنت على المايك الآن", Toast.LENGTH_SHORT).show();
             } else if (!nowOnSeat && wasOnSeat) {
                 micOn = false;
-                userChoseMute = false;
+                // A transient empty seat snapshot must not erase the user's mute choice.
+                // A real seat_left event / room exit resets this flag explicitly.
                 try {
                     RoomRtcEngine.getInstance().setMicEnabled(false);
                     RoomRtcEngine.getInstance().stopPublishing();
@@ -1818,11 +1820,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         ars.setMinimized(false);
         isHost = ars.isHost() || getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
         isAgencyRoom = ars.isAgencyRoom();
-        try {
-            micOn = RoomRtcEngine.getInstance().isMicEnabled();
-        } catch (Exception ignored) {
-            micOn = ars.isMicOn();
-        }
+        // ActiveRoomSession is the durable source across minimize/restore. The RTC
+        // provider may briefly report its startup default before its state is rebound.
+        micOn = ars.isMicOn();
+        userChoseMute = !micOn;
         roomSpeakerMuted = ars.isSpeakerMuted();
         // Preserve the pre-restore roster separately: the next HTTP refresh must not erase
         // the only good copy before we can decide whether an empty response is transient.
@@ -17091,18 +17092,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (moderatorMuted || muted) {
                     RoomSoundFx.playMute(this);
                     micOn = false;
+                    userChoseMute = true;
                     RoomRtcEngine.getInstance().setMicEnabled(false);
                     syncMicUi();
                     if (moderatorMuted) {
                         Toast.makeText(this, "قام مشرف الغرفة بكتم المايك", Toast.LENGTH_SHORT).show();
                     }
-                } else {
-                    // Server unmuted us — restore publish so others can hear again.
+                } else if (moderatorMuted || !userChoseMute) {
+                    // A server unmute may reopen the mic only when the user has not
+                    // explicitly chosen to stay muted.
                     userChoseMute = false;
                     micOn = true;
                     RoomRtcEngine.getInstance().setMicEnabled(true);
                     syncMicUi();
                     activateSeatAudio(currentSeats);
+                } else {
+                    micOn = false;
+                    RoomRtcEngine.getInstance().setMicEnabled(false);
+                    syncMicUi();
                 }
             }
             requestRoomRefresh(true);
@@ -17278,11 +17285,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (!PermissionHelper.hasAudioPermission(this)) {
                     PermissionHelper.ensureMediaPermissions(this, false);
                 }
-                userChoseMute = false;
-                micOn = true;
-                RoomRtcEngine.getInstance().setMicEnabled(true);
-                if (roomId != null) viewModel.setMic(roomId, false);
-                handler.postDelayed(() -> activateSeatAudio(currentSeats), 400);
+                // Approval grants the seat, but must not override a user's existing mute.
+                if (!userChoseMute) {
+                    micOn = true;
+                    RoomRtcEngine.getInstance().setMicEnabled(true);
+                    if (roomId != null) viewModel.setMic(roomId, false);
+                    handler.postDelayed(() -> activateSeatAudio(currentSeats), 400);
+                } else {
+                    micOn = false;
+                    RoomRtcEngine.getInstance().setMicEnabled(false);
+                }
+                syncMicUi();
             }
             if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) viewModel.loadSeatRequests(roomId);
             requestRoomRefresh(true);
