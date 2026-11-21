@@ -6,8 +6,12 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioManager;
+import android.media.AudioRecordingConfiguration;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -58,6 +62,8 @@ public class AuraLiveApp extends Application {
     private boolean roomAudioSuspendedForExternalApp;
     private boolean roomMicWasEnabledBeforeExternalApp;
     @Nullable private String roomMicRoomIdBeforeExternalApp;
+    @Nullable private AudioManager externalCaptureAudioManager;
+    @Nullable private AudioManager.AudioRecordingCallback externalCaptureCallback;
 
     private static final int REQUEST_POST_NOTIFICATIONS = 8104;
     private static final String NOTIFICATION_PERMISSION_PREFS = "jeho_notification_permission";
@@ -82,6 +88,7 @@ public class AuraLiveApp extends Application {
         return startedActivities > 0;
     }
 
+    /** Called only after Android reports that another foreground recorder has silenced JEHO capture. */
     private void suspendRoomAudioForExternalApp() {
         if (roomAudioSuspendedForExternalApp) return;
         RoomRtcEngine rtc = RoomRtcEngine.getInstance();
@@ -93,8 +100,8 @@ public class AuraLiveApp extends Application {
         roomMicRoomIdBeforeExternalApp = activeRoomId;
         roomMicWasEnabledBeforeExternalApp = rtc.isMicEnabled() && rtc.isPublishing();
 
-        // Keep the seat/session connected, but stop local capture before another app
-        // opens its recorder. This also prevents external speech from entering JEHO.
+        // Android has already granted capture priority to the external recorder.
+        // Stop publishing locally so no silent/stale room microphone remains active.
         if (roomMicWasEnabledBeforeExternalApp) {
             rtc.setMicEnabled(false);
             updateRoomMicMutedState(activeRoomId, true);
@@ -132,6 +139,46 @@ public class AuraLiveApp extends Application {
         }
         roomMicWasEnabledBeforeExternalApp = false;
         VoiceRoomForegroundService.refreshAudioForegroundType();
+    }
+
+    /**
+     * Wait for Android to report that JEHO's own microphone capture was silenced
+     * by a higher-priority foreground recorder/call. Merely backgrounding JEHO
+     * must never mute the room microphone.
+     */
+    private void registerExternalCaptureMonitor() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+        AudioManager manager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        if (manager == null) return;
+        externalCaptureAudioManager = manager;
+        externalCaptureCallback = new AudioManager.AudioRecordingCallback() {
+            @Override
+            public void onRecordingConfigChanged(java.util.List<AudioRecordingConfiguration> configs) {
+                if (isAppInForeground() || roomAudioSuspendedForExternalApp) return;
+                RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+                String roomId = rtc.getCurrentRoomId();
+                if (roomId == null || roomId.isEmpty() || !rtc.isInRoom(roomId)) return;
+                boolean captureSilenced = false;
+                if (configs != null) {
+                    for (AudioRecordingConfiguration config : configs) {
+                        if (config != null && config.isClientSilenced()) {
+                            captureSilenced = true;
+                            break;
+                        }
+                    }
+                }
+                if (captureSilenced) {
+                    suspendRoomAudioForExternalApp();
+                }
+            }
+        };
+        try {
+            manager.registerAudioRecordingCallback(
+                    externalCaptureCallback, new Handler(Looper.getMainLooper()));
+        } catch (Throwable t) {
+            android.util.Log.w("AuraLiveApp", "External recorder monitor unavailable: "
+                    + t.getMessage());
+        }
     }
 
     private void updateRoomMicMutedState(@Nullable String roomId, boolean muted) {
@@ -198,6 +245,7 @@ public class AuraLiveApp extends Application {
             com.Dramizo.Series.util.InviteReferralHelper.captureInstallReferrer(this);
         } catch (Exception ignored) {
         }
+        registerExternalCaptureMonitor();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
                 EdgeToEdgeHelper.apply(activity);
@@ -255,7 +303,8 @@ public class AuraLiveApp extends Application {
             @Override public void onActivityStopped(Activity activity) {
                 startedActivities = Math.max(0, startedActivities - 1);
                 if (foregroundActivity == activity) foregroundActivity = null;
-                if (startedActivities == 0) suspendRoomAudioForExternalApp();
+                // Do not stop the room microphone just because Home was pressed.
+                // External handoff is triggered only by Android's capture-silenced callback.
             }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
             @Override public void onActivityDestroyed(Activity activity) {}
