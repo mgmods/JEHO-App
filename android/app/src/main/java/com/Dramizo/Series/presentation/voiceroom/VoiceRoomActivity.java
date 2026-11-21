@@ -5168,19 +5168,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         final List<String> recipients = new ArrayList<>(unique);
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        markLuckyOverlayActive(1500L);
-        Runnable launch = () -> {
-            if (binding == null || binding.giftOverlay == null) return;
-            List<PointF> destinations = resolveMicCenters(recipients);
-            if (destinations.isEmpty()) return;
-            // Cannon gift reveal must be centered in the actual gift overlay,
-            // never anchored to a seat or pushed toward a screen edge.
-            // The stage animator's null revealCenter resolves to overlay width/2, height/2.
-            com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
-                    binding.giftOverlay, icon, destinations, totalCoins,
-                    Math.max(1, quantity), Math.max(1, recipients.size()),
-                    resolveLuckyGiftRevealCenter(), null, null);
-        };
+        markLuckyOverlayActive(2800L);
+        Runnable launch = () -> launchLuckyGiftScatter(
+                icon, recipients, totalCoins, quantity, recipients.size(), null, 0);
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
         } else {
@@ -12336,7 +12326,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         for (String uid : userIds) {
             if (uid == null || uid.isEmpty()) continue;
             View seat = findSeatViewForUser(uid);
-            if (seat == null) continue;
+            // A holder can exist before RecyclerView finishes measuring it. A
+            // zero-size seat resolves to the overlay origin and sends the gift
+            // toward an edge, so let the bounded retry wait for real bounds.
+            if (seat == null || seat.getWidth() <= 0 || seat.getHeight() <= 0) continue;
             android.graphics.PointF p =
                     GiftFlyAnimator.centerInOverlay(binding.giftOverlay, seat);
             if (p != null) targets.add(p);
@@ -12416,30 +12409,44 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        markLuckyOverlayActive(1500L);
+        markLuckyOverlayActive(2800L);
         Runnable launch = () -> {
             if (binding == null || binding.giftOverlay == null) return;
-            List<PointF> destinations = resolveMicCenters(ids);
-            if (destinations.isEmpty()) return;
-            PointF from = resolveLuckyGiftRevealCenter();
-            if (from == null) {
-                int w = Math.max(binding.giftOverlay.getWidth(), 1);
-                int h = Math.max(binding.giftOverlay.getHeight(), 1);
-                from = new PointF(w / 2f, h * 0.40f);
-            }
-            // Lucky gifts must first appear as one hero exactly at the room center.
-            // The old flyTogether path immediately created seat-bound copies, making
-            // the gift look as if it spawned at the edge when a target seat was there.
-            com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
-                    binding.giftOverlay, giftIconUrl, destinations, coinsSpent,
-                    Math.max(1, quantity), Math.max(1, personCount),
-                    from, onScatterStart, null);
+            launchLuckyGiftScatter(
+                    giftIconUrl, ids, coinsSpent, quantity, personCount, onScatterStart, 0);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
         } else {
             launch.run();
         }
+    }
+
+    /**
+     * Resolve the exact requested occupied seats after RecyclerView has attached
+     * their holders. A short bounded retry prevents silently dropping the scatter
+     * when the room event arrives during a seat-grid refresh.
+     */
+    private void launchLuckyGiftScatter(@Nullable String icon,
+                                        @NonNull List<String> recipientIds,
+                                        long coinsSpent, int quantity, int personCount,
+                                        @Nullable Runnable onScatterStart, int attempt) {
+        if (binding == null || binding.giftOverlay == null || recipientIds.isEmpty()) return;
+        List<PointF> destinations = resolveMicCenters(recipientIds);
+        if (destinations.size() < recipientIds.size() && attempt < 6) {
+            View retryHost = binding.recyclerSeats != null ? binding.recyclerSeats : binding.giftOverlay;
+            retryHost.postDelayed(() -> launchLuckyGiftScatter(
+                    icon, recipientIds, coinsSpent, quantity, personCount, onScatterStart, attempt + 1),
+                    110L);
+            return;
+        }
+        if (destinations.isEmpty()) return;
+        // Keep the already-verified hero position unchanged; only the outgoing
+        // copies travel to the selected occupied seats.
+        com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
+                binding.giftOverlay, icon, destinations, coinsSpent,
+                Math.max(1, quantity), Math.max(1, personCount),
+                resolveLuckyGiftRevealCenter(), onScatterStart, null);
     }
 
     /** Center → clone → mics for regular all-mic gift sends. */
