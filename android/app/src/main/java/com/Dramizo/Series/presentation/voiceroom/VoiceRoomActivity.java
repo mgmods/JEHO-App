@@ -4253,18 +4253,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // must remain unchanged while the Activity is hidden and recreated.
         ensureMinimizedListeningState();
         captureActiveRoomSession();
-        // Handoff: fade Exo to FGS, keep Zego local music alive, then leave UI.
-        try {
-            if (roomMusicPlayer != null
-                    && "playing".equalsIgnoreCase(currentMusicStatus)
-                    && currentMusicUrl != null
-                    && !currentMusicUrl.isEmpty()
-                    && !isLocalMusicUrl(currentMusicUrl)) {
-                // Avoid dual play: FGS will take over; dip volume briefly then finish.
-                roomMusicPlayer.setVolume(0.35f);
-            }
-        } catch (Exception ignored) {
-        }
+        // Keep the Activity player at full volume during handoff. The foreground
+        // player is checked for actual playback below; only then do we cross-fade.
+        // Dimming here caused an audible drop (and sounded like a music interruption)
+        // whenever background preparation took longer than expected.
         try {
             if (canManageMusic
                     && currentMusicUrl != null
@@ -4302,6 +4294,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             minimizeHandoffPending = false;
             minimizing = false;
             ActiveRoomSession.get().setMinimized(false);
+            // The background decoder did not take over. Keep the original Activity
+            // player running at its normal level before stopping the FGS owner.
+            try {
+                if (roomMusicPlayer != null) roomMusicPlayer.setVolume(1f);
+            } catch (Exception ignored) {
+            }
             try { VoiceRoomForegroundService.attachUi(this); } catch (RuntimeException ignored) {}
             ensureMinimizedListeningState();
             Toast.makeText(getApplicationContext(),
