@@ -717,8 +717,16 @@ public class VoiceRoomForegroundService extends Service {
         PendingIntent micIntent = serviceAction(ACTION_TOGGLE_MIC, 7305);
         PendingIntent speakerIntent = serviceAction(ACTION_TOGGLE_SPEAKER, 7306);
 
-        boolean micOn = RoomRtcEngine.getInstance().isMicEnabled();
-        boolean speakerOn = !RoomRtcEngine.getInstance().isSpeakerMuted();
+        android.content.SharedPreferences audioPrefs =
+                getSharedPreferences("voice_room_audio", MODE_PRIVATE);
+        boolean micOn = roomId != null && !roomId.isEmpty()
+                ? !audioPrefs.getBoolean("user_chose_mute_" + roomId,
+                        !RoomRtcEngine.getInstance().isMicEnabled())
+                : RoomRtcEngine.getInstance().isMicEnabled();
+        boolean speakerOn = roomId != null && !roomId.isEmpty()
+                ? !audioPrefs.getBoolean("speaker_muted_" + roomId,
+                        RoomRtcEngine.getInstance().isSpeakerMuted())
+                : !RoomRtcEngine.getInstance().isSpeakerMuted();
         String title = roomTitle != null && !roomTitle.isEmpty()
                 ? roomTitle : getString(R.string.voice_room);
 
@@ -986,6 +994,16 @@ public class VoiceRoomForegroundService extends Service {
             AppContainer container = ((AuraLiveApp) getApplication()).getContainer();
             container.getIoExecutor().execute(() ->
                     container.getRoomRepository().leave(leavingRoom));
+        }
+        // Notification "Exit" is a real room leave: stop capture and all local
+        // music/audio before disconnecting either RTC provider.
+        try {
+            RoomRtcEngine.getInstance().setMicEnabled(false);
+            RoomRtcEngine.getInstance().setSpeakerMuted(true);
+            RoomRtcEngine.getInstance().stopLocalMusic();
+            com.Dramizo.Series.util.RoomSoundFx.setMuted(true);
+            com.Dramizo.Series.util.GiftAudioFx.resetRoomGiftSounds();
+        } catch (Exception ignored) {
         }
         RoomRtcEngine.getInstance().logoutRoom();
         com.Dramizo.Series.util.ActiveRoomSession.get().clear();
