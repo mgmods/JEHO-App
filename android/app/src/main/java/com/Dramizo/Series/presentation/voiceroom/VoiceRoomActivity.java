@@ -386,6 +386,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean exiting;
     /** True when user minimized to Main — keep Zego/realtime, don't tear room down. */
     private boolean minimizing;
+    private boolean minimizeHandoffPending;
     /** Mikoo-style: leave/logout runs once; onDestroy must not repeat it. */
     private boolean roomTeardownDone;
     /** Speaker was muted by us because the app went to background (WhatsApp / Home). */
@@ -4279,14 +4280,60 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         } catch (Exception ignored) {
         }
+        // Wait for the foreground player to be READY before releasing the Activity player.
+        // This is a media handoff, not an arbitrary sleep: it avoids cutting the song on minimize.
+        minimizeHandoffPending = true;
+        completeRoomMinimizeWhenMusicReady(System.currentTimeMillis());
+    }
+
+    private void completeRoomMinimizeWhenMusicReady(long startedAtMs) {
+        if (!minimizeHandoffPending || isFinishing() || exiting) return;
+        boolean needsMediaHandoff = "playing".equalsIgnoreCase(currentMusicStatus)
+                && currentMusicUrl != null && !currentMusicUrl.isEmpty()
+                && !isLocalMusicUrl(currentMusicUrl);
+        if (needsMediaHandoff
+                && !VoiceRoomForegroundService.isMusicHandoffReady(roomId, currentMusicUrl)) {
+            if (System.currentTimeMillis() - startedAtMs < 1_600L) {
+                handler.postDelayed(() -> completeRoomMinimizeWhenMusicReady(startedAtMs), 30L);
+                return;
+            }
+            // Keep the room visible and its original player alive if the background player
+            // cannot prepare the same track. Never trade a failed handoff for silence.
+            minimizeHandoffPending = false;
+            minimizing = false;
+            ActiveRoomSession.get().setMinimized(false);
+            try { VoiceRoomForegroundService.attachUi(this); } catch (RuntimeException ignored) {}
+            ensureMinimizedListeningState();
+            Toast.makeText(getApplicationContext(),
+                    "تعذر تجهيز الموسيقى بالخلفية؛ بقيت الغرفة مفتوحة حتى لا ينقطع الصوت",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+
         Toast.makeText(getApplicationContext(), R.string.room_minimized_audio_continues,
                 Toast.LENGTH_SHORT).show();
-        // Keep a short handoff window for the foreground media service, then leave the UI.
-        // Do not remove this completely: it protects the active music stream from a cutout.
-        handler.postDelayed(() -> {
-            if (isFinishing() || exiting) return;
+        if (needsMediaHandoff && roomMusicPlayer != null) {
+            final ExoPlayer player = roomMusicPlayer;
+            ValueAnimator fade = ValueAnimator.ofFloat(player.getVolume(), 0f);
+            fade.setDuration(100L);
+            fade.addUpdateListener(animation -> {
+                if (roomMusicPlayer == player) {
+                    player.setVolume((float) animation.getAnimatedValue());
+                }
+            });
+            fade.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(android.animation.Animator animation) {
+                    if (minimizeHandoffPending && !isFinishing() && !exiting) {
+                        minimizeHandoffPending = false;
+                        navigateHomeAndFinish();
+                    }
+                }
+            });
+            fade.start();
+        } else {
+            minimizeHandoffPending = false;
             navigateHomeAndFinish();
-        }, 160L);
+        }
     }
 
     /**
