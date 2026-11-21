@@ -278,6 +278,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (isBlank(seat.user.levelBadgeUrl) && !isBlank(prev.levelBadgeUrl)) {
                 seat.user.levelBadgeUrl = prev.levelBadgeUrl;
             }
+            if (isBlank(seat.user.voiceWaveUrl) && !isBlank(prev.voiceWaveUrl)) {
+                seat.user.voiceWaveUrl = prev.voiceWaveUrl;
+            }
             if (isBlank(seat.user.displayName) && !isBlank(prev.displayName)) {
                 seat.user.displayName = prev.displayName;
             }
@@ -329,6 +332,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && Objects.equals(a.user.profileCardUrl, b.user.profileCardUrl)
                 && Objects.equals(a.user.chatBubbleUrl, b.user.chatBubbleUrl)
                 && Objects.equals(a.user.nameplateUrl, b.user.nameplateUrl)
+                && Objects.equals(a.user.voiceWaveUrl, b.user.voiceWaveUrl)
                 && Objects.equals(a.user.levelBadgeUrl, b.user.levelBadgeUrl)
                 && Objects.equals(a.user.nameStyle, b.user.nameStyle)
                 && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.label,
@@ -553,6 +557,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 if ("speaking".equals(p)) {
                     // Re-sync bound id: payload-only binds can otherwise drop waves forever.
                     if (userId != null) holder.boundUserId = userId;
+                    holder.voiceWaveUrl = seat.user != null ? seat.user.voiceWaveUrl : null;
                     boolean match = userId != null
                             && speakingUsers.contains(userId)
                             && !activeReactions.containsKey(userId);
@@ -633,6 +638,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (seat == null) return;
         String userId = seatUserId(seat);
         holder.boundUserId = userId;
+        holder.voiceWaveUrl = seat.user != null ? seat.user.voiceWaveUrl : null;
         Context ctx = holder.itemView.getContext();
         holder.b.getRoot().setOnClickListener(v -> {
             if (listener == null) return;
@@ -1393,6 +1399,16 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             stopSpeakingRipples(holder);
             return;
         }
+        String waveUrl = holder.voiceWaveUrl;
+        if (holder.b.imgVoiceWave != null) {
+            if (waveUrl != null && !waveUrl.trim().isEmpty()) {
+                holder.b.imgVoiceWave.setVisibility(View.VISIBLE);
+                Glide.with(holder.itemView).load(waveUrl).into(holder.b.imgVoiceWave);
+            } else {
+                holder.b.imgVoiceWave.setVisibility(View.GONE);
+                Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+            }
+        }
         // Only while this bind is actually speaking (sound-level driven).
         holder.speaking = true;
         if (holder.b.seatSpeakAura != null) {
@@ -1420,6 +1436,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         holder.speaking = false;
         if (holder.b.seatSpeakAura != null) {
             holder.b.seatSpeakAura.setSpeaking(false);
+        }
+        if (holder.b.imgVoiceWave != null) {
+            holder.b.imgVoiceWave.setVisibility(View.GONE);
+            Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
         }
         stopRipple(holder.b.seatRippleOuter);
         stopRipple(holder.b.seatRippleMid);
@@ -1473,6 +1493,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     public void onViewRecycled(@NonNull VH holder) {
         cancelReaction(holder.boundUserId);
         holder.boundUserId = null;
+        holder.voiceWaveUrl = null;
         holder.lastGiftCoins = Long.MIN_VALUE;
         // Do NOT pause HostSignalView here — grid refresh recycles often and left frames frozen.
         stopSpeakingRipples(holder);
@@ -1526,6 +1547,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     static class VH extends RecyclerView.ViewHolder {
         final ItemSeatBinding b;
         String boundUserId;
+        String voiceWaveUrl;
         boolean speaking;
         long lastGiftCoins = Long.MIN_VALUE;
 
