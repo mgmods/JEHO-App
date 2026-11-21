@@ -112,7 +112,7 @@ public final class RoomAudioSession {
         Context app = appContext.get();
         if (app == null) return;
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!externalRecordingActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 AudioAttributes attrs = new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -149,7 +149,6 @@ public final class RoomAudioSession {
         if (context == null) return;
         Context app = context.getApplicationContext();
         appContext = new WeakReference<>(app);
-        startExternalRecordingMonitor(app);
         AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) return;
         try {
@@ -164,16 +163,17 @@ public final class RoomAudioSession {
                         .setWillPauseWhenDucked(false)
                         .build();
                 am.requestAudioFocus(focusRequest);
-            } else {
+            } else if (!externalRecordingActive) {
                 am.requestAudioFocus(
                         null,
                         AudioManager.STREAM_VOICE_CALL,
                         AudioManager.AUDIOFOCUS_GAIN);
+                focusHeld = true;
+                am.setMode(AudioManager.MODE_IN_COMMUNICATION);
             }
-            focusHeld = true;
-            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
         } catch (Throwable ignored) {
         }
+        startExternalRecordingMonitor(app);
     }
 
     public static void release(@Nullable Context context) {
