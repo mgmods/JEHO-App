@@ -4974,7 +4974,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding == null || binding.comboGiftView == null) return;
         String giftName = luckyCannonGiftName != null && !luckyCannonGiftName.isEmpty()
                 ? luckyCannonGiftName : "هدية حظ";
-        binding.comboGiftView.showCannonLive("أنت", giftName, null,
+        AuthDtos.UserDto self = ContainerProvider.from(this).getSessionManager().getUser();
+        String senderAvatar = self != null ? self.avatarUrl
+                : ContainerProvider.from(this).getSessionManager().getAvatarUrl();
+        binding.comboGiftView.showCannonLive("أنت", giftName, senderAvatar,
                 luckyCannonGiftIcon, Math.max(1, count), 0);
         if (!live) binding.comboGiftView.finishCannonLive(2200L);
     }
@@ -16937,25 +16940,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (cannonLaunch) {
                 // The canonical room event starts the combo toast only after the release-time
                 // batch has been accepted by the server. X counts sent units, never lucky payout.
-                if (!localSenderEcho && binding != null && binding.comboGiftView != null) {
-                    final String comboKey = sender != null && !sender.isEmpty() ? sender : "unknown";
-                    final int liveCount = Math.max(1,
-                            luckyCannonRemoteComboCounts.containsKey(comboKey)
-                                    ? luckyCannonRemoteComboCounts.get(comboKey) + Math.max(1, qtyRemote)
-                                    : Math.max(1, qtyRemote));
-                    luckyCannonRemoteComboCounts.put(comboKey, liveCount);
-                    binding.comboGiftView.showCannonLive(sender, name, senderAvatar,
-                            icon, liveCount, totalCoins);
-                    handler.postDelayed(() -> {
-                        Integer current = luckyCannonRemoteComboCounts.get(comboKey);
-                        if (current != null && current == liveCount) {
-                            luckyCannonRemoteComboCounts.remove(comboKey);
-                            if (binding != null && binding.comboGiftView != null) {
-                                binding.comboGiftView.finishCannonLive(2200L);
-                            }
-                        }
-                    }, 350L);
-                }
+                // The animated X counter is sender-local only. Other room members still
+                // receive the cannon gift flight below, but never get a sender counter.
                 long perSeatSupport = allReceivers.isEmpty()
                         ? 0L : Math.max(0L, totalCoins / allReceivers.size());
                 if (perSeatSupport > 0L) {
