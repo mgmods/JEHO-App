@@ -68,6 +68,8 @@ public class AgencyWithdrawActivity extends ThemedActivity {
     private TextInputLayout tilAccount;
     private TextInputEditText etAccount;
     private MaterialButton btnSubmit;
+    @Nullable private LinearLayout rowMethodPicker;
+    @Nullable private RecyclerView recycler;
     private PackageAdapter packageAdapter;
 
     public static Intent intent(
@@ -107,13 +109,13 @@ public class AgencyWithdrawActivity extends ThemedActivity {
         tvEmptyPackages = findViewById(R.id.tvEmptyPackages);
         TextView tvBalance = findViewById(R.id.tvBalance);
         TextView tvMin = findViewById(R.id.tvMin);
-        LinearLayout rowMethodPicker = findViewById(R.id.rowMethodPicker);
+        rowMethodPicker = findViewById(R.id.rowMethodPicker);
         tvMethodLabel = findViewById(R.id.tvMethodLabel);
         tvSelectedAmount = findViewById(R.id.tvSelectedAmount);
         tilAccount = findViewById(R.id.tilAccount);
         etAccount = findViewById(R.id.etAccount);
         btnSubmit = findViewById(R.id.btnSubmit);
-        RecyclerView recycler = findViewById(R.id.recyclerPackages);
+        recycler = findViewById(R.id.recyclerPackages);
 
         if (btnBack != null) btnBack.setOnClickListener(v -> finish());
         if (tvTitle != null) {
