@@ -4281,11 +4281,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         Toast.makeText(getApplicationContext(), R.string.room_minimized_audio_continues,
                 Toast.LENGTH_SHORT).show();
-        // Small delay so FGS can start mediaPlayback before Activity releases Exo.
+        // Keep a short handoff window for the foreground media service, then leave the UI.
+        // Do not remove this completely: it protects the active music stream from a cutout.
         handler.postDelayed(() -> {
             if (isFinishing() || exiting) return;
             navigateHomeAndFinish();
-        }, 280L);
+        }, 160L);
     }
 
     /**
