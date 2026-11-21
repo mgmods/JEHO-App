@@ -44,11 +44,11 @@ public class CosmeticsActivity extends ThemedActivity {
     public static final String EXTRA_ROOM_ID = "room_id";
     static final String[] TYPES = {
             "vip_badge", "entry_effect", "room_card", "room_background",
-            "profile_card", "chat_bubble", "nameplate"
+            "profile_card", "chat_bubble", "nameplate", "voice_wave"
     };
     private static final String[] TITLES = {
             "الإطارات", "تأثيرات الدخول", "بطاقات الغرف", "خلفيات الغرف",
-            "إطارات الملف", "فقاعات الدردشة", "بطاقات الأسماء"
+            "إطارات الملف", "فقاعات الدردشة", "بطاقات الأسماء", "الموجات الصوتية"
     };
 
     private CosmeticsViewModel vm;
