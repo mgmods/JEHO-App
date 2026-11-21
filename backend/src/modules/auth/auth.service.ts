@@ -665,6 +665,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
         coverUrl: profile.coverUrl,
+        voiceWaveUrl: profile.voiceWaveUrl ?? null,
         bio: profile.bio,
         gender: user.gender,
         birthday: user.birthday,
