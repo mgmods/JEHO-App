@@ -900,6 +900,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         setSeatSize(holder.b.imgSeatShell, avatar, ctx);
         setSeatSize(holder.b.imgAvatar, avatar, ctx);
+        setSeatSize(holder.b.imgVoiceWave, avatar, ctx);
         setSeatSize(holder.b.imgFrame, frame, ctx);
         setSeatSize(holder.b.imgHostBadge, frame, ctx);
         if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, scaleMode == SCALE_MICRO ? 20 : 30, ctx);
@@ -1403,7 +1404,19 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (holder.b.imgVoiceWave != null) {
             if (waveUrl != null && !waveUrl.trim().isEmpty()) {
                 holder.b.imgVoiceWave.setVisibility(View.VISIBLE);
-                Glide.with(holder.itemView).load(waveUrl).into(holder.b.imgVoiceWave);
+                holder.b.imgVoiceWave.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                holder.b.imgVoiceWave.setClipToOutline(true);
+                holder.b.imgVoiceWave.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                    @Override public void getOutline(View v, android.graphics.Outline outline) {
+                        outline.setOval(0, 0, Math.max(1, v.getWidth()), Math.max(1, v.getHeight()));
+                    }
+                });
+                Glide.with(holder.itemView)
+                        .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim()))
+                        .fitCenter()
+                        .dontAnimate()
+                        .into(holder.b.imgVoiceWave);
+                startVoiceWaveMotion(holder.b.imgVoiceWave);
             } else {
                 holder.b.imgVoiceWave.setVisibility(View.GONE);
                 Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
@@ -1432,12 +1445,38 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
     }
 
+    private void startVoiceWaveMotion(@Nullable View wave) {
+        if (wave == null) return;
+        wave.animate().cancel();
+        wave.setScaleX(1f);
+        wave.setScaleY(1f);
+        wave.setAlpha(0.94f);
+        android.animation.ValueAnimator animator =
+                android.animation.ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(720L);
+        animator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        animator.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+        animator.addUpdateListener(a -> {
+            float t = (Float) a.getAnimatedValue();
+            float scale = 0.96f + (0.07f * t);
+            wave.setScaleX(scale);
+            wave.setScaleY(scale);
+            wave.setAlpha(0.88f + (0.12f * t));
+        });
+        wave.setTag(R.id.imgVoiceWave, animator);
+        animator.start();
+    }
+
     private void stopSpeakingRipples(VH holder) {
         holder.speaking = false;
         if (holder.b.seatSpeakAura != null) {
             holder.b.seatSpeakAura.setSpeaking(false);
         }
         if (holder.b.imgVoiceWave != null) {
+            holder.b.imgVoiceWave.animate().cancel();
+            holder.b.imgVoiceWave.setScaleX(1f);
+            holder.b.imgVoiceWave.setScaleY(1f);
+            holder.b.imgVoiceWave.setAlpha(1f);
             holder.b.imgVoiceWave.setVisibility(View.GONE);
             Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
         }
