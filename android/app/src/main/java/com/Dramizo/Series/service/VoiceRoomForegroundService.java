@@ -68,7 +68,31 @@ public class VoiceRoomForegroundService extends Service {
     private String roomTitle;
     private String roomCoverUrl;
     private ExoPlayer musicPlayer;
+    private static volatile VoiceRoomForegroundService activeInstance;
+    private static volatile ExoPlayer offeredMusicPlayer;
+    private static volatile String offeredRoomId;
+    private static volatile String offeredMusicUrl;
+    private static volatile String offeredPlayableUrl;
+    private static volatile String offeredMusicStatus;
+    private static volatile String returnedMusicSourceUrl;
+    private static volatile String returnedMusicPlayableUrl;
+    private final Player.Listener musicStateListener = new Player.Listener() {
+        @Override public void onPlaybackStateChanged(int playbackState) {
+            if (playbackState == Player.STATE_READY
+                    && "playing".equalsIgnoreCase(activeMusicStatus)
+                    && musicPlayer != null && musicPlayer.getPlayWhenReady()) handoffMusicReady = true;
+        }
+        @Override public void onIsPlayingChanged(boolean isPlaying) {
+            handoffMusicPlaying = isPlaying;
+            if (isPlaying) handoffMusicReady = true;
+        }
+        @Override public void onPlayerError(androidx.media3.common.PlaybackException error) {
+            handoffMusicReady = false;
+            handoffMusicPlaying = false;
+        }
+    };
     private String activeMusicUrl;
+    private String activeMusicPlayableUrl;
     private String activeMusicStatus;
     private boolean musicResolveInProgress;
     private static volatile String handoffRoomId;
@@ -131,6 +155,17 @@ public class VoiceRoomForegroundService extends Service {
                         long position = number(payload, "positionMs");
                         String startedAt = string(payload, "startedAt");
                         main.post(() -> applyMusic(url, status, position, startedAt));
+                        return;
+                    }
+                    if ("room:music_volume".equals(event)) {
+                        float volume = 1f;
+                        try {
+                            if (payload != null && payload.has("volume") && !payload.get("volume").isJsonNull()) {
+                                volume = payload.get("volume").getAsFloat();
+                            }
+                        } catch (Exception ignored) { }
+                        final float nextVolume = Math.max(0f, Math.min(1f, volume));
+                        main.post(() -> { if (musicPlayer != null) musicPlayer.setVolume(nextVolume); });
                         return;
                     }
                     if ("room:summon".equals(event)) {
@@ -379,28 +414,87 @@ public class VoiceRoomForegroundService extends Service {
 
     @Override public void onCreate() {
         super.onCreate();
+        activeInstance = this;
         musicPlayer = new ExoPlayer.Builder(this).build();
-        musicPlayer.addListener(new Player.Listener() {
-            @Override public void onPlaybackStateChanged(int playbackState) {
-                if (playbackState == Player.STATE_READY
-                        && "playing".equalsIgnoreCase(activeMusicStatus)
-                        && musicPlayer != null && musicPlayer.getPlayWhenReady()) {
-                    handoffMusicReady = true;
-                }
-            }
-
-            @Override public void onIsPlayingChanged(boolean isPlaying) {
-                handoffMusicPlaying = isPlaying;
-                if (isPlaying) handoffMusicReady = true;
-            }
-
-            @Override public void onPlayerError(androidx.media3.common.PlaybackException error) {
-                handoffMusicReady = false;
-                handoffMusicPlaying = false;
-            }
-        });
+        musicPlayer.addListener(musicStateListener);
     }
 
+    /** Offer the room's existing decoder to the foreground service without preparing a second player. */
+    public static void offerMusicPlayer(@Nullable ExoPlayer player, @Nullable String targetRoomId,
+            @Nullable String sourceMusicUrl, @Nullable String playableMusicUrl, @Nullable String targetStatus) {
+        if (player == null) return;
+        offeredMusicPlayer = player;
+        offeredRoomId = targetRoomId;
+        offeredMusicUrl = sourceMusicUrl;
+        offeredPlayableUrl = playableMusicUrl;
+        offeredMusicStatus = targetStatus;
+    }
+
+    public static void cancelOfferedMusicPlayer(@Nullable ExoPlayer player) {
+        if (player != null && offeredMusicPlayer == player) {
+            offeredMusicPlayer = null;
+            offeredRoomId = null;
+            offeredMusicUrl = null;
+            offeredPlayableUrl = null;
+            offeredMusicStatus = null;
+        }
+    }
+
+    private boolean adoptOfferedMusicPlayer() {
+        ExoPlayer offered = offeredMusicPlayer;
+        if (offered == null) return false;
+        String targetRoom = offeredRoomId;
+        String targetUrl = offeredMusicUrl;
+        String playableUrl = offeredPlayableUrl;
+        String targetStatus = offeredMusicStatus;
+        offeredMusicPlayer = null;
+        offeredRoomId = null;
+        offeredMusicUrl = null;
+        offeredPlayableUrl = null;
+        offeredMusicStatus = null;
+        if (musicPlayer != null && musicPlayer != offered) {
+            try { musicPlayer.removeListener(musicStateListener); } catch (Exception ignored) {}
+            try { musicPlayer.release(); } catch (Exception ignored) {}
+        }
+        musicPlayer = offered;
+        musicPlayer.addListener(musicStateListener);
+        activeMusicUrl = targetUrl;
+        activeMusicPlayableUrl = playableUrl;
+        activeMusicStatus = targetStatus;
+        handoffRoomId = targetRoom;
+        handoffMusicUrl = playableUrl;
+        handoffMusicReady = musicPlayer.getPlaybackState() == Player.STATE_READY;
+        handoffMusicPlaying = musicPlayer.isPlaying();
+        return true;
+    }
+
+    /** Return the exact same decoder to the room Activity when the user reopens the room. */
+    @Nullable
+    public static ExoPlayer takeMusicPlayerForUi() {
+        VoiceRoomForegroundService service = activeInstance;
+        if (service == null || service.musicPlayer == null) return null;
+        ExoPlayer player = service.musicPlayer;
+        returnedMusicSourceUrl = service.activeMusicUrl;
+        returnedMusicPlayableUrl = service.activeMusicPlayableUrl;
+        try { player.removeListener(service.musicStateListener); } catch (Exception ignored) {}
+        service.musicPlayer = null;
+        handoffMusicReady = false;
+        handoffMusicPlaying = false;
+        service.stopSelf();
+        return player;
+    }
+
+    @Nullable public static String consumeReturnedMusicSourceUrl() {
+        String value = returnedMusicSourceUrl;
+        returnedMusicSourceUrl = null;
+        return value;
+    }
+
+    @Nullable public static String consumeReturnedMusicPlayableUrl() {
+        String value = returnedMusicPlayableUrl;
+        returnedMusicPlayableUrl = null;
+        return value;
+    }
     /** True only after the background ExoPlayer has prepared the exact requested track. */
     public static boolean isMusicHandoffReady(String requestedRoomId, String requestedMusicUrl) {
         return requestedRoomId != null && requestedRoomId.equals(handoffRoomId)
@@ -459,6 +553,7 @@ public class VoiceRoomForegroundService extends Service {
             return START_NOT_STICKY;
         }
         stopping = false;
+        boolean adoptedMusicPlayer = adoptOfferedMusicPlayer();
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString(EXTRA_ROOM_ID, roomId)
                 .putString(EXTRA_TITLE, roomTitle)
@@ -476,11 +571,13 @@ public class VoiceRoomForegroundService extends Service {
         RealtimeClient.getInstance().addRoomListener(realtimeListener);
         main.removeCallbacks(renewToken);
         main.post(renewToken);
-        applyMusic(
-                intent.getStringExtra(EXTRA_MUSIC_URL),
-                intent.getStringExtra(EXTRA_MUSIC_STATUS),
-                intent.getLongExtra(EXTRA_MUSIC_POSITION, 0L),
-                intent.getStringExtra(EXTRA_MUSIC_STARTED_AT));
+        if (!adoptedMusicPlayer || musicPlayer == null || musicPlayer.getMediaItemCount() == 0) {
+            applyMusic(
+                    intent.getStringExtra(EXTRA_MUSIC_URL),
+                    intent.getStringExtra(EXTRA_MUSIC_STATUS),
+                    intent.getLongExtra(EXTRA_MUSIC_POSITION, 0L),
+                    intent.getStringExtra(EXTRA_MUSIC_STARTED_AT));
+        }
         return START_STICKY;
     }
 
@@ -759,6 +856,7 @@ public class VoiceRoomForegroundService extends Service {
                 && url.regionMatches(true, 0, "local://", 0, 8);
         if (url == null || url.isEmpty() || "stopped".equalsIgnoreCase(playStatus) || localMix) {
             activeMusicUrl = url;
+            activeMusicPlayableUrl = null;
             activeMusicStatus = playStatus;
             musicResolveInProgress = false;
             handoffRoomId = roomId;
@@ -780,6 +878,32 @@ public class VoiceRoomForegroundService extends Service {
             } catch (Exception ignored) {
             }
             return;
+        }
+
+        // Same source track: apply pause/resume/seek to the existing decoder instead
+        // of replacing its MediaItem (which would restart audio during minimize).
+        boolean sameSourceTrack = url.equals(activeMusicUrl) && musicPlayer.getMediaItemCount() > 0;
+        if (sameSourceTrack) {
+            activeMusicStatus = playStatus;
+            if ("paused".equalsIgnoreCase(playStatus)) {
+                musicPlayer.pause();
+                handoffMusicPlaying = false;
+                return;
+            }
+            if ("playing".equalsIgnoreCase(playStatus)) {
+                long target = Math.max(0L, positionMs);
+                if (startedAt != null) {
+                    try {
+                        target += Math.max(0L, System.currentTimeMillis()
+                                - java.time.Instant.parse(startedAt).toEpochMilli());
+                    } catch (Exception ignored) { }
+                }
+                if (target > 0L && Math.abs(musicPlayer.getCurrentPosition() - target) > 2500L) {
+                    musicPlayer.seekTo(target);
+                }
+                musicPlayer.play();
+                return;
+            }
         }
 
         // onUserLeaveHint, the minimize click and onStop can all request the same
@@ -842,6 +966,7 @@ public class VoiceRoomForegroundService extends Service {
         try {
             handoffMusicReady = false;
             handoffMusicPlaying = false;
+            activeMusicPlayableUrl = absolute;
             musicPlayer.setMediaItem(MediaItem.fromUri(absolute));
             musicPlayer.prepare();
             long target = Math.max(0L, positionMs);
@@ -914,16 +1039,19 @@ public class VoiceRoomForegroundService extends Service {
     private void stopBackgroundOwner(boolean clearPrefs) {
         if (clearPrefs) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().clear().apply();
+            detachBackgroundOwner();
+            stopSelf();
+        } else {
+            // The room UI is visible again. Keep the current decoder running until
+            // setupMusicUi() claims this exact player; do not stop/recreate the song.
+            main.removeCallbacks(renewToken);
+            RealtimeClient.getInstance().removeRoomListener(realtimeListener);
+            RoomRtcEngine.getInstance().removeRoomListener(rtcListener);
         }
-        detachBackgroundOwner();
         NotificationManagerCompat.from(this).cancel(BUBBLE_NOTIFICATION_ID);
         NotificationManagerCompat.from(this).cancel(SUMMON_NOTIFICATION_ID);
         NotificationManagerCompat.from(this).cancel(SEAT_INVITE_NOTIFICATION_ID);
-        try {
-            stopForeground(STOP_FOREGROUND_REMOVE);
-        } catch (Exception ignored) {
-        }
-        stopSelf();
+        try { stopForeground(STOP_FOREGROUND_REMOVE); } catch (Exception ignored) {}
     }
 
     private void detachBackgroundOwner() {
@@ -965,6 +1093,7 @@ public class VoiceRoomForegroundService extends Service {
 
     @Override
     public void onDestroy() {
+        if (activeInstance == this) activeInstance = null;
         detachBackgroundOwner();
         if (musicPlayer != null) {
             try {

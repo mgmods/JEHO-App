@@ -571,15 +571,24 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                         }
                     }
                 } else if ("speak_level".equals(p)) {
-                    if (userId != null && speakingUsers.contains(userId)
-                            && holder.b.seatSpeakAura != null) {
+                    if (userId != null && speakingUsers.contains(userId)) {
                         float lv = speakingLevels.containsKey(userId)
                                 ? speakingLevels.get(userId) : 48f;
-                        holder.b.seatSpeakAura.setSpeaking(true);
-                        holder.b.seatSpeakAura.setIntensity(lv);
-                        if (holder.b.seatVoiceWaveBars != null) {
-                            holder.b.seatVoiceWaveBars.setSpeaking(
-                                    holder.voiceWaveUrl != null && !holder.voiceWaveUrl.trim().isEmpty(), lv);
+                        boolean hasEquippedWave = holder.voiceWaveUrl != null
+                                && !holder.voiceWaveUrl.trim().isEmpty();
+                        if (hasEquippedWave) {
+                            if (holder.b.seatSpeakAura != null) {
+                                holder.b.seatSpeakAura.setSpeaking(false);
+                                holder.b.seatSpeakAura.setVisibility(View.GONE);
+                            }
+                            if (holder.b.seatVoiceWaveBars != null) {
+                                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+                            }
+                        } else if (holder.b.seatSpeakAura != null) {
+                            holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
+                            holder.b.seatSpeakAura.setSpeaking(true);
+                            holder.b.seatSpeakAura.setIntensity(lv);
                         }
                         holder.speaking = true;
                     }
@@ -1412,50 +1421,65 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             return;
         }
         String waveUrl = holder.voiceWaveUrl;
+        boolean hasEquippedWave = waveUrl != null && !waveUrl.trim().isEmpty();
         if (holder.b.imgVoiceWave != null) {
-            if (waveUrl != null && !waveUrl.trim().isEmpty()) {
+            if (hasEquippedWave) {
                 holder.b.imgVoiceWave.setVisibility(View.VISIBLE);
-                holder.b.imgVoiceWave.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                holder.b.imgVoiceWave.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
                 holder.b.imgVoiceWave.setClipToOutline(false);
                 holder.b.imgVoiceWave.setOutlineProvider(null);
                 Glide.with(holder.itemView)
                         .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim()))
-                        .fitCenter()
+                        .dontAnimate()
                         .into(holder.b.imgVoiceWave);
             } else {
                 holder.b.imgVoiceWave.setVisibility(View.GONE);
                 Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
             }
         }
-        if (holder.b.seatVoiceWaveBars != null) {
-            float level = holder.boundUserId != null && speakingLevels.containsKey(holder.boundUserId)
-                    ? speakingLevels.get(holder.boundUserId) : 48f;
-            holder.b.seatVoiceWaveBars.setSpeaking(
-                    waveUrl != null && !waveUrl.trim().isEmpty(), level);
+        if (hasEquippedWave) {
+            // Equipped cosmetic replaces the legacy aura and bars; never stack both.
+            if (holder.b.seatSpeakAura != null) {
+                holder.b.seatSpeakAura.setSpeaking(false);
+                holder.b.seatSpeakAura.setVisibility(View.GONE);
+            }
+            if (holder.b.seatVoiceWaveBars != null) {
+                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+            }
+            stopRipple(holder.b.seatRippleOuter);
+            stopRipple(holder.b.seatRippleMid);
+            stopRipple(holder.b.seatRippleInner);
+        } else {
+            // No equipped cosmetic: show the original/default speaking wave.
+            if (holder.b.seatSpeakAura != null) {
+                holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
+                holder.b.seatSpeakAura.setSpeaking(true);
+            }
+            if (holder.b.seatVoiceWaveBars != null) {
+                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+            }
         }
-        // Only while this bind is actually speaking (sound-level driven).
         holder.speaking = true;
-        if (holder.b.seatSpeakAura != null) {
-            holder.b.seatSpeakAura.setSpeaking(true);
+        if (holder.b.seatSpeakAura != null && !hasEquippedWave) {
             String uid = holder.boundUserId;
             float lv = uid != null && speakingLevels.containsKey(uid)
                     ? speakingLevels.get(uid) : 48f;
             holder.b.seatSpeakAura.setIntensity(lv);
-            return;
         }
-        // Fallback (old layouts)
-        holder.b.seatRippleOuter.setVisibility(View.VISIBLE);
-        startRipple(holder.b.seatRippleOuter, 0);
-        if (holder.b.seatRippleMid != null) {
-            holder.b.seatRippleMid.setVisibility(View.VISIBLE);
-            startRipple(holder.b.seatRippleMid, 180);
-        }
-        if (holder.b.seatRippleInner != null) {
-            holder.b.seatRippleInner.setVisibility(View.VISIBLE);
-            startRipple(holder.b.seatRippleInner, 360);
+        if (!hasEquippedWave && holder.b.seatSpeakAura == null) {
+            holder.b.seatRippleOuter.setVisibility(View.VISIBLE);
+            startRipple(holder.b.seatRippleOuter, 0);
+            if (holder.b.seatRippleMid != null) {
+                holder.b.seatRippleMid.setVisibility(View.VISIBLE);
+                startRipple(holder.b.seatRippleMid, 180);
+            }
+            if (holder.b.seatRippleInner != null) {
+                holder.b.seatRippleInner.setVisibility(View.VISIBLE);
+                startRipple(holder.b.seatRippleInner, 360);
+            }
         }
     }
-
     private void stopSpeakingRipples(VH holder) {
         holder.speaking = false;
         if (holder.b.seatSpeakAura != null) {
@@ -1519,8 +1543,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && holder.b.seatHostSignal.getVisibility() == View.VISIBLE) {
             holder.b.seatHostSignal.resumeMotion();
         }
-        if (holder.speaking && holder.b.seatSpeakAura != null
+        if (holder.speaking && (holder.voiceWaveUrl == null || holder.voiceWaveUrl.trim().isEmpty())
+                && holder.b.seatSpeakAura != null
                 && !holder.b.seatSpeakAura.isSpeakingActive()) {
+            holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
             holder.b.seatSpeakAura.setSpeaking(true);
         }
     }
