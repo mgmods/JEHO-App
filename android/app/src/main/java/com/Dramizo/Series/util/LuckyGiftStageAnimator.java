@@ -45,11 +45,17 @@ public final class LuckyGiftStageAnimator {
 
         final float density = overlay.getResources().getDisplayMetrics().density;
 
-        // Lucky-cannon reveal is deliberately screen-centered. Do not allow a seat,
-        // caller offset, RTL/LTR direction, or a stale revealCenter to push the hero
-        // toward the side of the room.
-        final float centerX = overlay.getWidth() * 0.5f;
-        final float centerY = overlay.getHeight() * 0.5f;
+        // Center the lucky-gift hero against the actual app window, not against
+        // giftOverlay's local bounds. The overlay can be inset/translated by room UI
+        // containers; using width/2 here makes the gift visibly drift toward an edge.
+        // Convert the root window's center from screen coordinates into overlay space.
+        final View root = overlay.getRootView();
+        final int[] rootLocation = new int[2];
+        final int[] overlayLocation = new int[2];
+        root.getLocationOnScreen(rootLocation);
+        overlay.getLocationOnScreen(overlayLocation);
+        final float centerX = rootLocation[0] + root.getWidth() * 0.5f - overlayLocation[0];
+        final float centerY = rootLocation[1] + root.getHeight() * 0.5f - overlayLocation[1];
 
         final FrameLayout stage = new FrameLayout(overlay.getContext());
         stage.setClipChildren(false);
