@@ -112,7 +112,7 @@ public final class RoomAudioSession {
         Context app = appContext.get();
         if (app == null) return;
         try {
-            if (!externalRecordingActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 AudioAttributes attrs = new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -152,23 +152,22 @@ public final class RoomAudioSession {
         AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) return;
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                AudioAttributes attrs = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build();
-                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                        .setAudioAttributes(attrs)
-                        .setAcceptsDelayedFocusGain(true)
-                        .setWillPauseWhenDucked(false)
-                        .build();
-                am.requestAudioFocus(focusRequest);
-            } else if (!externalRecordingActive) {
-                am.requestAudioFocus(
-                        null,
-                        AudioManager.STREAM_VOICE_CALL,
-                        AudioManager.AUDIOFOCUS_GAIN);
-                focusHeld = true;
+            if (!externalRecordingActive) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    AudioAttributes attrs = new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build();
+                    focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                            .setAudioAttributes(attrs)
+                            .setAcceptsDelayedFocusGain(true)
+                            .setWillPauseWhenDucked(false)
+                            .build();
+                    focusHeld = am.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+                } else {
+                    focusHeld = am.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL,
+                            AudioManager.AUDIOFOCUS_GAIN) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+                }
                 am.setMode(AudioManager.MODE_IN_COMMUNICATION);
             }
         } catch (Throwable ignored) {
