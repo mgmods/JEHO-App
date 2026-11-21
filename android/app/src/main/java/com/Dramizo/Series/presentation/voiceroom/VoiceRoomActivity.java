@@ -16860,9 +16860,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Lucky: Mikoo center-hold → scatter (no JSON/Lottie pulse).
             if (isLuckyGift) {
                 anim = null;
-                List<String> rainTargets = collectOccupiedMicUserIds();
-                if (rainTargets.isEmpty() && !allReceivers.isEmpty()) {
-                    rainTargets = allReceivers;
+                // Respect the recipients selected for this gift first.
+                // Only use every occupied mic when the event carries no explicit targets.
+                List<String> rainTargets = new ArrayList<>();
+                if (allReceivers != null && !allReceivers.isEmpty()) {
+                    rainTargets.addAll(allReceivers);
+                } else {
+                    rainTargets.addAll(collectOccupiedMicUserIds());
                 }
                 playLuckyGiftStage(
                         icon,
