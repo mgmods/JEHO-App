@@ -150,6 +150,26 @@ public class VoiceRoomForegroundService extends Service {
                         }
                         return;
                     }
+                    if ("room:music_volume".equals(event)) {
+                        // The room may be minimized: keep the background Exo/Zego
+                        // players in sync with the same live room-volume control.
+                        float volume = (float) Math.max(0d, Math.min(1d,
+                                payload != null && payload.has("volume")
+                                        ? payload.get("volume").getAsDouble() : 1d));
+                        main.post(() -> {
+                            if (roomId == null || !roomId.equals(id)) return;
+                            getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
+                                    .putFloat("shared_music_volume_" + roomId, volume).apply();
+                            boolean muted = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
+                                    .getBoolean("speaker_muted_" + roomId, false);
+                            try {
+                                RoomRtcEngine.getInstance().setLocalMusicVolume(muted ? 0f : volume);
+                                if (musicPlayer != null) musicPlayer.setVolume(muted ? 0f : volume);
+                            } catch (Exception ignored) {
+                            }
+                        });
+                        return;
+                    }
                     if ("room:music".equals(event)) {
                         String url = string(payload, "url");
                         String status = string(payload, "status");
@@ -465,19 +485,26 @@ public class VoiceRoomForegroundService extends Service {
             if (roomTitle == null || roomTitle.isEmpty()) roomTitle = activeRoomTitle(this);
             if (roomCoverUrl == null || roomCoverUrl.isEmpty()) roomCoverUrl = activeRoomCover(this);
         }
-        if (ACTION_LEAVE.equals(action)) {
-            leaveRoom(intent.getStringExtra(EXTRA_ROOM_ID));
-            return START_NOT_STICKY;
-        }
-        if (ACTION_TOGGLE_MIC.equals(action)) {
-            toggleMicFromNotification();
-            return START_STICKY;
-        }
-        if (ACTION_TOGGLE_SPEAKER.equals(action)) {
-            toggleSpeakerFromNotification();
-            return START_STICKY;
-        }
-        if (ACTION_SET_SPEAKER_MUTE.equals(action)) {
+        if (ACTION_LEAVE.equals(action)
+                || ACTION_TOGGLE_MIC.equals(action)
+                || ACTION_TOGGLE_SPEAKER.equals(action)
+                || ACTION_SET_SPEAKER_MUTE.equals(action)) {
+            // Notification buttons use foreground-service PendingIntents. Re-enter
+            // foreground before handling them so Android 12+ never kills the action
+            // service for failing to call startForeground after its background start.
+            enterForegroundSafe(resolveForegroundTypes());
+            if (ACTION_LEAVE.equals(action)) {
+                leaveRoom(intent.getStringExtra(EXTRA_ROOM_ID));
+                return START_NOT_STICKY;
+            }
+            if (ACTION_TOGGLE_MIC.equals(action)) {
+                toggleMicFromNotification();
+                return START_STICKY;
+            }
+            if (ACTION_TOGGLE_SPEAKER.equals(action)) {
+                toggleSpeakerFromNotification();
+                return START_STICKY;
+            }
             applySpeakerMute(intent.getBooleanExtra("muted", false));
             return START_STICKY;
         }
