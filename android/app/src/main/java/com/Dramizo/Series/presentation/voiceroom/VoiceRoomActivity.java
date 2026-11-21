@@ -1085,7 +1085,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             micOn = !micOn;
             userChoseMute = !micOn;
-            if (roomId != null) viewModel.setMic(roomId, !micOn);
+            if (roomId != null) {
+                getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
+                        .putBoolean("user_chose_mute_" + roomId, userChoseMute).apply();
+                viewModel.setMic(roomId, !micOn);
+            }
             RoomRtcEngine.getInstance().setMicEnabled(micOn);
             syncVoiceAudio(currentSeats);
             syncMicUi();
@@ -1674,6 +1678,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && (currentSeats == null || currentSeats.isEmpty())) {
             currentSeats = session.room.seats;
         }
+        userChoseMute = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
+                .getBoolean("user_chose_mute_" + roomId, userChoseMute);
         if (isOnSeat(currentSeats)) {
             if (!userChoseMute) {
                 RoomDtos.SeatDto mySeat = findMySeat(currentSeats);
@@ -4333,7 +4339,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Toast.LENGTH_SHORT).show();
         // Keep this Activity/player alive until the service confirms the new player is READY.
         handler.removeCallbacks(roomMusicHandoffTimeout);
-        handler.postDelayed(roomMusicHandoffTimeout, 12_000L);
+        handler.postDelayed(roomMusicHandoffTimeout, 30_000L);
     }
 
     /**
@@ -13191,7 +13197,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             }
             // Mikoo minimize / leave-UI: keep hearing others; mute only own mic.
-            ensuringRoomKeepAlive(true);
+            // The explicit minimize / onUserLeaveHint path already started the FGS.
+            // Do not send a second START while it is taking over the player: that
+            // would reset ExoPlayer to a stale position during the handoff.
+            if (!minimizing || !VoiceRoomForegroundService.hasActiveRoom(this, roomId)) {
+                ensuringRoomKeepAlive(true);
+            }
             ensureMinimizedListeningState();
         } else if (!exiting) {
             muteAudioForBackground();
@@ -13225,7 +13236,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         unmuteAudioAfterBackground();
         try {
             // Prefer live Zego mic state (may have been toggled from notification / mini).
-            micOn = RoomRtcEngine.getInstance().isMicEnabled();
+            userChoseMute = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
+                    .getBoolean("user_chose_mute_" + roomId, userChoseMute);
+            micOn = !userChoseMute && RoomRtcEngine.getInstance().isMicEnabled();
             RoomRtcEngine.getInstance().setMicEnabled(micOn);
             syncMicUi();
         } catch (Exception ignored) {
