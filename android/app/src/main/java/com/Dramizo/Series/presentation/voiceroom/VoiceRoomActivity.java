@@ -4974,7 +4974,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding == null || binding.comboGiftView == null) return;
         String giftName = luckyCannonGiftName != null && !luckyCannonGiftName.isEmpty()
                 ? luckyCannonGiftName : "هدية حظ";
-        binding.comboGiftView.showCannonLive("أنت", giftName, null,
+        AuthDtos.UserDto self = ContainerProvider.from(this).getSessionManager().getUser();
+        String senderAvatar = self != null ? self.avatarUrl
+                : ContainerProvider.from(this).getSessionManager().getAvatarUrl();
+        binding.comboGiftView.showCannonLive("أنت", giftName, senderAvatar,
                 luckyCannonGiftIcon, Math.max(1, count), 0);
         if (!live) binding.comboGiftView.finishCannonLive(2200L);
     }
@@ -6276,25 +6279,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         broadcastSharedMusicVolume(requestedVolume, previousVolume);
     }
 
-    /** Shared music gain; local room mute only affects this listener's playback. */
+    /** Shared music gain; the room speaker mute is local to this listener. */
     private void applySharedMusicVolume() {
+        // Apply one effective gain to every playback path. In particular, music mixed
+        // through the ZEGO local media player must also become silent; muting only the
+        // ExoPlayer left that source audible for the local host/publisher.
+        final float effectiveVolume = roomSpeakerMuted
+                ? 0f : Math.max(0f, Math.min(1f, sharedMusicVolume));
         if (roomMusicPlayer != null) {
-            roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : sharedMusicVolume);
+            roomMusicPlayer.setVolume(effectiveVolume);
         }
         if (youtubeUsingEmbed && musicYoutubeWebView != null) {
-            int percent = Math.round(sharedMusicVolume * 100f);
+            int percent = Math.round(effectiveVolume * 100f);
             String js = "if(window.musicYtPlayer&&window.musicYtPlayer.setVolume){"
                     + "if(" + percent + "===0){window.musicYtPlayer.mute();}"
                     + "else{window.musicYtPlayer.unMute();window.musicYtPlayer.setVolume("
                     + percent + ");}}";
             musicYoutubeWebView.evaluateJavascript(js, null);
         }
-        // For device music mixed into the host's published audio, adjust only the
-        // dedicated ZEGO media player; microphone capture gain remains untouched.
-        // Room metadata/role flags can arrive late, so also recognize the active publisher.
+        // This changes playback gain only. It never changes the microphone capture
+        // gain or the music stream being published to other room members.
         if (canManageMusic || isHost || isOwner || isRoomStaff()
                 || sameUser(myUserId, currentMusicPublisherId)) {
-            RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
+            RoomRtcEngine.getInstance().setLocalMusicVolume(effectiveVolume);
         }
         if (binding != null && binding.seekMusicVolume != null
                 && !binding.seekMusicVolume.isPressed()) {
@@ -10102,11 +10109,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void applyRoomSpeakerMute(boolean muted) {
         RoomSoundFx.setMuted(muted);
         RoomRtcEngine.getInstance().setSpeakerMuted(muted);
-        // Preserve the selected music gain on every track type. This does not touch
-        // microphone capture gain; only the dedicated music player is adjusted.
-        if (roomMusicPlayer != null) {
-            applySharedMusicVolume();
-        }
+        // Reapply local playback mute to every active music source (ExoPlayer,
+        // YouTube and the ZEGO local media player), while preserving its saved slider
+        // value and leaving microphone capture/published audio unchanged.
+        applySharedMusicVolume();
         if (!muted) {
             // Resume pulling seat streams after mute (minutes billing resumes only now).
             activateSeatAudio(currentSeats);
@@ -12342,18 +12348,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         int width = Math.max(1, binding.giftOverlay.getWidth());
         int height = Math.max(1, binding.giftOverlay.getHeight());
-        return new PointF(width * 0.5f, height - luckyCannonDp(84));
+        // Align the sender-off-seat launch point to the bottom-center edge.
+        return new PointF(width * 0.5f, height - luckyCannonDp(56));
     }
 
-    /** Cannon launches originate at the visible launcher; fall back to bottom-center if unavailable. */
+    /** Both lucky and cannon launches follow the sender: occupied mic, otherwise bottom-center. */
     @Nullable
     private PointF resolveLuckyCannonSource(@Nullable String senderId) {
-        if (binding == null || binding.giftOverlay == null) return null;
-        if (luckyCannonView != null && luckyCannonView.getVisibility() == View.VISIBLE
-                && luckyCannonView.getWidth() > 0 && luckyCannonView.getHeight() > 0) {
-            PointF cannonPoint = GiftFlyAnimator.centerInOverlay(binding.giftOverlay, luckyCannonView);
-            if (cannonPoint != null) return cannonPoint;
-        }
         return resolveLuckyGiftSource(senderId);
     }
 
@@ -12361,13 +12362,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private List<android.graphics.PointF> resolveMicCenters(@Nullable List<String> userIds) {
         List<android.graphics.PointF> targets = new ArrayList<>();
         if (binding == null || binding.giftOverlay == null || userIds == null) return targets;
+        // A recipient must still occupy a real mic at animation time. Never fall back
+        // to all room seats, hidden seat placeholders, or guessed screen coordinates.
+        Set<String> occupiedNow = new HashSet<>(collectOccupiedMicUserIds());
+        Set<String> resolvedUsers = new HashSet<>();
         for (String uid : userIds) {
-            if (uid == null || uid.isEmpty()) continue;
+            if (uid == null || uid.isEmpty() || !occupiedNow.contains(uid)
+                    || !resolvedUsers.add(uid)) continue;
             View seat = findSeatViewForUser(uid);
-            if (seat == null) continue;
+            if (seat == null || !seat.isShown()
+                    || seat.getWidth() <= 0 || seat.getHeight() <= 0) continue;
             android.graphics.PointF p =
                     GiftFlyAnimator.centerInOverlay(binding.giftOverlay, seat);
-            if (p != null) targets.add(p);
+            if (p == null || p.x < 0f || p.y < 0f
+                    || p.x > binding.giftOverlay.getWidth()
+                    || p.y > binding.giftOverlay.getHeight()) continue;
+            targets.add(p);
         }
         return targets;
     }
@@ -12452,7 +12462,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (id != null && !id.isEmpty()) unique.add(id);
             }
         }
-        if (unique.isEmpty()) unique.addAll(collectOccupiedMicUserIds());
+        if (unique.isEmpty()) return;
         final List<String> ids = new ArrayList<>(unique);
         if (ids.isEmpty()) return;
 
@@ -12509,7 +12519,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (id != null && !id.isEmpty()) unique.add(id);
             }
         }
-        if (unique.isEmpty()) unique.addAll(collectOccupiedMicUserIds());
+        if (unique.isEmpty()) return;
         final List<String> ids = new ArrayList<>(unique);
         if (ids.isEmpty()) return;
 
@@ -16933,25 +16943,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (cannonLaunch) {
                 // The canonical room event starts the combo toast only after the release-time
                 // batch has been accepted by the server. X counts sent units, never lucky payout.
-                if (!localSenderEcho && binding != null && binding.comboGiftView != null) {
-                    final String comboKey = sender != null && !sender.isEmpty() ? sender : "unknown";
-                    final int liveCount = Math.max(1,
-                            luckyCannonRemoteComboCounts.containsKey(comboKey)
-                                    ? luckyCannonRemoteComboCounts.get(comboKey) + Math.max(1, qtyRemote)
-                                    : Math.max(1, qtyRemote));
-                    luckyCannonRemoteComboCounts.put(comboKey, liveCount);
-                    binding.comboGiftView.showCannonLive(sender, name, senderAvatar,
-                            icon, liveCount, totalCoins);
-                    handler.postDelayed(() -> {
-                        Integer current = luckyCannonRemoteComboCounts.get(comboKey);
-                        if (current != null && current == liveCount) {
-                            luckyCannonRemoteComboCounts.remove(comboKey);
-                            if (binding != null && binding.comboGiftView != null) {
-                                binding.comboGiftView.finishCannonLive(2200L);
-                            }
-                        }
-                    }, 350L);
-                }
+                // The animated X counter is sender-local only. Other room members still
+                // receive the cannon gift flight below, but never get a sender counter.
                 long perSeatSupport = allReceivers.isEmpty()
                         ? 0L : Math.max(0L, totalCoins / allReceivers.size());
                 if (perSeatSupport > 0L) {
