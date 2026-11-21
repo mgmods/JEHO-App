@@ -1058,6 +1058,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             micOn = !micOn;
             // Remember an explicit local mute across seat changes and room UI recreation.
             userChoseMute = !micOn;
+            ActiveRoomSession.get().setUserChoseMute(userChoseMute);
             if (roomId != null) viewModel.setMic(roomId, !micOn);
             RoomRtcEngine.getInstance().setMicEnabled(micOn);
             syncVoiceAudio(currentSeats);
@@ -1546,7 +1547,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             locked = room.hasPassword || "locked".equalsIgnoreCase(room.status);
             ActiveRoomSession.get().updateRoom(room);
-            ActiveRoomSession.get().syncFlags(isHost, isAgencyRoom, micOn, roomSpeakerMuted);
+            ActiveRoomSession.get().syncFlags(isHost, isAgencyRoom, micOn, userChoseMute, roomSpeakerMuted);
 
             // Stage heavy visuals so G85/MIUI can keep the first frame under ANR budget.
             final RoomDtos.RoomDto roomSnap = room;
@@ -1823,7 +1824,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // ActiveRoomSession is the durable source across minimize/restore. The RTC
         // provider may briefly report its startup default before its state is rebound.
         micOn = ars.isMicOn();
-        userChoseMute = !micOn;
+        userChoseMute = ars.isUserChoseMute();
         roomSpeakerMuted = ars.isSpeakerMuted();
         // Preserve the pre-restore roster separately: the next HTTP refresh must not erase
         // the only good copy before we can decide whether an empty response is transient.
@@ -1862,6 +1863,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 isHost,
                 isAgencyRoom,
                 micOn,
+                userChoseMute,
                 roomSpeakerMuted);
     }
 
@@ -17092,13 +17094,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (moderatorMuted || muted) {
                     RoomSoundFx.playMute(this);
                     micOn = false;
-                    userChoseMute = true;
+                    if (!moderatorMuted) {
+                        userChoseMute = true;
+                        ActiveRoomSession.get().setUserChoseMute(true);
+                    }
                     RoomRtcEngine.getInstance().setMicEnabled(false);
                     syncMicUi();
                     if (moderatorMuted) {
                         Toast.makeText(this, "قام مشرف الغرفة بكتم المايك", Toast.LENGTH_SHORT).show();
                     }
-                } else if (moderatorMuted || !userChoseMute) {
+                } else if (!userChoseMute) {
                     // A server unmute may reopen the mic only when the user has not
                     // explicitly chosen to stay muted.
                     userChoseMute = false;
@@ -17316,6 +17321,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 restoreSeatSnapshotUntilMs = 0L;
                 micOn = false;
                 userChoseMute = false;
+                ActiveRoomSession.get().setUserChoseMute(false);
                 RoomRtcEngine.getInstance().setMicEnabled(false);
                 RoomRtcEngine.getInstance().stopPublishing();
                 if (forced) {
