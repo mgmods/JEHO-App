@@ -30,13 +30,21 @@ public final class LuckyGiftStageAnimator {
             @Nullable List<PointF> micTargets, long coinsSpent, int quantity, int personCount,
             @Nullable Runnable onScatterStart, @Nullable Runnable onEnd) {
         play(overlay, giftIconUrl, micTargets, coinsSpent, quantity, personCount,
-                null, onScatterStart, onEnd);
+                null, null, false, onScatterStart, onEnd);
     }
 
     public static void play(@Nullable FrameLayout overlay, @Nullable String giftIconUrl,
             @Nullable List<PointF> micTargets, long coinsSpent, int quantity, int personCount,
             @Nullable PointF revealCenter, @Nullable Runnable onScatterStart,
             @Nullable Runnable onEnd) {
+        play(overlay, giftIconUrl, micTargets, coinsSpent, quantity, personCount,
+                null, revealCenter, false, onScatterStart, onEnd);
+    }
+
+    public static void play(@Nullable FrameLayout overlay, @Nullable String giftIconUrl,
+            @Nullable List<PointF> micTargets, long coinsSpent, int quantity, int personCount,
+            @Nullable PointF launchPoint, @Nullable PointF revealCenter, boolean cannonBurst,
+            @Nullable Runnable onScatterStart, @Nullable Runnable onEnd) {
         if (overlay == null || overlay.getWidth() <= 0 || overlay.getHeight() <= 0
                 || giftIconUrl == null || giftIconUrl.trim().isEmpty()) {
             finish(onEnd);
@@ -54,8 +62,12 @@ public final class LuckyGiftStageAnimator {
         final int[] overlayLocation = new int[2];
         root.getLocationOnScreen(rootLocation);
         overlay.getLocationOnScreen(overlayLocation);
-        final float centerX = rootLocation[0] + root.getWidth() * 0.5f - overlayLocation[0];
-        final float centerY = rootLocation[1] + root.getHeight() * 0.5f - overlayLocation[1];
+        final float centerX = revealCenter != null ? revealCenter.x
+                : rootLocation[0] + root.getWidth() * 0.5f - overlayLocation[0];
+        final float centerY = revealCenter != null ? revealCenter.y
+                : rootLocation[1] + root.getHeight() * 0.5f - overlayLocation[1];
+        final float startX = launchPoint != null ? launchPoint.x : centerX;
+        final float startY = launchPoint != null ? launchPoint.y : overlay.getHeight() - 42f * density;
 
         final FrameLayout stage = new FrameLayout(overlay.getContext());
         stage.setClipChildren(false);
@@ -90,12 +102,12 @@ public final class LuckyGiftStageAnimator {
         FrameLayout.LayoutParams heroLp = new FrameLayout.LayoutParams(
                 Math.round(112f * density), Math.round(112f * density),
                 Gravity.TOP | Gravity.LEFT);
-        heroLp.leftMargin = Math.round(centerX - 56f * density);
-        heroLp.topMargin = Math.round(centerY - 56f * density);
+        heroLp.leftMargin = Math.round(startX - 56f * density);
+        heroLp.topMargin = Math.round(startY - 56f * density);
         stage.addView(hero, heroLp);
         hero.setAlpha(0f);
-        hero.setScaleX(0.18f);
-        hero.setScaleY(0.18f);
+        hero.setScaleX(0.42f);
+        hero.setScaleY(0.42f);
 
         TextView count = new TextView(overlay.getContext());
         int copies = Math.max(1, quantity);
@@ -116,8 +128,10 @@ public final class LuckyGiftStageAnimator {
         AnimatorSet reveal = new AnimatorSet();
         reveal.playTogether(
                 ObjectAnimator.ofFloat(hero, View.ALPHA, 0f, 1f),
-                ObjectAnimator.ofFloat(hero, View.SCALE_X, 0.18f, 1.18f, 1f),
-                ObjectAnimator.ofFloat(hero, View.SCALE_Y, 0.18f, 1.18f, 1f),
+                ObjectAnimator.ofFloat(hero, View.X, startX - 56f * density, centerX - 56f * density),
+                ObjectAnimator.ofFloat(hero, View.Y, startY - 56f * density, centerY - 56f * density),
+                ObjectAnimator.ofFloat(hero, View.SCALE_X, 0.42f, 1.22f, 1f),
+                ObjectAnimator.ofFloat(hero, View.SCALE_Y, 0.42f, 1.22f, 1f),
                 ObjectAnimator.ofFloat(glow, View.ALPHA, 0f, 0.85f, 0.5f),
                 ObjectAnimator.ofFloat(glow, View.SCALE_X, 0.45f, 1.1f),
                 ObjectAnimator.ofFloat(glow, View.SCALE_Y, 0.45f, 1.1f),
@@ -134,7 +148,7 @@ public final class LuckyGiftStageAnimator {
                 // launch one clone along a real path to each requested seat.
                 // The center hero remains visible throughout the seat flights.
                 scatter(overlay, stage, hero, giftIconUrl, centerX, centerY,
-                        micTargets, quantity, personCount, density, onEnd);
+                        micTargets, quantity, personCount, density, cannonBurst, onEnd);
             }
         });
         reveal.start();
@@ -142,7 +156,8 @@ public final class LuckyGiftStageAnimator {
 
     private static void scatter(FrameLayout overlay, FrameLayout stage, ImageView hero,
             String iconUrl, float fromX, float fromY, @Nullable List<PointF> targets,
-            int quantity, int personCount, float density, @Nullable Runnable onEnd) {
+            int quantity, int personCount, float density, boolean cannonBurst,
+            @Nullable Runnable onEnd) {
         List<PointF> seats = new ArrayList<>();
         if (targets != null) for (PointF p : targets) if (p != null) seats.add(p);
         if (seats.isEmpty()) {
@@ -187,7 +202,9 @@ public final class LuckyGiftStageAnimator {
                     ObjectAnimator.ofFloat(copy, View.SCALE_X, 0.68f, 1.14f, 0.82f),
                     ObjectAnimator.ofFloat(copy, View.SCALE_Y, 0.68f, 1.14f, 0.82f),
                     ObjectAnimator.ofFloat(copy, View.ROTATION, -14f, 14f, 0f));
-            flight.setStartDelay((i / 4) * 65L);
+            // Cannon volleys are synchronized: every selected mic receives
+            // its matching gift in the same burst, with no stagger between seats.
+            flight.setStartDelay(cannonBurst ? 0L : (i / 4) * 65L);
             flight.setDuration(660L);
             flight.setInterpolator(new DecelerateInterpolator(1.35f));
             flight.addListener(new AnimatorListenerAdapter() {
