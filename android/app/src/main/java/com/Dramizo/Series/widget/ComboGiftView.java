@@ -12,6 +12,9 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 
@@ -36,6 +39,8 @@ public class ComboGiftView extends FrameLayout {
     // updates omit the avatar URL; otherwise the profile image can blink away.
     @Nullable private String lastCannonSenderName;
     @Nullable private String lastCannonAvatarUrl;
+    // Cache valid profile images by sender because subsequent X events omit avatarUrl.
+    private final Map<String, String> cannonAvatarBySender = new HashMap<>();
     @Nullable private Runnable hideRunnable;
     @Nullable private Runnable crawlRunnable;
 
@@ -119,7 +124,7 @@ public class ComboGiftView extends FrameLayout {
         if (comboNum != null) {
             // Mikoo: "x" + count to the right of gift strip digits.
             comboNum.setText("X" + combo);
-            comboNum.setTextSize(combo >= 10 ? 20f : 22f);
+            comboNum.setTextSize(combo >= 10 ? 18f : 19f);
             comboNum.setVisibility(VISIBLE);
             comboNum.animate().cancel();
             comboNum.setScaleX(0.6f);
@@ -166,7 +171,7 @@ public class ComboGiftView extends FrameLayout {
         lastDisplayedCount = combo;
         if (comboNum != null) {
             comboNum.setText("X" + combo);
-            comboNum.setTextSize(combo >= 10 ? 20f : 22f);
+            comboNum.setTextSize(combo >= 10 ? 18f : 19f);
             comboNum.setVisibility(VISIBLE);
             comboNum.animate().cancel();
             comboNum.setScaleX(0.88f);
@@ -179,13 +184,14 @@ public class ComboGiftView extends FrameLayout {
         if (avatar != null) {
             String currentSender = senderName != null ? senderName.trim() : "";
             if (senderAvatarUrl != null && !senderAvatarUrl.trim().isEmpty()) {
-                lastCannonAvatarUrl = senderAvatarUrl;
-            } else if (lastCannonSenderName == null
-                    || !lastCannonSenderName.equals(currentSender)) {
-                lastCannonAvatarUrl = null;
+                lastCannonAvatarUrl = senderAvatarUrl.trim();
+                if (!currentSender.isEmpty()) cannonAvatarBySender.put(currentSender, lastCannonAvatarUrl);
             }
             lastCannonSenderName = currentSender;
-            bindSenderAvatar(lastCannonAvatarUrl);
+            String stableAvatar = !currentSender.isEmpty() ? cannonAvatarBySender.get(currentSender) : null;
+            if (stableAvatar == null || stableAvatar.isEmpty()) stableAvatar = lastCannonAvatarUrl;
+            // Missing avatar fields in later X updates must never clear the visible profile image.
+            bindSenderAvatar(stableAvatar);
             avatar.setVisibility(VISIBLE);
         }
         bindGiftIcon(giftIconUrl);
@@ -204,8 +210,8 @@ public class ComboGiftView extends FrameLayout {
         setTranslationX(0f);
         setTranslationY(0f);
         // Compact the live X toast and keep it visually secondary to the gift.
-        setScaleX(0.90f);
-        setScaleY(0.90f);
+        setScaleX(0.86f);
+        setScaleY(0.86f);
         bringToFront();
         showing = true;
         hideRunnable = null;
