@@ -12367,9 +12367,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     binding.giftOverlay, giftIconUrl, destinations, coinsSpent,
                     Math.max(1, quantity), Math.max(1, personCount),
                     from, onScatterStart, null);
-            if (onScatterStart != null) {
-                try { onScatterStart.run(); } catch (Exception ignored) {}
-            }
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
