@@ -17,6 +17,7 @@ export enum CosmeticType {
   CP_LOGO = 'cp_logo',
   CHAT_BUBBLE = 'chat_bubble',
   NAMEPLATE = 'nameplate',
+  VOICE_WAVE = 'voice_wave',
   LEVEL_BADGE = 'level_badge',
   VIP_BADGE = 'vip_badge',
   HOST_BADGE = 'host_badge',
