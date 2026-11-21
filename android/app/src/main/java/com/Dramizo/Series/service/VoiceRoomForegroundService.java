@@ -480,6 +480,7 @@ public class VoiceRoomForegroundService extends Service {
         service.musicPlayer = null;
         handoffMusicReady = false;
         handoffMusicPlaying = false;
+        service.stopSelf();
         return player;
     }
 
