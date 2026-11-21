@@ -1155,7 +1155,7 @@ export class CosmeticsService implements OnModuleInit {
       if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = owned.cosmetic.previewUrl || null;
-      if (type === CosmeticType.VOICE_WAVE) profile.voiceWaveUrl = owned.cosmetic.previewUrl || this.cosmeticAnimationUrl(owned.cosmetic) || null;
+      if (type === CosmeticType.VOICE_WAVE) profile.voiceWaveUrl = this.cosmeticAnimationUrl(owned.cosmetic) || owned.cosmetic.previewUrl || null;
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
       if (type === CosmeticType.HOST_BADGE) {
         // VIP and host frames share one avatar-frame slot; never layer them.
