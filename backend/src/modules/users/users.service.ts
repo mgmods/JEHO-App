@@ -527,7 +527,6 @@ export class UsersService {
       chatBubbleUrl: vipVisuals.chatBubbleUrl || flat.chatBubbleUrl,
       nameplateUrl: vipVisuals.nameplateUrl || flat.nameplateUrl,
       voiceWaveUrl: flat.voiceWaveUrl,
-      voiceWaveUrl: flat.voiceWaveUrl,
       nameStyle: vipVisuals.nameStyle && typeof vipVisuals.nameStyle === 'object' ? vipVisuals.nameStyle : null,
     };
     return this.withWearMeta(
