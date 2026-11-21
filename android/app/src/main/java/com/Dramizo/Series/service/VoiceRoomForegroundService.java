@@ -411,7 +411,22 @@ public class VoiceRoomForegroundService extends Service {
 
     @Override public void onCreate() {
         super.onCreate();
-        musicPlayer = new ExoPlayer.Builder(this).build();
+        // Match the room Activity's YouTube-compatible HTTP stack. Without the same
+        // user-agent and Referer/Origin headers, signed YouTube audio streams can fail
+        // only after the Activity hands playback to this background player.
+        androidx.media3.datasource.DefaultHttpDataSource.Factory httpFactory =
+                new androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                        .setUserAgent(com.Dramizo.Series.util.YoutubeAudioResolver.PLAYER_USER_AGENT)
+                        .setAllowCrossProtocolRedirects(true)
+                        .setConnectTimeoutMs(12_000)
+                        .setReadTimeoutMs(20_000)
+                        .setDefaultRequestProperties(java.util.Map.of(
+                                "Referer", "https://www.youtube.com/",
+                                "Origin", "https://www.youtube.com"));
+        musicPlayer = new ExoPlayer.Builder(this)
+                .setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
+                        .setDataSourceFactory(httpFactory))
+                .build();
         musicPlayer.addListener(musicHandoffListener);
     }
 
