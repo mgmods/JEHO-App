@@ -119,8 +119,10 @@ public final class LuckyGiftStageAnimator {
                 if (onScatterStart != null) {
                     try { onScatterStart.run(); } catch (Exception ignored) {}
                 }
-                stage.postDelayed(() -> scatter(overlay, stage, hero, giftIconUrl,
-                        centerX, centerY, micTargets, quantity, personCount, density, onEnd), 420L);
+                // Lucky-cannon hero must remain at the exact room center.
+                // Do not scatter copies toward occupied seats: that made the gift
+                // appear at the screen edges instead of staying centered.
+                stage.postDelayed(() -> fadeAndRemove(stage, onEnd), 900L);
             }
         });
         reveal.start();
