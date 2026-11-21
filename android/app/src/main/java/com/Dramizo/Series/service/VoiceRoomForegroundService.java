@@ -23,6 +23,7 @@ import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.IconCompat;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.annotation.OptIn;
@@ -67,6 +68,12 @@ public class VoiceRoomForegroundService extends Service {
     private String roomTitle;
     private String roomCoverUrl;
     private ExoPlayer musicPlayer;
+    private String activeMusicUrl;
+    private String activeMusicStatus;
+    private boolean musicResolveInProgress;
+    private static volatile String handoffRoomId;
+    private static volatile String handoffMusicUrl;
+    private static volatile boolean handoffMusicReady;
     private boolean stopping;
     private android.graphics.Bitmap coverBitmap;
 
@@ -372,6 +379,25 @@ public class VoiceRoomForegroundService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         musicPlayer = new ExoPlayer.Builder(this).build();
+        musicPlayer.addListener(new Player.Listener() {
+            @Override public void onPlaybackStateChanged(int playbackState) {
+                if (playbackState == Player.STATE_READY
+                        && "playing".equalsIgnoreCase(activeMusicStatus)) {
+                    handoffMusicReady = true;
+                }
+            }
+
+            @Override public void onPlayerError(androidx.media3.common.PlaybackException error) {
+                handoffMusicReady = false;
+            }
+        });
+    }
+
+    /** True only after the background ExoPlayer has prepared the exact requested track. */
+    public static boolean isMusicHandoffReady(String requestedRoomId, String requestedMusicUrl) {
+        return requestedRoomId != null && requestedRoomId.equals(handoffRoomId)
+                && requestedMusicUrl != null && requestedMusicUrl.equals(handoffMusicUrl)
+                && handoffMusicReady;
     }
 
     @Override
@@ -718,8 +744,16 @@ public class VoiceRoomForegroundService extends Service {
 
     private void applyMusic(String url, String status, long positionMs, String startedAt) {
         if (musicPlayer == null) return;
-        if (url == null || url.isEmpty() || "stopped".equalsIgnoreCase(status)
-                || url.regionMatches(true, 0, "local://", 0, 8)) {
+        final String playStatus = status != null ? status : "stopped";
+        final boolean localMix = url != null
+                && url.regionMatches(true, 0, "local://", 0, 8);
+        if (url == null || url.isEmpty() || "stopped".equalsIgnoreCase(playStatus) || localMix) {
+            activeMusicUrl = url;
+            activeMusicStatus = playStatus;
+            musicResolveInProgress = false;
+            handoffRoomId = roomId;
+            handoffMusicUrl = url;
+            handoffMusicReady = true;
             // Local phone music is mixed by the host into Zego — keep Zego, stop Exo.
             try {
                 musicPlayer.stop();
@@ -727,7 +761,7 @@ public class VoiceRoomForegroundService extends Service {
             }
             // Hosts: never pause Zego mix when minimizing.
             try {
-                if ("playing".equalsIgnoreCase(status)
+                if ("playing".equalsIgnoreCase(playStatus)
                         && RoomRtcEngine.getInstance().hasLocalMusicPlayer()
                         && !RoomRtcEngine.getInstance().isLocalMusicPlaying()) {
                     RoomRtcEngine.getInstance().resumeLocalMusic();
@@ -736,13 +770,33 @@ public class VoiceRoomForegroundService extends Service {
             }
             return;
         }
+
+        // onUserLeaveHint, the minimize click and onStop can all request the same
+        // foreground owner in quick succession. Do not reset a player already preparing
+        // or playing this exact track: doing so restarts the decoder and creates silence.
+        boolean sameRequest = url.equals(activeMusicUrl)
+                && playStatus.equalsIgnoreCase(activeMusicStatus);
+        if (sameRequest && (musicResolveInProgress
+                || (musicPlayer.getMediaItemCount() > 0
+                && musicPlayer.getPlaybackState() != Player.STATE_IDLE))) {
+            return;
+        }
+
+        activeMusicUrl = url;
+        activeMusicStatus = playStatus;
+        musicResolveInProgress = false;
+        handoffRoomId = roomId;
+        handoffMusicUrl = url;
+        handoffMusicReady = false;
         final long targetBase = Math.max(0L, positionMs);
         final String started = startedAt;
-        final String playStatus = status != null ? status : "stopped";
-        // Resolve YouTube → stream offline; direct HTTP/mp3 URLs play as-is.
+
+        // Resolve YouTube only once per handoff request; duplicate service starts must
+        // not launch parallel resolvers that replace one another's prepared stream.
         if (isYoutubeUrl(url)) {
             final String videoId = youtubeId(url);
             if (videoId == null || videoId.isEmpty()) return;
+            musicResolveInProgress = true;
             new Thread(() -> {
                 try {
                     com.Dramizo.Series.util.YoutubeAudioResolver.Resolved resolved =
@@ -751,9 +805,16 @@ public class VoiceRoomForegroundService extends Service {
                             ? (resolved.mixUrl != null && !resolved.mixUrl.isEmpty()
                             ? resolved.mixUrl : resolved.audioUrl)
                             : null;
-                    if (stream == null || stream.isEmpty()) return;
-                    main.post(() -> playMusicUrl(stream, playStatus, targetBase, started));
+                    main.post(() -> {
+                        if (!url.equals(activeMusicUrl)) return;
+                        musicResolveInProgress = false;
+                        if (stream == null || stream.isEmpty()) return;
+                        playMusicUrl(stream, playStatus, targetBase, started);
+                    });
                 } catch (Exception ignored) {
+                    main.post(() -> {
+                        if (url.equals(activeMusicUrl)) musicResolveInProgress = false;
+                    });
                 }
             }, "fgs-yt-music").start();
             return;
@@ -766,6 +827,7 @@ public class VoiceRoomForegroundService extends Service {
     private void playMusicUrl(String absolute, String status, long positionMs, String startedAt) {
         if (musicPlayer == null || absolute == null || absolute.isEmpty()) return;
         try {
+            handoffMusicReady = false;
             musicPlayer.setMediaItem(MediaItem.fromUri(absolute));
             musicPlayer.prepare();
             long target = Math.max(0L, positionMs);
@@ -781,6 +843,7 @@ public class VoiceRoomForegroundService extends Service {
             musicPlayer.setPlayWhenReady("playing".equalsIgnoreCase(status));
             musicPlayer.setVolume(1f);
         } catch (Exception ignored) {
+            handoffMusicReady = false;
         }
     }
 
@@ -850,6 +913,7 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void detachBackgroundOwner() {
+        handoffMusicReady = false;
         main.removeCallbacks(renewToken);
         RealtimeClient.getInstance().removeRoomListener(realtimeListener);
         RoomRtcEngine.getInstance().removeRoomListener(rtcListener);
