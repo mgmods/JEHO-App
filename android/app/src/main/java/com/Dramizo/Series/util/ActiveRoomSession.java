@@ -22,6 +22,7 @@ public final class ActiveRoomSession {
     private boolean agencyRoom;
     private boolean micOn;
     private boolean userChoseMute;
+    private boolean micSuspendedForBackground;
     private boolean speakerMuted;
 
     private ActiveRoomSession() {}
@@ -95,6 +96,14 @@ public final class ActiveRoomSession {
 
     public synchronized boolean isUserChoseMute() {
         return userChoseMute;
+    }
+
+    public synchronized void setMicSuspendedForBackground(boolean value) {
+        micSuspendedForBackground = value;
+    }
+
+    public synchronized boolean isMicSuspendedForBackground() {
+        return micSuspendedForBackground;
     }
 
     public synchronized void setSpeakerMuted(boolean value) {
@@ -173,6 +182,7 @@ public final class ActiveRoomSession {
         agencyRoom = false;
         micOn = false;
         userChoseMute = false;
+        micSuspendedForBackground = false;
         speakerMuted = false;
     }
 }
