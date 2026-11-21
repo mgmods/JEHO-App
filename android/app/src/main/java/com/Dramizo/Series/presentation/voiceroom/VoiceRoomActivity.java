@@ -440,6 +440,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private List<RoomDtos.SeatDto> restoreSeatSnapshot;
     /** Ignore transient empty seat refreshes only during the short post-restore window. */
     private long restoreSeatSnapshotUntilMs;
+    // Ignore transient room snapshots that briefly omit the local seat; a real seat_left
+    // event is authoritative and clears this grace period immediately.
+    private long localSeatMissingSinceMs;
+    private final Runnable localSeatSnapshotRetry = () -> {
+        if (!exiting && roomId != null && !roomId.isEmpty()) requestRoomRefresh(false);
+    };
     private final Runnable retryRealtimeJoinRunnable = () -> {
         if (exiting || isFinishing() || roomId == null) return;
         connectRealtimeRoom();
@@ -1470,6 +1476,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             if (seats == null) seats = new ArrayList<>();
             boolean wasOnSeat = isOnSeat(currentSeats);
+            if (wasOnSeat && !isOnSeat(seats)) {
+                long now = System.currentTimeMillis();
+                if (localSeatMissingSinceMs == 0L) localSeatMissingSinceMs = now;
+                // Refresh payloads can arrive before the seat roster catches up. Keep the
+                // existing local seat for a short grace window instead of stopping/restarting
+                // the mic publisher on every partial snapshot. Explicit seat_left bypasses it.
+                if (now - localSeatMissingSinceMs < 1800L) {
+                    seats = new ArrayList<>(currentSeats);
+                    room.seats = seats;
+                    handler.removeCallbacks(localSeatSnapshotRetry);
+                    handler.postDelayed(localSeatSnapshotRetry, 1900L);
+                } else {
+                    localSeatMissingSinceMs = 0L;
+                }
+            } else if (isOnSeat(seats)) {
+                localSeatMissingSinceMs = 0L;
+            }
             // On minimize/restore the new Activity starts with an empty in-memory seat list.
             // Compare against the cached room roster before deciding this is a brand-new seat;
             // otherwise the restore path can wrongly re-run new-seat mic activation and overwrite
@@ -1530,14 +1553,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         RoomRtcEngine.getInstance().setMicEnabled(false);
                     } catch (Exception ignored) {
                     }
-                }
-            } else if (nowOnSeat && isHost && !userChoseMute && !micOn
-                    && (mySeat == null || !mySeat.isModeratorMuted)) {
-                // Host already seated on first open (no wasOnSeat edge) — still open mic.
-                micOn = true;
-                try {
-                    RoomRtcEngine.getInstance().setMicEnabled(true);
-                } catch (Exception ignored) {
                 }
             }
             syncMicUi();
@@ -17346,6 +17361,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // This is an explicit server seat-left event, unlike an empty refresh snapshot.
                 restoreSeatSnapshot = null;
                 restoreSeatSnapshotUntilMs = 0L;
+                localSeatMissingSinceMs = 0L;
+                handler.removeCallbacks(localSeatSnapshotRetry);
                 micOn = false;
                 userChoseMute = false;
                 ActiveRoomSession.get().setUserChoseMute(false);
