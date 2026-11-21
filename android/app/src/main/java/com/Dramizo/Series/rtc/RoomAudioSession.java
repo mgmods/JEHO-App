@@ -25,6 +25,7 @@ public final class RoomAudioSession {
     private static boolean focusHeld;
     private static AudioManager recordingAudioManager;
     private static AudioManager.AudioRecordingCallback recordingCallback;
+    private static boolean externalRecordingActive;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     private RoomAudioSession() {}
@@ -80,7 +81,56 @@ public final class RoomAudioSession {
                 }
             }
         }
-        RoomRtcEngine.getInstance().setExternalCaptureActive(external);
+        if (external == externalRecordingActive) return;
+        externalRecordingActive = external;
+        if (external) {
+            RoomRtcEngine.getInstance().setExternalCaptureActive(true);
+            suspendForExternalRecording(manager);
+        } else {
+            resumeAfterExternalRecording(manager);
+            RoomRtcEngine.getInstance().setExternalCaptureActive(false);
+        }
+    }
+
+    private static void suspendForExternalRecording(AudioManager manager) {
+        try {
+            if (focusHeld) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
+                    manager.abandonAudioFocusRequest(focusRequest);
+                } else {
+                    manager.abandonAudioFocus(null);
+                }
+                focusHeld = false;
+                focusRequest = null;
+            }
+        } catch (Throwable ignored) {
+        }
+        RoomAudioRoute.releaseCommunicationRoute(appContext.get());
+    }
+
+    private static void resumeAfterExternalRecording(AudioManager manager) {
+        Context app = appContext.get();
+        if (app == null) return;
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build();
+                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(attrs)
+                        .setAcceptsDelayedFocusGain(true)
+                        .setWillPauseWhenDucked(false)
+                        .build();
+                focusHeld = manager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            } else {
+                focusHeld = manager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL,
+                        AudioManager.AUDIOFOCUS_GAIN) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            }
+            manager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            RoomAudioRoute.applyCommunicationRoute(app, !RoomRtcEngine.getInstance().isSpeakerMuted());
+        } catch (Throwable ignored) {
+        }
     }
 
     private static synchronized void stopExternalRecordingMonitor() {
@@ -88,6 +138,7 @@ public final class RoomAudioSession {
         AudioManager.AudioRecordingCallback callback = recordingCallback;
         recordingAudioManager = null;
         recordingCallback = null;
+        externalRecordingActive = false;
         if (manager != null && callback != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             try { manager.unregisterAudioRecordingCallback(callback); } catch (Throwable ignored) {}
         }
