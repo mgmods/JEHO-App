@@ -1414,7 +1414,6 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 Glide.with(holder.itemView)
                         .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim()))
                         .fitCenter()
-                        .dontAnimate()
                         .into(holder.b.imgVoiceWave);
                 startVoiceWaveMotion(holder.b.imgVoiceWave);
             } else {
@@ -1447,6 +1446,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
     private void startVoiceWaveMotion(@Nullable View wave) {
         if (wave == null) return;
+        Object old = wave.getTag(R.id.imgVoiceWave);
+        if (old instanceof android.animation.ValueAnimator) {
+            ((android.animation.ValueAnimator) old).cancel();
+        }
         wave.animate().cancel();
         wave.setScaleX(1f);
         wave.setScaleY(1f);
@@ -1473,6 +1476,11 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.seatSpeakAura.setSpeaking(false);
         }
         if (holder.b.imgVoiceWave != null) {
+            Object waveAnimator = holder.b.imgVoiceWave.getTag(R.id.imgVoiceWave);
+            if (waveAnimator instanceof android.animation.ValueAnimator) {
+                ((android.animation.ValueAnimator) waveAnimator).cancel();
+            }
+            holder.b.imgVoiceWave.setTag(R.id.imgVoiceWave, null);
             holder.b.imgVoiceWave.animate().cancel();
             holder.b.imgVoiceWave.setScaleX(1f);
             holder.b.imgVoiceWave.setScaleY(1f);
