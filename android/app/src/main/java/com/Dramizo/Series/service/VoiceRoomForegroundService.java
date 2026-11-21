@@ -594,7 +594,7 @@ public class VoiceRoomForegroundService extends Service {
                         .putBoolean("speaker_muted_" + roomId, muted).apply();
             }
             RoomRtcEngine.getInstance().setSpeakerMuted(muted);
-            com.Dramizo.Series.rtc.RoomSoundFx.setMuted(muted);
+            com.Dramizo.Series.util.RoomSoundFx.setMuted(muted);
             float sharedVolume = getSharedMusicVolume();
             RoomRtcEngine.getInstance().setLocalMusicVolume(muted ? 0f : sharedVolume);
             if (musicPlayer != null) musicPlayer.setVolume(muted ? 0f : sharedVolume);
