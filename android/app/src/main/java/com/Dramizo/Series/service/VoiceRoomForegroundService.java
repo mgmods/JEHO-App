@@ -75,17 +75,21 @@ public class VoiceRoomForegroundService extends Service {
     private ExoPlayer musicPlayer;
     private boolean stopping;
     private boolean musicHandoffPending;
+    private boolean handoffShouldPlay;
     private boolean uiAttachedWaitingForMusic;
     private final Player.Listener musicHandoffListener = new Player.Listener() {
         @Override public void onPlaybackStateChanged(int playbackState) {
+            // READY means the receiving player has prepared the exact item. Require
+            // playWhenReady for active songs so we never release the source too early.
             if (playbackState == Player.STATE_READY && musicHandoffPending
-                    && musicPlayer != null && !musicPlayer.getPlayWhenReady()) {
+                    && musicPlayer != null
+                    && musicPlayer.getPlayWhenReady() == handoffShouldPlay) {
                 musicHandoffPending = false;
                 notifyMusicHandoff(true);
             }
         }
         @Override public void onIsPlayingChanged(boolean isPlaying) {
-            if (isPlaying && musicHandoffPending) {
+            if (isPlaying && handoffShouldPlay && musicHandoffPending) {
                 musicHandoffPending = false;
                 notifyMusicHandoff(true);
             }
@@ -436,6 +440,16 @@ public class VoiceRoomForegroundService extends Service {
                     null, "stopped", 0L, null);
         }
         String action = intent.getAction();
+        // Notification actions can be delivered to a freshly recreated service instance.
+        // Restore the active room identity before handling leave/mic/speaker commands.
+        if (!ACTION_START.equals(action)) {
+            if (roomId == null || roomId.isEmpty()) {
+                roomId = intent.getStringExtra(EXTRA_ROOM_ID);
+                if (roomId == null || roomId.isEmpty()) roomId = activeRoomId(this);
+            }
+            if (roomTitle == null || roomTitle.isEmpty()) roomTitle = activeRoomTitle(this);
+            if (roomCoverUrl == null || roomCoverUrl.isEmpty()) roomCoverUrl = activeRoomCover(this);
+        }
         if (ACTION_LEAVE.equals(action)) {
             leaveRoom(intent.getStringExtra(EXTRA_ROOM_ID));
             return START_NOT_STICKY;
@@ -542,10 +556,16 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void toggleMicFromNotification() {
-        // Must use isMicEnabled — isPublishing stays true while mic is soft-muted.
+        // The service may have been recreated for this notification tap; use the
+        // persisted room id and keep the user's explicit mic choice across UI restore.
+        final String rid = roomId != null && !roomId.isEmpty() ? roomId : activeRoomId(this);
+        if (rid != null && !rid.isEmpty()) roomId = rid;
         boolean nextOn = !RoomRtcEngine.getInstance().isMicEnabled();
+        if (rid != null && !rid.isEmpty()) {
+            getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
+                    .putBoolean("user_chose_mute_" + rid, !nextOn).apply();
+        }
         RoomRtcEngine.getInstance().setMicEnabled(nextOn);
-        final String rid = roomId;
         if (rid != null && !rid.isEmpty()) {
             try {
                 AppContainer container = ((AuraLiveApp) getApplication()).getContainer();
@@ -559,8 +579,12 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void toggleSpeakerFromNotification() {
-        boolean nextMuted = !RoomRtcEngine.getInstance().isSpeakerMuted();
-        applySpeakerMute(nextMuted);
+        boolean currentMuted = roomId != null && !roomId.isEmpty()
+                ? getSharedPreferences("voice_room_audio", MODE_PRIVATE)
+                    .getBoolean("speaker_muted_" + roomId,
+                            RoomRtcEngine.getInstance().isSpeakerMuted())
+                : RoomRtcEngine.getInstance().isSpeakerMuted();
+        applySpeakerMute(!currentMuted);
     }
 
     private void applySpeakerMute(boolean muted) {
@@ -570,6 +594,7 @@ public class VoiceRoomForegroundService extends Service {
                         .putBoolean("speaker_muted_" + roomId, muted).apply();
             }
             RoomRtcEngine.getInstance().setSpeakerMuted(muted);
+            com.Dramizo.Series.rtc.RoomSoundFx.setMuted(muted);
             float sharedVolume = getSharedMusicVolume();
             RoomRtcEngine.getInstance().setLocalMusicVolume(muted ? 0f : sharedVolume);
             if (musicPlayer != null) musicPlayer.setVolume(muted ? 0f : sharedVolume);
@@ -646,9 +671,13 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private PendingIntent serviceAction(String action, int req) {
+        Intent command = new Intent(this, VoiceRoomForegroundService.class)
+                .setAction(action)
+                .putExtra(EXTRA_ROOM_ID, roomId)
+                .putExtra(EXTRA_TITLE, roomTitle)
+                .putExtra(EXTRA_COVER, roomCoverUrl);
         return PendingIntent.getService(
-                this, req,
-                new Intent(this, VoiceRoomForegroundService.class).setAction(action),
+                this, req, command,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
@@ -818,13 +847,18 @@ public class VoiceRoomForegroundService extends Service {
             return;
         }
         musicHandoffPending = true;
+        handoffShouldPlay = "playing".equalsIgnoreCase(status);
         final long targetBase = Math.max(0L, positionMs);
         final String started = startedAt;
         final String playStatus = status != null ? status : "stopped";
         // Resolve YouTube → stream offline; direct HTTP/mp3 URLs play as-is.
         if (isYoutubeUrl(url)) {
             final String videoId = youtubeId(url);
-            if (videoId == null || videoId.isEmpty()) return;
+            if (videoId == null || videoId.isEmpty()) {
+                musicHandoffPending = false;
+                notifyMusicHandoff(false);
+                return;
+            }
             new Thread(() -> {
                 try {
                     com.Dramizo.Series.util.YoutubeAudioResolver.Resolved resolved =
@@ -850,7 +884,13 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void playMusicUrl(String absolute, String status, long positionMs, String startedAt) {
-        if (musicPlayer == null || absolute == null || absolute.isEmpty()) return;
+        if (musicPlayer == null || absolute == null || absolute.isEmpty()) {
+            if (musicHandoffPending) {
+                musicHandoffPending = false;
+                notifyMusicHandoff(false);
+            }
+            return;
+        }
         try {
             musicPlayer.setMediaItem(MediaItem.fromUri(absolute));
             musicPlayer.prepare();
@@ -919,6 +959,13 @@ public class VoiceRoomForegroundService extends Service {
         }
         RoomRtcEngine.getInstance().logoutRoom();
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().clear().apply();
+        if (leavingRoom != null) {
+            getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
+                    .remove("user_chose_mute_" + leavingRoom)
+                    .remove("speaker_muted_" + leavingRoom)
+                    .remove("shared_music_volume_" + leavingRoom)
+                    .apply();
+        }
         detachBackgroundOwner();
         clearRoomNotifications(this);
         stopForeground(STOP_FOREGROUND_REMOVE);
