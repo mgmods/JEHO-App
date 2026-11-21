@@ -1580,7 +1580,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             switchingRoom = false;
             ActiveRoomSession.get().capture(
                     roomId, session, viewModel.getRoom().getValue(),
-                    isHost, isAgencyRoom, micOn, roomSpeakerMuted);
+                    isHost, isAgencyRoom, micOn, userChoseMute, roomSpeakerMuted);
             rtcCanPublish = session.canPublish;
             // expireAt from API is unix seconds — needed so first publish does not wait forever.
             rtcPublishTokenExpiresAtMs = session.expireAt > 0
@@ -1657,7 +1657,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             }
         }
-        RoomRtcEngine.getInstance().setMicEnabled(micOn);
+        RoomRtcEngine.getInstance().setMicEnabled(
+                micOn && !ActiveRoomSession.get().isMicSuspendedForBackground());
         roomSpeakerMuted = false;
         try {
             RoomRtcEngine.getInstance().clearPausedPlayStreams();
@@ -13134,6 +13135,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && roomId != null && !roomId.isEmpty()
                 && (pendingSession != null
                     || ActiveRoomSession.get().canResumeUi(roomId))) {
+            suspendRoomMicForBackground();
             ensuringRoomKeepAlive(true);
         }
         super.onUserLeaveHint();
@@ -13176,6 +13178,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Mikoo minimize / leave-UI: keep hearing others; mute only own mic.
             ensuringRoomKeepAlive(true);
             ensureMinimizedListeningState();
+            suspendRoomMicForBackground();
         } else if (!exiting) {
             muteAudioForBackground();
         }
@@ -13200,15 +13203,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // A resumed room UI must clear the session's minimized marker as well.
         // This is lifecycle-only: never call seat leave/join or change server seat indices.
         ActiveRoomSession.get().setMinimized(false);
-        // UI is back — stop FGS owner and restore intended mic (never force open).
+        ActiveRoomSession.get().setMicSuspendedForBackground(false);
+        try {
+            com.Dramizo.Series.rtc.RoomAudioSession.resume(this);
+        } catch (Exception ignored) {
+        }
+        // Restore saved user mic intent, not the temporarily suspended RTC track state.
         try {
             VoiceRoomForegroundService.attachUi(this);
         } catch (RuntimeException ignored) {
         }
         unmuteAudioAfterBackground();
         try {
-            // Prefer live Zego mic state (may have been toggled from notification / mini).
-            micOn = RoomRtcEngine.getInstance().isMicEnabled();
+            if (userChoseMute) micOn = false;
             RoomRtcEngine.getInstance().setMicEnabled(micOn);
             syncMicUi();
         } catch (Exception ignored) {
@@ -13233,6 +13240,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (pendingSeatInviteDialog) {
             pendingSeatInviteDialog = false;
             handler.postDelayed(this::showPendingSeatInviteDialog, 300);
+        }
+    }
+
+    /** Release local microphone capture in background without leaving the room/seat. */
+    private void suspendRoomMicForBackground() {
+        if (exiting || isChangingConfigurations()) return;
+        ActiveRoomSession.get().setMicSuspendedForBackground(true);
+        try {
+            RoomRtcEngine.getInstance().setMicEnabled(false);
+            boolean musicMixNeeded = canManageMusic
+                    && isLocalMusicUrl(currentMusicUrl)
+                    && ("playing".equalsIgnoreCase(currentMusicStatus)
+                    || "paused".equalsIgnoreCase(currentMusicStatus));
+            // Stop a normal mic publisher completely; preserve a DJ's music-only stream.
+            if (!musicMixNeeded) RoomRtcEngine.getInstance().stopPublishing();
+        } catch (Throwable ignored) {
+        }
+        try {
+            com.Dramizo.Series.rtc.RoomAudioSession.suspend(this);
+        } catch (Throwable ignored) {
         }
     }
 
@@ -17840,7 +17867,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && isLocalMusicUrl(currentMusicUrl)
                 && ("playing".equalsIgnoreCase(currentMusicStatus)
                 || "paused".equalsIgnoreCase(currentMusicStatus));
-        boolean shouldPublish = onSeat || musicMixPublish;
+        boolean micSuspendedInBackground = ActiveRoomSession.get().isMicSuspendedForBackground();
+        boolean shouldPublish = (onSeat && !micSuspendedInBackground) || musicMixPublish;
         boolean moderatorMuted = false;
         if (onSeat && seats != null) {
             for (RoomDtos.SeatDto seat : seats) {
@@ -17852,7 +17880,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (shouldPublish) {
             // Music-only publish: keep mic soft-muted unless seated with micOn.
-            RoomRtcEngine.getInstance().setMicEnabled(onSeat && micOn);
+            RoomRtcEngine.getInstance().setMicEnabled(
+                    onSeat && micOn && !micSuspendedInBackground);
             if (moderatorMuted && onSeat) {
                 rtcCanPublish = false;
                 handler.removeCallbacks(rtcTokenRefreshRunnable);
