@@ -157,6 +157,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         holder.itemView.setOnClickListener(v -> listener.onSelect(item));
 
         boolean headwear = isFrame;
+        boolean voiceWave = "voice_wave".equalsIgnoreCase(item.type);
         String still = stillPreviewUrl(item.previewUrl, item.animationUrl);
         String abs = AssetCatalog.absoluteUrl(still);
 
@@ -185,7 +186,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
             request.into(holder.b.imgPreview);
         }
 
-        if (headwear) {
+        if (headwear || voiceWave) {
             holder.b.imgFace.setVisibility(View.VISIBLE);
             ensureCircle(holder.b.imgFace);
             String avatarUrl = null;
@@ -211,6 +212,47 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
             Glide.with(holder.b.imgFace.getContext().getApplicationContext()).clear(holder.b.imgFace);
             holder.b.imgFace.setVisibility(View.GONE);
         }
+
+        if (voiceWave && holder.b.imgPreview.getVisibility() == View.VISIBLE
+                && abs != null && !abs.isEmpty()) {
+            holder.b.imgPreview.setClipToOutline(true);
+            holder.b.imgPreview.setOutlineProvider(new ViewOutlineProvider() {
+                @Override public void getOutline(View v, android.graphics.Outline outline) {
+                    outline.setOval(0, 0, Math.max(1, v.getWidth()), Math.max(1, v.getHeight()));
+                }
+            });
+            holder.b.imgPreview.setTag(R.id.imgPreview, startVoiceWavePreviewMotion(holder.b.imgPreview));
+        } else {
+            Object oldAnimator = holder.b.imgPreview.getTag(R.id.imgPreview);
+            if (oldAnimator instanceof android.animation.ValueAnimator) {
+                ((android.animation.ValueAnimator) oldAnimator).cancel();
+            }
+            holder.b.imgPreview.setTag(R.id.imgPreview, null);
+            holder.b.imgPreview.setScaleX(1f);
+            holder.b.imgPreview.setScaleY(1f);
+            holder.b.imgPreview.setAlpha(1f);
+        }
+    }
+
+    private static android.animation.ValueAnimator startVoiceWavePreviewMotion(View view) {
+        Object old = view.getTag(R.id.imgPreview);
+        if (old instanceof android.animation.ValueAnimator) {
+            ((android.animation.ValueAnimator) old).cancel();
+        }
+        android.animation.ValueAnimator animator =
+                android.animation.ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(760L);
+        animator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        animator.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+        animator.addUpdateListener(a -> {
+            float t = (Float) a.getAnimatedValue();
+            float scale = 0.95f + (0.06f * t);
+            view.setScaleX(scale);
+            view.setScaleY(scale);
+            view.setAlpha(0.9f + (0.1f * t));
+        });
+        animator.start();
+        return animator;
     }
 
     @Override
