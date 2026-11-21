@@ -5114,7 +5114,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         final List<String> recipients = new ArrayList<>(unique);
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        markLuckyOverlayActive(1500L);
+        markLuckyOverlayActive(2800L);
         Runnable launch = () -> launchLuckyGiftScatter(
                 icon, recipients, totalCoins, quantity, recipients.size(), null, 0);
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
@@ -12339,7 +12339,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        markLuckyOverlayActive(1500L);
+        markLuckyOverlayActive(2800L);
         Runnable launch = () -> {
             if (binding == null || binding.giftOverlay == null) return;
             launchLuckyGiftScatter(
