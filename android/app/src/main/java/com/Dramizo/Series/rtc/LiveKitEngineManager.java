@@ -706,6 +706,13 @@ public final class LiveKitEngineManager {
     }
 
     private void applyAudioRoute() {
+        // Async LiveKit mic-disable callbacks can finish after the Activity has gone
+        // background. Never let those callbacks reclaim VoIP mode/focus while another
+        // app (e.g. WhatsApp voice notes) needs the physical microphone.
+        if (RoomAudioSession.isSuspended()) {
+            RoomAudioRoute.releaseCommunicationRoute(application);
+            return;
+        }
         // wantOpenSpeaker = !speakerMuted (room “speaker” button on).
         RoomAudioRoute.applyCommunicationRoute(application, !speakerMuted);
     }
