@@ -1341,6 +1341,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       profileCardUrl: vipVisuals?.profileCardUrl || vipVisuals?.vipCardUrl || profile.profileCardUrl || user.profileCardUrl || null,
       chatBubbleUrl: vipVisuals?.chatBubbleUrl || profile.chatBubbleUrl || user.chatBubbleUrl || null,
       nameplateUrl: vipVisuals?.nameplateUrl || null,
+      voiceWaveUrl: profile.voiceWaveUrl ?? user.voiceWaveUrl ?? null,
+      voiceWaveUrl: profile.voiceWaveUrl ?? user.voiceWaveUrl ?? null,
       ...(displayRank || {}),
       profile: undefined,
     };
