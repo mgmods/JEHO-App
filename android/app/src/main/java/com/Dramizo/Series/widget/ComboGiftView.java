@@ -39,6 +39,7 @@ public class ComboGiftView extends FrameLayout {
     // updates omit the avatar URL; otherwise the profile image can blink away.
     @Nullable private String lastCannonSenderName;
     @Nullable private String lastCannonAvatarUrl;
+    @Nullable private String boundSenderAvatarUrl;
     // Cache valid profile images by sender because subsequent X events omit avatarUrl.
     private final Map<String, String> cannonAvatarBySender = new HashMap<>();
     @Nullable private Runnable hideRunnable;
@@ -82,12 +83,16 @@ public class ComboGiftView extends FrameLayout {
         final int fallback = com.Dramizo.Series.util.ImagePlaceholder.avatar();
         String raw = avatarUrl != null ? avatarUrl.trim() : "";
         if (raw.isEmpty()) {
+            if (boundSenderAvatarUrl == null) return;
             try { Glide.with(avatar).clear(avatar); } catch (Exception ignored) {}
+            boundSenderAvatarUrl = null;
             avatar.setImageResource(fallback);
             return;
         }
         String resolved = AssetCatalog.absoluteUrl(raw);
         if (resolved == null || resolved.trim().isEmpty()) resolved = raw;
+        if (resolved.equals(boundSenderAvatarUrl)) return;
+        boundSenderAvatarUrl = resolved;
         avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
         avatar.setImageResource(fallback);
         try {
@@ -189,8 +194,7 @@ public class ComboGiftView extends FrameLayout {
             }
             lastCannonSenderName = currentSender;
             String stableAvatar = !currentSender.isEmpty() ? cannonAvatarBySender.get(currentSender) : null;
-            if (stableAvatar == null || stableAvatar.isEmpty()) stableAvatar = lastCannonAvatarUrl;
-            // Missing avatar fields in later X updates must never clear the visible profile image.
+            // Keep the same sender's already-bound image; clear only when a different sender has no known image.
             bindSenderAvatar(stableAvatar);
             avatar.setVisibility(VISIBLE);
         }
