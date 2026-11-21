@@ -13378,6 +13378,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    /**
+     * Reconcile room audio controls after returning from the background notification.
+     * The service may have changed mic/speaker/volume while this Activity was not visible.
+     */
+    private void restoreNotificationAudioState() {
+        if (roomId == null || roomId.isEmpty()) return;
+        try {
+            android.content.SharedPreferences prefs =
+                    getSharedPreferences("voice_room_audio", MODE_PRIVATE);
+            userChoseMute = prefs.getBoolean("user_chose_mute_" + roomId, userChoseMute);
+            micOn = RoomRtcEngine.getInstance().isMicEnabled();
+            if (roomSpeakerMuted != prefs.getBoolean("speaker_muted_" + roomId, roomSpeakerMuted)) {
+                roomSpeakerMuted = prefs.getBoolean("speaker_muted_" + roomId, roomSpeakerMuted);
+            }
+            sharedMusicVolume = Math.max(0f, Math.min(1f,
+                    prefs.getFloat("shared_music_volume_" + roomId, sharedMusicVolume)));
+            RoomRtcEngine.getInstance().setSpeakerMuted(roomSpeakerMuted);
+            RoomSoundFx.setMuted(roomSpeakerMuted);
+            applySharedMusicVolume();
+            syncMicUi();
+        } catch (Exception e) {
+            android.util.Log.w("VoiceRoom", "Could not restore notification audio controls", e);
+        }
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -13400,6 +13425,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         minimizing = false;
         ActiveRoomSession.get().setMinimized(false);
+        restoreNotificationAudioState();
         // Same room brought back (notification / singleTask) — never rejoin.
         if (incomingRoomId != null && incomingRoomId.equals(roomId) && pendingSession != null) {
             resumedFromActiveSession = true;
