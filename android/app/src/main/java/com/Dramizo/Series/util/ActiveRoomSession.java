@@ -21,6 +21,7 @@ public final class ActiveRoomSession {
     private boolean host;
     private boolean agencyRoom;
     private boolean micOn;
+    private boolean userChoseMute;
     private boolean speakerMuted;
 
     private ActiveRoomSession() {}
@@ -36,6 +37,7 @@ public final class ActiveRoomSession {
             boolean host,
             boolean agencyRoom,
             boolean micOn,
+            boolean userChoseMute,
             boolean speakerMuted
     ) {
         if (roomId == null || roomId.isEmpty() || session == null) return;
@@ -60,6 +62,7 @@ public final class ActiveRoomSession {
         this.host = host;
         this.agencyRoom = agencyRoom;
         this.micOn = micOn;
+        this.userChoseMute = userChoseMute;
         this.speakerMuted = speakerMuted;
     }
 
@@ -84,6 +87,14 @@ public final class ActiveRoomSession {
 
     public synchronized void setMicOn(boolean value) {
         micOn = value;
+    }
+
+    public synchronized void setUserChoseMute(boolean value) {
+        userChoseMute = value;
+    }
+
+    public synchronized boolean isUserChoseMute() {
+        return userChoseMute;
     }
 
     public synchronized void setSpeakerMuted(boolean value) {
@@ -139,10 +150,12 @@ public final class ActiveRoomSession {
     }
 
     /** Snapshot flags for UI restore without inventing a new join. */
-    public synchronized void syncFlags(boolean host, boolean agencyRoom, boolean micOn, boolean speakerMuted) {
+    public synchronized void syncFlags(boolean host, boolean agencyRoom, boolean micOn,
+                                        boolean userChoseMute, boolean speakerMuted) {
         this.host = host;
         this.agencyRoom = agencyRoom;
         this.micOn = micOn;
+        this.userChoseMute = userChoseMute;
         this.speakerMuted = speakerMuted;
     }
 
@@ -159,6 +172,7 @@ public final class ActiveRoomSession {
         host = false;
         agencyRoom = false;
         micOn = false;
+        userChoseMute = false;
         speakerMuted = false;
     }
 }
