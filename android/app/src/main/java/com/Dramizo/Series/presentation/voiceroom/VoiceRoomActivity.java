@@ -4369,7 +4369,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     roomMusicPlayerListener = null;
                 }
                 VoiceRoomForegroundService.offerMusicPlayer(
-                        roomMusicPlayer, roomId, handoffMusicUrl, currentMusicStatus);
+                        roomMusicPlayer, roomId, currentMusicUrl, handoffMusicUrl, currentMusicStatus);
             }
             try {
                 ContextCompat.startForegroundService(
@@ -5458,6 +5458,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void setupMusicUi() {
         if (roomMusicPlayer != null) return;
         roomMusicPlayer = VoiceRoomForegroundService.takeMusicPlayerForUi();
+        if (roomMusicPlayer != null) {
+            String restoredSourceUrl = VoiceRoomForegroundService.consumeReturnedMusicSourceUrl();
+            String restoredPlayableUrl = VoiceRoomForegroundService.consumeReturnedMusicPlayableUrl();
+            if (restoredSourceUrl != null && !restoredSourceUrl.isEmpty()) {
+                preparedMusicUrl = isYoutubeMusicUrl(restoredSourceUrl)
+                        ? restoredSourceUrl : AssetCatalog.absoluteUrl(restoredSourceUrl);
+                currentMusicHandoffUrl = restoredPlayableUrl;
+                youtubeUsingEmbed = false;
+            }
+        }
         if (roomMusicPlayer == null) roomMusicPlayer = new ExoPlayer.Builder(this)
                 .setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
                         .setDataSourceFactory(
