@@ -577,10 +577,17 @@ public class VoiceRoomForegroundService extends Service {
         // persisted room id and keep the user's explicit mic choice across UI restore.
         final String rid = roomId != null && !roomId.isEmpty() ? roomId : activeRoomId(this);
         if (rid != null && !rid.isEmpty()) roomId = rid;
-        boolean nextOn = !RoomRtcEngine.getInstance().isMicEnabled();
+        android.content.SharedPreferences audioPrefs =
+                getSharedPreferences("voice_room_audio", MODE_PRIVATE);
+        boolean currentlyMuted = rid != null && !rid.isEmpty()
+                ? audioPrefs.getBoolean("user_chose_mute_" + rid,
+                        !RoomRtcEngine.getInstance().isMicEnabled())
+                : !RoomRtcEngine.getInstance().isMicEnabled();
+        // The persisted explicit user choice is authoritative across Activity recreation
+        // and notification actions; RTC engine state alone may lag during reconnect.
+        boolean nextOn = currentlyMuted;
         if (rid != null && !rid.isEmpty()) {
-            getSharedPreferences("voice_room_audio", MODE_PRIVATE).edit()
-                    .putBoolean("user_chose_mute_" + rid, !nextOn).apply();
+            audioPrefs.edit().putBoolean("user_chose_mute_" + rid, !nextOn).apply();
         }
         RoomRtcEngine.getInstance().setMicEnabled(nextOn);
         if (rid != null && !rid.isEmpty()) {
@@ -694,9 +701,14 @@ public class VoiceRoomForegroundService extends Service {
                 .putExtra(EXTRA_ROOM_ID, roomId)
                 .putExtra(EXTRA_TITLE, roomTitle)
                 .putExtra(EXTRA_COVER, roomCoverUrl);
-        return PendingIntent.getService(
-                this, req, command,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+        // Notification actions must be delivered reliably while the app is backgrounded.
+        // The room service is already foreground; use the foreground-service PendingIntent
+        // on Android O+ so mic/speaker/leave taps are not rejected as background starts.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            return PendingIntent.getForegroundService(this, req, command, flags);
+        }
+        return PendingIntent.getService(this, req, command, flags);
     }
 
     private Notification buildForegroundNotification() {
