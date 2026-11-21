@@ -502,6 +502,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyOverlayActive;
     private Runnable luckyOverlayRelease;
     private ExoPlayer roomMusicPlayer;
+    @Nullable private Player.Listener roomMusicPlayerListener;
     /** Lazy: create only when a Mikoo game opens (WebView cold-create freezes S23 if done in onCreate). */
     @Nullable private WebView roomGameWebView;
     /** Lazy: YouTube embed disc WebView. */
@@ -4282,61 +4283,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void completeRoomMinimizeWhenMusicReady(long startedAtMs) {
         if (!minimizeHandoffPending || isFinishing() || exiting) return;
-        boolean needsMediaHandoff = "playing".equalsIgnoreCase(currentMusicStatus)
-                && currentMusicUrl != null && !currentMusicUrl.isEmpty()
-                && !isLocalMusicUrl(currentMusicUrl);
-        if (needsMediaHandoff
-                && !VoiceRoomForegroundService.isMusicHandoffReady(roomId,
-                        currentMusicHandoffUrl != null ? currentMusicHandoffUrl : currentMusicUrl)) {
-            if (System.currentTimeMillis() - startedAtMs < 4000L) {
-                handler.postDelayed(() -> completeRoomMinimizeWhenMusicReady(startedAtMs), 30L);
-                return;
-            }
-            // Keep the room visible and its original player alive if the background player
-            // cannot prepare the same track. Never trade a failed handoff for silence.
-            minimizeHandoffPending = false;
-            minimizing = false;
-            ActiveRoomSession.get().setMinimized(false);
-            // The background decoder did not take over. Keep the original Activity
-            // player running at its normal level before stopping the FGS owner.
-            try {
-                if (roomMusicPlayer != null) roomMusicPlayer.setVolume(1f);
-            } catch (Exception ignored) {
-            }
-            try { VoiceRoomForegroundService.attachUi(this); } catch (RuntimeException ignored) {}
-            ensureMinimizedListeningState();
-            Toast.makeText(getApplicationContext(),
-                    "تعذر تجهيز الموسيقى بالخلفية؛ بقيت الغرفة مفتوحة حتى لا ينقطع الصوت",
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-
+        // The foreground service now owns the same ExoPlayer instance; no decoder
+        // preparation, second stream, wait loop, or cross-fade is required.
+        minimizeHandoffPending = false;
         Toast.makeText(getApplicationContext(), R.string.room_minimized_audio_continues,
                 Toast.LENGTH_SHORT).show();
-        if (needsMediaHandoff && roomMusicPlayer != null) {
-            final ExoPlayer player = roomMusicPlayer;
-            ValueAnimator fade = ValueAnimator.ofFloat(player.getVolume(), 0f);
-            fade.setDuration(100L);
-            fade.addUpdateListener(animation -> {
-                if (roomMusicPlayer == player) {
-                    player.setVolume((float) animation.getAnimatedValue());
-                }
-            });
-            fade.addListener(new android.animation.AnimatorListenerAdapter() {
-                @Override public void onAnimationEnd(android.animation.Animator animation) {
-                    if (minimizeHandoffPending && !isFinishing() && !exiting) {
-                        minimizeHandoffPending = false;
-                        navigateHomeAndFinish();
-                    }
-                }
-            });
-            fade.start();
-        } else {
-            minimizeHandoffPending = false;
-            navigateHomeAndFinish();
-        }
+        navigateHomeAndFinish();
     }
-
     /**
      * While the room UI is hidden, keep the live RTC session and every occupied seat intact.
      * Minimize is not a leave/mute action: changing local mic state here can make the RTC
@@ -4403,7 +4356,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ? binding.tvRoomTitle.getText() : null;
         try {
             currentMusicHandoffUrl = handoffMusicUrl;
-            ContextCompat.startForegroundService(
+            boolean transferMusicPlayer = roomMusicPlayer != null
+                    && currentMusicUrl != null && !currentMusicUrl.isEmpty()
+                    && !isLocalMusicUrl(currentMusicUrl)
+                    && ("playing".equalsIgnoreCase(currentMusicStatus)
+                    || "paused".equalsIgnoreCase(currentMusicStatus));
+            if (transferMusicPlayer) {
+                if (binding != null && binding.musicVideoSurface != null) musicVideoSetPlayer(null);
+                if (binding != null && binding.musicFloatVideo != null) musicFloatSetPlayer(null);
+                if (roomMusicPlayerListener != null) {
+                    roomMusicPlayer.removeListener(roomMusicPlayerListener);
+                    roomMusicPlayerListener = null;
+                }
+                VoiceRoomForegroundService.offerMusicPlayer(
+                        roomMusicPlayer, roomId, handoffMusicUrl, currentMusicStatus);
+            }
+            try {
+                ContextCompat.startForegroundService(
                     this,
                     VoiceRoomForegroundService.startIntent(
                             this,
@@ -4414,6 +4383,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             currentMusicStatus,
                             musicPosition,
                             handoffStartedAt));
+                if (transferMusicPlayer) roomMusicPlayer = null;
+            } catch (RuntimeException startError) {
+                if (transferMusicPlayer) {
+                    VoiceRoomForegroundService.cancelOfferedMusicPlayer(roomMusicPlayer);
+                    if (roomMusicPlayerListener != null) roomMusicPlayer.addListener(roomMusicPlayerListener);
+                    if (binding != null && binding.musicVideoSurface != null) musicVideoSetPlayer(roomMusicPlayer);
+                    if (binding != null && binding.musicFloatVideo != null) musicFloatSetPlayer(roomMusicPlayer);
+                }
+                throw startError;
+            }
         } catch (RuntimeException ignored) {
         }
     }
@@ -5478,7 +5457,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void setupMusicUi() {
         if (roomMusicPlayer != null) return;
-        roomMusicPlayer = new ExoPlayer.Builder(this)
+        roomMusicPlayer = VoiceRoomForegroundService.takeMusicPlayerForUi();
+        if (roomMusicPlayer == null) roomMusicPlayer = new ExoPlayer.Builder(this)
                 .setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
                         .setDataSourceFactory(
                                 new androidx.media3.datasource.DefaultHttpDataSource.Factory()
@@ -5503,7 +5483,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 skipMusicTrack();
             });
         });
-        roomMusicPlayer.addListener(new Player.Listener() {
+        roomMusicPlayerListener = new Player.Listener() {
             @Override
             public void onPlaybackStateChanged(int playbackState) {
                 if (playbackState == Player.STATE_ENDED
@@ -5542,7 +5522,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             public void onRenderedFirstFrame() {
                 showMusicVideoSurface(true);
             }
-        });
+        };
+        roomMusicPlayer.addListener(roomMusicPlayerListener);
         if (binding.musicVideoSurface != null) {
             musicVideoSetPlayer(roomMusicPlayer);
         }
