@@ -12259,7 +12259,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         for (String uid : userIds) {
             if (uid == null || uid.isEmpty()) continue;
             View seat = findSeatViewForUser(uid);
-            if (seat == null) continue;
+            // A holder can exist before RecyclerView finishes measuring it. A
+            // zero-size seat resolves to the overlay origin and sends the gift
+            // toward an edge, so let the bounded retry wait for real bounds.
+            if (seat == null || seat.getWidth() <= 0 || seat.getHeight() <= 0) continue;
             android.graphics.PointF p =
                     GiftFlyAnimator.centerInOverlay(binding.giftOverlay, seat);
             if (p != null) targets.add(p);
