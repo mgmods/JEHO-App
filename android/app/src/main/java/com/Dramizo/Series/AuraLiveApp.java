@@ -33,6 +33,8 @@ import com.Dramizo.Series.util.AuraNotificationHelper;
 import com.Dramizo.Series.util.NotificationRouter;
 import com.Dramizo.Series.util.RoomSoundFx;
 import com.Dramizo.Series.rtc.RoomRtcEngine;
+import com.Dramizo.Series.rtc.RoomAudioSession;
+import com.Dramizo.Series.service.VoiceRoomForegroundService;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.gson.JsonElement;
@@ -51,6 +53,12 @@ public class AuraLiveApp extends Application {
     private static volatile Activity foregroundActivity;
     private static volatile int startedActivities;
     private volatile String registeredFcmIdentity;
+    // Release the VoIP microphone/audio mode while another app (e.g. WhatsApp)
+    // is foregrounded. The room connection and playback remain alive.
+    private boolean roomAudioSuspendedForExternalApp;
+    private boolean roomMicWasEnabledBeforeExternalApp;
+    @Nullable private String roomMicRoomIdBeforeExternalApp;
+
     private static final int REQUEST_POST_NOTIFICATIONS = 8104;
     private static final String NOTIFICATION_PERMISSION_PREFS = "jeho_notification_permission";
 
@@ -72,6 +80,69 @@ public class AuraLiveApp extends Application {
 
     public static boolean isAppInForeground() {
         return startedActivities > 0;
+    }
+
+    private void suspendRoomAudioForExternalApp() {
+        if (roomAudioSuspendedForExternalApp) return;
+        RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+        String activeRoomId = rtc.getCurrentRoomId();
+        if (activeRoomId == null || activeRoomId.isEmpty() || !rtc.isInRoom(activeRoomId)) {
+            return;
+        }
+
+        roomMicRoomIdBeforeExternalApp = activeRoomId;
+        roomMicWasEnabledBeforeExternalApp = rtc.isMicEnabled() && rtc.isPublishing();
+
+        // Keep the seat/session connected, but stop local capture before another app
+        // opens its recorder. This also prevents external speech from entering JEHO.
+        if (roomMicWasEnabledBeforeExternalApp) {
+            rtc.setMicEnabled(false);
+            updateRoomMicMutedState(activeRoomId, true);
+        }
+
+        // MODE_IN_COMMUNICATION + voice focus can make Android report that a call
+        // owns the microphone. Restore normal system audio routing for other apps.
+        RoomAudioSession.release(this);
+        roomAudioSuspendedForExternalApp = true;
+        VoiceRoomForegroundService.refreshAudioForegroundType();
+    }
+
+    private void restoreRoomAudioAfterExternalApp() {
+        if (!roomAudioSuspendedForExternalApp) return;
+
+        RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+        String expectedRoomId = roomMicRoomIdBeforeExternalApp;
+        boolean sameRoomStillActive = expectedRoomId != null
+                && expectedRoomId.equals(rtc.getCurrentRoomId())
+                && rtc.isInRoom(expectedRoomId);
+
+        roomAudioSuspendedForExternalApp = false;
+        roomMicRoomIdBeforeExternalApp = null;
+
+        if (sameRoomStillActive) {
+            RoomAudioSession.acquire(this);
+            rtc.reapplyAudioRoute();
+
+            // Only restore a mic that was publishing before Home was pressed.
+            // If the user left the seat while away, publishing will have stopped.
+            if (roomMicWasEnabledBeforeExternalApp && rtc.isPublishing()) {
+                rtc.setMicEnabled(true);
+                updateRoomMicMutedState(expectedRoomId, false);
+            }
+        }
+        roomMicWasEnabledBeforeExternalApp = false;
+        VoiceRoomForegroundService.refreshAudioForegroundType();
+    }
+
+    private void updateRoomMicMutedState(@Nullable String roomId, boolean muted) {
+        if (roomId == null || roomId.isEmpty() || container == null) return;
+        try {
+            container.getIoExecutor().execute(() ->
+                    container.getRoomRepository().setMic(roomId, muted));
+        } catch (Throwable t) {
+            android.util.Log.w("AuraLiveApp", "Background room mic state update skipped: "
+                    + t.getMessage());
+        }
     }
 
     @Override
@@ -140,7 +211,9 @@ public class AuraLiveApp extends Application {
                         AppLoadingOverlay.showOnEntry(activity));
             }
             @Override public void onActivityStarted(Activity activity) {
+                boolean returningFromBackground = startedActivities == 0;
                 startedActivities++;
+                if (returningFromBackground) restoreRoomAudioAfterExternalApp();
                 // ThemedActivity pads contentRoot once in onPostCreate — skip global double-pad.
                 if (activity instanceof ThemedActivity) return;
                 // Skip shells that manage their own insets
@@ -182,6 +255,7 @@ public class AuraLiveApp extends Application {
             @Override public void onActivityStopped(Activity activity) {
                 startedActivities = Math.max(0, startedActivities - 1);
                 if (foregroundActivity == activity) foregroundActivity = null;
+                if (startedActivities == 0) suspendRoomAudioForExternalApp();
             }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
             @Override public void onActivityDestroyed(Activity activity) {}
