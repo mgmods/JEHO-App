@@ -5173,13 +5173,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (binding == null || binding.giftOverlay == null) return;
             List<PointF> destinations = resolveMicCenters(recipients);
             if (destinations.isEmpty()) return;
-            // Cannon gift reveal must be centered in the actual gift overlay,
-            // never anchored to a seat or pushed toward a screen edge.
-            // The stage animator's null revealCenter resolves to overlay width/2, height/2.
+            // Launch from the sender's occupied mic; listeners launch from the bottom edge.
+            // The hero travels to the center, grows, then splits evenly toward selected mics.
             com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
                     binding.giftOverlay, icon, destinations, totalCoins,
                     Math.max(1, quantity), Math.max(1, recipients.size()),
-                    resolveLuckyGiftRevealCenter(), null, null);
+                    resolveLuckyGiftLaunchPoint(), resolveLuckyGiftRevealCenter(),
+                    true, null, null);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
             binding.giftOverlay.post(launch);
@@ -5203,6 +5203,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         int w = Math.max(binding.giftOverlay.getWidth(), 1);
         int h = Math.max(binding.giftOverlay.getHeight(), 1);
         return new PointF(w * 0.50f, h * 0.52f);
+    }
+
+    /** Sender mic is the launch point; listeners launch from the lower screen edge. */
+    @Nullable
+    private PointF resolveLuckyGiftLaunchPoint() {
+        if (binding == null || binding.giftOverlay == null) return null;
+        View senderSeat = myUserId != null ? findSeatViewForUser(myUserId) : null;
+        if (senderSeat != null) {
+            PointF micCenter = GiftFlyAnimator.centerInOverlay(binding.giftOverlay, senderSeat);
+            if (micCenter != null) return micCenter;
+        }
+        int w = Math.max(binding.giftOverlay.getWidth(), 1);
+        int h = Math.max(binding.giftOverlay.getHeight(), 1);
+        return new PointF(w * 0.5f, Math.max(0f, h - luckyCannonDp(42)));
     }
 
     /** Highlight occupied seats matching gift recipients while the gift sheet is open. */
