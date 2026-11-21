@@ -55,6 +55,9 @@ public final class LuckyGiftStageAnimator {
         stage.setClipChildren(false);
         stage.setClipToPadding(false);
         stage.setClickable(false);
+        // Room UI is Arabic/RTL. Keep the animation stage LTR so absolute X
+        // coordinates and left margins are never mirrored toward the right edge.
+        stage.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         stage.setElevation(overlay.getElevation() + 40f * density);
         stage.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -66,7 +69,8 @@ public final class LuckyGiftStageAnimator {
         glowBg.setShape(GradientDrawable.OVAL);
         glow.setBackground(glowBg);
         FrameLayout.LayoutParams glowLp = new FrameLayout.LayoutParams(
-                Math.round(164f * density), Math.round(164f * density));
+                Math.round(164f * density), Math.round(164f * density),
+                Gravity.TOP | Gravity.LEFT);
         glowLp.leftMargin = Math.round(centerX - 82f * density);
         glowLp.topMargin = Math.round(centerY - 82f * density);
         stage.addView(glow, glowLp);
@@ -78,7 +82,8 @@ public final class LuckyGiftStageAnimator {
         hero.setScaleType(ImageView.ScaleType.FIT_CENTER);
         loadGift(hero, giftIconUrl);
         FrameLayout.LayoutParams heroLp = new FrameLayout.LayoutParams(
-                Math.round(112f * density), Math.round(112f * density));
+                Math.round(112f * density), Math.round(112f * density),
+                Gravity.TOP | Gravity.LEFT);
         heroLp.leftMargin = Math.round(centerX - 56f * density);
         heroLp.topMargin = Math.round(centerY - 56f * density);
         stage.addView(hero, heroLp);
