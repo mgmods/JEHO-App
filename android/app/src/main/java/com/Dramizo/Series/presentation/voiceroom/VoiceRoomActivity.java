@@ -1678,8 +1678,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && (currentSeats == null || currentSeats.isEmpty())) {
             currentSeats = session.room.seats;
         }
-        userChoseMute = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
-                .getBoolean("user_chose_mute_" + roomId, userChoseMute);
+        android.content.SharedPreferences roomAudioPrefs =
+                getSharedPreferences("voice_room_audio", MODE_PRIVATE);
+        userChoseMute = roomAudioPrefs.getBoolean("user_chose_mute_" + roomId, userChoseMute);
+        sharedMusicVolume = Math.max(0f, Math.min(1f,
+                roomAudioPrefs.getFloat("shared_music_volume_" + roomId, sharedMusicVolume)));
         if (isOnSeat(currentSeats)) {
             if (!userChoseMute) {
                 RoomDtos.SeatDto mySeat = findMySeat(currentSeats);
@@ -1689,8 +1692,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         RoomRtcEngine.getInstance().setMicEnabled(micOn);
-        roomSpeakerMuted = getSharedPreferences("voice_room_audio", MODE_PRIVATE)
-                .getBoolean("speaker_muted_" + roomId, false);
+        roomSpeakerMuted = roomAudioPrefs.getBoolean("speaker_muted_" + roomId, false);
         try {
             RoomRtcEngine.getInstance().clearPausedPlayStreams();
             RoomRtcEngine.getInstance().setSpeakerMuted(roomSpeakerMuted);
@@ -13247,6 +13249,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         android.content.SharedPreferences roomAudioPrefs =
                 getSharedPreferences("voice_room_audio", MODE_PRIVATE);
         roomSpeakerMuted = roomAudioPrefs.getBoolean("speaker_muted_" + roomId, roomSpeakerMuted);
+        sharedMusicVolume = Math.max(0f, Math.min(1f,
+                roomAudioPrefs.getFloat("shared_music_volume_" + roomId, sharedMusicVolume)));
         if (mutedForBackground) speakerMutedBeforeBackground = roomSpeakerMuted;
         unmuteAudioAfterBackground();
         try {
