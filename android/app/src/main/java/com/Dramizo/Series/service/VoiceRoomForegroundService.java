@@ -570,7 +570,7 @@ public class VoiceRoomForegroundService extends Service {
         RealtimeClient.getInstance().addRoomListener(realtimeListener);
         main.removeCallbacks(renewToken);
         main.post(renewToken);
-        if (!adoptedMusicPlayer) {
+        if (!adoptedMusicPlayer || musicPlayer == null || musicPlayer.getMediaItemCount() == 0) {
             applyMusic(
                     intent.getStringExtra(EXTRA_MUSIC_URL),
                     intent.getStringExtra(EXTRA_MUSIC_STATUS),
