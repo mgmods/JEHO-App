@@ -467,6 +467,11 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             lastPaintedSpeakLevel.remove(key);
             return;
         }
+        RoomDtos.SeatDto currentSeat = items.get(seatPos);
+        if (speaking && currentSeat != null && (currentSeat.isMuted || currentSeat.isModeratorMuted)) {
+            speaking = false;
+            level0to100 = 0f;
+        }
         Runnable pendingStop = speakingStopRunnables.remove(key);
         if (pendingStop != null) handler.removeCallbacks(pendingStop);
         if (!speaking) {
@@ -613,6 +618,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     holder.voiceWaveUrl = seat.user != null ? seat.user.voiceWaveUrl : null;
                     boolean match = userId != null
                             && speakingUsers.contains(userId)
+                            && seat != null && !seat.isMuted && !seat.isModeratorMuted
+                            && !(selfMicMuted && selfUserId != null && selfUserId.equals(userId))
                             && !activeReactions.containsKey(userId);
                     bindSpeaking(holder, match);
                     if (match && (holder.voiceWaveUrl == null || holder.voiceWaveUrl.trim().isEmpty())) {
