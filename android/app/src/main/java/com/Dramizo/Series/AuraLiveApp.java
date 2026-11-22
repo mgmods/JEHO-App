@@ -259,18 +259,20 @@ public class AuraLiveApp extends Application {
                         && rtc.isInRoom(roomId);
                 if (!roomActive) return;
 
-                if (anotherAppRecording && !isAppInForeground()) {
-                    // Do not depend on isClientSilenced(): some Android builds omit or
-                    // delay JEHO's silenced config even though another app owns capture.
+                if (anotherAppRecording) {
+                    // Pause JEHO room audio whenever another app owns the microphone,
+                    // including WhatsApp voice recording. Do not depend on whether JEHO
+                    // is currently foreground: Android may deliver lifecycle callbacks
+                    // after the external recorder has already taken capture priority.
                     suspendRoomAudioForExternalApp();
-                } else if (!anotherAppRecording
-                        && roomAudioSuspendedForExternalApp) {
-                    // Debounce the stop notification, then query Android again. Some
-                    // devices emit a transient empty capture list while switching input.
+                } else if (roomAudioSuspendedForExternalApp) {
+                    // Restore only after Android reports the external capture has ended.
+                    // Keep a short debounce for OEMs that emit a transient empty list
+                    // while WhatsApp switches from recording to sending.
                     Handler handler = externalCaptureHandler;
                     if (handler != null) {
                         handler.removeCallbacks(externalCaptureRestoreCheck);
-                        handler.postDelayed(externalCaptureRestoreCheck, 1400L);
+                        handler.postDelayed(externalCaptureRestoreCheck, 500L);
                     } else {
                         restoreRoomAudioAfterExternalApp();
                     }
