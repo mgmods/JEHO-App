@@ -41,9 +41,12 @@ import { staffIdentityApi, uploadsApi } from '@/api'
 import { resolveAsset } from '@/utils/assets'
 
 const roles = [
-  { key: 'super', label: 'السوبر أدمن', description: 'هوية حصرية للسوبر أدمن' },
-  { key: 'admin', label: 'الأدمن', description: 'هوية حصرية للأدمن' },
-  { key: 'manager', label: 'المانجر', description: 'هوية حصرية للمانجر' },
+  { key: 'super', label: 'السوبر أدمن', description: 'هوية رتبة السوبر أدمن' },
+  { key: 'admin', label: 'الأدمن', description: 'هوية رتبة الأدمن' },
+  { key: 'manager', label: 'المانجر', description: 'هوية رتبة المانجر' },
+  { key: 'rechargeAgent', label: 'وكيل شحن', description: 'هوية وكيل الشحن النشط' },
+  { key: 'agencyLeader', label: 'قائد الوكالة', description: 'هوية قائد أو مالك الوكالة' },
+  { key: 'host', label: 'مضيف', description: 'هوية المضيف داخل الوكالة' },
 ]
 const assets = [
   { key: 'frameUrl', label: 'إطار الصورة الشخصية' },
@@ -57,6 +60,9 @@ const form = reactive({
   super: blankRole('Super Admin', '#D8B35B'),
   admin: blankRole('Admin', '#9AA8C7'),
   manager: blankRole('Manager', '#37A889'),
+  rechargeAgent: blankRole('وكيل شحن', '#D8B35B'),
+  agencyLeader: blankRole('قائد الوكالة', '#D8B35B'),
+  host: blankRole('مضيف', '#37A889'),
 })
 const loading = ref(true)
 const saving = ref(false)
