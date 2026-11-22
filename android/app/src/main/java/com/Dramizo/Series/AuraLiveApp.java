@@ -75,7 +75,12 @@ public class AuraLiveApp extends Application {
     @Nullable private HandlerThread externalCaptureThread;
     @Nullable private Handler externalCaptureHandler;
     private final Runnable externalCaptureRestoreCheck = () -> {
-        if (!roomAudioSuspendedForExternalApp && !roomAudioReleasedForBackground) return;
+        // A normal Home/background transition only releases Android call-mode/focus.
+        // Never restore that state while the user is still outside JEHO unless an
+        // actual external recorder handoff was detected.
+        if (!roomAudioSuspendedForExternalApp) {
+            if (!(roomAudioReleasedForBackground && isAppInForeground())) return;
+        }
         boolean stillCapturing = snapshotExternalCaptureActive();
         externalRecorderActive = stillCapturing;
         if (!stillCapturing) {
@@ -186,13 +191,12 @@ public class AuraLiveApp extends Application {
             // RoomAudioSession/RoomAudioRoute independently refuse to acquire
             // MODE_IN_COMMUNICATION while JEHO is backgrounded, so WhatsApp can
             // still start another voice note without a call-mode lock.
-            RoomAudioSession.acquire(this);
             rtc.reapplyAudioRoute();
 
             // Only restore a mic that was publishing before the external handoff.
             // A normal Home/background transition never disables this flag.
             if (roomMicWasEnabledBeforeExternalApp && rtc.isPublishing()) {
-                rtc.setMicEnabled(true);
+                rtc.setMicEnabledForExternalRestore(true, this);
                 updateRoomMicMutedState(expectedRoomId, false);
             }
             // Restore room playback only if it was audible before the handoff.
@@ -263,7 +267,7 @@ public class AuraLiveApp extends Application {
                     // delay JEHO's silenced config even though another app owns capture.
                     suspendRoomAudioForExternalApp();
                 } else if (!anotherAppRecording
-                        && (roomAudioSuspendedForExternalApp || roomAudioReleasedForBackground)) {
+                        && roomAudioSuspendedForExternalApp) {
                     // Debounce the stop notification, then query Android again. Some
                     // devices emit a transient empty capture list while switching input.
                     Handler handler = externalCaptureHandler;
