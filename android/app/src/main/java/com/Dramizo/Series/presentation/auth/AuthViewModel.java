@@ -57,6 +57,15 @@ public class AuthViewModel extends ViewModel {
         });
     }
 
+    public void verifyPhoneSignup(String phone, String code, String password) {
+        loading.postValue(true);
+        container.getIoExecutor().execute(() -> {
+            Result<AuthDtos.AuthResult> r = container.getAuthRepository().verifyOtp(phone, code, null, password);
+            loading.postValue(false);
+            if (r.success) authSuccess.postValue(r.data); else error.postValue(r.error);
+        });
+    }
+
     public void guestLogin(String deviceId, String displayName) {
         loading.postValue(true);
         container.getIoExecutor().execute(() -> {
