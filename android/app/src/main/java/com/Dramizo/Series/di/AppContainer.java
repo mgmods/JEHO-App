@@ -250,7 +250,8 @@ public class AppContainer {
                             last = error;
                             if (attempt < 2) {
                                 try {
-                                    Thread.sleep(attempt == 0 ? 350L : 900L);
+                                    // Keep safe-read retries responsive; write requests are never retried here.
+                Thread.sleep(attempt == 0 ? 150L : 350L);
                                 } catch (InterruptedException interrupted) {
                                     Thread.currentThread().interrupt();
                                     throw error;

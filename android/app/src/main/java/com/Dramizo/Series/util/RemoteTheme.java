@@ -32,6 +32,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public final class RemoteTheme {
     private static volatile MiscDtos.ThemeDto cached;
+    // App startup and SplashActivity both request this config. Coalesce them so
+    // a cold launch performs one network refresh, not two competing requests.
+    private static final java.util.concurrent.atomic.AtomicBoolean REFRESH_IN_FLIGHT =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final java.util.concurrent.atomic.AtomicLong LAST_REFRESH_AT =
+            new java.util.concurrent.atomic.AtomicLong(-1L);
+    private static final long REFRESH_INTERVAL_MS = 60_000L;
     private static final CopyOnWriteArrayList<Runnable> refreshListeners = new CopyOnWriteArrayList<>();
 
     private RemoteTheme() {}
@@ -76,18 +83,30 @@ public final class RemoteTheme {
     /** Downloads the dashboard-controlled theme once per app start; failures keep the last cache. */
     public static void refreshFromApi(Context context, com.Dramizo.Series.data.remote.api.ConfigApi api) {
         if (context == null || api == null) return;
+        if (!REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        long now = android.os.SystemClock.elapsedRealtime();
+        long previous = LAST_REFRESH_AT.get();
+        if (previous >= 0L && now - previous < REFRESH_INTERVAL_MS) {
+            REFRESH_IN_FLIGHT.set(false);
+            return;
+        }
+        boolean completed = false;
         try {
             com.Dramizo.Series.domain.model.Result<MiscDtos.ThemeDto> result =
                     ApiCall.execute(api.theme());
-            if (!result.success || result.data == null) return;
-            MiscDtos.ThemeDto previous = cached != null ? cached : readDisk(context);
-            boolean changed = previous == null
-                    || !GSON.toJson(previous).equals(GSON.toJson(result.data));
+            if (result == null || !result.success || result.data == null) return;
+            MiscDtos.ThemeDto previousTheme = cached != null ? cached : readDisk(context);
+            boolean changed = previousTheme == null
+                    || !GSON.toJson(previousTheme).equals(GSON.toJson(result.data));
             cached = result.data;
             writeDisk(context, result.data);
             if (changed) notifyRefreshListeners();
+            completed = true;
         } catch (Throwable ignored) {
             // Remote configuration must never prevent the app from opening.
+        } finally {
+            if (completed) LAST_REFRESH_AT.set(android.os.SystemClock.elapsedRealtime());
+            REFRESH_IN_FLIGHT.set(false);
         }
     }
 

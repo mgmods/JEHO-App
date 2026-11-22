@@ -438,11 +438,11 @@ public class AuraLiveApp extends Application {
         try {
             container.getIoExecutor().execute(() -> {
                 ZegoEngineManager.getInstance().fetchAndApplyRemote(this, container.getConfigApi());
-                com.Dramizo.Series.util.RemoteTheme.refreshFromApi(this, container.getConfigApi());
                 AppFeatures.refresh(container);
+                // Paint cached navigation immediately; MainActivity performs the single
+                // network refresh after its first frame instead of racing SplashActivity.
                 com.Dramizo.Series.util.RemoteNavIcons.hydrateFromCache(container);
                 com.Dramizo.Series.util.RemoteSeatStickers.hydrateFromCache(container);
-                com.Dramizo.Series.util.RemoteNavIcons.refreshBlocking(container);
                 com.Dramizo.Series.util.RemoteSeatStickers.refreshBlocking(container);
             });
         } catch (Exception ignored) {
