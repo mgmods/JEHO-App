@@ -33,8 +33,9 @@ public final class StaffRoleHelper {
                  ) {
             return SUPER;
         }
-        if ("admin".equals(r)) return ADMIN;
-        if ("manager".equals(r) || "moderator".equals(r) || "mod".equals(r)) {
+        if ("admin".equals(r) || "administrator".equals(r) || "platform_admin".equals(r)) return ADMIN;
+        if ("manager".equals(r) || "platform_manager".equals(r)
+                || "moderator".equals(r) || "mod".equals(r)) {
             return MANAGER;
         }
         return NONE;
