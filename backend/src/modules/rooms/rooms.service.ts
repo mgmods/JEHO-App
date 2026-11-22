@@ -1341,7 +1341,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       profileCardUrl: vipVisuals?.profileCardUrl || vipVisuals?.vipCardUrl || profile.profileCardUrl || user.profileCardUrl || null,
       chatBubbleUrl: vipVisuals?.chatBubbleUrl || profile.chatBubbleUrl || user.chatBubbleUrl || null,
       nameplateUrl: vipVisuals?.nameplateUrl || null,
-      voiceWaveUrl: profile.voiceWaveUrl ?? user.voiceWaveUrl ?? null,
+      // Equipped cosmetics are authoritative for room wear. Do not fall back to the
+      // legacy user.voiceWaveUrl field, otherwise an old wave can reappear even after
+      // the user equips a newer purchased voice-wave cosmetic.
+      voiceWaveUrl: profile.voiceWaveUrl ?? null,
       ...(displayRank || {}),
       profile: undefined,
     };
