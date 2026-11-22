@@ -234,6 +234,12 @@ export const toastManagerApi = {
   save: (data) => safeRequest(() => api.patch('/admin/toast-manager', data)),
 }
 
+export const phoneOtpApi = {
+  get: () => safeRequest(() => api.get('/admin/phone-otp/settings')),
+  update: (data) => safeRequest(() => api.patch('/admin/phone-otp/settings', data)),
+  test: (phone) => safeRequest(() => api.post('/admin/phone-otp/test', { phone })),
+}
+
 export const settingsApi = {
   get: () => safeRequest(() => api.get('/admin/settings')),
   update: (data) => safeRequest(() => api.patch('/admin/settings', data)),
