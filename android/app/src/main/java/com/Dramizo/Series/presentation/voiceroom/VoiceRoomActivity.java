@@ -3169,6 +3169,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String gender;
         String vipBadgeUrl;
         int vipLevel;
+        String staffRoleKey = "";
+        String staffRoleLabel = "";
+        String staffBadgeUrl = "";
         boolean cpActive;
         final List<String> medalUrls = new ArrayList<>();
     }
@@ -3204,6 +3207,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     decoration.agencyRole = user.agency.role;
                 }
                 decoration.gender = user.gender;
+                decoration.staffRoleKey = staffIdentityRoleKey(user);
+                decoration.staffRoleLabel = staffIdentityFallbackLabel(user, decoration.staffRoleKey);
                 decoration.vipBadgeUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(user);
                 decoration.vipLevel = Math.max(0, user.vipLevel);
                 List<String> displayedIds = user.displayedMedalIds == null
@@ -3279,6 +3284,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void applyRoomChatDecorations(
             @NonNull View row, @NonNull RoomChatDecoration decoration, int fallbackVip) {
+        if (decoration.staffRoleKey != null && !decoration.staffRoleKey.isEmpty()) {
+            com.Dramizo.Series.util.StaffIdentityConfigCache.load(this, () -> {
+                com.Dramizo.Series.util.StaffIdentityConfigCache.RoleIdentity identity =
+                        com.Dramizo.Series.util.StaffIdentityConfigCache.get(decoration.staffRoleKey);
+                if (identity.badgeUrl != null) decoration.staffBadgeUrl = identity.badgeUrl;
+                if (identity.label != null && !identity.label.trim().isEmpty()) {
+                    decoration.staffRoleLabel = identity.label;
+                }
+                renderRoomChatDecorations(row, decoration, fallbackVip);
+            });
+            return;
+        }
+        renderRoomChatDecorations(row, decoration, fallbackVip);
+    }
+
+    private void renderRoomChatDecorations(
+            @NonNull View row, @NonNull RoomChatDecoration decoration, int fallbackVip) {
         LinearLayout inline = row.findViewById(R.id.chatBadgesRow);
         LinearLayout overflow = row.findViewById(R.id.chatBadgesOverflowRow);
         if (inline == null || overflow == null) return;
@@ -3303,6 +3325,39 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         LinearLayout[] overflowLine = new LinearLayout[] { null };
 
         int total = 0;
+        if (decoration.staffRoleKey != null && !decoration.staffRoleKey.isEmpty()) {
+            String roleLabel = decoration.staffRoleLabel == null || decoration.staffRoleLabel.trim().isEmpty()
+                    ? decoration.staffRoleKey : decoration.staffRoleLabel;
+            if (decoration.staffBadgeUrl != null && !decoration.staffBadgeUrl.trim().isEmpty()) {
+                ImageView roleBadge = new ImageView(this);
+                roleBadge.setContentDescription(roleLabel);
+                roleBadge.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                roleBadge.setLayoutParams(roomBadgeImageParams(116, 27, 2));
+                Glide.with(roleBadge).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(decoration.staffBadgeUrl.trim()))
+                        .fitCenter().into(roleBadge);
+                addRoomChatBadge(inline, overflow, roleBadge, total++, firstLineLimit, inlineUsed,
+                        overflowLineLimit, overflowUsed, overflowLine);
+            } else {
+                TextView roleBadge = new TextView(this);
+                roleBadge.setText(roleLabel);
+                roleBadge.setContentDescription(roleLabel);
+                roleBadge.setTextColor(Color.WHITE);
+                roleBadge.setTextSize(10f);
+                roleBadge.setTypeface(null, android.graphics.Typeface.BOLD);
+                roleBadge.setIncludeFontPadding(false);
+                roleBadge.setSingleLine(true);
+                roleBadge.setPadding(dp(8), dp(3), dp(8), dp(3));
+                GradientDrawable roleBg = new GradientDrawable();
+                roleBg.setColor("super".equals(decoration.staffRoleKey) ? 0xFF6D3CC8
+                        : "admin".equals(decoration.staffRoleKey) || "manager".equals(decoration.staffRoleKey)
+                                ? 0xFF245D9B : 0xFF8A5A24);
+                roleBg.setCornerRadius(dp(7));
+                roleBadge.setBackground(roleBg);
+                roleBadge.setLayoutParams(roomBadgeTextParams(2));
+                addRoomChatBadge(inline, overflow, roleBadge, total++, firstLineLimit, inlineUsed,
+                        overflowLineLimit, overflowUsed, overflowLine);
+            }
+        }
         // Agency and competition marks are intentionally omitted from chat identity.
         int effectiveVipLevel = Math.max(Math.max(0, fallbackVip), Math.max(0, decoration.vipLevel));
         if (effectiveVipLevel > 0) {
@@ -8996,86 +9051,87 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    private String staffIdentityRoleKey(@Nullable AuthDtos.UserDto user) {
+        if (user == null) return "";
+        if (com.Dramizo.Series.util.StaffRoleHelper.isStaff(user)) {
+            return com.Dramizo.Series.util.StaffRoleHelper.normalize(user);
+        }
+        if (user.isRechargeAgent) return "rechargeAgent";
+        String role = "";
+        if (user.agency != null && user.agency.role != null) {
+            role = user.agency.role.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        if ((role.isEmpty() || "member".equals(role)) && user.agencyClub != null
+                && user.agencyClub.role != null) {
+            role = user.agencyClub.role.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        role = role.replace('-', '_').replace("agency_", "");
+        if ("owner".equals(role) || "leader".equals(role)) return "agencyLeader";
+        if ("host".equals(role)) return "host";
+        return "";
+    }
+
+    private String staffIdentityFallbackLabel(@Nullable AuthDtos.UserDto user, String roleKey) {
+        if (user != null && com.Dramizo.Series.util.StaffRoleHelper.isStaff(user)) {
+            return com.Dramizo.Series.util.StaffRoleHelper.badgeAr(user);
+        }
+        if ("rechargeAgent".equals(roleKey)) return "وكيل شحن";
+        if ("agencyLeader".equals(roleKey)) return user != null
+                ? com.Dramizo.Series.util.StaffRoleHelper.genderizeLabel("قائد الوكالة", user.gender)
+                : "قائد الوكالة";
+        if ("host".equals(roleKey)) return user != null
+                ? com.Dramizo.Series.util.StaffRoleHelper.genderizeLabel("مضيف", user.gender)
+                : "مضيف";
+        return roleKey;
+    }
+
     private void bindRoomUserRoleBadges(
             @Nullable android.widget.LinearLayout container,
             @Nullable View row,
-            @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+            @Nullable AuthDtos.UserDto user) {
         if (container == null || row == null) return;
         container.removeAllViews();
-        if (user == null) {
+        String roleKey = staffIdentityRoleKey(user);
+        if (roleKey.isEmpty()) {
             row.setVisibility(View.GONE);
             return;
-        }
-
-        java.util.ArrayList<String> labels = new java.util.ArrayList<>();
-        String staff = user.staffRole == null ? "" : user.staffRole.trim().toLowerCase(java.util.Locale.ROOT);
-        if ("super".equals(staff) || "super_admin".equals(staff) || "superadmin".equals(staff)) {
-            labels.add("SUPER ADMIN");
-        } else if ("admin".equals(staff) || "administrator".equals(staff)) {
-            labels.add("ADMIN");
-        } else if ("manager".equals(staff) || "platform_manager".equals(staff)) {
-            labels.add("MANAGER");
-        }
-
-        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency = user.agency;
-        if (agency != null) {
-            String role = agency.role == null ? "" : agency.role.trim().toLowerCase(java.util.Locale.ROOT);
-            String agencyName = agency.name == null ? "" : agency.name.trim();
-
-            // Agency leader is a permanent identity badge and remains visible in every room.
-            if ("owner".equals(role)) {
-                labels.add("قائد وكالة");
-            } else {
-                // Hosts/moderators are shown only inside the room belonging to that same agency.
-                RoomDtos.RoomDto liveRoom = viewModel != null ? viewModel.getRoom().getValue() : null;
-                String roomAgencyId = liveRoom != null && liveRoom.agencyId != null
-                        ? liveRoom.agencyId.trim() : "";
-                String memberAgencyId = agency.id == null ? "" : agency.id.trim();
-                boolean sameAgencyRoom = isAgencyRoom && !roomAgencyId.isEmpty()
-                        && !memberAgencyId.isEmpty() && roomAgencyId.equals(memberAgencyId);
-                if (sameAgencyRoom) {
-                    if ("host".equals(role)) {
-                        labels.add("مضيفة");
-                    } else if (liveRoom.moderatorIds != null && user.id != null) {
-                        for (String moderatorId : liveRoom.moderatorIds) {
-                            if (moderatorId != null && sameUser(moderatorId, user.id)) {
-                                labels.add("مشرفة");
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (user.isRechargeAgent) labels.add("وكيل شحن");
-        if (labels.isEmpty()) {
-            row.setVisibility(View.GONE);
-            return;
-        }
-
-        float density = getResources().getDisplayMetrics().density;
-        for (String label : labels) {
-            TextView chip = new TextView(this);
-            chip.setText(label);
-            chip.setTextColor(0xFFFFFFFF);
-            chip.setTextSize(11);
-            chip.setTypeface(null, android.graphics.Typeface.BOLD);
-            chip.setGravity(android.view.Gravity.CENTER);
-            chip.setPadding((int)(10*density), (int)(6*density), (int)(10*density), (int)(6*density));
-            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-            bg.setColor(label.startsWith("SUPER") ? 0xFF6D3CC8
-                    : label.equals("ADMIN") || label.equals("MANAGER") ? 0xFF245D9B
-                    : label.startsWith("وكيل") ? 0xFF177A68 : 0xFF8A5A24);
-            bg.setCornerRadius(18*density);
-            chip.setBackground(bg);
-            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.setMarginEnd((int)(6*density));
-            container.addView(chip, lp);
         }
         row.setVisibility(View.VISIBLE);
+        com.Dramizo.Series.util.StaffIdentityConfigCache.load(this, () -> {
+            if (container.getParent() == null) return;
+            com.Dramizo.Series.util.StaffIdentityConfigCache.RoleIdentity identity =
+                    com.Dramizo.Series.util.StaffIdentityConfigCache.get(roleKey);
+            String fallback = staffIdentityFallbackLabel(user, roleKey);
+            String label = identity.label == null || identity.label.trim().isEmpty()
+                    ? fallback : com.Dramizo.Series.util.StaffRoleHelper.genderizeLabel(identity.label, user.gender);
+            container.removeAllViews();
+            if (identity.badgeUrl != null && !identity.badgeUrl.trim().isEmpty()) {
+                ImageView badge = new ImageView(this);
+                badge.setContentDescription(label);
+                badge.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                container.addView(badge, new LinearLayout.LayoutParams(dp(124), dp(28)));
+                Glide.with(badge).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(identity.badgeUrl.trim()))
+                        .fitCenter().into(badge);
+            } else {
+                TextView badge = new TextView(this);
+                badge.setText(label);
+                badge.setTextColor(Color.WHITE);
+                badge.setTextSize(11f);
+                badge.setTypeface(null, android.graphics.Typeface.BOLD);
+                badge.setGravity(Gravity.CENTER);
+                badge.setSingleLine(true);
+                badge.setPadding(dp(12), dp(4), dp(12), dp(4));
+                GradientDrawable background = new GradientDrawable();
+                background.setColor("super".equals(roleKey) ? 0xFF6D3CC8
+                        : "admin".equals(roleKey) || "manager".equals(roleKey) ? 0xFF245D9B
+                        : "host".equals(roleKey) ? 0xFF8A5A24 : 0xFF177A68);
+                background.setCornerRadius(dp(8));
+                badge.setBackground(background);
+                container.addView(badge, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(28)));
+            }
+            row.setVisibility(View.VISIBLE);
+        });
     }
 
     private static String roomCpTopSymbol(String type) {
