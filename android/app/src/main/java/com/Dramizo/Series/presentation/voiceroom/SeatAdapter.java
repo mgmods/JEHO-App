@@ -1746,6 +1746,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         holder.lastGiftCoins = Long.MIN_VALUE;
         // Do NOT pause HostSignalView here — grid refresh recycles often and left frames frozen.
         stopSpeakingRipples(holder);
+        com.Dramizo.Series.util.StaffIdentityFrameMotion.stop(holder.b.imgFrame);
         clearReactionView(holder);
         super.onViewRecycled(holder);
     }
