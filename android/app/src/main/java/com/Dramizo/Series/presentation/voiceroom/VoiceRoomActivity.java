@@ -3039,21 +3039,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     AvatarCosmetics.bindStacked(avatar, frameView, hostSignal, avatarUrl, frameUrl, null);
                 }
             }
-            // Restore the room agency/host role label beside the sender name.
-            // This is only an identity chip in the chat row; it is NOT an avatar overlay.
+            // Administrative roles are rendered once as the wide dashboard-configured
+            // badge in chatBadgesRow; never duplicate them as the legacy tiny host chip.
             if (hostChip != null) {
-                String roleLabel = agencyRoleLabelForRoomUser(userId);
-                // Being the owner/host of an ordinary room is not an agency role.
-                // Only agencyRoleLabelForRoomUser may authorize an agency identity chip.
-                if (roleLabel != null && !roleLabel.trim().isEmpty()) {
-                    hostChip.setText(roleLabel);
-                    hostChip.setVisibility(View.VISIBLE);
-                    hostChip.setClickable(false);
-                    hostChip.setFocusable(false);
-                } else {
-                    hostChip.setVisibility(View.GONE);
-                    hostChip.setText("");
-                }
+                hostChip.setVisibility(View.GONE);
+                hostChip.setText("");
+                hostChip.setOnClickListener(null);
             }
 
             // VIP/CP/ID/medals now sit inline beside the display name.
