@@ -290,16 +290,16 @@ jobs:
               exit 1
             fi
             CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
-            ACTUAL_SHA1="$(printf '%s\\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            ACTUAL_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
             if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
               echo "::error::${ABI} APK signing certificate mismatch."
               exit 1
             fi
             APK_BYTES="$(stat -c '%s' "$APK")"
             APK_MIB="$(awk -v n="$APK_BYTES" 'BEGIN {print n/1048576}')"
-            printf '%s  %s bytes (%.2f MiB)\\n' "$(basename "$APK")" "$APK_BYTES" "$APK_MIB"
+            printf '%s  %s bytes (%.2f MiB)\n' "$(basename "$APK")" "$APK_BYTES" "$APK_MIB"
             ENTRIES="$(unzip -Z1 "$APK")"
-            grep -q "^lib/${ABI}/.*\\.so$" <<< "$ENTRIES" || { echo "::error::${ABI} native libraries missing."; exit 1; }
+            grep -q "^lib/${ABI}/.*\.so$" <<< "$ENTRIES" || { echo "::error::${ABI} native libraries missing."; exit 1; }
             if [[ "$ABI" == "arm64-v8a" ]] && grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/' <<< "$ENTRIES"; then
               echo "::error::ARM64 split contains extra ABI libraries."
               exit 1
