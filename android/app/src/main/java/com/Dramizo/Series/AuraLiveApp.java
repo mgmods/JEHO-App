@@ -62,6 +62,7 @@ public class AuraLiveApp extends Application {
     private boolean roomAudioSuspendedForExternalApp;
     private boolean roomAudioReleasedForBackground;
     private boolean roomMicWasEnabledBeforeExternalApp;
+    private boolean roomSpeakerWasMutedBeforeExternalApp;
     @Nullable private String roomMicRoomIdBeforeExternalApp;
     @Nullable private AudioManager externalCaptureAudioManager;
     @Nullable private AudioManager.AudioRecordingCallback externalCaptureCallback;
@@ -100,12 +101,18 @@ public class AuraLiveApp extends Application {
 
         roomMicRoomIdBeforeExternalApp = activeRoomId;
         roomMicWasEnabledBeforeExternalApp = rtc.isMicEnabled() && rtc.isPublishing();
+        roomSpeakerWasMutedBeforeExternalApp = rtc.isSpeakerMuted();
 
         // Android has already granted capture priority to the external recorder.
         // Stop publishing locally so no silent/stale room microphone remains active.
         if (roomMicWasEnabledBeforeExternalApp) {
             rtc.setMicEnabled(false);
             updateRoomMicMutedState(activeRoomId, true);
+        }
+        // Also silence incoming room audio locally while the external app owns
+        // the microphone. Preserve the user's previous manual speaker-mute state.
+        if (!roomSpeakerWasMutedBeforeExternalApp) {
+            rtc.setSpeakerMuted(true);
         }
 
         // MODE_IN_COMMUNICATION + voice focus can make Android report that a call
@@ -143,8 +150,13 @@ public class AuraLiveApp extends Application {
                 rtc.setMicEnabled(true);
                 updateRoomMicMutedState(expectedRoomId, false);
             }
+            // Restore room playback only if it was audible before the handoff.
+            if (!roomSpeakerWasMutedBeforeExternalApp) {
+                rtc.setSpeakerMuted(false);
+            }
         }
         roomMicWasEnabledBeforeExternalApp = false;
+        roomSpeakerWasMutedBeforeExternalApp = false;
         VoiceRoomForegroundService.refreshAudioForegroundType();
     }
 
