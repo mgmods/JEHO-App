@@ -306,8 +306,23 @@ public class AuraLiveApp extends Application {
         for (AudioRecordingConfiguration config : configs) {
             if (config == null) continue;
             try {
-                String clientPackage = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                        ? config.getClientPackageName() : null;
+                String clientPackage = null;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    // getClientPackageName() is available on newer Android SDKs but
+                    // is not exposed by every compileSdk used by this project. Use
+                    // reflection so the external-recorder monitor remains compatible
+                    // with the current Android build toolchain while still using the
+                    // API at runtime when the platform provides it.
+                    try {
+                        java.lang.reflect.Method method =
+                                AudioRecordingConfiguration.class
+                                        .getMethod("getClientPackageName");
+                        Object value = method.invoke(config);
+                        if (value instanceof String) clientPackage = (String) value;
+                    } catch (Throwable ignored) {
+                        clientPackage = null;
+                    }
+                }
                 if (clientPackage != null && !clientPackage.isEmpty()) {
                     if (!getPackageName().equals(clientPackage)) {
                         externalPackageActive = true;
