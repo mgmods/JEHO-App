@@ -90,6 +90,7 @@ public class ProfileViewModel extends ViewModel {
         // Refresh the visible profile when the dashboard changes the purchased animated name style.
         if (!java.util.Objects.equals(a.nameStyle, b.nameStyle)) return false;
         if (!eq(a.hostBadgeUrl, b.hostBadgeUrl)) return false;
+        if (!eq(a.voiceWaveUrl, b.voiceWaveUrl)) return false;
         if (!eq(a.vipBadgeUrl, b.vipBadgeUrl)) return false;
         if (!eq(a.staffRole, b.staffRole)) return false;
         if (!java.util.Objects.equals(a.displayedMedalIds, b.displayedMedalIds)) return false;
