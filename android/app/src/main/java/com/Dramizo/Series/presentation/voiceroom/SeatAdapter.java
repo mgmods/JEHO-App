@@ -439,7 +439,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     public void setSpeaking(String userId, boolean speaking) {
-        setSpeaking(userId, speaking, speaking ? 48f : 0f);
+        // A microphone being enabled is not proof of speech. Only a measured
+        // live audio level may activate the seat waveform.
+        setSpeaking(userId, speaking, 0f);
     }
 
     public void setSpeaking(String userId, boolean speaking, float level0to100) {
@@ -469,6 +471,13 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         RoomDtos.SeatDto currentSeat = items.get(seatPos);
         if (speaking && currentSeat != null && (currentSeat.isMuted || currentSeat.isModeratorMuted)) {
+            speaking = false;
+            level0to100 = 0f;
+        }
+        // Suppress the false "speaking" pulse emitted when a user only opens
+        // the mic. RTC level updates must cross the speech-activity threshold.
+        if (speaking && (Float.isNaN(level0to100) || Float.isInfinite(level0to100)
+                || level0to100 < 5f)) {
             speaking = false;
             level0to100 = 0f;
         }
@@ -1400,6 +1409,15 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
     private void bindCustomDisplayRank(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (holder.b.rowCustomDisplayRank == null || holder.b.tvCustomRankBadge == null || holder.b.imgCustomRankBadge == null) return;
+        // Platform/administrative identities are deliberately never shown
+        // on microphone seats; their horizontal badge belongs to profile and chat UI.
+        if (user != null && (StaffRoleHelper.isStaff(user) || user.isRechargeAgent)) {
+            holder.b.rowCustomDisplayRank.setVisibility(View.GONE);
+            holder.b.tvCustomRankBadge.setText("");
+            Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+            holder.b.imgCustomRankBadge.setVisibility(View.GONE);
+            return;
+        }
         String title = user != null ? user.customDisplayRankName : null;
         String imageUrl = user != null ? user.customDisplayRankImageUrl : null;
         if (title == null || title.trim().isEmpty()) {
