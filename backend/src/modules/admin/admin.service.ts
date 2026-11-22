@@ -2496,7 +2496,6 @@ export class AdminService {
     try {
       return decryptSecret(raw, process.env.SETTINGS_ENCRYPTION_KEY);
     } catch (err) {
-      this.logger?.warn?.('Unable to decrypt phone OTP provider secret');
       return '';
     }
   }
@@ -2577,7 +2576,6 @@ export class AdminService {
     });
     const result = await response.json().catch(() => ({})) as Record<string, unknown>;
     if (!response.ok) {
-      this.logger?.warn?.(`Twilio Verify test failed: HTTP ${response.status}`);
       throw new BadRequestException('فشل طلب إرسال SMS. تحقق من بيانات Twilio والرصيد وإعدادات Verify');
     }
     return { ok: true, status: String(result.status || 'pending'), message: 'قبل Twilio طلب إرسال رمز الاختبار؛ تحقق من وصول الرسالة إلى الهاتف.' };
