@@ -51,6 +51,12 @@ const routes = [
         meta: { title: 'إدارة المداليات', module: 'users' },
       },
       {
+        path: 'staff-identity',
+        name: 'staff-identity',
+        component: () => import('@/views/StaffIdentityView.vue'),
+        meta: { title: 'إدارة الرتب الإدارية', module: 'settings' },
+      },
+      {
         path: 'users/:id',
         name: 'user-detail',
         component: () => import('@/views/UserDetailView.vue'),
