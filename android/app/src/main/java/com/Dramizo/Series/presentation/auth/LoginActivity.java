@@ -59,6 +59,7 @@ public class LoginActivity extends ThemedActivity {
     private TextView otpResend;
     private final Handler otpHandler = new Handler(Looper.getMainLooper());
     private int otpSecondsRemaining = 30;
+    private boolean distributingOtpAutofill = false;
     private final Runnable otpTicker = new Runnable() {
         @Override public void run() {
             if (phoneVerificationDialog == null || !phoneVerificationDialog.isShowing()) return;
@@ -451,15 +452,33 @@ public class LoginActivity extends ThemedActivity {
             field.setInputType(InputType.TYPE_CLASS_NUMBER);
             field.setSingleLine(true);
             field.setSelectAllOnFocus(true);
-            field.setFilters(new InputFilter[]{new InputFilter.LengthFilter(1)});
+            field.setFilters(new InputFilter[]{new InputFilter.LengthFilter(i == 0 ? 6 : 1)});
+            if (android.os.Build.VERSION.SDK_INT >= 26 && i == 0) {
+                field.setAutofillHints("smsOTP");
+            }
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(52), 1f);
             lp.setMargins(dp(3), 0, dp(3), 0);
             digits.addView(field, lp);
             field.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int st, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int st, int before, int count) {
-                    if (s.length() == 1 && index < 5) otpFields[index + 1].requestFocus();
-                    if (s.length() == 0 && index > 0) otpFields[index - 1].requestFocus();
+                    if (distributingOtpAutofill) return;
+                    if (index == 0 && s.length() > 1) {
+                        String digitsOnly = s.toString().replaceAll("[^0-9]", "");
+                        if (!digitsOnly.isEmpty()) {
+                            distributingOtpAutofill = true;
+                            for (int n = 0; n < 6; n++) {
+                                otpFields[n].setText(n < digitsOnly.length()
+                                        ? String.valueOf(digitsOnly.charAt(n)) : "");
+                            }
+                            distributingOtpAutofill = false;
+                            otpFields[Math.min(5, digitsOnly.length() - 1)].requestFocus();
+                        }
+                    } else if (s.length() == 1 && index < 5) {
+                        otpFields[index + 1].requestFocus();
+                    } else if (s.length() == 0 && index > 0) {
+                        otpFields[index - 1].requestFocus();
+                    }
                 }
                 @Override public void afterTextChanged(Editable e) {}
             });
