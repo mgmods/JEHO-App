@@ -30,8 +30,9 @@ public final class RoomAudioSession {
         // A muted room microphone must never leave Android in VoIP/call mode.
         // Likewise, a background room must not reclaim communication mode from
         // WhatsApp, voice recorder, or another foreground microphone client.
+        RoomRtcEngine rtc = RoomRtcEngine.getInstance();
         if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()
-                || !RoomRtcEngine.getInstance().isMicEnabled()) {
+                || !rtc.isMicEnabled() || !rtc.isPublishing()) {
             release(app);
             return;
         }
