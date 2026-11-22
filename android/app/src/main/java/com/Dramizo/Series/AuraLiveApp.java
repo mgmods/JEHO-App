@@ -186,13 +186,12 @@ public class AuraLiveApp extends Application {
             // RoomAudioSession/RoomAudioRoute independently refuse to acquire
             // MODE_IN_COMMUNICATION while JEHO is backgrounded, so WhatsApp can
             // still start another voice note without a call-mode lock.
-            RoomAudioSession.acquire(this);
+            // Restore the device route, then re-enable only the mic that was
+            // actively publishing before the external recorder took the input.
             rtc.reapplyAudioRoute();
 
-            // Only restore a mic that was publishing before the external handoff.
-            // A normal Home/background transition never disables this flag.
             if (roomMicWasEnabledBeforeExternalApp && rtc.isPublishing()) {
-                rtc.setMicEnabled(true);
+                rtc.setMicEnabledForExternalRestore(true, this);
                 updateRoomMicMutedState(expectedRoomId, false);
             }
             // Restore room playback only if it was audible before the handoff.
