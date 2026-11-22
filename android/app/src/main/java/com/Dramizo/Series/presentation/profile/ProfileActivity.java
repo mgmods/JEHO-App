@@ -812,89 +812,84 @@ public class ProfileActivity extends ThemedActivity {
     }
 
     private void bindStaffBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
-        if (binding == null || binding.tvStaffBadge == null) return;
-        // An admin-gifted display-rank badge is cosmetic only. It replaces the
-        // visible role chip, never the user's actual server-side permissions.
-        ViewGroup badgeParent = binding.tvStaffBadge.getParent() instanceof ViewGroup
-                ? (ViewGroup) binding.tvStaffBadge.getParent() : null;
-        ImageView customRankImage = badgeParent != null
-                ? badgeParent.findViewWithTag("jeho_custom_display_rank_image") : null;
-        String customRankName = user != null ? user.customDisplayRankName : null;
-        String customRankUrl = user != null ? user.customDisplayRankImageUrl : null;
-        if (customRankName != null && !customRankName.trim().isEmpty()) {
-            if (customRankUrl != null && !customRankUrl.trim().isEmpty() && badgeParent != null) {
-                binding.tvStaffBadge.setVisibility(View.GONE);
-                if (customRankImage == null) {
-                    customRankImage = new ImageView(this);
-                    customRankImage.setTag("jeho_custom_display_rank_image");
-                    customRankImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    int size = dpProfile(24);
-                    LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(size, size);
-                    imageParams.setMargins(dpProfile(4), 0, dpProfile(4), 0);
-                    int index = Math.min(badgeParent.indexOfChild(binding.tvStaffBadge) + 1, badgeParent.getChildCount());
-                    badgeParent.addView(customRankImage, index, imageParams);
-                }
-                customRankImage.setVisibility(View.VISIBLE);
-                // Glide keeps GIFs animated and displays static images normally.
-                Glide.with(this).load(AssetCatalog.absoluteUrl(customRankUrl.trim())).into(customRankImage);
-                customRankImage.setContentDescription(customRankName.trim());
-            } else {
-                if (customRankImage != null) {
-                    Glide.with(this).clear(customRankImage);
-                    customRankImage.setVisibility(View.GONE);
-                }
-                binding.tvStaffBadge.setVisibility(View.VISIBLE);
-                binding.tvStaffBadge.setText(customRankName.trim());
-            }
+        if (binding == null || binding.tvStaffBadge == null || user == null) return;
+        // Cosmetic gifted rank takes the same visual slot but never changes real permissions.
+        String customName = user.customDisplayRankName;
+        String customUrl = user.customDisplayRankImageUrl;
+        if (customName != null && !customName.trim().isEmpty()) {
+            showProfileRoleBadge(customName, customUrl);
             return;
         }
-        if (customRankImage != null) {
-            Glide.with(this).clear(customRankImage);
-            customRankImage.setVisibility(View.GONE);
-        }
-        boolean rechargeAgent = user != null && user.isRechargeAgent;
-        boolean agencyOwner = user.agency != null
-                && "owner".equalsIgnoreCase(user.agency.role);
-        // Agency identity is rendered by the single dedicated agency-role chip below.
-        // Do not duplicate it here as the old purple "وكالة" badge.
+        boolean rechargeAgent = user.isRechargeAgent;
+        boolean agencyOwner = user.agency != null && "owner".equalsIgnoreCase(user.agency.role);
         if (agencyOwner && !StaffRoleHelper.isStaff(user) && !rechargeAgent) {
+            clearProfileRoleBadgeAsset();
             binding.tvStaffBadge.setVisibility(View.GONE);
             return;
         }
         if (!StaffRoleHelper.isStaff(user) && !rechargeAgent) {
+            clearProfileRoleBadgeAsset();
             binding.tvStaffBadge.setVisibility(View.GONE);
             return;
         }
-        String role = StaffRoleHelper.normalize(user);
-        String label = StaffRoleHelper.isStaff(user)
-                ? StaffRoleHelper.badgeAr(user)
-                : (rechargeAgent ? "وكيل شحن" : "وكالة");
-        StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(role);
-        if (StaffRoleHelper.isStaff(user) && !identity.label.isEmpty()) label = identity.label;
-        label = StaffRoleHelper.genderizeLabel(label, user.gender);
+        String role = StaffRoleHelper.isStaff(user) ? StaffRoleHelper.normalize(user) : "rechargeAgent";
+        String fallback = StaffRoleHelper.isStaff(user)
+                ? StaffRoleHelper.badgeAr(user) : "وكيل شحن";
         binding.tvStaffBadge.setVisibility(View.VISIBLE);
-        binding.tvStaffBadge.setTag(StaffRoleHelper.isStaff(user) ? role : null);
-        binding.tvStaffBadge.setText(label);
-        binding.tvStaffBadge.setBackgroundResource(
-                StaffRoleHelper.SUPER.equals(role)
-                        ? R.drawable.bg_chip_staff_super
-                        : R.drawable.bg_chip_staff_manager);
-        if (StaffRoleHelper.isStaff(user)) {
-            final String fallbackLabel = StaffRoleHelper.badgeAr(user);
-            StaffIdentityConfigCache.load(this, () -> {
-                if (binding == null || binding.tvStaffBadge == null || !role.equals(binding.tvStaffBadge.getTag())) return;
-                StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(role);
-                binding.tvStaffBadge.setText(StaffRoleHelper.genderizeLabel(
-                        latest.label.isEmpty() ? fallbackLabel : latest.label, user.gender));
-                if (!latest.frameUrl.isEmpty() && binding.imgFrame != null) {
-                    try {
-                        binding.imgFrame.setVisibility(View.VISIBLE);
-                        com.bumptech.glide.Glide.with(this)
-                                .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.frameUrl))
-                                .into(binding.imgFrame);
-                    } catch (Exception ignored) { }
-                }
-            });
+        binding.tvStaffBadge.setText(fallback);
+        binding.tvStaffBadge.setTag(role);
+        StaffIdentityConfigCache.load(this, () -> {
+            if (binding == null || binding.tvStaffBadge == null || !role.equals(binding.tvStaffBadge.getTag())) return;
+            StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(role);
+            String label = latest.label == null || latest.label.trim().isEmpty() ? fallback : latest.label;
+            showProfileRoleBadge(StaffRoleHelper.genderizeLabel(label, user.gender), latest.badgeUrl);
+            if (!latest.frameUrl.isEmpty() && binding.imgFrame != null) {
+                try {
+                    binding.imgFrame.setVisibility(View.VISIBLE);
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(latest.frameUrl)).into(binding.imgFrame);
+                } catch (Exception ignored) { }
+            }
+        });
+    }
+
+    private void clearProfileRoleBadgeAsset() {
+        if (binding == null || binding.tvStaffBadge == null) return;
+        ViewGroup parent = binding.tvStaffBadge.getParent() instanceof ViewGroup
+                ? (ViewGroup) binding.tvStaffBadge.getParent() : null;
+        ImageView image = parent != null ? parent.findViewWithTag("jeho_custom_display_rank_image") : null;
+        if (image != null) {
+            Glide.with(this).clear(image);
+            image.setVisibility(View.GONE);
+        }
+    }
+
+    private void showProfileRoleBadge(String label, String imageUrl) {
+        if (binding == null || binding.tvStaffBadge == null) return;
+        ViewGroup parent = binding.tvStaffBadge.getParent() instanceof ViewGroup
+                ? (ViewGroup) binding.tvStaffBadge.getParent() : null;
+        ImageView image = parent != null ? parent.findViewWithTag("jeho_custom_display_rank_image") : null;
+        if (imageUrl != null && !imageUrl.trim().isEmpty() && parent != null) {
+            binding.tvStaffBadge.setVisibility(View.GONE);
+            if (image == null) {
+                image = new ImageView(this);
+                image.setTag("jeho_custom_display_rank_image");
+                image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                int size = dpProfile(24);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+                lp.setMargins(dpProfile(4), 0, dpProfile(4), 0);
+                int index = Math.min(parent.indexOfChild(binding.tvStaffBadge) + 1, parent.getChildCount());
+                parent.addView(image, index, lp);
+            }
+            image.setVisibility(View.VISIBLE);
+            Glide.with(this).load(AssetCatalog.absoluteUrl(imageUrl.trim())).into(image);
+            image.setContentDescription(label);
+        } else {
+            if (image != null) {
+                Glide.with(this).clear(image);
+                image.setVisibility(View.GONE);
+            }
+            binding.tvStaffBadge.setText(label == null ? "" : label);
+            binding.tvStaffBadge.setVisibility(label == null || label.trim().isEmpty() ? View.GONE : View.VISIBLE);
         }
     }
 
