@@ -1416,31 +1416,59 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
         }
         if (holder.b.tvStaffSeatBadge == null) return;
+        ViewGroup parent = holder.b.tvStaffSeatBadge.getParent() instanceof ViewGroup
+                ? (ViewGroup) holder.b.tvStaffSeatBadge.getParent() : null;
+        ImageView roleImage = parent != null ? parent.findViewWithTag("jeho_staff_role_badge_image") : null;
         if (user == null || !StaffRoleHelper.isStaff(user)) {
             holder.b.tvStaffSeatBadge.setVisibility(View.GONE);
             holder.b.tvStaffSeatBadge.setTag(null);
             holder.b.tvStaffSeatBadge.setText("");
+            if (roleImage != null) {
+                Glide.with(holder.itemView).clear(roleImage);
+                roleImage.setVisibility(View.GONE);
+            }
             return;
         }
         String role = StaffRoleHelper.normalize(user);
         StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(role);
         String fallbackLabel = StaffRoleHelper.badgeAr(user);
-        holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
         holder.b.tvStaffSeatBadge.setTag(role);
         holder.b.tvStaffSeatBadge.setText(identity.label.isEmpty() ? fallbackLabel : identity.label);
         holder.b.tvStaffSeatBadge.setBackgroundResource(
-                StaffRoleHelper.SUPER.equals(role)
-                        ? R.drawable.bg_chip_staff_super
-                        : R.drawable.bg_chip_staff_manager);
+                StaffRoleHelper.SUPER.equals(role) ? R.drawable.bg_chip_staff_super : R.drawable.bg_chip_staff_manager);
+        holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
         StaffIdentityConfigCache.load(holder.itemView.getContext(), () -> {
-            if (holder.b.tvStaffSeatBadge == null
-                    || holder.b.tvStaffSeatBadge.getVisibility() != View.VISIBLE
-                    || !role.equals(holder.b.tvStaffSeatBadge.getTag())) return;
+            if (holder.b.tvStaffSeatBadge == null || !role.equals(holder.b.tvStaffSeatBadge.getTag())) return;
             StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(role);
-            holder.b.tvStaffSeatBadge.setText(latest.label.isEmpty() ? fallbackLabel : latest.label);
-            if (!latest.frameUrl.isEmpty()) {
+            String label = latest.label.isEmpty() ? fallbackLabel : latest.label;
+            if (latest.badgeUrl != null && !latest.badgeUrl.trim().isEmpty() && parent != null) {
+                holder.b.tvStaffSeatBadge.setVisibility(View.GONE);
+                ImageView target = roleImage;
+                if (target == null) {
+                    target = new ImageView(holder.itemView.getContext());
+                    target.setTag("jeho_staff_role_badge_image");
+                    target.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    int size = Math.round(16 * holder.itemView.getResources().getDisplayMetrics().density);
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+                    lp.topMargin = Math.round(2 * holder.itemView.getResources().getDisplayMetrics().density);
+                    int index = Math.min(parent.indexOfChild(holder.b.tvStaffSeatBadge) + 1, parent.getChildCount());
+                    parent.addView(target, index, lp);
+                    roleImage = target;
+                }
+                target.setVisibility(View.VISIBLE);
+                Glide.with(holder.itemView).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.badgeUrl.trim())).into(target);
+                target.setContentDescription(label);
+            } else {
+                if (roleImage != null) {
+                    Glide.with(holder.itemView).clear(roleImage);
+                    roleImage.setVisibility(View.GONE);
+                }
+                holder.b.tvStaffSeatBadge.setText(label);
+                holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
+            }
+            if (!latest.frameUrl.isEmpty() && holder.b.imgFrame != null) {
                 try {
-                    Glide.with(holder.b.imgFrame).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.frameUrl))
+                    Glide.with(holder.itemView).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.frameUrl))
                             .into(holder.b.imgFrame);
                 } catch (Exception ignored) { }
             }
