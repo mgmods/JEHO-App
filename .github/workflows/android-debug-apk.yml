@@ -40,7 +40,7 @@ on:
 
 concurrency:
   group: jeho-android-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.event_name }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -94,6 +94,8 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A android/app/src/main/res
             git commit -m "perf(android): losslessly compress drawable resources"
+            git fetch origin "$PR_BRANCH"
+            git rebase "origin/$PR_BRANCH"
             git push origin "HEAD:$PR_BRANCH"
           fi
 
