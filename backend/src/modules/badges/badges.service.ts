@@ -726,8 +726,10 @@ export class BadgesService {
 
   private validate(dto: UpsertBadgeDto) {
     if (!dto.name?.trim()) throw new BadRequestException('Medal name is required');
-    if (!dto.imageUrl?.trim()) throw new BadRequestException('Medal image URL is required');
-    if (dto.name.length > 80 || dto.imageUrl.length > 512) throw new BadRequestException('Medal field is too long');
+    const category = String(dto.category || 'general').trim().toLowerCase();
+    if (category !== 'display_rank' && !dto.imageUrl?.trim()) throw new BadRequestException('Medal image URL is required');
+    if (dto.name.length > 80 || String(dto.imageUrl || '').length > 512) throw new BadRequestException('Medal field is too long');
+    if (!['general', 'display_rank', 'room_support'].includes(category)) throw new BadRequestException('Medal category is invalid');
     if (dto.manualTaskTitle && dto.manualTaskTitle.length > 120) throw new BadRequestException('Manual task title is too long');
     if (dto.manualTaskDescription && dto.manualTaskDescription.length > 500) throw new BadRequestException('Manual task description is too long');
     if (dto.manualTaskVisibility && !['visible', 'hidden'].includes(dto.manualTaskVisibility)) throw new BadRequestException('Manual task visibility is invalid');
