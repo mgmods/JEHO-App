@@ -876,8 +876,9 @@ public class ProfileActivity extends ThemedActivity {
                 image = new ImageView(this);
                 image.setTag("jeho_custom_display_rank_image");
                 image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                int size = dpProfile(24);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+                int badgeWidth = dpProfile(116);
+                int badgeHeight = dpProfile(28);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(badgeWidth, badgeHeight);
                 lp.setMargins(dpProfile(4), 0, dpProfile(4), 0);
                 int index = Math.min(parent.indexOfChild(binding.tvStaffBadge) + 1, parent.getChildCount());
                 parent.addView(image, index, lp);
