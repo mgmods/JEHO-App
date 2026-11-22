@@ -12,6 +12,7 @@ import { DataSource, Repository } from 'typeorm';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { decryptSecret } from '../../common/crypto/secret-box';
 import { createHash, randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { User, UserStatus } from '../../database/entities/user.entity';
@@ -211,7 +212,16 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
   private async settingValue(key: string, fallback = ''): Promise<string> {
     const row = await this.settingsRepo.findOne({ where: { key } });
-    return row?.value == null ? fallback : String(row.value);
+    const value = row?.value == null ? fallback : String(row.value);
+    if (key === 'twilio.auth_token' && value.trim().startsWith('{')) {
+      try {
+        return decryptSecret(value, this.configService.get<string>('app.settingsEncryptionKey') || process.env.SETTINGS_ENCRYPTION_KEY);
+      } catch (error) {
+        this.logger.error('Unable to decrypt Twilio Verify credentials');
+        throw new BadRequestException('تعذّر قراءة بيانات Twilio المحفوظة بشكل آمن');
+      }
+    }
+    return value;
   }
 
   private async twilioOtpEnabled(): Promise<boolean> {
