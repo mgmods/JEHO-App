@@ -135,19 +135,17 @@ public class AuraLiveApp extends Application {
                         externalCaptureAudioManager.getActiveRecordingConfigurations();
                 boolean anotherAppRecording = false;
                 if (activeConfigs != null) {
-                    final int ownUid = getApplicationInfo().uid;
                     for (AudioRecordingConfiguration config : activeConfigs) {
                         if (config == null) continue;
-                        int clientUid = -1;
+                        // Android exposes whether this app's active capture was
+                        // silenced by a higher-priority recorder. Client UID is a
+                        // hidden/system API and cannot be called by ordinary apps.
                         try {
-                            clientUid = config.getClientUid();
+                            if (config.isClientSilenced()) {
+                                anotherAppRecording = true;
+                                break;
+                            }
                         } catch (Throwable ignored) {
-                        }
-                        // Unknown/sanitized UID is treated conservatively as external:
-                        // better to leave JEHO's mic released than block a voice note.
-                        if (clientUid != ownUid) {
-                            anotherAppRecording = true;
-                            break;
                         }
                     }
                 }
@@ -237,21 +235,18 @@ public class AuraLiveApp extends Application {
                 // AudioRecordingCallback reports the active capture set. Do not gate this
                 // on foreground state: if the user returns to JEHO while WhatsApp is
                 // still recording, we must keep JEHO's mic and room playback suspended.
-                final int ownUid = getApplicationInfo().uid;
                 boolean anotherAppRecording = false;
                 if (configs != null) {
                     for (AudioRecordingConfiguration config : configs) {
                         if (config == null) continue;
-                        int clientUid = -1;
+                        // isClientSilenced() is the public SDK signal that a
+                        // higher-priority app (WhatsApp/call/recorder) owns capture.
                         try {
-                            clientUid = config.getClientUid();
+                            if (config.isClientSilenced()) {
+                                anotherAppRecording = true;
+                                break;
+                            }
                         } catch (Throwable ignored) {
-                        }
-                        if (clientUid != ownUid) {
-                            // Treat hidden/sanitized UIDs conservatively so a recorder
-                            // is never blocked just because Android withheld its UID.
-                            anotherAppRecording = true;
-                            break;
                         }
                     }
                 }
