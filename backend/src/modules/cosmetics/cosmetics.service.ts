@@ -223,6 +223,11 @@ export class CosmeticsService implements OnModuleInit {
     }
     void this.expirePrivateEntryCosmetics().catch(() => undefined);
     // Live DB is the catalog. Boot mutators only when BOOT_SEED_CATALOGS=1.
+    // Repair already-equipped voice waves from older records. This is idempotent:
+    // it only updates profiles whose equipped cosmetic is the authoritative source.
+    await this.refreshEquippedVoiceWaveUrls().catch((err) =>
+      this.logger.warn(`voice wave wear refresh: ${(err as Error).message}`),
+    );
     if (!bootCatalogSeedEnabled()) {
       this.logger.log('Cosmetics catalog: DB authoritative (no boot seed)');
       return;
@@ -1155,7 +1160,21 @@ export class CosmeticsService implements OnModuleInit {
       if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = owned.cosmetic.previewUrl || null;
       if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = owned.cosmetic.previewUrl || null;
-      if (type === CosmeticType.VOICE_WAVE) profile.voiceWaveUrl = owned.cosmetic.previewUrl || this.cosmeticAnimationUrl(owned.cosmetic) || null;
+      if (type === CosmeticType.VOICE_WAVE) {
+        // The preview is only the catalog thumbnail. The equipped voice wave must
+        // use the real animation/media URL when one exists; otherwise old preview
+        // art gets written into the profile and the room keeps showing the legacy wave.
+        const waveMedia = this.cosmeticAnimationUrl(owned.cosmetic);
+        const waveLower = String(waveMedia || '').toLowerCase();
+        const wavePlayable =
+          !!waveMedia &&
+          !waveLower.includes('runtime.html') &&
+          !waveLower.endsWith('.html') &&
+          !waveLower.endsWith('.json');
+        profile.voiceWaveUrl = wavePlayable
+          ? waveMedia
+          : owned.cosmetic.previewUrl || null;
+      }
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
       if (type === CosmeticType.HOST_BADGE) {
         // VIP and host frames share one avatar-frame slot; never layer them.
@@ -2123,6 +2142,37 @@ export class CosmeticsService implements OnModuleInit {
         this.logger.warn(`Equipped wear URL refresh failed: ${(err as Error).message}`),
       );
     }
+  }
+
+  /**
+   * Rebind equipped voice-wave wear from the owned cosmetic itself.
+   * This repairs profiles created before animationUrl became authoritative.
+   */
+  private async refreshEquippedVoiceWaveUrls() {
+    const equipped = await this.userCosmeticsRepo.find({
+      where: { equipped: true },
+      relations: ['cosmetic'],
+    });
+    let updated = 0;
+    for (const row of equipped) {
+      const c = row.cosmetic;
+      if (!c || c.type !== CosmeticType.VOICE_WAVE || !row.userId) continue;
+      const media = this.cosmeticAnimationUrl(c);
+      const lower = String(media || '').toLowerCase();
+      const playable =
+        !!media &&
+        !lower.includes('runtime.html') &&
+        !lower.endsWith('.html') &&
+        !lower.endsWith('.json');
+      const next = playable ? media : c.previewUrl || null;
+      if (!next) continue;
+      const profile = await this.profileRepo.findOne({ where: { userId: row.userId } });
+      if (!profile || profile.voiceWaveUrl === next) continue;
+      profile.voiceWaveUrl = next;
+      await this.profileRepo.save(profile);
+      updated += 1;
+    }
+    if (updated > 0) this.logger.log(`Refreshed equipped voice-wave URLs (${updated} profiles)`);
   }
 
   /** After catalog SVGA/MP4 URLs change, push new animationUrl onto equipped profiles. */
