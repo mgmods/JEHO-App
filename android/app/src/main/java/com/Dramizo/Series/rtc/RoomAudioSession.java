@@ -21,9 +21,21 @@ public final class RoomAudioSession {
     private RoomAudioSession() {}
 
     public static void acquire(@Nullable Context context) {
-        if (context == null) return;
-        Context app = context.getApplicationContext();
+        Context app = context != null
+                ? context.getApplicationContext()
+                : appContext.get();
+        if (app == null) return;
         appContext = new WeakReference<>(app);
+
+        // A muted room microphone must never leave Android in VoIP/call mode.
+        // Likewise, a background room must not reclaim communication mode from
+        // WhatsApp, voice recorder, or another foreground microphone client.
+        if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()
+                || !RoomRtcEngine.getInstance().isMicEnabled()) {
+            release(app);
+            return;
+        }
+
         AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) return;
         try {
