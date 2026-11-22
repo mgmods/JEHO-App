@@ -102,7 +102,7 @@ public final class RoomAudioRoute {
      *                        only if no external headset is attached.
      */
     public static void applyCommunicationRoute(@Nullable Context context, boolean wantOpenSpeaker) {
-        if (context == null) return;
+        if (context == null || RoomAudioSession.isSuspended()) return;
         try {
             AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
             if (am == null) return;

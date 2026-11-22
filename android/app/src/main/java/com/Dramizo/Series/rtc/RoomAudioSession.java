@@ -17,10 +17,23 @@ public final class RoomAudioSession {
     private static WeakReference<Context> appContext = new WeakReference<>(null);
     private static AudioFocusRequest focusRequest;
     private static boolean focusHeld;
+    /** While suspended, background RTC callbacks must not reclaim VoIP focus/mode. */
+    private static volatile boolean suspended;
 
     private RoomAudioSession() {}
 
-    public static void acquire(@Nullable Context context) {
+    public static synchronized void acquire(@Nullable Context context) {
+        if (context == null || suspended) return;
+        acquireInternal(context);
+    }
+
+    /** Explicit foreground return — clears background suspension then reacquires VoIP focus. */
+    public static synchronized void resume(@Nullable Context context) {
+        suspended = false;
+        acquireInternal(context);
+    }
+
+    private static void acquireInternal(@Nullable Context context) {
         if (context == null) return;
         Context app = context.getApplicationContext();
         appContext = new WeakReference<>(app);
@@ -50,7 +63,22 @@ public final class RoomAudioSession {
         }
     }
 
-    public static void release(@Nullable Context context) {
+    /** Release microphone/VoIP focus while keeping the RTC room connection alive. */
+    public static synchronized void suspend(@Nullable Context context) {
+        suspended = true;
+        releaseInternal(context);
+    }
+
+    public static synchronized boolean isSuspended() {
+        return suspended;
+    }
+
+    public static synchronized void release(@Nullable Context context) {
+        suspended = false;
+        releaseInternal(context);
+    }
+
+    private static void releaseInternal(@Nullable Context context) {
         Context app = context != null
                 ? context.getApplicationContext()
                 : appContext.get();
