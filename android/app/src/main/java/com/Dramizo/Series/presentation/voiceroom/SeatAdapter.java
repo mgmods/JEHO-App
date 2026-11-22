@@ -278,6 +278,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     seat.user.hostBadgeMeta = prev.hostBadgeMeta;
                 }
             }
+            // Room refresh payloads can temporarily omit equipped wear fields.
+            // Keep the last confirmed voice-wave URL for this seated user so the
+            // next speaking update does not fall back to the legacy default wave.
+            if (isBlank(seat.user.voiceWaveUrl) && !isBlank(prev.voiceWaveUrl)) {
+                seat.user.voiceWaveUrl = prev.voiceWaveUrl;
+            }
             if (isBlank(seat.user.levelBadgeUrl) && !isBlank(prev.levelBadgeUrl)) {
                 seat.user.levelBadgeUrl = prev.levelBadgeUrl;
             }
