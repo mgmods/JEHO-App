@@ -813,7 +813,46 @@ public class ProfileActivity extends ThemedActivity {
 
     private void bindStaffBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (binding == null || binding.tvStaffBadge == null) return;
-        boolean rechargeAgent = user.isRechargeAgent;
+        // An admin-gifted display-rank badge is cosmetic only. It replaces the
+        // visible role chip, never the user's actual server-side permissions.
+        ViewGroup badgeParent = binding.tvStaffBadge.getParent() instanceof ViewGroup
+                ? (ViewGroup) binding.tvStaffBadge.getParent() : null;
+        ImageView customRankImage = badgeParent != null
+                ? badgeParent.findViewWithTag("jeho_custom_display_rank_image") : null;
+        String customRankName = user != null ? user.customDisplayRankName : null;
+        String customRankUrl = user != null ? user.customDisplayRankImageUrl : null;
+        if (customRankName != null && !customRankName.trim().isEmpty()) {
+            if (customRankUrl != null && !customRankUrl.trim().isEmpty() && badgeParent != null) {
+                binding.tvStaffBadge.setVisibility(View.GONE);
+                if (customRankImage == null) {
+                    customRankImage = new ImageView(this);
+                    customRankImage.setTag("jeho_custom_display_rank_image");
+                    customRankImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    int size = dpProfile(24);
+                    LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(size, size);
+                    imageParams.setMargins(dpProfile(4), 0, dpProfile(4), 0);
+                    int index = Math.min(badgeParent.indexOfChild(binding.tvStaffBadge) + 1, badgeParent.getChildCount());
+                    badgeParent.addView(customRankImage, index, imageParams);
+                }
+                customRankImage.setVisibility(View.VISIBLE);
+                // Glide keeps GIFs animated and displays static images normally.
+                Glide.with(this).load(AssetCatalog.absoluteUrl(customRankUrl.trim())).into(customRankImage);
+                customRankImage.setContentDescription(customRankName.trim());
+            } else {
+                if (customRankImage != null) {
+                    Glide.with(this).clear(customRankImage);
+                    customRankImage.setVisibility(View.GONE);
+                }
+                binding.tvStaffBadge.setVisibility(View.VISIBLE);
+                binding.tvStaffBadge.setText(customRankName.trim());
+            }
+            return;
+        }
+        if (customRankImage != null) {
+            Glide.with(this).clear(customRankImage);
+            customRankImage.setVisibility(View.GONE);
+        }
+        boolean rechargeAgent = user != null && user.isRechargeAgent;
         boolean agencyOwner = user.agency != null
                 && "owner".equalsIgnoreCase(user.agency.role);
         // Agency identity is rendered by the single dedicated agency-role chip below.
