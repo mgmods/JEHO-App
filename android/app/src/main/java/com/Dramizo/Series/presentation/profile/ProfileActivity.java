@@ -847,6 +847,7 @@ public class ProfileActivity extends ThemedActivity {
                 try {
                     binding.imgFrame.setVisibility(View.VISIBLE);
                     Glide.with(this).load(AssetCatalog.absoluteUrl(latest.frameUrl)).into(binding.imgFrame);
+                    com.Dramizo.Series.util.StaffIdentityFrameMotion.start(binding.imgFrame);
                 } catch (Exception ignored) { }
             }
         });
