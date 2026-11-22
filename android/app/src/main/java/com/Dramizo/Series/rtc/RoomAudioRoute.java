@@ -113,8 +113,10 @@ public final class RoomAudioRoute {
             // MODE_IN_COMMUNICATION is interpreted by Android as an active call.
             // Never assert it while JEHO is backgrounded or its room mic is muted:
             // doing so blocks WhatsApp/voice recorders from acquiring the microphone.
+            com.Dramizo.Series.rtc.RoomRtcEngine rtc =
+                    com.Dramizo.Series.rtc.RoomRtcEngine.getInstance();
             if (!AuraLiveApp.isAppInForeground()
-                    || !com.Dramizo.Series.rtc.RoomRtcEngine.getInstance().isMicEnabled()) {
+                    || !rtc.isMicEnabled() || !rtc.isPublishing()) {
                 RoomAudioSession.release(context);
                 am.setSpeakerphoneOn(wantOpenSpeaker && !external);
                 return;
