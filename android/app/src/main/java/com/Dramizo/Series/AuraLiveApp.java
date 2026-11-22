@@ -11,6 +11,7 @@ import android.media.AudioRecordingConfiguration;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
@@ -68,6 +69,8 @@ public class AuraLiveApp extends Application {
     @Nullable private String roomMicRoomIdBeforeExternalApp;
     @Nullable private AudioManager externalCaptureAudioManager;
     @Nullable private AudioManager.AudioRecordingCallback externalCaptureCallback;
+    @Nullable private HandlerThread externalCaptureThread;
+    @Nullable private Handler externalCaptureHandler;
 
     private static final int REQUEST_POST_NOTIFICATIONS = 8104;
     private static final String NOTIFICATION_PERMISSION_PREFS = "jeho_notification_permission";
@@ -229,6 +232,12 @@ public class AuraLiveApp extends Application {
         AudioManager manager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         if (manager == null) return;
         externalCaptureAudioManager = manager;
+        // Process capture arbitration away from the UI thread. Android can notify
+        // us while WhatsApp is starting a voice note; keeping this callback off the
+        // main looper avoids extra delay if JEHO's UI is busy or animating.
+        externalCaptureThread = new HandlerThread("jeho-external-audio-monitor");
+        externalCaptureThread.start();
+        externalCaptureHandler = new Handler(externalCaptureThread.getLooper());
         externalCaptureCallback = new AudioManager.AudioRecordingCallback() {
             @Override
             public void onRecordingConfigChanged(java.util.List<AudioRecordingConfiguration> configs) {
@@ -271,7 +280,7 @@ public class AuraLiveApp extends Application {
         };
         try {
             manager.registerAudioRecordingCallback(
-                    externalCaptureCallback, new Handler(Looper.getMainLooper()));
+                    externalCaptureCallback, externalCaptureHandler);
         } catch (Throwable t) {
             android.util.Log.w("AuraLiveApp", "External recorder monitor unavailable: "
                     + t.getMessage());
@@ -292,6 +301,14 @@ public class AuraLiveApp extends Application {
         }
         externalCaptureAudioManager = null;
         externalCaptureCallback = null;
+        if (externalCaptureThread != null) {
+            try {
+                externalCaptureThread.quitSafely();
+            } catch (Throwable ignored) {
+            }
+        }
+        externalCaptureThread = null;
+        externalCaptureHandler = null;
         super.onTerminate();
     }
 
