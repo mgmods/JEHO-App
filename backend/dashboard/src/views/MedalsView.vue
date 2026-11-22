@@ -73,13 +73,19 @@
       <form class="form-grid" @submit.prevent="createMedal">
         <label>اسم المدالية<input v-model.trim="form.name" class="form-control" maxlength="80" required placeholder="مثلاً: مدالية التميز" /></label>
         <label>الوصف<input v-model.trim="form.description" class="form-control" maxlength="500" placeholder="وصف مختصر يظهر للإدارة" /></label>
-        <label class="wide">رابط الصورة<input v-model.trim="form.imageUrl" class="form-control" type="url" required placeholder="https://..." /></label>
+        <label>نوع الشارة
+          <select v-model="form.category" class="form-select">
+            <option value="general">مدالية عادية</option>
+            <option value="display_rank">شارة رتبة إدارية بديلة</option>
+          </select>
+        </label>
+        <label class="wide">رابط الصورة<input v-model.trim="form.imageUrl" class="form-control" type="url" :required="form.category !== 'display_rank'" :placeholder="form.category === 'display_rank' ? 'اختياري — اتركه فارغاً لعرض الاسم كنص' : 'https://...'" /></label>
         <label class="upload-box wide">
           <span><i class="bi bi-cloud-arrow-up"></i> {{ uploading ? 'جارٍ رفع الصورة…' : 'رفع صورة المدالية' }}</span>
           <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" :disabled="uploading" @change="uploadImage" />
         </label>
         <div v-if="form.imageUrl" class="medal-preview"><img :src="form.imageUrl" alt="معاينة المدالية" @error="previewBroken = true" @load="previewBroken = false" /><span v-if="previewBroken">تعذر تحميل الصورة</span></div>
-        <div class="hidden-task-config wide">
+        <div v-if="form.category !== 'display_rank'" class="hidden-task-config wide">
           <h3>مهمة سرّية تمنح المدالية تلقائياً</h3>
           <p>لا تظهر المهمة أو التقدم للمستخدم. السيرفر يمنح المدالية فور اكتمال الشرط.</p>
           <label class="check-row"><input v-model="form.hiddenTaskEnabled" type="checkbox" /> تفعيل المهمة السرّية</label>
@@ -91,7 +97,7 @@
           <label>العدد المطلوب<input v-model.number="form.hiddenTaskTarget" class="form-control" type="number" min="1" max="1000000000" /></label>
           <label>مدة المدالية بالأيام<input v-model.number="form.hiddenTaskDays" class="form-control" type="number" min="0" max="3650" /><small>0 = دائمة</small></label>
         </div>
-        <div class="manual-task-card wide">
+        <div v-if="form.category !== 'display_rank'" class="manual-task-card wide">
           <h3>مهمة يدوية لهذه المدالية</h3>
           <p>تظهر في مركز المهام أو تبقى مخفية. اعتماد الإنجاز ومنح المدالية يتم من الإدارة عبر الإهداء للمستخدم.</p>
           <label class="check-row"><input v-model="form.manualTaskEnabled" type="checkbox" /> تفعيل المهمة اليدوية</label>
@@ -106,7 +112,8 @@
           <label>مدة المدالية بالأيام<input v-model.number="form.manualTaskDays" class="form-control" type="number" min="0" max="3650" /><small>0 = دائمة</small></label>
         </div>
         <label>الترتيب<input v-model.number="form.sortOrder" class="form-control" type="number" min="0" /></label>
-        <label class="check-row"><input v-model="form.isAnimated" type="checkbox" /> المدالية متحركة</label>
+        <label class="check-row"><input v-model="form.isAnimated" type="checkbox" /> الشارة متحركة (GIF)</label>
+        <p v-if="form.category === 'display_rank'" class="secret-note wide">هذه الشارة تُهدى لمستخدم بواسطة ID وتظهر مكان شارة الرتبة الإدارية في الملف الشخصي والروم. يمكن أن تكون صورة متحركة أو ثابتة، أو اسماً نصياً دون صورة.</p>
         <button class="btn btn-success wide submit-btn" type="submit" :disabled="saving || uploading">{{ saving ? 'جارٍ الحفظ…' : 'حفظ المدالية' }}</button>
       </form>
     </section>
@@ -121,7 +128,7 @@
     <div v-else class="medal-grid">
       <article v-for="medal in medals" :key="medal.id" class="medal-card" :class="{ inactive: !medal.isActive }">
         <div class="card-top">
-          <div class="medal-art"><img :src="medal.imageUrl" :alt="medal.name" loading="lazy" /></div>
+          <div class="medal-art"><img v-if="medal.imageUrl" :src="medal.imageUrl" :alt="medal.name" loading="lazy" /><strong v-else>{{ medal.name }}</strong></div>
           <span class="status" :class="medal.isActive ? 'on' : 'off'">{{ medal.isActive ? 'متاحة' : 'مخفية' }}</span>
         </div>
         <h3>{{ medal.name }}</h3>
@@ -279,7 +286,7 @@ const recipient = reactive({})
 const duration = reactive({})
 const hiddenTask = reactive({})
 const manualTask = reactive({})
-const form = reactive({ name: '', description: '', imageUrl: '', sortOrder: 0, isAnimated: false, hiddenTaskEnabled: false, hiddenTaskEvent: 'gift', hiddenTaskTarget: 1, hiddenTaskDays: 7, manualTaskEnabled: false, manualTaskVisibility: 'hidden', manualTaskTitle: '', manualTaskDescription: '', manualTaskDays: 0 })
+const form = reactive({ name: '', description: '', imageUrl: '', category: 'general', sortOrder: 0, isAnimated: false, hiddenTaskEnabled: false, hiddenTaskEvent: 'gift', hiddenTaskTarget: 1, hiddenTaskDays: 7, manualTaskEnabled: false, manualTaskVisibility: 'hidden', manualTaskTitle: '', manualTaskDescription: '', manualTaskDays: 0 })
 
 function unwrap(data) { return data?.data?.data ?? data?.data ?? data ?? {} }
 async function load() {
@@ -326,8 +333,8 @@ async function createMedal() {
   saving.value = true; error.value = ''; success.value = ''
   try {
     const { data, error: err } = await medalsApi.create({
-      name: form.name, description: form.description, imageUrl: form.imageUrl,
-      category: 'general', awardType: 'manual', isActive: true,
+      name: form.name, description: form.description, imageUrl: form.imageUrl || '',
+      category: form.category, awardType: 'manual', isActive: true,
       isAnimated: form.isAnimated, sortOrder: Number(form.sortOrder) || 0,
       hiddenTaskEnabled: form.hiddenTaskEnabled, hiddenTaskEvent: form.hiddenTaskEvent,
       hiddenTaskTarget: Math.max(1, Number(form.hiddenTaskTarget) || 1),
@@ -339,8 +346,8 @@ async function createMedal() {
       manualTaskDays: Math.max(0, Math.min(3650, Number(form.manualTaskDays) || 0)),
     })
     if (err) throw new Error(err.message || 'تعذر حفظ المدالية')
-    success.value = 'تم حفظ المدالية بنجاح.'
-    Object.assign(form, { name: '', description: '', imageUrl: '', sortOrder: 0, isAnimated: false, hiddenTaskEnabled: false, hiddenTaskEvent: 'gift', hiddenTaskTarget: 1, hiddenTaskDays: 7, manualTaskEnabled: false, manualTaskVisibility: 'hidden', manualTaskTitle: '', manualTaskDescription: '', manualTaskDays: 0 })
+    success.value = form.category === 'display_rank' ? 'تم حفظ شارة الرتبة البديلة. يمكنك إهداؤها الآن بواسطة ID.' : 'تم حفظ المدالية بنجاح.'
+    Object.assign(form, { name: '', description: '', imageUrl: '', category: 'general', sortOrder: 0, isAnimated: false, hiddenTaskEnabled: false, hiddenTaskEvent: 'gift', hiddenTaskTarget: 1, hiddenTaskDays: 7, manualTaskEnabled: false, manualTaskVisibility: 'hidden', manualTaskTitle: '', manualTaskDescription: '', manualTaskDays: 0 })
     await load()
   } catch (e) { error.value = e?.message || 'تعذر حفظ المدالية' }
   finally { saving.value = false }
