@@ -160,6 +160,14 @@ public final class RoomRtcEngine {
     public void setMicEnabled(boolean enabled) {
         if (isLiveKit()) LiveKitEngineManager.getInstance().setMicEnabled(enabled);
         else ZegoEngineManager.getInstance().setMicEnabled(enabled);
+
+        // Releasing the room mic must also release Android's call audio mode/focus.
+        // This applies to both LiveKit and Zego, including the notification action.
+        if (enabled) {
+            RoomAudioSession.acquire(null);
+        } else {
+            RoomAudioSession.release(null);
+        }
     }
 
     public boolean isMicEnabled() {
