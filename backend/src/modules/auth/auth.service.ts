@@ -311,6 +311,9 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException('رمز التحقق غير صحيح أو منتهي');
       }
     } else {
+      if (this.configService.get('app.nodeEnv') === 'production') {
+        throw new BadRequestException('التحقق عبر SMS غير مفعّل حالياً. لا يمكن قبول رمز محلي في بيئة الإنتاج.');
+      }
       const otp = await this.otpRepo.findOne({
         where: { target: phone, used: false, purpose: OtpPurpose.LOGIN },
         order: { createdAt: 'DESC' },
