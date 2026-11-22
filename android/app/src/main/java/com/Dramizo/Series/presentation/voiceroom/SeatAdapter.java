@@ -90,6 +90,22 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (selfMicMuted == muted) return;
         selfMicMuted = muted;
         if (selfUserId == null || selfUserId.isEmpty()) return;
+        if (muted) {
+            // Closing the local mic must stop the local speaking ring immediately.
+            String key = normalizeUserId(selfUserId);
+            Runnable pending = speakingStopRunnables.remove(key);
+            if (pending != null) handler.removeCallbacks(pending);
+            speakingUsers.remove(key);
+            speakingLevels.remove(key);
+            lastPaintedSpeakLevel.remove(key);
+            for (int i = 0; i < items.size(); i++) {
+                if (key.equals(seatUserId(items.get(i)))) {
+                    notifyItemChanged(i, "speaking");
+                    notifyItemChanged(i, "mute");
+                    return;
+                }
+            }
+        }
         for (int i = 0; i < items.size(); i++) {
             RoomDtos.SeatDto seat = items.get(i);
             if (seat != null && selfUserId.equals(seatUserId(seat))) {
@@ -429,6 +445,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     public void setSpeaking(String userId, boolean speaking, float level0to100) {
         String key = normalizeUserId(userId);
         if (key.isEmpty()) {
+            return;
+        }
+        // A muted local microphone can never be considered actively speaking.
+        if (speaking && selfMicMuted && selfUserId != null && selfUserId.equals(key)) {
             return;
         }
         // Only light waves on a seat that currently holds this user.
@@ -967,7 +987,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         setSeatSize(holder.b.imgSeatShell, avatar, ctx);
         setSeatSize(holder.b.imgAvatar, avatar, ctx);
-        setSeatSize(holder.b.imgVoiceWave, frame + 4, ctx);
+        setSeatSize(holder.b.imgVoiceWave, frame, ctx);
         if (holder.b.seatVoiceWaveBars != null) {
             setSeatSize(holder.b.seatVoiceWaveBars, frame + 10, ctx);
             holder.b.seatVoiceWaveBars.setBarCount(
@@ -1537,138 +1557,83 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             stopSpeakingRipples(holder);
             return;
         }
+        holder.speaking = true;
         String waveUrl = holder.voiceWaveUrl;
         boolean hasEquippedWave = waveUrl != null && !waveUrl.trim().isEmpty();
-        if (holder.b.imgVoiceWave != null) {
+
+        // Exactly one visual ring: the equipped asset OR the built-in seat aura.
+        if (holder.b.imgVoiceWaveOuter != null) {
+            holder.b.imgVoiceWaveOuter.animate().cancel();
+            holder.b.imgVoiceWaveOuter.clearAnimation();
+            holder.b.imgVoiceWaveOuter.setVisibility(View.GONE);
+        }
+        if (hasEquippedWave && holder.b.imgVoiceWave != null) {
+            android.widget.ImageView wave = holder.b.imgVoiceWave;
+            wave.animate().cancel();
+            wave.setAlpha(1f);
+            wave.setScaleX(1f);
+            wave.setScaleY(1f);
+            wave.setVisibility(View.VISIBLE);
+            wave.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
+            wave.setClipToOutline(false);
+            wave.setOutlineProvider(null);
+            if (!Objects.equals(holder.loadedVoiceWaveUrl, waveUrl.trim())) {
+                String absoluteWave = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim());
+                Glide.with(holder.itemView).clear(wave);
+                Glide.with(holder.itemView).load(absoluteWave).into(wave);
+                holder.loadedVoiceWaveUrl = waveUrl.trim();
+            }
+            startEquippedVoiceWaveMotion(holder);
+        } else if (holder.b.imgVoiceWave != null) {
+            holder.b.imgVoiceWave.animate().cancel();
+            holder.b.imgVoiceWave.clearAnimation();
+            holder.b.imgVoiceWave.setVisibility(View.GONE);
+            stopEquippedVoiceWaveMotion(holder);
+            if (holder.loadedVoiceWaveUrl != null) {
+                Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+                holder.loadedVoiceWaveUrl = null;
+            }
+        }
+
+        if (holder.b.seatSpeakAura != null) {
             if (hasEquippedWave) {
-                holder.b.imgVoiceWave.animate().cancel();
-                holder.b.imgVoiceWave.setAlpha(1f);
-                holder.b.imgVoiceWave.setVisibility(View.VISIBLE);
-                holder.b.imgVoiceWave.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
-                holder.b.imgVoiceWave.setClipToOutline(false);
-                holder.b.imgVoiceWave.setOutlineProvider(null);
-                if (!Objects.equals(holder.loadedVoiceWaveUrl, waveUrl.trim())) {
-                    String absoluteWave = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim());
-                    Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
-                    Glide.with(holder.itemView).load(absoluteWave).into(holder.b.imgVoiceWave);
-                    holder.loadedVoiceWaveUrl = waveUrl.trim();
-                    startEquippedVoiceWaveMotion(holder);
-                } else {
-                    ensureEquippedVoiceWaveMotion(holder);
-                }
-            } else {
-                holder.b.imgVoiceWave.setVisibility(View.GONE);
-                stopEquippedVoiceWaveMotion(holder);
-                if (holder.loadedVoiceWaveUrl != null) {
-                    Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
-                    holder.loadedVoiceWaveUrl = null;
-                }
-            }
-        }
-        if (hasEquippedWave) {
-                holder.b.imgVoiceWave.setVisibility(View.VISIBLE);
-                holder.b.imgVoiceWave.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
-                holder.b.imgVoiceWave.setClipToOutline(false);
-                holder.b.imgVoiceWave.setOutlineProvider(null);
-                if (!Objects.equals(holder.loadedVoiceWaveUrl, waveUrl.trim())) {
-                    String absoluteWave = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim());
-                    Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
-                    Glide.with(holder.itemView)
-                            .load(absoluteWave)
-                            .into(holder.b.imgVoiceWave);
-                    if (holder.b.imgVoiceWaveOuter != null) { holder.b.imgVoiceWaveOuter.clearAnimation(); holder.b.imgVoiceWaveOuter.setVisibility(View.GONE); }
-                    holder.loadedVoiceWaveUrl = waveUrl.trim();
-                    startEquippedVoiceWaveMotion(holder);
-                } else {
-                    ensureEquippedVoiceWaveMotion(holder);
-                }
-            } else {
-                holder.b.imgVoiceWave.setVisibility(View.GONE);
-                stopEquippedVoiceWaveMotion(holder);
-                if (holder.loadedVoiceWaveUrl != null) {
-                    Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
-                    if (holder.b.imgVoiceWaveOuter != null) {
-                        Glide.with(holder.itemView).clear(holder.b.imgVoiceWaveOuter);
-                    }
-                    holder.loadedVoiceWaveUrl = null;
-                }
-            }
-        }
-        if (hasEquippedWave) {
-            // Equipped cosmetic replaces the legacy aura and bars; never stack both.
-            if (holder.b.seatSpeakAura != null) {
                 holder.b.seatSpeakAura.setSpeaking(false);
                 holder.b.seatSpeakAura.setVisibility(View.GONE);
-            }
-            if (holder.b.seatVoiceWaveBars != null) {
-                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
-                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
-            }
-            stopRipple(holder.b.seatRippleOuter);
-            stopRipple(holder.b.seatRippleMid);
-            stopRipple(holder.b.seatRippleInner);
-        } else {
-            // No equipped cosmetic: show the original/default speaking wave.
-            if (holder.b.seatSpeakAura != null) {
+            } else {
                 holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
                 holder.b.seatSpeakAura.setSpeaking(true);
-            }
-            if (holder.b.seatVoiceWaveBars != null) {
-                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
-            }
-        }
-        holder.speaking = true;
-        if (holder.b.seatSpeakAura != null && !hasEquippedWave) {
-            String uid = holder.boundUserId;
-            float lv = uid != null && speakingLevels.containsKey(uid)
-                    ? speakingLevels.get(uid) : 48f;
-            holder.b.seatSpeakAura.setIntensity(lv);
-        }
-        if (!hasEquippedWave && holder.b.seatSpeakAura == null) {
-            holder.b.seatRippleOuter.setVisibility(View.VISIBLE);
-            startRipple(holder.b.seatRippleOuter, 0);
-            if (holder.b.seatRippleMid != null) {
-                holder.b.seatRippleMid.setVisibility(View.VISIBLE);
-                startRipple(holder.b.seatRippleMid, 180);
-            }
-            if (holder.b.seatRippleInner != null) {
-                holder.b.seatRippleInner.setVisibility(View.VISIBLE);
-                startRipple(holder.b.seatRippleInner, 360);
+                String uid = holder.boundUserId;
+                float lv = uid != null && speakingLevels.containsKey(uid)
+                        ? speakingLevels.get(uid) : 48f;
+                holder.b.seatSpeakAura.setIntensity(lv);
             }
         }
+        if (holder.b.seatVoiceWaveBars != null) {
+            holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+            holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+        }
+        stopRipple(holder.b.seatRippleOuter);
+        stopRipple(holder.b.seatRippleMid);
+        stopRipple(holder.b.seatRippleInner);
     }
-    /**
-     * Equipped voice waves are always animated, even when the dashboard upload is
-     * a static PNG. Two independent layers recreate the old visual language:
-     * the larger outer layer rotates/pulses around the avatar while the inner
-     * layer breathes in the opposite direction. Native GIF/WebP animation is
-     * preserved by Glide on both layers.
-     */
-    /** A single equipped ring follows the seat boundary; no stacked outer layer. */
+
+    /** The equipped image is one ring at the avatar boundary; only its rotation is continuous. */
     private void startEquippedVoiceWaveMotion(VH holder) {
         if (holder.b.imgVoiceWave == null) return;
-        stopEquippedVoiceWaveMotion(holder);
-        AnimationSet motion = new AnimationSet(true);
+        holder.b.imgVoiceWave.animate().cancel();
+        holder.b.imgVoiceWave.clearAnimation();
         RotateAnimation rotate = new RotateAnimation(
                 0f, 360f, Animation.RELATIVE_TO_SELF, 0.5f,
                 Animation.RELATIVE_TO_SELF, 0.5f);
-        ScaleAnimation pulse = new ScaleAnimation(
-                0.96f, 1.04f, 0.96f, 1.04f,
-                Animation.RELATIVE_TO_SELF, 0.5f,
-                Animation.RELATIVE_TO_SELF, 0.5f);
-        motion.addAnimation(rotate);
-        motion.addAnimation(pulse);
-        motion.setDuration(1800L);
-        motion.setRepeatCount(Animation.INFINITE);
-        motion.setRepeatMode(Animation.RESTART);
-        motion.setInterpolator(new android.view.animation.LinearInterpolator());
-        holder.b.imgVoiceWave.startAnimation(motion);
+        rotate.setDuration(1250L);
+        rotate.setRepeatCount(Animation.INFINITE);
+        rotate.setRepeatMode(Animation.RESTART);
+        rotate.setInterpolator(new android.view.animation.LinearInterpolator());
+        holder.b.imgVoiceWave.startAnimation(rotate);
     }
 
     private void ensureEquippedVoiceWaveMotion(VH holder) {
-        if (holder.b.imgVoiceWave.getAnimation() == null
-                || (holder.b.imgVoiceWaveOuter != null
-                    && holder.b.imgVoiceWaveOuter.getAnimation() == null)) {
+        if (holder.b.imgVoiceWave != null && holder.b.imgVoiceWave.getAnimation() == null) {
             startEquippedVoiceWaveMotion(holder);
         }
     }
@@ -1686,37 +1651,33 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     private void stopSpeakingRipples(VH holder) {
         holder.speaking = false;
         if (holder.b.seatSpeakAura != null) {
+            // SeatSpeakLightningView owns its short fade-out and hides itself afterwards.
             holder.b.seatSpeakAura.setSpeaking(false);
-        }
-        if (holder.b.seatVoiceWaveBars != null) {
-            holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
-        }
-        boolean hasEquippedWave = holder.voiceWaveUrl != null && !holder.voiceWaveUrl.trim().isEmpty();
-        if (holder.b.seatSpeakAura != null && hasEquippedWave) {
-            holder.b.seatSpeakAura.setSpeaking(false);
-            holder.b.seatSpeakAura.setVisibility(View.GONE);
-        } else if (holder.b.seatSpeakAura != null) {
-            holder.b.seatSpeakAura.setSpeaking(false);
-            holder.b.seatSpeakAura.setVisibility(View.INVISIBLE);
         }
         if (holder.b.seatVoiceWaveBars != null) {
             holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
             holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
         }
+        if (holder.b.imgVoiceWaveOuter != null) {
+            holder.b.imgVoiceWaveOuter.animate().cancel();
+            holder.b.imgVoiceWaveOuter.setVisibility(View.GONE);
+        }
         if (holder.b.imgVoiceWave != null) {
-            Object waveAnimator = holder.b.imgVoiceWave.getTag(R.id.imgVoiceWave);
-            if (waveAnimator instanceof android.animation.ValueAnimator) {
-                ((android.animation.ValueAnimator) waveAnimator).cancel();
-            }
-            holder.b.imgVoiceWave.setTag(R.id.imgVoiceWave, null);
-            holder.b.imgVoiceWave.animate().cancel();
-            holder.b.imgVoiceWave.setScaleX(1f);
-            holder.b.imgVoiceWave.setScaleY(1f);
-            holder.b.imgVoiceWave.setAlpha(1f);
-            holder.b.imgVoiceWave.setVisibility(View.GONE);
-            stopEquippedVoiceWaveMotion(holder);
-            Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
-            holder.loadedVoiceWaveUrl = null;
+            android.widget.ImageView wave = holder.b.imgVoiceWave;
+            wave.clearAnimation();
+            wave.animate().cancel();
+            wave.animate().alpha(0f).scaleX(0.94f).scaleY(0.94f)
+                    .setDuration(130L)
+                    .withEndAction(() -> {
+                        if (holder.speaking) return;
+                        wave.setVisibility(View.GONE);
+                        wave.setScaleX(1f);
+                        wave.setScaleY(1f);
+                        wave.setAlpha(1f);
+                        stopEquippedVoiceWaveMotion(holder);
+                        Glide.with(holder.itemView).clear(wave);
+                        holder.loadedVoiceWaveUrl = null;
+                    }).start();
         }
         stopRipple(holder.b.seatRippleOuter);
         stopRipple(holder.b.seatRippleMid);
