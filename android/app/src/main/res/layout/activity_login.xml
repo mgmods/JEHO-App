@@ -149,6 +149,14 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
+            <Spinner
+                android:id="@+id/spinnerCountryCode"
+                android:layout_width="116dp"
+                android:layout_height="48dp"
+                android:layout_gravity="start"
+                android:layout_marginBottom="6dp"
+                android:visibility="gone" />
+
             <LinearLayout
                 android:id="@+id/authForm"
                 android:layout_width="match_parent"
@@ -167,7 +175,7 @@
                         android:id="@+id/etAuthIdentifier"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="textEmailAddress"
+                        android:inputType="phone"
                         android:maxLines="1" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -177,14 +185,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:hint="@string/email"
+                    android:hint="رقم الهاتف"
                     android:visibility="gone">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etAuthEmail"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="textEmailAddress"
+                        android:inputType="phone"
                         android:maxLines="1" />
                 </com.google.android.material.textfield.TextInputLayout>
 
