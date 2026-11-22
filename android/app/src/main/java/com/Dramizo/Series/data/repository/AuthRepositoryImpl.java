@@ -64,6 +64,11 @@ public class AuthRepositoryImpl implements AuthRepository {
     }
 
     @Override
+    public Result<AuthDtos.AuthResult> verifyOtp(String phone, String code, String username, String password) {
+        return persist(ApiCall.execute(api.verifyOtp(new AuthDtos.VerifyOtpRequest(phone, code, username, password))));
+    }
+
+    @Override
     public Result<AuthDtos.AuthResult> guestLogin(String deviceId, String displayName) {
         return persist(ApiCall.execute(api.guestLogin(new AuthDtos.GuestLoginRequest(deviceId, displayName))));
     }
