@@ -204,7 +204,7 @@ export class UsersService {
         `SELECT b.name AS "name", b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated"
            FROM user_badges ub
            JOIN badges b ON b.id = ub."badgeId"
-          WHERE ub."userId" = $1 AND b.category = 'display_rank' AND b."isActive" = true
+          WHERE ub."userId" = $1 AND b.category = 'display_rank'
             AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
           ORDER BY ub."grantedAt" DESC, b."sortOrder" ASC
           LIMIT 1`,
