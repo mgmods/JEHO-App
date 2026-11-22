@@ -188,14 +188,6 @@
                     android:src="@drawable/lg_gg" />
             </FrameLayout>
 
-            <Spinner
-                android:id="@+id/spinnerCountryCode"
-                android:layout_width="116dp"
-                android:layout_height="48dp"
-                android:layout_gravity="start"
-                android:layout_marginBottom="6dp"
-                android:visibility="gone" />
-
             <LinearLayout
                 android:id="@+id/authForm"
                 android:layout_width="match_parent"
@@ -203,37 +195,57 @@
                 android:layout_marginTop="20dp"
                 android:orientation="vertical">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/identifierLayout"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/email_or_username">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etAuthIdentifier"
-                        android:layout_width="match_parent"
+                    <Spinner
+                        android:id="@+id/spinnerCountryCode"
+                        android:layout_width="116dp"
+                        android:layout_height="54dp"
+                        android:layout_marginEnd="6dp"
+                        android:visibility="gone" />
+
+                    <FrameLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:inputType="phone"
-                        android:maxLines="1" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_weight="1">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/emailLayout"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="رقم الهاتف"
-                    android:visibility="gone">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etAuthEmail"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="phone"
-                        android:maxLines="1" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/identifierLayout"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="@string/email_or_username">
+        
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etAuthIdentifier"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="phone"
+                                android:maxLines="1" />
+                        </com.google.android.material.textfield.TextInputLayout>
+        
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/emailLayout"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:hint="رقم الهاتف"
+                            android:visibility="gone">
+        
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etAuthEmail"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="phone"
+                                android:maxLines="1" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </FrameLayout>
+                </LinearLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/usernameLayout"
