@@ -75,7 +75,9 @@ public class AuraLiveApp extends Application {
     @Nullable private HandlerThread externalCaptureThread;
     @Nullable private Handler externalCaptureHandler;
     private final Runnable externalCaptureRestoreCheck = () -> {
-        if (!roomAudioSuspendedForExternalApp && !roomAudioReleasedForBackground) return;
+        if (!roomAudioSuspendedForExternalApp) {
+            if (!(roomAudioReleasedForBackground && isAppInForeground())) return;
+        }
         boolean stillCapturing = snapshotExternalCaptureActive();
         externalRecorderActive = stillCapturing;
         if (!stillCapturing) {
@@ -262,7 +264,7 @@ public class AuraLiveApp extends Application {
                     // delay JEHO's silenced config even though another app owns capture.
                     suspendRoomAudioForExternalApp();
                 } else if (!anotherAppRecording
-                        && (roomAudioSuspendedForExternalApp || roomAudioReleasedForBackground)) {
+                        && roomAudioSuspendedForExternalApp) {
                     // Debounce the stop notification, then query Android again. Some
                     // devices emit a transient empty capture list while switching input.
                     Handler handler = externalCaptureHandler;
