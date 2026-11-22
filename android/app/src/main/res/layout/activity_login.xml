@@ -149,6 +149,45 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:id="@+id/tvAuthDivider"
+                android:text="@string/or_continue_with"
+                android:textColor="@color/text_hint"
+                android:textSize="12sp" />
+
+            <FrameLayout
+                android:id="@+id/googleLoginGroup"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp">
+
+                <TextView
+                    android:id="@+id/btnGoogle"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_login_google_pill"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center"
+                    android:paddingStart="52dp"
+                    android:paddingEnd="20dp"
+                    android:text="@string/continue_with_google"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center_vertical|start"
+                    android:layout_marginStart="22dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/lg_gg" />
+            </FrameLayout>
+
             <Spinner
                 android:id="@+id/spinnerCountryCode"
                 android:layout_width="116dp"
@@ -272,44 +311,7 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center"
-                android:id="@+id/tvAuthDivider"
-                android:text="@string/or_continue_with"
-                android:textColor="@color/text_hint"
-                android:textSize="12sp" />
 
-            <FrameLayout
-                android:id="@+id/googleLoginGroup"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="12dp">
-
-                <TextView
-                    android:id="@+id/btnGoogle"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/bg_login_google_pill"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center"
-                    android:paddingStart="52dp"
-                    android:paddingEnd="20dp"
-                    android:text="@string/continue_with_google"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:layout_gravity="center_vertical|start"
-                    android:layout_marginStart="22dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/lg_gg" />
-            </FrameLayout>
 
             <TextView
                 android:id="@+id/tvLoginHint"
