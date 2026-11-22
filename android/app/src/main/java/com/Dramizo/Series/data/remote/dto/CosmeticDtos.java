@@ -54,6 +54,7 @@ public final class CosmeticDtos {
         @SerializedName("profileCardUrl") public String profileCardUrl;
         @SerializedName("chatBubbleUrl") public String chatBubbleUrl;
         @SerializedName("nameplateUrl") public String nameplateUrl;
+        @SerializedName("voiceWaveUrl") public String voiceWaveUrl;
         @SerializedName("levelBadgeUrl") public String levelBadgeUrl;
         @SerializedName("vipBadgeUrl") public String vipBadgeUrl;
         @SerializedName("hostBadgeUrl") public String hostBadgeUrl;
