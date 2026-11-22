@@ -158,16 +158,32 @@ public class AuraLiveApp extends Application {
                 RoomRtcEngine rtc = RoomRtcEngine.getInstance();
                 String roomId = rtc.getCurrentRoomId();
                 if (roomId == null || roomId.isEmpty() || !rtc.isInRoom(roomId)) return;
-                boolean captureSilenced = false;
+                boolean ownCaptureSilenced = false;
+                boolean externalRecorderActive = false;
+                final int ownUid = getApplicationInfo().uid;
                 if (configs != null) {
                     for (AudioRecordingConfiguration config : configs) {
-                        if (config != null && config.isClientSilenced()) {
-                            captureSilenced = true;
-                            break;
+                        if (config == null) continue;
+                        // The important distinction is whether a different UID is
+                        // actively recording. A silenced JEHO configuration by itself
+                        // is not enough: Android can report transient/other configs
+                        // while no external recorder is actually taking the mic.
+                        int clientUid = -1;
+                        try {
+                            clientUid = config.getClientUid();
+                        } catch (Throwable ignored) {
+                        }
+                        boolean isOwn = clientUid == ownUid;
+                        if (isOwn && config.isClientSilenced()) {
+                            ownCaptureSilenced = true;
+                        } else if (!isOwn && clientUid > 0) {
+                            externalRecorderActive = true;
                         }
                     }
                 }
-                if (captureSilenced) {
+                // Release JEHO only for a real competing recorder/call. This keeps
+                // Home/background behavior unchanged and prevents false handoffs.
+                if (externalRecorderActive && ownCaptureSilenced) {
                     suspendRoomAudioForExternalApp();
                 }
             }
@@ -179,6 +195,23 @@ public class AuraLiveApp extends Application {
             android.util.Log.w("AuraLiveApp", "External recorder monitor unavailable: "
                     + t.getMessage());
         }
+    }
+
+    /** Stop monitoring once the application process is terminating. */
+    @Override
+    public void onTerminate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                && externalCaptureAudioManager != null
+                && externalCaptureCallback != null) {
+            try {
+                externalCaptureAudioManager.unregisterAudioRecordingCallback(
+                        externalCaptureCallback);
+            } catch (Throwable ignored) {
+            }
+        }
+        externalCaptureAudioManager = null;
+        externalCaptureCallback = null;
+        super.onTerminate();
     }
 
     private void updateRoomMicMutedState(@Nullable String roomId, boolean muted) {
