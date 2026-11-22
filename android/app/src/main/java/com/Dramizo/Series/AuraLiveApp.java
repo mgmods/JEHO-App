@@ -71,6 +71,14 @@ public class AuraLiveApp extends Application {
     @Nullable private AudioManager.AudioRecordingCallback externalCaptureCallback;
     @Nullable private HandlerThread externalCaptureThread;
     @Nullable private Handler externalCaptureHandler;
+    private final Runnable externalCaptureRestoreCheck = () -> {
+        if (!roomAudioSuspendedForExternalApp && !roomAudioReleasedForBackground) return;
+        boolean stillCapturing = snapshotExternalCaptureActive();
+        externalRecorderActive = stillCapturing;
+        if (!stillCapturing && isAppInForeground()) {
+            restoreRoomAudioAfterExternalApp();
+        }
+    };
 
     private static final int REQUEST_POST_NOTIFICATIONS = 8104;
     private static final String NOTIFICATION_PERMISSION_PREFS = "jeho_notification_permission";
@@ -107,6 +115,10 @@ public class AuraLiveApp extends Application {
         roomMicRoomIdBeforeExternalApp = activeRoomId;
         roomMicWasEnabledBeforeExternalApp = rtc.isMicEnabled() && rtc.isPublishing();
         roomSpeakerWasMutedBeforeExternalApp = rtc.isSpeakerMuted();
+        // Set the latch before muting our RTC capture. The follow-up Android callback
+        // may then contain only WhatsApp's capture configuration (not JEHO's silenced
+        // configuration), which still means the external recorder is active.
+        roomAudioSuspendedForExternalApp = true;
 
         // Android has already granted capture priority to the external recorder.
         // Stop publishing locally so no silent/stale room microphone remains active.
@@ -123,7 +135,6 @@ public class AuraLiveApp extends Application {
         // MODE_IN_COMMUNICATION + voice focus can make Android report that a call
         // owns the microphone. Restore normal system audio routing for other apps.
         RoomAudioSession.release(this);
-        roomAudioSuspendedForExternalApp = true;
         VoiceRoomForegroundService.refreshAudioForegroundType();
     }
 
@@ -136,22 +147,8 @@ public class AuraLiveApp extends Application {
             try {
                 java.util.List<AudioRecordingConfiguration> activeConfigs =
                         externalCaptureAudioManager.getActiveRecordingConfigurations();
-                boolean anotherAppRecording = false;
-                if (activeConfigs != null) {
-                    for (AudioRecordingConfiguration config : activeConfigs) {
-                        if (config == null) continue;
-                        // Android exposes whether this app's active capture was
-                        // silenced by a higher-priority recorder. Client UID is a
-                        // hidden/system API and cannot be called by ordinary apps.
-                        try {
-                            if (config.isClientSilenced()) {
-                                anotherAppRecording = true;
-                                break;
-                            }
-                        } catch (Throwable ignored) {
-                        }
-                    }
-                }
+                boolean anotherAppRecording = hasExternalCapture(activeConfigs,
+                        roomAudioSuspendedForExternalApp);
                 externalRecorderActive = anotherAppRecording;
             } catch (Throwable t) {
                 android.util.Log.w("AuraLiveApp",
@@ -244,21 +241,8 @@ public class AuraLiveApp extends Application {
                 // AudioRecordingCallback reports the active capture set. Do not gate this
                 // on foreground state: if the user returns to JEHO while WhatsApp is
                 // still recording, we must keep JEHO's mic and room playback suspended.
-                boolean anotherAppRecording = false;
-                if (configs != null) {
-                    for (AudioRecordingConfiguration config : configs) {
-                        if (config == null) continue;
-                        // isClientSilenced() is the public SDK signal that a
-                        // higher-priority app (WhatsApp/call/recorder) owns capture.
-                        try {
-                            if (config.isClientSilenced()) {
-                                anotherAppRecording = true;
-                                break;
-                            }
-                        } catch (Throwable ignored) {
-                        }
-                    }
-                }
+                boolean anotherAppRecording = hasExternalCapture(configs,
+                        roomAudioSuspendedForExternalApp);
                 externalRecorderActive = anotherAppRecording;
 
                 RoomRtcEngine rtc = RoomRtcEngine.getInstance();
@@ -271,10 +255,19 @@ public class AuraLiveApp extends Application {
                     // Do not depend on isClientSilenced(): some Android builds omit or
                     // delay JEHO's silenced config even though another app owns capture.
                     suspendRoomAudioForExternalApp();
-                } else if (!anotherAppRecording && isAppInForeground()
+                } else if (!anotherAppRecording
                         && (roomAudioSuspendedForExternalApp || roomAudioReleasedForBackground)) {
-                    // Restore only after Android confirms the external recorder is gone.
-                    restoreRoomAudioAfterExternalApp();
+                    // Debounce the stop notification, then query Android again. Some
+                    // devices emit a transient empty capture list while switching input.
+                    Handler handler = externalCaptureHandler;
+                    if (handler != null) {
+                        handler.removeCallbacks(externalCaptureRestoreCheck);
+                        handler.postDelayed(externalCaptureRestoreCheck, 1400L);
+                    } else if (isAppInForeground()) {
+                        restoreRoomAudioAfterExternalApp();
+                    }
+                } else if (anotherAppRecording && externalCaptureHandler != null) {
+                    externalCaptureHandler.removeCallbacks(externalCaptureRestoreCheck);
                 }
             }
         };
@@ -284,6 +277,43 @@ public class AuraLiveApp extends Application {
         } catch (Throwable t) {
             android.util.Log.w("AuraLiveApp", "External recorder monitor unavailable: "
                     + t.getMessage());
+        }
+    }
+
+    /**
+     * While JEHO capture is still running, Android marks JEHO's configuration as
+     * silenced when WhatsApp owns the input. After JEHO mutes its RTC mic, that
+     * configuration disappears; any remaining active capture configuration then
+     * belongs to the external recorder. This lets us detect its stop reliably.
+     */
+    private boolean hasExternalCapture(
+            @Nullable java.util.List<AudioRecordingConfiguration> configs,
+            boolean ourCaptureAlreadySuspended) {
+        if (configs == null) return ourCaptureAlreadySuspended;
+        if (ourCaptureAlreadySuspended) return !configs.isEmpty();
+        for (AudioRecordingConfiguration config : configs) {
+            if (config == null) continue;
+            try {
+                if (config.isClientSilenced()) return true;
+            } catch (Throwable ignored) {
+            }
+        }
+        return false;
+    }
+
+    /** Synchronous recheck used by the delayed restore and foreground transition. */
+    private boolean snapshotExternalCaptureActive() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N
+                || externalCaptureAudioManager == null) return externalRecorderActive;
+        try {
+            java.util.List<AudioRecordingConfiguration> configs =
+                    externalCaptureAudioManager.getActiveRecordingConfigurations();
+            return hasExternalCapture(configs, roomAudioSuspendedForExternalApp);
+        } catch (Throwable t) {
+            android.util.Log.w("AuraLiveApp",
+                    "Could not recheck active recorder before restoring room audio: "
+                            + t.getMessage());
+            return true; // Fail safe: do not steal the microphone on an uncertain snapshot.
         }
     }
 
