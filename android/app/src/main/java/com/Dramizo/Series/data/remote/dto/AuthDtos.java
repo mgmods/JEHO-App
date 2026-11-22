@@ -47,11 +47,17 @@ public final class AuthDtos {
         @SerializedName("phone") public String phone;
         @SerializedName("code") public String code;
         @SerializedName("username") public String username;
+        @SerializedName("password") public String password;
 
         public VerifyOtpRequest(String phone, String code, String username) {
+            this(phone, code, username, null);
+        }
+
+        public VerifyOtpRequest(String phone, String code, String username, String password) {
             this.phone = phone;
             this.code = code;
             this.username = username;
+            this.password = password;
         }
     }
 

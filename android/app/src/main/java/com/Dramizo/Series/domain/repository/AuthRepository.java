@@ -8,6 +8,7 @@ public interface AuthRepository {
     Result<AuthDtos.AuthResult> register(String email, String password, String username, String displayName);
     Result<AuthDtos.OtpSentResult> sendOtp(String phone);
     Result<AuthDtos.AuthResult> verifyOtp(String phone, String code, String username);
+    Result<AuthDtos.AuthResult> verifyOtp(String phone, String code, String username, String password);
     Result<AuthDtos.AuthResult> guestLogin(String deviceId, String displayName);
     Result<AuthDtos.AuthResult> socialLogin(String provider, String token);
 

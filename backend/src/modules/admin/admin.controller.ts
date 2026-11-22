@@ -1568,6 +1568,27 @@ export class AdminController {
     return { value: JSON.stringify(parsed) };
   }
 
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('phone-otp/settings')
+  getPhoneOtpSettings() {
+    return this.adminService.getPhoneOtpSettings();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('phone-otp/settings')
+  updatePhoneOtpSettings(@Body() body: Record<string, unknown>) {
+    return this.adminService.updatePhoneOtpSettings(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('phone-otp/test')
+  testPhoneOtp(@Body() body: Record<string, unknown>) {
+    return this.adminService.testPhoneOtp(body || {});
+  }
+
   @Get('settings')
   getSettings() {
     return this.adminService.getSettings();

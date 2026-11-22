@@ -91,6 +91,7 @@ import {
   type PermissionsMap,
 } from '../../common/dashboard-permissions';
 import { SecurityShieldService } from '../../common/security/security-shield.service';
+import { encryptSecret, decryptSecret, SecretBoxError } from '../../common/crypto/secret-box';
 
 /** Reasonable monthly VIP coin prices (not explosion formula). */
 export function vipPriceForLevel(level: number): number {
@@ -2484,6 +2485,108 @@ export class AdminService {
     };
   }
 
+  private phoneOtpStoredValue(key: string): Promise<string> {
+    return this.settingsRepo.findOne({ where: { key } }).then((row) => String(row?.value ?? ''));
+  }
+
+  private phoneOtpSecret(raw: string): string {
+    if (!raw) return '';
+    // Accept legacy plaintext during migration, but all new dashboard writes are encrypted.
+    if (!raw.trim().startsWith('{')) return raw;
+    try {
+      return decryptSecret(raw, process.env.SETTINGS_ENCRYPTION_KEY);
+    } catch (err) {
+      return '';
+    }
+  }
+
+  async getPhoneOtpSettings() {
+    const [enabled, accountSid, serviceSid, tokenRaw] = await Promise.all([
+      this.phoneOtpStoredValue('twilio.verify.enabled'),
+      this.phoneOtpStoredValue('twilio.account_sid'),
+      this.phoneOtpStoredValue('twilio.verify_service_sid'),
+      this.phoneOtpStoredValue('twilio.auth_token'),
+    ]);
+    const on = ['true', '1', 'yes', 'on'].includes(enabled.trim().toLowerCase());
+    return {
+      enabled: on,
+      accountSid,
+      verifyServiceSid: serviceSid,
+      authTokenConfigured: !!tokenRaw,
+      credentialsConfigured: !!accountSid && !!serviceSid && !!tokenRaw,
+    };
+  }
+
+  async updatePhoneOtpSettings(body: Record<string, unknown>) {
+    const current = await this.getPhoneOtpSettings();
+    const accountSid = body.accountSid === undefined ? current.accountSid : String(body.accountSid || '').trim();
+    const serviceSid = body.verifyServiceSid === undefined ? current.verifyServiceSid : String(body.verifyServiceSid || '').trim();
+    const token = String(body.authToken || '').trim();
+    const enabled = body.enabled === true || ['true', '1', 'yes', 'on'].includes(String(body.enabled || '').toLowerCase());
+    if (accountSid && !/^AC[0-9a-f]{32}$/i.test(accountSid)) {
+      throw new BadRequestException('صيغة Account SID غير صحيحة');
+    }
+    if (serviceSid && !/^VA[0-9a-f]{32}$/i.test(serviceSid)) {
+      throw new BadRequestException('صيغة Verify Service SID غير صحيحة');
+    }
+    if (enabled && (!accountSid || !serviceSid || (!token && !current.authTokenConfigured))) {
+      throw new BadRequestException('أكمل بيانات Twilio Verify قبل تفعيل إرسال الرموز');
+    }
+    let encryptedToken = '';
+    const existingTokenRaw = await this.phoneOtpStoredValue('twilio.auth_token');
+    const tokenToStore = token || (enabled && existingTokenRaw && !existingTokenRaw.trim().startsWith('{') ? existingTokenRaw : '');
+    if (tokenToStore) {
+      if (tokenToStore.length < 16 || tokenToStore.length > 256) throw new BadRequestException('رمز Twilio Auth Token غير صالح');
+      try {
+        encryptedToken = encryptSecret(tokenToStore, process.env.SETTINGS_ENCRYPTION_KEY);
+        if (decryptSecret(encryptedToken, process.env.SETTINGS_ENCRYPTION_KEY) !== tokenToStore) {
+          throw new Error('secret encryption verification failed');
+        }
+      } catch (err) {
+        if (err instanceof SecretBoxError) throw new BadRequestException(err.message);
+        throw new BadRequestException('تعذّر حفظ مفتاح Twilio بشكل آمن');
+      }
+    }
+    // Validate/encrypt every secret before changing any stored setting.
+    await this.setSetting('twilio.account_sid', accountSid, 'Twilio Account SID');
+    await this.setSetting('twilio.verify_service_sid', serviceSid, 'Twilio Verify Service SID');
+    if (encryptedToken) {
+      await this.setSetting('twilio.auth_token', encryptedToken, 'Encrypted Twilio Verify Auth Token');
+    }
+    await this.setSetting('twilio.verify.enabled', String(enabled), 'Enable Twilio Verify');
+    await this.setSetting('twilio.otp.enabled', String(enabled), 'Enable phone OTP');
+    return this.getPhoneOtpSettings();
+  }
+
+  async testPhoneOtp(body: Record<string, unknown>) {
+    const phone = String(body.phone || '').trim();
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+      throw new BadRequestException('أدخل رقم اختبار دولياً يبدأ بعلامة +');
+    }
+    const [accountSid, serviceSid, tokenRaw] = await Promise.all([
+      this.phoneOtpStoredValue('twilio.account_sid'),
+      this.phoneOtpStoredValue('twilio.verify_service_sid'),
+      this.phoneOtpStoredValue('twilio.auth_token'),
+    ]);
+    const token = this.phoneOtpSecret(tokenRaw);
+    if (!accountSid || !serviceSid || !token) {
+      throw new BadRequestException('احفظ بيانات Twilio Verify أولاً');
+    }
+    const response = await fetch(`https://verify.twilio.com/v2/Services/${encodeURIComponent(serviceSid)}/Verifications`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${accountSid}:${token}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ To: phone, Channel: 'sms' }),
+    });
+    const result = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (!response.ok) {
+      throw new BadRequestException('فشل طلب إرسال SMS. تحقق من بيانات Twilio والرصيد وإعدادات Verify');
+    }
+    return { ok: true, status: String(result.status || 'pending'), message: 'قبل Twilio طلب إرسال رمز الاختبار؛ تحقق من وصول الرسالة إلى الهاتف.' };
+  }
+
   async getSettings() {
     const rows = await this.settingsRepo.find({ order: { key: 'ASC' } });
     // Never return Twilio Auth Token plaintext through the generic settings API.
@@ -2798,6 +2901,9 @@ export class AdminService {
   }
 
   async setSetting(key: string, value: string, description?: string) {
+    if (key === 'twilio.auth_token' && !String(value || '').trim().startsWith('{')) {
+      throw new BadRequestException('Twilio Auth Token must be saved through the encrypted phone OTP settings flow');
+    }
     let nextValue = value;
     if (key === 'app_games') {
       try {

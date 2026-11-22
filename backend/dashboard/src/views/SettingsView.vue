@@ -39,6 +39,9 @@
       <div class="settings-main">
         <LoadingSpinner v-if="loading && isCoreTab" />
 
+        <template v-else-if="settingsTab === 'phone-otp'">
+          <PhoneOtpSettingsPanel />
+        </template>
         <template v-else-if="settingsTab === 'payment'">
           <PaymentSettingsPanel />
           <FourthwallPaymentPanel />
@@ -801,6 +804,7 @@ import PaymentSettingsPanel from '@/components/settings/PaymentSettingsPanel.vue
 import FourthwallPaymentPanel from '@/components/settings/FourthwallPaymentPanel.vue'
 import ShamCashPaymentPanel from '@/components/settings/ShamCashPaymentPanel.vue'
 import ZegoSettingsPanel from '@/components/settings/ZegoSettingsPanel.vue'
+import PhoneOtpSettingsPanel from '@/components/settings/PhoneOtpSettingsPanel.vue'
 import SectionBackgroundPanel from '@/components/settings/SectionBackgroundPanel.vue'
 import { setDashboardLocale } from '@/i18n'
 import { readDashboardLocale } from '@/utils/locale'
@@ -932,6 +936,7 @@ const settingTabs = computed(() => {
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles', permission: 'settings' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check', permission: 'settings' },
     { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card', permission: 'settings' },
+    { id: 'phone-otp', label: 'التحقق برقم الهاتف', icon: 'bi-chat-square-dots', permission: 'settings' },
     { id: 'zego', label: t('settings.tabZego'), icon: 'bi-broadcast-pin', permission: 'settings' },
     { id: 'account', label: t('settings.tabAccount'), icon: 'bi-person-lock', self: true },
     { id: 'other', label: t('settings.tabOther'), icon: 'bi-three-dots', permission: 'settings' },

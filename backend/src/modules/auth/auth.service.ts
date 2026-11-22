@@ -12,6 +12,7 @@ import { DataSource, Repository } from 'typeorm';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { decryptSecret } from '../../common/crypto/secret-box';
 import { createHash, randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { User, UserStatus } from '../../database/entities/user.entity';
@@ -165,7 +166,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       .createQueryBuilder('u')
       .addSelect('u.passwordHash')
       .where(
-        'LOWER(u.email) = :id OR LOWER(u.username) = :id OR u.publicId = :raw',
+        'LOWER(u.email) = :id OR LOWER(u.username) = :id OR u.publicId = :raw OR u.phone = :raw',
         { id: identifier, raw: dto.identifier.trim() },
       )
       .getOne();
@@ -211,7 +212,16 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
   private async settingValue(key: string, fallback = ''): Promise<string> {
     const row = await this.settingsRepo.findOne({ where: { key } });
-    return row?.value == null ? fallback : String(row.value);
+    const value = row?.value == null ? fallback : String(row.value);
+    if (key === 'twilio.auth_token' && value.trim().startsWith('{')) {
+      try {
+        return decryptSecret(value, this.configService.get<string>('app.settingsEncryptionKey') || process.env.SETTINGS_ENCRYPTION_KEY);
+      } catch (error) {
+        this.logger.error('Unable to decrypt Twilio Verify credentials');
+        throw new BadRequestException('تعذّر قراءة بيانات Twilio المحفوظة بشكل آمن');
+      }
+    }
+    return value;
   }
 
   private async twilioOtpEnabled(): Promise<boolean> {
@@ -262,6 +272,10 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       return { sent: true, expiresIn: 600, provider: 'twilio' };
     }
 
+    if (this.configService.get('app.nodeEnv') === 'production') {
+      throw new BadRequestException('إرسال رموز SMS غير مفعّل حالياً. يرجى إكمال إعدادات التحقق من لوحة الإدارة.');
+    }
+
     const code = String(randomInt(100000, 999999));
     const codeHash = this.hashOtp(code);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -297,6 +311,9 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException('رمز التحقق غير صحيح أو منتهي');
       }
     } else {
+      if (this.configService.get('app.nodeEnv') === 'production') {
+        throw new BadRequestException('التحقق عبر SMS غير مفعّل حالياً. لا يمكن قبول رمز محلي في بيئة الإنتاج.');
+      }
       const otp = await this.otpRepo.findOne({
         where: { target: phone, used: false, purpose: OtpPurpose.LOGIN },
         order: { createdAt: 'DESC' },
@@ -320,6 +337,12 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     }
 
     let user = await this.usersRepo.findOne({ where: { phone } });
+    if (user && dto.password) {
+      // A signup verification must never become a password-reset path for an
+      // existing phone account. Existing users must authenticate or use the
+      // dedicated account-recovery flow.
+      throw new ConflictException('رقم الهاتف مسجل مسبقاً، سجّل الدخول بدلاً من إنشاء حساب جديد');
+    }
     if (!user) {
       const username =
         dto.username?.toLowerCase() ||
@@ -330,6 +353,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         publicId: await this.allocatePublicId(),
         displayName: username,
         phoneVerified: true,
+        ...(dto.password ? { passwordHash: await bcrypt.hash(dto.password, 12) } : {}),
       });
       await this.usersRepo.save(user);
       await this.bootstrapUser(user);
