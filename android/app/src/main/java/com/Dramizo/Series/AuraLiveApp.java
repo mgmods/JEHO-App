@@ -176,6 +176,13 @@ public class AuraLiveApp extends Application {
         String roomId = rtc.getCurrentRoomId();
         if (roomId == null || roomId.isEmpty() || !rtc.isInRoom(roomId)) return;
 
+        // If another app was already recording before JEHO moved to background,
+        // the recording callback may not fire again after the lifecycle transition.
+        // Apply the full temporary handoff immediately in that case.
+        if (externalRecorderActive) {
+            suspendRoomAudioForExternalApp();
+            return;
+        }
         roomAudioReleasedForBackground = true;
         RoomAudioSession.release(this);
         VoiceRoomForegroundService.refreshAudioForegroundType();
