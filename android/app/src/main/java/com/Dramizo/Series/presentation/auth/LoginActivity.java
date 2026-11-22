@@ -52,6 +52,7 @@ public class LoginActivity extends ThemedActivity {
     private boolean registerMode = false;
     private String pendingPhoneSignup;
     private String pendingPhonePassword;
+    private AlertDialog creatingAccountDialog;
     private AlertDialog phoneVerificationDialog;
     private EditText[] otpFields;
     private TextView otpCountdown;
@@ -122,6 +123,7 @@ public class LoginActivity extends ThemedActivity {
         binding.identifierLayout.setHint("رقم الهاتف");
         viewModel.getOtpSent().observe(this, sent -> {
             if (sent == null || !sent.sent || pendingPhoneSignup == null) return;
+            dismissCreatingAccountProgress();
             if (phoneVerificationDialog == null || !phoneVerificationDialog.isShowing()) {
                 showPhoneVerificationDialog();
             } else {
@@ -187,16 +189,28 @@ public class LoginActivity extends ThemedActivity {
 
         // Working backend-backed email/username + password authentication.
         binding.btnAuthSubmit.setOnClickListener(v -> submitPasswordAuth());
-        binding.btnAuthMode.setOnClickListener(v -> setRegisterMode(!registerMode));
-        setRegisterMode(false);
+        binding.btnAuthMode.setOnClickListener(v -> {
+            if (registerMode) {
+                finish();
+            } else {
+                Intent create = new Intent(this, LoginActivity.class);
+                create.putExtra("open_phone_signup", true);
+                startActivity(create);
+            }
+        });
+        setRegisterMode(getIntent().getBooleanExtra("open_phone_signup", false));
 
         viewModel.getLoading().observe(this, loading ->
                 binding.progress.setVisibility(Boolean.TRUE.equals(loading) ? View.VISIBLE : View.GONE));
         viewModel.getError().observe(this, err -> {
-            if (err != null) Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+            if (err != null) {
+                dismissCreatingAccountProgress();
+                Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+            }
         });
         viewModel.getAuthSuccess().observe(this, result -> {
             if (result == null) return;
+            dismissCreatingAccountProgress();
             AppContainer container = ContainerProvider.from(this);
             // Login DTOs can omit country/gender for an existing account. Resolve /me first
             // so returning users are not sent through profile creation again.
@@ -366,8 +380,37 @@ public class LoginActivity extends ThemedActivity {
         }
         pendingPhoneSignup = phone;
         pendingPhonePassword = password;
-        binding.progress.setVisibility(View.VISIBLE);
+        showCreatingAccountProgress();
         viewModel.sendOtp(phone);
+    }
+
+    private void showCreatingAccountProgress() {
+        if (creatingAccountDialog != null && creatingAccountDialog.isShowing()) return;
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(22), dp(12), dp(22), dp(12));
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        android.widget.ProgressBar spinner = new android.widget.ProgressBar(this);
+        row.addView(spinner, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        TextView message = new TextView(this);
+        message.setText("جاري إنشاء حسابك");
+        message.setTextSize(15);
+        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        textLp.setMargins(dp(16), 0, 0, 0);
+        row.addView(message, textLp);
+        creatingAccountDialog = new AlertDialog.Builder(this)
+                .setView(row)
+                .setCancelable(false)
+                .create();
+        creatingAccountDialog.show();
+    }
+
+    private void dismissCreatingAccountProgress() {
+        if (creatingAccountDialog != null) {
+            creatingAccountDialog.dismiss();
+            creatingAccountDialog = null;
+        }
     }
 
     private void startOtpCountdown() {
