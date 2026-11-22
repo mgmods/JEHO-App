@@ -2895,6 +2895,9 @@ export class AdminService {
   }
 
   async setSetting(key: string, value: string, description?: string) {
+    if (key === 'twilio.auth_token' && !String(value || '').trim().startsWith('{')) {
+      throw new BadRequestException('Twilio Auth Token must be saved through the encrypted phone OTP settings flow');
+    }
     let nextValue = value;
     if (key === 'app_games') {
       try {
