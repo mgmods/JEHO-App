@@ -15,6 +15,7 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationSet;
 import android.view.animation.OvershootInterpolator;
 import android.view.animation.ScaleAnimation;
+import android.view.animation.RotateAnimation;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -70,6 +71,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     private final Set<String> speakingUsers = new HashSet<>();
     private final Map<String, Float> speakingLevels = new HashMap<>();
     private final Map<String, Float> lastPaintedSpeakLevel = new HashMap<>();
+    // Ignore very short VAD silence gaps; otherwise the equipped wave flashes off/on.
+    private final Map<String, Runnable> speakingStopRunnables = new HashMap<>();
     private final Map<String, Integer> activeReactions = new HashMap<>();
     private final Map<String, String> activeReactionKeys = new HashMap<>();
     private final Map<String, Runnable> hideReactionRunnables = new HashMap<>();
@@ -301,6 +304,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         speakingUsers.retainAll(seated);
         speakingLevels.keySet().retainAll(seated);
+        for (String uid : new HashSet<>(speakingStopRunnables.keySet())) {
+            if (!seated.contains(uid)) {
+                Runnable pending = speakingStopRunnables.remove(uid);
+                if (pending != null) handler.removeCallbacks(pending);
+            }
+        }
     }
 
     private static boolean sameSeat(RoomDtos.SeatDto a, RoomDtos.SeatDto b) {
@@ -423,17 +432,36 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
         }
         if (seatPos < 0) {
+            Runnable pending = speakingStopRunnables.remove(key);
+            if (pending != null) handler.removeCallbacks(pending);
             speakingUsers.remove(key);
             speakingLevels.remove(key);
             lastPaintedSpeakLevel.remove(key);
             return;
         }
-        boolean changed = speaking ? speakingUsers.add(key) : speakingUsers.remove(key);
-        if (speaking) {
-            speakingLevels.put(key, Math.max(0f, level0to100));
-        } else {
-            speakingLevels.remove(key);
+        Runnable pendingStop = speakingStopRunnables.remove(key);
+        if (pendingStop != null) handler.removeCallbacks(pendingStop);
+        if (!speaking) {
+            // Voice activity detection can briefly dip to zero between syllables or
+            // during RTC level updates. Keep the current wave through that short gap.
+            Runnable delayedStop = () -> {
+                speakingStopRunnables.remove(key);
+                if (!speakingUsers.remove(key)) return;
+                speakingLevels.remove(key);
+                lastPaintedSpeakLevel.remove(key);
+                for (int i = 0; i < items.size(); i++) {
+                    if (key.equals(seatUserId(items.get(i)))) {
+                        notifyItemChanged(i, "speaking");
+                        break;
+                    }
+                }
+            };
+            speakingStopRunnables.put(key, delayedStop);
+            handler.postDelayed(delayedStop, 700L);
+            return;
         }
+        boolean changed = speakingUsers.add(key);
+        speakingLevels.put(key, Math.max(0f, level0to100));
         if (!changed) {
             // Already speaking: refresh intensity sparingly (avoid RecyclerView churn).
             if (speaking) {
@@ -1426,13 +1454,35 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgVoiceWave.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
                 holder.b.imgVoiceWave.setClipToOutline(false);
                 holder.b.imgVoiceWave.setOutlineProvider(null);
-                Glide.with(holder.itemView)
-                        .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim()))
-                        .dontAnimate()
-                        .into(holder.b.imgVoiceWave);
+                if (!Objects.equals(holder.loadedVoiceWaveUrl, waveUrl.trim())) {
+                    String absoluteWave = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim());
+                    Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+                    Glide.with(holder.itemView)
+                            .load(absoluteWave)
+                            .into(holder.b.imgVoiceWave);
+                    if (holder.b.imgVoiceWaveOuter != null) {
+                        Glide.with(holder.itemView).clear(holder.b.imgVoiceWaveOuter);
+                        Glide.with(holder.itemView)
+                                .load(absoluteWave)
+                                .into(holder.b.imgVoiceWaveOuter);
+                        holder.b.imgVoiceWaveOuter.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
+                        holder.b.imgVoiceWaveOuter.setVisibility(View.VISIBLE);
+                    }
+                    holder.loadedVoiceWaveUrl = waveUrl.trim();
+                    startEquippedVoiceWaveMotion(holder);
+                } else {
+                    ensureEquippedVoiceWaveMotion(holder);
+                }
             } else {
                 holder.b.imgVoiceWave.setVisibility(View.GONE);
-                Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+                stopEquippedVoiceWaveMotion(holder);
+                if (holder.loadedVoiceWaveUrl != null) {
+                    Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+                    if (holder.b.imgVoiceWaveOuter != null) {
+                        Glide.with(holder.itemView).clear(holder.b.imgVoiceWaveOuter);
+                    }
+                    holder.loadedVoiceWaveUrl = null;
+                }
             }
         }
         if (hasEquippedWave) {
@@ -1478,6 +1528,79 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
         }
     }
+    /**
+     * Equipped voice waves are always animated, even when the dashboard upload is
+     * a static PNG. Two independent layers recreate the old visual language:
+     * the larger outer layer rotates/pulses around the avatar while the inner
+     * layer breathes in the opposite direction. Native GIF/WebP animation is
+     * preserved by Glide on both layers.
+     */
+    private void startEquippedVoiceWaveMotion(VH holder) {
+        if (holder.b.imgVoiceWave == null) return;
+        stopEquippedVoiceWaveMotion(holder);
+
+        AnimationSet inner = new AnimationSet(true);
+        RotateAnimation innerRotate = new RotateAnimation(
+                0f, -360f, Animation.RELATIVE_TO_SELF, 0.5f,
+                Animation.RELATIVE_TO_SELF, 0.5f);
+        ScaleAnimation innerScale = new ScaleAnimation(
+                0.97f, 1.035f, 0.97f, 1.035f,
+                Animation.RELATIVE_TO_SELF, 0.5f,
+                Animation.RELATIVE_TO_SELF, 0.5f);
+        inner.addAnimation(innerRotate);
+        inner.addAnimation(innerScale);
+        inner.setDuration(3200L);
+        inner.setRepeatCount(Animation.INFINITE);
+        inner.setRepeatMode(Animation.RESTART);
+        inner.setInterpolator(new android.view.animation.LinearInterpolator());
+        holder.b.imgVoiceWave.startAnimation(inner);
+
+        if (holder.b.imgVoiceWaveOuter != null) {
+            AnimationSet outer = new AnimationSet(true);
+            RotateAnimation outerRotate = new RotateAnimation(
+                    0f, 360f, Animation.RELATIVE_TO_SELF, 0.5f,
+                    Animation.RELATIVE_TO_SELF, 0.5f);
+            ScaleAnimation outerScale = new ScaleAnimation(
+                    0.96f, 1.10f, 0.96f, 1.10f,
+                    Animation.RELATIVE_TO_SELF, 0.5f,
+                    Animation.RELATIVE_TO_SELF, 0.5f);
+            outer.addAnimation(outerRotate);
+            outer.addAnimation(outerScale);
+            outer.setDuration(2500L);
+            outer.setRepeatCount(Animation.INFINITE);
+            outer.setRepeatMode(Animation.RESTART);
+            outer.setInterpolator(new android.view.animation.LinearInterpolator());
+            holder.b.imgVoiceWaveOuter.startAnimation(outer);
+            holder.b.imgVoiceWaveOuter.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void ensureEquippedVoiceWaveMotion(VH holder) {
+        if (holder.b.imgVoiceWave.getAnimation() == null
+                || (holder.b.imgVoiceWaveOuter != null
+                    && holder.b.imgVoiceWaveOuter.getAnimation() == null)) {
+            startEquippedVoiceWaveMotion(holder);
+        }
+    }
+
+    private void stopEquippedVoiceWaveMotion(VH holder) {
+        if (holder.b.imgVoiceWave != null) {
+            holder.b.imgVoiceWave.clearAnimation();
+            holder.b.imgVoiceWave.setScaleX(1f);
+            holder.b.imgVoiceWave.setScaleY(1f);
+            holder.b.imgVoiceWave.setRotation(0f);
+            holder.b.imgVoiceWave.setAlpha(1f);
+        }
+        if (holder.b.imgVoiceWaveOuter != null) {
+            holder.b.imgVoiceWaveOuter.clearAnimation();
+            holder.b.imgVoiceWaveOuter.setScaleX(1f);
+            holder.b.imgVoiceWaveOuter.setScaleY(1f);
+            holder.b.imgVoiceWaveOuter.setRotation(0f);
+            holder.b.imgVoiceWaveOuter.setAlpha(0.62f);
+            holder.b.imgVoiceWaveOuter.setVisibility(View.GONE);
+        }
+    }
+
     private void stopSpeakingRipples(VH holder) {
         holder.speaking = false;
         if (holder.b.seatSpeakAura != null) {
@@ -1485,6 +1608,18 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         if (holder.b.seatVoiceWaveBars != null) {
             holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+        }
+        boolean hasEquippedWave = holder.voiceWaveUrl != null && !holder.voiceWaveUrl.trim().isEmpty();
+        if (holder.b.seatSpeakAura != null && hasEquippedWave) {
+            holder.b.seatSpeakAura.setSpeaking(false);
+            holder.b.seatSpeakAura.setVisibility(View.GONE);
+        } else if (holder.b.seatSpeakAura != null) {
+            holder.b.seatSpeakAura.setSpeaking(false);
+            holder.b.seatSpeakAura.setVisibility(View.INVISIBLE);
+        }
+        if (holder.b.seatVoiceWaveBars != null) {
+            holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+            holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
         }
         if (holder.b.imgVoiceWave != null) {
             Object waveAnimator = holder.b.imgVoiceWave.getTag(R.id.imgVoiceWave);
@@ -1497,7 +1632,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.imgVoiceWave.setScaleY(1f);
             holder.b.imgVoiceWave.setAlpha(1f);
             holder.b.imgVoiceWave.setVisibility(View.GONE);
+            stopEquippedVoiceWaveMotion(holder);
             Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+            if (holder.b.imgVoiceWaveOuter != null) {
+                Glide.with(holder.itemView).clear(holder.b.imgVoiceWaveOuter);
+            }
+            holder.loadedVoiceWaveUrl = null;
         }
         stopRipple(holder.b.seatRippleOuter);
         stopRipple(holder.b.seatRippleMid);
@@ -1554,6 +1694,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         cancelReaction(holder.boundUserId);
         holder.boundUserId = null;
         holder.voiceWaveUrl = null;
+        holder.loadedVoiceWaveUrl = null;
         holder.lastGiftCoins = Long.MIN_VALUE;
         // Do NOT pause HostSignalView here — grid refresh recycles often and left frames frozen.
         stopSpeakingRipples(holder);
@@ -1581,6 +1722,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             handler.removeCallbacks(hide);
         }
         hideReactionRunnables.clear();
+        for (Runnable stop : speakingStopRunnables.values()) {
+            handler.removeCallbacks(stop);
+        }
+        speakingStopRunnables.clear();
         activeReactions.clear();
         activeReactionKeys.clear();
     }
@@ -1608,6 +1753,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         final ItemSeatBinding b;
         String boundUserId;
         String voiceWaveUrl;
+        String loadedVoiceWaveUrl;
         boolean speaking;
         long lastGiftCoins = Long.MIN_VALUE;
 
