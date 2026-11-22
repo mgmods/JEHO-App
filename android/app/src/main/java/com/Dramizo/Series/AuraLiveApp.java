@@ -78,7 +78,10 @@ public class AuraLiveApp extends Application {
         if (!roomAudioSuspendedForExternalApp && !roomAudioReleasedForBackground) return;
         boolean stillCapturing = snapshotExternalCaptureActive();
         externalRecorderActive = stillCapturing;
-        if (!stillCapturing && isAppInForeground()) {
+        if (!stillCapturing) {
+            // Restore the room even if the user is still in WhatsApp. Audio-session
+            // acquisition remains guarded by app foreground state, so this resumes
+            // RTC mic/playback without reclaiming Android's communication mode.
             restoreRoomAudioAfterExternalApp();
         }
     };
@@ -179,10 +182,10 @@ public class AuraLiveApp extends Application {
         roomMicCaptureSessionIdBeforeExternalApp = -1;
 
         if (sameRoomStillActive) {
-            // Re-enter communication mode only when JEHO is actually foreground.
-            // While backgrounded, MODE_IN_COMMUNICATION is treated by Android as an
-            // active voice call and blocks ordinary apps such as WhatsApp from
-            // capturing the microphone.
+            // Restore RTC mic/playback as soon as the external capture ends.
+            // RoomAudioSession/RoomAudioRoute independently refuse to acquire
+            // MODE_IN_COMMUNICATION while JEHO is backgrounded, so WhatsApp can
+            // still start another voice note without a call-mode lock.
             RoomAudioSession.acquire(this);
             rtc.reapplyAudioRoute();
 
@@ -267,7 +270,7 @@ public class AuraLiveApp extends Application {
                     if (handler != null) {
                         handler.removeCallbacks(externalCaptureRestoreCheck);
                         handler.postDelayed(externalCaptureRestoreCheck, 1400L);
-                    } else if (isAppInForeground()) {
+                    } else {
                         restoreRoomAudioAfterExternalApp();
                     }
                 } else if (anotherAppRecording && externalCaptureHandler != null) {
