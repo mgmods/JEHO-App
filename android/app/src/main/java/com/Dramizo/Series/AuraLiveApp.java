@@ -64,6 +64,9 @@ public class AuraLiveApp extends Application {
     private boolean roomAudioReleasedForBackground;
     private boolean roomMicWasEnabledBeforeExternalApp;
     private boolean roomSpeakerWasMutedBeforeExternalApp;
+    // Android session ID of JEHO's own capture stream, used to distinguish it
+    // from WhatsApp's stream after JEHO mutes its microphone.
+    private volatile int roomMicCaptureSessionIdBeforeExternalApp = -1;
     // Updated for every Android recording-config callback, including while JEHO is foreground.
     private volatile boolean externalRecorderActive;
     @Nullable private String roomMicRoomIdBeforeExternalApp;
@@ -173,6 +176,7 @@ public class AuraLiveApp extends Application {
         roomAudioSuspendedForExternalApp = false;
         roomAudioReleasedForBackground = false;
         roomMicRoomIdBeforeExternalApp = null;
+        roomMicCaptureSessionIdBeforeExternalApp = -1;
 
         if (sameRoomStillActive) {
             // Re-enter communication mode only when JEHO is actually foreground.
@@ -290,11 +294,30 @@ public class AuraLiveApp extends Application {
             @Nullable java.util.List<AudioRecordingConfiguration> configs,
             boolean ourCaptureAlreadySuspended) {
         if (configs == null) return ourCaptureAlreadySuspended;
-        if (ourCaptureAlreadySuspended) return !configs.isEmpty();
+        if (ourCaptureAlreadySuspended) {
+            int ownSessionId = roomMicCaptureSessionIdBeforeExternalApp;
+            if (ownSessionId < 0) return !configs.isEmpty();
+            for (AudioRecordingConfiguration config : configs) {
+                if (config == null) continue;
+                try {
+                    if (config.getClientAudioSessionId() != ownSessionId) return true;
+                } catch (Throwable ignored) {
+                    // If the platform cannot identify the session, fail safe.
+                    return true;
+                }
+            }
+            // Zego may keep JEHO's muted AudioRecord alive. Ignore that session;
+            // the external capture is finished when no other session remains.
+            return false;
+        }
         for (AudioRecordingConfiguration config : configs) {
             if (config == null) continue;
             try {
-                if (config.isClientSilenced()) return true;
+                if (config.isClientSilenced()) {
+                    roomMicCaptureSessionIdBeforeExternalApp =
+                            config.getClientAudioSessionId();
+                    return true;
+                }
             } catch (Throwable ignored) {
             }
         }
