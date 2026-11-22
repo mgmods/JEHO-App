@@ -582,10 +582,25 @@ public class VoiceRoomForegroundService extends Service {
         RealtimeClient.getInstance().addRoomListener(realtimeListener);
         main.removeCallbacks(renewToken);
         main.post(renewToken);
-        if (!adoptedMusicPlayer || musicPlayer == null || musicPlayer.getMediaItemCount() == 0) {
+        String requestedMusicUrl = intent.getStringExtra(EXTRA_MUSIC_URL);
+        String requestedMusicStatus = intent.getStringExtra(EXTRA_MUSIC_STATUS);
+        boolean sameTrackAlreadyOwned = musicPlayer != null
+                && musicPlayer.getMediaItemCount() > 0
+                && requestedMusicUrl != null
+                && requestedMusicUrl.equals(activeMusicUrl)
+                && requestedMusicStatus != null
+                && requestedMusicStatus.equalsIgnoreCase(activeMusicStatus)
+                && musicPlayer.getPlaybackState() != Player.STATE_ENDED;
+        // onUserLeaveHint and onStop both request the same background owner.
+        // The second request has no Activity player/position anymore; replaying
+        // applyMusic with position=0 used to seek the adopted decoder to the start,
+        // causing an audible cut/jump during minimize. Keep the exact live decoder.
+        if (!adoptedMusicPlayer && !sameTrackAlreadyOwned
+                && (musicPlayer == null || musicPlayer.getMediaItemCount() == 0
+                || requestedMusicUrl == null || !requestedMusicUrl.equals(activeMusicUrl))) {
             applyMusic(
-                    intent.getStringExtra(EXTRA_MUSIC_URL),
-                    intent.getStringExtra(EXTRA_MUSIC_STATUS),
+                    requestedMusicUrl,
+                    requestedMusicStatus,
                     intent.getLongExtra(EXTRA_MUSIC_POSITION, 0L),
                     intent.getStringExtra(EXTRA_MUSIC_STARTED_AT));
         }
@@ -602,8 +617,14 @@ public class VoiceRoomForegroundService extends Service {
         boolean micOk = ContextCompat.checkSelfPermission(
                 this, android.Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED;
-        if (micOk && RoomRtcEngine.getInstance().isPublishing()
-                && RoomRtcEngine.getInstance().isMicEnabled()) {
+        boolean rtcMicActive = RoomRtcEngine.getInstance().isPublishing()
+                && RoomRtcEngine.getInstance().isMicEnabled();
+        boolean micWasTemporarilyYielded =
+                ((AuraLiveApp) getApplication()).shouldKeepRoomMicrophoneForegroundType();
+        if (micOk && (rtcMicActive || micWasTemporarilyYielded)) {
+            // Retain the microphone FGS type across a WhatsApp handoff. Removing it
+            // while backgrounded would make Android 14+ reject re-adding the type
+            // when the external recording ends, preventing automatic mic restoration.
             types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
         }
         return types;
