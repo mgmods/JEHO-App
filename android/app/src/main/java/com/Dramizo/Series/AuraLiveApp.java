@@ -60,6 +60,7 @@ public class AuraLiveApp extends Application {
     // Release the VoIP microphone/audio mode while another app (e.g. WhatsApp)
     // is foregrounded. The room connection and playback remain alive.
     private boolean roomAudioSuspendedForExternalApp;
+    private boolean roomAudioReleasedForBackground;
     private boolean roomMicWasEnabledBeforeExternalApp;
     @Nullable private String roomMicRoomIdBeforeExternalApp;
     @Nullable private AudioManager externalCaptureAudioManager;
@@ -115,29 +116,49 @@ public class AuraLiveApp extends Application {
     }
 
     private void restoreRoomAudioAfterExternalApp() {
-        if (!roomAudioSuspendedForExternalApp) return;
-
         RoomRtcEngine rtc = RoomRtcEngine.getInstance();
-        String expectedRoomId = roomMicRoomIdBeforeExternalApp;
+        String expectedRoomId = roomMicRoomIdBeforeExternalApp != null
+                ? roomMicRoomIdBeforeExternalApp : rtc.getCurrentRoomId();
         boolean sameRoomStillActive = expectedRoomId != null
                 && expectedRoomId.equals(rtc.getCurrentRoomId())
                 && rtc.isInRoom(expectedRoomId);
 
+        if (!roomAudioSuspendedForExternalApp && !roomAudioReleasedForBackground) return;
+
         roomAudioSuspendedForExternalApp = false;
+        roomAudioReleasedForBackground = false;
         roomMicRoomIdBeforeExternalApp = null;
 
         if (sameRoomStillActive) {
+            // Re-enter communication mode only when JEHO is actually foreground.
+            // While backgrounded, MODE_IN_COMMUNICATION is treated by Android as an
+            // active voice call and blocks ordinary apps such as WhatsApp from
+            // capturing the microphone.
             RoomAudioSession.acquire(this);
             rtc.reapplyAudioRoute();
 
-            // Only restore a mic that was publishing before Home was pressed.
-            // If the user left the seat while away, publishing will have stopped.
+            // Only restore a mic that was publishing before the external handoff.
+            // A normal Home/background transition never disables this flag.
             if (roomMicWasEnabledBeforeExternalApp && rtc.isPublishing()) {
                 rtc.setMicEnabled(true);
                 updateRoomMicMutedState(expectedRoomId, false);
             }
         }
         roomMicWasEnabledBeforeExternalApp = false;
+        VoiceRoomForegroundService.refreshAudioForegroundType();
+    }
+
+    /** Release Android's call audio mode while JEHO is backgrounded, but keep the
+     * RTC room and local publishing state alive. This is what allows ordinary
+     * recorders (WhatsApp, voice recorder, etc.) to capture the microphone. */
+    private void releaseAudioModeForBackground() {
+        if (roomAudioReleasedForBackground || isAppInForeground()) return;
+        RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+        String roomId = rtc.getCurrentRoomId();
+        if (roomId == null || roomId.isEmpty() || !rtc.isInRoom(roomId)) return;
+
+        roomAudioReleasedForBackground = true;
+        RoomAudioSession.release(this);
         VoiceRoomForegroundService.refreshAudioForegroundType();
     }
 
@@ -336,8 +357,11 @@ public class AuraLiveApp extends Application {
             @Override public void onActivityStopped(Activity activity) {
                 startedActivities = Math.max(0, startedActivities - 1);
                 if (foregroundActivity == activity) foregroundActivity = null;
-                // Do not stop the room microphone just because Home was pressed.
-                // External handoff is triggered only by Android's capture-silenced callback.
+                // Do not disable/unpublish JEHO's room microphone on Home. Only release
+                // Android's communication/call mode so a foreground recorder can capture.
+                if (startedActivities == 0) {
+                    releaseAudioModeForBackground();
+                }
             }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
             @Override public void onActivityDestroyed(Activity activity) {}
