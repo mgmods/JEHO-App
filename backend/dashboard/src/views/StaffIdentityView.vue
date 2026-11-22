@@ -49,10 +49,10 @@
             <label class="field-label">اسم الرتبة الظاهر</label>
             <input v-model.trim="form[role.key].label" class="text-input" maxlength="32" :placeholder="role.label" />
             <div class="preview-strip">
-              <span>معاينة الهوية</span>
+              <span>معاينة الشارة كما تظهر في التطبيق</span>
               <div class="mini-identity">
-                <span class="mini-badge"><img v-if="form[role.key].badgeUrl" :src="resolveAsset(form[role.key].badgeUrl)" /><i v-else class="bi bi-award"></i></span>
-                <b>{{ form[role.key].label || role.label }}</b>
+                <img v-if="form[role.key].badgeUrl" class="mini-role-badge" :src="resolveAsset(form[role.key].badgeUrl)" :alt="'شارة ' + (form[role.key].label || role.label)" />
+                <b v-else>{{ form[role.key].label || role.label }}</b>
               </div>
             </div>
           </div>
@@ -248,7 +248,7 @@ onMounted(load)
 .url-input,.text-input{width:100%;min-width:0;min-height:42px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#172033;padding:9px 11px;outline:none}.url-input:focus,.text-input:focus{border-color:#3985d6;box-shadow:0 0 0 3px #3985d622}
 .hint{display:block;color:#64748b;line-height:1.6;margin-top:8px}
 .role-settings{padding:14px;border:1px solid #dbe4ef;border-radius:15px;background:#fbfdff}
-.field-label{display:block;color:#334155;font-weight:900;margin-bottom:8px}.preview-strip{margin-top:18px;padding:12px;background:#edf4fc;border-radius:12px}.preview-strip>span{display:block;color:#64748b;font-size:.78rem;font-weight:800;margin-bottom:10px}.mini-identity{display:flex;align-items:center;gap:9px;color:#15243a}.mini-badge{width:38px;height:38px;border-radius:11px;background:#fff;border:1px solid #cbd8e8;display:grid;place-items:center;color:var(--role-accent);overflow:hidden}.mini-badge img{width:100%;height:100%;object-fit:contain}
+.field-label{display:block;color:#334155;font-weight:900;margin-bottom:8px}.preview-strip{margin-top:18px;padding:12px;background:#edf4fc;border-radius:12px}.preview-strip>span{display:block;color:#64748b;font-size:.78rem;font-weight:800;margin-bottom:10px}.mini-identity{display:flex;align-items:center;min-height:34px;color:#15243a}.mini-role-badge{width:150px;height:34px;object-fit:contain;display:block}
 .gift-panel{border:1px solid #b9d8f7;border-radius:15px;background:linear-gradient(110deg,#eef7ff,#f8fbff);padding:15px}
 .gift-title{display:flex;align-items:center;gap:11px;color:#174b7d;margin-bottom:14px}.gift-title>i{font-size:1.5rem;color:#1d75c9}.gift-title strong,.gift-title small{display:block}.gift-title strong{font-size:1rem;font-weight:900}.gift-title small{color:#55718e;margin-top:3px}
 .gift-controls{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:10px;align-items:end}.gift-controls label span{display:block;font-size:.82rem;font-weight:900;color:#294766;margin-bottom:6px}
