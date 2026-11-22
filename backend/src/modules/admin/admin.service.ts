@@ -2533,11 +2533,13 @@ export class AdminService {
       throw new BadRequestException('أكمل بيانات Twilio Verify قبل تفعيل إرسال الرموز');
     }
     let encryptedToken = '';
-    if (token) {
-      if (token.length < 16 || token.length > 256) throw new BadRequestException('رمز Twilio Auth Token غير صالح');
+    const existingTokenRaw = await this.phoneOtpStoredValue('twilio.auth_token');
+    const tokenToStore = token || (existingTokenRaw && !existingTokenRaw.trim().startsWith('{') ? existingTokenRaw : '');
+    if (tokenToStore) {
+      if (tokenToStore.length < 16 || tokenToStore.length > 256) throw new BadRequestException('رمز Twilio Auth Token غير صالح');
       try {
-        encryptedToken = encryptSecret(token, process.env.SETTINGS_ENCRYPTION_KEY);
-        if (decryptSecret(encryptedToken, process.env.SETTINGS_ENCRYPTION_KEY) !== token) {
+        encryptedToken = encryptSecret(tokenToStore, process.env.SETTINGS_ENCRYPTION_KEY);
+        if (decryptSecret(encryptedToken, process.env.SETTINGS_ENCRYPTION_KEY) !== tokenToStore) {
           throw new Error('secret encryption verification failed');
         }
       } catch (err) {
