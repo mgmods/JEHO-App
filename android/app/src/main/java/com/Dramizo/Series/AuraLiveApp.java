@@ -297,34 +297,58 @@ public class AuraLiveApp extends Application {
             @Nullable java.util.List<AudioRecordingConfiguration> configs,
             boolean ourCaptureAlreadySuspended) {
         if (configs == null) return ourCaptureAlreadySuspended;
-        if (ourCaptureAlreadySuspended) {
-            int ownSessionId = roomMicCaptureSessionIdBeforeExternalApp;
-            if (ownSessionId < 0) return !configs.isEmpty();
-            for (AudioRecordingConfiguration config : configs) {
-                if (config == null) continue;
-                try {
-                    if (config.getClientAudioSessionId() != ownSessionId) return true;
-                } catch (Throwable ignored) {
-                    // If the platform cannot identify the session, fail safe.
-                    return true;
-                }
-            }
-            // Zego may keep JEHO's muted AudioRecord alive. Ignore that session;
-            // the external capture is finished when no other session remains.
-            return false;
-        }
+
+        // Do not rely only on isClientSilenced(): several Android/OEM builds do
+        // not mark JEHO's AudioRecord as silenced even after WhatsApp has taken
+        // microphone priority. The recording configuration exposes the client
+        // package on Android 10+, so identify external capture directly.
+        boolean externalPackageActive = false;
+        boolean ownSessionActive = false;
         for (AudioRecordingConfiguration config : configs) {
             if (config == null) continue;
             try {
-                if (config.isClientSilenced()) {
+                String clientPackage = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                        ? config.getClientPackageName() : null;
+                if (clientPackage != null && !clientPackage.isEmpty()) {
+                    if (!getPackageName().equals(clientPackage)) {
+                        externalPackageActive = true;
+                    } else {
+                        ownSessionActive = true;
+                        if (roomMicCaptureSessionIdBeforeExternalApp < 0) {
+                            roomMicCaptureSessionIdBeforeExternalApp =
+                                    config.getClientAudioSessionId();
+                        }
+                    }
+                } else if (config.isClientSilenced() && !ourCaptureAlreadySuspended) {
                     roomMicCaptureSessionIdBeforeExternalApp =
                             config.getClientAudioSessionId();
-                    return true;
+                    externalPackageActive = true;
+                } else if (ourCaptureAlreadySuspended
+                        && config.getClientAudioSessionId()
+                        != roomMicCaptureSessionIdBeforeExternalApp) {
+                    // Fallback for platform builds that omit the package name.
+                    externalPackageActive = true;
                 }
             } catch (Throwable ignored) {
+                // If an active recorder cannot be classified, fail safe and keep
+                // JEHO muted rather than stealing the microphone from WhatsApp.
+                externalPackageActive = true;
             }
         }
+        if (externalPackageActive) return true;
+        if (ourCaptureAlreadySuspended) {
+            // Zego may keep JEHO's muted AudioRecord alive. Its own session is
+            // not evidence that an external app is still recording.
+            return false;
+        }
         return false;
+    }
+
+    /** Keep the microphone FGS type that was started while JEHO was visible.
+     * This lets RTC restore its previously-active mic after WhatsApp finishes,
+     * even when JEHO is still backgrounded (Android 14+ while-in-use rules). */
+    public boolean shouldKeepRoomMicrophoneForegroundType() {
+        return roomAudioSuspendedForExternalApp && roomMicWasEnabledBeforeExternalApp;
     }
 
     /** Synchronous recheck used by the delayed restore and foreground transition. */
