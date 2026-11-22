@@ -275,6 +275,55 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Verify architecture-specific APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="android/app/build/outputs/apk/release"
+          APKSIGNER="$(find "${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"/build-tools -type f -name apksigner -print | sort -V | tail -n 1)"
+          EXPECTED_SHA1="FE544713A2726865005599472B4527C62818E696"
+          for ABI in arm64-v8a armeabi-v7a; do
+            APK="$OUT/app-${ABI}-release.apk"
+            if [[ ! -f "$APK" ]]; then
+              echo "::error::Expected split APK missing: $APK"
+              find "$OUT" -maxdepth 1 -type f -name '*.apk' -print || true
+              exit 1
+            fi
+            CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
+            ACTUAL_SHA1="$(printf '%s\\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
+              echo "::error::${ABI} APK signing certificate mismatch."
+              exit 1
+            fi
+            APK_BYTES="$(stat -c '%s' "$APK")"
+            APK_MIB="$(awk -v n="$APK_BYTES" 'BEGIN {print n/1048576}')"
+            printf '%s  %s bytes (%.2f MiB)\\n' "$(basename "$APK")" "$APK_BYTES" "$APK_MIB"
+            ENTRIES="$(unzip -Z1 "$APK")"
+            grep -q "^lib/${ABI}/.*\\.so$" <<< "$ENTRIES" || { echo "::error::${ABI} native libraries missing."; exit 1; }
+            if [[ "$ABI" == "arm64-v8a" ]] && grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/' <<< "$ENTRIES"; then
+              echo "::error::ARM64 split contains extra ABI libraries."
+              exit 1
+            fi
+          done
+          echo "Verified: architecture-specific APKs retain the existing JEHO signing certificate and contain only their intended ABI."
+
+      - name: Upload ARM64 phone APK (smaller install package)
+        uses: actions/upload-artifact@v4
+        with:
+          name: JEHO-MG-JEHO-ARM64-Update-APK
+          path: android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload ARMv7 compatibility APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: JEHO-MG-JEHO-ARMv7-Update-APK
+          path: android/app/build/outputs/apk/release/app-armeabi-v7a-release.apk
+          if-no-files-found: error
+          retention-days: 7
+
+
       - name: Check Appetize preview token
         id: appetize-config
         env:
