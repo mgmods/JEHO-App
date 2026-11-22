@@ -3281,7 +3281,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         com.Dramizo.Series.util.StaffIdentityConfigCache.get(decoration.staffRoleKey);
                 if (identity.badgeUrl != null) decoration.staffBadgeUrl = identity.badgeUrl;
                 if (identity.label != null && !identity.label.trim().isEmpty()) {
-                    decoration.staffRoleLabel = identity.label;
+                    decoration.staffRoleLabel = com.Dramizo.Series.util.StaffRoleHelper.genderizeLabel(
+                            identity.label, decoration.gender);
                 }
                 renderRoomChatDecorations(row, decoration, fallbackVip);
             });
