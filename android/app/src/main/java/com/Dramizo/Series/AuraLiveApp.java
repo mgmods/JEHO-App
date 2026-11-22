@@ -107,7 +107,7 @@ public class AuraLiveApp extends Application {
     }
 
     /** Called only after Android reports that another foreground recorder has silenced JEHO capture. */
-    private void suspendRoomAudioForExternalApp() {
+    private synchronized void suspendRoomAudioForExternalApp() {
         if (roomAudioSuspendedForExternalApp) return;
         RoomRtcEngine rtc = RoomRtcEngine.getInstance();
         String activeRoomId = rtc.getCurrentRoomId();
@@ -141,7 +141,7 @@ public class AuraLiveApp extends Application {
         VoiceRoomForegroundService.refreshAudioForegroundType();
     }
 
-    private void restoreRoomAudioAfterExternalApp() {
+    private synchronized void restoreRoomAudioAfterExternalApp() {
         // Do a synchronous snapshot before reclaiming the microphone. The
         // AudioRecordingCallback can be delivered after onActivityStarted(), so
         // relying only on its last value can steal the mic back from WhatsApp.
@@ -205,7 +205,7 @@ public class AuraLiveApp extends Application {
     /** Release Android's call audio mode while JEHO is backgrounded, but keep the
      * RTC room and local publishing state alive. This is what allows ordinary
      * recorders (WhatsApp, voice recorder, etc.) to capture the microphone. */
-    private void releaseAudioModeForBackground() {
+    private synchronized void releaseAudioModeForBackground() {
         if (roomAudioReleasedForBackground || isAppInForeground()) return;
         RoomRtcEngine rtc = RoomRtcEngine.getInstance();
         String roomId = rtc.getCurrentRoomId();
@@ -290,7 +290,7 @@ public class AuraLiveApp extends Application {
      * configuration disappears; any remaining active capture configuration then
      * belongs to the external recorder. This lets us detect its stop reliably.
      */
-    private boolean hasExternalCapture(
+    private synchronized boolean hasExternalCapture(
             @Nullable java.util.List<AudioRecordingConfiguration> configs,
             boolean ourCaptureAlreadySuspended) {
         if (configs == null) return ourCaptureAlreadySuspended;
