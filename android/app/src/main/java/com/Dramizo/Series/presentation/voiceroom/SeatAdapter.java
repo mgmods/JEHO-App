@@ -465,7 +465,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 }
             };
             speakingStopRunnables.put(key, delayedStop);
-            handler.postDelayed(delayedStop, 700L);
+            handler.postDelayed(delayedStop, 320L);
             return;
         }
         boolean changed = speakingUsers.add(key);
@@ -618,6 +618,25 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                             if (holder.b.seatVoiceWaveBars != null) {
                                 holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
                                 holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+                            }
+                            // Make equipped waves react to live RTC level updates instead of
+                            // remaining a decorative, constant-speed image around the avatar.
+                            float amplitude = Math.max(0f, Math.min(100f, lv)) / 100f;
+                            float innerScale = 0.96f + amplitude * 0.16f;
+                            if (holder.b.imgVoiceWave != null) {
+                                holder.b.imgVoiceWave.animate().cancel();
+                                holder.b.imgVoiceWave.animate()
+                                        .scaleX(innerScale).scaleY(innerScale)
+                                        .alpha(0.78f + amplitude * 0.22f)
+                                        .setDuration(110L).start();
+                            }
+                            if (holder.b.imgVoiceWaveOuter != null) {
+                                float outerScale = 1.02f + amplitude * 0.14f;
+                                holder.b.imgVoiceWaveOuter.animate().cancel();
+                                holder.b.imgVoiceWaveOuter.animate()
+                                        .scaleX(outerScale).scaleY(outerScale)
+                                        .alpha(0.28f + amplitude * 0.42f)
+                                        .setDuration(130L).start();
                             }
                         } else if (holder.b.seatSpeakAura != null) {
                             holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
