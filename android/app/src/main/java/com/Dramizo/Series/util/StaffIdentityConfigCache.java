@@ -77,7 +77,7 @@ public final class StaffIdentityConfigCache {
                     Object data = response.body() != null ? response.body().data : null;
                     if (response.isSuccessful() && response.body() != null && response.body().success && data instanceof Map) {
                         Map<?, ?> root = (Map<?, ?>) data;
-                        for (String role : new String[]{"super", "admin", "manager"}) {
+                        for (String role : new String[]{"super", "admin", "manager", "rechargeAgent", "agencyLeader", "host"}) {
                             Object raw = root.get(role);
                             if (raw instanceof Map) parsed.put(role, fromMap((Map<?, ?>) raw, role));
                         }
@@ -102,7 +102,7 @@ public final class StaffIdentityConfigCache {
     private static void finish(Map<String, RoleIdentity> parsed) {
         List<Runnable> callbacks;
         synchronized (LOCK) {
-            for (String role : new String[]{"super", "admin", "manager"}) {
+            for (String role : new String[]{"super", "admin", "manager", "rechargeAgent", "agencyLeader", "host"}) {
                 CACHE.put(role, parsed.getOrDefault(role, defaults(role)));
             }
             loaded = true;
@@ -138,6 +138,9 @@ public final class StaffIdentityConfigCache {
         if (StaffRoleHelper.SUPER.equals(role)) return new RoleIdentity("Super Admin", "#D8B35B", "", "", "", "", "");
         if (StaffRoleHelper.ADMIN.equals(role)) return new RoleIdentity("Admin", "#9AA8C7", "", "", "", "", "");
         if (StaffRoleHelper.MANAGER.equals(role)) return new RoleIdentity("Manager", "#37A889", "", "", "", "", "");
+        if ("rechargeAgent".equals(role)) return new RoleIdentity("وكيل شحن", "#D8B35B", "", "", "", "", "");
+        if ("agencyLeader".equals(role)) return new RoleIdentity("قائد الوكالة", "#D8B35B", "", "", "", "", "");
+        if ("host".equals(role)) return new RoleIdentity("مضيف", "#37A889", "", "", "", "", "");
         return new RoleIdentity("", "#6B4CC2", "", "", "", "", "");
     }
 }
