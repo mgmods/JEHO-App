@@ -295,6 +295,9 @@ export class AdminService {
       super: role('Super Admin', '#D8B35B'),
       admin: role('Admin', '#9AA8C7'),
       manager: role('Manager', '#37A889'),
+      rechargeAgent: role('وكيل شحن', '#D8B35B'),
+      agencyLeader: role('قائد الوكالة', '#D8B35B'),
+      host: role('مضيف', '#37A889'),
     };
   }
 
@@ -312,7 +315,10 @@ export class AdminService {
         const label = typeof source.label === 'string' && source.label.trim() ? source.label.trim().slice(0, 32) : fallback.label;
         return { label, accentColor: color, badgeUrl: url('badgeUrl'), frameUrl: url('frameUrl'), nameplateUrl: url('nameplateUrl'), messageCardUrl: url('messageCardUrl'), entryEffectUrl: url('entryEffectUrl') };
       };
-      return { super: clean('super'), admin: clean('admin'), manager: clean('manager') };
+      return {
+        super: clean('super'), admin: clean('admin'), manager: clean('manager'),
+        rechargeAgent: clean('rechargeAgent'), agencyLeader: clean('agencyLeader'), host: clean('host'),
+      };
     } catch {
       return defaults;
     }
@@ -331,7 +337,7 @@ export class AdminService {
       return raw;
     };
     const next: Record<string, any> = {};
-    for (const role of ['super', 'admin', 'manager'] as const) {
+    for (const role of ['super', 'admin', 'manager', 'rechargeAgent', 'agencyLeader', 'host'] as const) {
       const patch = input[role] && typeof input[role] === 'object' ? input[role] as Record<string, unknown> : {};
       const base = current[role];
       const label = patch.label === undefined ? base.label : String(patch.label || '').trim().slice(0, 32);
