@@ -8,10 +8,19 @@ import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
 import android.widget.Toast;
+import android.widget.TextView;
+import android.widget.LinearLayout;
+import android.view.Gravity;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.text.InputFilter;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.text.InputType;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog.Builder;
 import java.util.ArrayList;
 import java.util.Locale;
 
@@ -43,6 +52,26 @@ public class LoginActivity extends ThemedActivity {
     private boolean registerMode = false;
     private String pendingPhoneSignup;
     private String pendingPhonePassword;
+    private AlertDialog phoneVerificationDialog;
+    private EditText[] otpFields;
+    private TextView otpCountdown;
+    private TextView otpResend;
+    private final Handler otpHandler = new Handler(Looper.getMainLooper());
+    private int otpSecondsRemaining = 30;
+    private final Runnable otpTicker = new Runnable() {
+        @Override public void run() {
+            if (phoneVerificationDialog == null || !phoneVerificationDialog.isShowing()) return;
+            if (otpSecondsRemaining > 0) {
+                otpCountdown.setText("يمكنك طلب رمز جديد بعد " + otpSecondsRemaining + " ثانية");
+                otpSecondsRemaining--;
+                otpHandler.postDelayed(this, 1000L);
+            } else {
+                otpCountdown.setText("لم يصلك الرمز؟");
+                otpResend.setEnabled(true);
+                otpResend.setAlpha(1f);
+            }
+        }
+    };
 
     @Override
     protected boolean wantsContentSystemPadding() {
@@ -93,7 +122,12 @@ public class LoginActivity extends ThemedActivity {
         binding.identifierLayout.setHint("رقم الهاتف");
         viewModel.getOtpSent().observe(this, sent -> {
             if (sent == null || !sent.sent || pendingPhoneSignup == null) return;
-            showPhoneVerificationDialog();
+            if (phoneVerificationDialog == null || !phoneVerificationDialog.isShowing()) {
+                showPhoneVerificationDialog();
+            } else {
+                startOtpCountdown();
+                Toast.makeText(this, "تم إرسال رمز تحقق جديد", Toast.LENGTH_SHORT).show();
+            }
         });
 
         if (ContainerProvider.from(this).getSessionManager().isLoggedIn()) {
@@ -336,32 +370,119 @@ public class LoginActivity extends ThemedActivity {
         viewModel.sendOtp(phone);
     }
 
+    private void startOtpCountdown() {
+        otpHandler.removeCallbacks(otpTicker);
+        otpSecondsRemaining = 30;
+        otpResend.setEnabled(false);
+        otpResend.setAlpha(0.45f);
+        otpTicker.run();
+    }
+
     private void showPhoneVerificationDialog() {
         binding.progress.setVisibility(View.GONE);
-        EditText codeInput = new EditText(this);
-        codeInput.setHint("رمز التحقق المكون من 6 أرقام");
-        codeInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        codeInput.setSingleLine(true);
-        codeInput.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        new AlertDialog.Builder(this)
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(10), dp(18), dp(4));
+
+        TextView description = new TextView(this);
+        description.setText("أدخل رمز التحقق المكوّن من ستة أرقام الذي وصلك على هاتفك");
+        description.setGravity(Gravity.CENTER);
+        description.setTextSize(14);
+        content.addView(description);
+
+        LinearLayout digits = new LinearLayout(this);
+        digits.setGravity(Gravity.CENTER);
+        digits.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams digitsParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(58));
+        digitsParams.topMargin = dp(18);
+        content.addView(digits, digitsParams);
+
+        otpFields = new EditText[6];
+        for (int i = 0; i < 6; i++) {
+            final int index = i;
+            EditText field = new EditText(this);
+            otpFields[i] = field;
+            field.setGravity(Gravity.CENTER);
+            field.setTextSize(21);
+            field.setInputType(InputType.TYPE_CLASS_NUMBER);
+            field.setSingleLine(true);
+            field.setSelectAllOnFocus(true);
+            field.setFilters(new InputFilter[]{new InputFilter.LengthFilter(1)});
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(52), 1f);
+            lp.setMargins(dp(3), 0, dp(3), 0);
+            digits.addView(field, lp);
+            field.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int st, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int st, int before, int count) {
+                    if (s.length() == 1 && index < 5) otpFields[index + 1].requestFocus();
+                    if (s.length() == 0 && index > 0) otpFields[index - 1].requestFocus();
+                }
+                @Override public void afterTextChanged(Editable e) {}
+            });
+        }
+
+        otpCountdown = new TextView(this);
+        otpCountdown.setGravity(Gravity.CENTER);
+        otpCountdown.setTextSize(13);
+        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(38));
+        countLp.topMargin = dp(10);
+        content.addView(otpCountdown, countLp);
+
+        otpResend = new TextView(this);
+        otpResend.setText("إعادة إرسال الرمز");
+        otpResend.setGravity(Gravity.CENTER);
+        otpResend.setTextSize(14);
+        otpResend.setTextColor(getColor(R.color.gift_accent));
+        otpResend.setEnabled(false);
+        otpResend.setAlpha(0.45f);
+        content.addView(otpResend, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(40)));
+        otpResend.setOnClickListener(v -> {
+            if (otpSecondsRemaining > 0 || pendingPhoneSignup == null) return;
+            otpResend.setEnabled(false);
+            otpResend.setAlpha(0.45f);
+            binding.progress.setVisibility(View.VISIBLE);
+            viewModel.sendOtp(pendingPhoneSignup);
+        });
+
+        phoneVerificationDialog = new AlertDialog.Builder(this)
                 .setTitle("التحقق من حسابك")
-                .setMessage("أدخل رمز التحقق الذي وصلك على رقم الهاتف")
-                .setView(codeInput)
-                .setPositiveButton("تأكيد", (dialog, which) -> {
-                    String code = codeInput.getText() == null ? "" : codeInput.getText().toString().trim();
-                    if (code.length() != 6) {
-                        Toast.makeText(this, "أدخل الرمز المكون من ستة أرقام", Toast.LENGTH_LONG).show();
-                        showPhoneVerificationDialog();
-                        return;
-                    }
-                    binding.progress.setVisibility(View.VISIBLE);
-                    viewModel.verifyPhoneSignup(pendingPhoneSignup, code, pendingPhonePassword);
-                })
+                .setView(content)
+                .setPositiveButton("تأكيد", null)
                 .setNegativeButton("إلغاء", (dialog, which) -> {
                     pendingPhoneSignup = null;
                     pendingPhonePassword = null;
                 })
-                .show();
+                .create();
+        phoneVerificationDialog.setOnDismissListener(dialog -> {
+            otpHandler.removeCallbacks(otpTicker);
+            phoneVerificationDialog = null;
+        });
+        phoneVerificationDialog.setOnShowListener(dialog -> {
+            phoneVerificationDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                StringBuilder code = new StringBuilder(6);
+                for (EditText field : otpFields) {
+                    String value = field.getText() == null ? "" : field.getText().toString();
+                    if (value.isEmpty()) {
+                        field.requestFocus();
+                        Toast.makeText(this, "أدخل الأرقام الستة كاملة", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    code.append(value);
+                }
+                binding.progress.setVisibility(View.VISIBLE);
+                viewModel.verifyPhoneSignup(pendingPhoneSignup, code.toString(), pendingPhonePassword);
+            });
+            otpFields[0].requestFocus();
+            startOtpCountdown();
+        });
+        phoneVerificationDialog.show();
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     static void copyPendingDeepLink(Intent from, Intent to) {
