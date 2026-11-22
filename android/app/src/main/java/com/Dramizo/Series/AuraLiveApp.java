@@ -310,8 +310,18 @@ public class AuraLiveApp extends Application {
         for (AudioRecordingConfiguration config : configs) {
             if (config == null) continue;
             try {
-                String clientPackage = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                        ? config.getClientPackageName() : null;
+                String clientPackage = null;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    // Some compileSdk versions do not expose this API; resolve it at runtime.
+                    try {
+                        java.lang.reflect.Method packageMethod =
+                                AudioRecordingConfiguration.class.getMethod("getClientPackageName");
+                        Object packageValue = packageMethod.invoke(config);
+                        if (packageValue instanceof String) clientPackage = (String) packageValue;
+                    } catch (Throwable ignored) {
+                        clientPackage = null;
+                    }
+                }
                 if (clientPackage != null && !clientPackage.isEmpty()) {
                     if (!getPackageName().equals(clientPackage)) {
                         externalPackageActive = true;
