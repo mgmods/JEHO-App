@@ -289,7 +289,7 @@ export class AdminService {
 
   private staffIdentityDefaults() {
     const role = (label: string, accentColor: string) => ({
-      label, accentColor, badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '',
+      label, accentColor, badgeUrl: '', frameUrl: '', badgeId: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '',
     });
     return {
       super: role('Super Admin', '#D8B35B'),
@@ -313,7 +313,8 @@ export class AdminService {
         const url = (key: string) => typeof source[key] === 'string' && /^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(source[key]) ? source[key].slice(0, 2048) : '';
         const color = typeof source.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(source.accentColor) ? source.accentColor : fallback.accentColor;
         const label = typeof source.label === 'string' && source.label.trim() ? source.label.trim().slice(0, 32) : fallback.label;
-        return { label, accentColor: color, badgeUrl: url('badgeUrl'), frameUrl: url('frameUrl'), nameplateUrl: url('nameplateUrl'), messageCardUrl: url('messageCardUrl'), entryEffectUrl: url('entryEffectUrl') };
+        const badgeId = typeof source.badgeId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(source.badgeId) ? source.badgeId : '';
+        return { label, accentColor: color, badgeUrl: url('badgeUrl'), frameUrl: url('frameUrl'), badgeId, nameplateUrl: url('nameplateUrl'), messageCardUrl: url('messageCardUrl'), entryEffectUrl: url('entryEffectUrl') };
       };
       return {
         super: clean('super'), admin: clean('admin'), manager: clean('manager'),
@@ -346,7 +347,10 @@ export class AdminService {
       if (!/^#[0-9a-f]{6}$/i.test(accentColor)) throw new BadRequestException('Accent color must be a hex color');
       const assets: Record<string, string> = {};
       for (const key of allowed) assets[key] = url(patch[key], key) ?? base[key as keyof typeof base] as string;
-      next[role] = { label, accentColor, ...assets };
+      const badgeId = patch.badgeId === undefined
+        ? base.badgeId
+        : (typeof patch.badgeId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(patch.badgeId) ? patch.badgeId : '');
+      next[role] = { label, accentColor, ...assets, badgeId };
     }
     const key = 'staff_identity_config';
     const existing = await this.settingsRepo.findOne({ where: { key } });
