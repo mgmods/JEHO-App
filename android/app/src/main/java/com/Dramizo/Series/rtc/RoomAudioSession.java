@@ -20,6 +20,44 @@ public final class RoomAudioSession {
 
     private RoomAudioSession() {}
 
+/**
+     * Re-acquire communication routing after an external recorder has finished.
+     * This is intentionally allowed while JEHO is backgrounded: the external
+     * capture has already ended, and the room was explicitly suspended for it.
+     */
+    public static void acquireForExternalRestore(@Nullable Context context) {
+        Context app = context != null
+                ? context.getApplicationContext()
+                : appContext.get();
+        if (app == null) return;
+        appContext = new WeakReference<>(app);
+
+        AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build();
+                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                        .setAudioAttributes(attrs)
+                        .setAcceptsDelayedFocusGain(false)
+                        .setWillPauseWhenDucked(false)
+                        .build();
+                am.requestAudioFocus(focusRequest);
+            } else {
+                am.requestAudioFocus(
+                        null,
+                        AudioManager.STREAM_VOICE_CALL,
+                        AudioManager.AUDIOFOCUS_GAIN);
+            }
+            focusHeld = true;
+            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        } catch (Throwable ignored) {
+        }
+    }
+
     public static void acquire(@Nullable Context context) {
         Context app = context != null
                 ? context.getApplicationContext()
