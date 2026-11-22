@@ -2534,7 +2534,7 @@ export class AdminService {
     }
     let encryptedToken = '';
     const existingTokenRaw = await this.phoneOtpStoredValue('twilio.auth_token');
-    const tokenToStore = token || (existingTokenRaw && !existingTokenRaw.trim().startsWith('{') ? existingTokenRaw : '');
+    const tokenToStore = token || (enabled && existingTokenRaw && !existingTokenRaw.trim().startsWith('{') ? existingTokenRaw : '');
     if (tokenToStore) {
       if (tokenToStore.length < 16 || tokenToStore.length > 256) throw new BadRequestException('رمز Twilio Auth Token غير صالح');
       try {
