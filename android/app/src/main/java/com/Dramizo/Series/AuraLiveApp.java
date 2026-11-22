@@ -303,7 +303,6 @@ public class AuraLiveApp extends Application {
         // microphone priority. The recording configuration exposes the client
         // package on Android 10+, so identify external capture directly.
         boolean externalPackageActive = false;
-        boolean ownSessionActive = false;
         for (AudioRecordingConfiguration config : configs) {
             if (config == null) continue;
             try {
@@ -313,7 +312,6 @@ public class AuraLiveApp extends Application {
                     if (!getPackageName().equals(clientPackage)) {
                         externalPackageActive = true;
                     } else {
-                        ownSessionActive = true;
                         if (roomMicCaptureSessionIdBeforeExternalApp < 0) {
                             roomMicCaptureSessionIdBeforeExternalApp =
                                     config.getClientAudioSessionId();
