@@ -902,6 +902,16 @@ public class ProfileActivity extends ThemedActivity {
     private void bindAgencyRoleBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (binding == null || binding.agencyRoleBadgeContainer == null
                 || binding.tvAgencyRoleBadge == null || binding.imgAgencyRoleBadge == null) return;
+        // A person gets one administrative identity at a time. Platform staff and
+        // recharge-agent ranks take precedence over an additional agency-role badge.
+        if (user != null && (StaffRoleHelper.isStaff(user) || user.isRechargeAgent)) {
+            binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
+            binding.tvAgencyRoleBadge.setText("");
+            binding.tvAgencyRoleBadge.setVisibility(View.GONE);
+            Glide.with(this).clear(binding.imgAgencyRoleBadge);
+            binding.imgAgencyRoleBadge.setVisibility(View.GONE);
+            return;
+        }
 
         com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency =
                 user == null ? null : user.agency;
