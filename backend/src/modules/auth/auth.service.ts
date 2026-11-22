@@ -165,7 +165,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       .createQueryBuilder('u')
       .addSelect('u.passwordHash')
       .where(
-        'LOWER(u.email) = :id OR LOWER(u.username) = :id OR u.publicId = :raw',
+        'LOWER(u.email) = :id OR LOWER(u.username) = :id OR u.publicId = :raw OR u.phone = :raw',
         { id: identifier, raw: dto.identifier.trim() },
       )
       .getOne();
@@ -330,11 +330,13 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         publicId: await this.allocatePublicId(),
         displayName: username,
         phoneVerified: true,
+        ...(dto.password ? { passwordHash: await bcrypt.hash(dto.password, 12) } : {}),
       });
       await this.usersRepo.save(user);
       await this.bootstrapUser(user);
     } else {
       user.phoneVerified = true;
+      if (dto.password) user.passwordHash = await bcrypt.hash(dto.password, 12);
       user.lastOnlineAt = new Date();
       await this.usersRepo.save(user);
     }
