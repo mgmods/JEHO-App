@@ -1371,8 +1371,15 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         TextView badge = holder.b.tvAgencyRoleBadge;
         if (badge == null) return;
+        ViewGroup parent = badge.getParent() instanceof ViewGroup ? (ViewGroup) badge.getParent() : null;
+        ImageView image = parent != null ? parent.findViewWithTag("jeho_agency_role_badge_image") : null;
+        final ImageView[] imageRef = new ImageView[]{image};
         badge.setText("");
         badge.setVisibility(View.GONE);
+        if (imageRef[0] != null) {
+            Glide.with(holder.itemView).clear(imageRef[0]);
+            imageRef[0].setVisibility(View.GONE);
+        }
         if (user == null) return;
 
         com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency = user.agency;
@@ -1387,18 +1394,46 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             role = club.role.trim().toLowerCase(Locale.ROOT);
             memberAgencyId = club.agencyId == null ? "" : club.agencyId.trim();
         }
-
         boolean leader = "owner".equals(role) || "leader".equals(role);
         boolean host = "host".equals(role);
-        // A leader's identity follows the user into every room. A host badge is
-        // room-scoped and is shown only inside the agency room that appointed them.
         if (!leader && !(host && agencyRoom && roomAgencyId != null
                 && !roomAgencyId.isEmpty() && roomAgencyId.equals(memberAgencyId))) return;
 
-        String label = StaffRoleHelper.genderizeLabel(
-                leader ? "♛  قائد الوكالة" : "مضيف", user.gender);
-        badge.setText(label);
+        String key = leader ? "agencyLeader" : "host";
+        String fallback = StaffRoleHelper.genderizeLabel(leader ? "قائد الوكالة" : "مضيف", user.gender);
+        badge.setText(fallback);
         badge.setVisibility(View.VISIBLE);
+        StaffIdentityConfigCache.load(holder.itemView.getContext(), () -> {
+            if (badge.getParent() == null) return;
+            StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(key);
+            String label = identity.label == null || identity.label.trim().isEmpty() ? fallback
+                    : StaffRoleHelper.genderizeLabel(identity.label, user.gender);
+            if (identity.badgeUrl != null && !identity.badgeUrl.trim().isEmpty() && parent != null) {
+                badge.setVisibility(View.GONE);
+                ImageView target = imageRef[0];
+                if (target == null) {
+                    target = new ImageView(holder.itemView.getContext());
+                    target.setTag("jeho_agency_role_badge_image");
+                    target.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    int size = Math.round(16 * holder.itemView.getResources().getDisplayMetrics().density);
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+                    lp.topMargin = Math.round(2 * holder.itemView.getResources().getDisplayMetrics().density);
+                    int index = Math.min(parent.indexOfChild(badge) + 1, parent.getChildCount());
+                    parent.addView(target, index, lp);
+                    imageRef[0] = target;
+                }
+                target.setVisibility(View.VISIBLE);
+                Glide.with(holder.itemView).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(identity.badgeUrl.trim())).into(target);
+                target.setContentDescription(label);
+            } else {
+                if (imageRef[0] != null) {
+                    Glide.with(holder.itemView).clear(imageRef[0]);
+                    imageRef[0].setVisibility(View.GONE);
+                }
+                badge.setText(label);
+                badge.setVisibility(View.VISIBLE);
+            }
+        });
     }
 
     private void bindStaffSeatBadge(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
