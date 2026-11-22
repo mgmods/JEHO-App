@@ -28,7 +28,18 @@
             android:focusable="false"
             android:visibility="invisible" />
 
-        <!-- User-equipped transparent wave artwork; visible only while this seat is speaking. -->
+        <!-- User-equipped voice wave: two animated layers, like the original Mikoo waves. -->
+        <ImageView
+            android:id="@+id/imgVoiceWaveOuter"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:elevation="1dp"
+            android:scaleType="fitCenter"
+            android:alpha="0.62"
+            android:visibility="gone" />
+
         <ImageView
             android:id="@+id/imgVoiceWave"
             android:layout_width="55dp"
