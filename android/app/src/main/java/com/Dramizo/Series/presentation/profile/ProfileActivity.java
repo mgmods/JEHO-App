@@ -855,6 +855,7 @@ public class ProfileActivity extends ThemedActivity {
 
     private void clearProfileRoleBadgeAsset() {
         if (binding == null || binding.tvStaffBadge == null) return;
+        com.Dramizo.Series.util.StaffIdentityFrameMotion.stop(binding.imgFrame);
         ViewGroup parent = binding.tvStaffBadge.getParent() instanceof ViewGroup
                 ? (ViewGroup) binding.tvStaffBadge.getParent() : null;
         ImageView image = parent != null ? parent.findViewWithTag("jeho_custom_display_rank_image") : null;
