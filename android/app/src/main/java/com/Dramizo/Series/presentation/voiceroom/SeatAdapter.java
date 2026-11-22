@@ -1419,13 +1419,14 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         ViewGroup parent = holder.b.tvStaffSeatBadge.getParent() instanceof ViewGroup
                 ? (ViewGroup) holder.b.tvStaffSeatBadge.getParent() : null;
         ImageView roleImage = parent != null ? parent.findViewWithTag("jeho_staff_role_badge_image") : null;
+        final ImageView[] roleImageRef = new ImageView[]{roleImage};
         if (user == null || !StaffRoleHelper.isStaff(user)) {
             holder.b.tvStaffSeatBadge.setVisibility(View.GONE);
             holder.b.tvStaffSeatBadge.setTag(null);
             holder.b.tvStaffSeatBadge.setText("");
-            if (roleImage != null) {
-                Glide.with(holder.itemView).clear(roleImage);
-                roleImage.setVisibility(View.GONE);
+            if (roleImageRef[0] != null) {
+                Glide.with(holder.itemView).clear(roleImageRef[0]);
+                roleImageRef[0].setVisibility(View.GONE);
             }
             return;
         }
@@ -1443,7 +1444,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             String label = latest.label.isEmpty() ? fallbackLabel : latest.label;
             if (latest.badgeUrl != null && !latest.badgeUrl.trim().isEmpty() && parent != null) {
                 holder.b.tvStaffSeatBadge.setVisibility(View.GONE);
-                ImageView target = roleImage;
+                ImageView target = roleImageRef[0];
                 if (target == null) {
                     target = new ImageView(holder.itemView.getContext());
                     target.setTag("jeho_staff_role_badge_image");
@@ -1453,15 +1454,15 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     lp.topMargin = Math.round(2 * holder.itemView.getResources().getDisplayMetrics().density);
                     int index = Math.min(parent.indexOfChild(holder.b.tvStaffSeatBadge) + 1, parent.getChildCount());
                     parent.addView(target, index, lp);
-                    roleImage = target;
+                    roleImageRef[0] = target;
                 }
                 target.setVisibility(View.VISIBLE);
                 Glide.with(holder.itemView).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.badgeUrl.trim())).into(target);
                 target.setContentDescription(label);
             } else {
-                if (roleImage != null) {
-                    Glide.with(holder.itemView).clear(roleImage);
-                    roleImage.setVisibility(View.GONE);
+                if (roleImageRef[0] != null) {
+                    Glide.with(holder.itemView).clear(roleImageRef[0]);
+                    roleImageRef[0].setVisibility(View.GONE);
                 }
                 holder.b.tvStaffSeatBadge.setText(label);
                 holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
