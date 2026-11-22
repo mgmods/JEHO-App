@@ -8,6 +8,12 @@ import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
 import android.widget.Toast;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.text.InputType;
+import androidx.appcompat.app.AlertDialog;
+import java.util.ArrayList;
+import java.util.Locale;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -35,6 +41,8 @@ public class LoginActivity extends ThemedActivity {
     private AuthViewModel viewModel;
     private GoogleSignInClient googleClient;
     private boolean registerMode = false;
+    private String pendingPhoneSignup;
+    private String pendingPhonePassword;
 
     @Override
     protected boolean wantsContentSystemPadding() {
@@ -80,6 +88,13 @@ public class LoginActivity extends ThemedActivity {
         EdgeToEdgeHelper.padBottom(binding.contentRoot);
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(AuthViewModel.class);
+
+        setupCountryCodes();
+        binding.identifierLayout.setHint("رقم الهاتف");
+        viewModel.getOtpSent().observe(this, sent -> {
+            if (sent == null || !sent.sent || pendingPhoneSignup == null) return;
+            showPhoneVerificationDialog();
+        });
 
         if (ContainerProvider.from(this).getSessionManager().isLoggedIn()) {
             AppContainer container = ContainerProvider.from(this);
@@ -226,8 +241,45 @@ public class LoginActivity extends ThemedActivity {
         finish();
     }
 
+    private void setupCountryCodes() {
+        String[] codes = {
+                "🇧🇬 +359", "🇸🇾 +963", "🇸🇦 +966", "🇦🇪 +971",
+                "🇪🇬 +20", "🇯🇴 +962", "🇱🇧 +961", "🇮🇶 +964",
+                "🇹🇷 +90", "🇧🇭 +973", "🇰🇼 +965", "🇶🇦 +974",
+                "🇴🇲 +968", "🇺🇸 +1", "🇬🇧 +44", "🇩🇪 +49",
+                "🇫🇷 +33", "🇳🇱 +31", "🇸🇪 +46", "🇨🇦 +1"
+        };
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, codes);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        binding.spinnerCountryCode.setAdapter(adapter);
+        String region = Locale.getDefault().getCountry();
+        String defaultCode = "BG".equalsIgnoreCase(region) ? "+359"
+                : "SY".equalsIgnoreCase(region) ? "+963"
+                : "SA".equalsIgnoreCase(region) ? "+966"
+                : "AE".equalsIgnoreCase(region) ? "+971"
+                : "US".equalsIgnoreCase(region) ? "+1"
+                : "GB".equalsIgnoreCase(region) ? "+44"
+                : "DE".equalsIgnoreCase(region) ? "+49" : "+359";
+        for (int i = 0; i < codes.length; i++) {
+            if (codes[i].endsWith(defaultCode)) {
+                binding.spinnerCountryCode.setSelection(i);
+                break;
+            }
+        }
+    }
+
+    private String fullPhone(String localNumber) {
+        String raw = localNumber == null ? "" : localNumber.replaceAll("[^0-9]", "");
+        String selected = String.valueOf(binding.spinnerCountryCode.getSelectedItem());
+        String code = selected.substring(selected.lastIndexOf(' ') + 1);
+        if (raw.startsWith("0")) raw = raw.substring(1);
+        return code + raw;
+    }
+
     private void setRegisterMode(boolean register) {
         registerMode = register;
+        binding.spinnerCountryCode.setVisibility(View.VISIBLE);
         binding.emailLayout.setVisibility(register ? View.VISIBLE : View.GONE);
         binding.confirmPasswordLayout.setVisibility(register ? View.VISIBLE : View.GONE);
         binding.googleLoginGroup.setVisibility(register ? View.GONE : View.VISIBLE);
@@ -235,16 +287,14 @@ public class LoginActivity extends ThemedActivity {
         binding.tvLoginHint.setVisibility(register ? View.GONE : View.VISIBLE);
         binding.usernameLayout.setVisibility(View.GONE);
         binding.identifierLayout.setVisibility(register ? View.GONE : View.VISIBLE);
-        binding.btnAuthSubmit.setText(register ? R.string.register : R.string.login);
-        binding.btnAuthMode.setText(register ? R.string.login : R.string.create_account);
-        binding.tvLoginHint.setText(register
-                ? R.string.login_google_or_password_hint
-                : R.string.login_google_or_password_hint);
+        binding.btnAuthSubmit.setText(register ? "متابعة" : "تسجيل الدخول");
+        binding.btnAuthMode.setText(register
+                ? "لديك حساب؟ تسجيل الدخول"
+                : "ليس لديك حساب؟ إنشاء حساب جديد");
+        binding.tvLoginHint.setText("المتابعة باستخدام Google أو رقم الهاتف");
     }
 
     private void submitPasswordAuth() {
-        // Passwords are compared and submitted exactly as entered; never trim
-        // either field because even a trailing character must remain significant.
         String password = binding.etAuthPassword.getText() == null
                 ? "" : binding.etAuthPassword.getText().toString();
         if (password.length() < 6) {
@@ -252,40 +302,66 @@ public class LoginActivity extends ThemedActivity {
             binding.etAuthPassword.requestFocus();
             return;
         }
-        if (registerMode) {
-            String confirmPassword = binding.etAuthConfirmPassword.getText() == null
-                    ? "" : binding.etAuthConfirmPassword.getText().toString();
-            if (confirmPassword.isEmpty() || !password.equals(confirmPassword)) {
-                binding.etAuthConfirmPassword.setError("كلمتا المرور غير متطابقتين");
-                binding.etAuthConfirmPassword.requestFocus();
-                return;
-            }
-            binding.etAuthPassword.setError(null);
-            binding.etAuthConfirmPassword.setError(null);
-        }
         if (!registerMode) {
-            String identifier = binding.etAuthIdentifier.getText() == null
-                    ? "" : binding.etAuthIdentifier.getText().toString().trim();
-            if (identifier.isEmpty()) {
-                binding.etAuthIdentifier.setError(getString(R.string.required_field));
+            String local = binding.etAuthIdentifier.getText() == null
+                    ? "" : binding.etAuthIdentifier.getText().toString();
+            String phone = fullPhone(local);
+            if (local.trim().length() < 5) {
+                binding.etAuthIdentifier.setError("أدخل رقم هاتف صحيح");
                 binding.etAuthIdentifier.requestFocus();
                 return;
             }
-            viewModel.login(identifier, password);
+            viewModel.login(phone, password);
             return;
         }
 
-        String email = binding.etAuthEmail.getText() == null
-                ? "" : binding.etAuthEmail.getText().toString().trim();
-        String username = "";
-        String displayName = "";
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            binding.etAuthEmail.setError(getString(R.string.valid_email_required));
+        String local = binding.etAuthEmail.getText() == null
+                ? "" : binding.etAuthEmail.getText().toString();
+        String phone = fullPhone(local);
+        String confirm = binding.etAuthConfirmPassword.getText() == null
+                ? "" : binding.etAuthConfirmPassword.getText().toString();
+        if (local.replaceAll("[^0-9]", "").length() < 5) {
+            binding.etAuthEmail.setError("أدخل رقم هاتف صحيح");
             binding.etAuthEmail.requestFocus();
             return;
         }
-        // Username is generated by the server and is never shown during signup.
-        viewModel.register(email, password, "", "");
+        if (!password.equals(confirm)) {
+            binding.etAuthConfirmPassword.setError("كلمتا المرور غير متطابقتين");
+            binding.etAuthConfirmPassword.requestFocus();
+            return;
+        }
+        pendingPhoneSignup = phone;
+        pendingPhonePassword = password;
+        binding.progress.setVisibility(View.VISIBLE);
+        viewModel.sendOtp(phone);
+    }
+
+    private void showPhoneVerificationDialog() {
+        binding.progress.setVisibility(View.GONE);
+        EditText codeInput = new EditText(this);
+        codeInput.setHint("رمز التحقق المكون من 6 أرقام");
+        codeInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        codeInput.setSingleLine(true);
+        codeInput.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+        new AlertDialog.Builder(this)
+                .setTitle("التحقق من حسابك")
+                .setMessage("أدخل رمز التحقق الذي وصلك على رقم الهاتف")
+                .setView(codeInput)
+                .setPositiveButton("تأكيد", (dialog, which) -> {
+                    String code = codeInput.getText() == null ? "" : codeInput.getText().toString().trim();
+                    if (code.length() != 6) {
+                        Toast.makeText(this, "أدخل الرمز المكون من ستة أرقام", Toast.LENGTH_LONG).show();
+                        showPhoneVerificationDialog();
+                        return;
+                    }
+                    binding.progress.setVisibility(View.VISIBLE);
+                    viewModel.verifyPhoneSignup(pendingPhoneSignup, code, pendingPhonePassword);
+                })
+                .setNegativeButton("إلغاء", (dialog, which) -> {
+                    pendingPhoneSignup = null;
+                    pendingPhonePassword = null;
+                })
+                .show();
     }
 
     static void copyPendingDeepLink(Intent from, Intent to) {
