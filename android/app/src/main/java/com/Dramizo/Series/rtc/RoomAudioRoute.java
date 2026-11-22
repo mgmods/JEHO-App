@@ -7,6 +7,8 @@ import android.os.Build;
 
 import androidx.annotation.Nullable;
 
+import com.Dramizo.Series.AuraLiveApp;
+
 /**
  * Room voice routing: prefer wired / BT headsets over forced loudspeaker.
  */
@@ -106,8 +108,19 @@ public final class RoomAudioRoute {
         try {
             AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
             if (am == null) return;
-            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
             boolean external = hasExternalHeadset(context);
+
+            // MODE_IN_COMMUNICATION is interpreted by Android as an active call.
+            // Never assert it while JEHO is backgrounded or its room mic is muted:
+            // doing so blocks WhatsApp/voice recorders from acquiring the microphone.
+            if (!AuraLiveApp.isAppInForeground()
+                    || !com.Dramizo.Series.rtc.RoomRtcEngine.getInstance().isMicEnabled()) {
+                RoomAudioSession.release(context);
+                am.setSpeakerphoneOn(wantOpenSpeaker && !external);
+                return;
+            }
+
+            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
             am.setSpeakerphoneOn(wantOpenSpeaker && !external);
             // SCO only for HFP/BLE voice headsets — never on pure A2DP (causes lag/crash with WebRTC).
             if (hasBluetoothScoHeadset(context) && am.isBluetoothScoAvailableOffCall()) {
