@@ -125,6 +125,39 @@ public class AuraLiveApp extends Application {
     }
 
     private void restoreRoomAudioAfterExternalApp() {
+        // Do a synchronous snapshot before reclaiming the microphone. The
+        // AudioRecordingCallback can be delivered after onActivityStarted(), so
+        // relying only on its last value can steal the mic back from WhatsApp.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+                && externalCaptureAudioManager != null) {
+            try {
+                java.util.List<AudioRecordingConfiguration> activeConfigs =
+                        externalCaptureAudioManager.getActiveRecordingConfigurations();
+                boolean anotherAppRecording = false;
+                if (activeConfigs != null) {
+                    final int ownUid = getApplicationInfo().uid;
+                    for (AudioRecordingConfiguration config : activeConfigs) {
+                        if (config == null) continue;
+                        int clientUid = -1;
+                        try {
+                            clientUid = config.getClientUid();
+                        } catch (Throwable ignored) {
+                        }
+                        // Unknown/sanitized UID is treated conservatively as external:
+                        // better to leave JEHO's mic released than block a voice note.
+                        if (clientUid != ownUid) {
+                            anotherAppRecording = true;
+                            break;
+                        }
+                    }
+                }
+                externalRecorderActive = anotherAppRecording;
+            } catch (Throwable t) {
+                android.util.Log.w("AuraLiveApp",
+                        "Could not snapshot active recorders before audio restore: "
+                                + t.getMessage());
+            }
+        }
         RoomRtcEngine rtc = RoomRtcEngine.getInstance();
         String expectedRoomId = roomMicRoomIdBeforeExternalApp != null
                 ? roomMicRoomIdBeforeExternalApp : rtc.getCurrentRoomId();
@@ -214,7 +247,9 @@ public class AuraLiveApp extends Application {
                             clientUid = config.getClientUid();
                         } catch (Throwable ignored) {
                         }
-                        if (clientUid > 0 && clientUid != ownUid) {
+                        if (clientUid != ownUid) {
+                            // Treat hidden/sanitized UIDs conservatively so a recorder
+                            // is never blocked just because Android withheld its UID.
                             anotherAppRecording = true;
                             break;
                         }
