@@ -157,6 +157,17 @@ public final class RoomRtcEngine {
         this.sessionCanPublish = canPublish;
     }
 
+/** Restore the room microphone after a detected external recorder has ended.
+     * Unlike the normal setter, this may reacquire Android communication mode while
+     * JEHO is backgrounded because the external capture has already been confirmed stopped.
+     */
+    public void setMicEnabledForExternalRestore(boolean enabled, @Nullable Context context) {
+        if (isLiveKit()) LiveKitEngineManager.getInstance().setMicEnabled(enabled);
+        else ZegoEngineManager.getInstance().setMicEnabled(enabled);
+        if (enabled) RoomAudioSession.acquireForExternalRestore(context);
+        else RoomAudioSession.release(context);
+    }
+
     public void setMicEnabled(boolean enabled) {
         if (isLiveKit()) LiveKitEngineManager.getInstance().setMicEnabled(enabled);
         else ZegoEngineManager.getInstance().setMicEnabled(enabled);
