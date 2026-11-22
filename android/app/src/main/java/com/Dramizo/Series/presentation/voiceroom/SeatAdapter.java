@@ -665,10 +665,15 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                                         .alpha(0.28f + amplitude * 0.42f)
                                         .setDuration(130L).start();
                             }
-                        } else if (holder.b.seatSpeakAura != null) {
-                            holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
-                            holder.b.seatSpeakAura.setSpeaking(true);
-                            holder.b.seatSpeakAura.setIntensity(lv);
+                        } else {
+                            if (holder.b.seatSpeakAura != null) {
+                                holder.b.seatSpeakAura.setSpeaking(false);
+                                holder.b.seatSpeakAura.setVisibility(View.GONE);
+                            }
+                            if (holder.b.seatVoiceWaveBars != null) {
+                                holder.b.seatVoiceWaveBars.setVisibility(View.VISIBLE);
+                                holder.b.seatVoiceWaveBars.setSpeaking(true, lv);
+                            }
                         }
                         holder.speaking = true;
                     }
@@ -857,8 +862,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (holder.b.imgSeatHostMark != null) {
                 holder.b.imgSeatHostMark.setVisibility(isCreator ? View.VISIBLE : View.GONE);
             }
-            bindStaffSeatBadge(holder, seat.user);
-            bindAgencyRoleSeatBadge(holder, seat.user);
+            bindStaffSeatBadge(holder, null);
+            bindAgencyRoleSeatBadge(holder, null);
             bindCustomDisplayRank(holder, seat.user);
             bindRoomSupportMedal(holder, seat.user);
             if (holder.b.tvStatus != null) {
@@ -1603,22 +1608,21 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
         }
 
+        String uid = holder.boundUserId;
+        float liveLevel = uid != null && speakingLevels.containsKey(uid)
+                ? speakingLevels.get(uid) : 48f;
         if (holder.b.seatSpeakAura != null) {
-            if (hasEquippedWave) {
-                holder.b.seatSpeakAura.setSpeaking(false);
-                holder.b.seatSpeakAura.setVisibility(View.GONE);
-            } else {
-                holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
-                holder.b.seatSpeakAura.setSpeaking(true);
-                String uid = holder.boundUserId;
-                float lv = uid != null && speakingLevels.containsKey(uid)
-                        ? speakingLevels.get(uid) : 48f;
-                holder.b.seatSpeakAura.setIntensity(lv);
-            }
+            holder.b.seatSpeakAura.setSpeaking(false);
+            holder.b.seatSpeakAura.setVisibility(View.GONE);
         }
         if (holder.b.seatVoiceWaveBars != null) {
-            holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
-            holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+            if (hasEquippedWave) {
+                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+            } else {
+                holder.b.seatVoiceWaveBars.setVisibility(View.VISIBLE);
+                holder.b.seatVoiceWaveBars.setSpeaking(true, liveLevel);
+            }
         }
         stopRipple(holder.b.seatRippleOuter);
         stopRipple(holder.b.seatRippleMid);
@@ -1730,10 +1734,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.seatHostSignal.resumeMotion();
         }
         if (holder.speaking && (holder.voiceWaveUrl == null || holder.voiceWaveUrl.trim().isEmpty())
-                && holder.b.seatSpeakAura != null
-                && !holder.b.seatSpeakAura.isSpeakingActive()) {
-            holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
-            holder.b.seatSpeakAura.setSpeaking(true);
+                && holder.b.seatVoiceWaveBars != null) {
+            String uid = holder.boundUserId;
+            float liveLevel = uid != null && speakingLevels.containsKey(uid)
+                    ? speakingLevels.get(uid) : 48f;
+            holder.b.seatVoiceWaveBars.setVisibility(View.VISIBLE);
+            holder.b.seatVoiceWaveBars.setSpeaking(true, liveLevel);
         }
     }
 
