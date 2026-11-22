@@ -39,6 +39,11 @@ public final class RemoteNavIcons {
     public static final String TAB_ME = "me";
 
     private static volatile MiscDtos.NavIconsDto cached;
+    private static final java.util.concurrent.atomic.AtomicBoolean REFRESH_IN_FLIGHT =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final java.util.concurrent.atomic.AtomicLong LAST_REFRESH_AT =
+            new java.util.concurrent.atomic.AtomicLong(-1L);
+    private static final long REFRESH_INTERVAL_MS = 60_000L;
     private static final ConcurrentHashMap<String, Drawable> SVG_CACHE = new ConcurrentHashMap<>();
     private static final ExecutorService SVG_IO = Executors.newFixedThreadPool(2);
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -82,18 +87,29 @@ public final class RemoteNavIcons {
 
     /** Network refresh + encrypted write. Call from a background thread. */
     public static void refreshBlocking(AppContainer c) {
-        if (c == null) return;
+        if (c == null || !REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        long now = android.os.SystemClock.elapsedRealtime();
+        long previous = LAST_REFRESH_AT.get();
+        if (previous >= 0L && now - previous < REFRESH_INTERVAL_MS) {
+            REFRESH_IN_FLIGHT.set(false);
+            return;
+        }
+        boolean completed = false;
         try {
             Result<MiscDtos.NavIconsDto> r = ApiCall.execute(c.getConfigApi().navIcons(System.currentTimeMillis()));
-            if (!r.success || r.data == null) return;
-            MiscDtos.NavIconsDto previous = cached;
-            if (previous == null || previous.version != r.data.version) SVG_CACHE.clear();
+            if (r == null || !r.success || r.data == null) return;
+            MiscDtos.NavIconsDto previousConfig = cached;
+            if (previousConfig == null || previousConfig.version != r.data.version) SVG_CACHE.clear();
             cached = r.data;
             c.getFeatureCache().putJson(
                     EncryptedFeatureCache.UID_APP,
                     EncryptedFeatureCache.NS_NAV_ICONS,
                     r.data);
+            completed = true;
         } catch (Exception ignored) {
+        } finally {
+            if (completed) LAST_REFRESH_AT.set(android.os.SystemClock.elapsedRealtime());
+            REFRESH_IN_FLIGHT.set(false);
         }
     }
 
