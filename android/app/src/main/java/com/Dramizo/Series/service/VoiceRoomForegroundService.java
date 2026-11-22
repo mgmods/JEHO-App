@@ -595,9 +595,7 @@ public class VoiceRoomForegroundService extends Service {
         // The second request has no Activity player/position anymore; replaying
         // applyMusic with position=0 used to seek the adopted decoder to the start,
         // causing an audible cut/jump during minimize. Keep the exact live decoder.
-        if (!adoptedMusicPlayer && !sameTrackAlreadyOwned
-                && (musicPlayer == null || musicPlayer.getMediaItemCount() == 0
-                || requestedMusicUrl == null || !requestedMusicUrl.equals(activeMusicUrl))) {
+        if (!adoptedMusicPlayer && !sameTrackAlreadyOwned) {
             applyMusic(
                     requestedMusicUrl,
                     requestedMusicStatus,
