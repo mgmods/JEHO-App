@@ -272,6 +272,10 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       return { sent: true, expiresIn: 600, provider: 'twilio' };
     }
 
+    if (this.configService.get('app.nodeEnv') === 'production') {
+      throw new BadRequestException('إرسال رموز SMS غير مفعّل حالياً. يرجى إكمال إعدادات التحقق من لوحة الإدارة.');
+    }
+
     const code = String(randomInt(100000, 999999));
     const codeHash = this.hashOtp(code);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
