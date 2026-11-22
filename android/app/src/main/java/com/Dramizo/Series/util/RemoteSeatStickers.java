@@ -67,4 +67,5 @@ public final class RemoteSeatStickers {
             if (completed) LAST_REFRESH_AT.set(android.os.SystemClock.elapsedRealtime());
             REFRESH_IN_FLIGHT.set(false);
         }
-    }}
+    }
+}
