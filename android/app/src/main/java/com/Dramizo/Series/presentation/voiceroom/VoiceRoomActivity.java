@@ -17918,7 +17918,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (shouldPublish) {
             // Music-only publish: keep mic soft-muted unless seated with micOn.
-            RoomRtcEngine.getInstance().setMicEnabled(onSeat && micOn);
+            // Avoid repeating mic/focus transitions on every seat-state refresh.
+            boolean desiredMicEnabled = onSeat && micOn;
+            if (RoomRtcEngine.getInstance().isMicEnabled() != desiredMicEnabled) {
+                RoomRtcEngine.getInstance().setMicEnabled(desiredMicEnabled);
+            }
             if (moderatorMuted && onSeat) {
                 rtcCanPublish = false;
                 handler.removeCallbacks(rtcTokenRefreshRunnable);
@@ -17927,7 +17931,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             if (rtcCanPublish
                     && System.currentTimeMillis() < rtcPublishTokenExpiresAtMs - 20_000L) {
-                RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                if (!RoomRtcEngine.getInstance().isPublishing()) {
+                    RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                }
             } else {
                 refreshRtcPublishToken(streamId);
             }
@@ -17968,9 +17974,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                 && LiveKitEngineManager.getInstance().isSessionCanPublish();
                 if (livekitAlreadyPublishable) {
                     if (isOnSeat(currentSeats) || isLocalMusicMixNeeded()) {
-                        RoomRtcEngine.getInstance().startPublishingAudio(streamId);
-                        RoomRtcEngine.getInstance().setMicEnabled(
-                                isOnSeat(currentSeats) && micOn);
+                        if (!RoomRtcEngine.getInstance().isPublishing()) {
+                            RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                        }
+                        boolean desiredMicEnabled = isOnSeat(currentSeats) && micOn;
+                        if (RoomRtcEngine.getInstance().isMicEnabled() != desiredMicEnabled) {
+                            RoomRtcEngine.getInstance().setMicEnabled(desiredMicEnabled);
+                        }
                         handler.removeCallbacks(rtcTokenRefreshRunnable);
                         long refreshDelay = Math.max(
                                 60_000L,
@@ -17984,9 +17994,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 RoomRtcEngine.getInstance().renewRoomToken(zegoRoom, result.data.token);
                 if ((isOnSeat(currentSeats) || isLocalMusicMixNeeded()) && rtcCanPublish) {
-                    RoomRtcEngine.getInstance().startPublishingAudio(streamId);
-                    RoomRtcEngine.getInstance().setMicEnabled(
-                            isOnSeat(currentSeats) && micOn);
+                    if (!RoomRtcEngine.getInstance().isPublishing()) {
+                        RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                    }
+                    boolean desiredMicEnabled = isOnSeat(currentSeats) && micOn;
+                    if (RoomRtcEngine.getInstance().isMicEnabled() != desiredMicEnabled) {
+                        RoomRtcEngine.getInstance().setMicEnabled(desiredMicEnabled);
+                    }
                     handler.removeCallbacks(rtcTokenRefreshRunnable);
                     long refreshDelay = Math.max(
                             15_000L,

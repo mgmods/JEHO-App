@@ -20,6 +20,37 @@ public final class RoomAudioSession {
 
     private RoomAudioSession() {}
 
+    /** Re-acquire VoIP routing after an external recorder has been confirmed stopped. */
+    public static void acquireForExternalRestore(@Nullable Context context) {
+        Context app = context != null ? context.getApplicationContext() : appContext.get();
+        if (app == null) return;
+        appContext = new WeakReference<>(app);
+        AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        try {
+            if (focusHeld && am.getMode() == AudioManager.MODE_IN_COMMUNICATION) {
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build();
+                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(attrs)
+                        .setAcceptsDelayedFocusGain(true)
+                        .setWillPauseWhenDucked(false)
+                        .build();
+                focusHeld = am.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            } else {
+                focusHeld = am.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL,
+                        AudioManager.AUDIOFOCUS_GAIN) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            }
+            if (focusHeld) am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        } catch (Throwable ignored) {
+        }
+    }
+
     public static void acquire(@Nullable Context context) {
         Context app = context != null
                 ? context.getApplicationContext()

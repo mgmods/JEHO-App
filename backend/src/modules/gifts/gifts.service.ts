@@ -3539,11 +3539,13 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       ...new Set(rawIds.map((id) => String(id || '').trim()).filter((id) => id.length > 0)),
     ].slice(0, 30);
     if (receiverIds.length === 0) {
-      throw new BadRequestException(
-        selfGiftBlocked
-          ? 'إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة'
-          : 'اختر مستلمًا صالحًا على المايك',
-      );
+      // Match the established room-gift fallback: when nobody occupies a mic,
+      // deliver the gift to the live room owner/active host instead of rejecting it.
+      const room = await this.roomsRepo.findOne({ where: { id: dto.roomId } });
+      if (!room) throw new NotFoundException('Room not found');
+      const roomHostId = String(room.activeHostId || room.hostId || '').trim();
+      if (!roomHostId) throw new BadRequestException('Room has no host');
+      receiverIds.push(roomHostId);
     }
     if (dto.requestId) {
       const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds, undefined, dto);
