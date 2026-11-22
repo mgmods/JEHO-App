@@ -59,6 +59,13 @@ export class VerifyOtpDto {
   @IsOptional()
   @IsString()
   username?: string;
+
+  @ApiPropertyOptional({ minLength: 6, maxLength: 72, description: 'Password to set after successful phone verification' })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(72)
+  password?: string;
 }
 
 export class GuestLoginDto {
