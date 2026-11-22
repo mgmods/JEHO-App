@@ -873,7 +873,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
             bindStaffSeatBadge(holder, null);
             bindAgencyRoleSeatBadge(holder, null);
-            bindCustomDisplayRank(holder, seat.user);
+            // Administrative rank badges belong only in profile/chat identity surfaces, never under a live mic seat.
+            bindCustomDisplayRank(holder, null);
             bindRoomSupportMedal(holder, seat.user);
             if (holder.b.tvStatus != null) {
                 holder.b.tvStatus.setVisibility(View.GONE);
