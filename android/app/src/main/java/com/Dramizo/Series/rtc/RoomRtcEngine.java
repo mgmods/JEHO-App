@@ -157,6 +157,14 @@ public final class RoomRtcEngine {
         this.sessionCanPublish = canPublish;
     }
 
+    /** Restore a previously active room mic after an external recorder has ended. */
+    public void setMicEnabledForExternalRestore(boolean enabled, @Nullable Context context) {
+        if (isLiveKit()) LiveKitEngineManager.getInstance().setMicEnabled(enabled);
+        else ZegoEngineManager.getInstance().setMicEnabled(enabled);
+        if (enabled) RoomAudioSession.acquireForExternalRestore(context);
+        else RoomAudioSession.release(context);
+    }
+
     public void setMicEnabled(boolean enabled) {
         if (isLiveKit()) LiveKitEngineManager.getInstance().setMicEnabled(enabled);
         else ZegoEngineManager.getInstance().setMicEnabled(enabled);
