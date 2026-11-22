@@ -45,3 +45,5 @@ jobs:
             ghcr.io/mgmods/jeho-own-backend:mg-jeho
             ghcr.io/mgmods/jeho-own-backend:sha-${{ github.sha }}
             ghcr.io/mgmods/jeho-own-backend:${{ github.sha }}
+
+# Rebuild trigger: publish the current authoritative MG-JEHO backend source to GHCR.
