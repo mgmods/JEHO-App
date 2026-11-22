@@ -16,6 +16,7 @@ import { Device } from '../../database/entities/device.entity';
 import { User } from '../../database/entities/user.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { Room } from '../../database/entities/room.entity';
+import { AgencyMember } from '../../database/entities/agency-member.entity';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
 import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -149,10 +150,10 @@ export class AdminPushDto {
   @IsString()
   url?: string;
 
-  @ApiPropertyOptional({ enum: ['all', 'hosts', 'vip', 'user'] })
+  @ApiPropertyOptional({ enum: ['all', 'hosts', 'agency_leaders', 'staff', 'vip', 'user'] })
   @IsOptional()
   @IsString()
-  audience?: 'all' | 'hosts' | 'vip' | 'user';
+  audience?: 'all' | 'hosts' | 'agency_leaders' | 'staff' | 'vip' | 'user';
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -185,6 +186,8 @@ export class NotificationsService {
     private readonly vipRepo: Repository<UserVip>,
     @InjectRepository(Room)
     private readonly roomsRepo: Repository<Room>,
+    @InjectRepository(AgencyMember)
+    private readonly agencyMembersRepo: Repository<AgencyMember>,
     private readonly firebase: FirebaseAdminService,
     private readonly realtime: RealtimeGateway,
   ) {}
@@ -695,6 +698,25 @@ export class NotificationsService {
         .where('r.hostId IS NOT NULL')
         .getRawMany<{ hostId: string }>();
       return rows.map((r) => r.hostId).filter(Boolean);
+    }
+    if (audience === 'agency_leaders') {
+      const rows = await this.agencyMembersRepo
+        .createQueryBuilder('m')
+        .select('DISTINCT m.userId', 'userId')
+        .where('m.role = :role', { role: 'owner' })
+        .andWhere('m.status = :status', { status: 'active' })
+        .andWhere('m.isActive = true')
+        .getRawMany<{ userId: string }>();
+      return rows.map((r) => r.userId).filter(Boolean);
+    }
+    if (audience === 'staff') {
+      const rows = await this.usersRepo
+        .createQueryBuilder('u')
+        .select('u.id', 'id')
+        .where('u.staffRole IN (:...roles)', { roles: ['super', 'manager'] })
+        .orWhere('u.isAdmin = true')
+        .getRawMany<{ id: string }>();
+      return rows.map((r) => r.id).filter(Boolean);
     }
     if (audience === 'vip') {
       const now = new Date();

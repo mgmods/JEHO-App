@@ -465,7 +465,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 }
             };
             speakingStopRunnables.put(key, delayedStop);
-            handler.postDelayed(delayedStop, 90L);
+            handler.postDelayed(delayedStop, 40L);
             return;
         }
         boolean changed = speakingUsers.add(key);
@@ -1541,6 +1541,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         boolean hasEquippedWave = waveUrl != null && !waveUrl.trim().isEmpty();
         if (holder.b.imgVoiceWave != null) {
             if (hasEquippedWave) {
+                holder.b.imgVoiceWave.animate().cancel();
+                holder.b.imgVoiceWave.setAlpha(1f);
                 holder.b.imgVoiceWave.setVisibility(View.VISIBLE);
                 holder.b.imgVoiceWave.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
                 holder.b.imgVoiceWave.setClipToOutline(false);
@@ -1574,14 +1576,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     Glide.with(holder.itemView)
                             .load(absoluteWave)
                             .into(holder.b.imgVoiceWave);
-                    if (holder.b.imgVoiceWaveOuter != null) {
-                        Glide.with(holder.itemView).clear(holder.b.imgVoiceWaveOuter);
-                        Glide.with(holder.itemView)
-                                .load(absoluteWave)
-                                .into(holder.b.imgVoiceWaveOuter);
-                        holder.b.imgVoiceWaveOuter.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
-                        holder.b.imgVoiceWaveOuter.setVisibility(View.VISIBLE);
-                    }
+                    if (holder.b.imgVoiceWaveOuter != null) { holder.b.imgVoiceWaveOuter.clearAnimation(); holder.b.imgVoiceWaveOuter.setVisibility(View.GONE); }
                     holder.loadedVoiceWaveUrl = waveUrl.trim();
                     startEquippedVoiceWaveMotion(holder);
                 } else {

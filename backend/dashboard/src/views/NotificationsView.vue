@@ -126,6 +126,8 @@
               <select v-model="form.audience" class="form-select">
                 <option value="all">{{ t('notifications.allUsers') }}</option>
                 <option value="hosts">{{ t('notifications.hostsOnly') }}</option>
+                <option value="agency_leaders">قادة الوكالات</option>
+                <option value="staff">الإدارة (سوبر / مدير)</option>
                 <option value="vip">{{ t('notifications.vipMembers') }}</option>
                 <option value="user">{{ t('notifications.specificUser') }}</option>
               </select>
