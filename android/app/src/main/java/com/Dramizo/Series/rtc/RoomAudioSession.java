@@ -33,9 +33,9 @@ public final class RoomAudioSession {
                         .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build();
-                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                         .setAudioAttributes(attrs)
-                        .setAcceptsDelayedFocusGain(false)
+                        .setAcceptsDelayedFocusGain(true)
                         .setWillPauseWhenDucked(false)
                         .build();
                 focusHeld = am.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
@@ -43,7 +43,7 @@ public final class RoomAudioSession {
                 focusHeld = am.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL,
                         AudioManager.AUDIOFOCUS_GAIN) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
             }
-            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            if (focusHeld) am.setMode(AudioManager.MODE_IN_COMMUNICATION);
         } catch (Throwable ignored) {
         }
     }
