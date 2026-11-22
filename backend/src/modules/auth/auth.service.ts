@@ -320,6 +320,12 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     }
 
     let user = await this.usersRepo.findOne({ where: { phone } });
+    if (user && dto.password) {
+      // A signup verification must never become a password-reset path for an
+      // existing phone account. Existing users must authenticate or use the
+      // dedicated account-recovery flow.
+      throw new ConflictException('رقم الهاتف مسجل مسبقاً، سجّل الدخول بدلاً من إنشاء حساب جديد');
+    }
     if (!user) {
       const username =
         dto.username?.toLowerCase() ||
@@ -336,7 +342,6 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       await this.bootstrapUser(user);
     } else {
       user.phoneVerified = true;
-      if (dto.password) user.passwordHash = await bcrypt.hash(dto.password, 12);
       user.lastOnlineAt = new Date();
       await this.usersRepo.save(user);
     }
