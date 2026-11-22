@@ -174,7 +174,14 @@ public class AuraLiveApp extends Application {
             // reclaim MODE_IN_COMMUNICATION or the microphone until that capture ends.
             return;
         }
-        if (!roomAudioSuspendedForExternalApp && !roomAudioReleasedForBackground) return;
+        // A normal Home/background transition sets roomAudioReleasedForBackground
+        // only to release Android call-mode/focus. It must NOT trigger a restore while
+        // the user is still outside JEHO; otherwise the next WhatsApp recorder would
+        // immediately lose the microphone again. Only an actual external-recorder
+        // handoff is restored in the background.
+        if (!roomAudioSuspendedForExternalApp) {
+            if (!(roomAudioReleasedForBackground && isAppInForeground())) return;
+        }
 
         roomAudioSuspendedForExternalApp = false;
         roomAudioReleasedForBackground = false;
@@ -186,13 +193,13 @@ public class AuraLiveApp extends Application {
             // RoomAudioSession/RoomAudioRoute independently refuse to acquire
             // MODE_IN_COMMUNICATION while JEHO is backgrounded, so WhatsApp can
             // still start another voice note without a call-mode lock.
-            RoomAudioSession.acquire(this);
             rtc.reapplyAudioRoute();
 
             // Only restore a mic that was publishing before the external handoff.
-            // A normal Home/background transition never disables this flag.
+            // This explicit restore is allowed while JEHO remains backgrounded;
+            // the external recorder was already confirmed stopped above.
             if (roomMicWasEnabledBeforeExternalApp && rtc.isPublishing()) {
-                rtc.setMicEnabled(true);
+                rtc.setMicEnabledForExternalRestore(true, this);
                 updateRoomMicMutedState(expectedRoomId, false);
             }
             // Restore room playback only if it was audible before the handoff.
@@ -263,7 +270,7 @@ public class AuraLiveApp extends Application {
                     // delay JEHO's silenced config even though another app owns capture.
                     suspendRoomAudioForExternalApp();
                 } else if (!anotherAppRecording
-                        && (roomAudioSuspendedForExternalApp || roomAudioReleasedForBackground)) {
+                        && roomAudioSuspendedForExternalApp) {
                     // Debounce the stop notification, then query Android again. Some
                     // devices emit a transient empty capture list while switching input.
                     Handler handler = externalCaptureHandler;
