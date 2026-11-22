@@ -927,16 +927,35 @@ public class ProfileActivity extends ThemedActivity {
             return;
         }
 
-        // Keep the role text visible even if a dashboard role icon is configured.
+        binding.agencyRoleBadgeContainer.setVisibility(View.VISIBLE);
         binding.imgAgencyRoleBadge.setVisibility(View.GONE);
         binding.imgAgencyRoleBadge.setImageDrawable(null);
-        binding.tvAgencyRoleBadge.setText(
-                StaffRoleHelper.genderizeLabel(label, user == null ? null : user.gender));
+        binding.tvAgencyRoleBadge.setText(StaffRoleHelper.genderizeLabel(label, user == null ? null : user.gender));
         binding.tvAgencyRoleBadge.setTextColor(android.graphics.Color.WHITE);
         binding.tvAgencyRoleBadge.setBackgroundResource(
                 leader ? R.drawable.bg_chip_staff_super : R.drawable.bg_chip_staff_manager);
         binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
-        binding.agencyRoleBadgeContainer.setVisibility(View.VISIBLE);
+        String identityKey = leader ? "agencyLeader" : ("host".equals(role) ? "host" : "");
+        if (!identityKey.isEmpty()) {
+            StaffIdentityConfigCache.load(this, () -> {
+                if (binding == null || binding.agencyRoleBadgeContainer == null) return;
+                StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(identityKey);
+                if (identity.badgeUrl != null && !identity.badgeUrl.trim().isEmpty()) {
+                    binding.tvAgencyRoleBadge.setVisibility(View.GONE);
+                    binding.imgAgencyRoleBadge.setVisibility(View.VISIBLE);
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(identity.badgeUrl.trim()))
+                            .into(binding.imgAgencyRoleBadge);
+                    binding.imgAgencyRoleBadge.setContentDescription(
+                            StaffRoleHelper.genderizeLabel(identity.label, user == null ? null : user.gender));
+                } else {
+                    binding.imgAgencyRoleBadge.setVisibility(View.GONE);
+                    binding.tvAgencyRoleBadge.setText(StaffRoleHelper.genderizeLabel(
+                            identity.label == null || identity.label.trim().isEmpty() ? label : identity.label,
+                            user == null ? null : user.gender));
+                    binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
+                }
+            });
+        }
     }
 
     private boolean isAgencyDisplayRole(String role) {
