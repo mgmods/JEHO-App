@@ -65,13 +65,21 @@ public class SeatSpeakLightningView extends View {
             }
             active = true;
             setVisibility(VISIBLE);
+            animate().cancel();
             setAlpha(1f);
             startAnim();
         } else {
+            if (!active) return;
             active = false;
             intensity = 0.55f;
             stopAnim();
-            setVisibility(INVISIBLE);
+            animate().cancel();
+            animate().alpha(0f).setDuration(140L).withEndAction(() -> {
+                if (!active) {
+                    setVisibility(INVISIBLE);
+                    setAlpha(1f);
+                }
+            }).start();
             invalidate();
         }
     }
@@ -128,76 +136,25 @@ public class SeatSpeakLightningView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         if (!active || getWidth() <= 0 || getHeight() <= 0) return;
-
         float cx = getWidth() * 0.5f;
         float cy = getHeight() * 0.5f;
-        float maxR = Math.min(cx, cy);
         float density = getResources().getDisplayMetrics().density;
-
-        // Avatar is ~52dp inside a ~100dp cell → ring starts just outside the face.
-        float avatarR = maxR * 0.52f;
-        float breath = 1f + 0.06f * (float) Math.sin(phase * Math.PI * 2.0);
-        float amp = 0.85f + 0.35f * intensity;
-
-        // Soft radial glow under rings (premium live apps look).
-        float glowR = avatarR * (1.55f + 0.35f * intensity) * breath;
-        int glowKey = (int) (glowR * 10) + (int) (intensity * 40);
-        if (glowShader == null || glowKey != lastGlowKey) {
-            int inner = withAlpha(0xFF4DE8FF, 0.22f + 0.18f * intensity);
-            int mid = withAlpha(0xFFFFD54F, 0.10f + 0.08f * intensity);
-            int outer = 0x00000000;
-            glowShader = new RadialGradient(
-                    cx, cy, Math.max(1f, glowR),
-                    new int[]{inner, mid, outer},
-                    new float[]{0.35f, 0.7f, 1f},
-                    Shader.TileMode.CLAMP);
-            lastGlowKey = glowKey;
-        }
-        glowPaint.setShader(glowShader);
-        canvas.drawCircle(cx, cy, glowR, glowPaint);
-        glowPaint.setShader(null);
-
-        // Stable luminous core ring hugging the avatar edge.
-        float coreStroke = Math.max(1.8f * density, maxR * 0.035f);
-        coreRingPaint.setStrokeWidth(coreStroke);
-        coreRingPaint.setColor(withAlpha(0xFFFFFFFF, 0.35f + 0.45f * intensity));
-        canvas.drawCircle(cx, cy, avatarR * 1.02f * breath, coreRingPaint);
-        coreRingPaint.setStrokeWidth(coreStroke * 0.55f);
-        coreRingPaint.setColor(withAlpha(0xFF40E0FF, 0.55f + 0.35f * intensity));
-        canvas.drawCircle(cx, cy, avatarR * 1.02f * breath, coreRingPaint);
-
-        // 4 expanding sound-wave rings (phase staggered).
-        int rings = 4;
-        float travel = maxR * 0.48f * amp;
-        for (int i = 0; i < rings; i++) {
-            float t = (phase + i / (float) rings) % 1f;
-            float ease = 1f - (1f - t) * (1f - t); // ease-out expand
-            float r = avatarR * 1.06f + travel * ease;
-            if (r > maxR * 0.98f) continue;
-            float fade = (1f - t);
-            fade = fade * fade;
-            float a = fade * (0.55f + 0.4f * intensity);
-            float sw = Math.max(1.4f * density, maxR * 0.028f) * (1.25f - t * 0.55f);
-
-            // Outer soft halo stroke
-            ringPaint.setStrokeWidth(sw * 2.1f);
-            ringPaint.setColor(withAlpha(waveColor(i), a * 0.28f));
-            canvas.drawCircle(cx, cy, r, ringPaint);
-
-            // Sharp primary wave
-            ringPaint.setStrokeWidth(sw);
-            ringPaint.setColor(withAlpha(waveColor(i), a));
-            canvas.drawCircle(cx, cy, r, ringPaint);
-        }
-    }
-
-    private static int waveColor(int index) {
-        switch (index % 4) {
-            case 0: return 0xFF7CFFF0; // mint cyan
-            case 1: return 0xFFFFFFFF; // white
-            case 2: return 0xFFFFE082; // soft gold
-            default: return 0xFFB388FF; // soft violet accent
-        }
+        float radius = Math.min(cx, cy) * 0.88f;
+        float pulse = 1f + 0.045f * (float) Math.sin(phase * Math.PI * 2d);
+        float audio = 0.55f + 0.45f * intensity;
+        float ringRadius = radius * pulse;
+        float stroke = Math.max(2f * density, radius * 0.055f);
+        // One luminous ring hugs the mic/avatar boundary; audio level controls its energy.
+        ringPaint.setShader(null);
+        ringPaint.setStrokeWidth(stroke * 2.4f);
+        ringPaint.setColor(withAlpha(0xFF40DFFF, 0.16f + 0.18f * audio));
+        canvas.drawCircle(cx, cy, ringRadius, ringPaint);
+        ringPaint.setStrokeWidth(stroke);
+        ringPaint.setColor(withAlpha(0xFFFFD76A, 0.45f + 0.45f * audio));
+        canvas.drawCircle(cx, cy, ringRadius, ringPaint);
+        coreRingPaint.setStrokeWidth(Math.max(1f * density, stroke * 0.38f));
+        coreRingPaint.setColor(withAlpha(0xFFFFFFFF, 0.28f + 0.48f * audio));
+        canvas.drawCircle(cx, cy, ringRadius - stroke * 0.7f, coreRingPaint);
     }
 
     private static int withAlpha(int color, float a) {

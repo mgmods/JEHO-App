@@ -465,7 +465,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 }
             };
             speakingStopRunnables.put(key, delayedStop);
-            handler.postDelayed(delayedStop, 320L);
+            handler.postDelayed(delayedStop, 90L);
             return;
         }
         boolean changed = speakingUsers.add(key);
@@ -1548,6 +1548,29 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 if (!Objects.equals(holder.loadedVoiceWaveUrl, waveUrl.trim())) {
                     String absoluteWave = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim());
                     Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+                    Glide.with(holder.itemView).load(absoluteWave).into(holder.b.imgVoiceWave);
+                    holder.loadedVoiceWaveUrl = waveUrl.trim();
+                    startEquippedVoiceWaveMotion(holder);
+                } else {
+                    ensureEquippedVoiceWaveMotion(holder);
+                }
+            } else {
+                holder.b.imgVoiceWave.setVisibility(View.GONE);
+                stopEquippedVoiceWaveMotion(holder);
+                if (holder.loadedVoiceWaveUrl != null) {
+                    Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+                    holder.loadedVoiceWaveUrl = null;
+                }
+            }
+        }
+        if (hasEquippedWave) {
+                holder.b.imgVoiceWave.setVisibility(View.VISIBLE);
+                holder.b.imgVoiceWave.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
+                holder.b.imgVoiceWave.setClipToOutline(false);
+                holder.b.imgVoiceWave.setOutlineProvider(null);
+                if (!Objects.equals(holder.loadedVoiceWaveUrl, waveUrl.trim())) {
+                    String absoluteWave = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim());
+                    Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
                     Glide.with(holder.itemView)
                             .load(absoluteWave)
                             .into(holder.b.imgVoiceWave);
@@ -1626,44 +1649,25 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
      * layer breathes in the opposite direction. Native GIF/WebP animation is
      * preserved by Glide on both layers.
      */
+    /** A single equipped ring follows the seat boundary; no stacked outer layer. */
     private void startEquippedVoiceWaveMotion(VH holder) {
         if (holder.b.imgVoiceWave == null) return;
         stopEquippedVoiceWaveMotion(holder);
-
-        AnimationSet inner = new AnimationSet(true);
-        RotateAnimation innerRotate = new RotateAnimation(
-                0f, -360f, Animation.RELATIVE_TO_SELF, 0.5f,
+        AnimationSet motion = new AnimationSet(true);
+        RotateAnimation rotate = new RotateAnimation(
+                0f, 360f, Animation.RELATIVE_TO_SELF, 0.5f,
                 Animation.RELATIVE_TO_SELF, 0.5f);
-        ScaleAnimation innerScale = new ScaleAnimation(
-                0.97f, 1.035f, 0.97f, 1.035f,
+        ScaleAnimation pulse = new ScaleAnimation(
+                0.96f, 1.04f, 0.96f, 1.04f,
                 Animation.RELATIVE_TO_SELF, 0.5f,
                 Animation.RELATIVE_TO_SELF, 0.5f);
-        inner.addAnimation(innerRotate);
-        inner.addAnimation(innerScale);
-        inner.setDuration(3200L);
-        inner.setRepeatCount(Animation.INFINITE);
-        inner.setRepeatMode(Animation.RESTART);
-        inner.setInterpolator(new android.view.animation.LinearInterpolator());
-        holder.b.imgVoiceWave.startAnimation(inner);
-
-        if (holder.b.imgVoiceWaveOuter != null) {
-            AnimationSet outer = new AnimationSet(true);
-            RotateAnimation outerRotate = new RotateAnimation(
-                    0f, 360f, Animation.RELATIVE_TO_SELF, 0.5f,
-                    Animation.RELATIVE_TO_SELF, 0.5f);
-            ScaleAnimation outerScale = new ScaleAnimation(
-                    0.96f, 1.10f, 0.96f, 1.10f,
-                    Animation.RELATIVE_TO_SELF, 0.5f,
-                    Animation.RELATIVE_TO_SELF, 0.5f);
-            outer.addAnimation(outerRotate);
-            outer.addAnimation(outerScale);
-            outer.setDuration(2500L);
-            outer.setRepeatCount(Animation.INFINITE);
-            outer.setRepeatMode(Animation.RESTART);
-            outer.setInterpolator(new android.view.animation.LinearInterpolator());
-            holder.b.imgVoiceWaveOuter.startAnimation(outer);
-            holder.b.imgVoiceWaveOuter.setVisibility(View.VISIBLE);
-        }
+        motion.addAnimation(rotate);
+        motion.addAnimation(pulse);
+        motion.setDuration(1800L);
+        motion.setRepeatCount(Animation.INFINITE);
+        motion.setRepeatMode(Animation.RESTART);
+        motion.setInterpolator(new android.view.animation.LinearInterpolator());
+        holder.b.imgVoiceWave.startAnimation(motion);
     }
 
     private void ensureEquippedVoiceWaveMotion(VH holder) {
@@ -1681,14 +1685,6 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.imgVoiceWave.setScaleY(1f);
             holder.b.imgVoiceWave.setRotation(0f);
             holder.b.imgVoiceWave.setAlpha(1f);
-        }
-        if (holder.b.imgVoiceWaveOuter != null) {
-            holder.b.imgVoiceWaveOuter.clearAnimation();
-            holder.b.imgVoiceWaveOuter.setScaleX(1f);
-            holder.b.imgVoiceWaveOuter.setScaleY(1f);
-            holder.b.imgVoiceWaveOuter.setRotation(0f);
-            holder.b.imgVoiceWaveOuter.setAlpha(0.62f);
-            holder.b.imgVoiceWaveOuter.setVisibility(View.GONE);
         }
     }
 
@@ -1725,9 +1721,6 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.imgVoiceWave.setVisibility(View.GONE);
             stopEquippedVoiceWaveMotion(holder);
             Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
-            if (holder.b.imgVoiceWaveOuter != null) {
-                Glide.with(holder.itemView).clear(holder.b.imgVoiceWaveOuter);
-            }
             holder.loadedVoiceWaveUrl = null;
         }
         stopRipple(holder.b.seatRippleOuter);
