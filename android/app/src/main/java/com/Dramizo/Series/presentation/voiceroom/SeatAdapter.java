@@ -1554,6 +1554,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 try {
                     Glide.with(holder.itemView).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.frameUrl))
                             .into(holder.b.imgFrame);
+                    com.Dramizo.Series.util.StaffIdentityFrameMotion.start(holder.b.imgFrame);
                 } catch (Exception ignored) { }
             }
         });
