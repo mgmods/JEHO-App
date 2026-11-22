@@ -63,6 +63,8 @@ public class AuraLiveApp extends Application {
     private boolean roomAudioReleasedForBackground;
     private boolean roomMicWasEnabledBeforeExternalApp;
     private boolean roomSpeakerWasMutedBeforeExternalApp;
+    // Updated for every Android recording-config callback, including while JEHO is foreground.
+    private volatile boolean externalRecorderActive;
     @Nullable private String roomMicRoomIdBeforeExternalApp;
     @Nullable private AudioManager externalCaptureAudioManager;
     @Nullable private AudioManager.AudioRecordingCallback externalCaptureCallback;
@@ -130,6 +132,11 @@ public class AuraLiveApp extends Application {
                 && expectedRoomId.equals(rtc.getCurrentRoomId())
                 && rtc.isInRoom(expectedRoomId);
 
+        if (externalRecorderActive) {
+            // The user may return to JEHO while WhatsApp is still recording. Do not
+            // reclaim MODE_IN_COMMUNICATION or the microphone until that capture ends.
+            return;
+        }
         if (!roomAudioSuspendedForExternalApp && !roomAudioReleasedForBackground) return;
 
         roomAudioSuspendedForExternalApp = false;
@@ -187,37 +194,41 @@ public class AuraLiveApp extends Application {
         externalCaptureCallback = new AudioManager.AudioRecordingCallback() {
             @Override
             public void onRecordingConfigChanged(java.util.List<AudioRecordingConfiguration> configs) {
-                if (isAppInForeground() || roomAudioSuspendedForExternalApp) return;
-                RoomRtcEngine rtc = RoomRtcEngine.getInstance();
-                String roomId = rtc.getCurrentRoomId();
-                if (roomId == null || roomId.isEmpty() || !rtc.isInRoom(roomId)) return;
-                boolean ownCaptureSilenced = false;
-                boolean externalRecorderActive = false;
+                // AudioRecordingCallback reports the active capture set. Do not gate this
+                // on foreground state: if the user returns to JEHO while WhatsApp is
+                // still recording, we must keep JEHO's mic and room playback suspended.
                 final int ownUid = getApplicationInfo().uid;
+                boolean anotherAppRecording = false;
                 if (configs != null) {
                     for (AudioRecordingConfiguration config : configs) {
                         if (config == null) continue;
-                        // The important distinction is whether a different UID is
-                        // actively recording. A silenced JEHO configuration by itself
-                        // is not enough: Android can report transient/other configs
-                        // while no external recorder is actually taking the mic.
                         int clientUid = -1;
                         try {
                             clientUid = config.getClientUid();
                         } catch (Throwable ignored) {
                         }
-                        boolean isOwn = clientUid == ownUid;
-                        if (isOwn && config.isClientSilenced()) {
-                            ownCaptureSilenced = true;
-                        } else if (!isOwn && clientUid > 0) {
-                            externalRecorderActive = true;
+                        if (clientUid > 0 && clientUid != ownUid) {
+                            anotherAppRecording = true;
+                            break;
                         }
                     }
                 }
-                // Release JEHO only for a real competing recorder/call. This keeps
-                // Home/background behavior unchanged and prevents false handoffs.
-                if (externalRecorderActive && ownCaptureSilenced) {
+                externalRecorderActive = anotherAppRecording;
+
+                RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+                String roomId = rtc.getCurrentRoomId();
+                boolean roomActive = roomId != null && !roomId.isEmpty()
+                        && rtc.isInRoom(roomId);
+                if (!roomActive) return;
+
+                if (anotherAppRecording && !isAppInForeground()) {
+                    // Do not depend on isClientSilenced(): some Android builds omit or
+                    // delay JEHO's silenced config even though another app owns capture.
                     suspendRoomAudioForExternalApp();
+                } else if (!anotherAppRecording && isAppInForeground()
+                        && (roomAudioSuspendedForExternalApp || roomAudioReleasedForBackground)) {
+                    // Restore only after Android confirms the external recorder is gone.
+                    restoreRoomAudioAfterExternalApp();
                 }
             }
         };
