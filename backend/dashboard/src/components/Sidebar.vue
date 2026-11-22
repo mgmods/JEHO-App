@@ -83,6 +83,13 @@ const sections = computed(() => [
     ],
   },
   {
+    id: 'staff-identity',
+    label: 'إدارة الرتب الإدارية',
+    items: [
+      { name: 'staff-identity', icon: 'bi-person-badge-fill', label: 'هوية الرتب الإدارية', module: 'settings' },
+    ],
+  },
+  {
     id: 'community',
     label: t('nav.community'),
     items: [
