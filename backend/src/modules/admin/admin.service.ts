@@ -2532,20 +2532,24 @@ export class AdminService {
     if (enabled && (!accountSid || !serviceSid || (!token && !current.authTokenConfigured))) {
       throw new BadRequestException('أكمل بيانات Twilio Verify قبل تفعيل إرسال الرموز');
     }
-    await this.setSetting('twilio.account_sid', accountSid, 'Twilio Account SID');
-    await this.setSetting('twilio.verify_service_sid', serviceSid, 'Twilio Verify Service SID');
+    let encryptedToken = '';
     if (token) {
       if (token.length < 16 || token.length > 256) throw new BadRequestException('رمز Twilio Auth Token غير صالح');
       try {
-        const encrypted = encryptSecret(token, process.env.SETTINGS_ENCRYPTION_KEY);
-        if (decryptSecret(encrypted, process.env.SETTINGS_ENCRYPTION_KEY) !== token) {
+        encryptedToken = encryptSecret(token, process.env.SETTINGS_ENCRYPTION_KEY);
+        if (decryptSecret(encryptedToken, process.env.SETTINGS_ENCRYPTION_KEY) !== token) {
           throw new Error('secret encryption verification failed');
         }
-        await this.setSetting('twilio.auth_token', encrypted, 'Encrypted Twilio Verify Auth Token');
       } catch (err) {
         if (err instanceof SecretBoxError) throw new BadRequestException(err.message);
         throw new BadRequestException('تعذّر حفظ مفتاح Twilio بشكل آمن');
       }
+    }
+    // Validate/encrypt every secret before changing any stored setting.
+    await this.setSetting('twilio.account_sid', accountSid, 'Twilio Account SID');
+    await this.setSetting('twilio.verify_service_sid', serviceSid, 'Twilio Verify Service SID');
+    if (encryptedToken) {
+      await this.setSetting('twilio.auth_token', encryptedToken, 'Encrypted Twilio Verify Auth Token');
     }
     await this.setSetting('twilio.verify.enabled', String(enabled), 'Enable Twilio Verify');
     await this.setSetting('twilio.otp.enabled', String(enabled), 'Enable phone OTP');
