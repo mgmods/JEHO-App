@@ -480,7 +480,18 @@ public class VoiceRoomForegroundService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         activeInstance = this;
-        musicPlayer = new ExoPlayer.Builder(this).build();
+        musicPlayer = new ExoPlayer.Builder(this)
+                // This player is the durable room-music owner while JEHO is minimized.
+                // VoIP focus is released in the background so apps such as WhatsApp can
+                // record; therefore ExoPlayer must not independently pause the room music
+                // when that focus changes. External recording is paused/restored explicitly.
+                .setAudioAttributes(
+                        new androidx.media3.common.AudioAttributes.Builder()
+                                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
+                                .build(),
+                        false)
+                .build();
         musicPlayer.addListener(musicStateListener);
     }
 
