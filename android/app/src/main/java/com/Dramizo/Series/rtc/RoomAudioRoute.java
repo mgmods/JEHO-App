@@ -119,11 +119,9 @@ public final class RoomAudioRoute {
                 return;
             }
             if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
-                // Never re-enter VoIP mode from a delayed RTC/device callback while
-                // JEHO is minimized. Normal media routing lets WhatsApp and other
-                // recorders use the microphone; the foreground service keeps music
-                // playback alive independently of the communication session.
-                RoomAudioSession.release(context);
+                // Yield call mode/focus so WhatsApp can capture, but preserve the
+                // RTC-selected speaker route so room playback remains audible.
+                RoomAudioSession.releaseForBackground(context);
                 return;
             }
             am.setMode(AudioManager.MODE_IN_COMMUNICATION);
@@ -170,12 +168,14 @@ public final class RoomAudioRoute {
         try {
             AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
             if (am == null) return;
-            if (!AuraLiveApp.isAppInForeground()
-                    || RoomAudioSession.isExternalCaptureSuspended()) {
-                // Route-only callbacks (for example headset plug events) must not
-                // restore a VoIP communication device while JEHO is backgrounded
-                // or another app owns capture.
+            if (RoomAudioSession.isExternalCaptureSuspended()) {
                 RoomAudioSession.release(context);
+                return;
+            }
+            if (!AuraLiveApp.isAppInForeground()) {
+                // Do not reclaim call mode in background; retain the current output
+                // route for the active room stream.
+                RoomAudioSession.releaseForBackground(context);
                 return;
             }
             boolean external = hasExternalHeadset(context);
