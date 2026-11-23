@@ -124,7 +124,7 @@ public final class RoomAudioRoute {
                 return;
             }
             am.setMode(AudioManager.MODE_IN_COMMUNICATION);
-            am.setSpeakerphoneOn(wantOpenSpeaker && !external);
+            applyCommunicationDevice(am, wantOpenSpeaker && !external);
             // SCO only for HFP/BLE voice headsets — never on pure A2DP (causes lag/crash with WebRTC).
             if (hasBluetoothScoHeadset(context) && am.isBluetoothScoAvailableOffCall()) {
                 try {
@@ -150,7 +150,11 @@ public final class RoomAudioRoute {
                 am.setBluetoothScoOn(false);
             } catch (Throwable ignored) {
             }
-            am.setSpeakerphoneOn(false);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try { am.clearCommunicationDevice(); } catch (Throwable ignored) {}
+            } else {
+                am.setSpeakerphoneOn(false);
+            }
             am.setMode(AudioManager.MODE_NORMAL);
         } catch (Throwable ignored) {
         }
@@ -165,8 +169,35 @@ public final class RoomAudioRoute {
             AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
             if (am == null) return;
             boolean external = hasExternalHeadset(context);
-            am.setSpeakerphoneOn(wantOpenSpeaker && !external);
+            applyCommunicationDevice(am, wantOpenSpeaker && !external);
         } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * Android 12+ routes communication audio through an explicit communication device.
+     * The legacy speakerphone flag alone is not reliable on newer audio stacks.
+     */
+    private static void applyCommunicationDevice(AudioManager am, boolean wantSpeaker) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                if (wantSpeaker) {
+                    AudioDeviceInfo[] devices = am.getAvailableCommunicationDevices();
+                    if (devices != null) {
+                        for (AudioDeviceInfo device : devices) {
+                            if (device != null
+                                    && device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                                am.setCommunicationDevice(device);
+                                return;
+                            }
+                        }
+                    }
+                }
+                am.clearCommunicationDevice();
+            } catch (Throwable ignored) {
+            }
+        } else {
+            try { am.setSpeakerphoneOn(wantSpeaker); } catch (Throwable ignored) {}
         }
     }
 
