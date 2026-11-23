@@ -17489,10 +17489,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (!PermissionHelper.hasAudioPermission(this)) {
                     PermissionHelper.ensureMediaPermissions(this, false);
                 }
-                userChoseMute = false;
-                micOn = true;
-                RoomRtcEngine.getInstance().setMicEnabled(true);
-                if (roomId != null) viewModel.setMic(roomId, false);
+                // A seat hop is not a request to unmute. If the user was already
+                // seated and explicitly muted, carry that choice to the new seat.
+                boolean preserveUserMute = userChoseMute && isOnSeat(currentSeats);
+                if (preserveUserMute) {
+                    micOn = false;
+                    RoomRtcEngine.getInstance().setMicEnabled(false);
+                    if (roomId != null) viewModel.setMic(roomId, true);
+                } else {
+                    userChoseMute = false;
+                    micOn = true;
+                    RoomRtcEngine.getInstance().setMicEnabled(true);
+                    if (roomId != null) viewModel.setMic(roomId, false);
+                }
+                syncMicUi();
                 handler.postDelayed(() -> activateSeatAudio(currentSeats), 400);
             }
             if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) viewModel.loadSeatRequests(roomId);
@@ -18816,8 +18826,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 copy.user = me;
                 copy.status = "occupied";
                 copy.isLocked = false;
-                // Don't inherit previous occupant's mute badge.
-                copy.isMuted = false;
+                // Don't inherit the previous occupant's mute badge; retain our
+                // own explicit mute choice when hopping between seats.
+                copy.isMuted = userChoseMute;
                 copy.isModeratorMuted = false;
                 placed = true;
             }
@@ -18829,7 +18840,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             neu.userId = myUserId;
             neu.user = me;
             neu.status = "occupied";
-            neu.isMuted = false;
+            neu.isMuted = userChoseMute;
             neu.isModeratorMuted = false;
             next.add(neu);
         }
