@@ -17,6 +17,16 @@ public final class RoomAudioSession {
     private static WeakReference<Context> appContext = new WeakReference<>(null);
     private static AudioFocusRequest focusRequest;
     private static boolean focusHeld;
+    // True only while an external app (for example WhatsApp voice recording) owns capture.
+    private static volatile boolean externalCaptureSuspended;
+
+    public static void setExternalCaptureSuspended(boolean suspended) {
+        externalCaptureSuspended = suspended;
+    }
+
+    public static boolean isExternalCaptureSuspended() {
+        return externalCaptureSuspended;
+    }
 
     private RoomAudioSession() {}
 
@@ -58,12 +68,10 @@ public final class RoomAudioSession {
         if (app == null) return;
         appContext = new WeakReference<>(app);
 
-        // A muted room microphone must never leave Android in VoIP/call mode.
-        // Likewise, a background room must not reclaim communication mode from
-        // WhatsApp, voice recorder, or another foreground microphone client.
-        RoomRtcEngine rtc = RoomRtcEngine.getInstance();
-        if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()
-                || !rtc.isMicEnabled() || !rtc.isPublishing()) {
+        // Keep the room playback route stable while the room is active, including
+        // when the user minimizes JEHO or has manually muted their microphone.
+        // Only an explicitly detected external recorder may suspend this session.
+        if (externalCaptureSuspended) {
             release(app);
             return;
         }
