@@ -780,8 +780,6 @@
         android:importantForAccessibility="no"
         android:layout_marginStart="12dp"
         android:layout_marginTop="28dp"
-        android:clipChildren="false"
-        android:clipToPadding="false"
         android:layoutDirection="ltr"
         android:visibility="gone"
         app:layout_constraintStart_toStartOf="@id/recyclerSeats"
