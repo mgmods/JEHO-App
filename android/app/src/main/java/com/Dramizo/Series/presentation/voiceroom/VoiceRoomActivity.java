@@ -5554,6 +5554,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         if (roomMusicPlayer == null) roomMusicPlayer = new ExoPlayer.Builder(this)
+                // The room Music Player is handed to VoiceRoomForegroundService when the
+                // Activity is minimized. Do not let ExoPlayer's automatic audio-focus
+                // handling pause that decoder just because JEHO releases VoIP focus for
+                // another app. WhatsApp handoff is controlled explicitly by AuraLiveApp.
+                .setAudioAttributes(
+                        new androidx.media3.common.AudioAttributes.Builder()
+                                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
+                                .build(),
+                        false)
                 .setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
                         .setDataSourceFactory(
                                 new androidx.media3.datasource.DefaultHttpDataSource.Factory()
