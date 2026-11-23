@@ -105,6 +105,36 @@ public final class RoomAudioSession {
         }
     }
 
+    /**
+     * Background the room without clearing its selected communication device.
+     * Audio focus is yielded to other apps, but the active room route remains
+     * selected until an external recorder is actually detected.
+     */
+    public static void releaseFocusKeepRoute(@Nullable Context context) {
+        Context app = context != null
+                ? context.getApplicationContext()
+                : appContext.get();
+        if (app == null) return;
+        AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        try {
+            if (focusHeld) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
+                    am.abandonAudioFocusRequest(focusRequest);
+                } else {
+                    am.abandonAudioFocus(null);
+                }
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            focusHeld = false;
+            focusRequest = null;
+        }
+        // Intentionally do not change MODE_IN_COMMUNICATION or clear the
+        // communication device here. The recording monitor performs a full
+        // release immediately when another app starts capturing audio.
+    }
+
     public static void release(@Nullable Context context) {
         Context app = context != null
                 ? context.getApplicationContext()
