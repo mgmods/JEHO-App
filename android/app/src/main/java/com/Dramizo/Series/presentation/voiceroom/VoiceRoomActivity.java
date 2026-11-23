@@ -5525,11 +5525,33 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             String restoredSourceUrl = VoiceRoomForegroundService.consumeReturnedMusicSourceUrl();
             String restoredPlayableUrl = VoiceRoomForegroundService.consumeReturnedMusicPlayableUrl();
+            String restoredStatus = VoiceRoomForegroundService.consumeReturnedMusicStatus();
             if (restoredSourceUrl != null && !restoredSourceUrl.isEmpty()) {
+                // The foreground service is authoritative during the Activity handoff.
+                // Restore its track metadata too, so a partial room snapshot cannot hide
+                // a song that is still audibly playing in the same decoder.
+                currentMusicUrl = restoredSourceUrl;
+                if (restoredStatus != null && !restoredStatus.trim().isEmpty()) {
+                    currentMusicStatus = restoredStatus;
+                }
                 preparedMusicUrl = isYoutubeMusicUrl(restoredSourceUrl)
                         ? restoredSourceUrl : AssetCatalog.absoluteUrl(restoredSourceUrl);
                 currentMusicHandoffUrl = restoredPlayableUrl;
                 youtubeUsingEmbed = false;
+                if ("playing".equalsIgnoreCase(currentMusicStatus)
+                        || "paused".equalsIgnoreCase(currentMusicStatus)) {
+                    boolean showMusic = !restoredSourceUrl.equals(dismissedMusicUrl);
+                    if (canManageMusic && binding != null && binding.musicCard != null) {
+                        musicPanelExpanded = showMusic;
+                        binding.musicCard.setVisibility(showMusic ? View.VISIBLE : View.GONE);
+                        if (showMusic && binding.tvMusicTitle != null) {
+                            binding.tvMusicTitle.setText("موسيقى الغرفة");
+                            binding.tvMusicArtist.setText("من هاتف المضيف");
+                        }
+                    }
+                    if (!canManageMusic) showMusicReopenChip(showMusic
+                            && "playing".equalsIgnoreCase(currentMusicStatus));
+                }
             }
         }
         if (roomMusicPlayer == null) roomMusicPlayer = new ExoPlayer.Builder(this)
@@ -5909,9 +5931,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ensureMusicUiReady();
         }
         String incomingMusicUrl = url != null ? url.trim() : null;
-        boolean urlEmpty = incomingMusicUrl == null || incomingMusicUrl.isEmpty();
         String prevStatus = currentMusicStatus;
         String prevUrl = currentMusicUrl != null ? currentMusicUrl.trim() : null;
+        // Some room refresh payloads omit musicUrl while the foreground decoder
+        // continues playing. Treat a missing field as partial data, not a stop;
+        // an explicit empty URL or stopped status still clears the music normally.
+        if (incomingMusicUrl == null && prevUrl != null
+                && (status == null || status.trim().isEmpty())
+                && ("playing".equalsIgnoreCase(prevStatus)
+                    || "paused".equalsIgnoreCase(prevStatus))
+                && ((roomMusicPlayer != null && roomMusicPlayer.getMediaItemCount() > 0)
+                    || RoomRtcEngine.getInstance().isLocalMusicPlaying())) {
+            incomingMusicUrl = prevUrl;
+        }
+        boolean urlEmpty = incomingMusicUrl == null || incomingMusicUrl.isEmpty();
         if (!java.util.Objects.equals(prevUrl, incomingMusicUrl)) currentMusicHandoffUrl = null;
         // Never treat a missing status as "stopped" during room refresh (lock/settings).
         // That was killing YouTube mid-song when getRoom omitted or nulled musicStatus.
@@ -5951,7 +5984,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && "playing".equalsIgnoreCase(currentMusicStatus)) {
             clearDismissedMusic();
         }
-        currentMusicUrl = url;
+        currentMusicUrl = incomingMusicUrl;
         boolean playing = "playing".equalsIgnoreCase(currentMusicStatus);
         boolean paused = "paused".equalsIgnoreCase(currentMusicStatus);
         boolean stopped = urlEmpty || "stopped".equalsIgnoreCase(currentMusicStatus);
