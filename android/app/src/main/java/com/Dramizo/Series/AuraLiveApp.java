@@ -187,9 +187,8 @@ public class AuraLiveApp extends Application {
         RoomAudioSession.setExternalCaptureSuspended(false);
         if (sameRoomStillActive) {
             // Restore RTC mic/playback as soon as the external capture ends.
-            // RoomAudioSession/RoomAudioRoute independently refuse to acquire
-            // MODE_IN_COMMUNICATION while JEHO is backgrounded, so WhatsApp can
-            // still start another voice note without a call-mode lock.
+            // Reacquire the room route only after the external capture snapshot
+            // confirms that WhatsApp (or the other recorder) has released the mic.
             // Restore the device route, then re-enable only the mic that was
             // actively publishing before the external recorder took the input.
             rtc.reapplyAudioRoute();
@@ -265,6 +264,8 @@ public class AuraLiveApp extends Application {
                 if (!roomActive) return;
 
                 if (anotherAppRecording) {
+                    Handler handler = externalCaptureHandler;
+                    if (handler != null) handler.removeCallbacks(externalCaptureRestoreCheck);
                     // Pause JEHO room audio whenever another app owns the microphone,
                     // including WhatsApp voice recording. Do not depend on whether JEHO
                     // is currently foreground: Android may deliver lifecycle callbacks
