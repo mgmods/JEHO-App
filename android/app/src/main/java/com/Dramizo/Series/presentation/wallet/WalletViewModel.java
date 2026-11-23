@@ -59,6 +59,8 @@ public class WalletViewModel extends ViewModel {
                         } else if (!w.success) {
                             error.postValue(w.error);
                         }
+                    } catch (RuntimeException failure) {
+                        android.util.Log.w("WalletViewModel", "Wallet refresh failed", failure);
                     } finally {
                         synchronized (WalletViewModel.this) {
                             walletLoading = false;
@@ -75,6 +77,8 @@ public class WalletViewModel extends ViewModel {
                             packages.postValue(p.data.items);
                             success = true;
                         }
+                    } catch (RuntimeException failure) {
+                        android.util.Log.w("WalletViewModel", "Recharge packages refresh failed", failure);
                     } finally {
                         synchronized (WalletViewModel.this) {
                             packagesLoading = false;
@@ -103,7 +107,7 @@ public class WalletViewModel extends ViewModel {
                 synchronized (WalletViewModel.this) {
                     // The purchase response is authoritative; force the next explicit
                     // refresh to bypass the normal short wallet cache.
-                    lastWalletLoadAt = System.currentTimeMillis();
+                    lastWalletLoadAt = 0L;
                 }
                 message.postValue("تم الشحن بنجاح");
             } else {
