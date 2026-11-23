@@ -51,6 +51,9 @@ public class CosmeticsViewModel extends ViewModel {
     /** Private entry effects are returned only by the authenticated inventory endpoint, never the public catalog. */
     private final List<CosmeticDtos.CosmeticDto> privateEntryInventory = new ArrayList<>();
     private final AtomicInteger loadSeq = new AtomicInteger();
+    private final Map<String, List<CosmeticDtos.CosmeticDto>> catalogCache = new HashMap<>();
+    private final Map<String, Long> catalogCacheAtMs = new HashMap<>();
+    private static final long CATALOG_CACHE_MS = 30_000L;
     private volatile String filterType;
     private volatile boolean bagMode;
     private volatile String currentRoomId;
@@ -169,9 +172,12 @@ public class CosmeticsViewModel extends ViewModel {
             synchronized (ownedIds) {
                 boolean openingPrivateEntryBag = bagMode
                         && ("entry_effect".equals(loadType) || "join_toast".equals(loadType));
+                // An empty inventory is a valid cached result too. Treating it as
+                // "not loaded" caused an inventory request on every mall tab reopen
+                // for users who own no cosmetics.
                 needInventory = openingPrivateEntryBag
-                        || System.currentTimeMillis() - inventoryLoadedAtMs > INVENTORY_CACHE_MS
-                        || ownedIds.isEmpty();
+                        || inventoryLoadedAtMs == 0L
+                        || System.currentTimeMillis() - inventoryLoadedAtMs > INVENTORY_CACHE_MS;
             }
             if (needInventory) {
                 Result<List<CosmeticDtos.UserCosmeticDto>> inv =
@@ -198,8 +204,28 @@ public class CosmeticsViewModel extends ViewModel {
                     inventoryLoadedAtMs = System.currentTimeMillis();
                 }
             }
-            Result<List<CosmeticDtos.CosmeticDto>> cat =
-                    container.getCosmeticsRepository().catalog(loadType);
+            String cacheKey = loadType != null ? loadType : "";
+            List<CosmeticDtos.CosmeticDto> cachedCatalog = null;
+            synchronized (catalogCache) {
+                Long cachedAt = catalogCacheAtMs.get(cacheKey);
+                List<CosmeticDtos.CosmeticDto> cached = catalogCache.get(cacheKey);
+                if (cached != null && cachedAt != null
+                        && System.currentTimeMillis() - cachedAt < CATALOG_CACHE_MS) {
+                    cachedCatalog = new ArrayList<>(cached);
+                }
+            }
+            Result<List<CosmeticDtos.CosmeticDto>> cat;
+            if (cachedCatalog != null) {
+                cat = Result.ok(cachedCatalog);
+            } else {
+                cat = container.getCosmeticsRepository().catalog(loadType);
+                if (cat.success && cat.data != null) {
+                    synchronized (catalogCache) {
+                        catalogCache.put(cacheKey, new ArrayList<>(cat.data));
+                        catalogCacheAtMs.put(cacheKey, System.currentTimeMillis());
+                    }
+                }
+            }
             // Accept only the latest in-flight request.
             if (seq != loadSeq.get()) return;
             if (cat.success && cat.data != null) {
