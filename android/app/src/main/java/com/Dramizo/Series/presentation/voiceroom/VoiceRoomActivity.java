@@ -506,7 +506,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     // Process-wide latch: playback callbacks must not restart any music decoder
     // while another app owns microphone capture, even if the room Activity is recreated.
     private static volatile boolean externalCaptureMusicSuspended;
-    private static volatile boolean externalCaptureLocalMusicWasPlaying;
     @Nullable private Player.Listener roomMusicPlayerListener;
     /** Lazy: create only when a Mikoo game opens (WebView cold-create freezes S23 if done in onCreate). */
     @Nullable private WebView roomGameWebView;
@@ -10642,14 +10641,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Set synchronously before posting to the Activity thread. Realtime music
         // events and lifecycle callbacks can arrive before the UI task is executed.
         externalCaptureMusicSuspended = true;
-        try {
-            RoomRtcEngine rtc = RoomRtcEngine.getInstance();
-            if (rtc.hasLocalMusicPlayer() && rtc.isLocalMusicPlaying()) {
-                externalCaptureLocalMusicWasPlaying = true;
-                rtc.pauseLocalMusic();
-            }
-        } catch (RuntimeException ignored) {
-        }
+        // RTC speaker mute also silences Zego's local music monitor without
+        // stopping the host's published music stream for the other room members.
         VoiceRoomActivity room = getAliveInstance();
         if (room != null) room.runOnUiThread(room::pauseMusicForExternalCapture);
     }
@@ -10657,15 +10650,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Resume the same room track after the external recorder has released the microphone. */
     public static void restoreMusicAfterExternalCapture() {
         externalCaptureMusicSuspended = false;
-        boolean resumeLocalMix = externalCaptureLocalMusicWasPlaying;
-        externalCaptureLocalMusicWasPlaying = false;
-        try {
-            RoomRtcEngine rtc = RoomRtcEngine.getInstance();
-            if (resumeLocalMix && !rtc.isSpeakerMuted() && rtc.hasLocalMusicPlayer()) {
-                rtc.resumeLocalMusic();
-            }
-        } catch (RuntimeException ignored) {
-        }
         VoiceRoomActivity room = getAliveInstance();
         if (room != null) room.runOnUiThread(room::resumeMusicAfterExternalCapture);
     }
