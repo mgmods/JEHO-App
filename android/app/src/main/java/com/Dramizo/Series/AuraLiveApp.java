@@ -117,8 +117,14 @@ public class AuraLiveApp extends Application {
         RoomRtcEngine rtc = RoomRtcEngine.getInstance();
         String activeRoomId = rtc.getCurrentRoomId();
         if (activeRoomId == null || activeRoomId.isEmpty() || !rtc.isInRoom(activeRoomId)) {
-            return;
+            // The foreground room service remains authoritative after the room UI is
+            // minimized/destroyed; do not miss WhatsApp capture just because the
+            // Activity-owned RTC room marker is temporarily unavailable.
+            activeRoomId = VoiceRoomForegroundService.activeRoomId(this);
         }
+        if (activeRoomId == null || activeRoomId.isEmpty()
+                || !VoiceRoomForegroundService.hasActiveRoom(this, activeRoomId)
+                        && !rtc.isInRoom(activeRoomId)) return;
 
         roomMicRoomIdBeforeExternalApp = activeRoomId;
         roomMicWasEnabledBeforeExternalApp = rtc.isMicEnabled() && rtc.isPublishing();
@@ -171,8 +177,8 @@ public class AuraLiveApp extends Application {
         String expectedRoomId = roomMicRoomIdBeforeExternalApp != null
                 ? roomMicRoomIdBeforeExternalApp : rtc.getCurrentRoomId();
         boolean sameRoomStillActive = expectedRoomId != null
-                && expectedRoomId.equals(rtc.getCurrentRoomId())
-                && rtc.isInRoom(expectedRoomId);
+                && (expectedRoomId.equals(rtc.getCurrentRoomId()) && rtc.isInRoom(expectedRoomId)
+                || VoiceRoomForegroundService.hasActiveRoom(this, expectedRoomId));
 
         if (externalRecorderActive) {
             // The user may return to JEHO while WhatsApp is still recording. Do not
@@ -265,6 +271,11 @@ public class AuraLiveApp extends Application {
                 String roomId = rtc.getCurrentRoomId();
                 boolean roomActive = roomId != null && !roomId.isEmpty()
                         && rtc.isInRoom(roomId);
+                if (!roomActive) {
+                    String serviceRoomId = VoiceRoomForegroundService.activeRoomId(AuraLiveApp.this);
+                    roomActive = serviceRoomId != null && !serviceRoomId.isEmpty()
+                            && VoiceRoomForegroundService.hasActiveRoom(AuraLiveApp.this, serviceRoomId);
+                }
                 if (!roomActive) return;
 
                 if (anotherAppRecording) {
