@@ -68,6 +68,8 @@ public class VoiceRoomForegroundService extends Service {
     private String roomTitle;
     private String roomCoverUrl;
     private ExoPlayer musicPlayer;
+    // Last room music gain from the room controls; speaker mute is a local output override.
+    private float roomMusicVolume = 1f;
     private static volatile VoiceRoomForegroundService activeInstance;
     private static volatile boolean externalCaptureMusicSuspended;
     private static volatile ExoPlayer offeredMusicPlayer;
@@ -168,7 +170,10 @@ public class VoiceRoomForegroundService extends Service {
                             }
                         } catch (Exception ignored) { }
                         final float nextVolume = Math.max(0f, Math.min(1f, volume));
-                        main.post(() -> { if (musicPlayer != null) musicPlayer.setVolume(nextVolume); });
+                        main.post(() -> {
+                            roomMusicVolume = nextVolume;
+                            applyRoomMusicOutputVolume();
+                        });
                         return;
                     }
                     if ("room:summon".equals(event)) {
@@ -610,11 +615,6 @@ public class VoiceRoomForegroundService extends Service {
                 .putString(EXTRA_TITLE, roomTitle)
                 .putString(EXTRA_COVER, roomCoverUrl)
                 .apply();
-        // Keep hearing the room while minimized (never leave speaker muted from Activity onStop).
-        try {
-            RoomRtcEngine.getInstance().setSpeakerMuted(false);
-        } catch (Exception ignored) {
-        }
         enterForegroundSafe(resolveForegroundTypes());
         loadCoverAsync();
         postRoomBubble();
@@ -717,7 +717,19 @@ public class VoiceRoomForegroundService extends Service {
     private void toggleSpeakerFromNotification() {
         boolean nextMuted = !RoomRtcEngine.getInstance().isSpeakerMuted();
         RoomRtcEngine.getInstance().setSpeakerMuted(nextMuted);
+        // The notification speaker switch controls every incoming room sound on this
+        // device, including the independent ExoPlayer music path. It never touches mic.
+        applyRoomMusicOutputVolume();
         refreshNotificationUi();
+    }
+
+    private void applyRoomMusicOutputVolume() {
+        if (musicPlayer == null) return;
+        try {
+            musicPlayer.setVolume(RoomRtcEngine.getInstance().isSpeakerMuted()
+                    ? 0f : Math.max(0f, Math.min(1f, roomMusicVolume)));
+        } catch (Exception ignored) {
+        }
     }
 
     private void refreshNotificationUi() {
@@ -1058,7 +1070,7 @@ public class VoiceRoomForegroundService extends Service {
             musicPlayer.setPlayWhenReady(
                     "playing".equalsIgnoreCase(status)
                             && !externalCaptureMusicPaused && !externalCaptureMusicSuspended);
-            musicPlayer.setVolume(1f);
+            applyRoomMusicOutputVolume();
         } catch (Exception ignored) {
             handoffMusicReady = false;
         }
