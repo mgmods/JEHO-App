@@ -136,10 +136,12 @@ public class LoginActivity extends ThemedActivity {
                     googleLauncher.launch(googleClient.getSignInIntent()));
         });
 
-        // Working backend-backed email/username + password authentication.
-        binding.btnAuthSubmit.setOnClickListener(v -> submitPasswordAuth());
-        binding.btnAuthMode.setOnClickListener(v -> setRegisterMode(!registerMode));
-        setRegisterMode(false);
+        // Google is the only sign-in method exposed in the app.
+        // Keep the existing Google/Firebase flow unchanged.
+        binding.authForm.setVisibility(View.GONE);
+        binding.tvAuthDivider.setVisibility(View.GONE);
+        binding.googleLoginGroup.setVisibility(View.VISIBLE);
+        binding.tvLoginHint.setVisibility(View.VISIBLE);
 
         viewModel.getLoading().observe(this, loading ->
                 binding.progress.setVisibility(Boolean.TRUE.equals(loading) ? View.VISIBLE : View.GONE));
