@@ -110,15 +110,12 @@ public final class RoomAudioRoute {
             if (am == null) return;
             boolean external = hasExternalHeadset(context);
 
-            // MODE_IN_COMMUNICATION is interpreted by Android as an active call.
-            // Never assert it while JEHO is backgrounded or its room mic is muted:
-            // doing so blocks WhatsApp/voice recorders from acquiring the microphone.
-            com.Dramizo.Series.rtc.RoomRtcEngine rtc =
-                    com.Dramizo.Series.rtc.RoomRtcEngine.getInstance();
-            if (!AuraLiveApp.isAppInForeground()
-                    || !rtc.isMicEnabled() || !rtc.isPublishing()) {
+            // During a confirmed external recording, leave Android's capture and
+            // communication route to that app. Otherwise keep the room route stable
+            // in background and even when this user's microphone is muted.
+            if (RoomAudioSession.isExternalCaptureSuspended()) {
                 RoomAudioSession.release(context);
-                am.setSpeakerphoneOn(wantOpenSpeaker && !external);
+                am.setSpeakerphoneOn(false);
                 return;
             }
 
