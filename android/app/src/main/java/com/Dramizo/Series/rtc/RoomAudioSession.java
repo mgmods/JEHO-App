@@ -71,9 +71,9 @@ public final class RoomAudioSession {
         // Keep the room playback route stable while the room is active, including
         // when the user minimizes JEHO or has manually muted their microphone.
         // Only an explicitly detected external recorder may suspend this session.
-        if (externalCaptureSuspended || !com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
-            // Background playback is handled by the room foreground service. Keep
-            // Android's call focus available to WhatsApp/voice recorders instead.
+        if (externalCaptureSuspended) {
+            // A confirmed external recorder owns capture. Release only for this
+            // explicit handoff, never merely because JEHO moved to background.
             release(app);
             return;
         }
