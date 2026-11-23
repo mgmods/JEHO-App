@@ -10627,6 +10627,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return room;
     }
 
+    /** Refresh the mic control after the external recorder releases a previously-open mic. */
+    public static void onExternalMicRestored(boolean enabled) {
+        VoiceRoomActivity room = getAliveInstance();
+        if (room == null) return;
+        room.runOnUiThread(() -> {
+            room.micOn = enabled;
+            room.syncMicUi();
+        });
+    }
+
     /** Pause only this device's Activity-owned music decoder while an external app records. */
     public static void suspendMusicForExternalCapture() {
         // Set synchronously before posting to the Activity thread. Realtime music
