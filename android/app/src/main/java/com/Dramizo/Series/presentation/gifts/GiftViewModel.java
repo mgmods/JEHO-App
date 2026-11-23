@@ -27,10 +27,10 @@ public class GiftViewModel extends ViewModel {
     private String lastReceiverId;
     private int combo = 1;
     private long lastSendAt;
-    private boolean loadInFlight;
-    private long lastLoadCompletedAt;
+    private volatile boolean loadInFlight;
+    private volatile long lastLoadCompletedAt;
     private long lastWalletLoadAt;
-    private boolean walletLoadInFlight;
+    private volatile boolean walletLoadInFlight;
 
     public GiftViewModel(AppContainer c) {
         this.c = c;
