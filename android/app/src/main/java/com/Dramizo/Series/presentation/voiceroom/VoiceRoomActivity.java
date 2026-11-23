@@ -531,7 +531,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean earlyJoinStarted;
     private boolean musicUiReady;
     /** Prevents room music playback on this device while an external app records voice. */
-    private volatile boolean externalCaptureMusicPaused;
     /** Prefetch completed before observers existed — publish after wires. */
     @Nullable private RoomDtos.JoinRoomResult pendingPrefetchSession;
     private String currentMusicUrl;
@@ -10624,40 +10623,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } catch (RuntimeException ignored) {}
         } else if (!isLocalMusicUrl(currentMusicUrl) && roomMusicPlayer != null) {
             try { roomMusicPlayer.play(); } catch (RuntimeException ignored) {}
-        }
-    }
-
-    /** Pause the Activity-owned ExoPlayer/YouTube music during an external voice recording. */
-    public static void suspendMusicForExternalCapture() {
-        VoiceRoomActivity room = getAliveInstance();
-        if (room != null) room.runOnUiThread(room::pauseMusicForExternalCapture);
-    }
-
-    /** Restore the current room music state after the external recorder releases the mic. */
-    public static void restoreMusicAfterExternalCapture() {
-        VoiceRoomActivity room = getAliveInstance();
-        if (room != null) room.runOnUiThread(room::resumeMusicAfterExternalCapture);
-    }
-
-    private void pauseMusicForExternalCapture() {
-        externalCaptureMusicPaused = true;
-        if (roomMusicPlayer != null) roomMusicPlayer.pause();
-        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
-            try { musicYoutubeWebView.evaluateJavascript(
-                    "if(window.musicYtPlayer&&musicYtPlayer.pauseVideo)musicYtPlayer.pauseVideo();", null);
-            } catch (Exception ignored) {}
-        }
-    }
-
-    private void resumeMusicAfterExternalCapture() {
-        externalCaptureMusicPaused = false;
-        if (!"playing".equalsIgnoreCase(currentMusicStatus)) return;
-        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
-            try { musicYoutubeWebView.evaluateJavascript(
-                    "if(window.musicYtPlayer&&musicYtPlayer.playVideo)musicYtPlayer.playVideo();", null);
-            } catch (Exception ignored) {}
-        } else if (!isLocalMusicUrl(currentMusicUrl) && roomMusicPlayer != null) {
-            roomMusicPlayer.setPlayWhenReady(true);
         }
     }
 
