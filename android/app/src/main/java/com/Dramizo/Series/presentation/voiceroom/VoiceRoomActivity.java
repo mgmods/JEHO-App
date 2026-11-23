@@ -529,6 +529,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** HTTP join kicked off at start of onCreate (parallel with UI setup). */
     private boolean earlyJoinStarted;
     private boolean musicUiReady;
+    /** Prevents room music playback on this device while an external app records voice. */
+    private volatile boolean externalCaptureMusicPaused;
     /** Prefetch completed before observers existed — publish after wires. */
     @Nullable private RoomDtos.JoinRoomResult pendingPrefetchSession;
     private String currentMusicUrl;
@@ -4317,7 +4319,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 RoomRtcEngine.getInstance().boostMusicMixVolume();
                 if (!RoomRtcEngine.getInstance().isLocalMusicPlaying()
                         && RoomRtcEngine.getInstance().hasLocalMusicPlayer()) {
-                    RoomRtcEngine.getInstance().resumeLocalMusic();
+                    if (!externalCaptureMusicPaused) RoomRtcEngine.getInstance().resumeLocalMusic();
                 }
             }
         } catch (Exception ignored) {
@@ -6102,7 +6104,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.seekTo(target);
             }
             applySharedMusicVolume();
-            roomMusicPlayer.setPlayWhenReady(playing);
+            roomMusicPlayer.setPlayWhenReady(playing && !externalCaptureMusicPaused);
             if ("stopped".equalsIgnoreCase(currentMusicStatus)) {
                 roomMusicPlayer.pause();
                 roomMusicPlayer.seekTo(0);
@@ -6189,7 +6191,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (!playing) return;
 
-        final String requestKey = ytUrl + "|stream|" + (playing ? "1" : "0");
+        final String requestKey = ytUrl + "|stream|" + (playing && !externalCaptureMusicPaused ? "1" : "0");
         if (requestKey.equals(pendingYtResolveKey)) return;
         pendingYtResolveKey = requestKey;
 
@@ -6227,7 +6229,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.prepare();
                 roomMusicPlayer.seekTo(seekTarget);
                 applySharedMusicVolume();
-                roomMusicPlayer.setPlayWhenReady(true);
+                roomMusicPlayer.setPlayWhenReady(!externalCaptureMusicPaused);
                 bindMusicVideoSurfaces();
                 if (hasVideo) {
                     showMusicVideoSurface(true);
@@ -6578,7 +6580,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else {
             pos = roomMusicPlayer != null ? roomMusicPlayer.getCurrentPosition() : 0L;
             if (roomMusicPlayer != null) {
-                roomMusicPlayer.setPlayWhenReady(!currentlyPlaying);
+                roomMusicPlayer.setPlayWhenReady(!currentlyPlaying && !externalCaptureMusicPaused);
             }
         }
         currentMusicStatus = currentlyPlaying ? "paused" : "playing";
@@ -10580,6 +10582,40 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         VoiceRoomActivity room = sAliveRoom != null ? sAliveRoom.get() : null;
         if (room == null || room.isFinishing() || room.isDestroyed()) return null;
         return room;
+    }
+
+    /** Pause the Activity-owned ExoPlayer/YouTube music during an external voice recording. */
+    public static void suspendMusicForExternalCapture() {
+        VoiceRoomActivity room = getAliveInstance();
+        if (room != null) room.runOnUiThread(room::pauseMusicForExternalCapture);
+    }
+
+    /** Restore the current room music state after the external recorder releases the mic. */
+    public static void restoreMusicAfterExternalCapture() {
+        VoiceRoomActivity room = getAliveInstance();
+        if (room != null) room.runOnUiThread(room::resumeMusicAfterExternalCapture);
+    }
+
+    private void pauseMusicForExternalCapture() {
+        externalCaptureMusicPaused = true;
+        if (roomMusicPlayer != null) roomMusicPlayer.pause();
+        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
+            try { musicYoutubeWebView.evaluateJavascript(
+                    "if(window.musicYtPlayer&&musicYtPlayer.pauseVideo)musicYtPlayer.pauseVideo();", null);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void resumeMusicAfterExternalCapture() {
+        externalCaptureMusicPaused = false;
+        if (!"playing".equalsIgnoreCase(currentMusicStatus)) return;
+        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
+            try { musicYoutubeWebView.evaluateJavascript(
+                    "if(window.musicYtPlayer&&musicYtPlayer.playVideo)musicYtPlayer.playVideo();", null);
+            } catch (Exception ignored) {}
+        } else if (!isLocalMusicUrl(currentMusicUrl) && roomMusicPlayer != null) {
+            roomMusicPlayer.setPlayWhenReady(true);
+        }
     }
 
     /** True when a celebration belongs to the room currently represented by this activity. */
