@@ -306,13 +306,14 @@ public class AuraLiveApp extends Application {
                     // after the external recorder has already taken capture priority.
                     suspendRoomAudioForExternalApp();
                 } else if (roomAudioSuspendedForExternalApp) {
-                    // Restore only after Android reports the external capture has ended.
-                    // Keep a short debounce for OEMs that emit a transient empty list
-                    // while WhatsApp switches from recording to sending.
+                    // Require a stable capture-free window. Some Android/OEM builds
+                    // briefly emit an empty recording-config list while WhatsApp changes
+                    // recorder state; a 500 ms restore caused room music to flicker back
+                    // on during a still-active voice note.
                     Handler handler = externalCaptureHandler;
                     if (handler != null) {
                         handler.removeCallbacks(externalCaptureRestoreCheck);
-                        handler.postDelayed(externalCaptureRestoreCheck, 500L);
+                        handler.postDelayed(externalCaptureRestoreCheck, 1500L);
                     } else {
                         restoreRoomAudioAfterExternalApp();
                     }
