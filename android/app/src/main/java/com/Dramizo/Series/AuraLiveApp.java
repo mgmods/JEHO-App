@@ -248,8 +248,13 @@ public class AuraLiveApp extends Application {
             suspendRoomAudioForExternalApp();
             return;
         }
+        // Yield audio focus, but keep the selected room communication device.
+        // Clearing MODE_IN_COMMUNICATION here reset Android 12+ routing to the
+        // earpiece while the foreground room service was still playing. If an
+        // external recorder actually starts, its capture callback performs the
+        // full audio-session release and restores system routing for that app.
         roomAudioReleasedForBackground = true;
-        RoomAudioSession.release(this);
+        RoomAudioSession.releaseFocusKeepRoute(this);
         VoiceRoomForegroundService.refreshAudioForegroundType();
     }
 
