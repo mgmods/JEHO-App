@@ -187,7 +187,7 @@ public class HomeViewModel extends ViewModel {
 
     /** Append next page (Mikoo load more). */
     public void loadMoreRooms() {
-        if (roomsLoadingMore || !roomsHasMore) return;
+        if (roomsLoadingMore || !roomsHasMore || roomsResetLoadInFlight.get()) return;
         loadRooms(true, false);
     }
 
@@ -417,24 +417,33 @@ public class HomeViewModel extends ViewModel {
         }
         homeRankingsLoading = true;
         lastHomeRankingsLoadAt = now;
-        c.getIoExecutor().execute(() -> {
-            try {
-                Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> rich =
-                        c.getRankingsUseCase.execute("weekly", "rich");
-                if (rich.success && rich.data != null && rich.data.items != null) {
-                    richRanking.postValue(rich.data.items);
+        try {
+            c.getIoExecutor().execute(() -> {
+                boolean success = false;
+                try {
+                    Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> rich =
+                            c.getRankingsUseCase.execute("weekly", "rich");
+                    if (rich.success && rich.data != null && rich.data.items != null) {
+                        richRanking.postValue(rich.data.items);
+                        success = true;
+                    }
+                    Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> gifts =
+                            c.getRankingsUseCase.execute("weekly", "gifts");
+                    if (gifts.success && gifts.data != null && gifts.data.items != null) {
+                        billionRanking.postValue(gifts.data.items);
+                        success = true;
+                    }
+                } catch (Exception ignored) {
+                    // Cached ranking data remains visible; room joins must not be affected by retry storms.
+                } finally {
+                    homeRankingsLoading = false;
+                    if (!success) lastHomeRankingsLoadAt = 0L;
                 }
-                Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> gifts =
-                        c.getRankingsUseCase.execute("weekly", "gifts");
-                if (gifts.success && gifts.data != null && gifts.data.items != null) {
-                    billionRanking.postValue(gifts.data.items);
-                }
-            } catch (Exception ignored) {
-                // Cached ranking data remains visible; room joins must not be affected by retry storms.
-            } finally {
-                homeRankingsLoading = false;
-            }
-        });
+            });
+        } catch (RuntimeException rejected) {
+            homeRankingsLoading = false;
+            lastHomeRankingsLoadAt = 0L;
+        }
     }
 
     public void loadFollowingRooms() {
