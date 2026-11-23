@@ -212,11 +212,12 @@ public class AuraLiveApp extends Application {
             if (!roomSpeakerWasMutedBeforeExternalApp) {
                 rtc.setSpeakerMuted(false);
             }
-            // Always clear both music handoff latches. Each owner independently
-            // checks the preserved speaker preference before producing sound.
-            VoiceRoomForegroundService.restoreMusicAfterExternalCapture();
-            VoiceRoomActivity.restoreMusicAfterExternalCapture();
         }
+        // Always clear both music handoff latches, even if the user left the room
+        // while WhatsApp was recording. Each owner checks the preserved speaker
+        // preference and its own active-room/player state before producing sound.
+        VoiceRoomForegroundService.restoreMusicAfterExternalCapture();
+        VoiceRoomActivity.restoreMusicAfterExternalCapture();
         roomMicWasEnabledBeforeExternalApp = false;
         roomSpeakerWasMutedBeforeExternalApp = false;
         VoiceRoomForegroundService.refreshAudioForegroundType();
