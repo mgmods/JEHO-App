@@ -35,6 +35,11 @@ public final class RoomAudioSession {
         Context app = context != null ? context.getApplicationContext() : appContext.get();
         if (app == null) return;
         appContext = new WeakReference<>(app);
+        // External capture may finish while JEHO is still minimized. Restore the
+        // RTC mic/playback state, but never reclaim Android call mode or focus
+        // until a JEHO screen is foreground again; otherwise the next WhatsApp
+        // voice note can be blocked by a stale communication session.
+        if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()) return;
         AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) return;
         try {
