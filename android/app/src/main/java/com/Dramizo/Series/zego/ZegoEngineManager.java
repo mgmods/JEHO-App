@@ -349,6 +349,16 @@ public class ZegoEngineManager {
         initialized = engine != null;
         if (initialized) {
             activeAppId = appId;
+            // Explicitly enable AEC before any publish/play/media-player operation.
+            // This removes room music played through ZEGO from the captured mic signal
+            // instead of sending the loudspeaker's music back as part of the voice.
+            try {
+                engine.enableAEC(true);
+                engine.enableHeadphoneAEC(true);
+            } catch (Throwable audioProcessingError) {
+                Log.w(TAG, "ZEGO AEC setup unavailable: "
+                        + audioProcessingError.getMessage());
+            }
             engine.startSoundLevelMonitor();
             applyZegoAudioRoute();
         }
