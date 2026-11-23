@@ -204,6 +204,7 @@ public class AuraLiveApp extends Application {
             if (roomMicWasEnabledBeforeExternalApp && rtc.isPublishing()) {
                 rtc.setMicEnabledForExternalRestore(true, this);
                 updateRoomMicMutedState(expectedRoomId, false);
+                VoiceRoomActivity.onExternalMicRestored(true);
             } else {
                 // Playback must resume even when the user had muted their own mic.
                 RoomAudioSession.acquire(this);
