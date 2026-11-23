@@ -102,6 +102,32 @@ public class VoiceRoomForegroundService extends Service {
     private boolean musicResolveInProgress;
     // External voice-note capture temporarily pauses only this device's room music.
     private boolean externalCaptureMusicPaused;
+    private int localMixRecoveryAttempts;
+    private final Runnable localMixRecovery = new Runnable() {
+        @Override public void run() {
+            if (stopping || roomId == null
+                    || activeMusicUrl == null
+                    || !activeMusicUrl.regionMatches(true, 0, "local://", 0, 8)
+                    || !"playing".equalsIgnoreCase(activeMusicStatus)
+                    || externalCaptureMusicPaused || externalCaptureMusicSuspended) {
+                localMixRecoveryAttempts = 0;
+                return;
+            }
+            try {
+                RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+                if (rtc.hasLocalMusicPlayer() && !rtc.isLocalMusicPlaying()) {
+                    rtc.resumeLocalMusic();
+                }
+            } catch (Throwable ignored) {
+            }
+            localMixRecoveryAttempts++;
+            if (localMixRecoveryAttempts < 8) {
+                main.postDelayed(this, 750L);
+            } else {
+                localMixRecoveryAttempts = 0;
+            }
+        }
+    };
     private static volatile String handoffRoomId;
     private static volatile String handoffMusicUrl;
     private static volatile boolean handoffMusicReady;
@@ -398,9 +424,21 @@ public class VoiceRoomForegroundService extends Service {
         if (service != null) service.main.post(() -> {
             service.externalCaptureMusicPaused = false;
             service.applyRoomMusicOutputVolume();
+            RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+            if ("playing".equalsIgnoreCase(service.activeMusicStatus)
+                    && service.activeMusicUrl != null
+                    && service.activeMusicUrl.regionMatches(true, 0, "local://", 0, 8)
+                    && !rtc.isSpeakerMuted()
+                    && rtc.hasLocalMusicPlayer()
+                    && !rtc.isLocalMusicPlaying()) {
+                rtc.resumeLocalMusic();
+                service.main.removeCallbacks(service.localMixRecovery);
+                service.localMixRecoveryAttempts = 0;
+                service.main.postDelayed(service.localMixRecovery, 750L);
+            }
             if (service.musicPlayer != null
                     && "playing".equalsIgnoreCase(service.activeMusicStatus)
-                    && !RoomRtcEngine.getInstance().isSpeakerMuted()) {
+                    && !rtc.isSpeakerMuted()) {
                 service.musicPlayer.play();
             }
         });
@@ -978,10 +1016,10 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void applyMusic(String url, String status, long positionMs, String startedAt) {
-        if (musicPlayer == null) return;
         final String playStatus = status != null ? status : "stopped";
         final boolean localMix = url != null
                 && url.regionMatches(true, 0, "local://", 0, 8);
+        if (musicPlayer == null && !localMix) return;
         if (url == null || url.isEmpty() || "stopped".equalsIgnoreCase(playStatus) || localMix) {
             activeMusicUrl = url;
             activeMusicPlayableUrl = null;
@@ -996,15 +1034,21 @@ public class VoiceRoomForegroundService extends Service {
                 musicPlayer.stop();
             } catch (Exception ignored) {
             }
-            // Hosts: never pause Zego mix when minimizing.
-            try {
-                if ("playing".equalsIgnoreCase(playStatus)
-                        && !externalCaptureMusicPaused && !externalCaptureMusicSuspended
-                        && RoomRtcEngine.getInstance().hasLocalMusicPlayer()
-                        && !RoomRtcEngine.getInstance().isLocalMusicPlaying()) {
-                    RoomRtcEngine.getInstance().resumeLocalMusic();
+            // Hosts: keep the Zego local mix alive across Activity/service handoff.
+            // SDK playback can settle asynchronously after Android changes audio mode,
+            // so retry briefly instead of relying on a single immediate resume call.
+            main.removeCallbacks(localMixRecovery);
+            localMixRecoveryAttempts = 0;
+            if ("playing".equalsIgnoreCase(playStatus)
+                    && !externalCaptureMusicPaused && !externalCaptureMusicSuspended) {
+                try {
+                    RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+                    if (rtc.hasLocalMusicPlayer() && !rtc.isLocalMusicPlaying()) {
+                        rtc.resumeLocalMusic();
+                    }
+                } catch (Throwable ignored) {
                 }
-            } catch (Exception ignored) {
+                main.postDelayed(localMixRecovery, 750L);
             }
             return;
         }
