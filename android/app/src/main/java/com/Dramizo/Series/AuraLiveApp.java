@@ -551,9 +551,10 @@ public class AuraLiveApp extends Application {
             @Override public void onActivityStopped(Activity activity) {
                 startedActivities = Math.max(0, startedActivities - 1);
                 if (foregroundActivity == activity) foregroundActivity = null;
-                // Backgrounding JEHO is not an audio handoff: keep RTC playback,
-                // room music and the existing microphone session alive. The explicit
-                // recording monitor below handles WhatsApp/voice-recorder capture.
+                // Release only Android's call mode/focus in background so WhatsApp
+                // can acquire the microphone. Keep the RTC session, room playback,
+                // music decoder and published mic alive in the foreground service.
+                if (startedActivities == 0) releaseAudioModeForBackground();
             }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
             @Override public void onActivityDestroyed(Activity activity) {}
