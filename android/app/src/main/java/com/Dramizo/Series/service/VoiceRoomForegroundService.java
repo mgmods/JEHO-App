@@ -373,7 +373,9 @@ public class VoiceRoomForegroundService extends Service {
         });
         ExoPlayer offered = offeredMusicPlayer;
         if (offered != null) {
-            try { offered.pause(); } catch (Exception ignored) {}
+            new Handler(Looper.getMainLooper()).post(() -> {
+                try { offered.pause(); } catch (Exception ignored) {}
+            });
         }
     }
 
@@ -390,7 +392,9 @@ public class VoiceRoomForegroundService extends Service {
         });
         ExoPlayer offered = offeredMusicPlayer;
         if (offered != null && "playing".equalsIgnoreCase(offeredMusicStatus)) {
-            try { offered.play(); } catch (Exception ignored) {}
+            new Handler(Looper.getMainLooper()).post(() -> {
+                try { offered.play(); } catch (Exception ignored) {}
+            });
         }
     }
 
