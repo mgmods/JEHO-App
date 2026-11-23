@@ -79,6 +79,7 @@ public class VoiceRoomForegroundService extends Service {
     private static volatile String offeredMusicStatus;
     private static volatile String returnedMusicSourceUrl;
     private static volatile String returnedMusicPlayableUrl;
+    private static volatile String returnedMusicStatus;
     private final Player.Listener musicStateListener = new Player.Listener() {
         @Override public void onPlaybackStateChanged(int playbackState) {
             if (playbackState == Player.STATE_READY
@@ -541,6 +542,7 @@ public class VoiceRoomForegroundService extends Service {
         ExoPlayer player = service.musicPlayer;
         returnedMusicSourceUrl = service.activeMusicUrl;
         returnedMusicPlayableUrl = service.activeMusicPlayableUrl;
+        returnedMusicStatus = service.activeMusicStatus;
         try { player.removeListener(service.musicStateListener); } catch (Exception ignored) {}
         service.musicPlayer = null;
         handoffMusicReady = false;
@@ -558,6 +560,12 @@ public class VoiceRoomForegroundService extends Service {
     @Nullable public static String consumeReturnedMusicPlayableUrl() {
         String value = returnedMusicPlayableUrl;
         returnedMusicPlayableUrl = null;
+        return value;
+    }
+
+    @Nullable public static String consumeReturnedMusicStatus() {
+        String value = returnedMusicStatus;
+        returnedMusicStatus = null;
         return value;
     }
     /** True only after the background ExoPlayer has prepared the exact requested track. */
