@@ -95,6 +95,8 @@ public class VoiceRoomForegroundService extends Service {
     private String activeMusicPlayableUrl;
     private String activeMusicStatus;
     private boolean musicResolveInProgress;
+    // External voice-note capture temporarily pauses only this device's room music.
+    private boolean externalCaptureMusicPaused;
     private static volatile String handoffRoomId;
     private static volatile String handoffMusicUrl;
     private static volatile boolean handoffMusicReady;
@@ -360,6 +362,30 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     /** Update the Android FGS type when local microphone capture is suspended/restored. */
+    /** Pause the service-owned room music decoder during an external voice recording. */
+    public static void suspendMusicForExternalCapture() {
+        VoiceRoomForegroundService service = activeInstance;
+        if (service == null) return;
+        service.main.post(() -> {
+            service.externalCaptureMusicPaused = true;
+            if (service.musicPlayer != null) service.musicPlayer.pause();
+        });
+    }
+
+    /** Resume only if the room's authoritative music state is still playing. */
+    public static void restoreMusicAfterExternalCapture() {
+        VoiceRoomForegroundService service = activeInstance;
+        if (service == null) return;
+        service.main.post(() -> {
+            if (!service.externalCaptureMusicPaused) return;
+            service.externalCaptureMusicPaused = false;
+            if (service.musicPlayer != null
+                    && "playing".equalsIgnoreCase(service.activeMusicStatus)) {
+                service.musicPlayer.play();
+            }
+        });
+    }
+
     public static void refreshAudioForegroundType() {
         VoiceRoomForegroundService service = activeInstance;
         if (service == null) return;
@@ -937,7 +963,7 @@ public class VoiceRoomForegroundService extends Service {
                 if (target > 0L && Math.abs(musicPlayer.getCurrentPosition() - target) > 2500L) {
                     musicPlayer.seekTo(target);
                 }
-                musicPlayer.play();
+                if (!externalCaptureMusicPaused) musicPlayer.play();
                 return;
             }
         }
@@ -1015,7 +1041,8 @@ public class VoiceRoomForegroundService extends Service {
                 }
             }
             musicPlayer.seekTo(target);
-            musicPlayer.setPlayWhenReady("playing".equalsIgnoreCase(status));
+            musicPlayer.setPlayWhenReady(
+                    "playing".equalsIgnoreCase(status) && !externalCaptureMusicPaused);
             musicPlayer.setVolume(1f);
         } catch (Exception ignored) {
             handoffMusicReady = false;
