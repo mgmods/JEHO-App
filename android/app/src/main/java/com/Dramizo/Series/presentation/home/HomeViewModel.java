@@ -46,6 +46,8 @@ public class HomeViewModel extends ViewModel {
     private boolean roomsLoadingMore;
     private final java.util.concurrent.atomic.AtomicBoolean roomsResetLoadInFlight =
             new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final java.util.concurrent.atomic.AtomicInteger roomsListGeneration =
+            new java.util.concurrent.atomic.AtomicInteger(0);
     private final java.util.concurrent.atomic.AtomicBoolean roomsQuietRefreshInFlight =
             new java.util.concurrent.atomic.AtomicBoolean(false);
     private volatile boolean bannersLoading;
@@ -286,6 +288,9 @@ public class HomeViewModel extends ViewModel {
         // Prevent duplicate page-1 requests when resume, tab selection and swipe refresh
         // happen together. Duplicate resets used to race and replace newer room results.
         if (reset && !roomsResetLoadInFlight.compareAndSet(false, true)) return;
+        final int requestGeneration = reset
+                ? roomsListGeneration.incrementAndGet() : roomsListGeneration.get();
+        if (!reset && roomsResetLoadInFlight.get()) return;
         if (reset) {
             roomsPage = 1;
             roomsHasMore = true;
@@ -306,11 +311,15 @@ public class HomeViewModel extends ViewModel {
                 } catch (RuntimeException ignored) {
                     // A transient transport failure must not strand the loading state.
                 } finally {
-                    roomsLoadingMore = false;
-                    if (reset) roomsResetLoadInFlight.set(false);
-                    loadingMore.postValue(false);
-                    if (!quiet && reset) loading.postValue(false);
+                    if (requestGeneration == roomsListGeneration.get()) {
+                        roomsLoadingMore = false;
+                        if (reset) roomsResetLoadInFlight.set(false);
+                        loadingMore.postValue(false);
+                        if (!quiet && reset) loading.postValue(false);
+                    }
                 }
+                // A newer refresh supersedes any older pagination response.
+                if (requestGeneration != roomsListGeneration.get()) return;
                 if (r != null && r.success && r.data != null && r.data.items != null) {
                     List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
                     roomsHasMore = pageItems.size() >= PAGE_SIZE;
@@ -342,9 +351,11 @@ public class HomeViewModel extends ViewModel {
                 // the next user retry requests the same page instead of disabling pagination.
             });
         } catch (RuntimeException rejected) {
-            roomsLoadingMore = false;
-            if (reset) roomsResetLoadInFlight.set(false);
-            loadingMore.postValue(false);
+            if (requestGeneration == roomsListGeneration.get()) {
+                roomsLoadingMore = false;
+                if (reset) roomsResetLoadInFlight.set(false);
+                loadingMore.postValue(false);
+            }
             if (!quiet && reset) {
                 loading.postValue(false);
                 error.postValue(c.getAppContext().getString(R.string.load_rooms_failed));
