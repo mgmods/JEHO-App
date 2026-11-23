@@ -773,8 +773,11 @@
          Extra top margin so avatars clear seat 9/10 number badges. -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/rowTopHosts"
-        android:layout_width="wrap_content"
-        android:layout_height="26dp"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipChildren="true"
+        android:clipToPadding="true"
+        android:importantForAccessibility="no"
         android:layout_marginStart="12dp"
         android:layout_marginTop="28dp"
         android:clipChildren="false"
