@@ -89,16 +89,19 @@ public class GiftViewModel extends ViewModel {
         if (local != null && !local.isEmpty()) {
             gifts.postValue(new ArrayList<>(local));
         }
-        if (loadInFlight) return;
-        // Reopening the room gift sheet should paint from memory, not refetch the
-        // same catalog on every open. Realtime CP config updates remain independent.
-        long now = System.currentTimeMillis();
-        if (hasGiftsNow() && lastLoadCompletedAt > 0L
-                && now - lastLoadCompletedAt < 15_000L) return;
         final boolean hadUsableCatalog = hasGiftsNow() || (local != null && !local.isEmpty());
-        loadInFlight = true;
+        synchronized (this) {
+            if (loadInFlight) return;
+            // Reopening the room gift sheet should paint from memory, not refetch the
+            // same catalog on every open. Realtime CP config updates remain independent.
+            long now = System.currentTimeMillis();
+            if (hadUsableCatalog && lastLoadCompletedAt > 0L
+                    && now - lastLoadCompletedAt < 15_000L) return;
+            loadInFlight = true;
+        }
         try {
             c.getIoExecutor().execute(() -> {
+            boolean catalogRefreshSucceeded = false;
             try {
                 Result<List<GiftDtos.GiftCategoryDto>> cats =
                         c.getGiftRepository().refreshCategories();
@@ -108,11 +111,13 @@ public class GiftViewModel extends ViewModel {
 
                 Result<GiftDtos.GiftList> r = c.getGiftRepository().refreshGifts();
                 if (r.success && r.data != null && !r.data.isEmpty()) {
+                    catalogRefreshSucceeded = true;
                     gifts.postValue(new ArrayList<>(r.data));
                     // GiftBottomSheet warms only a small visible priority window.
                     // Preloading the entire catalog here duplicated its Glide/video cache work
                     // and could exhaust memory on room devices while a gift was being sent.
                 } else if (r.success && r.data != null) {
+                    catalogRefreshSucceeded = true;
                     gifts.postValue(r.data);
                     if (r.data.isEmpty()) {
                         error.postValue("لا توجد هدايا حالياً");
@@ -193,12 +198,15 @@ public class GiftViewModel extends ViewModel {
                 }
                 android.util.Log.w("GiftViewModel", "Gift catalog refresh exception", failure);
             } finally {
-                loadInFlight = false;
-                lastLoadCompletedAt = System.currentTimeMillis();
+                synchronized (GiftViewModel.this) {
+                    loadInFlight = false;
+                    lastLoadCompletedAt = catalogRefreshSucceeded
+                            ? System.currentTimeMillis() : 0L;
+                }
             }
             });
         } catch (RuntimeException rejected) {
-            loadInFlight = false;
+            synchronized (this) { loadInFlight = false; lastLoadCompletedAt = 0L; }
             android.util.Log.w("GiftViewModel", "Gift catalog executor rejected refresh", rejected);
             if (!hadUsableCatalog) {
                 error.postValue("تعذر تحميل الهدايا حالياً، حاول مجددًا");
