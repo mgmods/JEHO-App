@@ -503,6 +503,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private Runnable luckyOverlayRelease;
     private ExoPlayer roomMusicPlayer;
     private volatile boolean externalCaptureMusicPaused;
+    // Process-wide latch: playback callbacks must not restart any music decoder
+    // while another app owns microphone capture, even if the room Activity is recreated.
+    private static volatile boolean externalCaptureMusicSuspended;
+    private static volatile boolean externalCaptureLocalMusicWasPlaying;
     @Nullable private Player.Listener roomMusicPlayerListener;
     /** Lazy: create only when a Mikoo game opens (WebView cold-create freezes S23 if done in onCreate). */
     @Nullable private WebView roomGameWebView;
@@ -4319,7 +4323,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 RoomRtcEngine.getInstance().boostMusicMixVolume();
                 if (!RoomRtcEngine.getInstance().isLocalMusicPlaying()
                         && RoomRtcEngine.getInstance().hasLocalMusicPlayer()) {
-                    if (!externalCaptureMusicPaused) RoomRtcEngine.getInstance().resumeLocalMusic();
+                    if (!externalCaptureMusicPaused && !externalCaptureMusicSuspended) RoomRtcEngine.getInstance().resumeLocalMusic();
                 }
             }
         } catch (Exception ignored) {
@@ -5516,6 +5520,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (roomMusicPlayer != null) return;
         roomMusicPlayer = VoiceRoomForegroundService.takeMusicPlayerForUi();
         if (roomMusicPlayer != null) {
+            if (externalCaptureMusicSuspended) {
+                try { roomMusicPlayer.pause(); } catch (RuntimeException ignored) {}
+            }
             String restoredSourceUrl = VoiceRoomForegroundService.consumeReturnedMusicSourceUrl();
             String restoredPlayableUrl = VoiceRoomForegroundService.consumeReturnedMusicPlayableUrl();
             if (restoredSourceUrl != null && !restoredSourceUrl.isEmpty()) {
@@ -6107,7 +6114,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.seekTo(target);
             }
             applySharedMusicVolume();
-            roomMusicPlayer.setPlayWhenReady(playing && !externalCaptureMusicPaused);
+            roomMusicPlayer.setPlayWhenReady(playing && !externalCaptureMusicPaused && !externalCaptureMusicSuspended);
             if ("stopped".equalsIgnoreCase(currentMusicStatus)) {
                 roomMusicPlayer.pause();
                 roomMusicPlayer.seekTo(0);
@@ -6173,7 +6180,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.seekTo(seekTarget);
             }
             applySharedMusicVolume();
-            roomMusicPlayer.setPlayWhenReady(playing && !externalCaptureMusicPaused);
+            roomMusicPlayer.setPlayWhenReady(playing && !externalCaptureMusicPaused && !externalCaptureMusicSuspended);
             bindMusicVideoSurfaces();
             return;
         }
@@ -6194,7 +6201,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (!playing) return;
 
-        final String requestKey = ytUrl + "|stream|" + (playing && !externalCaptureMusicPaused ? "1" : "0");
+        final String requestKey = ytUrl + "|stream|" + (playing && !externalCaptureMusicPaused && !externalCaptureMusicSuspended ? "1" : "0");
         if (requestKey.equals(pendingYtResolveKey)) return;
         pendingYtResolveKey = requestKey;
 
@@ -6232,7 +6239,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.prepare();
                 roomMusicPlayer.seekTo(seekTarget);
                 applySharedMusicVolume();
-                roomMusicPlayer.setPlayWhenReady(!externalCaptureMusicPaused);
+                roomMusicPlayer.setPlayWhenReady(!externalCaptureMusicPaused && !externalCaptureMusicSuspended);
                 bindMusicVideoSurfaces();
                 if (hasVideo) {
                     showMusicVideoSurface(true);
@@ -6458,7 +6465,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 + "<script src='https://www.youtube.com/iframe_api'></script><script>"
                 + "var musicYtPlayer;function onYouTubeIframeAPIReady(){musicYtPlayer=new YT.Player('player',"
                 + "{height:'100%',width:'100%',videoId:'" + videoId + "',playerVars:{autoplay:"
-                + (playing && !externalCaptureMusicPaused ? "1" : "0")
+                + (playing && !externalCaptureMusicPaused && !externalCaptureMusicSuspended ? "1" : "0")
                 + ",controls:0,playsinline:1,rel:0,modestbranding:1,fs:0,start:" + startSec
                 + "},events:{onReady:function(e){var v=" + Math.round(sharedMusicVolume * 100f)
                 + ";if(v===0)e.target.mute();else{e.target.unMute();e.target.setVolume(v);}}}});}"
@@ -6575,7 +6582,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 } else if (roomMusicPlayer != null && currentMusicUrl.equals(preparedMusicUrl)
                         && roomMusicPlayer.getMediaItemCount() > 0) {
                     applySharedMusicVolume();
-                    roomMusicPlayer.setPlayWhenReady(!externalCaptureMusicPaused);
+                    roomMusicPlayer.setPlayWhenReady(!externalCaptureMusicPaused && !externalCaptureMusicSuspended);
                 } else {
                     streamYoutubeInDisc(currentMusicUrl, true, false, pos, null, null, null);
                 }
@@ -6583,7 +6590,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else {
             pos = roomMusicPlayer != null ? roomMusicPlayer.getCurrentPosition() : 0L;
             if (roomMusicPlayer != null) {
-                roomMusicPlayer.setPlayWhenReady(!currentlyPlaying && !externalCaptureMusicPaused);
+                roomMusicPlayer.setPlayWhenReady(!currentlyPlaying && !externalCaptureMusicPaused && !externalCaptureMusicSuspended);
             }
         }
         currentMusicStatus = currentlyPlaying ? "paused" : "playing";
@@ -10589,16 +10596,35 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Pause only this device's Activity-owned music decoder while an external app records. */
     public static void suspendMusicForExternalCapture() {
+        // Set synchronously before posting to the Activity thread. Realtime music
+        // events and lifecycle callbacks can arrive before the UI task is executed.
+        externalCaptureMusicSuspended = true;
+        try {
+            RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+            if (rtc.hasLocalMusicPlayer() && rtc.isLocalMusicPlaying()) {
+                externalCaptureLocalMusicWasPlaying = true;
+                rtc.pauseLocalMusic();
+            }
+        } catch (RuntimeException ignored) {
+        }
         VoiceRoomActivity room = getAliveInstance();
-        if (room == null) return;
-        room.runOnUiThread(room::pauseMusicForExternalCapture);
+        if (room != null) room.runOnUiThread(room::pauseMusicForExternalCapture);
     }
 
     /** Resume the same room track after the external recorder has released the microphone. */
     public static void restoreMusicAfterExternalCapture() {
+        externalCaptureMusicSuspended = false;
+        boolean resumeLocalMix = externalCaptureLocalMusicWasPlaying;
+        externalCaptureLocalMusicWasPlaying = false;
+        try {
+            RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+            if (resumeLocalMix && !rtc.isSpeakerMuted() && rtc.hasLocalMusicPlayer()) {
+                rtc.resumeLocalMusic();
+            }
+        } catch (RuntimeException ignored) {
+        }
         VoiceRoomActivity room = getAliveInstance();
-        if (room == null) return;
-        room.runOnUiThread(room::resumeMusicAfterExternalCapture);
+        if (room != null) room.runOnUiThread(room::resumeMusicAfterExternalCapture);
     }
 
     private void pauseMusicForExternalCapture() {
@@ -10617,6 +10643,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void resumeMusicAfterExternalCapture() {
         externalCaptureMusicPaused = false;
+        if (roomSpeakerMuted || RoomRtcEngine.getInstance().isSpeakerMuted()) return;
+        RoomSoundFx.setMuted(false);
         if (!"playing".equalsIgnoreCase(currentMusicStatus)) return;
         if (youtubeUsingEmbed && musicYoutubeWebView != null) {
             try {
@@ -13391,8 +13419,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             roomSpeakerMuted = true;
             RoomSoundFx.setMuted(true);
             RoomRtcEngine.getInstance().setSpeakerMuted(true);
-            // Re-assert music mix after speaker mute (mute stops remote pulls only).
-            if (canManageMusic
+            // Re-assert music mix after speaker mute (mute stops remote pulls only),
+            // but never restart it while an external recorder owns the microphone.
+            if (!externalCaptureMusicSuspended && canManageMusic
                     && currentMusicUrl != null
                     && !currentMusicUrl.isEmpty()
                     && "playing".equalsIgnoreCase(currentMusicStatus)) {
@@ -13411,7 +13440,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!mutedForBackground) return;
         mutedForBackground = false;
         try {
-            boolean keepMuted = speakerMutedBeforeBackground;
+            boolean keepMuted = externalCaptureMusicSuspended || speakerMutedBeforeBackground;
             roomSpeakerMuted = keepMuted;
             RoomSoundFx.setMuted(keepMuted);
             RoomRtcEngine.getInstance().setSpeakerMuted(keepMuted);
@@ -13876,12 +13905,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         } else {
             mutedForBackground = false;
-            roomSpeakerMuted = false;
-            RoomSoundFx.setMuted(false);
+            // Activity teardown must not undo the external-recorder handoff or a
+            // user-selected speaker mute. The application restores this state only
+            // after Android confirms that WhatsApp released microphone capture.
+            boolean keepSpeakerMuted = externalCaptureMusicSuspended
+                    || RoomRtcEngine.getInstance().isSpeakerMuted();
+            roomSpeakerMuted = keepSpeakerMuted;
+            RoomSoundFx.setMuted(keepSpeakerMuted);
             GiftAudioFx.resetRoomGiftSounds();
-            try {
-                RoomRtcEngine.getInstance().setSpeakerMuted(false);
-            } catch (Exception ignored) {
+            if (!keepSpeakerMuted) {
+                try { RoomRtcEngine.getInstance().setSpeakerMuted(false); }
+                catch (Exception ignored) {}
             }
         }
         if (relationshipSeatEffectsOverlay != null) {
