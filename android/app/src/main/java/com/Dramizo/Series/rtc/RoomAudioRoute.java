@@ -181,7 +181,7 @@ public final class RoomAudioRoute {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
                 if (wantSpeaker) {
-                    AudioDeviceInfo[] devices = am.getAvailableCommunicationDevices();
+                    java.util.List<AudioDeviceInfo> devices = am.getAvailableCommunicationDevices();
                     if (devices != null) {
                         for (AudioDeviceInfo device : devices) {
                             if (device != null
