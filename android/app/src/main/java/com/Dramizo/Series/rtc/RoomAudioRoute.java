@@ -118,6 +118,13 @@ public final class RoomAudioRoute {
                 am.setSpeakerphoneOn(false);
                 return;
             }
+            if (!AuraLiveApp.isAppInForeground()) {
+                // Background room audio is owned by the media foreground service.
+                // Do not reclaim MODE_IN_COMMUNICATION from WhatsApp or another app.
+                RoomAudioSession.release(context);
+                am.setSpeakerphoneOn(wantOpenSpeaker && !external);
+                return;
+            }
 
             am.setMode(AudioManager.MODE_IN_COMMUNICATION);
             am.setSpeakerphoneOn(wantOpenSpeaker && !external);
