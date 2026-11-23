@@ -187,6 +187,8 @@ public class AuraLiveApp extends Application {
         }
         if (!roomAudioSuspendedForExternalApp && !roomAudioReleasedForBackground) return;
 
+        boolean restorePreviouslyAudibleSpeaker = roomAudioSuspendedForExternalApp
+                && !roomSpeakerWasMutedBeforeExternalApp;
         roomAudioSuspendedForExternalApp = false;
         roomAudioReleasedForBackground = false;
         roomMicRoomIdBeforeExternalApp = null;
@@ -209,8 +211,10 @@ public class AuraLiveApp extends Application {
                 // Playback must resume even when the user had muted their own mic.
                 RoomAudioSession.acquire(this);
             }
-            // Restore room playback only if it was audible before the handoff.
-            if (!roomSpeakerWasMutedBeforeExternalApp) {
+            // Only restore the previous speaker state after a real external-capture
+            // handoff. A background-only focus yield must preserve any speaker mute
+            // the user changed from the room notification while minimized.
+            if (restorePreviouslyAudibleSpeaker) {
                 rtc.setSpeakerMuted(false);
             }
         }
