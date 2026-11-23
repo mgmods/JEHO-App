@@ -127,6 +127,7 @@ public class AuraLiveApp extends Application {
         // may then contain only WhatsApp's capture configuration (not JEHO's silenced
         // configuration), which still means the external recorder is active.
         roomAudioSuspendedForExternalApp = true;
+        RoomAudioSession.setExternalCaptureSuspended(true);
 
         // Android has already granted capture priority to the external recorder.
         // Stop publishing locally so no silent/stale room microphone remains active.
@@ -183,6 +184,7 @@ public class AuraLiveApp extends Application {
         roomMicRoomIdBeforeExternalApp = null;
         roomMicCaptureSessionIdBeforeExternalApp = -1;
 
+        RoomAudioSession.setExternalCaptureSuspended(false);
         if (sameRoomStillActive) {
             // Restore RTC mic/playback as soon as the external capture ends.
             // RoomAudioSession/RoomAudioRoute independently refuse to acquire
@@ -195,6 +197,9 @@ public class AuraLiveApp extends Application {
             if (roomMicWasEnabledBeforeExternalApp && rtc.isPublishing()) {
                 rtc.setMicEnabledForExternalRestore(true, this);
                 updateRoomMicMutedState(expectedRoomId, false);
+            } else {
+                // Playback must resume even when the user had muted their own mic.
+                RoomAudioSession.acquire(this);
             }
             // Restore room playback only if it was audible before the handoff.
             if (!roomSpeakerWasMutedBeforeExternalApp) {
@@ -530,11 +535,9 @@ public class AuraLiveApp extends Application {
             @Override public void onActivityStopped(Activity activity) {
                 startedActivities = Math.max(0, startedActivities - 1);
                 if (foregroundActivity == activity) foregroundActivity = null;
-                // Do not disable/unpublish JEHO's room microphone on Home. Only release
-                // Android's communication/call mode so a foreground recorder can capture.
-                if (startedActivities == 0) {
-                    releaseAudioModeForBackground();
-                }
+                // Backgrounding JEHO is not an audio handoff: keep RTC playback,
+                // room music and the existing microphone session alive. The explicit
+                // recording monitor below handles WhatsApp/voice-recorder capture.
             }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
             @Override public void onActivityDestroyed(Activity activity) {}
