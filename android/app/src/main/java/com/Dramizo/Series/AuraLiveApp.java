@@ -211,9 +211,11 @@ public class AuraLiveApp extends Application {
             // Restore room playback only if it was audible before the handoff.
             if (!roomSpeakerWasMutedBeforeExternalApp) {
                 rtc.setSpeakerMuted(false);
-                VoiceRoomForegroundService.restoreMusicAfterExternalCapture();
-                VoiceRoomActivity.restoreMusicAfterExternalCapture();
             }
+            // Always clear both music handoff latches. Each owner independently
+            // checks the preserved speaker preference before producing sound.
+            VoiceRoomForegroundService.restoreMusicAfterExternalCapture();
+            VoiceRoomActivity.restoreMusicAfterExternalCapture();
         }
         roomMicWasEnabledBeforeExternalApp = false;
         roomSpeakerWasMutedBeforeExternalApp = false;
