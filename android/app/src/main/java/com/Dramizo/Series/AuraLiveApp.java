@@ -227,7 +227,15 @@ public class AuraLiveApp extends Application {
         if (roomAudioReleasedForBackground || isAppInForeground()) return;
         RoomRtcEngine rtc = RoomRtcEngine.getInstance();
         String roomId = rtc.getCurrentRoomId();
-        if (roomId == null || roomId.isEmpty() || !rtc.isInRoom(roomId)) return;
+        boolean roomActive = roomId != null && !roomId.isEmpty() && rtc.isInRoom(roomId);
+        if (!roomActive) {
+            // The foreground service may own the live room while its Activity is
+            // minimized. Keep the same background handoff behavior in that case.
+            roomId = VoiceRoomForegroundService.activeRoomId(this);
+            roomActive = roomId != null && !roomId.isEmpty()
+                    && VoiceRoomForegroundService.hasActiveRoom(this, roomId);
+        }
+        if (!roomActive) return;
 
         // If another app was already recording before JEHO moved to background,
         // the recording callback may not fire again after the lifecycle transition.
@@ -571,10 +579,12 @@ public class AuraLiveApp extends Application {
             @Override public void onActivityStopped(Activity activity) {
                 startedActivities = Math.max(0, startedActivities - 1);
                 if (foregroundActivity == activity) foregroundActivity = null;
-                // Backgrounding is not an audio handoff. Keep the room route and
-                // playback focus stable to avoid a pause/cut on minimize or app switching.
-                // The external-recording callback below releases focus only when an
-                // actual recorder (for example WhatsApp voice notes) takes microphone input.
+                // Release only Android's call mode/focus when the last JEHO screen
+                // goes to background. Keep RTC publishing, room playback and the music
+                // foreground service alive; this lets WhatsApp acquire the microphone.
+                // The recording monitor performs the full temporary room-audio handoff
+                // only when an external recorder actually starts capturing.
+                if (startedActivities == 0) releaseAudioModeForBackground();
             }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
             @Override public void onActivityDestroyed(Activity activity) {}
