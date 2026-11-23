@@ -194,6 +194,9 @@ public final class RoomRtcEngine {
     }
 
     public void setSpeakerMuted(boolean muted) {
+        // Keep all room output muted until the external recorder releases capture;
+        // only the handoff restore path clears the suspension latch first.
+        if (!muted && RoomAudioSession.isExternalCaptureSuspended()) return;
         if (isLiveKit()) LiveKitEngineManager.getInstance().setSpeakerMuted(muted);
         else ZegoEngineManager.getInstance().setSpeakerMuted(muted);
     }
