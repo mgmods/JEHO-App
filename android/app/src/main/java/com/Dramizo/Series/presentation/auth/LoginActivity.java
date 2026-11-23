@@ -142,6 +142,7 @@ public class LoginActivity extends ThemedActivity {
         binding.tvAuthDivider.setVisibility(View.GONE);
         binding.googleLoginGroup.setVisibility(View.VISIBLE);
         binding.tvLoginHint.setVisibility(View.VISIBLE);
+        // Password and registration views remain in the legacy binding only; they are not active.
 
         viewModel.getLoading().observe(this, loading ->
                 binding.progress.setVisibility(Boolean.TRUE.equals(loading) ? View.VISIBLE : View.GONE));
