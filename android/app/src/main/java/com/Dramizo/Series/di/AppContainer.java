@@ -92,8 +92,10 @@ import com.Dramizo.Series.domain.usecase.wallet.GetWalletUseCase;
 import com.Dramizo.Series.domain.usecase.wallet.GetRechargePackagesUseCase;
 import com.Dramizo.Series.domain.usecase.wallet.VerifyPurchaseUseCase;
 
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
@@ -185,13 +187,18 @@ public class AppContainer {
         // Four workers let long uploads/background calls queue latency-sensitive actions;
         // keep a little more headroom without creating an unbounded thread-per-request pool.
         ioExecutor = Executors.newFixedThreadPool(16);
-        // Dedicated workers keep cannon sends from waiting behind chat, uploads, and room refreshes.
-        // The cannon itself still allows only one wallet transaction in flight per sender.
-        luckyCannonExecutor = Executors.newFixedThreadPool(2, runnable -> {
-            Thread thread = new Thread(runnable, "jeho-lucky-cannon");
-            thread.setPriority(Thread.NORM_PRIORITY + 1);
-            return thread;
-        });
+        // Dedicated, bounded lane for hold-to-send gifts. Two requests may execute and
+        // exactly one may wait; accidental repeat-loop regressions cannot grow an
+        // unbounded queue and retain stale wallet transactions after the finger is up.
+        luckyCannonExecutor = new ThreadPoolExecutor(
+                2, 2, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(1),
+                runnable -> {
+                    Thread thread = new Thread(runnable, "jeho-lucky-cannon");
+                    thread.setPriority(Thread.NORM_PRIORITY + 1);
+                    return thread;
+                },
+                new ThreadPoolExecutor.AbortPolicy());
         database = Room.databaseBuilder(appContext, AuraDatabase.class, "auralive.db")
                 .fallbackToDestructiveMigration()
                 .build();
