@@ -370,11 +370,16 @@ public class VoiceRoomForegroundService extends Service {
     /** Update the Android FGS type when local microphone capture is suspended/restored. */
     /** Pause both the active service player and a player currently being handed off. */
     public static void suspendMusicForExternalCapture() {
+        // Process-wide gate is synchronous: a delayed music/realtime callback must
+        // not restart the decoder before the main-thread pause task is delivered.
         externalCaptureMusicSuspended = true;
         VoiceRoomForegroundService service = activeInstance;
         if (service != null) service.main.post(() -> {
             service.externalCaptureMusicPaused = true;
-            if (service.musicPlayer != null) service.musicPlayer.pause();
+            if (service.musicPlayer != null) {
+                service.musicPlayer.pause();
+                try { service.musicPlayer.setVolume(0f); } catch (Exception ignored) {}
+            }
         });
         ExoPlayer offered = offeredMusicPlayer;
         if (offered != null) {
@@ -390,15 +395,19 @@ public class VoiceRoomForegroundService extends Service {
         VoiceRoomForegroundService service = activeInstance;
         if (service != null) service.main.post(() -> {
             service.externalCaptureMusicPaused = false;
+            service.applyRoomMusicOutputVolume();
             if (service.musicPlayer != null
-                    && "playing".equalsIgnoreCase(service.activeMusicStatus)) {
+                    && "playing".equalsIgnoreCase(service.activeMusicStatus)
+                    && !RoomRtcEngine.getInstance().isSpeakerMuted()) {
                 service.musicPlayer.play();
             }
         });
         ExoPlayer offered = offeredMusicPlayer;
         if (offered != null && "playing".equalsIgnoreCase(offeredMusicStatus)) {
             new Handler(Looper.getMainLooper()).post(() -> {
-                try { offered.play(); } catch (Exception ignored) {}
+                try {
+                    if (!RoomRtcEngine.getInstance().isSpeakerMuted()) offered.play();
+                } catch (Exception ignored) {}
             });
         }
     }
@@ -609,6 +618,7 @@ public class VoiceRoomForegroundService extends Service {
             return START_NOT_STICKY;
         }
         stopping = false;
+        externalCaptureMusicPaused = externalCaptureMusicSuspended;
         boolean adoptedMusicPlayer = adoptOfferedMusicPlayer();
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString(EXTRA_ROOM_ID, roomId)
@@ -959,6 +969,7 @@ public class VoiceRoomForegroundService extends Service {
             // Hosts: never pause Zego mix when minimizing.
             try {
                 if ("playing".equalsIgnoreCase(playStatus)
+                        && !externalCaptureMusicPaused && !externalCaptureMusicSuspended
                         && RoomRtcEngine.getInstance().hasLocalMusicPlayer()
                         && !RoomRtcEngine.getInstance().isLocalMusicPlaying()) {
                     RoomRtcEngine.getInstance().resumeLocalMusic();
