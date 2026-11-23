@@ -258,7 +258,9 @@ public class AuraLiveApp extends Application {
         // Media playback continues through the room foreground service in normal
         // media mode; external capture callbacks still perform the full handoff.
         roomAudioReleasedForBackground = true;
-        RoomAudioSession.release(this);
+        // Release VoIP ownership for WhatsApp without clearing the active room
+        // speaker route; remote RTC playback must remain audible while minimized.
+        RoomAudioSession.releaseForBackground(this);
         VoiceRoomForegroundService.refreshAudioForegroundType();
     }
 
