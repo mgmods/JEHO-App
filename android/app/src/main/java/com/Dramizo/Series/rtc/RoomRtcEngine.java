@@ -166,6 +166,9 @@ public final class RoomRtcEngine {
     }
 
     public void setMicEnabled(boolean enabled) {
+        // Never let room controls reclaim the microphone while an external recorder
+        // owns capture. The dedicated external-restore method bypasses this guard.
+        if (enabled && RoomAudioSession.isExternalCaptureSuspended()) return;
         // Seat/state callbacks can arrive repeatedly while entering a room. Do not
         // toggle the RTC microphone or Android audio focus when the requested state
         // already matches the engine state; repeated toggles caused the Android
@@ -191,6 +194,9 @@ public final class RoomRtcEngine {
     }
 
     public void setSpeakerMuted(boolean muted) {
+        // Keep all room output muted until the external recorder releases capture;
+        // only the handoff restore path clears the suspension latch first.
+        if (!muted && RoomAudioSession.isExternalCaptureSuspended()) return;
         if (isLiveKit()) LiveKitEngineManager.getInstance().setSpeakerMuted(muted);
         else ZegoEngineManager.getInstance().setSpeakerMuted(muted);
     }

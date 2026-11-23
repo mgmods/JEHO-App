@@ -68,12 +68,10 @@ public final class RoomAudioSession {
         if (app == null) return;
         appContext = new WeakReference<>(app);
 
-        // Keep the room playback route stable while the room is active, including
-        // when the user minimizes JEHO or has manually muted their microphone.
-        // Only an explicitly detected external recorder may suspend this session.
-        if (externalCaptureSuspended) {
-            // A confirmed external recorder owns capture. Release only for this
-            // explicit handoff, never merely because JEHO moved to background.
+        // The foreground room service keeps RTC playback and music alive while
+        // JEHO is backgrounded. Do not let delayed seat/RTC callbacks reclaim
+        // MODE_IN_COMMUNICATION or audio focus from WhatsApp/voice recorders.
+        if (externalCaptureSuspended || !com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
             release(app);
             return;
         }

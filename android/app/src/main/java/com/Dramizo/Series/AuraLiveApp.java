@@ -204,6 +204,7 @@ public class AuraLiveApp extends Application {
             if (roomMicWasEnabledBeforeExternalApp && rtc.isPublishing()) {
                 rtc.setMicEnabledForExternalRestore(true, this);
                 updateRoomMicMutedState(expectedRoomId, false);
+                VoiceRoomActivity.onExternalMicRestored(true);
             } else {
                 // Playback must resume even when the user had muted their own mic.
                 RoomAudioSession.acquire(this);
@@ -211,10 +212,13 @@ public class AuraLiveApp extends Application {
             // Restore room playback only if it was audible before the handoff.
             if (!roomSpeakerWasMutedBeforeExternalApp) {
                 rtc.setSpeakerMuted(false);
-                VoiceRoomForegroundService.restoreMusicAfterExternalCapture();
-                VoiceRoomActivity.restoreMusicAfterExternalCapture();
             }
         }
+        // Always clear both music handoff latches, even if the user left the room
+        // while WhatsApp was recording. Each owner checks the preserved speaker
+        // preference and its own active-room/player state before producing sound.
+        VoiceRoomForegroundService.restoreMusicAfterExternalCapture();
+        VoiceRoomActivity.restoreMusicAfterExternalCapture();
         roomMicWasEnabledBeforeExternalApp = false;
         roomSpeakerWasMutedBeforeExternalApp = false;
         VoiceRoomForegroundService.refreshAudioForegroundType();
@@ -227,7 +231,15 @@ public class AuraLiveApp extends Application {
         if (roomAudioReleasedForBackground || isAppInForeground()) return;
         RoomRtcEngine rtc = RoomRtcEngine.getInstance();
         String roomId = rtc.getCurrentRoomId();
-        if (roomId == null || roomId.isEmpty() || !rtc.isInRoom(roomId)) return;
+        boolean roomActive = roomId != null && !roomId.isEmpty() && rtc.isInRoom(roomId);
+        if (!roomActive) {
+            // The foreground service may own the live room while its Activity is
+            // minimized. Keep the same background handoff behavior in that case.
+            roomId = VoiceRoomForegroundService.activeRoomId(this);
+            roomActive = roomId != null && !roomId.isEmpty()
+                    && VoiceRoomForegroundService.hasActiveRoom(this, roomId);
+        }
+        if (!roomActive) return;
 
         // If another app was already recording before JEHO moved to background,
         // the recording callback may not fire again after the lifecycle transition.
@@ -294,13 +306,14 @@ public class AuraLiveApp extends Application {
                     // after the external recorder has already taken capture priority.
                     suspendRoomAudioForExternalApp();
                 } else if (roomAudioSuspendedForExternalApp) {
-                    // Restore only after Android reports the external capture has ended.
-                    // Keep a short debounce for OEMs that emit a transient empty list
-                    // while WhatsApp switches from recording to sending.
+                    // Require a stable capture-free window. Some Android/OEM builds
+                    // briefly emit an empty recording-config list while WhatsApp changes
+                    // recorder state; a 500 ms restore caused room music to flicker back
+                    // on during a still-active voice note.
                     Handler handler = externalCaptureHandler;
                     if (handler != null) {
                         handler.removeCallbacks(externalCaptureRestoreCheck);
-                        handler.postDelayed(externalCaptureRestoreCheck, 500L);
+                        handler.postDelayed(externalCaptureRestoreCheck, 1500L);
                     } else {
                         restoreRoomAudioAfterExternalApp();
                     }
@@ -571,10 +584,12 @@ public class AuraLiveApp extends Application {
             @Override public void onActivityStopped(Activity activity) {
                 startedActivities = Math.max(0, startedActivities - 1);
                 if (foregroundActivity == activity) foregroundActivity = null;
-                // Backgrounding is not an audio handoff. Keep the room route and
-                // playback focus stable to avoid a pause/cut on minimize or app switching.
-                // The external-recording callback below releases focus only when an
-                // actual recorder (for example WhatsApp voice notes) takes microphone input.
+                // Release only Android's call mode/focus when the last JEHO screen
+                // goes to background. Keep RTC publishing, room playback and the music
+                // foreground service alive; this lets WhatsApp acquire the microphone.
+                // The recording monitor performs the full temporary room-audio handoff
+                // only when an external recorder actually starts capturing.
+                if (startedActivities == 0) releaseAudioModeForBackground();
             }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
             @Override public void onActivityDestroyed(Activity activity) {}
