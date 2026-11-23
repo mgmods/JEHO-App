@@ -140,6 +140,39 @@ public final class RoomAudioSession {
         // release immediately when another app starts capturing audio.
     }
 
+    /**
+     * Yield Android call mode/focus to other apps while keeping the RTC engine's
+     * selected output route intact. A full release clears the speaker/communication
+     * device and can make background room audio disappear on some devices.
+     */
+    public static void releaseForBackground(@Nullable Context context) {
+        Context app = context != null
+                ? context.getApplicationContext()
+                : appContext.get();
+        if (app == null) return;
+        AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        try {
+            if (focusHeld) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
+                    am.abandonAudioFocusRequest(focusRequest);
+                } else {
+                    am.abandonAudioFocus(null);
+                }
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            focusHeld = false;
+            focusRequest = null;
+        }
+        try {
+            // MODE_NORMAL releases VoIP ownership so WhatsApp can record.
+            // Do not clear the SDK/device speaker route: RTC playback is still live.
+            am.setMode(AudioManager.MODE_NORMAL);
+        } catch (Throwable ignored) {
+        }
+    }
+
     public static void release(@Nullable Context context) {
         Context app = context != null
                 ? context.getApplicationContext()
