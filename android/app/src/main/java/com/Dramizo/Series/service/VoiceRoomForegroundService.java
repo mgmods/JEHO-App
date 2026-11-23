@@ -713,7 +713,9 @@ public class VoiceRoomForegroundService extends Service {
         // Do not reopen the microphone from a background notification: Android must
         // leave the recorder available to the foreground app chosen by the user.
         boolean nextOn = !RoomRtcEngine.getInstance().isMicEnabled();
-        if (nextOn && !com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
+        if (nextOn && (externalCaptureMusicSuspended
+                || RoomAudioSession.isExternalCaptureSuspended()
+                || !com.Dramizo.Series.AuraLiveApp.isAppInForeground())) {
             refreshNotificationUi();
             return;
         }
@@ -733,6 +735,14 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void toggleSpeakerFromNotification() {
+        // External capture owns the output handoff too. Do not let a notification
+        // tap unmute voices/music until WhatsApp has released the microphone.
+        if (externalCaptureMusicSuspended || RoomAudioSession.isExternalCaptureSuspended()) {
+            RoomRtcEngine.getInstance().setSpeakerMuted(true);
+            applyRoomMusicOutputVolume();
+            refreshNotificationUi();
+            return;
+        }
         boolean nextMuted = !RoomRtcEngine.getInstance().isSpeakerMuted();
         RoomRtcEngine.getInstance().setSpeakerMuted(nextMuted);
         // The notification speaker switch controls every incoming room sound on this
