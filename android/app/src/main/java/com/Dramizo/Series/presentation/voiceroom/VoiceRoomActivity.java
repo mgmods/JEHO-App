@@ -13415,6 +13415,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             VoiceRoomForegroundService.attachUi(this);
         } catch (RuntimeException ignored) {
         }
+        // This Activity can survive while another app is foregrounded. The background
+        // handoff moved its ExoPlayer into the service and nulled roomMusicPlayer, while
+        // musicUiReady stayed true. Rebind now to reclaim that same decoder and restore
+        // the Activity listener and controls instead of leaving a stale music panel.
+        if (roomMusicPlayer == null && musicUiReady) {
+            musicUiReady = false;
+            ensureMusicUiReady();
+        }
         unmuteAudioAfterBackground();
         try {
             // Prefer live Zego mic state (may have been toggled from notification / mini).
