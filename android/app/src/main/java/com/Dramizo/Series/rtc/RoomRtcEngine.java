@@ -172,19 +172,16 @@ public final class RoomRtcEngine {
         // privacy mic indicator to flash and could interrupt music/voice routing.
         boolean current = isMicEnabled();
         if (current == enabled) {
-            if (enabled) RoomAudioSession.acquire(null);
+            RoomAudioSession.acquire(null);
             return;
         }
 
         if (isLiveKit()) LiveKitEngineManager.getInstance().setMicEnabled(enabled);
         else ZegoEngineManager.getInstance().setMicEnabled(enabled);
 
-        // Releasing the room mic must also release Android's call audio mode/focus.
-        if (enabled) {
-            RoomAudioSession.acquire(null);
-        } else {
-            RoomAudioSession.release(null);
-        }
+        // Muting the local microphone must not tear down the room's playback route.
+        // External recording uses the explicit handoff flag to release audio focus.
+        RoomAudioSession.acquire(null);
     }
 
     public boolean isMicEnabled() {
