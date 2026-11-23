@@ -69,6 +69,7 @@ public class VoiceRoomForegroundService extends Service {
     private String roomCoverUrl;
     private ExoPlayer musicPlayer;
     private static volatile VoiceRoomForegroundService activeInstance;
+    private static volatile boolean externalCaptureMusicSuspended;
     private static volatile ExoPlayer offeredMusicPlayer;
     private static volatile String offeredRoomId;
     private static volatile String offeredMusicUrl;
@@ -362,28 +363,35 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     /** Update the Android FGS type when local microphone capture is suspended/restored. */
-    /** Pause the service-owned room music decoder during an external voice recording. */
+    /** Pause both the active service player and a player currently being handed off. */
     public static void suspendMusicForExternalCapture() {
+        externalCaptureMusicSuspended = true;
         VoiceRoomForegroundService service = activeInstance;
-        if (service == null) return;
-        service.main.post(() -> {
+        if (service != null) service.main.post(() -> {
             service.externalCaptureMusicPaused = true;
             if (service.musicPlayer != null) service.musicPlayer.pause();
         });
+        ExoPlayer offered = offeredMusicPlayer;
+        if (offered != null) {
+            try { offered.pause(); } catch (Exception ignored) {}
+        }
     }
 
-    /** Resume only if the room's authoritative music state is still playing. */
+    /** Resume the exact existing decoder only after the external recorder releases capture. */
     public static void restoreMusicAfterExternalCapture() {
+        externalCaptureMusicSuspended = false;
         VoiceRoomForegroundService service = activeInstance;
-        if (service == null) return;
-        service.main.post(() -> {
-            if (!service.externalCaptureMusicPaused) return;
+        if (service != null) service.main.post(() -> {
             service.externalCaptureMusicPaused = false;
             if (service.musicPlayer != null
                     && "playing".equalsIgnoreCase(service.activeMusicStatus)) {
                 service.musicPlayer.play();
             }
         });
+        ExoPlayer offered = offeredMusicPlayer;
+        if (offered != null && "playing".equalsIgnoreCase(offeredMusicStatus)) {
+            try { offered.play(); } catch (Exception ignored) {}
+        }
     }
 
     public static void refreshAudioForegroundType() {
@@ -495,6 +503,8 @@ public class VoiceRoomForegroundService extends Service {
         }
         musicPlayer = offered;
         musicPlayer.addListener(musicStateListener);
+        externalCaptureMusicPaused = externalCaptureMusicSuspended;
+        if (externalCaptureMusicPaused) musicPlayer.pause();
         activeMusicUrl = targetUrl;
         activeMusicPlayableUrl = playableUrl;
         activeMusicStatus = targetStatus;
@@ -963,7 +973,7 @@ public class VoiceRoomForegroundService extends Service {
                 if (target > 0L && Math.abs(musicPlayer.getCurrentPosition() - target) > 2500L) {
                     musicPlayer.seekTo(target);
                 }
-                if (!externalCaptureMusicPaused) musicPlayer.play();
+                if (!externalCaptureMusicPaused && !externalCaptureMusicSuspended) musicPlayer.play();
                 return;
             }
         }
@@ -1042,7 +1052,8 @@ public class VoiceRoomForegroundService extends Service {
             }
             musicPlayer.seekTo(target);
             musicPlayer.setPlayWhenReady(
-                    "playing".equalsIgnoreCase(status) && !externalCaptureMusicPaused);
+                    "playing".equalsIgnoreCase(status)
+                            && !externalCaptureMusicPaused && !externalCaptureMusicSuspended);
             musicPlayer.setVolume(1f);
         } catch (Exception ignored) {
             handoffMusicReady = false;
