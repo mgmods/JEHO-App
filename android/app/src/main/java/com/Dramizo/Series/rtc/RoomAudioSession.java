@@ -68,11 +68,14 @@ public final class RoomAudioSession {
         if (app == null) return;
         appContext = new WeakReference<>(app);
 
-        // The foreground room service keeps RTC playback and music alive while
-        // JEHO is backgrounded. Do not let delayed seat/RTC callbacks reclaim
-        // MODE_IN_COMMUNICATION or audio focus from WhatsApp/voice recorders.
-        if (externalCaptureSuspended || !com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
+        // Keep the existing room route while the room foreground service is active.
+        // Background callbacks must not clear the speaker route or request focus again.
+        // If an external recorder (for example WhatsApp) takes capture, release fully.
+        if (externalCaptureSuspended) {
             release(app);
+            return;
+        }
+        if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
             return;
         }
 
