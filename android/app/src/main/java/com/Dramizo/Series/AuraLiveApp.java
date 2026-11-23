@@ -252,13 +252,13 @@ public class AuraLiveApp extends Application {
             suspendRoomAudioForExternalApp();
             return;
         }
-        // Yield audio focus, but keep the selected room communication device.
-        // Clearing MODE_IN_COMMUNICATION here reset Android 12+ routing to the
-        // earpiece while the foreground room service was still playing. If an
-        // external recorder actually starts, its capture callback performs the
-        // full audio-session release and restores system routing for that app.
+        // Fully release VoIP mode/focus as soon as JEHO is backgrounded.
+        // Keeping MODE_IN_COMMUNICATION active makes Android treat the room as
+        // an ongoing call and can block WhatsApp voice-note recording.
+        // Media playback continues through the room foreground service in normal
+        // media mode; external capture callbacks still perform the full handoff.
         roomAudioReleasedForBackground = true;
-        RoomAudioSession.releaseFocusKeepRoute(this);
+        RoomAudioSession.release(this);
         VoiceRoomForegroundService.refreshAudioForegroundType();
     }
 
