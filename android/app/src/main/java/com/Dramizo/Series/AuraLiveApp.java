@@ -128,6 +128,7 @@ public class AuraLiveApp extends Application {
         // configuration), which still means the external recorder is active.
         roomAudioSuspendedForExternalApp = true;
         RoomAudioSession.setExternalCaptureSuspended(true);
+        VoiceRoomForegroundService.suspendMusicForExternalCapture();
 
         // Android has already granted capture priority to the external recorder.
         // Stop publishing locally so no silent/stale room microphone remains active.
@@ -203,6 +204,7 @@ public class AuraLiveApp extends Application {
             // Restore room playback only if it was audible before the handoff.
             if (!roomSpeakerWasMutedBeforeExternalApp) {
                 rtc.setSpeakerMuted(false);
+                VoiceRoomForegroundService.restoreMusicAfterExternalCapture();
             }
         }
         roomMicWasEnabledBeforeExternalApp = false;
