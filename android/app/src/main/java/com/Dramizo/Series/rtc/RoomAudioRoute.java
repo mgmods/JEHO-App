@@ -152,9 +152,8 @@ public final class RoomAudioRoute {
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 try { am.clearCommunicationDevice(); } catch (Throwable ignored) {}
-            } else {
-                am.setSpeakerphoneOn(false);
             }
+            try { am.setSpeakerphoneOn(false); } catch (Throwable ignored) {}
             am.setMode(AudioManager.MODE_NORMAL);
         } catch (Throwable ignored) {
         }
@@ -187,14 +186,15 @@ public final class RoomAudioRoute {
                         for (AudioDeviceInfo device : devices) {
                             if (device != null
                                     && device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
-                                am.setCommunicationDevice(device);
-                                return;
+                                if (am.setCommunicationDevice(device)) return;
                             }
                         }
                     }
                 }
                 am.clearCommunicationDevice();
+                am.setSpeakerphoneOn(false);
             } catch (Throwable ignored) {
+                try { am.setSpeakerphoneOn(wantSpeaker); } catch (Throwable ignoredAgain) {}
             }
         } else {
             try { am.setSpeakerphoneOn(wantSpeaker); } catch (Throwable ignored) {}
