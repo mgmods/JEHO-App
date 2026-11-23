@@ -502,6 +502,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyOverlayActive;
     private Runnable luckyOverlayRelease;
     private ExoPlayer roomMusicPlayer;
+    private volatile boolean externalCaptureMusicPaused;
     @Nullable private Player.Listener roomMusicPlayerListener;
     /** Lazy: create only when a Mikoo game opens (WebView cold-create freezes S23 if done in onCreate). */
     @Nullable private WebView roomGameWebView;
@@ -6170,7 +6171,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.seekTo(seekTarget);
             }
             applySharedMusicVolume();
-            roomMusicPlayer.setPlayWhenReady(playing);
+            roomMusicPlayer.setPlayWhenReady(playing && !externalCaptureMusicPaused);
             bindMusicVideoSurfaces();
             return;
         }
@@ -6455,7 +6456,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 + "<script src='https://www.youtube.com/iframe_api'></script><script>"
                 + "var musicYtPlayer;function onYouTubeIframeAPIReady(){musicYtPlayer=new YT.Player('player',"
                 + "{height:'100%',width:'100%',videoId:'" + videoId + "',playerVars:{autoplay:"
-                + (playing ? "1" : "0")
+                + (playing && !externalCaptureMusicPaused ? "1" : "0")
                 + ",controls:0,playsinline:1,rel:0,modestbranding:1,fs:0,start:" + startSec
                 + "},events:{onReady:function(e){var v=" + Math.round(sharedMusicVolume * 100f)
                 + ";if(v===0)e.target.mute();else{e.target.unMute();e.target.setVolume(v);}}}});}"
@@ -6572,7 +6573,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 } else if (roomMusicPlayer != null && currentMusicUrl.equals(preparedMusicUrl)
                         && roomMusicPlayer.getMediaItemCount() > 0) {
                     applySharedMusicVolume();
-                    roomMusicPlayer.setPlayWhenReady(true);
+                    roomMusicPlayer.setPlayWhenReady(!externalCaptureMusicPaused);
                 } else {
                     streamYoutubeInDisc(currentMusicUrl, true, false, pos, null, null, null);
                 }
@@ -10582,6 +10583,48 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         VoiceRoomActivity room = sAliveRoom != null ? sAliveRoom.get() : null;
         if (room == null || room.isFinishing() || room.isDestroyed()) return null;
         return room;
+    }
+
+    /** Pause only this device's Activity-owned music decoder while an external app records. */
+    public static void suspendMusicForExternalCapture() {
+        VoiceRoomActivity room = getAliveInstance();
+        if (room == null) return;
+        room.runOnUiThread(room::pauseMusicForExternalCapture);
+    }
+
+    /** Resume the same room track after the external recorder has released the microphone. */
+    public static void restoreMusicAfterExternalCapture() {
+        VoiceRoomActivity room = getAliveInstance();
+        if (room == null) return;
+        room.runOnUiThread(room::resumeMusicAfterExternalCapture);
+    }
+
+    private void pauseMusicForExternalCapture() {
+        externalCaptureMusicPaused = true;
+        if (roomMusicPlayer != null) {
+            try { roomMusicPlayer.pause(); } catch (RuntimeException ignored) {}
+        }
+        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
+            try {
+                musicYoutubeWebView.evaluateJavascript(
+                        "if(window.musicYtPlayer&&musicYtPlayer.pauseVideo)musicYtPlayer.pauseVideo();",
+                        null);
+            } catch (RuntimeException ignored) {}
+        }
+    }
+
+    private void resumeMusicAfterExternalCapture() {
+        externalCaptureMusicPaused = false;
+        if (!"playing".equalsIgnoreCase(currentMusicStatus)) return;
+        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
+            try {
+                musicYoutubeWebView.evaluateJavascript(
+                        "if(window.musicYtPlayer&&musicYtPlayer.playVideo)musicYtPlayer.playVideo();",
+                        null);
+            } catch (RuntimeException ignored) {}
+        } else if (!isLocalMusicUrl(currentMusicUrl) && roomMusicPlayer != null) {
+            try { roomMusicPlayer.play(); } catch (RuntimeException ignored) {}
+        }
     }
 
     /** Pause the Activity-owned ExoPlayer/YouTube music during an external voice recording. */
