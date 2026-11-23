@@ -276,7 +276,14 @@ public class AuraLiveApp extends Application {
                     roomActive = serviceRoomId != null && !serviceRoomId.isEmpty()
                             && VoiceRoomForegroundService.hasActiveRoom(AuraLiveApp.this, serviceRoomId);
                 }
-                if (!roomActive) return;
+                if (!roomActive) {
+                    // Clear the temporary audio-focus latch if the user left the room
+                    // while WhatsApp was recording; otherwise the next room would stay muted.
+                    if (!anotherAppRecording && roomAudioSuspendedForExternalApp) {
+                        restoreRoomAudioAfterExternalApp();
+                    }
+                    return;
+                }
 
                 if (anotherAppRecording) {
                     Handler handler = externalCaptureHandler;
@@ -360,11 +367,24 @@ public class AuraLiveApp extends Application {
                     roomMicCaptureSessionIdBeforeExternalApp =
                             config.getClientAudioSessionId();
                     externalPackageActive = true;
-                } else if (ourCaptureAlreadySuspended
-                        && config.getClientAudioSessionId()
-                        != roomMicCaptureSessionIdBeforeExternalApp) {
-                    // Fallback for platform builds that omit the package name.
-                    externalPackageActive = true;
+                } else {
+                    int sessionId = config.getClientAudioSessionId();
+                    if (ourCaptureAlreadySuspended) {
+                        // Fallback for Android/OEM builds that omit package names:
+                        // WhatsApp owns a different AudioRecord session from JEHO.
+                        if (sessionId != roomMicCaptureSessionIdBeforeExternalApp) {
+                            externalPackageActive = true;
+                        }
+                    } else if (config.isClientSilenced()) {
+                        roomMicCaptureSessionIdBeforeExternalApp = sessionId;
+                        externalPackageActive = true;
+                    } else if (roomMicCaptureSessionIdBeforeExternalApp < 0) {
+                        // Remember JEHO's first active capture session before another
+                        // app starts recording, so a second session can be identified.
+                        roomMicCaptureSessionIdBeforeExternalApp = sessionId;
+                    } else if (sessionId != roomMicCaptureSessionIdBeforeExternalApp) {
+                        externalPackageActive = true;
+                    }
                 }
             } catch (Throwable ignored) {
                 // If an active recorder cannot be classified, fail safe and keep
