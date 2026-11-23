@@ -119,8 +119,11 @@ public final class RoomAudioRoute {
                 return;
             }
             if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
-                RoomAudioSession.release(context);
-                am.setSpeakerphoneOn(wantOpenSpeaker && !external);
+                // Keep the room's communication route while its foreground service
+                // carries the call in the background. Do not request audio focus here:
+                // an external recorder is handled by externalCaptureSuspended above.
+                am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                applyCommunicationDevice(am, wantOpenSpeaker && !external);
                 return;
             }
             am.setMode(AudioManager.MODE_IN_COMMUNICATION);
