@@ -571,10 +571,10 @@ public class AuraLiveApp extends Application {
             @Override public void onActivityStopped(Activity activity) {
                 startedActivities = Math.max(0, startedActivities - 1);
                 if (foregroundActivity == activity) foregroundActivity = null;
-                // Release only Android's call mode/focus in background so WhatsApp
-                // can acquire the microphone. Keep the RTC session, room playback,
-                // music decoder and published mic alive in the foreground service.
-                if (startedActivities == 0) releaseAudioModeForBackground();
+                // Backgrounding is not an audio handoff. Keep the room route and
+                // playback focus stable to avoid a pause/cut on minimize or app switching.
+                // The external-recording callback below releases focus only when an
+                // actual recorder (for example WhatsApp voice notes) takes microphone input.
             }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
             @Override public void onActivityDestroyed(Activity activity) {}
