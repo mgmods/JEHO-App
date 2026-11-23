@@ -110,12 +110,17 @@ public final class RoomAudioRoute {
             if (am == null) return;
             boolean external = hasExternalHeadset(context);
 
-            // During a confirmed external recording, leave Android's capture and
-            // communication route to that app. Otherwise keep the room route stable
-            // in background and even when this user's microphone is muted.
+            // Background room playback belongs to the foreground media service.
+            // Never reclaim the VoIP communication mode from WhatsApp or another
+            // foreground recorder due to delayed route/mic callbacks.
             if (RoomAudioSession.isExternalCaptureSuspended()) {
                 RoomAudioSession.release(context);
                 am.setSpeakerphoneOn(false);
+                return;
+            }
+            if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
+                RoomAudioSession.release(context);
+                am.setSpeakerphoneOn(wantOpenSpeaker && !external);
                 return;
             }
             am.setMode(AudioManager.MODE_IN_COMMUNICATION);
