@@ -28,6 +28,9 @@ public class GiftViewModel extends ViewModel {
     private int combo = 1;
     private long lastSendAt;
     private boolean loadInFlight;
+    private long lastLoadCompletedAt;
+    private long lastWalletLoadAt;
+    private boolean walletLoadInFlight;
 
     public GiftViewModel(AppContainer c) {
         this.c = c;
@@ -87,6 +90,11 @@ public class GiftViewModel extends ViewModel {
             gifts.postValue(new ArrayList<>(local));
         }
         if (loadInFlight) return;
+        // Reopening the room gift sheet should paint from memory, not refetch the
+        // same catalog on every open. Realtime CP config updates remain independent.
+        long now = System.currentTimeMillis();
+        if (hasGiftsNow() && lastLoadCompletedAt > 0L
+                && now - lastLoadCompletedAt < 15_000L) return;
         final boolean hadUsableCatalog = hasGiftsNow() || (local != null && !local.isEmpty());
         loadInFlight = true;
         try {
@@ -186,6 +194,7 @@ public class GiftViewModel extends ViewModel {
                 android.util.Log.w("GiftViewModel", "Gift catalog refresh exception", failure);
             } finally {
                 loadInFlight = false;
+                lastLoadCompletedAt = System.currentTimeMillis();
             }
             });
         } catch (RuntimeException rejected) {
@@ -198,12 +207,27 @@ public class GiftViewModel extends ViewModel {
     }
 
     public void loadWallet() {
-        c.getIoExecutor().execute(() -> {
-            Result<WalletDtos.WalletDto> r = c.getWalletUseCase.execute();
-            if (r.success && r.data != null) {
-                coinsBalance.postValue(r.data.coins);
-            }
-        });
+        long now = System.currentTimeMillis();
+        if (walletLoadInFlight || (lastWalletLoadAt > 0L
+                && now - lastWalletLoadAt < 5_000L)) return;
+        walletLoadInFlight = true;
+        lastWalletLoadAt = now;
+        try {
+            c.getIoExecutor().execute(() -> {
+                try {
+                    Result<WalletDtos.WalletDto> r = c.getWalletUseCase.execute();
+                    if (r.success && r.data != null) {
+                        coinsBalance.postValue(r.data.coins);
+                    }
+                } finally {
+                    walletLoadInFlight = false;
+                }
+            });
+        } catch (RuntimeException rejected) {
+            walletLoadInFlight = false;
+            lastWalletLoadAt = 0L;
+            android.util.Log.w("GiftViewModel", "Wallet refresh executor rejected request", rejected);
+        }
     }
 
     public void send(String giftId, String receiverId, String roomId) {
