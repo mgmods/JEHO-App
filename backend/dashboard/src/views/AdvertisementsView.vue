@@ -8,7 +8,7 @@
     <div v-else class="row g-3">
       <div class="col-12">
         <div class="glass p-3">
-          <div class="mb-3 p-3 rounded" :style="{background: form.background || 'linear-gradient(90deg,#21142d,#32184c)', opacity: Math.max(0.2, Math.min(1, (form.backgroundOpacity || 92)/100))}">
+          <div class="mb-3 p-3 rounded" :style="{background: form.background || 'linear-gradient(90deg,#21142d,#32184c)', backgroundImage: form.backgroundImage ? 'url(' + form.backgroundImage + ')' : undefined, backgroundSize: 'cover', backgroundPosition: 'center'}">
             <div class="small">معاينة مباشرة</div>
             <strong>{{ queue[0]?.senderName || 'اسم المرسل' }}</strong>
             <span class="ms-2">{{ queue[0]?.text || 'نص الإعلان سيظهر هنا بشكل متحرك داخل التطبيق' }}</span>
@@ -32,6 +32,10 @@
             <div class="col-md-3 form-check form-switch">
               <input id="sendEnabled" v-model="form.sendButtonEnabled" class="form-check-input" type="checkbox">
               <label class="form-check-label" for="sendEnabled">إظهار زر إرسال إعلان</label>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">منطقة إعادة ضبط الحد اليومي (IANA)</label>
+              <input v-model="form.resetTimezone" type="text" placeholder="Asia/Riyadh" class="form-control" dir="ltr">
             </div>
             <div class="col-md-3">
               <label class="form-label small">الحد اليومي للعضو</label>
@@ -65,6 +69,8 @@
           <div class="row g-2">
             <div class="col-6"><label class="form-label small">الموضع</label><select v-model="form.position" class="form-select"><option value="safe-top">أعلى آمن</option><option value="safe-bottom">أسفل آمن</option><option value="custom-safe">موضع مخصص آمن</option></select></div>
             <div class="col-6"><label class="form-label small">الاتجاه</label><select v-model="form.direction" class="form-select"><option value="rtl">RTL</option><option value="ltr">LTR</option></select></div>
+            <div class="col-6"><label class="form-label small">نوع الانتقال</label><select v-model="form.transitionType" class="form-select"><option value="slide">انزلاق</option><option value="fade">تلاشي</option></select></div>
+            <div class="col-6"><label class="form-label small">قالب الشريط</label><select v-model="form.template" class="form-select"><option value="premium-v1">فاخر</option><option value="compact">مختصر</option><option value="gold">ذهبي</option></select></div>
             <div class="col-6"><label class="form-label small">مدة العرض ms</label><input v-model.number="form.displayDurationMs" type="number" min="1000" max="120000" class="form-control"></div>
             <div class="col-6"><label class="form-label small">الفاصل ms</label><input v-model.number="form.gapMs" type="number" min="0" max="120000" class="form-control"></div>
             <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="form.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
@@ -90,25 +96,30 @@
             <div class="col-6"><label class="form-label small">الزوايا dp</label><input v-model.number="form.radiusDp" type="number" min="0" max="40" class="form-control"></div>
             <div class="col-6"><label class="form-label small">المسافة dp</label><input v-model.number="form.spacingDp" type="number" min="0" max="30" class="form-control"></div>
             <div class="col-6"><label class="form-label small">شكل الصورة</label><select v-model="form.avatarShape" class="form-select"><option value="circle">دائرية</option><option value="square">مربعة</option></select></div>
+            <div class="col-6"><label class="form-label small">نوع الخط</label><select v-model="form.fontFamily" class="form-select"><option value="default">افتراضي</option><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option></select></div>
           </div>
         </div>
       </div>
 
       <div class="col-lg-8">
         <div class="glass p-3 h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3 class="h6 mb-0">طابور الإعلانات</h3>
-            <button class="btn btn-outline-light btn-sm" @click="loadQueue">تحديث</button>
+          <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h3 class="h6 mb-0">طابور الإعلانات وسجل العرض</h3>
+            <div class="d-flex gap-2">
+              <input v-model="queueSearch" class="form-control form-control-sm" placeholder="بحث بالعضو أو النص أو ID" @keyup.enter="loadQueue">
+              <button class="btn btn-outline-light btn-sm" @click="loadQueue">بحث</button>
+              <button class="btn btn-outline-light btn-sm" @click="showHistory=!showHistory;loadQueue()">{{ showHistory ? 'عرض الطابور' : 'سجل الإعلانات' }}</button>
+            </div>
           </div>
           <div class="table-responsive">
             <table class="table table-dark table-sm align-middle mb-0">
-              <thead><tr><th>الحالة</th><th>المرسل</th><th>النص</th><th>الترتيب</th><th>إجراء</th></tr></thead>
+              <thead><tr><th>الحالة</th><th>المرسل</th><th>النص</th><th>الترتيب</th><th>التوقيت</th><th>إجراء</th></tr></thead>
               <tbody>
                 <tr v-for="ad in queue" :key="ad.id">
-                  <td>{{ ad.status }}</td><td>{{ ad.senderName }}</td><td class="text-truncate" style="max-width:260px">{{ ad.text }}</td><td>{{ ad.queueOrder }}</td>
-                  <td><button class="btn btn-sm btn-outline-danger" :disabled="ad.status === 'playing'" @click="remove(ad.id)">حذف</button></td>
+                  <td><span :class="ad.status === 'playing' ? 'badge bg-success' : 'badge bg-secondary'">{{ ad.status === 'playing' ? 'يُعرض الآن' : ad.status === 'queued' ? 'بانتظار العرض' : ad.status }}</span></td><td>{{ ad.senderName }}</td><td class="text-truncate" style="max-width:260px">{{ ad.text }}</td><td>{{ ad.queueOrder }}</td><td>{{ ad.startedAt || ad.createdAt }}</td>
+                  <td class="d-flex gap-1"><button v-if="!showHistory && ad.status === 'queued'" class="btn btn-sm btn-outline-warning" @click="prioritize(ad.id)">أولوية</button><button v-if="!showHistory" class="btn btn-sm btn-outline-danger" :disabled="ad.status === 'playing'" @click="remove(ad.id)">حذف</button></td>
                 </tr>
-                <tr v-if="!queue.length"><td colspan="5" class="text-center text-muted py-4">الطابور فارغ</td></tr>
+                <tr v-if="!queue.length"><td colspan="6" class="text-center text-muted py-4">لا توجد إعلانات</td></tr>
               </tbody>
             </table>
           </div>
@@ -117,11 +128,14 @@
 
       <div class="col-12">
         <div class="glass p-3">
-          <h3 class="h6 mb-3">إحصائيات آخر {{ statsDays }} يوم</h3>
+          <div class="d-flex align-items-center justify-content-between mb-3"><h3 class="h6 mb-0">إحصائيات آخر {{ statsDays }} يوم</h3><select v-model.number="statsDays" class="form-select form-select-sm" style="width:110px" @change="loadStats"><option :value="1">اليوم</option><option :value="7">7 أيام</option><option :value="30">30 يوم</option></select></div>
           <div class="row g-2">
             <div class="col-6 col-md-3"><div class="stat-card"><div class="small text-muted">الإجمالي</div><div class="h4 mb-0">{{ stats.total || 0 }}</div></div></div>
             <div class="col-6 col-md-3"><div class="stat-card"><div class="small text-muted">المعروض</div><div class="h4 mb-0">{{ stats.displayed || 0 }}</div></div></div>
             <div class="col-6 col-md-3"><div class="stat-card"><div class="small text-muted">المرفوض</div><div class="h4 mb-0">{{ stats.rejected || 0 }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="stat-card"><div class="small text-muted">بانتظار العرض</div><div class="h4 mb-0">{{ stats.waiting || 0 }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="stat-card"><div class="small text-muted">المقبول</div><div class="h4 mb-0">{{ stats.accepted || 0 }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="stat-card"><div class="small text-muted">محاولات التكرار</div><div class="h4 mb-0">{{ stats.duplicateAttempts || 0 }}</div></div></div>
             <div class="col-6 col-md-3"><div class="stat-card"><div class="small text-muted">كلمات محظورة</div><div class="h4 mb-0">{{ stats.blockedwordattempts || stats.blockedWordAttempts || 0 }}</div></div></div>
           </div>
         </div>
@@ -138,12 +152,12 @@ import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const loading=ref(true), saving=ref(false), savingWords=ref(false), error=ref(''), success=ref('')
-const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=7
-const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle'})
+const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=ref(7), queueSearch=ref(''), showHistory=ref(false)
+const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',template:'premium-v1'})
 function apply(data){ Object.assign(form,data||{}); }
 async function load(){
   loading.value=true; error.value=''
-  const [c,q,s,b]=await Promise.all([advertisementsApi.config(),advertisementsApi.queue({limit:100}),advertisementsApi.stats({days:statsDays}),advertisementsApi.bannedWords()])
+  const [c,q,s,b]=await Promise.all([advertisementsApi.config(),advertisementsApi.queue({limit:100,q:queueSearch.value,history:showHistory.value}),advertisementsApi.stats({days:statsDays.value}),advertisementsApi.bannedWords()])
   if(c.error){error.value=c.error.message||String(c.error);loading.value=false;return}
   apply(c.data?.data??c.data)
   queue.value=q.data?.items||q.data?.data?.items||[]
@@ -153,7 +167,9 @@ async function load(){
 }
 async function save(){saving.value=true;const r=await advertisementsApi.saveConfig({...form});saving.value=false;if(r.error){error.value=r.error.message||String(r.error);return}success.value='تم حفظ إعدادات الإعلانات';apply(r.data?.data??r.data)}
 async function saveWords(){savingWords.value=true;const r=await advertisementsApi.saveBannedWords(bannedWords.value);savingWords.value=false;if(r.error){error.value=r.error.message||String(r.error);return}success.value='تم حفظ الكلمات المحظورة'}
-async function loadQueue(){const r=await advertisementsApi.queue({limit:100});if(!r.error)queue.value=r.data?.items||r.data?.data?.items||[]}
+async function loadQueue(){const r=await advertisementsApi.queue({limit:100,q:queueSearch.value,history:showHistory.value});if(!r.error)queue.value=r.data?.items||r.data?.data?.items||[]}
+async function loadStats(){const r=await advertisementsApi.stats({days:statsDays.value});if(!r.error)stats.value=r.data?.data??r.data??{}}
+async function prioritize(id){const r=await advertisementsApi.queueAction(id,{action:'priority',queueOrder:0});if(r.error){error.value=r.error.message||String(r.error);return}await loadQueue()}
 async function remove(id){const r=await advertisementsApi.queueAction(id,{action:'remove'});if(r.error){error.value=r.error.message||String(r.error);return}await loadQueue()}
 onMounted(load)
 </script>
