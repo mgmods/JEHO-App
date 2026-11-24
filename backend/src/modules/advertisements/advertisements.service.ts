@@ -220,7 +220,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   private publicAd(a:Advertisement){return{id:a.id,senderId:a.senderId,senderName:a.senderName,senderImageUrl:a.senderImageUrl,text:a.text,status:a.status,queueOrder:Number(a.queueOrder||0),createdAt:a.createdAt,startedAt:a.startedAt,completedAt:a.completedAt,displayDurationMs:a.displayDurationMs};}
   private async getBannedWords(){const r=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_banned_words']);return String(r?.[0]?.value||'').split(',').map(x=>x.trim()).filter(Boolean);}
-  private normalize(input:string){return String(input||'').normalize('NFKC').toLocaleLowerCase('ar').replace(/[ـ\\s\\u200b-\\u200f]+/g,'').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/ة/g,'ه');}
+  private normalize(input:string){return String(input||'').normalize('NFKC').toLocaleLowerCase('ar').replace(/[^\p{L}\p{N}]/gu,'').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/ة/g,'ه');}
   private resetKey(timezone:string){try{return new Intl.DateTimeFormat('en-CA',{timeZone:timezone||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}catch{return new Date().toISOString().slice(0,10);}}
   private async resetStartFromDb(timezone:string){
     const safe = String(timezone || 'UTC').trim() || 'UTC';
