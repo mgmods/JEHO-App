@@ -1040,24 +1040,33 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.tvName.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
             holder.b.tvName.setMarqueeRepeatLimit(-1);
             holder.b.tvName.setSelected(true);
-            if (scaleMode == SCALE_MICRO) {
-                View nameRow = (View) holder.b.tvName.getParent().getParent();
-                ViewGroup.LayoutParams nameRowRaw = nameRow.getLayoutParams();
-                if (nameRowRaw instanceof ViewGroup.MarginLayoutParams nameRowLp) {
-                    nameRowLp.topMargin = 0;
-                    nameRowLp.bottomMargin = 0;
-                    nameRow.setLayoutParams(nameRowLp);
-                }
-                ViewGroup.LayoutParams nameRaw = holder.b.tvName.getLayoutParams();
-                nameRaw.height = Math.round(16 * d);
-                holder.b.tvName.setLayoutParams(nameRaw);
-                View rankRow = holder.b.rowCustomDisplayRank;
-                if (rankRow != null) {
-                    ViewGroup.LayoutParams rankRaw = rankRow.getLayoutParams();
-                    if (rankRaw instanceof ViewGroup.MarginLayoutParams rankLp) {
-                        rankLp.topMargin = Math.round(7 * d);
-                        rankRow.setLayoutParams(rankLp);
-                    }
+            View nameRow = (View) holder.b.tvName.getParent().getParent();
+            ViewGroup.LayoutParams nameRowRaw = nameRow.getLayoutParams();
+            nameRowRaw.height = scaleMode == SCALE_MICRO
+                    ? Math.round(16 * d) : ViewGroup.LayoutParams.WRAP_CONTENT;
+            if (nameRowRaw instanceof ViewGroup.MarginLayoutParams nameRowLp) {
+                nameRowLp.topMargin = 0;
+                nameRowLp.bottomMargin = 0;
+            }
+            nameRow.setLayoutParams(nameRowRaw);
+
+            View nameContainer = (View) holder.b.tvName.getParent();
+            ViewGroup.LayoutParams nameContainerLp = nameContainer.getLayoutParams();
+            nameContainerLp.height = scaleMode == SCALE_MICRO
+                    ? Math.round(16 * d) : Math.round(22 * d);
+            nameContainer.setLayoutParams(nameContainerLp);
+
+            ViewGroup.LayoutParams nameRaw = holder.b.tvName.getLayoutParams();
+            nameRaw.height = scaleMode == SCALE_MICRO
+                    ? Math.round(16 * d) : ViewGroup.LayoutParams.MATCH_PARENT;
+            holder.b.tvName.setLayoutParams(nameRaw);
+
+            View rankRow = holder.b.rowCustomDisplayRank;
+            if (rankRow != null && scaleMode == SCALE_MICRO) {
+                ViewGroup.LayoutParams rankRaw = rankRow.getLayoutParams();
+                if (rankRaw instanceof ViewGroup.MarginLayoutParams rankLp) {
+                    rankLp.topMargin = Math.round(7 * d);
+                    rankRow.setLayoutParams(rankLp);
                 }
             }
         }
@@ -1066,6 +1075,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         if (holder.b.tvGiftCount != null) {
             holder.b.tvGiftCount.setTextSize(scaleMode == SCALE_MICRO ? 8f : scaleMode == SCALE_COMPACT ? 9f : 10f);
+            ViewGroup.LayoutParams coinRaw = holder.b.tvGiftCount.getLayoutParams();
+            coinRaw.height = Math.round((scaleMode == SCALE_MICRO ? 12 : 14) * d);
+            if (coinRaw instanceof ViewGroup.MarginLayoutParams coinLp) {
+                coinLp.topMargin = Math.round((scaleMode == SCALE_MICRO ? 1 : 2) * d);
+            }
+            holder.b.tvGiftCount.setLayoutParams(coinRaw);
         }
     }
 
