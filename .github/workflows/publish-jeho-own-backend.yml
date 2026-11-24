@@ -47,3 +47,4 @@ jobs:
             ghcr.io/mgmods/jeho-own-backend:${{ github.sha }}
 
 # Rebuild trigger: publish the current authoritative MG-JEHO backend source to GHCR.
+# Manual Ghaymah image refresh requested on 2026-11-24; keep the build on MG-JEHO.
