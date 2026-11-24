@@ -90,9 +90,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (!key || key.length < 8 || key.length > 128) throw new BadRequestException('معرّف الطلب غير صالح');
 
     const existing = await this.ads.findOne({where:{idempotencyKey:key}});
-    if (existing) { await this.recordRejected(userId, text, 'duplicate', 'محاولة إرسال مكررة'); return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)}; }
+    if (existing) { return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)}; }
 
-    // Queue capacity is checked again under the same transaction/advisory lock below; the preliminary check only provides a fast rejection.
+    // The transaction serializes all queue mutations so maxQueueSize and queueOrder
+    // remain correct even when many devices submit at the same moment.
 
     const banned = await this.getBannedWords();
     const normalized = this.normalize(text);
@@ -105,7 +106,13 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const qr = this.db.createQueryRunner();
     await qr.connect(); await qr.startTransaction();
     try {
+      await qr.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['voice-room-ad-queue']);
       await qr.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['voice-ad-limit:'+userId+':'+this.resetKey(c.resetTimezone)]);
+      const duplicate = await qr.manager.findOne(Advertisement,{where:{idempotencyKey:key}});
+      if (duplicate) {
+        await qr.commitTransaction();
+        return {duplicate:true, advertisement:this.publicAd(duplicate), remaining:await this.remainingForUser(userId)};
+      }
       const start = await this.resetStartFromDb(c.resetTimezone);
       const count = Number((await qr.query('SELECT COUNT(*)::int AS count FROM "jeho_own"."room_advertisements" WHERE "senderId"=$1 AND "createdAt">=$2 AND "status" IN ($3,$4,$5)',[userId,start,AdvertisementStatus.QUEUED,AdvertisementStatus.PLAYING,AdvertisementStatus.COMPLETED]))?.[0]?.count || 0);
       const limit = Math.max(0,Math.floor(Number(c.dailyLimit)||0));
@@ -210,7 +217,11 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   private async resetStartFromDb(timezone:string){
     const safe = String(timezone || 'UTC').trim() || 'UTC';
     try {
-      const rows = await this.db.query("SELECT date_trunc('day', (NOW() AT TIME ZONE $1)) AS start",[safe]);
+      // Build the UTC instant corresponding to midnight in the configured IANA timezone.
+      const rows = await this.db.query(
+        "SELECT ((date_trunc('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1)) AS start",
+        [safe],
+      );
       return rows?.[0]?.start ? new Date(rows[0].start) : new Date();
     } catch {
       return new Date(this.resetKey(safe)+'T00:00:00.000Z');
