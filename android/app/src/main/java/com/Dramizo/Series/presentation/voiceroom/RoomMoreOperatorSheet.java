@@ -329,6 +329,8 @@ final class RoomMoreOperatorSheet {
 
         final int[] maxTextLength = {180};
         final String[] idempotencyKey = {UUID.randomUUID().toString()};
+        final boolean[] requestAttempted = {false};
+        final boolean[] requestInFlight = {false};
         input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxTextLength[0])});
 
         AlertDialog dialog = new AlertDialog.Builder(ctx)
@@ -342,6 +344,7 @@ final class RoomMoreOperatorSheet {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence text, int st, int before, int count) {
                 counter.setText(text.length() + " / " + maxTextLength[0]);
+                if (requestAttempted[0] && !requestInFlight[0]) idempotencyKey[0] = UUID.randomUUID().toString();
             }
             @Override public void afterTextChanged(Editable e) {}
         });
@@ -382,6 +385,9 @@ final class RoomMoreOperatorSheet {
             });
             send.setOnClickListener(btn -> {
                 btn.setEnabled(false);
+                input.setEnabled(false);
+                requestAttempted[0] = true;
+                requestInFlight[0] = true;
                 Map<String,String> body = new HashMap<>();
                 body.put("text", input.getText().toString().trim());
                 body.put("idempotencyKey", idempotencyKey[0]);
@@ -391,12 +397,16 @@ final class RoomMoreOperatorSheet {
                             dialog.dismiss();
                             Toast.makeText(ctx, "تم إرسال الإعلان إلى الطابور", Toast.LENGTH_SHORT).show();
                         } else {
-                            btn.setEnabled(true);
+                            requestInFlight[0] = false;
+                            input.setEnabled(true);
+                            btn.setEnabled(input.getText().toString().trim().length() > 0 && input.length() <= maxTextLength[0]);
                             Toast.makeText(ctx, "تعذر إرسال الإعلان", Toast.LENGTH_SHORT).show();
                         }
                     }
                     @Override public void onFailure(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>> call, Throwable t) {
-                        btn.setEnabled(true);
+                        requestInFlight[0] = false;
+                        input.setEnabled(true);
+                        btn.setEnabled(input.getText().toString().trim().length() > 0 && input.length() <= maxTextLength[0]);
                         Toast.makeText(ctx, "تعذر الاتصال بالخادم", Toast.LENGTH_SHORT).show();
                     }
                 });
