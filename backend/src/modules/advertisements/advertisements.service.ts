@@ -10,7 +10,7 @@ const DEFAULT_CONFIG: any = {
   enabled: true, sendButtonEnabled: true, paused: false, dailyLimit: 1, maxQueueSize: 500, maxTextLength: 180,
   resetTimezone: 'UTC', displayDurationMs: 9000, gapMs: 1800,
   entrySpeedPxPerSec: 120, exitSpeedPxPerSec: 120, reducedMotionStatic: true,
-  template: 'premium-v1', position: 'safe-bottom', direction: 'rtl',
+  template: 'premium-v1', position: 'safe-bottom', direction: 'rtl', transitionType: 'slide', fontFamily: 'default',
   background: 'linear-gradient(90deg,rgba(20,12,42,.94),rgba(50,24,76,.86))',
   backgroundImage: '', backgroundOpacity: 92, radiusDp: 18, heightDp: 48,
   avatarDp: 34, avatarShape: 'circle', nameSp: 12, textSp: 13,
@@ -141,8 +141,13 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       });
       await qr.manager.save(ad); await qr.commitTransaction(); void this.tick();
       return {duplicate:false,advertisement:this.publicAd(ad),remaining:await this.remainingForUser(userId)};
-    } catch(e) { await qr.rollbackTransaction(); throw e; }
-    finally { await qr.release(); }
+    } catch(e) {
+      await qr.rollbackTransaction();
+      if (e instanceof ConflictException && /الحد اليومي|الطابور ممتلئ/.test(e.message)) {
+        await this.recordRejected(userId, text, e.message.includes('الحد اليومي') ? 'daily_limit' : 'queue_full', e.message);
+      }
+      throw e;
+    } finally { await qr.release(); }
   }
 
   private async recordRejected(userId:string,text:string,code:string,reason:string) {
@@ -188,7 +193,11 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
     [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,100],['avatarDp',20,56],['nameSp',8,24],['textSp',9,30],['spacingDp',0,30]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
-    ['resetTimezone','template','position','direction','background','backgroundImage','avatarShape','nameColor','textColor'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
+    ['resetTimezone','template','position','direction','background','backgroundImage','avatarShape','nameColor','textColor','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
+    if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
+    if (!['default','sans','serif','mono'].includes(merged.fontFamily)) merged.fontFamily='default';
+    if (!['safe-top','safe-bottom','custom-safe'].includes(merged.position)) merged.position='safe-bottom';
+    if (!['rtl','ltr'].includes(merged.direction)) merged.direction='rtl';
     await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']);
     this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged);
     return merged;
@@ -224,6 +233,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day'))::int AS total,
       COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND status='completed')::int AS displayed,
       COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND status='rejected')::int AS rejected,
+      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND status='queued')::int AS waiting,
+      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND status IN ('queued','playing','completed','removed'))::int AS accepted,
       COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND rejectionCode='blocked_word')::int AS blockedWordAttempts,
       COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND rejectionCode='duplicate')::int AS duplicateAttempts
       FROM "jeho_own"."room_advertisements"`;
