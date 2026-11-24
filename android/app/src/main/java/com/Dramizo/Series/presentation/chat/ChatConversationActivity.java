@@ -1626,6 +1626,16 @@ public class ChatConversationActivity extends ThemedActivity {
     }
 
     private boolean voiceRecordingActive;
+    private boolean roomAudioHandoffForVoiceRecording;
+
+    private void restoreChatVoiceRoomAudio() {
+        if (!roomAudioHandoffForVoiceRecording) return;
+        roomAudioHandoffForVoiceRecording = false;
+        try {
+            ((AuraLiveApp) getApplication()).onChatVoiceRecordingFinished();
+        } catch (Throwable ignored) {
+        }
+    }
 
     private void setupVoiceButton() {
         if (binding.btnVoice == null) return;
@@ -1670,6 +1680,8 @@ public class ChatConversationActivity extends ThemedActivity {
             mediaRecorder.setOutputFile(voiceFile.getAbsolutePath());
             mediaRecorder.prepare();
             mediaRecorder.start();
+            ((AuraLiveApp) getApplication()).onChatVoiceRecordingStarted();
+            roomAudioHandoffForVoiceRecording = true;
             voiceStartedAt = SystemClock.elapsedRealtime();
             voiceCancelled = false;
             voiceRecordingActive = true;
@@ -1758,6 +1770,7 @@ public class ChatConversationActivity extends ThemedActivity {
                 voiceFile.delete();
             }
             voiceFile = null;
+            restoreChatVoiceRoomAudio();
             return;
         }
         if (durationSec < 1) {
@@ -1765,6 +1778,7 @@ public class ChatConversationActivity extends ThemedActivity {
             voiceFile.delete();
             voiceFile = null;
             Toast.makeText(this, R.string.hold_to_record, Toast.LENGTH_SHORT).show();
+            restoreChatVoiceRoomAudio();
             return;
         }
         uploadAndSendVoice(voiceFile, durationSec);
@@ -1798,14 +1812,21 @@ public class ChatConversationActivity extends ThemedActivity {
                     //noinspection ResultOfMethodCallIgnored
                     file.delete();
                     String url = AssetCatalog.absoluteUrl(resp.body().data.url);
-                    runOnUiThread(() -> viewModel.sendAudio(conversationId, url, durationSec));
+                    runOnUiThread(() -> {
+                        viewModel.sendAudio(conversationId, url, durationSec);
+                        restoreChatVoiceRoomAudio();
+                    });
                 } else {
-                    runOnUiThread(() ->
-                            Toast.makeText(this, R.string.error_generic, Toast.LENGTH_LONG).show());
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, R.string.error_generic, Toast.LENGTH_LONG).show();
+                        restoreChatVoiceRoomAudio();
+                    });
                 }
             } catch (Exception e) {
-                runOnUiThread(() ->
-                        Toast.makeText(this, R.string.error_generic, Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> {
+                    Toast.makeText(this, R.string.error_generic, Toast.LENGTH_LONG).show();
+                    restoreChatVoiceRoomAudio();
+                });
             }
         });
     }
@@ -2464,6 +2485,7 @@ public class ChatConversationActivity extends ThemedActivity {
         if (adapter != null) adapter.releasePlayer();
         hideVoiceHud();
         stopRecorderQuiet();
+        restoreChatVoiceRoomAudio();
         if (chatBackgroundVideo != null) chatBackgroundVideo.stopPlayback();
         voiceUiHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
