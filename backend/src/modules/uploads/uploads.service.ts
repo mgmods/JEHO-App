@@ -107,7 +107,7 @@ export class UploadsService implements OnModuleInit {
         file: Express.Multer.File,
         cb: (error: Error | null, accept: boolean) => void,
       ) => {
-        const allowed = /\.(jpg|jpeg|png|gif|webp|svg|svga|mp4|mp3|m4a|aac|wav|pdf|mov|webm|3gp|json)$/i;
+        const allowed = /\.(jpg|jpeg|png|gif|webp|svg|svga|mp4|mp3|m4a|aac|wav|pdf|mov|webm|3gp|json|ttf|otf)$/i;
         if (!allowed.test(extname(file.originalname))) {
           return cb(new BadRequestException('File type not allowed') as any, false);
         }
@@ -202,6 +202,8 @@ export class UploadsService implements OnModuleInit {
       '.svga': 'application/octet-stream',
       '.pdf': 'application/pdf',
       '.json': 'application/json',
+      '.ttf': 'font/ttf',
+      '.otf': 'font/otf',
     };
     return {
       buffer: readFileSync(localPath),
@@ -234,6 +236,14 @@ export class UploadsService implements OnModuleInit {
       throw new ServiceUnavailableException(
         'Durable media storage is not configured. Upload was rejected to prevent media loss after restart.',
       );
+    }
+    if (['.ttf', '.otf'].includes(ext)) {
+      const signature = readFileSync(storedPath).subarray(0, 4).toString('binary');
+      const validFont = signature === '\u0000\u0001\u0000\u0000' || signature === 'OTTO' || signature === 'true' || signature === 'typ1';
+      if (!validFont) {
+        if (existsSync(storedPath)) unlinkSync(storedPath);
+        throw new BadRequestException('Invalid TTF/OTF font file');
+      }
     }
     if (
       ['.mp3', '.m4a', '.aac', '.wav'].includes(ext) &&
