@@ -43,6 +43,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private final AtomicBoolean attached = new AtomicBoolean(false);
     private volatile AdvertisementDtos.Ticker config;
     private volatile String currentAdId = "";
+    private ObjectAnimator activeAnimator;
 
     public RoomAdvertisementTickerView(Context context) { this(context, null); }
     public RoomAdvertisementTickerView(Context context, @Nullable AttributeSet attrs) { this(context, attrs, 0); }
@@ -78,29 +79,32 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         super.onAttachedToWindow();
         if (attached.compareAndSet(false, true)) {
             RealtimeClient.getInstance().addUserListener(this);
-            ContainerProvider.from(getContext()).getRoomApi().advertisementCurrent().enqueue(new Callback<ApiResponse<AdvertisementDtos.Current>>() {
-                @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Current>> call, Response<ApiResponse<AdvertisementDtos.Current>> response) {
-                    AdvertisementDtos.Current current = response.body() != null ? response.body().data : null;
-                    if (current != null && current.config != null) SEND_BUTTON_ENABLED = current.config.sendButtonEnabled;
-                    if (current != null && current.advertisement != null && current.config != null && current.config.enabled) {
-                        post(() -> showAdvertisement(current.advertisement, current.config));
-                    }
-                }
-                @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Current>> call, Throwable t) {}
-            });
+            refreshCurrent();
         }
     }
 
     @Override protected void onDetachedFromWindow() {
         if (attached.compareAndSet(true, false)) {
             RealtimeClient.getInstance().removeUserListener(this);
+            cancelActiveAnimator();
         }
         super.onDetachedFromWindow();
     }
 
     @Override public void onUserEvent(String event, JsonObject payload) {
         if ("room:advertisement:config".equals(event)) {
-            try { AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class); config = next; if (next != null) SEND_BUTTON_ENABLED = next.sendButtonEnabled; if (next != null && !next.enabled) post(() -> setVisibility(GONE)); } catch (Exception ignored) {}
+            try {
+                AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class);
+                config = next;
+                if (next != null) SEND_BUTTON_ENABLED = next.sendButtonEnabled;
+                if (next != null && !next.enabled) {
+                    currentAdId = "";
+                    cancelActiveAnimator();
+                    post(() -> setVisibility(GONE));
+                } else if (next != null) {
+                    refreshCurrent();
+                }
+            } catch (Exception ignored) {}
             return;
         }
         if (!"room:advertisement".equals(event) || payload == null) return;
@@ -110,11 +114,39 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         post(() -> showAdvertisement(ev.advertisement, ev.config));
     }
 
-    @Override public void onConnected() {}
-    @Override public void onDisconnected() {}
+    @Override public void onConnected() { refreshCurrent(); }
+    @Override public void onDisconnected() { cancelActiveAnimator(); }
+
+    private void refreshCurrent() {
+        if (!attached.get()) return;
+        ContainerProvider.from(getContext()).getRoomApi().advertisementCurrent().enqueue(new Callback<ApiResponse<AdvertisementDtos.Current>>() {
+            @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Current>> call, Response<ApiResponse<AdvertisementDtos.Current>> response) {
+                AdvertisementDtos.Current current = response.body() != null ? response.body().data : null;
+                if (current != null && current.config != null) {
+                    SEND_BUTTON_ENABLED = current.config.sendButtonEnabled;
+                    config = current.config;
+                }
+                if (current != null && current.advertisement != null && current.config != null && current.config.enabled) {
+                    post(() -> showAdvertisement(current.advertisement, current.config));
+                } else if (current != null && current.config != null && !current.config.enabled) {
+                    post(() -> setVisibility(GONE));
+                }
+            }
+            @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Current>> call, Throwable t) {}
+        });
+    }
+
+    private void cancelActiveAnimator() {
+        ObjectAnimator animator = activeAnimator;
+        activeAnimator = null;
+        if (animator != null) animator.cancel();
+        text.animate().cancel();
+    }
 
     private void showAdvertisement(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
-        if (ad.id == null || ad.id.equals(currentAdId)) return;
+        if (ad.id == null) return;
+        if (ad.id.equals(currentAdId)) return;
+        cancelActiveAnimator();
         currentAdId = ad.id;
         config = cfg;
         bindConfig(cfg);
@@ -167,11 +199,13 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     }
 
     private void animateTextIn(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
-        text.animate().cancel();
+        cancelActiveAnimator();
         text.clearAnimation();
         text.setTranslationX(0f);
         if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
             text.setText(text.getText());
+            long visibleFor = Math.max(1000L, ad.displayDurationMs) + Math.max(0, cfg != null ? cfg.gapMs : 1800);
+            postDelayed(() -> { if (ad.id.equals(currentAdId)) setVisibility(INVISIBLE); }, visibleFor);
             return;
         }
         text.post(() -> {
@@ -186,9 +220,11 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             float speedPxPerSec = speedDpPerSec * getResources().getDisplayMetrics().density;
             long duration = Math.max(500L, Math.min(60000L, (long) ((distance / Math.max(1f, speedPxPerSec)) * 1000L)));
             ObjectAnimator in = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, start, 0f);
+            activeAnimator = in;
             in.setDuration(duration);
             in.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
+                    if (activeAnimator == in) activeAnimator = null;
                     postDelayed(() -> { if (ad.id.equals(currentAdId)) animateTextAcross(ad, cfg, viewport); }, 650L);
                 }
             });
@@ -205,9 +241,11 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         float speed = safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120);
         long duration = Math.max(500L, Math.min(60000L, (long) ((distance / Math.max(1f, speed * getResources().getDisplayMetrics().density)) * 1000L)));
         ObjectAnimator out = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, 0f, end);
+        activeAnimator = out;
         out.setDuration(duration);
         out.addListener(new AnimatorListenerAdapter() {
             @Override public void onAnimationEnd(Animator animation) {
+                if (activeAnimator == out) activeAnimator = null;
                 if (ad.id.equals(currentAdId)) {
                     postDelayed(() -> { if (ad.id.equals(currentAdId)) setVisibility(INVISIBLE); }, Math.max(0, cfg != null ? cfg.gapMs : 1800));
                 }
