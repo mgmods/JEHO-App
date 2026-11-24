@@ -114,9 +114,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 config = next;
                 if (next != null) SEND_BUTTON_ENABLED = next.enabled && next.sendButtonEnabled;
                 if (next != null && !next.enabled) {
-                    currentAdId = "";
-                    cancelActiveAnimator();
-                    post(() -> setVisibility(GONE));
+                    post(this::hideAdvertisement);
                 } else if (next != null) {
                     refreshCurrent();
                 }
@@ -165,9 +163,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                     } catch (Exception ignored) {}
                     final long remainingMs = remaining;
                     if (remainingMs > 0L) post(() -> showAdvertisement(current.advertisement, current.config, remainingMs));
-                    else post(() -> { currentAdId = ""; setVisibility(GONE); });
-                } else if (current != null && current.config != null && !current.config.enabled) {
-                    post(() -> setVisibility(GONE));
+                    else post(RoomAdvertisementTickerView.this::hideAdvertisement);
+                } else {
+                    // No globally active advertisement: remove the entire row, not just its contents.
+                    post(RoomAdvertisementTickerView.this::hideAdvertisement);
                 }
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Current>> call, Throwable t) {}
@@ -180,6 +179,19 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         animationGeneration++;
         if (animator != null) animator.cancel();
         text.animate().cancel();
+    }
+
+    private void hideAdvertisement() {
+        cancelActiveAnimator();
+        currentAdId = "";
+        needsResume = false;
+        currentDisplayBudgetMs = 0L;
+        text.setText("");
+        text.setTranslationX(0f);
+        text.setAlpha(1f);
+        Glide.with(this).clear(backgroundImage);
+        backgroundImage.setVisibility(GONE);
+        setVisibility(GONE);
     }
 
     private void showAdvertisement(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
@@ -278,8 +290,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setTranslationX(0f);
         if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
             text.setText(text.getText());
-            long visibleFor = Math.max(1000L, currentDisplayBudgetMs) + Math.max(0, cfg != null ? cfg.gapMs : 1800);
-            postDelayed(() -> { if (generation == animationGeneration && ad.id.equals(currentAdId)) setVisibility(INVISIBLE); }, visibleFor);
+            long visibleFor = Math.max(1000L, currentDisplayBudgetMs);
+            postDelayed(() -> {
+                if (generation == animationGeneration && ad.id.equals(currentAdId)) hideAdvertisement();
+            }, visibleFor);
             return;
         }
         text.post(() -> {
@@ -330,7 +344,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             @Override public void onAnimationEnd(Animator animation) {
                 if (activeAnimator == out) activeAnimator = null;
                 if (generation == animationGeneration && ad.id.equals(currentAdId)) {
-                    setVisibility(INVISIBLE);
+                    hideAdvertisement();
                 }
             }
         });
