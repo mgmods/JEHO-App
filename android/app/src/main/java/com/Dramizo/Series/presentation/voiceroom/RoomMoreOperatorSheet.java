@@ -356,7 +356,9 @@ final class RoomMoreOperatorSheet {
                     if (cfg != null && cfg.maxTextLength > 0) {
                         maxTextLength[0] = Math.max(1, Math.min(500, cfg.maxTextLength));
                         input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxTextLength[0])});
+                        if (input.length() > maxTextLength[0]) input.getText().delete(maxTextLength[0], input.length());
                         counter.setText(input.length() + " / " + maxTextLength[0]);
+                        send.setEnabled(input.getText().toString().trim().length() > 0 && input.length() <= maxTextLength[0]);
                     }
                 }
                 @Override public void onFailure(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Config>> call, Throwable t) {}
