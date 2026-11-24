@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -185,7 +186,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             in.setDuration(duration);
             in.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
-                    animateTextAcross(ad, cfg, viewport);
+                    postDelayed(() -> { if (ad.id.equals(currentAdId)) animateTextAcross(ad, cfg, viewport); }, 650L);
                 }
             });
             in.start();
@@ -214,7 +215,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     private boolean isReduceMotionEnabled() {
         AccessibilityManager am = (AccessibilityManager) getContext().getSystemService(Context.ACCESSIBILITY_SERVICE);
-        return am != null && am.isEnabled() && Build.VERSION.SDK_INT >= 19;
+        if (Build.VERSION.SDK_INT < 17) return false;
+        try { return Settings.Global.getFloat(getContext().getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f; }
+        catch (Exception ignored) { return false; }
     }
 
     private static float safe(int value, int fallback) { return value > 0 ? value : fallback; }
