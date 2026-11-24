@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException, ConflictException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, QueryRunner } from 'typeorm';
 import { Advertisement, AdvertisementStatus } from '../../database/entities/advertisement.entity';
 import { User } from '../../database/entities/user.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
@@ -22,6 +22,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(AdvertisementsService.name);
   private timer: ReturnType<typeof setInterval> | null = null;
   private busy = false;
+  private leaderRunner: QueryRunner | null = null;
+  private nextLeadershipCheckAt = 0;
 
   constructor(
     @InjectRepository(Advertisement) private readonly ads: Repository<Advertisement>,
@@ -37,7 +39,39 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     void this.tick();
   }
 
-  onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
+  async onModuleDestroy() {
+    if (this.timer) clearInterval(this.timer);
+    if (this.leaderRunner) {
+      try { await this.leaderRunner.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', ['voice-room-ad-worker']); } catch {}
+      try { await this.leaderRunner.release(); } catch {}
+      this.leaderRunner = null;
+    }
+  }
+
+  private async ensureWorkerLeadership(): Promise<boolean> {
+    if (this.leaderRunner && !this.leaderRunner.isReleased) {
+      try { await this.leaderRunner.query('SELECT 1'); return true; }
+      catch { try { await this.leaderRunner.release(); } catch {} this.leaderRunner = null; }
+    }
+    if (Date.now() < this.nextLeadershipCheckAt) return false;
+    this.nextLeadershipCheckAt = Date.now() + 5000;
+    const runner = this.db.createQueryRunner();
+    try {
+      await runner.connect();
+      const rows = await runner.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired', ['voice-room-ad-worker']);
+      if (rows?.[0]?.acquired === true || rows?.[0]?.acquired === 't') {
+        this.leaderRunner = runner;
+        this.log.log('This API instance is the active global room-advertisement worker.');
+        return true;
+      }
+      await runner.release();
+      return false;
+    } catch (error) {
+      try { await runner.release(); } catch {}
+      this.log.warn('Advertisement worker election failed: ' + String((error as any)?.message || error));
+      return false;
+    }
+  }
 
   private async config() {
     const rows = await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1', ['voice_room_ads_config']);
@@ -157,7 +191,9 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async tick() {
-    if(this.busy)return; this.busy=true;
+    if(this.busy)return;
+    if (!(await this.ensureWorkerLeadership())) return;
+    this.busy=true;
     try {
       const c=await this.config();
       if(c.enabled!==true || c.paused===true)return;
