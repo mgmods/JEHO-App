@@ -159,7 +159,8 @@ async function load(){
   loading.value=true; error.value=''
   const [c,q,s,b]=await Promise.all([advertisementsApi.config(),advertisementsApi.queue({limit:100,q:queueSearch.value,history:showHistory.value}),advertisementsApi.stats({days:statsDays.value}),advertisementsApi.bannedWords()])
   if(c.error){error.value=c.error.message||String(c.error);loading.value=false;return}
-  apply(c.data?.data??c.data)
+  const configData=c.data?.data??c.data
+  apply(configData?.ticker??configData)
   queue.value=q.data?.items||q.data?.data?.items||[]
   stats.value=s.data?.data??s.data??{}
   bannedWords.value=b.data?.words??b.data?.data?.words??''
