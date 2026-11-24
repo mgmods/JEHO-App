@@ -85,6 +85,15 @@ public class AuraLiveApp extends Application {
             // acquisition remains guarded by app foreground state, so this resumes
             // RTC mic/playback without reclaiming Android's communication mode.
             restoreRoomAudioAfterExternalApp();
+        } else if (roomAudioSuspendedForExternalApp) {
+            // Android may briefly report a stale active-recorder snapshot after
+            // a voice note ends. Retry until capture is actually released instead
+            // of leaving room playback suspended indefinitely.
+            Handler handler = externalCaptureHandler;
+            if (handler != null) {
+                handler.removeCallbacks(externalCaptureRestoreCheck);
+                handler.postDelayed(externalCaptureRestoreCheck, 500L);
+            }
         }
     };
 
@@ -324,7 +333,7 @@ public class AuraLiveApp extends Application {
                     Handler handler = externalCaptureHandler;
                     if (handler != null) {
                         handler.removeCallbacks(externalCaptureRestoreCheck);
-                        handler.postDelayed(externalCaptureRestoreCheck, 1500L);
+                        handler.postDelayed(externalCaptureRestoreCheck, 350L);
                     } else {
                         restoreRoomAudioAfterExternalApp();
                     }
