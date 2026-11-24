@@ -1,6 +1,12 @@
 package com.Dramizo.Series.presentation.voiceroom;
 
 import android.app.Dialog;
+import android.app.AlertDialog;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.Toast;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -34,9 +40,17 @@ import androidx.viewpager.widget.ViewPager;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.util.InviteReferralHelper;
+import com.Dramizo.Series.data.remote.dto.AdvertisementDtos;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 /**
  * Mikoo {@code RoomMoreOperatorDialog}: tabs غرفة / أداة / تأثير + grid icons.
@@ -150,8 +164,12 @@ final class RoomMoreOperatorSheet {
         }
 
         MorePagerAdapter adapter = new MorePagerAdapter(pages, item -> {
-            dialog.dismiss();
-            host.onMoreAction(item.action);
+            if ("send_advertisement".equals(item.action)) {
+                showAdvertisementDialog(host);
+            } else {
+                dialog.dismiss();
+                host.onMoreAction(item.action);
+            }
         });
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(Math.max(1, pages.size()));
@@ -252,6 +270,7 @@ final class RoomMoreOperatorSheet {
 
     private static List<Item> buildToolItems(Host host) {
         List<Item> list = new ArrayList<>();
+        list.add(item(R.drawable.ic_asset_notice, "📢 إرسال إعلان", "send_advertisement"));
         boolean muted = host.roomSpeakerMuted();
         list.add(item(
                 muted ? R.drawable.mute_close : R.drawable.mute_open,
@@ -277,6 +296,95 @@ final class RoomMoreOperatorSheet {
                 R.string.room_more_low_gift,
                 "low_gift"));
         return list;
+    }
+
+    private static void showAdvertisementDialog(@NonNull Host host) {
+        Context ctx = host.context();
+        LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (20 * ctx.getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, 0);
+
+        TextView remaining = new TextView(ctx);
+        remaining.setTextColor(Color.LTGRAY);
+        remaining.setTextSize(12);
+        remaining.setPadding(0, 0, 0, pad / 3);
+        box.addView(remaining);
+
+        EditText input = new EditText(ctx);
+        input.setHint("اكتب نص الإعلان");
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(0x88FFFFFF);
+        input.setMinLines(3);
+        input.setMaxLines(6);
+        input.setGravity(Gravity.TOP | Gravity.RIGHT);
+        box.addView(input, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView counter = new TextView(ctx);
+        counter.setTextColor(0xFFB9C4D0);
+        counter.setTextSize(11);
+        counter.setGravity(Gravity.RIGHT);
+        box.addView(counter);
+
+        AlertDialog dialog = new AlertDialog.Builder(ctx)
+                .setTitle("إعلان جديد")
+                .setView(box)
+                .setNegativeButton("إلغاء", null)
+                .setPositiveButton("إرسال", null)
+                .create();
+
+        input.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            @Override public void onTextChanged(CharSequence text, int st, int before, int count) {
+                counter.setText(text.length() + " / 180");
+            }
+            @Override public void afterTextChanged(Editable e) {}
+        });
+        counter.setText("0 / 180");
+
+        dialog.setOnShowListener(v -> {
+            final android.widget.Button send = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            send.setEnabled(false);
+            ContainerProvider.from(ctx).getRoomApi().advertisementRemaining().enqueue(new Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>>() {
+                @Override public void onResponse(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>> call, Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>> response) {
+                    AdvertisementDtos.Remaining r = response.body() != null ? response.body().data : null;
+                    if (r != null) remaining.setText("المتبقي اليوم: " + r.remaining + " من " + r.limit);
+                    else remaining.setText("تعذر قراءة الحد اليومي");
+                }
+                @Override public void onFailure(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>> call, Throwable t) {
+                    remaining.setText("تعذر قراءة الحد اليومي");
+                }
+            });
+            input.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+                @Override public void onTextChanged(CharSequence s, int st, int before, int count) {
+                    send.setEnabled(s != null && s.toString().trim().length() > 0 && s.length() <= 180);
+                }
+                @Override public void afterTextChanged(Editable e) {}
+            });
+            send.setOnClickListener(btn -> {
+                btn.setEnabled(false);
+                Map<String,String> body = new HashMap<>();
+                body.put("text", input.getText().toString().trim());
+                body.put("idempotencyKey", UUID.randomUUID().toString());
+                ContainerProvider.from(ctx).getRoomApi().createAdvertisement(body).enqueue(new Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>>() {
+                    @Override public void onResponse(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>> call, Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().success) {
+                            dialog.dismiss();
+                            Toast.makeText(ctx, "تم إرسال الإعلان إلى الطابور", Toast.LENGTH_SHORT).show();
+                        } else {
+                            btn.setEnabled(true);
+                            Toast.makeText(ctx, "تعذر إرسال الإعلان", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                    @Override public void onFailure(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>> call, Throwable t) {
+                        btn.setEnabled(true);
+                        Toast.makeText(ctx, "تعذر الاتصال بالخادم", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            });
+        });
+        dialog.show();
     }
 
     private static List<Item> buildChallengeItems(Host host) {
