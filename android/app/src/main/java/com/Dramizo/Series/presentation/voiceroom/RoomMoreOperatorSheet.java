@@ -4,6 +4,7 @@ import android.app.Dialog;
 import android.app.AlertDialog;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.text.InputFilter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.content.ClipData;
@@ -326,6 +327,10 @@ final class RoomMoreOperatorSheet {
         counter.setGravity(Gravity.RIGHT);
         box.addView(counter);
 
+        final int[] maxTextLength = {180};
+        final String[] idempotencyKey = {UUID.randomUUID().toString()};
+        input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxTextLength[0])});
+
         AlertDialog dialog = new AlertDialog.Builder(ctx)
                 .setTitle("إعلان جديد")
                 .setView(box)
@@ -336,7 +341,7 @@ final class RoomMoreOperatorSheet {
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence text, int st, int before, int count) {
-                counter.setText(text.length() + " / 180");
+                counter.setText(text.length() + " / " + maxTextLength[0]);
             }
             @Override public void afterTextChanged(Editable e) {}
         });
@@ -345,6 +350,17 @@ final class RoomMoreOperatorSheet {
         dialog.setOnShowListener(v -> {
             final android.widget.Button send = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
             send.setEnabled(false);
+            ContainerProvider.from(ctx).getRoomApi().advertisementConfig().enqueue(new Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Config>>() {
+                @Override public void onResponse(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Config>> call, Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Config>> response) {
+                    AdvertisementDtos.Config cfg = response.body() != null ? response.body().data : null;
+                    if (cfg != null && cfg.maxTextLength > 0) {
+                        maxTextLength[0] = Math.max(1, Math.min(500, cfg.maxTextLength));
+                        input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxTextLength[0])});
+                        counter.setText(input.length() + " / " + maxTextLength[0]);
+                    }
+                }
+                @Override public void onFailure(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Config>> call, Throwable t) {}
+            });
             ContainerProvider.from(ctx).getRoomApi().advertisementRemaining().enqueue(new Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>>() {
                 @Override public void onResponse(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>> call, Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>> response) {
                     AdvertisementDtos.Remaining r = response.body() != null ? response.body().data : null;
@@ -358,7 +374,7 @@ final class RoomMoreOperatorSheet {
             input.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
                 @Override public void onTextChanged(CharSequence s, int st, int before, int count) {
-                    send.setEnabled(s != null && s.toString().trim().length() > 0 && s.length() <= 180);
+                    send.setEnabled(s != null && s.toString().trim().length() > 0 && s.length() <= maxTextLength[0]);
                 }
                 @Override public void afterTextChanged(Editable e) {}
             });
@@ -366,7 +382,7 @@ final class RoomMoreOperatorSheet {
                 btn.setEnabled(false);
                 Map<String,String> body = new HashMap<>();
                 body.put("text", input.getText().toString().trim());
-                body.put("idempotencyKey", UUID.randomUUID().toString());
+                body.put("idempotencyKey", idempotencyKey[0]);
                 ContainerProvider.from(ctx).getRoomApi().createAdvertisement(body).enqueue(new Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>>() {
                     @Override public void onResponse(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>> call, Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>> response) {
                         if (response.isSuccessful() && response.body() != null && response.body().success) {
