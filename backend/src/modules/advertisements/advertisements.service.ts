@@ -14,6 +14,8 @@ const DEFAULT_CONFIG: any = {
   backgroundImage: '', backgroundOpacity: 92, radiusDp: 18, heightDp: 48,
   avatarDp: 34, avatarShape: 'circle', nameSp: 12, textSp: 13, customOffsetDp: 0,
   nameColor: '#FFD98A', textColor: '#FFFFFF', spacingDp: 8,
+  avatarOffsetXDp: 0, avatarOffsetYDp: 0, nameOffsetXDp: 0, nameOffsetYDp: 0, nameWidthDp: 90,
+  textOffsetXDp: 0, textOffsetYDp: 0, textWidthDp: 0,
 };
 
 @Injectable()
@@ -237,7 +239,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c=await this.config();
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
-    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,100],['avatarDp',20,56],['nameSp',8,24],['textSp',9,30],['spacingDp',0,30],['customOffsetDp',-100,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
+    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
     ['resetTimezone','template','position','direction','background','backgroundImage','avatarShape','nameColor','textColor','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
