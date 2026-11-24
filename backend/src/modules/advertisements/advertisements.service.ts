@@ -209,7 +209,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   private async resetStartFromDb(timezone:string){
     const safe = String(timezone || 'UTC').trim() || 'UTC';
     try {
-      const rows = await this.db.query('SELECT date_trunc(\\'day\\', NOW(), $1) AS start',[safe]);
+      const rows = await this.db.query("SELECT date_trunc('day', NOW(), $1) AS start",[safe]);
       return rows?.[0]?.start ? new Date(rows[0].start) : new Date();
     } catch {
       return new Date(this.resetKey(safe)+'T00:00:00.000Z');
