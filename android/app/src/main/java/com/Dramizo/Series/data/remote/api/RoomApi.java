@@ -19,6 +19,9 @@ public interface RoomApi {
     @GET("advertisements/config")
     Call<ApiResponse<AdvertisementDtos.Config>> advertisementConfig();
 
+    @GET("advertisements/current")
+    Call<ApiResponse<AdvertisementDtos.Current>> advertisementCurrent();
+
     @GET("advertisements/remaining")
     Call<ApiResponse<AdvertisementDtos.Remaining>> advertisementRemaining();
 
