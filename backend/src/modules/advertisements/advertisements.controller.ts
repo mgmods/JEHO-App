@@ -38,6 +38,10 @@ export class AdvertisementsController {
   patchConfig(@Body() body: Record<string, unknown>) { return this.service.patchConfig(body || {}); }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
+  @Get('admin/banned-words')
+  adminBannedWords() { return this.service.adminBannedWords(); }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @Patch('admin/banned-words')
   patchBannedWords(@Body() body: { words?: string }) { return this.service.patchBannedWords(String(body?.words || '')); }
 
