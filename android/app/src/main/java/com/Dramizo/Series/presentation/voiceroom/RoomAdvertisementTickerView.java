@@ -228,38 +228,42 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             float start = rtl ? distance : -distance;
             float end = rtl ? -distance : distance;
             text.setTranslationX(start);
-            float speedDpPerSec = rtl ? safe(cfg != null ? cfg.entrySpeedPxPerSec : 120, 120) : safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120);
-            float speedPxPerSec = speedDpPerSec * getResources().getDisplayMetrics().density;
-            long duration = Math.max(500L, Math.min(60000L, (long) ((distance / Math.max(1f, speedPxPerSec)) * 1000L)));
+            float density = getResources().getDisplayMetrics().density;
+            float entrySpeed = safe(cfg != null ? cfg.entrySpeedPxPerSec : 120, 120) * density;
+            float exitSpeed = safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120) * density;
+            long requestedEntry = Math.max(250L, (long) ((distance / Math.max(1f, entrySpeed)) * 1000L));
+            long requestedExit = Math.max(250L, (long) ((distance / Math.max(1f, exitSpeed)) * 1000L));
+            long budget = Math.max(1000L, ad.displayDurationMs > 0 ? ad.displayDurationMs : (cfg != null ? cfg.displayDurationMs : 9000));
+            long requestedTotal = requestedEntry + requestedExit;
+            long entryDuration = requestedTotal > budget ? Math.max(250L, budget * requestedEntry / requestedTotal) : requestedEntry;
+            long exitDuration = Math.max(250L, budget - entryDuration);
+            if (entryDuration + exitDuration > budget) entryDuration = Math.max(250L, budget - exitDuration);
             ObjectAnimator in = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, start, 0f);
             activeAnimator = in;
-            in.setDuration(duration);
+            in.setDuration(entryDuration);
             in.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
                     if (activeAnimator == in) activeAnimator = null;
-                    postDelayed(() -> { if (ad.id.equals(currentAdId)) animateTextAcross(ad, cfg, viewport); }, 650L);
+                    if (ad.id.equals(currentAdId)) animateTextAcross(ad, cfg, viewport, exitDuration);
                 }
             });
             in.start();
         });
     }
 
-    private void animateTextAcross(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, int viewport) {
+    private void animateTextAcross(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, int viewport, long exitDuration) {
         if (!ad.id.equals(currentAdId)) return;
         int width = Math.max(1, text.getWidth());
         boolean rtl = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction);
         float end = rtl ? -(viewport + width) : (viewport + width);
-        float distance = Math.abs(end);
-        float speed = safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120);
-        long duration = Math.max(500L, Math.min(60000L, (long) ((distance / Math.max(1f, speed * getResources().getDisplayMetrics().density)) * 1000L)));
         ObjectAnimator out = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, 0f, end);
         activeAnimator = out;
-        out.setDuration(duration);
+        out.setDuration(Math.max(250L, exitDuration));
         out.addListener(new AnimatorListenerAdapter() {
             @Override public void onAnimationEnd(Animator animation) {
                 if (activeAnimator == out) activeAnimator = null;
                 if (ad.id.equals(currentAdId)) {
-                    postDelayed(() -> { if (ad.id.equals(currentAdId)) setVisibility(INVISIBLE); }, Math.max(0, cfg != null ? cfg.gapMs : 1800));
+                    setVisibility(INVISIBLE);
                 }
             }
         });
