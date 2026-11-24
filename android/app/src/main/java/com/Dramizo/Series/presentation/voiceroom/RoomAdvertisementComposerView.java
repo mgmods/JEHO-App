@@ -8,6 +8,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.util.AttributeSet;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -36,6 +37,9 @@ public final class RoomAdvertisementComposerView extends FrameLayout {
     private int remaining = 0;
     private int maxLength = 180;
     private boolean featureEnabled = false;
+
+    public RoomAdvertisementComposerView(Context context, AttributeSet attrs) { this(context); }
+    public RoomAdvertisementComposerView(Context context, AttributeSet attrs, int defStyleAttr) { this(context); }
 
     public RoomAdvertisementComposerView(Context context) {
         super(context);
