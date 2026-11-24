@@ -343,12 +343,12 @@ final class RoomMoreOperatorSheet {
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence text, int st, int before, int count) {
-                counter.setText(text.length() + " / " + maxTextLength[0]);
+                counter.setText("المتبقي: " + Math.max(0, maxTextLength[0] - text.length()) + " حرف");
                 if (requestAttempted[0] && !requestInFlight[0]) idempotencyKey[0] = UUID.randomUUID().toString();
             }
             @Override public void afterTextChanged(Editable e) {}
         });
-        counter.setText("0 / 180");
+        counter.setText("المتبقي: 180 حرف");
 
         dialog.setOnShowListener(v -> {
             final android.widget.Button send = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -360,7 +360,7 @@ final class RoomMoreOperatorSheet {
                         maxTextLength[0] = Math.max(1, Math.min(500, cfg.maxTextLength));
                         input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxTextLength[0])});
                         if (input.length() > maxTextLength[0]) input.getText().delete(maxTextLength[0], input.length());
-                        counter.setText(input.length() + " / " + maxTextLength[0]);
+                        counter.setText("المتبقي: " + Math.max(0, maxTextLength[0] - input.length()) + " حرف");
                         send.setEnabled(input.getText().toString().trim().length() > 0 && input.length() <= maxTextLength[0]);
                     }
                 }
