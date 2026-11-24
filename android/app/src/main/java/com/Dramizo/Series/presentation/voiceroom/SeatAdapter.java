@@ -296,12 +296,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     seat.user.hostBadgeMeta = prev.hostBadgeMeta;
                 }
             }
-            // Room refresh payloads can temporarily omit equipped wear fields.
-            // Keep the last confirmed voice-wave URL for this seated user so the
-            // next speaking update does not fall back to the legacy default wave.
-            if (isBlank(seat.user.voiceWaveUrl) && !isBlank(prev.voiceWaveUrl)) {
-                seat.user.voiceWaveUrl = prev.voiceWaveUrl;
-            }
+            // Do not carry a previous equipped voice wave into a fresh room payload.
+            // An empty/missing equipped URL means the user has unequipped it, so the
+            // legacy built-in speaking wave must become active again.
             if (isBlank(seat.user.levelBadgeUrl) && !isBlank(prev.levelBadgeUrl)) {
                 seat.user.levelBadgeUrl = prev.levelBadgeUrl;
             }
@@ -675,13 +672,14 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                                         .setDuration(130L).start();
                             }
                         } else {
-                            if (holder.b.seatSpeakAura != null) {
-                                holder.b.seatSpeakAura.setSpeaking(false);
-                                holder.b.seatSpeakAura.setVisibility(View.GONE);
-                            }
                             if (holder.b.seatVoiceWaveBars != null) {
-                                holder.b.seatVoiceWaveBars.setVisibility(View.VISIBLE);
-                                holder.b.seatVoiceWaveBars.setSpeaking(true, lv);
+                                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+                            }
+                            if (holder.b.seatSpeakAura != null) {
+                                holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
+                                holder.b.seatSpeakAura.setSpeaking(true);
+                                holder.b.seatSpeakAura.setIntensity(lv);
                             }
                         }
                         holder.speaking = true;
@@ -1630,17 +1628,26 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         String uid = holder.boundUserId;
         float liveLevel = uid != null && speakingLevels.containsKey(uid)
                 ? speakingLevels.get(uid) : 48f;
-        if (holder.b.seatSpeakAura != null) {
-            holder.b.seatSpeakAura.setSpeaking(false);
-            holder.b.seatSpeakAura.setVisibility(View.GONE);
-        }
-        if (holder.b.seatVoiceWaveBars != null) {
-            if (hasEquippedWave) {
+        if (hasEquippedWave) {
+            // A purchased/equipped wave replaces every built-in speaking effect.
+            if (holder.b.seatSpeakAura != null) {
+                holder.b.seatSpeakAura.setSpeaking(false);
+                holder.b.seatSpeakAura.setVisibility(View.GONE);
+            }
+            if (holder.b.seatVoiceWaveBars != null) {
                 holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
                 holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
-            } else {
-                holder.b.seatVoiceWaveBars.setVisibility(View.VISIBLE);
-                holder.b.seatVoiceWaveBars.setSpeaking(true, liveLevel);
+            }
+        } else {
+            // No equipped wave: restore the original legacy aura only.
+            if (holder.b.seatVoiceWaveBars != null) {
+                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+            }
+            if (holder.b.seatSpeakAura != null) {
+                holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
+                holder.b.seatSpeakAura.setSpeaking(true);
+                holder.b.seatSpeakAura.setIntensity(liveLevel);
             }
         }
         stopRipple(holder.b.seatRippleOuter);
