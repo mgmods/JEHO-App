@@ -13,6 +13,7 @@ export class AdvertisementsController {
   constructor(private readonly service: AdvertisementsService) {}
 
   @Get('config') getConfig() { return this.service.getPublicConfig(); }
+  @Get('current') current() { return this.service.current(); }
   @Get('remaining') remaining(@CurrentUser('sub') userId: string) { return this.service.remainingForUser(userId); }
 
   @Post()
