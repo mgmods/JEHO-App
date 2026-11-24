@@ -70,7 +70,7 @@
             <div class="col-6"><label class="form-label small">الموضع</label><select v-model="form.position" class="form-select"><option value="safe-top">أعلى آمن</option><option value="safe-bottom">أسفل آمن</option><option value="custom-safe">موضع مخصص آمن</option></select></div>
             <div class="col-6"><label class="form-label small">الاتجاه</label><select v-model="form.direction" class="form-select"><option value="rtl">RTL</option><option value="ltr">LTR</option></select></div>
             <div class="col-6"><label class="form-label small">نوع الانتقال</label><select v-model="form.transitionType" class="form-select"><option value="slide">انزلاق</option><option value="fade">تلاشي</option></select></div>
-            <div class="col-6"><label class="form-label small">قالب الشريط</label><select v-model="form.template" class="form-select"><option value="premium-v1">فاخر</option><option value="compact">مختصر</option><option value="gold">ذهبي</option></select></div>
+            <div class="col-6"><label class="form-label small">قالب الشريط</label><select v-model="form.template" class="form-select" @change="applyTemplate"><option value="premium-v1">فاخر</option><option value="compact">مختصر</option><option value="gold">ذهبي</option></select></div>
             <div class="col-6"><label class="form-label small">مدة العرض ms</label><input v-model.number="form.displayDurationMs" type="number" min="1000" max="120000" class="form-control"></div>
             <div class="col-6"><label class="form-label small">الفاصل ms</label><input v-model.number="form.gapMs" type="number" min="0" max="120000" class="form-control"></div>
             <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="form.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
@@ -155,6 +155,11 @@ const loading=ref(true), saving=ref(false), savingWords=ref(false), error=ref(''
 const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=ref(7), queueSearch=ref(''), showHistory=ref(false)
 const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',template:'premium-v1'})
 function apply(data){ Object.assign(form,data||{}); }
+function applyTemplate(){
+  if(form.template==='compact') Object.assign(form,{heightDp:42,avatarDp:28,radiusDp:12,spacingDp:6,nameSp:11,textSp:12,background:'linear-gradient(90deg,#17212B,#263746)'})
+  else if(form.template==='gold') Object.assign(form,{heightDp:52,avatarDp:36,radiusDp:20,spacingDp:10,nameSp:13,textSp:14,nameColor:'#FFE2A0',textColor:'#FFFFFF',background:'linear-gradient(90deg,#35220A,#6A4817)'})
+  else Object.assign(form,{heightDp:48,avatarDp:34,radiusDp:18,spacingDp:8,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'linear-gradient(90deg,#21142d,#32184c)'})
+}
 async function load(){
   loading.value=true; error.value=''
   const [c,q,s,b]=await Promise.all([advertisementsApi.config(),advertisementsApi.queue({limit:100,q:queueSearch.value,history:showHistory.value}),advertisementsApi.stats({days:statsDays.value}),advertisementsApi.bannedWords()])
