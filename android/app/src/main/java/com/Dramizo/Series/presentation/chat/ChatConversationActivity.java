@@ -1,4 +1,5 @@
 package com.Dramizo.Series.presentation.chat;
+import com.Dramizo.Series.AuraLiveApp;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.content.Intent;
