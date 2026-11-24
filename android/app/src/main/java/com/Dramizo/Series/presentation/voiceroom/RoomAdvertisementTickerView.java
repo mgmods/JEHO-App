@@ -447,6 +447,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             if (lp == null) return;
             lp.startToStart = ConstraintLayout.LayoutParams.UNSET;
             lp.endToEnd = ConstraintLayout.LayoutParams.UNSET;
+            lp.leftToLeft = ConstraintLayout.LayoutParams.UNSET;
+            lp.rightToRight = ConstraintLayout.LayoutParams.UNSET;
             lp.topToTop = ConstraintLayout.LayoutParams.UNSET;
             lp.bottomToBottom = ConstraintLayout.LayoutParams.UNSET;
             lp.topToBottom = ConstraintLayout.LayoutParams.UNSET;
