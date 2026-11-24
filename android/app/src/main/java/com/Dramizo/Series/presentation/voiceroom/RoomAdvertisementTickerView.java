@@ -235,26 +235,26 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         int spacing = dp(Math.max(0, cfg.spacingDp));
         FrameLayout.LayoutParams av = (FrameLayout.LayoutParams) avatar.getLayoutParams();
         av.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
-        av.leftMargin = Math.max(0, spacing + dp(cfg.avatarOffsetXDp));
+        av.leftMargin = Math.max(0, spacing + signedDp(cfg.avatarOffsetXDp));
         av.rightMargin = 0;
         avatar.setLayoutParams(av);
-        avatar.setTranslationY(dp(cfg.avatarOffsetYDp));
+        avatar.setTranslationY(signedDp(cfg.avatarOffsetYDp));
 
         int nameWidth = dp(cfg.nameWidthDp > 0 ? cfg.nameWidthDp : 90);
         FrameLayout.LayoutParams nm = (FrameLayout.LayoutParams) name.getLayoutParams();
         nm.width = nameWidth;
         nm.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
-        nm.leftMargin = Math.max(0, spacing + dp(cfg.avatarDp) + spacing + dp(cfg.nameOffsetXDp));
+        nm.leftMargin = Math.max(0, spacing + dp(cfg.avatarDp) + spacing + signedDp(cfg.nameOffsetXDp));
         name.setLayoutParams(nm);
-        name.setTranslationY(dp(cfg.nameOffsetYDp));
+        name.setTranslationY(signedDp(cfg.nameOffsetYDp));
 
         FrameLayout.LayoutParams vp = (FrameLayout.LayoutParams) textViewport.getLayoutParams();
         vp.gravity = Gravity.CENTER_VERTICAL;
-        vp.leftMargin = Math.max(0, spacing + dp(cfg.avatarDp) + spacing + nameWidth + dp(cfg.textOffsetXDp));
+        vp.leftMargin = Math.max(0, spacing + dp(cfg.avatarDp) + spacing + nameWidth + signedDp(cfg.textOffsetXDp));
         vp.rightMargin = spacing;
         vp.width = cfg.textWidthDp > 0 ? dp(cfg.textWidthDp) : ViewGroup.LayoutParams.MATCH_PARENT;
         textViewport.setLayoutParams(vp);
-        textViewport.setTranslationY(dp(cfg.textOffsetYDp));
+        textViewport.setTranslationY(signedDp(cfg.textOffsetYDp));
     }
 
     private void bindAd(AdvertisementDtos.Advertisement ad) {
@@ -409,6 +409,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private static float safe(int value, int fallback) { return value > 0 ? value : fallback; }
     private static int dp(float px) { return Math.max(1, Math.round(px * 1f)); }
     private int dp(int value) { return Math.max(1, Math.round(value * getResources().getDisplayMetrics().density)); }
+    private int signedDp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private static int safeColor(String value, int fallback) { try { return Color.parseColor(value); } catch (Exception e) { return fallback; } }
     private static int parseColorWithOpacity(int opacity, String value) {
         try {
