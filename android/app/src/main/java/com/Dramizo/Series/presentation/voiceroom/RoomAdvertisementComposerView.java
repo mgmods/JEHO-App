@@ -328,7 +328,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         }
     }
 
-    private void submit(String text, AlertDialog dialog, Button send) {
+    private void submit(String text, Dialog dialog, Button send) {
         if (!loading.compareAndSet(false, true)) return;
         openButton.setEnabled(false);
         Map<String, String> body = new HashMap<>();
