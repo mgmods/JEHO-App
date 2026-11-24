@@ -454,8 +454,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             lp.horizontalBias = Math.max(0, Math.min(100, xPercent)) / 100f;
             lp.verticalBias = Math.max(0, Math.min(100, yPercent)) / 100f;
             if ("free".equalsIgnoreCase(position)) {
-                lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID;
-                lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.leftToLeft = ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.rightToRight = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.topMargin = 0;
