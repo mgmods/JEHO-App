@@ -2104,4 +2104,17 @@
             android:visibility="gone" />
     </FrameLayout>
 
+
+    <!-- Global room advertisement composer; quota and availability are loaded from the API. -->
+    <com.Dramizo.Series.presentation.voiceroom.RoomAdvertisementComposerView
+        android:id="@+id/roomAdvertisementComposer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="118dp"
+        android:elevation="24dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
