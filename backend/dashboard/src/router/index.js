@@ -288,6 +288,12 @@ const routes = [
         meta: { title: 'إعدادات علاقات CP' },
       },
       {
+        path: 'advertisements',
+        name: 'advertisements',
+        component: () => import('@/views/AdvertisementsView.vue'),
+        meta: { title: 'إدارة إعلانات الرومات', module: 'settings' },
+      },
+      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/views/SettingsView.vue'),
