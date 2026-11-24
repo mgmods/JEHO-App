@@ -40,6 +40,14 @@ public final class AdvertisementDtos {
         public String textColor;
         public int spacingDp;
         public int customOffsetDp;
+        public int avatarOffsetXDp;
+        public int avatarOffsetYDp;
+        public int nameOffsetXDp;
+        public int nameOffsetYDp;
+        public int nameWidthDp;
+        public int textOffsetXDp;
+        public int textOffsetYDp;
+        public int textWidthDp;
     }
 
     public static class Remaining {
