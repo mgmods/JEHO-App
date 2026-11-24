@@ -39,6 +39,7 @@ public final class AdvertisementDtos {
         public String nameColor;
         public String textColor;
         public int spacingDp;
+        public int customOffsetDp;
     }
 
     public static class Remaining {
