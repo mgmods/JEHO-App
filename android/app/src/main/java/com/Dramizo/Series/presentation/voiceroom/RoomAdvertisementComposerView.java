@@ -12,7 +12,6 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.util.AttributeSet;
 import android.view.View;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -37,7 +36,7 @@ import retrofit2.Response;
 /** Room-wide advertisement composer. All quota and permission decisions remain server-authoritative. */
 public final class RoomAdvertisementComposerView extends FrameLayout implements RealtimeClient.UserListener {
     private final AtomicBoolean loading = new AtomicBoolean(false);
-    private Button openButton;
+    private TextView openButton;
     private int remaining = 0;
     private int maxLength = 180;
     private boolean featureEnabled = false;
@@ -49,8 +48,11 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         super(context);
         setClipChildren(false);
         setClipToPadding(false);
-        openButton = new Button(context);
-        openButton.setAllCaps(false);
+        openButton = new TextView(context);
+        openButton.setGravity(Gravity.CENTER);
+        openButton.setIncludeFontPadding(false);
+        openButton.setClickable(true);
+        openButton.setFocusable(true);
         openButton.setText("✦ إعلان");
         openButton.setTextColor(Color.WHITE);
         openButton.setTextSize(12);
@@ -61,7 +63,9 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         bg.setCornerRadius(dp(22));
         openButton.setBackground(bg);
         openButton.setElevation(dp(5));
-        openButton.setPadding(dp(14), 0, dp(14), 0);
+        openButton.setPadding(dp(16), 0, dp(16), 0);
+        openButton.setLetterSpacing(0.02f);
+        bg.setStroke(dp(1), Color.rgb(244, 206, 126));
         addView(openButton, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(38), Gravity.CENTER));
         openButton.setOnClickListener(v -> openComposer());
         setVisibility(GONE);
@@ -150,10 +154,11 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         LinearLayout root = new LinearLayout(getContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(18), dp(20), dp(18));
+        root.setPadding(dp(22), dp(22), dp(22), dp(22));
         GradientDrawable card = new GradientDrawable();
         card.setColor(surface);
-        card.setCornerRadius(dp(24));
+        card.setCornerRadius(dp(28));
+        card.setStroke(dp(1), Color.rgb(239, 228, 207));
         root.setBackground(card);
         root.setElevation(dp(16));
 
@@ -163,7 +168,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         TextView emblem = new TextView(getContext());
         emblem.setText("📣");
-        emblem.setTextSize(22);
+        emblem.setTextSize(23);
+        emblem.setIncludeFontPadding(false);
         emblem.setGravity(Gravity.CENTER);
         GradientDrawable emblemBg = new GradientDrawable();
         emblemBg.setColor(Color.rgb(255, 241, 211));
@@ -177,11 +183,12 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         TextView title = new TextView(getContext());
         title.setText("إعلان عام لكل الغرف");
         title.setTextColor(ink);
-        title.setTextSize(18);
+        title.setTextSize(19);
+        title.setLetterSpacing(-0.01f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         heading.addView(title);
         TextView subtitle = new TextView(getContext());
-        subtitle.setText("رسالتك ستصل إلى مجتمع JEHO بالكامل");
+        subtitle.setText("إعلان موحّد يصل إلى جميع الغرف");
         subtitle.setTextColor(muted);
         subtitle.setTextSize(11);
         LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
@@ -198,7 +205,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         root.addView(header);
 
         TextView info = new TextView(getContext());
-        info.setText("سيبدأ ظهور الإعلان بعد 10 ثوانٍ من الإرسال، ويُعرض في جميع الرومات النشطة.");
+        info.setText("سيبدأ الإعلان بعد 10 ثوانٍ، ثم يظهر في جميع الغرف النشطة.");
         info.setTextColor(Color.rgb(111, 83, 35));
         info.setTextSize(12);
         info.setLineSpacing(dp(2), 1f);
@@ -226,8 +233,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         input.setTextColor(ink);
         input.setHintTextColor(Color.rgb(165, 169, 177));
         input.setSingleLine(false);
-        input.setMinLines(3);
-        input.setMaxLines(4);
+        input.setMinLines(4);
+        input.setMaxLines(5);
         input.setGravity(Gravity.TOP | Gravity.RIGHT);
         input.setTextDirection(View.TEXT_DIRECTION_RTL);
         input.setPadding(dp(13), dp(12), dp(13), dp(12));
@@ -236,7 +243,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         inputBg.setCornerRadius(dp(14));
         inputBg.setStroke(dp(1), Color.rgb(229, 226, 219));
         input.setBackground(inputBg);
-        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(112));
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(124));
         inputParams.topMargin = dp(8);
         root.addView(input, inputParams);
 
@@ -271,27 +278,37 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(48));
         actionsParams.topMargin = dp(18);
 
-        Button cancel = new Button(getContext());
+        TextView cancel = new TextView(getContext());
         cancel.setText("إلغاء");
-        cancel.setAllCaps(false);
+        cancel.setGravity(Gravity.CENTER);
+        cancel.setIncludeFontPadding(false);
+        cancel.setClickable(true);
+        cancel.setFocusable(true);
         cancel.setTextSize(13);
         cancel.setTextColor(Color.rgb(91, 96, 106));
         GradientDrawable cancelBg = new GradientDrawable();
         cancelBg.setColor(Color.rgb(238, 239, 241));
         cancelBg.setCornerRadius(dp(13));
+        cancelBg.setStroke(dp(1), Color.rgb(224, 226, 230));
         cancel.setBackground(cancelBg);
         actions.addView(cancel, new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.8f));
 
-        Button send = new Button(getContext());
+        TextView send = new TextView(getContext());
         send.setText("إرسال للجميع  ➤");
-        send.setAllCaps(false);
+        send.setGravity(Gravity.CENTER);
+        send.setIncludeFontPadding(false);
+        send.setClickable(true);
+        send.setFocusable(true);
         send.setTextSize(13);
         send.setTypeface(Typeface.DEFAULT_BOLD);
         send.setTextColor(Color.WHITE);
         GradientDrawable sendBg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{Color.rgb(157, 99, 25), Color.rgb(218, 163, 66)});
         sendBg.setCornerRadius(dp(13));
+        sendBg.setStroke(dp(1), Color.rgb(236, 197, 119));
         send.setBackground(sendBg);
+        send.setElevation(dp(3));
+        send.setLetterSpacing(0.015f);
         LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.2f);
         sendParams.leftMargin = dp(9);
         actions.addView(send, sendParams);
@@ -328,7 +345,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         }
     }
 
-    private void submit(String text, Dialog dialog, Button send) {
+    private void submit(String text, Dialog dialog, TextView send) {
         if (!loading.compareAndSet(false, true)) return;
         openButton.setEnabled(false);
         Map<String, String> body = new HashMap<>();
