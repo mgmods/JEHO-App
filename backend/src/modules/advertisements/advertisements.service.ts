@@ -47,14 +47,15 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async ensureConfig() {
-    const rows = await this.db.query('SELECT id FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1', ['voice_room_ads_config']);
-    if (!rows.length) {
-      await this.db.query('INSERT INTO "jeho_own"."app_settings" ("id","key","value","description","createdAt","updatedAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW(),NOW())', ['voice_room_ads_config', JSON.stringify(DEFAULT_CONFIG), 'Voice room advertising live configuration']);
-    }
-    const banned = await this.db.query('SELECT id FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1', ['voice_room_ads_banned_words']);
-    if (!banned.length) {
-      await this.db.query('INSERT INTO "jeho_own"."app_settings" ("id","key","value","description","createdAt","updatedAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW(),NOW())', ['voice_room_ads_banned_words', '', 'Voice room advertising banned words, comma-separated']);
-    }
+    // Unique-key upserts make first boot safe when multiple API replicas start together.
+    await this.db.query(
+      'INSERT INTO "jeho_own"."app_settings" ("id","key","value","description","createdAt","updatedAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW(),NOW()) ON CONFLICT ("key") DO NOTHING',
+      ['voice_room_ads_config', JSON.stringify(DEFAULT_CONFIG), 'Voice room advertising live configuration'],
+    );
+    await this.db.query(
+      'INSERT INTO "jeho_own"."app_settings" ("id","key","value","description","createdAt","updatedAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW(),NOW()) ON CONFLICT ("key") DO NOTHING',
+      ['voice_room_ads_banned_words', '', 'Voice room advertising banned words, comma-separated'],
+    );
   }
 
   async current() {
