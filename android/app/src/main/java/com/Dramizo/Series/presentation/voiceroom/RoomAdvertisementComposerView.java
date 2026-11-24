@@ -40,6 +40,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
     private int remaining = 0;
     private int maxLength = 180;
     private boolean featureEnabled = false;
+    // Reuse this key whenever the request outcome is uncertain; the backend deduplicates it.
+    private String pendingIdempotencyKey;
 
     public RoomAdvertisementComposerView(Context context, AttributeSet attrs) { this(context); }
     public RoomAdvertisementComposerView(Context context, AttributeSet attrs, int defStyleAttr) { this(context); }
@@ -350,35 +352,146 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         openButton.setEnabled(false);
         Map<String, String> body = new HashMap<>();
         body.put("text", text);
-        body.put("idempotencyKey", UUID.randomUUID().toString());
+        if (pendingIdempotencyKey == null) pendingIdempotencyKey = UUID.randomUUID().toString();
+        body.put("idempotencyKey", pendingIdempotencyKey);
         ContainerProvider.from(getContext()).getRoomApi().createAdvertisement(body)
                 .enqueue(new Callback<ApiResponse<AdvertisementDtos.CreateResponse>>() {
             @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.CreateResponse>> call,
                                              Response<ApiResponse<AdvertisementDtos.CreateResponse>> response) {
                 loading.set(false);
-                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
-                    AdvertisementDtos.CreateResponse result = response.body().data;
-                    remaining = result.remaining == null ? Math.max(0, remaining - (result.duplicate ? 0 : 1)) : result.remaining.remaining;
-                    Toast.makeText(getContext(), "تم إرسال الإعلان إلى الطابور العام", Toast.LENGTH_LONG).show();
+                // A 2xx response confirms the controller completed the create operation.
+                // The response envelope is optional: never report a saved ad as a failure
+                // merely because response.body().data is absent.
+                if (response.isSuccessful()) {
+                    AdvertisementDtos.CreateResponse result = response.body() == null ? null : response.body().data;
+                    if (result != null && result.remaining != null) {
+                        remaining = Math.max(0, result.remaining.remaining);
+                    } else {
+                        remaining = Math.max(0, remaining - 1);
+                    }
+                    pendingIdempotencyKey = null;
                     dialog.dismiss();
                     refreshQuota();
+                    showResultDialog(true, "تم إرسال الإعلان بنجاح",
+                            "تم قبول إعلانك وإضافته إلى قائمة الإعلانات العامة. سيبدأ عرضه حسب توقيت النظام.");
                 } else {
                     send.setEnabled(true);
                     send.setText("إرسال للجميع");
-                    String message = "تعذر إرسال الإعلان، حاول مرة أخرى";
-                    try { if (response.errorBody() != null) message = response.errorBody().string(); } catch (Exception ignored) {}
-                    Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
+                    String message = "تعذّر إرسال الإعلان. تحقق من البيانات وحاول مرة أخرى.";
+                    try {
+                        if (response.errorBody() != null) {
+                            String raw = response.errorBody().string();
+                            try {
+                                org.json.JSONObject json = new org.json.JSONObject(raw);
+                                Object apiMessage = json.opt("message");
+                                if (apiMessage instanceof org.json.JSONArray) {
+                                    org.json.JSONArray messages = (org.json.JSONArray) apiMessage;
+                                    if (messages.length() > 0) message = messages.optString(0, message);
+                                } else if (apiMessage instanceof String && !((String) apiMessage).trim().isEmpty()) {
+                                    message = (String) apiMessage;
+                                }
+                            } catch (Exception ignored) {
+                                if (!raw.trim().isEmpty() && !raw.trim().startsWith("{")) message = raw;
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                    // Client errors are definitive. Keep the key on 5xx: commit outcome may be uncertain.
+                    if (response.code() >= 400 && response.code() < 500) pendingIdempotencyKey = null;
+                    showResultDialog(false, "لم يتم إرسال الإعلان", message);
                     refreshQuota();
                 }
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.CreateResponse>> call, Throwable t) {
                 loading.set(false);
                 send.setEnabled(true);
-                send.setText("إرسال للجميع");
-                Toast.makeText(getContext(), "تعذر الاتصال بالخادم، لم يتم تأكيد الإرسال", Toast.LENGTH_LONG).show();
+                send.setText("إعادة المحاولة");
+                // The server may have committed before the connection dropped.
+                // Keep the same key so a retry returns the original ad instead of creating another.
+                showResultDialog(false, "تعذّر تأكيد الإرسال",
+                        "انقطع الاتصال قبل وصول التأكيد. أعد المحاولة؛ سنستخدم رقم الطلب نفسه لمنع تكرار الإعلان.");
                 refreshQuota();
             }
         });
+    }
+
+    private void showResultDialog(boolean success, String titleText, String messageText) {
+        final Dialog resultDialog = new Dialog(getContext());
+        resultDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout panel = new LinearLayout(getContext());
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(dp(22), dp(22), dp(22), dp(20));
+        GradientDrawable panelBg = new GradientDrawable();
+        panelBg.setColor(Color.WHITE);
+        panelBg.setCornerRadius(dp(22));
+        panel.setBackground(panelBg);
+
+        TextView mark = new TextView(getContext());
+        mark.setText(success ? "✓" : "!");
+        mark.setTextSize(28);
+        mark.setTypeface(Typeface.DEFAULT_BOLD);
+        mark.setTextColor(Color.WHITE);
+        mark.setGravity(Gravity.CENTER);
+        GradientDrawable markBg = new GradientDrawable();
+        markBg.setColor(success ? Color.rgb(38, 160, 105) : Color.rgb(210, 145, 45));
+        markBg.setShape(GradientDrawable.OVAL);
+        mark.setBackground(markBg);
+        panel.addView(mark, new LinearLayout.LayoutParams(dp(58), dp(58)));
+
+        TextView title = new TextView(getContext());
+        title.setText(titleText);
+        title.setTextColor(Color.rgb(38, 42, 50));
+        title.setTextSize(18);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        titleLp.topMargin = dp(15);
+        panel.addView(title, titleLp);
+
+        TextView message = new TextView(getContext());
+        message.setText(messageText);
+        message.setTextColor(Color.rgb(111, 117, 128));
+        message.setTextSize(13);
+        message.setGravity(Gravity.CENTER);
+        message.setLineSpacing(dp(3), 1f);
+        LinearLayout.LayoutParams messageLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        messageLp.topMargin = dp(8);
+        panel.addView(message, messageLp);
+
+        TextView ok = new TextView(getContext());
+        ok.setText("حسناً");
+        ok.setGravity(Gravity.CENTER);
+        ok.setTextColor(Color.WHITE);
+        ok.setTextSize(14);
+        ok.setTypeface(Typeface.DEFAULT_BOLD);
+        ok.setClickable(true);
+        GradientDrawable okBg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.rgb(157, 99, 25), Color.rgb(218, 163, 66)});
+        okBg.setCornerRadius(dp(13));
+        ok.setBackground(okBg);
+        LinearLayout.LayoutParams okLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, dp(46));
+        okLp.topMargin = dp(18);
+        panel.addView(ok, okLp);
+
+        resultDialog.setContentView(panel);
+        Window w = resultDialog.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawableResource(android.R.color.transparent);
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams p = new WindowManager.LayoutParams();
+            p.copyFrom(w.getAttributes());
+            p.width = (int) (getResources().getDisplayMetrics().widthPixels * .84f);
+            p.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            p.dimAmount = .58f;
+            w.setAttributes(p);
+        }
+        ok.setOnClickListener(v -> resultDialog.dismiss());
+        resultDialog.show();
+        if (w != null) w.setLayout((int) (getResources().getDisplayMetrics().widthPixels * .84f),
+                WindowManager.LayoutParams.WRAP_CONTENT);
     }
 
     private int dp(float value) { return (int) (value * getResources().getDisplayMetrics().density + .5f); }
