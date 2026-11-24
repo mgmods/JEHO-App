@@ -34,6 +34,9 @@ import com.google.gson.JsonObject;
 import com.bumptech.glide.Glide;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.util.TimeZone;
 
 public final class RoomAdvertisementTickerView extends FrameLayout implements RealtimeClient.UserListener {
     public static volatile boolean SEND_BUTTON_ENABLED = true;
@@ -138,8 +141,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 if (current != null && current.advertisement != null && current.config != null && current.config.enabled) {
                     long remaining = Math.max(0L, current.advertisement.displayDurationMs);
                     try {
-                        long serverNow = current.serverNow == null ? System.currentTimeMillis() : java.time.Instant.parse(current.serverNow).toEpochMilli();
-                        long startedAt = current.advertisement.startedAt == null ? serverNow : java.time.Instant.parse(current.advertisement.startedAt).toEpochMilli();
+                        long serverNow = parseIsoUtc(current.serverNow, System.currentTimeMillis());
+                        long startedAt = parseIsoUtc(current.advertisement.startedAt, serverNow);
                         remaining = current.advertisement.displayDurationMs - Math.max(0L, serverNow - startedAt);
                     } catch (Exception ignored) {}
                     final long remainingMs = remaining;
@@ -352,6 +355,16 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         }
         bg.setCornerRadius(dp(Math.max(0, radiusDp)));
         return bg;
+    }
+
+    private static long parseIsoUtc(String value, long fallback) {
+        if (value == null || value.trim().isEmpty()) return fallback;
+        try {
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+            format.setTimeZone(TimeZone.getTimeZone("UTC"));
+            java.util.Date parsed = format.parse(value);
+            return parsed == null ? fallback : parsed.getTime();
+        } catch (Exception ignored) { return fallback; }
     }
 
     private boolean isReduceMotionEnabled() {
