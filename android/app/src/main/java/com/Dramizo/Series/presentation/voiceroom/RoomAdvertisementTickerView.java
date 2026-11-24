@@ -46,6 +46,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private volatile AdvertisementDtos.Ticker config;
     private volatile String currentAdId = "";
     private ObjectAnimator activeAnimator;
+    private volatile boolean needsResume = false;
+    private boolean movingForPlacement = false;
+    private long currentDisplayBudgetMs = 9000L;
 
     public RoomAdvertisementTickerView(Context context) { this(context, null); }
     public RoomAdvertisementTickerView(Context context, @Nullable AttributeSet attrs) { this(context, attrs, 0); }
@@ -92,6 +95,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (attached.compareAndSet(true, false)) {
             RealtimeClient.getInstance().removeUserListener(this);
             cancelActiveAnimator();
+            if (!movingForPlacement) needsResume = true;
         }
         super.onDetachedFromWindow();
     }
@@ -132,7 +136,15 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                     config = current.config;
                 }
                 if (current != null && current.advertisement != null && current.config != null && current.config.enabled) {
-                    post(() -> showAdvertisement(current.advertisement, current.config));
+                    long remaining = Math.max(0L, current.advertisement.displayDurationMs);
+                    try {
+                        long serverNow = current.serverNow == null ? System.currentTimeMillis() : java.time.Instant.parse(current.serverNow).toEpochMilli();
+                        long startedAt = current.advertisement.startedAt == null ? serverNow : java.time.Instant.parse(current.advertisement.startedAt).toEpochMilli();
+                        remaining = current.advertisement.displayDurationMs - Math.max(0L, serverNow - startedAt);
+                    } catch (Exception ignored) {}
+                    final long remainingMs = remaining;
+                    if (remainingMs > 0L) post(() -> showAdvertisement(current.advertisement, current.config, remainingMs));
+                    else post(() -> { currentAdId = ""; setVisibility(GONE); });
                 } else if (current != null && current.config != null && !current.config.enabled) {
                     post(() -> setVisibility(GONE));
                 }
@@ -149,14 +161,21 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     }
 
     private void showAdvertisement(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
-        if (ad.id == null) return;
-        if (ad.id.equals(currentAdId)) {
+        showAdvertisement(ad, cfg, ad == null ? 0L : ad.displayDurationMs);
+    }
+
+    private void showAdvertisement(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, long remainingMs) {
+        if (ad == null || ad.id == null) return;
+        boolean sameAd = ad.id.equals(currentAdId);
+        if (sameAd && !needsResume) {
             config = cfg;
             bindConfig(cfg);
             return;
         }
         cancelActiveAnimator();
         currentAdId = ad.id;
+        needsResume = false;
+        currentDisplayBudgetMs = Math.max(250L, remainingMs);
         config = cfg;
         bindConfig(cfg);
         bindAd(ad);
@@ -225,7 +244,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setTranslationX(0f);
         if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
             text.setText(text.getText());
-            long visibleFor = Math.max(1000L, ad.displayDurationMs) + Math.max(0, cfg != null ? cfg.gapMs : 1800);
+            long visibleFor = Math.max(1000L, currentDisplayBudgetMs) + Math.max(0, cfg != null ? cfg.gapMs : 1800);
             postDelayed(() -> { if (ad.id.equals(currentAdId)) setVisibility(INVISIBLE); }, visibleFor);
             return;
         }
@@ -242,7 +261,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             float exitSpeed = safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120) * density;
             long requestedEntry = Math.max(250L, (long) ((distance / Math.max(1f, entrySpeed)) * 1000L));
             long requestedExit = Math.max(250L, (long) ((distance / Math.max(1f, exitSpeed)) * 1000L));
-            long budget = Math.max(1000L, ad.displayDurationMs > 0 ? ad.displayDurationMs : (cfg != null ? cfg.displayDurationMs : 9000));
+            long budget = Math.max(1000L, currentDisplayBudgetMs > 0 ? currentDisplayBudgetMs : (cfg != null ? cfg.displayDurationMs : 9000));
             long requestedTotal = requestedEntry + requestedExit;
             long entryDuration = requestedTotal > budget ? Math.max(250L, budget * requestedEntry / requestedTotal) : requestedEntry;
             long exitDuration = Math.max(250L, budget - entryDuration);
@@ -297,8 +316,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             }
         }
         if (current != target) {
+            movingForPlacement = true;
             parent.removeView(this);
             parent.addView(this, Math.max(0, Math.min(target, parent.getChildCount())));
+            movingForPlacement = false;
         }
     }
 
