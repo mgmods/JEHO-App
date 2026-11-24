@@ -23,6 +23,11 @@ import androidx.annotation.Nullable;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AdvertisementDtos;
 import com.Dramizo.Series.realtime.RealtimeClient;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.data.remote.dto.ApiResponse;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import com.google.gson.JsonObject;
 import com.squareup.picasso.Picasso;
 
@@ -71,6 +76,15 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         super.onAttachedToWindow();
         if (attached.compareAndSet(false, true)) {
             RealtimeClient.getInstance().addUserListener(this);
+            ContainerProvider.from(getContext()).getRoomApi().advertisementCurrent().enqueue(new Callback<ApiResponse<AdvertisementDtos.Current>>() {
+                @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Current>> call, Response<ApiResponse<AdvertisementDtos.Current>> response) {
+                    AdvertisementDtos.Current current = response.body() != null ? response.body().data : null;
+                    if (current != null && current.advertisement != null && current.config != null && current.config.enabled) {
+                        post(() -> showAdvertisement(current.advertisement, current.config));
+                    }
+                }
+                @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Current>> call, Throwable t) {}
+            });
         }
     }
 
