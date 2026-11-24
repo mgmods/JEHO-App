@@ -8,6 +8,11 @@
     <div v-else class="row g-3">
       <div class="col-12">
         <div class="glass p-3">
+          <div class="mb-3 p-3 rounded" :style="{background: form.background || 'linear-gradient(90deg,#21142d,#32184c)', opacity: Math.max(0.2, Math.min(1, (form.backgroundOpacity || 92)/100))}">
+            <div class="small">معاينة مباشرة</div>
+            <strong>{{ queue[0]?.senderName || 'اسم المرسل' }}</strong>
+            <span class="ms-2">{{ queue[0]?.text || 'نص الإعلان سيظهر هنا بشكل متحرك داخل التطبيق' }}</span>
+          </div>
           <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
               <h3 class="h6 mb-1">التحكم العام</h3>
@@ -79,6 +84,12 @@
             <div class="col-6"><label class="form-label small">النص sp</label><input v-model.number="form.textSp" type="number" class="form-control"></div>
             <div class="col-6"><label class="form-label small">لون الاسم</label><input v-model="form.nameColor" type="text" class="form-control" dir="ltr"></div>
             <div class="col-6"><label class="form-label small">لون النص</label><input v-model="form.textColor" type="text" class="form-control" dir="ltr"></div>
+            <div class="col-6"><label class="form-label small">لون/خلفية الشريط</label><input v-model="form.background" type="text" class="form-control" dir="ltr"></div>
+            <div class="col-6"><label class="form-label small">صورة الخلفية URL</label><input v-model="form.backgroundImage" type="text" class="form-control" dir="ltr"></div>
+            <div class="col-6"><label class="form-label small">شفافية الخلفية %</label><input v-model.number="form.backgroundOpacity" type="number" min="0" max="100" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">الزوايا dp</label><input v-model.number="form.radiusDp" type="number" min="0" max="40" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">المسافة dp</label><input v-model.number="form.spacingDp" type="number" min="0" max="30" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">شكل الصورة</label><select v-model="form.avatarShape" class="form-select"><option value="circle">دائرية</option><option value="square">مربعة</option></select></div>
           </div>
         </div>
       </div>
@@ -128,15 +139,16 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const loading=ref(true), saving=ref(false), savingWords=ref(false), error=ref(''), success=ref('')
 const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=7
-const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF})
+const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle'})
 function apply(data){ Object.assign(form,data||{}); }
 async function load(){
   loading.value=true; error.value=''
-  const [c,q,s]=await Promise.all([advertisementsApi.config(),advertisementsApi.queue({limit:100}),advertisementsApi.stats({days:statsDays})])
+  const [c,q,s,b]=await Promise.all([advertisementsApi.config(),advertisementsApi.queue({limit:100}),advertisementsApi.stats({days:statsDays}),advertisementsApi.bannedWords()])
   if(c.error){error.value=c.error.message||String(c.error);loading.value=false;return}
   apply(c.data?.data??c.data)
   queue.value=q.data?.items||q.data?.data?.items||[]
   stats.value=s.data?.data??s.data??{}
+  bannedWords.value=b.data?.words??b.data?.data?.words??''
   loading.value=false
 }
 async function save(){saving.value=true;const r=await advertisementsApi.saveConfig({...form});saving.value=false;if(r.error){error.value=r.error.message||String(r.error);return}success.value='تم حفظ إعدادات الإعلانات';apply(r.data?.data??r.data)}
