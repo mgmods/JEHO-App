@@ -404,6 +404,7 @@ export const advertisementsApi = {
   queue: (params) => safeRequest(() => api.get('/advertisements/admin/queue', { params })),
   stats: (params) => safeRequest(() => api.get('/advertisements/admin/stats', { params })),
   saveConfig: (data) => safeRequest(() => api.patch('/advertisements/admin/config', data)),
+  bannedWords: () => safeRequest(() => api.get('/advertisements/admin/banned-words')),
   saveBannedWords: (words) => safeRequest(() => api.patch('/advertisements/admin/banned-words', { words })),
   queueAction: (id, data) => safeRequest(() => api.patch(`/advertisements/admin/queue/${id}`, data)),
 }
