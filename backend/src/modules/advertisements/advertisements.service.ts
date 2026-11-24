@@ -234,8 +234,14 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     ['resetTimezone','template','position','direction','background','backgroundImage','avatarShape','nameColor','textColor','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
     if (!['default','sans','serif','mono'].includes(merged.fontFamily)) merged.fontFamily='default';
+    if (!['premium-v1','compact','gold'].includes(merged.template)) merged.template='premium-v1';
+    if (!['circle','square'].includes(merged.avatarShape)) merged.avatarShape='circle';
     if (!['safe-top','safe-bottom','custom-safe'].includes(merged.position)) merged.position='safe-bottom';
     if (!['rtl','ltr'].includes(merged.direction)) merged.direction='rtl';
+    try { new Intl.DateTimeFormat('en-US',{timeZone:merged.resetTimezone || 'UTC'}).format(new Date()); }
+    catch { throw new BadRequestException('منطقة التوقيت غير صالحة؛ استخدم اسم IANA مثل Asia/Riyadh'); }
+    if (merged.backgroundImage && !/^https?:\\/\\//i.test(merged.backgroundImage)) merged.backgroundImage='';
+    merged.backgroundImage=String(merged.backgroundImage||'').slice(0,2048);
     await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']);
     this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged);
     return merged;
