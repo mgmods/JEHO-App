@@ -67,3 +67,5 @@ export * from './badge.entity';
 export * from './user-badge.entity';
 
 export * from './custom-gift-grant.entity';
+
+export * from './advertisement.entity';
