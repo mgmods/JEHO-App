@@ -270,7 +270,9 @@ final class RoomMoreOperatorSheet {
 
     private static List<Item> buildToolItems(Host host) {
         List<Item> list = new ArrayList<>();
-        list.add(item(R.drawable.ic_asset_notice, "📢 إرسال إعلان", "send_advertisement"));
+        if (RoomAdvertisementTickerView.SEND_BUTTON_ENABLED) {
+            list.add(item(R.drawable.ic_asset_notice, "📢 إرسال إعلان", "send_advertisement"));
+        }
         boolean muted = host.roomSpeakerMuted();
         list.add(item(
                 muted ? R.drawable.mute_close : R.drawable.mute_open,
