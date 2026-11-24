@@ -92,8 +92,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const existing = await this.ads.findOne({where:{idempotencyKey:key}});
     if (existing) { await this.recordRejected(userId, text, 'duplicate', 'محاولة إرسال مكررة'); return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)}; }
 
-    const queuedCount = await this.ads.count({ where: { status: AdvertisementStatus.QUEUED } });
-    if (queuedCount >= Math.max(1, Math.floor(Number(c.maxQueueSize) || 500))) throw new ConflictException('طابور الإعلانات ممتلئ حالياً');
+    // Queue capacity is checked again under the same transaction/advisory lock below; the preliminary check only provides a fast rejection.
 
     const banned = await this.getBannedWords();
     const normalized = this.normalize(text);
@@ -111,6 +110,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       const count = Number((await qr.query('SELECT COUNT(*)::int AS count FROM "jeho_own"."room_advertisements" WHERE "senderId"=$1 AND "createdAt">=$2 AND "status" IN ($3,$4,$5)',[userId,start,AdvertisementStatus.QUEUED,AdvertisementStatus.PLAYING,AdvertisementStatus.COMPLETED]))?.[0]?.count || 0);
       const limit = Math.max(0,Math.floor(Number(c.dailyLimit)||0));
       if (count >= limit) throw new ConflictException('لقد وصلت إلى الحد اليومي للإعلانات');
+      const queueCount = Number((await qr.query('SELECT COUNT(*)::int AS count FROM "jeho_own"."room_advertisements" WHERE "status"=$1',[AdvertisementStatus.QUEUED]))?.[0]?.count || 0);
+      if (queueCount >= Math.max(1, Math.floor(Number(c.maxQueueSize) || 500))) throw new ConflictException('طابور الإعلانات ممتلئ حالياً');
 
       const user = await qr.manager.getRepository(User).findOne({where:{id:userId}});
       if (!user) throw new BadRequestException('الحساب غير موجود');
