@@ -65,6 +65,11 @@ public final class AdvertisementDtos {
         public Remaining remaining;
     }
 
+    public static class Current {
+        public Advertisement advertisement;
+        public Ticker config;
+    }
+
     public static class RealtimeEvent {
         public String type;
         public Advertisement advertisement;
