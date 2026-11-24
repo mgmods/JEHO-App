@@ -6,6 +6,8 @@ import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.LinearGradient;
+import android.graphics.Shader;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -34,6 +36,10 @@ import retrofit2.Callback;
 import retrofit2.Response;
 import com.google.gson.JsonObject;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
+import java.io.File;
+import com.Dramizo.Series.util.ApiOrigin;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.text.SimpleDateFormat;
@@ -57,6 +63,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private long animationGeneration = 0L;
     private volatile long serverClockOffsetMs = 0L;
     private volatile boolean serverClockKnown = false;
+    private CustomTarget<File> customFontTarget;
+    private volatile String loadedCustomFontUrl = "";
+    private volatile Typeface customTypeface;
 
     public RoomAdvertisementTickerView(Context context) { this(context, null); }
     public RoomAdvertisementTickerView(Context context, @Nullable AttributeSet attrs) { this(context, attrs, 0); }
@@ -103,6 +112,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (attached.compareAndSet(true, false)) {
             RealtimeClient.getInstance().removeUserListener(this);
             cancelActiveAnimator();
+            if (customFontTarget != null) { Glide.with(this).clear(customFontTarget); customFontTarget = null; }
             if (!movingForPlacement) needsResume = true;
         }
         super.onDetachedFromWindow();
@@ -241,11 +251,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         name.setTextColor(safeColor(cfg.nameColor, Color.WHITE));
         text.setTextSize(Math.max(9, cfg.textSp > 0 ? cfg.textSp : 13));
         text.setTextColor(safeColor(cfg.textColor, Color.WHITE));
-        Typeface face = "serif".equalsIgnoreCase(cfg.fontFamily) ? Typeface.SERIF
-                : "mono".equalsIgnoreCase(cfg.fontFamily) ? Typeface.MONOSPACE
-                : "sans".equalsIgnoreCase(cfg.fontFamily) ? Typeface.SANS_SERIF : Typeface.DEFAULT;
-        text.setTypeface(face);
-        name.setTypeface(face, Typeface.BOLD);
+        applyConfiguredTypeface(cfg);
+        applyConfiguredGradients(cfg);
         int spacing = dp(Math.max(0, cfg.spacingDp));
         FrameLayout.LayoutParams av = (FrameLayout.LayoutParams) avatar.getLayoutParams();
         av.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
@@ -274,6 +281,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private void bindAd(AdvertisementDtos.Advertisement ad) {
         name.setText(ad.senderName == null ? "عضو" : ad.senderName);
         text.setText(ad.text == null ? "" : ad.text);
+        if (config != null) applyConfiguredGradients(config);
         if (ad.senderImageUrl != null && !ad.senderImageUrl.trim().isEmpty()) {
             com.bumptech.glide.RequestBuilder<Drawable> request = Glide.with(this).load(ad.senderImageUrl).centerCrop()
                     .placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar);
@@ -283,6 +291,82 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             avatar.setImageResource(R.drawable.ic_default_avatar);
         }
         setVisibility(VISIBLE);
+    }
+
+    private String resolvedCustomFontUrl(AdvertisementDtos.Ticker cfg) {
+        if (cfg == null || cfg.customFontUrl == null || cfg.customFontUrl.trim().isEmpty()) return "";
+        String value = cfg.customFontUrl.trim();
+        return value.startsWith("/") ? ApiOrigin.origin() + value : value;
+    }
+
+    private void applyConfiguredTypeface(AdvertisementDtos.Ticker cfg) {
+        String family = cfg == null ? "default" : cfg.fontFamily;
+        Typeface face;
+        if ("custom".equalsIgnoreCase(family)) {
+            face = customTypeface != null ? customTypeface : Typeface.DEFAULT;
+            loadCustomTypeface(cfg);
+        } else {
+            if (customFontTarget != null) { Glide.with(this).clear(customFontTarget); customFontTarget = null; }
+            loadedCustomFontUrl = "";
+            customTypeface = null;
+            face = "serif".equalsIgnoreCase(family) ? Typeface.SERIF
+                    : "mono".equalsIgnoreCase(family) ? Typeface.MONOSPACE
+                    : "sans".equalsIgnoreCase(family) ? Typeface.SANS_SERIF : Typeface.DEFAULT;
+        }
+        text.setTypeface(face);
+        name.setTypeface(face, Typeface.BOLD);
+    }
+
+    private void loadCustomTypeface(AdvertisementDtos.Ticker cfg) {
+        final String url = resolvedCustomFontUrl(cfg);
+        if (url.isEmpty() || url.equals(loadedCustomFontUrl)) return;
+        loadedCustomFontUrl = url;
+        if (customFontTarget != null) Glide.with(this).clear(customFontTarget);
+        customFontTarget = new CustomTarget<File>() {
+            @Override public void onResourceReady(File resource, Transition<? super File> transition) {
+                if (config == null || !url.equals(resolvedCustomFontUrl(config))) return;
+                try {
+                    Typeface loaded = Typeface.createFromFile(resource);
+                    customTypeface = loaded;
+                    text.setTypeface(loaded);
+                    name.setTypeface(loaded, Typeface.BOLD);
+                    applyConfiguredGradients(config);
+                } catch (Exception ignored) {
+                    customTypeface = null;
+                }
+            }
+            @Override public void onLoadCleared(Drawable placeholder) {}
+            @Override public void onLoadFailed(Drawable errorDrawable) {
+                customTypeface = null;
+            }
+        };
+        Glide.with(this).asFile().load(url).into(customFontTarget);
+    }
+
+    private void applyConfiguredGradients(AdvertisementDtos.Ticker cfg) {
+        if (cfg == null) return;
+        applyGradient(name, cfg.nameGradientEnabled, cfg.nameGradientStartColor,
+                cfg.nameGradientEndColor, cfg.nameColor);
+        applyGradient(text, cfg.textGradientEnabled, cfg.textGradientStartColor,
+                cfg.textGradientEndColor, cfg.textColor);
+    }
+
+    private void applyGradient(TextView target, boolean enabled, String startColor,
+                               String endColor, String fallbackColor) {
+        target.getPaint().setShader(null);
+        if (!enabled) {
+            target.setTextColor(safeColor(fallbackColor, Color.WHITE));
+            target.invalidate();
+            return;
+        }
+        target.post(() -> {
+            int width = Math.max(1, target.getWidth());
+            int start = safeColor(startColor, Color.WHITE);
+            int end = safeColor(endColor, start);
+            target.getPaint().setShader(new LinearGradient(0f, 0f, width, 0f,
+                    start, end, Shader.TileMode.CLAMP));
+            target.invalidate();
+        });
     }
 
     private void animateTextIn(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, long generation) {
