@@ -319,7 +319,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     }
 
     private void applySafePlacement(String position, int customOffsetDp) {
-        setTranslationY("custom-safe".equalsIgnoreCase(position) ? dp(Math.max(-100, Math.min(100, customOffsetDp))) : 0f);
+        setTranslationY("custom-safe".equalsIgnoreCase(position) ? Math.round(Math.max(-100, Math.min(100, customOffsetDp)) * getResources().getDisplayMetrics().density) : 0f);
         if (!(getParent() instanceof LinearLayout)) return;
         LinearLayout parent = (LinearLayout) getParent();
         int current = parent.indexOfChild(this);
