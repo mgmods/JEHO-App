@@ -52,6 +52,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private volatile boolean needsResume = false;
     private boolean movingForPlacement = false;
     private long currentDisplayBudgetMs = 9000L;
+    private long animationGeneration = 0L;
     private volatile long serverClockOffsetMs = 0L;
     private volatile boolean serverClockKnown = false;
 
@@ -170,6 +171,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private void cancelActiveAnimator() {
         ObjectAnimator animator = activeAnimator;
         activeAnimator = null;
+        animationGeneration++;
         if (animator != null) animator.cancel();
         text.animate().cancel();
     }
@@ -193,7 +195,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         config = cfg;
         bindConfig(cfg);
         bindAd(ad);
-        animateTextIn(ad, cfg);
+        animateTextIn(ad, cfg, animationGeneration);
     }
 
     private void bindConfig(AdvertisementDtos.Ticker cfg) {
@@ -251,18 +253,18 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setVisibility(VISIBLE);
     }
 
-    private void animateTextIn(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
-        cancelActiveAnimator();
+    private void animateTextIn(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, long generation) {
         text.clearAnimation();
         text.setAlpha(1f);
         text.setTranslationX(0f);
         if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
             text.setText(text.getText());
             long visibleFor = Math.max(1000L, currentDisplayBudgetMs) + Math.max(0, cfg != null ? cfg.gapMs : 1800);
-            postDelayed(() -> { if (ad.id.equals(currentAdId)) setVisibility(INVISIBLE); }, visibleFor);
+            postDelayed(() -> { if (generation == animationGeneration && ad.id.equals(currentAdId)) setVisibility(INVISIBLE); }, visibleFor);
             return;
         }
         text.post(() -> {
+            if (generation != animationGeneration || !ad.id.equals(currentAdId)) return;
             int viewport = Math.max(1, textViewport.getWidth());
             int width = Math.max(1, text.getWidth());
             int distance = viewport + width;
@@ -289,15 +291,15 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             in.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
                     if (activeAnimator == in) activeAnimator = null;
-                    if (ad.id.equals(currentAdId)) animateTextAcross(ad, cfg, viewport, exitDuration);
+                    if (generation == animationGeneration && ad.id.equals(currentAdId)) animateTextAcross(ad, cfg, viewport, exitDuration, generation);
                 }
             });
             in.start();
         });
     }
 
-    private void animateTextAcross(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, int viewport, long exitDuration) {
-        if (!ad.id.equals(currentAdId)) return;
+    private void animateTextAcross(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, int viewport, long exitDuration, long generation) {
+        if (generation != animationGeneration || !ad.id.equals(currentAdId)) return;
         int width = Math.max(1, text.getWidth());
         boolean rtl = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction);
         float end = rtl ? -(viewport + width) : (viewport + width);
@@ -308,7 +310,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         out.addListener(new AnimatorListenerAdapter() {
             @Override public void onAnimationEnd(Animator animation) {
                 if (activeAnimator == out) activeAnimator = null;
-                if (ad.id.equals(currentAdId)) {
+                if (generation == animationGeneration && ad.id.equals(currentAdId)) {
                     setVisibility(INVISIBLE);
                 }
             }
