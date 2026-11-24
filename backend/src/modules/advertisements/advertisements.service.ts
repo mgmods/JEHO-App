@@ -294,7 +294,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   private containsBannedWord(text:string, banned:string){
     const term=Array.from(this.normalize(banned)).filter(ch=>/[\p{L}\p{N}]/u.test(ch));
     if(!term.length)return false;
-    const escaped=term.map(ch=>ch.replace(/[.*+?^${}()|[\]\\]/g,'\\  private normalize(input:string){return String(input||'').normalize('NFKC').toLocaleLowerCase('ar').replace(/[^\p{L}\p{N}]/gu,'').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/ة/g,'ه');}')).join('[^\\p{L}\\p{N}]*');
+    const escaped=term.join('[^\\p{L}\\p{N}]*');
     const pattern=new RegExp('(?<![\\p{L}\\p{N}])'+escaped+'(?![\\p{L}\\p{N}])','u');
     return pattern.test(this.normalize(text));
   }
