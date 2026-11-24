@@ -20,6 +20,8 @@ import android.widget.Toast;
 import com.Dramizo.Series.data.remote.dto.AdvertisementDtos;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.realtime.RealtimeClient;
+import com.google.gson.JsonObject;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -31,7 +33,7 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 /** Room-wide advertisement composer. All quota and permission decisions remain server-authoritative. */
-public final class RoomAdvertisementComposerView extends FrameLayout {
+public final class RoomAdvertisementComposerView extends FrameLayout implements RealtimeClient.UserListener {
     private final AtomicBoolean loading = new AtomicBoolean(false);
     private Button openButton;
     private int remaining = 0;
@@ -61,7 +63,35 @@ public final class RoomAdvertisementComposerView extends FrameLayout {
         addView(openButton, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(38), Gravity.CENTER));
         openButton.setOnClickListener(v -> openComposer());
         setVisibility(GONE);
+    }
+
+    @Override protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        RealtimeClient.getInstance().addUserListener(this);
         refreshQuota();
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        RealtimeClient.getInstance().removeUserListener(this);
+        super.onDetachedFromWindow();
+    }
+
+    @Override public void onConnected() { refreshQuota(); }
+    @Override public void onDisconnected() {}
+
+    @Override public void onUserEvent(String event, JsonObject payload) {
+        if (!"room:advertisement:config".equals(event) || payload == null) return;
+        try {
+            AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class);
+            if (next == null) return;
+            featureEnabled = next.enabled && next.sendButtonEnabled;
+            maxLength = next.maxTextLength > 0 ? next.maxTextLength : 180;
+            if (!featureEnabled) {
+                post(() -> setVisibility(GONE));
+            } else {
+                refreshRemaining();
+            }
+        } catch (Exception ignored) {}
     }
 
     private void refreshQuota() {
