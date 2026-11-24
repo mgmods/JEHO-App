@@ -1050,7 +1050,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
             nameRow.setLayoutParams(nameRowRaw);
 
-            View nameContainer = (View) holder.b.tvName.getParent();
+            // Reuse the nameContainer measured above; keep its width and set the row height.
             ViewGroup.LayoutParams nameContainerLp = nameContainer.getLayoutParams();
             nameContainerLp.height = scaleMode == SCALE_MICRO
                     ? Math.round(16 * d) : Math.round(22 * d);
