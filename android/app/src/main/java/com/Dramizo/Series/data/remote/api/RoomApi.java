@@ -3,6 +3,7 @@ package com.Dramizo.Series.data.remote.api;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
+import com.Dramizo.Series.data.remote.dto.AdvertisementDtos;
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.DELETE;
@@ -14,6 +15,16 @@ import retrofit2.http.Query;
 import java.util.Map;
 
 public interface RoomApi {
+
+    @GET("advertisements/config")
+    Call<ApiResponse<AdvertisementDtos.Config>> advertisementConfig();
+
+    @GET("advertisements/remaining")
+    Call<ApiResponse<AdvertisementDtos.Remaining>> advertisementRemaining();
+
+    @POST("advertisements")
+    Call<ApiResponse<AdvertisementDtos.CreateResponse>> createAdvertisement(@Body Map<String, String> body);
+
     @GET("rooms/music-library")
     Call<ApiResponse<RoomDtos.MusicLibraryDto>> musicLibrary();
 
