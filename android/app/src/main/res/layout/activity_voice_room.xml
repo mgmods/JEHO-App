@@ -754,6 +754,16 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Globally synchronized advertisement ticker. GONE means it occupies no room space. -->
+    <com.Dramizo.Series.presentation.voiceroom.RoomAdvertisementTickerView
+        android:id="@+id/roomAdvertisementTicker"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerSeats"
         android:layout_width="0dp"
@@ -767,7 +777,7 @@
         android:paddingBottom="6dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
+        app:layout_constraintTop_toBottomOf="@id/roomAdvertisementTicker" />
 
     <!-- Top supporters under seats — Mikoo cascade: count + overlapping circles.
          Extra top margin so avatars clear seat 9/10 number badges. -->
