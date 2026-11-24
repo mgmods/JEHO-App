@@ -18,7 +18,7 @@ import android.widget.Toast;
 
 import com.Dramizo.Series.data.remote.dto.AdvertisementDtos;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
-import com.Dramizo.Series.data.remote.ContainerProvider;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
 
 import java.util.HashMap;
 import java.util.Map;
