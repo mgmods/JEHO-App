@@ -42,6 +42,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
     private boolean featureEnabled = false;
     // Reuse this key whenever the request outcome is uncertain; the backend deduplicates it.
     private String pendingIdempotencyKey;
+    private String pendingIdempotencyText;
 
     public RoomAdvertisementComposerView(Context context, AttributeSet attrs) { this(context); }
     public RoomAdvertisementComposerView(Context context, AttributeSet attrs, int defStyleAttr) { this(context); }
@@ -352,7 +353,10 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         openButton.setEnabled(false);
         Map<String, String> body = new HashMap<>();
         body.put("text", text);
-        if (pendingIdempotencyKey == null) pendingIdempotencyKey = UUID.randomUUID().toString();
+        if (pendingIdempotencyKey == null || !text.equals(pendingIdempotencyText)) {
+            pendingIdempotencyKey = UUID.randomUUID().toString();
+            pendingIdempotencyText = text;
+        }
         body.put("idempotencyKey", pendingIdempotencyKey);
         ContainerProvider.from(getContext()).getRoomApi().createAdvertisement(body)
                 .enqueue(new Callback<ApiResponse<AdvertisementDtos.CreateResponse>>() {
@@ -370,6 +374,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                         remaining = Math.max(0, remaining - 1);
                     }
                     pendingIdempotencyKey = null;
+                    pendingIdempotencyText = null;
                     dialog.dismiss();
                     refreshQuota();
                     showResultDialog(true, "تم إرسال الإعلان بنجاح",
@@ -396,7 +401,10 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                         }
                     } catch (Exception ignored) {}
                     // Client errors are definitive. Keep the key on 5xx: commit outcome may be uncertain.
-                    if (response.code() >= 400 && response.code() < 500) pendingIdempotencyKey = null;
+                    if (response.code() >= 400 && response.code() < 500) {
+                        pendingIdempotencyKey = null;
+                        pendingIdempotencyText = null;
+                    }
                     showResultDialog(false, "لم يتم إرسال الإعلان", message);
                     refreshQuota();
                 }
