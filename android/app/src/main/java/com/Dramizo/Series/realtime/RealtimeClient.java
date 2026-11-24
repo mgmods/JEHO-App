@@ -172,6 +172,7 @@ public class RealtimeClient {
             socket.on("room:slot_ended", onSlotEnded);
             socket.on("room:gift_sounds", onRoomGiftSounds);
             socket.on("room:display_settings", onRoomDisplaySettings);
+            socket.on("room:advertisement", args -> dispatchUserEvent("room:advertisement", args));
             socket.on("task:progress", onTaskProgress);
             socket.on("contest:score", onContestScore);
             socket.on("contest:pk-status", args -> dispatchUserEvent("contest:pk-status", args));
