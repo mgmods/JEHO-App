@@ -10873,15 +10873,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int activeRoomFeed = 0; // 0 = all activity, 1 = text chat, 2 = gifts only
 
     /**
-     * Raises only the room feed tabs for the compact 10/15/20/30-seat layouts.
-     * No size, order, behavior, or other room controls are changed.
+     * Keep the room feed tabs in normal layout flow. Their position must not
+     * depend on seat-count animations or gift/coin updates.
      */
     private void applyRoomFeedTabsSeatOffset() {
         if (binding == null || binding.rowOfficialNews == null) return;
-        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
-        int seatCount = room != null ? room.seatCount : 0;
-        float raiseDp = (seatCount == 10 || seatCount == 15 || seatCount == 20 || seatCount == 30) ? 12f : 0f;
-        binding.rowOfficialNews.setTranslationY(-raiseDp * getResources().getDisplayMetrics().density);
+        binding.rowOfficialNews.setTranslationY(0f);
     }
 
     private void initRoomFeedTabs() {
@@ -18340,12 +18337,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         int rows = guestCount <= 0 ? 1 : (guestCount + columns - 1) / columns;
-        // Match measured SeatAdapter cell height (avatar frame + name + vertical padding).
-        // The old 64/74/84dp estimates were too short for the actual 76dp seat frame,
-        // so the last row was clipped/overlapped by the supporter and relationship layers.
-        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 76
-                : scale == SeatAdapter.SCALE_COMPACT ? 82
-                : scale == SeatAdapter.SCALE_MEDIUM ? 88 : 98;
+        // Reserve the full measured seat footprint, including the name and the
+        // always-reserved coin-counter line. This prevents the final grid row from
+        // being clipped when all seats are configured and occupied.
+        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 92
+                : scale == SeatAdapter.SCALE_COMPACT ? 104
+                : scale == SeatAdapter.SCALE_MEDIUM ? 110 : 122;
         int totalHeightPx = dp(rows * rowHeightDp + 4);
         // 30-mic rooms stay fully visible as a six-column/five-row grid.
         boolean largeSeatGrid = guestCount > 20;
@@ -18368,7 +18365,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (topRaw instanceof ViewGroup.MarginLayoutParams topLp) {
                 // On 30-seat rooms, give the supporter stack a little more clearance
                 // below the final seat row without moving the room bottom controls.
-                topLp.topMargin = dp(largeSeatGrid ? 22 : 28);
+                topLp.topMargin = dp(largeSeatGrid ? 14 : 16);
                 binding.rowTopHosts.setLayoutParams(topLp);
             }
         }
