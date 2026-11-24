@@ -463,11 +463,15 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 lp.topMargin = 0;
                 lp.bottomMargin = 0;
             } else if ("safe-top".equalsIgnoreCase(position)) {
+                lp.leftToLeft = ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.rightToRight = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.topMargin = dp(68);
                 lp.horizontalBias = 0.5f;
                 lp.verticalBias = 0f;
             } else {
+                lp.leftToLeft = ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.rightToRight = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.bottomToTop = R.id.bottomBar;
                 lp.bottomMargin = "custom-safe".equalsIgnoreCase(position)
                         ? dp(Math.max(0, 76 - customOffsetDp)) : dp(6);
