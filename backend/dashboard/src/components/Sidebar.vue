@@ -109,6 +109,7 @@ const sections = computed(() => [
     items: [
       { name: 'rooms', icon: 'bi-mic', label: t('nav.rooms') },
       { name: 'support-chest', icon: 'bi-box2-heart', label: 'صندوق الدعم' },
+      { name: 'advertisements', icon: 'bi-megaphone-fill', label: 'إعلانات الغرفة', module: 'settings' },
       {
         name: 'settings',
         query: { tab: 'zego' },
