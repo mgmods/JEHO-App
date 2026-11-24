@@ -397,3 +397,13 @@ export const medalsApi = {
   grant: (id, payload) => safeRequest(() => api.post(`/admin/badges/${id}/grant`, payload)),
   grantAll: (id, payload) => safeRequest(() => api.post(`/admin/badges/${id}/grant-all`, payload)),
 }
+
+
+export const advertisementsApi = {
+  config: () => safeRequest(() => api.get('/advertisements/config')),
+  queue: (params) => safeRequest(() => api.get('/advertisements/admin/queue', { params })),
+  stats: (params) => safeRequest(() => api.get('/advertisements/admin/stats', { params })),
+  saveConfig: (data) => safeRequest(() => api.patch('/advertisements/admin/config', data)),
+  saveBannedWords: (words) => safeRequest(() => api.patch('/advertisements/admin/banned-words', { words })),
+  queueAction: (id, data) => safeRequest(() => api.patch(`/advertisements/admin/queue/${id}`, data)),
+}
