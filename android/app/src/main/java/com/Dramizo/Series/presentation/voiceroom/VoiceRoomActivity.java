@@ -10880,7 +10880,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding == null || binding.rowOfficialNews == null) return;
         RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
         int seatCount = room != null ? room.seatCount : 0;
-        float raiseDp = (seatCount == 10 || seatCount == 15 || seatCount == 20 || seatCount == 30) ? 4f : 0f;
+        float raiseDp = (seatCount == 10 || seatCount == 15 || seatCount == 20 || seatCount == 30) ? 12f : 0f;
         binding.rowOfficialNews.setTranslationY(-raiseDp * getResources().getDisplayMetrics().density);
     }
 
