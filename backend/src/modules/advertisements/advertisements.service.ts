@@ -24,6 +24,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   private leaderRunner: QueryRunner | null = null;
   private nextLeadershipCheckAt = 0;
   private nextLeaderHealthAt = 0;
+  private leaderJustAcquired = false;
 
   constructor(
     @InjectRepository(Advertisement) private readonly ads: Repository<Advertisement>,
@@ -62,6 +63,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       const rows = await runner.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired', ['voice-room-ad-worker']);
       if (rows?.[0]?.acquired === true || rows?.[0]?.acquired === 't') {
         this.leaderRunner = runner;
+        this.leaderJustAcquired = true;
         this.log.log('This API instance is the active global room-advertisement worker.');
         return true;
       }
@@ -194,7 +196,17 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     this.busy=true;
     try {
       const c=await this.config();
-      if(c.enabled!==true || c.paused===true)return;
+      if(c.enabled!==true)return;
+      if(this.leaderJustAcquired){
+        this.leaderJustAcquired=false;
+        const recovered=await this.ads.findOne({where:{status:AdvertisementStatus.PLAYING},order:{startedAt:'ASC'}});
+        if(recovered){
+          const serverNow=new Date();
+          const remaining=this.bound(recovered.displayDurationMs,1000,120000,9000)-(serverNow.getTime()-(recovered.startedAt?.getTime()||serverNow.getTime()));
+          if(remaining>0)this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(recovered),config:c,at:(recovered.startedAt||serverNow).toISOString(),serverNow:serverNow.toISOString(),recovered:true});
+        }
+      }
+      if(c.paused===true)return;
       const now=Date.now();
       const current=await this.ads.findOne({where:{status:AdvertisementStatus.PLAYING},order:{startedAt:'ASC'}});
       if(current){
@@ -215,7 +227,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         if(!next){await qr.commitTransaction();return;}
         next.status=AdvertisementStatus.PLAYING; next.startedAt=new Date(); next.displayDurationMs=this.bound(next.displayDurationMs,1000,120000,9000);
         await qr.manager.save(next); await qr.commitTransaction();
-        this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(next),config:c,at:next.startedAt.toISOString()});
+        this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(next),config:c,at:next.startedAt.toISOString(),serverNow:new Date().toISOString()});
       }catch(e){await qr.rollbackTransaction();}finally{await qr.release();}
     }catch(e){this.log.warn('Advertisement tick failed: '+String((e as any)?.message||e));}
     finally{this.busy=false;}
