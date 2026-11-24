@@ -52,6 +52,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private volatile boolean needsResume = false;
     private boolean movingForPlacement = false;
     private long currentDisplayBudgetMs = 9000L;
+    private volatile long serverClockOffsetMs = 0L;
+    private volatile boolean serverClockKnown = false;
 
     public RoomAdvertisementTickerView(Context context) { this(context, null); }
     public RoomAdvertisementTickerView(Context context, @Nullable AttributeSet attrs) { this(context, attrs, 0); }
@@ -123,7 +125,14 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (!payload.has("advertisement") || !payload.get("advertisement").isJsonObject()) return;
         AdvertisementDtos.RealtimeEvent ev = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.RealtimeEvent.class);
         if (ev == null || ev.advertisement == null || !"start".equals(ev.type)) return;
-        post(() -> showAdvertisement(ev.advertisement, ev.config));
+        long remaining = ev.advertisement.displayDurationMs;
+        if (serverClockKnown && ev.at != null) {
+            long serverNow = System.currentTimeMillis() + serverClockOffsetMs;
+            long startedAt = parseIsoUtc(ev.at, serverNow);
+            remaining = ev.advertisement.displayDurationMs - Math.max(0L, serverNow - startedAt);
+        }
+        final long remainingMs = remaining;
+        if (remainingMs > 0L) post(() -> showAdvertisement(ev.advertisement, ev.config, remainingMs));
     }
 
     @Override public void onConnected() { refreshCurrent(); }
@@ -142,6 +151,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                     long remaining = Math.max(0L, current.advertisement.displayDurationMs);
                     try {
                         long serverNow = parseIsoUtc(current.serverNow, System.currentTimeMillis());
+                        serverClockOffsetMs = serverNow - System.currentTimeMillis();
+                        serverClockKnown = true;
                         long startedAt = parseIsoUtc(current.advertisement.startedAt, serverNow);
                         remaining = current.advertisement.displayDurationMs - Math.max(0L, serverNow - startedAt);
                     } catch (Exception ignored) {}
