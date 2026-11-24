@@ -232,10 +232,11 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 : "mono".equalsIgnoreCase(cfg.fontFamily) ? Typeface.MONOSPACE
                 : "sans".equalsIgnoreCase(cfg.fontFamily) ? Typeface.SANS_SERIF : Typeface.DEFAULT;
         text.setTypeface(face);
+        name.setTypeface(face, Typeface.BOLD);
         int spacing = dp(Math.max(0, cfg.spacingDp));
         FrameLayout.LayoutParams av = (FrameLayout.LayoutParams) avatar.getLayoutParams();
         av.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
-        av.leftMargin = Math.max(0, spacing + signedDp(cfg.avatarOffsetXDp));
+        av.leftMargin = spacing + signedDp(cfg.avatarOffsetXDp);
         av.rightMargin = 0;
         avatar.setLayoutParams(av);
         avatar.setTranslationY(signedDp(cfg.avatarOffsetYDp));
@@ -244,13 +245,13 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         FrameLayout.LayoutParams nm = (FrameLayout.LayoutParams) name.getLayoutParams();
         nm.width = nameWidth;
         nm.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
-        nm.leftMargin = Math.max(0, spacing + dp(cfg.avatarDp) + spacing + signedDp(cfg.nameOffsetXDp));
+        nm.leftMargin = spacing + dp(cfg.avatarDp) + spacing + signedDp(cfg.nameOffsetXDp);
         name.setLayoutParams(nm);
         name.setTranslationY(signedDp(cfg.nameOffsetYDp));
 
         FrameLayout.LayoutParams vp = (FrameLayout.LayoutParams) textViewport.getLayoutParams();
         vp.gravity = Gravity.CENTER_VERTICAL;
-        vp.leftMargin = Math.max(0, spacing + dp(cfg.avatarDp) + spacing + nameWidth + signedDp(cfg.textOffsetXDp));
+        vp.leftMargin = spacing + dp(cfg.avatarDp) + spacing + nameWidth + signedDp(cfg.textOffsetXDp);
         vp.rightMargin = spacing;
         vp.width = cfg.textWidthDp > 0 ? dp(cfg.textWidthDp) : ViewGroup.LayoutParams.MATCH_PARENT;
         textViewport.setLayoutParams(vp);
