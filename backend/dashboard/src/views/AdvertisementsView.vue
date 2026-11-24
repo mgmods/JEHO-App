@@ -11,10 +11,10 @@
           <div class="mb-3 p-3 rounded" :style="{background: form.background || 'linear-gradient(90deg,#21142d,#32184c)', backgroundImage: form.backgroundImage ? 'url(' + form.backgroundImage + ')' : undefined, backgroundSize: 'cover', backgroundPosition: 'center', minHeight: form.heightDp + 'px', borderRadius: form.radiusDp + 'px', padding: form.spacingDp + 'px'}">
             <div class="small mb-1">معاينة مباشرة</div>
             <div class="d-flex align-items-center gap-2">
-              <img v-if="queue[0]?.senderImageUrl" :src="queue[0].senderImageUrl" :style="{width:form.avatarDp+'px',height:form.avatarDp+'px',borderRadius:form.avatarShape==='circle'?'50%':'6px',objectFit:'cover'}" alt="صورة المرسل">
-              <div v-else class="d-flex align-items-center justify-content-center bg-secondary" :style="{width:form.avatarDp+'px',height:form.avatarDp+'px',borderRadius:form.avatarShape==='circle'?'50%':'6px'}">👤</div>
-              <strong :style="{color:form.nameColor,fontSize:form.nameSp+'px'}">{{ queue[0]?.senderName || 'اسم المرسل' }}</strong>
-              <span class="ms-2" :style="{color:form.textColor,fontSize:form.textSp+'px',fontFamily:form.fontFamily}">{{ queue[0]?.text || 'نص الإعلان سيظهر هنا بشكل متحرك داخل التطبيق' }}</span>
+              <img v-if="queue[0]?.senderImageUrl" :src="queue[0].senderImageUrl" :style="{width:form.avatarDp+'px',height:form.avatarDp+'px',borderRadius:form.avatarShape==='circle'?'50%':'6px',objectFit:'cover',transform:'translate('+form.avatarOffsetXDp+'px,'+form.avatarOffsetYDp+'px)'}" alt="صورة المرسل">
+              <div v-else class="d-flex align-items-center justify-content-center bg-secondary" :style="{width:form.avatarDp+'px',height:form.avatarDp+'px',borderRadius:form.avatarShape==='circle'?'50%':'6px',transform:'translate('+form.avatarOffsetXDp+'px,'+form.avatarOffsetYDp+'px)'}">👤</div>
+              <strong :style="{color:form.nameColor,fontSize:form.nameSp+'px',width:form.nameWidthDp+'px',transform:'translate('+form.nameOffsetXDp+'px,'+form.nameOffsetYDp+'px)',fontFamily:form.fontFamily==='serif'?'serif':form.fontFamily==='mono'?'monospace':'sans-serif'}">{{ queue[0]?.senderName || 'اسم المرسل' }}</strong>
+              <span class="ms-2" :style="{color:form.textColor,fontSize:form.textSp+'px',fontFamily:form.fontFamily==='serif'?'serif':form.fontFamily==='mono'?'monospace':'sans-serif',transform:'translate('+form.textOffsetXDp+'px,'+form.textOffsetYDp+'px)',maxWidth:form.textWidthDp>0?form.textWidthDp+'px':'none'}">{{ queue[0]?.text || 'نص الإعلان سيظهر هنا بشكل متحرك داخل التطبيق' }}</span>
             </div>
           </div>
           <div class="d-flex justify-content-between align-items-center mb-3">
