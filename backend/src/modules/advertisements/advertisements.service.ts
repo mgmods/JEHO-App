@@ -208,7 +208,13 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async adminStats(days=7){
-    const sql='SELECT COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL \\'1 day\\'))::int AS total, COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL \\'1 day\\') AND status=\\'completed\\')::int AS displayed, COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL \\'1 day\\') AND status=\\'rejected\\')::int AS rejected, COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL \\'1 day\\') AND rejectionCode=\\'blocked_word\\')::int AS blockedWordAttempts FROM "jeho_own"."room_advertisements"';
+    const sql = `SELECT
+      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day'))::int AS total,
+      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND status='completed')::int AS displayed,
+      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND status='rejected')::int AS rejected,
+      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND rejectionCode='blocked_word')::int AS blockedWordAttempts,
+      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND rejectionCode='duplicate')::int AS duplicateAttempts
+      FROM "jeho_own"."room_advertisements"`;
     return (await this.db.query(sql,[days]))?.[0]||{};
   }
 
