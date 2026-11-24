@@ -101,7 +101,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             try {
                 AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class);
                 config = next;
-                if (next != null) SEND_BUTTON_ENABLED = next.sendButtonEnabled;
+                if (next != null) SEND_BUTTON_ENABLED = next.enabled && next.sendButtonEnabled;
                 if (next != null && !next.enabled) {
                     currentAdId = "";
                     cancelActiveAnimator();
@@ -128,7 +128,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Current>> call, Response<ApiResponse<AdvertisementDtos.Current>> response) {
                 AdvertisementDtos.Current current = response.body() != null ? response.body().data : null;
                 if (current != null && current.config != null) {
-                    SEND_BUTTON_ENABLED = current.config.sendButtonEnabled;
+                    SEND_BUTTON_ENABLED = current.config.enabled && current.config.sendButtonEnabled;
                     config = current.config;
                 }
                 if (current != null && current.advertisement != null && current.config != null && current.config.enabled) {
