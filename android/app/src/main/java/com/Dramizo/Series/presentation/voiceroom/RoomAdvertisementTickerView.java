@@ -155,7 +155,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (ad.senderImageUrl != null && !ad.senderImageUrl.trim().isEmpty()) {
             Picasso.get().load(ad.senderImageUrl).fit().centerCrop().into(avatar);
         } else {
-            avatar.setImageResource(R.drawable.ic_asset_profile);
+            avatar.setImageResource(R.drawable.ic_default_avatar);
         }
         if (config != null && "square".equalsIgnoreCase(config.avatarShape)) {
             avatar.setBackground(null);
