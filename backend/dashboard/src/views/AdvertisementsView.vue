@@ -11,7 +11,8 @@
           <div class="mb-3 p-3 rounded" :style="{background: form.background || 'linear-gradient(90deg,#21142d,#32184c)', backgroundImage: form.backgroundImage ? 'url(' + form.backgroundImage + ')' : undefined, backgroundSize: 'cover', backgroundPosition: 'center', minHeight: form.heightDp + 'px', borderRadius: form.radiusDp + 'px', padding: form.spacingDp + 'px'}">
             <div class="small mb-1">معاينة مباشرة</div>
             <div class="d-flex align-items-center gap-2">
-              <img :src="queue[0]?.senderImageUrl || '/assets/default-avatar.png'" :style="{width:form.avatarDp+'px',height:form.avatarDp+'px',borderRadius:form.avatarShape==='circle'?'50%':'6px',objectFit:'cover'}" alt="صورة المرسل">
+              <img v-if="queue[0]?.senderImageUrl" :src="queue[0].senderImageUrl" :style="{width:form.avatarDp+'px',height:form.avatarDp+'px',borderRadius:form.avatarShape==='circle'?'50%':'6px',objectFit:'cover'}" alt="صورة المرسل">
+              <div v-else class="d-flex align-items-center justify-content-center bg-secondary" :style="{width:form.avatarDp+'px',height:form.avatarDp+'px',borderRadius:form.avatarShape==='circle'?'50%':'6px'}">👤</div>
               <strong :style="{color:form.nameColor,fontSize:form.nameSp+'px'}">{{ queue[0]?.senderName || 'اسم المرسل' }}</strong>
               <span class="ms-2" :style="{color:form.textColor,fontSize:form.textSp+'px',fontFamily:form.fontFamily}">{{ queue[0]?.text || 'نص الإعلان سيظهر هنا بشكل متحرك داخل التطبيق' }}</span>
             </div>
