@@ -19,6 +19,7 @@ const DEFAULT_CONFIG: any = {
   customFontUrl: '', customFontName: '', spacingDp: 8,
   avatarOffsetXDp: 0, avatarOffsetYDp: 0, nameOffsetXDp: 0, nameOffsetYDp: 0, nameWidthDp: 90,
   textOffsetXDp: 0, textOffsetYDp: 0, textWidthDp: 0,
+  positionXPercent: 50, positionYPercent: 52,
 };
 
 @Injectable()
@@ -244,7 +245,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c=await this.config();
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
-    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
+    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic','nameGradientEnabled','textGradientEnabled'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
     ['resetTimezone','template','position','direction','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
@@ -256,7 +257,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     }
     if (!['premium-v1','compact','gold'].includes(merged.template)) merged.template='premium-v1';
     if (!['circle','square'].includes(merged.avatarShape)) merged.avatarShape='circle';
-    if (!['safe-top','safe-bottom','custom-safe'].includes(merged.position)) merged.position='safe-bottom';
+    if (!['safe-top','safe-bottom','custom-safe','free'].includes(merged.position)) merged.position='safe-bottom';
     if (!['rtl','ltr'].includes(merged.direction)) merged.direction='rtl';
     try { new Intl.DateTimeFormat('en-US',{timeZone:merged.resetTimezone || 'UTC'}).format(new Date()); }
     catch { throw new BadRequestException('منطقة التوقيت غير صالحة؛ استخدم اسم IANA مثل Asia/Riyadh'); }
