@@ -1,5 +1,6 @@
 name: Android Universal APK
 # JEHO Stories build validation pipeline
+# Final validation marker 2026-11-24
 # Compile and release both validate the same current MG-JEHO Android source.
 
 on:
