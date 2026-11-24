@@ -354,6 +354,16 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     private void applySafePlacement(String position, int customOffsetDp) {
         setTranslationY("custom-safe".equalsIgnoreCase(position) ? Math.round(Math.max(-100, Math.min(100, customOffsetDp)) * getResources().getDisplayMetrics().density) : 0f);
+        if (getParent() instanceof FrameLayout) {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
+            if (lp != null) {
+                lp.gravity = ("safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position))
+                        ? (Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL)
+                        : (Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+                setLayoutParams(lp);
+            }
+            return;
+        }
         if (getParent() instanceof ConstraintLayout) {
             ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) getLayoutParams();
             if (lp != null) {
