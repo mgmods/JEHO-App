@@ -291,7 +291,7 @@ const routes = [
         path: 'advertisements',
         name: 'advertisements',
         component: () => import('@/views/AdvertisementsView.vue'),
-        meta: { title: 'إدارة إعلانات الرومات', module: 'settings' },
+        meta: { title: 'إدارة إعلانات الرومات', module: 'rooms' },
       },
       {
         path: 'settings',
