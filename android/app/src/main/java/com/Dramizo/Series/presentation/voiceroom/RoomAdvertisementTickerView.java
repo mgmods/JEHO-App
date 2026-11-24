@@ -191,7 +191,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 : "mono".equalsIgnoreCase(cfg.fontFamily) ? Typeface.MONOSPACE
                 : "sans".equalsIgnoreCase(cfg.fontFamily) ? Typeface.SANS_SERIF : Typeface.DEFAULT;
         text.setTypeface(face);
-        int spacing = dp(Math.max(4, cfg.spacingDp > 0 ? cfg.spacingDp : 8));
+        int spacing = dp(Math.max(0, cfg.spacingDp));
         FrameLayout.LayoutParams av = (FrameLayout.LayoutParams) avatar.getLayoutParams();
         av.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
         av.leftMargin = spacing; av.rightMargin = 0; avatar.setLayoutParams(av);
@@ -221,6 +221,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private void animateTextIn(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
         cancelActiveAnimator();
         text.clearAnimation();
+        text.setAlpha(1f);
         text.setTranslationX(0f);
         if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
             text.setText(text.getText());
