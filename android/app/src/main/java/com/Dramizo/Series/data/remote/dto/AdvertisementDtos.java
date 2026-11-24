@@ -79,5 +79,7 @@ public final class AdvertisementDtos {
         public Advertisement advertisement;
         public Ticker config;
         public String at;
+        public String serverNow;
+        public boolean recovered;
     }
 }
