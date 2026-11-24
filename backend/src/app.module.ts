@@ -426,6 +426,53 @@ const entityList = Object.values(entities).filter(
               );
             }
     
+            // Global voice-room advertisements: additive, idempotent schema bootstrap.
+            // This runs under the shared JEHO schema advisory lock and never synchronizes existing tables.
+            console.log('[JEHO-OWN DB STEP] room_advertisements: start');
+            try {
+              await schemaLockRunner.query(`
+                CREATE TABLE IF NOT EXISTS "jeho_own"."room_advertisements" (
+                  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                  "senderId" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE CASCADE,
+                  "senderName" varchar(128) NOT NULL,
+                  "senderImageUrl" varchar(512),
+                  "text" varchar(500) NOT NULL,
+                  "status" varchar(16) NOT NULL DEFAULT 'queued',
+                  "queueOrder" bigint NOT NULL DEFAULT 0,
+                  "startedAt" timestamptz,
+                  "completedAt" timestamptz,
+                  "nextEligibleAt" timestamptz,
+                  "rejectionCode" varchar(64),
+                  "rejectionReason" varchar(255),
+                  "idempotencyKey" varchar(128),
+                  "displayTemplateId" varchar(64),
+                  "displayDurationMs" integer NOT NULL DEFAULT 9000,
+                  "createdAt" timestamptz NOT NULL DEFAULT now(),
+                  "updatedAt" timestamptz NOT NULL DEFAULT now()
+                )
+              `);
+              await schemaLockRunner.query('CREATE INDEX IF NOT EXISTS "idx_room_ads_queue" ON "jeho_own"."room_advertisements" ("status","queueOrder","createdAt")');
+              await schemaLockRunner.query('CREATE INDEX IF NOT EXISTS "idx_room_ads_sender_day" ON "jeho_own"."room_advertisements" ("senderId","createdAt")');
+              await schemaLockRunner.query('CREATE UNIQUE INDEX IF NOT EXISTS "uq_room_ads_idempotency" ON "jeho_own"."room_advertisements" ("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL');
+              await schemaLockRunner.query(`
+                INSERT INTO "jeho_own"."app_settings" ("id","key","value","description","createdAt","updatedAt")
+                SELECT gen_random_uuid(),'voice_room_ads_config',
+                  '{"enabled":true,"sendButtonEnabled":true,"paused":false,"dailyLimit":1,"maxQueueSize":500,"maxTextLength":180,"resetTimezone":"UTC","displayDurationMs":9000,"gapMs":1800,"entrySpeedPxPerSec":120,"exitSpeedPxPerSec":120,"reducedMotionStatic":true,"template":"premium-v1","position":"safe-bottom","direction":"rtl","background":"#21142d","backgroundImage":"","backgroundOpacity":92,"radiusDp":18,"heightDp":48,"avatarDp":34,"avatarShape":"circle","nameSp":12,"textSp":13,"nameColor":"#FFD98A","textColor":"#FFFFFF","spacingDp":8}',
+                  'Voice room advertising live configuration',NOW(),NOW()
+                WHERE NOT EXISTS (SELECT 1 FROM "jeho_own"."app_settings" WHERE "key"='voice_room_ads_config')
+              `);
+              await schemaLockRunner.query(`
+                INSERT INTO "jeho_own"."app_settings" ("id","key","value","description","createdAt","updatedAt")
+                SELECT gen_random_uuid(),'voice_room_ads_banned_words','',
+                  'Voice room advertising banned words, comma-separated',NOW(),NOW()
+                WHERE NOT EXISTS (SELECT 1 FROM "jeho_own"."app_settings" WHERE "key"='voice_room_ads_banned_words')
+              `);
+              console.log('[JEHO-OWN DB STEP] room_advertisements: complete');
+            } catch (error) {
+              schemaMaintenanceHadFailure = true;
+              console.error('[AdvertisementsBootstrap] Could not initialize advertisement tables/settings.', error instanceof Error ? error.message : String(error));
+            }
+
             // Safe startup diagnostics: identify the connected database/schema without logging credentials.
             console.log('[JEHO-OWN DB STEP] final database diagnostics: start');
             const [connectionInfo] = await appDataSource.query(
@@ -509,6 +556,7 @@ const entityList = Object.values(entities).filter(
     ModerationModule,
     BadgesModule,
     MomentsModule,
+    AdvertisementsModule,
   ],
   providers: [
     PostgresLockMonitorService,
